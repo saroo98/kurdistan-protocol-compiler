@@ -27,10 +27,17 @@ func (i *Interpreter) State() string {
 }
 
 func (i *Interpreter) Apply(message string) error {
+	return i.ApplyAuthenticated(message, false)
+}
+
+func (i *Interpreter) ApplyAuthenticated(message string, authenticated bool) error {
 	for _, tr := range i.profile.Transitions {
 		if tr.From == i.state && tr.OnMessage == message {
 			if tr.Role != i.role {
 				return fmt.Errorf("transition %q requires role %q", message, tr.Role)
+			}
+			if tr.RequiresAuth && !authenticated {
+				return fmt.Errorf("transition %q requires authenticated proof", message)
 			}
 			i.state = tr.To
 			return nil
@@ -82,7 +89,7 @@ func RunFirstContactPath(p *ir.Profile) ([]string, error) {
 		if active.state != step.FromState {
 			active.state = step.FromState
 		}
-		if err := active.Apply(step.Message); err != nil {
+		if err := active.ApplyAuthenticated(step.Message, step.Proof); err != nil {
 			return nil, err
 		}
 		client.state = step.ToState
