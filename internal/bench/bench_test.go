@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"kurdistan/internal/compiler"
+	"kurdistan/internal/diversity"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/padding"
 	"kurdistan/internal/relay"
 	"kurdistan/internal/scheduler"
+	ktrace "kurdistan/internal/trace"
 )
 
 func BenchmarkProfileGeneration(b *testing.B) {
@@ -19,6 +21,48 @@ func BenchmarkProfileGeneration(b *testing.B) {
 		if _, err := compiler.Generate(int64(i + 1)); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkCorpusGeneration1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		if _, err := diversity.GenerateProfiles(int64(i*1000+1), 1000); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDiversityAnalysis100(b *testing.B) {
+	profiles, err := diversity.GenerateProfiles(1, 100)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = diversity.AnalyzeProfiles(profiles)
+	}
+}
+
+func BenchmarkPairwiseProfileCompare(b *testing.B) {
+	a, _ := compiler.Generate(1)
+	c, _ := compiler.Generate(2)
+	for i := 0; i < b.N; i++ {
+		_ = diversity.CompareProfileStructure(a, c)
+	}
+}
+
+func BenchmarkTraceScan100(b *testing.B) {
+	traces := make([][]ktrace.Event, 0, 100)
+	for i := 0; i < 100; i++ {
+		traces = append(traces, []ktrace.Event{
+			{ProfileID: "kp", EventType: "first_contact", State: "s0", FrameBytes: 20 + i%7},
+			{ProfileID: "kp", EventType: "first_contact", State: "s1", FrameBytes: 30 + i%11},
+			{ProfileID: "kp", EventType: "frame", Semantic: "data", FrameBytes: 50 + i%13, PaddingBytes: i % 5, SchedulerMode: "balanced"},
+		})
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ktrace.ScanTraces(traces, ktrace.DefaultStabilityThreshold)
 	}
 }
 
