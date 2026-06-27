@@ -11,6 +11,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "compare" {
+		os.Exit(runCompare(os.Args[2:]))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "adversary" {
 		os.Exit(runAdversary(os.Args[2:]))
 	}
@@ -24,6 +27,7 @@ func runAudit(args []string) int {
 	full := flags.Bool("full", false, "run full local audit")
 	out := flags.String("out", "", "optional audit JSON output path")
 	status := flags.String("status", "", "optional STATUS.md output path")
+	baseline := flags.String("baseline", "", "optional baseline audit JSON for longitudinal comparison")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	traces := flags.Int("traces", 0, "optional trace count override")
@@ -50,11 +54,23 @@ func runAudit(args []string) int {
 	}
 	cfg.OutputPath = *out
 	cfg.StatusPath = *status
+	cfg.BaselinePath = *baseline
 
 	report, err := audit.Run(context.Background(), cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	comparisonPassed := true
+	if cfg.BaselinePath != "" {
+		oldReport, err := audit.LoadReport(cfg.BaselinePath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		comparison := audit.CompareReports(oldReport, report, audit.DefaultComparisonThresholds())
+		report.BaselineComparison = &comparison
+		comparisonPassed = comparison.Passed
 	}
 	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -65,7 +81,40 @@ func runAudit(args []string) int {
 		return 1
 	}
 	fmt.Print(report.HumanSummary())
-	if !report.Passed() {
+	if report.BaselineComparison != nil {
+		fmt.Print(report.BaselineComparison.HumanSummary())
+	}
+	if !report.Passed() || !comparisonPassed {
+		return 1
+	}
+	return 0
+}
+
+func runCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old audit JSON path")
+	newPath := flags.String("new", "", "new audit JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldReport, err := audit.LoadReport(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReport, err := audit.LoadReport(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	comparison := audit.CompareReports(oldReport, newReport, audit.DefaultComparisonThresholds())
+	fmt.Print(comparison.HumanSummary())
+	if !comparison.Passed {
 		return 1
 	}
 	return 0
