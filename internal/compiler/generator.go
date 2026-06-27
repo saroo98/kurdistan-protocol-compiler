@@ -137,7 +137,7 @@ func buildStateMachine(rng *rand.Rand, pattern contactPattern) ([]ir.State, []ir
 		}
 		states = append(states, ir.State{ID: next, Role: ir.RoleShared})
 		message := fmt.Sprintf("fc_%02d_%s", i, randomSymbol(rng, 5))
-		wire := "w_" + randomSymbol(rng, 10)
+		wire := randomWireSymbol(rng, 12)
 		proof := i == len(pattern.Roles)-1
 		if proof {
 			proofMessage = message
@@ -149,7 +149,7 @@ func buildStateMachine(rng *rand.Rand, pattern contactPattern) ([]ir.State, []ir
 			WireSymbol:  wire,
 			FromState:   current,
 			ToState:     next,
-			PayloadSize: payloadSizeForStep(rng, proof),
+			PayloadSize: payloadSizeForStep(rng, proof, i == 0 && role == ir.RoleClient),
 			Proof:       proof,
 			Decoy:       pattern.Decoy != nil && pattern.Decoy[i],
 		}
@@ -182,7 +182,7 @@ func generatedMessages(rng *rand.Rand) []ir.MessageSymbol {
 	for _, semantic := range ir.RelaySemantics() {
 		messages = append(messages, ir.MessageSymbol{
 			Semantic:       semantic,
-			WireSymbol:     "w_" + randomSymbol(rng, 12),
+			WireSymbol:     randomWireSymbol(rng, 14),
 			Direction:      "bidirectional",
 			MinPayloadSize: 0,
 			MaxPayloadSize: 2 * 1024 * 1024,
@@ -235,11 +235,15 @@ func directionForRole(role string) string {
 	return "server_to_client"
 }
 
-func payloadSizeForStep(rng *rand.Rand, proof bool) int {
+func payloadSizeForStep(rng *rand.Rand, proof, firstClient bool) int {
 	if proof {
 		return 32
 	}
-	return 12 + rng.Intn(40)
+	size := 12 + rng.Intn(40)
+	if firstClient && size < 16 {
+		size = 16
+	}
+	return size
 }
 
 func profileID(seed int64) string {
@@ -265,5 +269,14 @@ func randomSymbol(rng *rand.Rand, n int) string {
 			continue
 		}
 		return symbol
+	}
+}
+
+func randomWireSymbol(rng *rand.Rand, n int) string {
+	for {
+		symbol := randomSymbol(rng, n)
+		if len(symbol) > 0 && symbol[0] != 'w' {
+			return symbol
+		}
 	}
 }

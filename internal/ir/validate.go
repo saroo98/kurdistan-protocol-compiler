@@ -146,6 +146,15 @@ func validateStates(p *Profile) error {
 			return fmt.Errorf("invalid first-contact step")
 		}
 	}
+	if len(p.FirstContact.Steps) > 0 {
+		first := p.FirstContact.Steps[0]
+		if first.Role != RoleClient {
+			return fmt.Errorf("first-contact must begin with client")
+		}
+		if first.PayloadSize < p.Auth.NonceBytes {
+			return fmt.Errorf("first-contact nonce payload is too small")
+		}
+	}
 	return nil
 }
 
