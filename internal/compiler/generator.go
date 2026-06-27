@@ -1,0 +1,269 @@
+package compiler
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"strings"
+
+	"kurdistan/internal/ir"
+)
+
+func Generate(seed int64) (*ir.Profile, error) {
+	rng := rand.New(rand.NewSource(seed))
+	id := profileID(seed)
+	pattern := firstContactPatterns()[rng.Intn(len(firstContactPatterns()))]
+	states, transitions, steps, proofMessage := buildStateMachine(rng, pattern)
+
+	lengthModes := []string{"varint_prefix", "fixed_2_prefix", "fixed_4_prefix", "length_suffix_lab"}
+	typeModes := []string{"explicit_generated_tag", "derived_from_state", "derived_from_header_order", "table_indexed_symbol"}
+	headerOrders := [][]string{
+		{"length", "type", "stream", "flags"},
+		{"type", "length", "flags", "stream"},
+		{"stream", "type", "length", "flags"},
+		{"flags", "stream", "type", "length"},
+	}
+	fragmentModes := []string{"no_fragmentation_for_small_payloads", "fixed_size_chunks", "bounded_variable_chunks", "scheduler_controlled_chunks"}
+	paddingPlacements := []string{"none", "prefix", "suffix", "inter_frame", "probabilistic"}
+
+	schedulerModes := []string{"max_speed", "balanced", "interactive_first", "bulk_first"}
+	mode := schedulerModes[rng.Intn(len(schedulerModes))]
+	scheduler := schedulerForMode(rng, mode)
+	placement := paddingPlacements[rng.Intn(len(paddingPlacements))]
+
+	p := &ir.Profile{
+		Version: ir.SupportedVersion,
+		ID:      id,
+		Seed:    seed,
+		RolePolicy: ir.RolePolicy{
+			ClientRole: ir.RoleClient,
+			ServerRole: ir.RoleServer,
+		},
+		Carrier:     ir.CarrierSpec{Type: "lab_tcp"},
+		States:      states,
+		Transitions: transitions,
+		FirstContact: ir.FirstContactSpec{
+			PatternID:       pattern.Name,
+			StartState:      states[0].ID,
+			RelayReadyState: states[len(states)-2].ID,
+			Steps:           steps,
+		},
+		Messages: generatedMessages(rng),
+		FrameGrammar: ir.FrameGrammar{
+			LengthMode:        lengthModes[rng.Intn(len(lengthModes))],
+			TypeMode:          typeModes[rng.Intn(len(typeModes))],
+			HeaderOrder:       headerOrders[rng.Intn(len(headerOrders))],
+			FragmentationMode: fragmentModes[rng.Intn(len(fragmentModes))],
+			ChecksumMode:      []string{"none", "crc32"}[rng.Intn(2)],
+			PaddingPlacement:  placement,
+		},
+		Auth: ir.AuthSpec{
+			Mode:         "hmac-sha256-transcript-test-only",
+			KeyID:        "test-only-" + randomSymbol(rng, 5),
+			TestKeyHex:   testKeyHex(seed, id),
+			NonceBytes:   16,
+			ProofMessage: proofMessage,
+		},
+		Scheduler: scheduler,
+		Padding:   paddingForPlacement(rng, placement),
+		InvalidInput: ir.InvalidInputPolicy{
+			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
+			MalformedFrame:      []string{"close", "ignore", "delayed_close", "generated_malformed_response"}[rng.Intn(4)],
+			FailedAuth:          []string{"close", "delayed_close", "decoy_path", "fixed_local_only_rejection"}[rng.Intn(4)],
+			Replay:              []string{"close", "delayed_close", "reject_nonce", "ordinary_error_shaped_response"}[rng.Intn(4)],
+			DelayMsMin:          rng.Intn(10),
+			DelayMsMax:          10 + rng.Intn(40),
+		},
+		Limits: ir.SafetyLimits{
+			MaxFrameBytes:    64 * 1024,
+			MaxPayloadBytes:  2 * 1024 * 1024,
+			MaxStates:        32,
+			MaxTransitions:   64,
+			MaxSessionMillis: 30000,
+		},
+	}
+	hash, err := ir.CanonicalHash(p)
+	if err != nil {
+		return nil, err
+	}
+	p.GenerationHash = hash
+	if err := ir.Validate(p); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func ValidateDeterministic(p *ir.Profile) error {
+	if p == nil {
+		return fmt.Errorf("nil profile")
+	}
+	regen, err := Generate(p.Seed)
+	if err != nil {
+		return err
+	}
+	if regen.GenerationHash != p.GenerationHash || regen.ID != p.ID {
+		return fmt.Errorf("profile is not deterministic under seed %d", p.Seed)
+	}
+	return nil
+}
+
+type contactPattern struct {
+	Name  string
+	Roles []string
+	Decoy map[int]bool
+}
+
+func firstContactPatterns() []contactPattern {
+	return []contactPattern{
+		{Name: "C-S-C-PROOF", Roles: []string{ir.RoleClient, ir.RoleServer, ir.RoleClient}},
+		{Name: "C-C-S-PROOF", Roles: []string{ir.RoleClient, ir.RoleClient, ir.RoleServer, ir.RoleClient}},
+		{Name: "C-S-S-PROOF", Roles: []string{ir.RoleClient, ir.RoleServer, ir.RoleServer, ir.RoleClient}},
+		{Name: "C-DECOY-C-S-PROOF", Roles: []string{ir.RoleClient, ir.RoleServer, ir.RoleClient, ir.RoleServer, ir.RoleClient}, Decoy: map[int]bool{1: true}},
+	}
+}
+
+func buildStateMachine(rng *rand.Rand, pattern contactPattern) ([]ir.State, []ir.Transition, []ir.FirstContactStep, string) {
+	statePrefix := "s_" + randomSymbol(rng, 5)
+	states := []ir.State{{ID: statePrefix + "_start", Role: ir.RoleShared}}
+	transitions := make([]ir.Transition, 0, len(pattern.Roles))
+	steps := make([]ir.FirstContactStep, 0, len(pattern.Roles))
+	current := states[0].ID
+	proofMessage := ""
+	for i, role := range pattern.Roles {
+		next := fmt.Sprintf("%s_%02d_%s", statePrefix, i, randomSymbol(rng, 4))
+		if i == len(pattern.Roles)-1 {
+			next = statePrefix + "_relay_ready"
+		}
+		states = append(states, ir.State{ID: next, Role: ir.RoleShared})
+		message := fmt.Sprintf("fc_%02d_%s", i, randomSymbol(rng, 5))
+		wire := "w_" + randomSymbol(rng, 10)
+		proof := i == len(pattern.Roles)-1
+		if proof {
+			proofMessage = message
+		}
+		step := ir.FirstContactStep{
+			Role:        role,
+			Direction:   directionForRole(role),
+			Message:     message,
+			WireSymbol:  wire,
+			FromState:   current,
+			ToState:     next,
+			PayloadSize: payloadSizeForStep(rng, proof),
+			Proof:       proof,
+			Decoy:       pattern.Decoy != nil && pattern.Decoy[i],
+		}
+		steps = append(steps, step)
+		transitions = append(transitions, ir.Transition{
+			From:         current,
+			To:           next,
+			Role:         role,
+			OnMessage:    message,
+			EmitsMessage: message,
+			RequiresAuth: proof,
+			Description:  "generated first-contact transition",
+		})
+		current = next
+	}
+	states = append(states, ir.State{ID: statePrefix + "_terminal", Role: ir.RoleShared, Terminal: true})
+	transitions = append(transitions, ir.Transition{
+		From:         current,
+		To:           statePrefix + "_terminal",
+		Role:         ir.RoleClient,
+		OnMessage:    "session_close",
+		EmitsMessage: "session_close",
+		Description:  "generated terminal transition",
+	})
+	return states, transitions, steps, proofMessage
+}
+
+func generatedMessages(rng *rand.Rand) []ir.MessageSymbol {
+	messages := make([]ir.MessageSymbol, 0, len(ir.RelaySemantics()))
+	for _, semantic := range ir.RelaySemantics() {
+		messages = append(messages, ir.MessageSymbol{
+			Semantic:       semantic,
+			WireSymbol:     "w_" + randomSymbol(rng, 12),
+			Direction:      "bidirectional",
+			MinPayloadSize: 0,
+			MaxPayloadSize: 2 * 1024 * 1024,
+		})
+	}
+	return messages
+}
+
+func schedulerForMode(rng *rand.Rand, mode string) ir.SchedulerPolicy {
+	flush := 0
+	switch mode {
+	case "max_speed":
+		flush = rng.Intn(6)
+	case "balanced":
+		flush = 5 + rng.Intn(16)
+	case "interactive_first":
+		flush = 1 + rng.Intn(10)
+	case "bulk_first":
+		flush = 10 + rng.Intn(31)
+	}
+	return ir.SchedulerPolicy{
+		Mode:              mode,
+		MaxBatchBytes:     []int{4 * 1024, 8 * 1024, 16 * 1024, 32 * 1024}[rng.Intn(4)],
+		FlushIntervalMs:   flush,
+		MaxInFlightFrames: []int{4, 8, 16, 32}[rng.Intn(4)],
+		PriorityMode:      map[string]string{"max_speed": "fifo", "balanced": "mixed", "interactive_first": "small_first", "bulk_first": "large_first"}[mode],
+	}
+}
+
+func paddingForPlacement(rng *rand.Rand, placement string) ir.PaddingPolicy {
+	if placement == "none" {
+		return ir.PaddingPolicy{Mode: "none"}
+	}
+	minPad := rng.Intn(8)
+	maxPad := minPad + 8 + rng.Intn(48)
+	switch placement {
+	case "probabilistic":
+		return ir.PaddingPolicy{Mode: "probabilistic", MinPaddingBytes: minPad, MaxPaddingBytes: maxPad, Probability: 0.5}
+	case "inter_frame":
+		return ir.PaddingPolicy{Mode: "inter_frame", MinPaddingBytes: minPad, MaxPaddingBytes: maxPad, Probability: 1}
+	default:
+		return ir.PaddingPolicy{Mode: "bounded", MinPaddingBytes: minPad, MaxPaddingBytes: maxPad, Probability: 1}
+	}
+}
+
+func directionForRole(role string) string {
+	if role == ir.RoleClient {
+		return "client_to_server"
+	}
+	return "server_to_client"
+}
+
+func payloadSizeForStep(rng *rand.Rand, proof bool) int {
+	if proof {
+		return 32
+	}
+	return 12 + rng.Intn(40)
+}
+
+func profileID(seed int64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("kurdistan-profile:%d", seed)))
+	return "kp_" + hex.EncodeToString(sum[:])[:16]
+}
+
+func testKeyHex(seed int64, id string) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("test-only-key:%s:%d", id, seed)))
+	return hex.EncodeToString(sum[:])
+}
+
+func randomSymbol(rng *rand.Rand, n int) string {
+	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+	for {
+		buf := make([]byte, n)
+		for i := range buf {
+			buf[i] = alphabet[rng.Intn(len(alphabet))]
+		}
+		symbol := string(buf)
+		upper := strings.ToUpper(symbol)
+		if strings.Contains(upper, "HELLO") || strings.Contains(upper, "AUTH") || strings.Contains(upper, "OPEN") || strings.Contains(upper, "KURD") || strings.Contains(upper, "VPN") || strings.Contains(upper, "PROXY") || strings.Contains(upper, "CONNECT") {
+			continue
+		}
+		return symbol
+	}
+}
