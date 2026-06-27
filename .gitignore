@@ -1,0 +1,10 @@
+*.exe
+*.test
+*.out
+*.log
+.tools/
+coverage.txt
+profiles/examples/*.json
+testdata/traces/*.jsonl
+!profiles/examples/.gitkeep
+!testdata/traces/.gitkeep
