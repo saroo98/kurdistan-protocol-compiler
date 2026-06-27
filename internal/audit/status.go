@@ -94,16 +94,43 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintf(&b, "- `different_profile_separation_ratio_delta`: `%.3f`\n", comparison.MetricDeltas.DifferentProfileSeparation)
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Generated Source Backend")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "generated_backend_codegen"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderGateDetail(&b, gate, "generated_module_count")
+		renderGateDetail(&b, gate, "generated_tests_run")
+		renderGateDetail(&b, gate, "interpreted_traces_checked")
+		renderGateDetail(&b, gate, "generated_traces_checked")
+		renderGateDetail(&b, gate, "round_trip_exercised_by")
+		renderNamedGateResult(&b, report.Gates, "generated_semantic_equivalence")
+		renderNamedGateResult(&b, report.Gates, "generated_profile_diversity")
+		renderNamedGateResult(&b, report.Gates, "generated_fixed_signature")
+		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
+		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
+			fmt.Fprintf(&b, "- `semantic_equivalence`: `%s`\n", summary.SemanticEquivalence)
+			fmt.Fprintf(&b, "- `generated_profile_diversity`: `%s`\n", summary.GeneratedProfileDiversity)
+			fmt.Fprintf(&b, "- `fixed_signature`: `%s`\n", summary.FixedSignature)
+			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
+			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
+		}
+	} else {
+		fmt.Fprintln(&b, "- Generated-backend audit was not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck codegen --quick` for generated source checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Single-stream loopback-only runtime.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
+	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
 	fmt.Fprintln(&b, "- The audit detects local regressions; it cannot prove undetectability or real-world robustness.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 6 should focus on richer lab-only malformed-session corpora, longitudinal fixture curation, and clearer explanations for gate failures.")
+	fmt.Fprintln(&b, "Milestone 7 should focus on generated-backend trace comparison depth, richer lab-only malformed-session corpora, and clearer explanations for gate failures.")
 	return b.String()
 }
 
@@ -145,6 +172,18 @@ func renderGateDetail(b *strings.Builder, gate GateResult, key string) {
 	if value, ok := gate.Details[key]; ok {
 		fmt.Fprintf(b, "- `%s`: `%v`\n", key, value)
 	}
+}
+
+func renderNamedGateResult(b *strings.Builder, gates []GateResult, name string) {
+	gate, ok := gateByName(gates, name)
+	if !ok {
+		return
+	}
+	result := "failed"
+	if gate.Passed {
+		result = "passed"
+	}
+	fmt.Fprintf(b, "- `%s`: `%s`\n", name, result)
 }
 
 func toJSONMap(value any) map[string]any {

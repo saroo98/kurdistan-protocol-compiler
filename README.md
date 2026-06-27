@@ -54,6 +54,45 @@ go run ./cmd/kclient \
 
 The client sends the message through the generated protocol to the local server, the server relays only to the local echo target, and the client verifies the echoed response. Payload contents are not logged.
 
+## Generated Source Backend
+
+Generate a lab-only profile-specific Go module from a validated profile:
+
+```bash
+go run ./cmd/kgen \
+  --profile profiles/examples/profile-12345.json \
+  --out .generated/profile-12345
+```
+
+Use `--force` to overwrite generated files in an existing output directory:
+
+```bash
+go run ./cmd/kgen --profile profiles/examples/profile-12345.json --out .generated/profile-12345 --force
+```
+
+Build and test the generated module:
+
+```bash
+cd .generated/profile-12345
+go test ./...
+```
+
+Run the generated loopback-only commands in separate terminals:
+
+```bash
+go run ./cmd/generated-echo --listen 127.0.0.1:9100
+go run ./cmd/generated-server --listen 127.0.0.1:7100 --target 127.0.0.1:9100
+go run ./cmd/generated-client --server 127.0.0.1:7100 --message "hello generated"
+```
+
+Generated client and server commands accept `--trace out.jsonl` for payload-free trace events. Generated modules also include a self-contained trace runner:
+
+```bash
+go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json
+```
+
+Generated output is ignored under `.generated/` and is intended for local lab inspection only.
+
 ## Traces
 
 Both `kclient` and `kserver` accept `--trace out.jsonl`. Trace events include metadata such as state, semantic operation, frame sizes, padding sizes, and scheduler mode. Traces never include payload bytes, keys, proofs, raw frames, external destinations, or personal data.
@@ -102,6 +141,16 @@ Run the adversarial black-box clustering analysis directly:
 go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck adversary --quick --out testdata/audit/adversary.json
 ```
+
+Run the optional generated-backend audit:
+
+```bash
+go run ./cmd/kcheck codegen --quick
+go run ./cmd/kcheck codegen --full --out testdata/audit/codegen.json
+go run ./cmd/kcheck codegen --quick --status STATUS.md
+```
+
+The generated-backend audit checks semantic equivalence against the interpreted runtime, generated trace diversity across profiles, fixed-signature regressions, mutant detection, and generated source scanner results.
 
 Compare audit reports for longitudinal regressions:
 
