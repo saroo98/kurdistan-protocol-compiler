@@ -1,0 +1,100 @@
+package audit
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/diversity"
+	"kurdistan/internal/ir"
+	"kurdistan/internal/labtrace"
+	ktrace "kurdistan/internal/trace"
+)
+
+func BenchmarkQuickAudit(b *testing.B) {
+	cfg := DefaultConfig("quick")
+	for i := 0; i < b.N; i++ {
+		if _, err := Run(context.Background(), cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkFullAuditCore(b *testing.B) {
+	cfg := DefaultConfig("full")
+	cfg.TraceCount = 10
+	for i := 0; i < b.N; i++ {
+		if _, err := Run(context.Background(), cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGateEvaluation(b *testing.B) {
+	profiles, err := diversity.GenerateProfiles(1, 100)
+	if err != nil {
+		b.Fatal(err)
+	}
+	corpus := diversity.SummarizeCorpus(1, profiles)
+	rawTraces := makeTraceCorpusForBench(b, profiles[:10])
+	scan := ktrace.ScanTraces(rawTraces, ktrace.DefaultStabilityThreshold)
+	thresholds := DefaultThresholds()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ProfileCorpusDiversityGate(corpus, thresholds)
+		_ = BlackBoxTraceDiversityGate(scan, thresholds)
+		_ = FixedSignatureGate(profiles, rawTraces, thresholds)
+		_ = AdversarialBlackBoxClusteringGate(context.Background(), profiles, rawTraces, thresholds)
+		_ = MalformedProbeBehaviorGate(profiles, thresholds)
+	}
+}
+
+func BenchmarkAdversarialGateQuick(b *testing.B) {
+	profiles, err := diversity.GenerateProfiles(1, 30)
+	if err != nil {
+		b.Fatal(err)
+	}
+	rawTraces := makeTraceCorpusForBench(b, profiles[:10])
+	thresholds := DefaultThresholds()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = AdversarialBlackBoxClusteringGate(context.Background(), profiles, rawTraces, thresholds)
+	}
+}
+
+func BenchmarkStatusRendering(b *testing.B) {
+	report, err := Run(context.Background(), AuditConfig{
+		Mode:         "quick",
+		StartSeed:    1,
+		ProfileCount: 20,
+		TraceCount:   5,
+		Thresholds: func() AuditThresholds {
+			t := DefaultThresholds()
+			t.MinInvalidInputCombinations = 3
+			t.MinFrameGrammarCombinations = 3
+			t.MinSchedulerCombinations = 3
+			t.MinPaddingCombinations = 2
+			t.MinDifferentTraceSeparationRatio = 0.4
+			return t
+		}(),
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = RenderStatus(report)
+	}
+}
+
+func makeTraceCorpusForBench(b *testing.B, profiles []*ir.Profile) [][]ktrace.Event {
+	b.Helper()
+	traces := make([][]ktrace.Event, 0, len(profiles))
+	for _, p := range profiles {
+		events, err := labtrace.CaptureTrace(context.Background(), p, []byte("hello kurdistan"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		traces = append(traces, events)
+	}
+	return traces
+}
