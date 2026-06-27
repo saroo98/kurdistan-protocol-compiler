@@ -1,0 +1,125 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+
+	"kurdistan/internal/adversary"
+	"kurdistan/internal/audit"
+)
+
+func main() {
+	if len(os.Args) > 1 && os.Args[1] == "adversary" {
+		os.Exit(runAdversary(os.Args[2:]))
+	}
+	os.Exit(runAudit(os.Args[1:]))
+}
+
+func runAudit(args []string) int {
+	flags := flag.NewFlagSet("kcheck", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local audit")
+	full := flags.Bool("full", false, "run full local audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
+	profiles := flags.Int("profiles", 0, "optional profile count override")
+	traces := flags.Int("traces", 0, "optional trace count override")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	if *startSeed != 0 {
+		cfg.StartSeed = *startSeed
+	}
+	if *profiles != 0 {
+		cfg.ProfileCount = *profiles
+	}
+	if *traces != 0 {
+		cfg.TraceCount = *traces
+	}
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+
+	report, err := audit.Run(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runAdversary(args []string) int {
+	flags := flag.NewFlagSet("kcheck adversary", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local adversary analysis")
+	full := flags.Bool("full", false, "run full local adversary analysis")
+	out := flags.String("out", "", "optional adversary JSON output path")
+	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
+	profiles := flags.Int("profiles", 0, "optional profile count override")
+	traces := flags.Int("traces", 0, "optional trace count override")
+	controls := flags.Int("controls", 0, "optional synthetic control count override")
+	threshold := flags.Float64("threshold", 0, "optional clustering threshold override")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := adversary.DefaultAnalysisConfig(mode)
+	if *startSeed != 0 {
+		cfg.StartSeed = *startSeed
+	}
+	if *profiles != 0 {
+		cfg.ProfileCount = *profiles
+	}
+	if *traces != 0 {
+		cfg.TraceCount = *traces
+	}
+	if *controls != 0 {
+		cfg.ControlCount = *controls
+	}
+	if *threshold != 0 {
+		cfg.ClusterThreshold = *threshold
+	}
+	report, err := adversary.RunLocalAnalysis(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := adversary.WriteJSON(*out, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
