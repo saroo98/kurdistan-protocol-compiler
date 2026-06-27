@@ -8,6 +8,7 @@ import (
 
 	"kurdistan/internal/auth"
 	"kurdistan/internal/compiler"
+	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 )
 
@@ -22,6 +23,8 @@ func main() {
 		err = generate(os.Args[2:])
 	case "validate":
 		err = validate(os.Args[2:])
+	case "corpus":
+		err = corpus(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -89,6 +92,43 @@ func validate(args []string) error {
 	return nil
 }
 
+func corpus(args []string) error {
+	fs := flag.NewFlagSet("corpus", flag.ContinueOnError)
+	startSeed := fs.Int64("start-seed", 1, "first deterministic seed")
+	count := fs.Int("count", 1000, "number of profiles to generate")
+	out := fs.String("out", "testdata/corpus/summary.json", "summary JSON path")
+	writeProfiles := fs.Bool("write-profiles", false, "write full profile JSON files next to the summary")
+	profilesDir := fs.String("profiles-dir", "", "optional directory for --write-profiles")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	profiles, err := diversity.GenerateProfiles(*startSeed, *count)
+	if err != nil {
+		return err
+	}
+	summary := diversity.SummarizeCorpus(*startSeed, profiles)
+	if err := diversity.WriteCorpusSummary(*out, summary); err != nil {
+		return err
+	}
+	if *writeProfiles {
+		dir := *profilesDir
+		if dir == "" {
+			dir = filepath.Join(filepath.Dir(*out), "profiles")
+		}
+		if err := diversity.WriteProfiles(dir, profiles); err != nil {
+			return err
+		}
+	}
+	fmt.Printf("profiles: %d\n", summary.ProfileCount)
+	fmt.Printf("unique_first_contact_patterns: %d\n", summary.UniqueFirstContactPatterns)
+	fmt.Printf("unique_frame_grammar_combinations: %d\n", summary.UniqueFrameGrammarCombinations)
+	fmt.Printf("unique_scheduler_combinations: %d\n", summary.UniqueSchedulerCombinations)
+	fmt.Printf("unique_padding_combinations: %d\n", summary.UniquePaddingCombinations)
+	fmt.Printf("unique_invalid_input_policy_combinations: %d\n", summary.UniqueInvalidInputPolicyCombinations)
+	fmt.Printf("structurally_different_pairs: %d\n", summary.StructurallyDifferentPairs)
+	return nil
+}
+
 func printSummary(p *ir.Profile) {
 	fmt.Printf("profile_id: %s\n", p.ID)
 	fmt.Printf("states: %d\n", len(p.States))
@@ -100,5 +140,5 @@ func printSummary(p *ir.Profile) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: kdc generate --seed 12345 --out profile.json | kdc validate --profile profile.json")
+	fmt.Fprintln(os.Stderr, "usage: kdc generate --seed 12345 --out profile.json | kdc validate --profile profile.json | kdc corpus --start-seed 1 --count 1000 --out testdata/corpus/summary.json")
 }

@@ -5,6 +5,12 @@
 .tools/
 coverage.txt
 profiles/examples/*.json
+testdata/corpus/*.json
+testdata/corpus/profiles/
+testdata/audit/*.json
+testdata/traces/*.json
 testdata/traces/*.jsonl
 !profiles/examples/.gitkeep
+!testdata/corpus/.gitkeep
+!testdata/audit/.gitkeep
 !testdata/traces/.gitkeep
