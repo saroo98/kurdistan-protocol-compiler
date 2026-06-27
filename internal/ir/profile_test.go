@@ -53,3 +53,12 @@ func TestValidateRejectsInvalidSchedulerBounds(t *testing.T) {
 		t.Fatal("expected invalid scheduler bounds to fail")
 	}
 }
+
+func TestValidateRejectsFirstContactNoncePayloadTooSmall(t *testing.T) {
+	p, _ := compiler.Generate(1)
+	p.GenerationHash = ""
+	p.FirstContact.Steps[0].PayloadSize = p.Auth.NonceBytes - 1
+	if err := ir.Validate(p); err == nil {
+		t.Fatal("expected undersized nonce payload to fail")
+	}
+}

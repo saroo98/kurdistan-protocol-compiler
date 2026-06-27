@@ -326,6 +326,9 @@ func contactPayload(p *ir.Profile, step ir.FirstContactStep, transcript [][]byte
 	if step.Proof {
 		return auth.Proof(p, transcript, nonce)
 	}
+	if index == 0 && step.Role == ir.RoleClient && step.PayloadSize < p.Auth.NonceBytes {
+		return nil, fmt.Errorf("first-contact payload too small for nonce")
+	}
 	payload := make([]byte, step.PayloadSize)
 	copy(payload, []byte(step.WireSymbol))
 	for i := range payload {
