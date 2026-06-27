@@ -24,6 +24,9 @@ Run:
 - go test ./...
 - go test -bench=. ./... when changing scheduler, framing, relay, or benchmark code
 - go vet ./... when feasible
+- go run ./cmd/kgen --profile <profile.json> --out .generated/<name> when verifying generated source output
+- go run ./cmd/kcheck codegen --quick when changing the generated source backend
+- from a generated output directory, go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json when verifying generated trace capture
 
 ## Style
 

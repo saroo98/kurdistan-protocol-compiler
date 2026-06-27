@@ -17,6 +17,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "adversary" {
 		os.Exit(runAdversary(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "codegen" {
+		os.Exit(runCodegen(os.Args[2:]))
+	}
 	os.Exit(runAudit(os.Args[1:]))
 }
 
@@ -168,6 +171,53 @@ func runAdversary(args []string) int {
 	}
 	fmt.Print(report.HumanSummary())
 	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runCodegen(args []string) int {
+	flags := flag.NewFlagSet("kcheck codegen", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local generated-backend audit")
+	full := flags.Bool("full", false, "run full local generated-backend audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
+	profiles := flags.Int("profiles", 0, "optional generated profile count override")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultCodegenAuditConfig(mode)
+	if *startSeed != 0 {
+		cfg.StartSeed = *startSeed
+	}
+	if *profiles != 0 {
+		cfg.ProfileCount = *profiles
+	}
+	cfg.OutputPath = *out
+	report, err := audit.RunCodegenAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(*status, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
 		return 1
 	}
 	return 0

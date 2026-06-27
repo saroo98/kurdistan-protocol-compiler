@@ -3,6 +3,7 @@
 *.out
 *.log
 .tools/
+.generated/
 coverage.txt
 profiles/examples/*.json
 testdata/corpus/*.json

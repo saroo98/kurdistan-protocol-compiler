@@ -2,41 +2,33 @@
 
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
-- Latest audit mode: `quick`
-- Generated at: `2026-06-27T18:34:53Z`
-- Profile count: `100`
-- Trace count: `20`
+- Latest audit mode: `codegen-quick`
+- Generated at: `2026-06-27T19:32:37Z`
+- Profile count: `3`
+- Trace count: `3`
 - Conclusion: `passed`
 
 ## Gate Results
 
 | Gate | Result | Severity | Summary |
 | --- | --- | --- | --- |
-| `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
-| `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 6 groups; 0 failures |
-| `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
-| `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
-| `same_profile_consistency` | PASS | `required` | same-family by canonical feature distance |
-| `different_profile_separation` | PASS | `required` | 190/190 trace pairs separated |
-| `malformed_probe_behavior` | PASS | `required` | invalid-input behavior distribution checked |
-| `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
+| `generated_backend_codegen` | PASS | `required` | 3 generated modules checked; 0 failures |
+| `generated_semantic_equivalence` | PASS | `required` | 3 generated/interpreted profile pairs checked; 0 failures |
+| `generated_profile_diversity` | PASS | `required` | 3/3 generated trace pairs separated |
+| `generated_fixed_signature` | PASS | `required` | 5 trace stability metrics checked; 0 failures |
+| `generated_vs_interpreted_divergence` | PASS | `informational` | equally diverse |
+| `generated_mutant_detection` | PASS | `required` | 4/4 mutant modes detected |
+| `generated_source_scanner` | PASS | `required` | 3 generated modules scanned; 0 failures |
 
 ## Benchmark Highlights
 
-- Profile generation: `4 ms`
-- Trace generation: `34 ms`
-- Total audit runtime: `104 ms`
+- Profile generation: `0 ms`
+- Trace generation: `0 ms`
+- Total audit runtime: `7413 ms`
 
 ## Corpus Diversity Summary
 
-- `number_of_profiles`: `100`
-- `unique_first_contact_patterns`: `4`
-- `unique_frame_grammar_combinations`: `98`
-- `unique_scheduler_combinations`: `94`
-- `unique_padding_combinations`: `63`
-- `unique_invalid_input_policy_combinations`: `100`
-- `structurally_different_pairs`: `4950`
+- See audit JSON for corpus details.
 
 ## Trace Diversity Summary
 
@@ -44,33 +36,40 @@
 
 ## Adversarial Black-Box Summary
 
-- Gate result: `true`
-- `cluster_count`: `6`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.35766823678777193`
-- `same_profile_distance`: `0`
-- `generated_cluster_conclusion`: `multiple clusters`
+- Adversarial clustering gate has not been run.
 
 ## Baseline Comparison
 
-- Conclusion: `passed`
-- pass/fail changes: `3`
-- `first_contact_patterns_delta`: `0`
-- `frame_grammar_combinations_delta`: `82`
-- `scheduler_combinations_delta`: `80`
-- `padding_combinations_delta`: `55`
-- `invalid_input_combinations_delta`: `82`
-- `cluster_count_delta`: `5`
-- `largest_cluster_ratio_delta`: `-0.350`
-- `different_profile_separation_ratio_delta`: `0.300`
+- No baseline comparison was run.
+- Run `go run ./cmd/kcheck --quick --status STATUS.md --baseline testdata/audit/baseline-small.json` to include longitudinal deltas.
+
+## Generated Source Backend
+
+- Gate result: `true`
+- `generated_module_count`: `3`
+- `generated_tests_run`: `3`
+- `interpreted_traces_checked`: `3`
+- `generated_traces_checked`: `3`
+- `round_trip_exercised_by`: `generated-trace command and generated protocol tests`
+- `generated_semantic_equivalence`: `passed`
+- `generated_profile_diversity`: `passed`
+- `generated_fixed_signature`: `passed`
+- `generated_mutant_detection`: `passed`
+- `generated_source_scanner`: `passed`
+- `semantic_equivalence`: `passed`
+- `generated_profile_diversity`: `passed`
+- `fixed_signature`: `passed`
+- `mutant_detection`: `passed`
+- `source_scanner`: `passed`
 
 ## Known Limitations
 
 - Single-stream loopback-only runtime.
 - Test-only key material and no production key exchange.
+- Generated source still reuses shared lab helpers for IO, framing, scheduling, padding, auth, and traces.
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
 - The audit detects local regressions; it cannot prove undetectability or real-world robustness.
 
 ## Next Milestone
 
-Milestone 6 should focus on richer lab-only malformed-session corpora, longitudinal fixture curation, and clearer explanations for gate failures.
+Milestone 7 should focus on generated-backend trace comparison depth, richer lab-only malformed-session corpora, and clearer explanations for gate failures.
