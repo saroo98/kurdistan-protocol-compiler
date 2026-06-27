@@ -18,6 +18,7 @@ type AuditReport struct {
 	CorpusSummary      any                    `json:"corpus_summary,omitempty"`
 	TraceScanSummary   any                    `json:"trace_scan_summary,omitempty"`
 	BenchmarkSummary   any                    `json:"benchmark_summary,omitempty"`
+	CodegenSummary     any                    `json:"codegen,omitempty"`
 	BaselineComparison *AuditComparisonReport `json:"baseline_comparison,omitempty"`
 	Conclusion         string                 `json:"conclusion"`
 }
