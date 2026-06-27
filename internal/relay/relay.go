@@ -187,7 +187,7 @@ func ClientHandshake(r *bufio.Reader, w io.Writer, p *ir.Profile, rec *ktrace.Re
 			if _, err := w.Write(packet); err != nil {
 				return err
 			}
-			if err := clientFSM.Apply(step.Message); err != nil {
+			if err := clientFSM.ApplyAuthenticated(step.Message, step.Proof); err != nil {
 				return err
 			}
 			_ = rec.Record(ktrace.Event{Role: ir.RoleClient, ProfileID: p.ID, EventType: "first_contact", State: step.ToState, Semantic: step.Message, WireSymbol: step.WireSymbol, Direction: step.Direction, FrameBytes: len(packet), PayloadBytes: len(payload), SchedulerMode: p.Scheduler.Mode})
@@ -201,7 +201,7 @@ func ClientHandshake(r *bufio.Reader, w io.Writer, p *ir.Profile, rec *ktrace.Re
 		if err != nil {
 			return err
 		}
-		if err := serverShadow.Apply(step.Message); err != nil {
+		if err := serverShadow.ApplyAuthenticated(step.Message, step.Proof); err != nil {
 			return err
 		}
 		transcript = append(transcript, packet)
@@ -246,7 +246,7 @@ func ServerHandshake(r *bufio.Reader, w io.Writer, p *ir.Profile, rec *ktrace.Re
 					return fmt.Errorf("auth proof rejected")
 				}
 			}
-			if err := clientShadow.Apply(step.Message); err != nil {
+			if err := clientShadow.ApplyAuthenticated(step.Message, step.Proof); err != nil {
 				return err
 			}
 			_ = rec.Record(ktrace.Event{Role: ir.RoleServer, ProfileID: p.ID, EventType: "first_contact", State: step.ToState, Semantic: step.Message, WireSymbol: step.WireSymbol, Direction: step.Direction, FrameBytes: len(packet), PayloadBytes: len(payload), SchedulerMode: p.Scheduler.Mode})
@@ -267,7 +267,7 @@ func ServerHandshake(r *bufio.Reader, w io.Writer, p *ir.Profile, rec *ktrace.Re
 		if _, err := w.Write(packet); err != nil {
 			return err
 		}
-		if err := serverFSM.Apply(step.Message); err != nil {
+		if err := serverFSM.ApplyAuthenticated(step.Message, step.Proof); err != nil {
 			return err
 		}
 		transcript = append(transcript, packet)

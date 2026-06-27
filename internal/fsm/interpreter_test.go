@@ -44,6 +44,34 @@ func TestWrongProfileFails(t *testing.T) {
 	}
 }
 
+func TestMissingProofFails(t *testing.T) {
+	p, _ := compiler.Generate(42)
+	i, _ := New(p, ir.RoleClient)
+	for _, step := range p.FirstContact.Steps {
+		_ = i.SetStateForPeer(step.FromState)
+		if !step.Proof {
+			continue
+		}
+		if err := i.Apply(step.Message); err == nil {
+			t.Fatal("expected proof-required transition to fail without authenticated proof")
+		}
+		if err := i.ApplyAuthenticated(step.Message, true); err != nil {
+			t.Fatalf("expected authenticated proof transition to pass: %v", err)
+		}
+		return
+	}
+	t.Fatal("generated profile had no proof step")
+}
+
+func TestMalformedTransitionsRejectedByValidation(t *testing.T) {
+	p, _ := compiler.Generate(42)
+	p.GenerationHash = ""
+	p.Transitions[0].From = "missing"
+	if _, err := New(p, ir.RoleClient); err == nil {
+		t.Fatal("expected malformed transition graph to fail validation")
+	}
+}
+
 func TestDifferentGeneratedProfilesHaveDifferentStatePaths(t *testing.T) {
 	a, _ := compiler.Generate(42)
 	b, _ := compiler.Generate(43)
