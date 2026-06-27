@@ -66,6 +66,43 @@ go run ./cmd/ktrace compare \
 
 The compare command exits zero when traces are meaningfully different and nonzero when they are invalid or suspiciously similar.
 
+Scan a directory of traces for suspiciously stable signatures:
+
+```bash
+go run ./cmd/ktrace scan --dir testdata/traces
+```
+
+Generate a small loopback-only trace corpus and summary:
+
+```bash
+go run ./cmd/ktrace corpus --start-seed 1 --count 20 --out testdata/traces/corpus-summary.json
+```
+
+## Corpus Diversity Audit
+
+Generate an aggregate profile corpus summary without writing full profiles:
+
+```bash
+go run ./cmd/kdc corpus --start-seed 1 --count 1000 --out testdata/corpus/summary.json
+```
+
+The corpus command validates every generated profile and writes aggregate metrics only unless `--write-profiles` is explicitly provided.
+
+Run regression gates that combine profile diversity and black-box trace diversity:
+
+```bash
+go run ./cmd/kcheck --quick
+go run ./cmd/kcheck --full --out testdata/audit/latest.json
+go run ./cmd/kcheck --quick --status STATUS.md
+```
+
+Run the adversarial black-box clustering analysis directly:
+
+```bash
+go run ./cmd/kcheck adversary --quick
+go run ./cmd/kcheck adversary --quick --out testdata/audit/adversary.json
+```
+
 ## Tests And Benchmarks
 
 ```bash
@@ -73,6 +110,7 @@ gofmt -w .
 go test ./...
 go vet ./...
 go test -bench=. ./...
+go test -fuzz=Fuzz ./internal/framing
 ```
 
 Benchmarks measure profile generation, frame encode/decode, local round trips, scheduler overhead, and padding overhead. They are lab measurements only and do not imply real-world performance or detectability.
