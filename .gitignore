@@ -8,6 +8,8 @@ profiles/examples/*.json
 testdata/corpus/*.json
 testdata/corpus/profiles/
 testdata/audit/*.json
+!testdata/audit/baseline-small.json
+!testdata/audit/failing-fixed-small.json
 testdata/traces/*.json
 testdata/traces/*.jsonl
 !profiles/examples/.gitkeep

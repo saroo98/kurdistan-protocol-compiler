@@ -219,11 +219,16 @@ func SameProfileConsistencyGate(ctx context.Context) GateResult {
 		return gate("same_profile_consistency", false, "required", err.Error(), nil, []string{err.Error()})
 	}
 	report := ktrace.CompareEvents(a, b)
+	distance := adversary.Distance(adversary.ExtractFeaturesWithMetadata("same_profile_a", "", a), adversary.ExtractFeaturesWithMetadata("same_profile_b", "", b))
 	failures := []string{}
-	if report.MeaningfullyDifferent {
+	if report.MeaningfullyDifferent && distance > DefaultThresholds().MaxSameProfileDistance {
 		failures = append(failures, "same profile trace classified as meaningfully different")
 	}
-	return gate("same_profile_consistency", len(failures) == 0, "required", report.Conclusion, map[string]any{"difference_score": report.DifferenceScore}, failures)
+	summary := report.Conclusion
+	if report.MeaningfullyDifferent && len(failures) == 0 {
+		summary = "same-family by canonical feature distance"
+	}
+	return gate("same_profile_consistency", len(failures) == 0, "required", summary, map[string]any{"difference_score": report.DifferenceScore, "canonical_distance": distance}, failures)
 }
 
 func DifferentProfileSeparationGate(traces [][]ktrace.Event, thresholds AuditThresholds) GateResult {

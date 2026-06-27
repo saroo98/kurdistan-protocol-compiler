@@ -9,16 +9,17 @@ import (
 )
 
 type AuditReport struct {
-	Version          string       `json:"version"`
-	Mode             string       `json:"mode"`
-	GeneratedAt      string       `json:"generated_at"`
-	ProfileCount     int          `json:"profile_count"`
-	TraceCount       int          `json:"trace_count"`
-	Gates            []GateResult `json:"gates"`
-	CorpusSummary    any          `json:"corpus_summary,omitempty"`
-	TraceScanSummary any          `json:"trace_scan_summary,omitempty"`
-	BenchmarkSummary any          `json:"benchmark_summary,omitempty"`
-	Conclusion       string       `json:"conclusion"`
+	Version            string                 `json:"version"`
+	Mode               string                 `json:"mode"`
+	GeneratedAt        string                 `json:"generated_at"`
+	ProfileCount       int                    `json:"profile_count"`
+	TraceCount         int                    `json:"trace_count"`
+	Gates              []GateResult           `json:"gates"`
+	CorpusSummary      any                    `json:"corpus_summary,omitempty"`
+	TraceScanSummary   any                    `json:"trace_scan_summary,omitempty"`
+	BenchmarkSummary   any                    `json:"benchmark_summary,omitempty"`
+	BaselineComparison *AuditComparisonReport `json:"baseline_comparison,omitempty"`
+	Conclusion         string                 `json:"conclusion"`
 }
 
 type GateResult struct {

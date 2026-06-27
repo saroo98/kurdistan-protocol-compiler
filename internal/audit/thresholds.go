@@ -1,6 +1,6 @@
 package audit
 
-const Version = "0.4.0-lab"
+const Version = "0.5.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`
@@ -9,6 +9,7 @@ type AuditConfig struct {
 	TraceCount   int             `json:"trace_count"`
 	OutputPath   string          `json:"output_path,omitempty"`
 	StatusPath   string          `json:"status_path,omitempty"`
+	BaselinePath string          `json:"baseline_path,omitempty"`
 	Thresholds   AuditThresholds `json:"thresholds"`
 }
 

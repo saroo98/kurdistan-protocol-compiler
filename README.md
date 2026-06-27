@@ -103,6 +103,18 @@ go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck adversary --quick --out testdata/audit/adversary.json
 ```
 
+Compare audit reports for longitudinal regressions:
+
+```bash
+go run ./cmd/kcheck compare --old testdata/audit/baseline-small.json --new testdata/audit/baseline-small.json
+```
+
+Generate `STATUS.md` with baseline comparison:
+
+```bash
+go run ./cmd/kcheck --quick --status STATUS.md --baseline testdata/audit/baseline-small.json
+```
+
 ## Tests And Benchmarks
 
 ```bash

@@ -3,7 +3,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-27T17:57:36Z`
+- Generated at: `2026-06-27T18:34:53Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -14,10 +14,10 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 5 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 6 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
-| `same_profile_consistency` | PASS | `required` | suspiciously similar |
+| `same_profile_consistency` | PASS | `required` | same-family by canonical feature distance |
 | `different_profile_separation` | PASS | `required` | 190/190 trace pairs separated |
 | `malformed_probe_behavior` | PASS | `required` | invalid-input behavior distribution checked |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
@@ -25,8 +25,8 @@
 ## Benchmark Highlights
 
 - Profile generation: `4 ms`
-- Trace generation: `13 ms`
-- Total audit runtime: `74 ms`
+- Trace generation: `34 ms`
+- Total audit runtime: `104 ms`
 
 ## Corpus Diversity Summary
 
@@ -45,11 +45,24 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `5`
+- `cluster_count`: `6`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3569484046924118`
-- `same_profile_distance`: `0.008771929824561403`
+- `different_profile_average_distance`: `0.35766823678777193`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
+
+## Baseline Comparison
+
+- Conclusion: `passed`
+- pass/fail changes: `3`
+- `first_contact_patterns_delta`: `0`
+- `frame_grammar_combinations_delta`: `82`
+- `scheduler_combinations_delta`: `80`
+- `padding_combinations_delta`: `55`
+- `invalid_input_combinations_delta`: `82`
+- `cluster_count_delta`: `5`
+- `largest_cluster_ratio_delta`: `-0.350`
+- `different_profile_separation_ratio_delta`: `0.300`
 
 ## Known Limitations
 
@@ -60,4 +73,4 @@
 
 ## Next Milestone
 
-Milestone 5 should focus on richer lab-only probe corpora, regression fixtures for malformed sessions, and longitudinal comparisons across compiler changes.
+Milestone 6 should focus on richer lab-only malformed-session corpora, longitudinal fixture curation, and clearer explanations for gate failures.

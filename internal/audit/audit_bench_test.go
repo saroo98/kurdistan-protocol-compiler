@@ -7,6 +7,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
+	"kurdistan/internal/mutant"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -80,6 +81,58 @@ func BenchmarkStatusRendering(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = RenderStatus(report)
+	}
+}
+
+func BenchmarkMutationGateEvaluation(b *testing.B) {
+	profiles, err := mutant.GenerateProfiles(mutant.ModePaddingNoiseOnly, 1, 20)
+	if err != nil {
+		b.Fatal(err)
+	}
+	traces := mutant.TraceFixtures(mutant.ModePaddingNoiseOnly, profiles)
+	thresholds := DefaultThresholds()
+	thresholds.MinFirstContactPatterns = 2
+	thresholds.MinFrameGrammarCombinations = 2
+	thresholds.MinSchedulerCombinations = 2
+	thresholds.MinPaddingCombinations = 2
+	thresholds.MinInvalidInputCombinations = 2
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		summary := diversity.SummarizeCorpus(1, profiles)
+		scan := ktrace.ScanTraces(traces, ktrace.DefaultStabilityThreshold)
+		_ = ProfileCorpusDiversityGate(summary, thresholds)
+		_ = BlackBoxTraceDiversityGate(scan, thresholds)
+		_ = AdversarialBlackBoxClusteringGate(context.Background(), profiles, traces, thresholds)
+		_ = MalformedProbeBehaviorGate(profiles, thresholds)
+	}
+}
+
+func BenchmarkAuditComparison(b *testing.B) {
+	oldReport, err := LoadReport("testdata/audit/baseline-small.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	newReport, err := LoadReport("testdata/audit/failing-fixed-small.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	thresholds := DefaultComparisonThresholds()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = CompareReports(oldReport, newReport, thresholds)
+	}
+}
+
+func BenchmarkLongitudinalStatusRendering(b *testing.B) {
+	report, err := LoadReport("testdata/audit/baseline-small.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	comparison := CompareReports(report, report, DefaultComparisonThresholds())
+	report.BaselineComparison = &comparison
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = RenderStatus(report)

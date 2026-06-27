@@ -75,6 +75,25 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Adversarial clustering gate has not been run.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Baseline Comparison")
+	fmt.Fprintln(&b)
+	if report.BaselineComparison == nil {
+		fmt.Fprintln(&b, "- No baseline comparison was run.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck --quick --status STATUS.md --baseline testdata/audit/baseline-small.json` to include longitudinal deltas.")
+	} else {
+		comparison := report.BaselineComparison
+		fmt.Fprintf(&b, "- Conclusion: `%s`\n", comparison.Conclusion)
+		fmt.Fprintf(&b, "- pass/fail changes: `%d`\n", len(comparison.GateChanges))
+		fmt.Fprintf(&b, "- `first_contact_patterns_delta`: `%d`\n", comparison.MetricDeltas.FirstContactPatterns)
+		fmt.Fprintf(&b, "- `frame_grammar_combinations_delta`: `%d`\n", comparison.MetricDeltas.FrameGrammarCombinations)
+		fmt.Fprintf(&b, "- `scheduler_combinations_delta`: `%d`\n", comparison.MetricDeltas.SchedulerCombinations)
+		fmt.Fprintf(&b, "- `padding_combinations_delta`: `%d`\n", comparison.MetricDeltas.PaddingCombinations)
+		fmt.Fprintf(&b, "- `invalid_input_combinations_delta`: `%d`\n", comparison.MetricDeltas.InvalidInputCombinations)
+		fmt.Fprintf(&b, "- `cluster_count_delta`: `%d`\n", comparison.MetricDeltas.ClusterCount)
+		fmt.Fprintf(&b, "- `largest_cluster_ratio_delta`: `%.3f`\n", comparison.MetricDeltas.LargestClusterRatio)
+		fmt.Fprintf(&b, "- `different_profile_separation_ratio_delta`: `%.3f`\n", comparison.MetricDeltas.DifferentProfileSeparation)
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Single-stream loopback-only runtime.")
@@ -84,7 +103,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 5 should focus on richer lab-only probe corpora, regression fixtures for malformed sessions, and longitudinal comparisons across compiler changes.")
+	fmt.Fprintln(&b, "Milestone 6 should focus on richer lab-only malformed-session corpora, longitudinal fixture curation, and clearer explanations for gate failures.")
 	return b.String()
 }
 

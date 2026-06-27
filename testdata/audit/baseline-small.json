@@ -1,0 +1,68 @@
+{
+  "version": "0.5.0-lab",
+  "mode": "quick",
+  "generated_at": "2026-06-27T00:00:00Z",
+  "profile_count": 20,
+  "trace_count": 8,
+  "gates": [
+    {
+      "name": "profile_corpus_diversity",
+      "passed": true,
+      "severity": "required",
+      "summary": "small baseline profile corpus passed"
+    },
+    {
+      "name": "black_box_trace_diversity",
+      "passed": true,
+      "severity": "required",
+      "summary": "small baseline traces passed"
+    },
+    {
+      "name": "adversarial_black_box_clustering",
+      "passed": true,
+      "severity": "required",
+      "summary": "small baseline adversarial gate passed",
+      "details": {
+        "cluster_count": 1,
+        "largest_cluster_ratio": 0.9,
+        "different_profile_average_distance": 0.31
+      }
+    },
+    {
+      "name": "fixed_signature",
+      "passed": true,
+      "severity": "required",
+      "summary": "fixed signatures not detected"
+    },
+    {
+      "name": "different_profile_separation",
+      "passed": true,
+      "severity": "required",
+      "summary": "different profiles separated",
+      "details": {
+        "ratio": 0.7
+      }
+    },
+    {
+      "name": "malformed_probe_behavior",
+      "passed": true,
+      "severity": "required",
+      "summary": "probe behavior varied"
+    }
+  ],
+  "corpus_summary": {
+    "number_of_profiles": 20,
+    "unique_first_contact_patterns": 4,
+    "unique_frame_grammar_combinations": 16,
+    "unique_scheduler_combinations": 14,
+    "unique_padding_combinations": 8,
+    "unique_invalid_input_policy_combinations": 18,
+    "structurally_different_pairs": 190
+  },
+  "benchmark_summary": {
+    "profile_generation_millis": 1,
+    "trace_generation_millis": 4,
+    "total_millis": 20
+  },
+  "conclusion": "passed"
+}
