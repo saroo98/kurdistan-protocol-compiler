@@ -71,6 +71,7 @@ func Generate(seed int64) (*ir.Profile, error) {
 		Scheduler:      scheduler,
 		Stream:         streamPolicy(rng),
 		ProxySemantics: proxySemanticsPolicy(rng),
+		CarrierPolicy:  carrierPolicy(rng),
 		Padding:        paddingForPlacement(rng, placement),
 		InvalidInput: ir.InvalidInputPolicy{
 			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
@@ -272,6 +273,27 @@ func proxySemanticsPolicy(rng *rand.Rand) ir.ProxySemanticsPolicy {
 		TargetClasses:            ir.SyntheticTargetClasses(),
 		MaxRequestBytes:          requestLimit,
 		MaxResponseBytes:         responseLimit,
+	}
+}
+
+func carrierPolicy(rng *rand.Rand) ir.CarrierPolicy {
+	family := ir.CarrierFamilies()[rng.Intn(len(ir.CarrierFamilies()))]
+	return ir.CarrierPolicy{
+		CarrierFamily:          family,
+		EnvelopeEncoding:       []string{"single_semantic", "coalesced_semantics", "split_semantic", "table_mapped_envelope", "state_derived_envelope"}[rng.Intn(5)],
+		FlushPolicy:            []string{"flush_each", "flush_on_threshold", "flush_on_priority", "flush_on_state_transition", "delayed_flush_bucket"}[rng.Intn(5)],
+		BatchPolicy:            []string{"no_batch", "fixed_batch", "profile_bucket_batch", "priority_split_batch", "state_transition_batch"}[rng.Intn(5)],
+		ChunkingPolicy:         []string{"no_chunk", "fixed_chunk", "profile_bucket_chunk", "priority_aware_chunk", "state_derived_chunk"}[rng.Intn(5)],
+		ReliabilityPolicy:      []string{"ordered_only", "ack_required", "retry_bounded", "drop_detect", "reorder_recover"}[rng.Intn(5)],
+		ReorderPolicy:          []string{"none", "stable", "deterministic_reorder", "lossy_reorder", "recoverable_reorder"}[rng.Intn(5)],
+		BackpressurePolicy:     []string{"carrier_queue_backpressure", "stream_window_backpressure", "session_window_backpressure", "priority_backpressure", "drop_or_delay_metadata"}[rng.Intn(5)],
+		PriorityMappingPolicy:  []string{"direct_priority", "bucketed_priority", "state_derived_priority", "interactive_bias"}[rng.Intn(4)],
+		EnvelopePaddingPolicy:  []string{"none", "small_bucket", "state_bucket", "priority_bucket", "carrier_family_bucket"}[rng.Intn(5)],
+		TimingBucketPolicy:     []string{"none", "flush_bucket", "poll_cycle_bucket", "retry_bucket"}[rng.Intn(4)],
+		MaxEnvelopeBytes:       []int{1024, 2048, 4096, 8192, 16 * 1024}[rng.Intn(5)],
+		MaxMessagesPerEnvelope: []int{1, 2, 4, 8}[rng.Intn(4)],
+		MaxCarrierQueueDepth:   []int{4, 8, 16, 32}[rng.Intn(4)],
+		MaxRetryCount:          []int{0, 1, 2, 3}[rng.Intn(4)],
 	}
 }
 

@@ -383,6 +383,87 @@ func CaptureProxySemTrace(ctx context.Context, targets string, streamCount int) 
 		return nil, err
 	}
 
+	carrierSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/carrieradversary"
+	ktrace "kurdistan/internal/trace"
+)
+
+const CarrierFamily = %[1]s
+const CarrierEnvelopeEncoding = %[2]s
+const CarrierFlushPolicy = %[3]s
+const CarrierBatchPolicy = %[4]s
+const CarrierChunkingPolicy = %[5]s
+const CarrierReliabilityPolicy = %[6]s
+const CarrierReorderPolicy = %[7]s
+const CarrierBackpressurePolicy = %[8]s
+const CarrierPriorityMappingPolicy = %[9]s
+const CarrierEnvelopePaddingPolicy = %[10]s
+const CarrierTimingBucketPolicy = %[11]s
+const CarrierMaxEnvelopeBytes = %[12]d
+const CarrierMaxMessagesPerEnvelope = %[13]d
+const CarrierMaxQueueDepth = %[14]d
+const CarrierMaxRetryCount = %[15]d
+
+type CarrierDemoResult struct {
+	Family             string `+"`json:\"family\"`"+`
+	Scenario           string `+"`json:\"scenario\"`"+`
+	EnvelopeCount      int    `+"`json:\"envelope_count\"`"+`
+	SemanticMessages    int    `+"`json:\"semantic_messages\"`"+`
+	BackpressureEvents int    `+"`json:\"backpressure_events\"`"+`
+	ReorderEvents      int    `+"`json:\"reorder_events\"`"+`
+	RetryEvents        int    `+"`json:\"retry_events\"`"+`
+	EventCount         int    `+"`json:\"event_count\"`"+`
+}
+
+func CarrierDemo(ctx context.Context, carrierName string, streamCount int) (CarrierDemoResult, []ktrace.Event, error) {
+	if streamCount <= 0 {
+		streamCount = 4
+	}
+	if streamCount > StreamMaxConcurrentStreams {
+		streamCount = StreamMaxConcurrentStreams
+	}
+	scenario := carrieradversary.DefaultScenario(carrieradversary.ScenarioMixedCarrierMatrix)
+	if carrierName != "" && carrierName != "mixed" {
+		scenario.CarrierFamily = carrierName
+	}
+	scenario.StreamCount = streamCount
+	run, err := carrieradversary.RunScenario(ctx, StaticProfile(), scenario)
+	if err != nil {
+		return CarrierDemoResult{}, nil, err
+	}
+	return CarrierDemoResult{
+		Family:             run.Family,
+		Scenario:           run.Scenario,
+		EnvelopeCount:      run.Checks.EnvelopeCount,
+		SemanticMessages:    run.Checks.SemanticMessageCount,
+		BackpressureEvents: run.Checks.BackpressureEvents,
+		ReorderEvents:      run.Checks.ReorderEvents,
+		RetryEvents:        run.Checks.RetryEvents,
+		EventCount:         len(run.Events),
+	}, run.Events, nil
+}
+
+func CaptureCarrierTrace(ctx context.Context, carrierName string, streamCount int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := CarrierDemo(ctx, carrierName, streamCount)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	summary := TraceCaptureSummary{
+		ProfileID:      ProfileID,
+		EventCount:     len(events),
+		DataEventCount: result.SemanticMessages,
+	}
+	return events, summary, nil
+}
+`, quote(p.CarrierPolicy.CarrierFamily), quote(p.CarrierPolicy.EnvelopeEncoding), quote(p.CarrierPolicy.FlushPolicy), quote(p.CarrierPolicy.BatchPolicy), quote(p.CarrierPolicy.ChunkingPolicy), quote(p.CarrierPolicy.ReliabilityPolicy), quote(p.CarrierPolicy.ReorderPolicy), quote(p.CarrierPolicy.BackpressurePolicy), quote(p.CarrierPolicy.PriorityMappingPolicy), quote(p.CarrierPolicy.EnvelopePaddingPolicy), quote(p.CarrierPolicy.TimingBucketPolicy), p.CarrierPolicy.MaxEnvelopeBytes, p.CarrierPolicy.MaxMessagesPerEnvelope, p.CarrierPolicy.MaxCarrierQueueDepth, p.CarrierPolicy.MaxRetryCount)
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -752,6 +833,70 @@ func TestGeneratedProxyAdversaryScenarios(t *testing.T) {
 		return nil, err
 	}
 
+	carrierTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+func TestGeneratedCarrierDemo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := CarrierDemo(ctx, "mixed", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.EnvelopeCount == 0 || result.SemanticMessages == 0 || len(events) == 0 {
+		t.Fatalf("carrier demo did not emit safe metadata: %%+v", result)
+	}
+	if CarrierFamily == "" || CarrierEnvelopeEncoding == "" || CarrierFlushPolicy == "" {
+		t.Fatalf("carrier specialization constants missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/carrieradversary"
+)
+
+func TestGeneratedCarrierAdversaryScenarios(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, kind := range []string{
+		carrieradversary.ScenarioStreamVsMessageEquivalence,
+		carrieradversary.ScenarioBatchingPressure,
+		carrieradversary.ScenarioLossyRetryRecovery,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			run, err := carrieradversary.RunScenario(ctx, StaticProfile(), carrieradversary.DefaultScenario(kind))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !run.Correct {
+				t.Fatalf("generated carrier scenario failed: %%+v", run.Checks)
+			}
+			if len(run.Events) == 0 {
+				t.Fatalf("carrier scenario emitted no trace metadata")
+			}
+		})
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -1070,6 +1215,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/framing_generated.go", Content: framing, Go: true},
 		{RelPath: "protocol/stream_generated.go", Content: streamSource, Go: true},
 		{RelPath: "protocol/proxysem_generated.go", Content: proxySemSource, Go: true},
+		{RelPath: "protocol/carrier_generated.go", Content: carrierSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -1079,6 +1225,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/multistream_test.go", Content: multiStreamTestSource, Go: true},
 		{RelPath: "protocol/proxysem_test.go", Content: proxySemTestSource, Go: true},
 		{RelPath: "protocol/proxyadversary_test.go", Content: proxySemAdversaryTestSource, Go: true},
+		{RelPath: "protocol/carrier_test.go", Content: carrierTestSource, Go: true},
+		{RelPath: "protocol/carrieradversary_test.go", Content: carrierAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -1111,11 +1259,26 @@ func main() {
 	tracePath := flag.String("trace", "", "optional payload-free trace JSONL path")
 	multiStreamDemo := flag.Bool("multistream-demo", false, "run local generated multi-stream lab demo")
 	proxySemDemo := flag.Bool("proxysem-demo", false, "run local generated proxy-semantics demo")
+	carrierDemo := flag.Bool("carrier-demo", false, "run local generated carrier abstraction demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
+	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
+	if *carrierDemo {
+		result, events, err := protocol.CarrierDemo(ctx, *carrierName, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("carrier=%%s envelopes=%%d semantic_messages=%%d backpressure_events=%%d reorder_events=%%d retry_events=%%d\n", result.Family, result.EnvelopeCount, result.SemanticMessages, result.BackpressureEvents, result.ReorderEvents, result.RetryEvents)
+		return
+	}
 	if *proxySemDemo {
 		result, events, err := protocol.ProxySemDemo(ctx, *targets, *streamCount)
 		if err != nil {
@@ -1269,6 +1432,7 @@ func main() {
 	summaryPath := flag.String("summary", "", "optional trace summary JSON path")
 	multiStream := flag.Bool("multistream", false, "capture local generated multi-stream trace")
 	proxySem := flag.Bool("proxysem", false, "capture local generated proxy-semantics trace")
+	carrierName := flag.String("carrier", "", "capture local generated carrier trace with the selected abstract carrier")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
@@ -1277,7 +1441,9 @@ func main() {
 	var events []ktrace.Event
 	var summary protocol.TraceCaptureSummary
 	var err error
-	if *proxySem {
+	if *carrierName != "" {
+		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
+	} else if *proxySem {
 		events, summary, err = protocol.CaptureProxySemTrace(ctx, *targets, *streamCount)
 	} else if *multiStream {
 		events, summary, err = protocol.CaptureGeneratedMultiStreamTrace(ctx, *streamCount)

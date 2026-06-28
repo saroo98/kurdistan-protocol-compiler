@@ -56,6 +56,9 @@ func Validate(p *Profile) error {
 	if err := validateProxySemanticsPolicy(p.ProxySemantics, p.Limits, p.Messages); err != nil {
 		return err
 	}
+	if err := validateCarrierPolicy(p.CarrierPolicy, p.Limits); err != nil {
+		return err
+	}
 	if err := validatePadding(p.Padding); err != nil {
 		return err
 	}
@@ -390,6 +393,55 @@ func validateProxySemanticsPolicy(p ProxySemanticsPolicy, limits SafetyLimits, m
 		if count != 1 {
 			return fmt.Errorf("proxy semantic %q has %d mappings", semantic, count)
 		}
+	}
+	return nil
+}
+
+func validateCarrierPolicy(p CarrierPolicy, limits SafetyLimits) error {
+	if !oneOf(p.CarrierFamily, CarrierFamilies()...) {
+		return fmt.Errorf("invalid carrier family")
+	}
+	if !oneOf(p.EnvelopeEncoding, "single_semantic", "coalesced_semantics", "split_semantic", "table_mapped_envelope", "state_derived_envelope") {
+		return fmt.Errorf("invalid carrier envelope encoding")
+	}
+	if !oneOf(p.FlushPolicy, "flush_each", "flush_on_threshold", "flush_on_priority", "flush_on_state_transition", "delayed_flush_bucket") {
+		return fmt.Errorf("invalid carrier flush policy")
+	}
+	if !oneOf(p.BatchPolicy, "no_batch", "fixed_batch", "profile_bucket_batch", "priority_split_batch", "state_transition_batch") {
+		return fmt.Errorf("invalid carrier batch policy")
+	}
+	if !oneOf(p.ChunkingPolicy, "no_chunk", "fixed_chunk", "profile_bucket_chunk", "priority_aware_chunk", "state_derived_chunk") {
+		return fmt.Errorf("invalid carrier chunking policy")
+	}
+	if !oneOf(p.ReliabilityPolicy, "ordered_only", "ack_required", "retry_bounded", "drop_detect", "reorder_recover") {
+		return fmt.Errorf("invalid carrier reliability policy")
+	}
+	if !oneOf(p.ReorderPolicy, "none", "stable", "deterministic_reorder", "lossy_reorder", "recoverable_reorder") {
+		return fmt.Errorf("invalid carrier reorder policy")
+	}
+	if !oneOf(p.BackpressurePolicy, "carrier_queue_backpressure", "stream_window_backpressure", "session_window_backpressure", "priority_backpressure", "drop_or_delay_metadata") {
+		return fmt.Errorf("invalid carrier backpressure policy")
+	}
+	if !oneOf(p.PriorityMappingPolicy, "direct_priority", "bucketed_priority", "state_derived_priority", "interactive_bias") {
+		return fmt.Errorf("invalid carrier priority mapping policy")
+	}
+	if !oneOf(p.EnvelopePaddingPolicy, "none", "small_bucket", "state_bucket", "priority_bucket", "carrier_family_bucket") {
+		return fmt.Errorf("invalid carrier envelope padding policy")
+	}
+	if !oneOf(p.TimingBucketPolicy, "none", "flush_bucket", "poll_cycle_bucket", "retry_bucket") {
+		return fmt.Errorf("invalid carrier timing bucket policy")
+	}
+	if p.MaxEnvelopeBytes <= 0 || p.MaxEnvelopeBytes > limits.MaxFrameBytes {
+		return fmt.Errorf("invalid carrier envelope byte limit")
+	}
+	if p.MaxMessagesPerEnvelope <= 0 || p.MaxMessagesPerEnvelope > 32 {
+		return fmt.Errorf("invalid carrier max messages per envelope")
+	}
+	if p.MaxCarrierQueueDepth <= 0 || p.MaxCarrierQueueDepth > 256 {
+		return fmt.Errorf("invalid carrier queue depth")
+	}
+	if p.MaxRetryCount < 0 || p.MaxRetryCount > 8 {
+		return fmt.Errorf("invalid carrier retry count")
 	}
 	return nil
 }

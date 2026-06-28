@@ -3,7 +3,7 @@
 
 package audit
 
-const Version = "0.10.0-lab"
+const Version = "0.11.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`
@@ -53,6 +53,12 @@ type AuditThresholds struct {
 	MaxProxyAdversaryDominantRatio    float64 `json:"max_proxy_adversary_dominant_ratio"`
 	MinProxyAdversaryDiversityScore   float64 `json:"min_proxy_adversary_diversity_score"`
 	MinProxyAdversaryScenarioSuccess  float64 `json:"min_proxy_adversary_scenario_success"`
+	MinCarrierPolicyCombinations      int     `json:"min_carrier_policy_combinations"`
+	MinCarrierFamilies                int     `json:"min_carrier_families"`
+	MinCarrierEnvelopeEncodings       int     `json:"min_carrier_envelope_encodings"`
+	MaxCarrierAdversaryDominantRatio  float64 `json:"max_carrier_adversary_dominant_ratio"`
+	MinCarrierAdversaryDiversityScore float64 `json:"min_carrier_adversary_diversity_score"`
+	MinCarrierScenarioSuccess         float64 `json:"min_carrier_scenario_success"`
 }
 
 func DefaultConfig(mode string) AuditConfig {
@@ -111,6 +117,12 @@ func DefaultThresholds() AuditThresholds {
 		MaxProxyAdversaryDominantRatio:    0.90,
 		MinProxyAdversaryDiversityScore:   0.18,
 		MinProxyAdversaryScenarioSuccess:  0.90,
+		MinCarrierPolicyCombinations:      8,
+		MinCarrierFamilies:                3,
+		MinCarrierEnvelopeEncodings:       3,
+		MaxCarrierAdversaryDominantRatio:  0.90,
+		MinCarrierAdversaryDiversityScore: 0.18,
+		MinCarrierScenarioSuccess:         0.90,
 	}
 }
 

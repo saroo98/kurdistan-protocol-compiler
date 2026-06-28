@@ -188,7 +188,7 @@ func targetClassesForScenario(scenario Scenario) []string {
 	case ScenarioTargetResetMidstream:
 		return []string{proxysem.TargetResetMidstream, proxysem.TargetEcho, proxysem.TargetFixedResponse}
 	case ScenarioMixedTargets:
-		return []string{proxysem.TargetErrorResponse, proxysem.TargetEcho, proxysem.TargetFixedResponse, proxysem.TargetSlowResponse, proxysem.TargetChunkedResponse, proxysem.TargetLargeObject, proxysem.TargetDripResponse, proxysem.TargetJitteryResponse}
+		return []string{proxysem.TargetErrorResponse, proxysem.TargetResetMidstream, proxysem.TargetEcho, proxysem.TargetFixedResponse, proxysem.TargetSlowResponse, proxysem.TargetChunkedResponse, proxysem.TargetLargeObject, proxysem.TargetDripResponse, proxysem.TargetJitteryResponse}
 	case ScenarioLargeResponseBackpressure:
 		return []string{proxysem.TargetLargeObject, proxysem.TargetEcho}
 	case ScenarioDripResponsePriority:
