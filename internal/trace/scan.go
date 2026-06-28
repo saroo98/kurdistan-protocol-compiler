@@ -77,6 +77,12 @@ func ScanTraces(traces [][]Event, threshold float64) TraceScanReport {
 	add("padding_histogram", perTraceValue(traces, paddingHistogramSignature))
 	add("invalid_input_result", presentTraceValue(traces, invalidInputSignature))
 	add("close_behavior", presentTraceValue(traces, closeBehaviorSignature))
+	add("stream_count", perTraceValue(traces, streamCountSignature))
+	add("stream_interleaving_pattern", perTraceValue(traces, streamInterleavingSignature))
+	add("stream_priority_pattern", perTraceValue(traces, streamPrioritySignature))
+	add("window_update_pattern", perTraceValue(traces, windowUpdateSignature))
+	add("stream_close_reset_pattern", perTraceValue(traces, streamCloseResetSignature))
+	add("backpressure_pattern", perTraceValue(traces, backpressureSignature))
 	if len(report.Flagged) > 0 {
 		report.Conclusion = "suspicious stability detected"
 	} else {
@@ -207,6 +213,67 @@ func closeBehaviorSignature(events []Event) string {
 	return ""
 }
 
+func streamCountSignature(events []Event) string {
+	seen := map[string]bool{}
+	for _, ev := range events {
+		if ev.StreamLabel != "" {
+			seen[ev.StreamLabel] = true
+		}
+	}
+	return fmt.Sprint(len(seen))
+}
+
+func streamInterleavingSignature(events []Event) string {
+	parts := []string{}
+	for _, ev := range events {
+		if ev.StreamLabel == "" || ev.StreamEvent == "" {
+			continue
+		}
+		parts = append(parts, ev.StreamLabel+":"+ev.StreamEvent)
+	}
+	return strings.Join(limitTraceParts(parts, 24), ">")
+}
+
+func streamPrioritySignature(events []Event) string {
+	parts := []string{}
+	for _, ev := range events {
+		if ev.PriorityClass != "" {
+			parts = append(parts, ev.PriorityClass)
+		}
+	}
+	return strings.Join(collapseTraceRepeats(limitTraceParts(parts, 24)), ">")
+}
+
+func windowUpdateSignature(events []Event) string {
+	parts := []string{}
+	for _, ev := range events {
+		if ev.Semantic == "window_update" || ev.StreamEvent == "window_update" {
+			parts = append(parts, ev.StreamWindowBucket+"/"+ev.SessionWindowBucket)
+		}
+	}
+	return strings.Join(parts, ">")
+}
+
+func streamCloseResetSignature(events []Event) string {
+	parts := []string{}
+	for _, ev := range events {
+		if ev.CloseResetEvent != "" {
+			parts = append(parts, ev.CloseResetEvent)
+		}
+	}
+	return strings.Join(parts, ">")
+}
+
+func backpressureSignature(events []Event) string {
+	count := 0
+	for _, ev := range events {
+		if ev.Backpressure {
+			count++
+		}
+	}
+	return fmt.Sprint(count)
+}
+
 func intHistogramSignature(values []int) string {
 	counts := map[int]int{}
 	for _, value := range values {
@@ -222,4 +289,24 @@ func intHistogramSignature(values []int) string {
 		parts = append(parts, fmt.Sprintf("%d:%d", key, counts[key]))
 	}
 	return strings.Join(parts, ",")
+}
+
+func limitTraceParts(values []string, limit int) []string {
+	if len(values) <= limit {
+		return values
+	}
+	return values[:limit]
+}
+
+func collapseTraceRepeats(values []string) []string {
+	out := make([]string, 0, len(values))
+	prev := ""
+	for _, value := range values {
+		if value == "" || value == prev {
+			continue
+		}
+		out = append(out, value)
+		prev = value
+	}
+	return out
 }

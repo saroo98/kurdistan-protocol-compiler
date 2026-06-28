@@ -27,12 +27,14 @@ Can Kurdistan generate not only different profile documents, but also profile-sp
     profile_static.go
     states_generated.go
     framing_generated.go
+    stream_generated.go
     scheduler_generated.go
     invalid_input_generated.go
     auth_generated.go
     trace_capture_generated.go
     protocol.go
     protocol_test.go
+    multistream_test.go
     protocol_bench_test.go
     probe_test.go
   cmd/
@@ -55,6 +57,7 @@ Generated code inlines or specializes:
 - semantic-to-wire symbol map
 - frame grammar strategy constants
 - scheduler constants
+- stream ID encoding, max stream/window limits, priority, window-update, close, and reset constants
 - padding and invalid-input policy constants
 - safety limits
 - static profile construction
@@ -68,6 +71,7 @@ The backend deliberately reuses small local helpers for:
 - loopback-only relay IO
 - frame encode/decode mechanics
 - scheduler planning
+- lab-only stream session and flow-control mechanics
 - padding generation
 - test-only HMAC transcript proof
 - payload-free trace recording
@@ -127,6 +131,13 @@ Run a self-contained generated loopback trace:
 go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json
 ```
 
+Run the generated multi-stream lab demo:
+
+```bash
+go run ./cmd/generated-client --multistream-demo --streams 3
+go run ./cmd/generated-trace --multistream --streams 4 --trace generated-multistream.jsonl --summary generated-multistream-summary.json
+```
+
 Run the optional generated-backend audit:
 
 ```bash
@@ -143,7 +154,7 @@ This is evidence of local interoperability, not proof that generated behavior is
 ## Limitations
 
 - The generated backend still uses shared Go helper packages for safety-critical IO, framing, HMAC, scheduling, padding, and trace recording.
-- The generated command set is single-stream and loopback-only.
+- Multi-stream support is loopback-only lab semantics, not proxy, VPN, SOCKS, or HTTP carrier behavior.
 - Trace compatibility is a payload-free subset focused on existing `trace.Event` fields.
 - There is no production key exchange.
 - There is no SOCKS, VPN, HTTP carrier, TLS mimicry, CDN behavior, deployment script, mobile app, external target support, live-network testing, or real censorship testing.

@@ -15,12 +15,15 @@ const (
 	RoleServer = "server"
 	RoleShared = "shared"
 
-	SemanticOpenStream = "open_stream"
-	SemanticData       = "data"
-	SemanticClose      = "close_stream"
-	SemanticAck        = "ack"
-	SemanticPadding    = "padding"
-	SemanticError      = "error"
+	SemanticOpenStream   = "open_stream"
+	SemanticData         = "data"
+	SemanticClose        = "close_stream"
+	SemanticAck          = "ack"
+	SemanticResetStream  = "reset_stream"
+	SemanticWindowUpdate = "window_update"
+	SemanticSessionClose = "session_close"
+	SemanticPadding      = "padding"
+	SemanticError        = "error"
 )
 
 type Profile struct {
@@ -37,6 +40,7 @@ type Profile struct {
 	FrameGrammar   FrameGrammar       `json:"frame_grammar"`
 	Auth           AuthSpec           `json:"auth"`
 	Scheduler      SchedulerPolicy    `json:"scheduler"`
+	Stream         StreamPolicy       `json:"stream"`
 	Padding        PaddingPolicy      `json:"padding"`
 	InvalidInput   InvalidInputPolicy `json:"invalid_input"`
 	Limits         SafetyLimits       `json:"limits"`
@@ -119,6 +123,19 @@ type SchedulerPolicy struct {
 	PriorityMode      string `json:"priority_mode"`
 }
 
+type StreamPolicy struct {
+	IDStrategy                string `json:"id_strategy"`
+	IDEncodingMode            string `json:"id_encoding_mode"`
+	MaxConcurrentStreams      int    `json:"max_concurrent_streams"`
+	InitialStreamWindowBytes  int    `json:"initial_stream_window_bytes"`
+	InitialSessionWindowBytes int    `json:"initial_session_window_bytes"`
+	WindowUpdatePolicy        string `json:"window_update_policy"`
+	PriorityPolicy            string `json:"priority_policy"`
+	ClosePolicy               string `json:"close_policy"`
+	ResetPolicy               string `json:"reset_policy"`
+	MaxStreamID               uint32 `json:"max_stream_id"`
+}
+
 type PaddingPolicy struct {
 	Mode            string  `json:"mode"`
 	MinPaddingBytes int     `json:"min_padding_bytes"`
@@ -197,5 +214,15 @@ func MessageByWireSymbol(p *Profile, wire string) (MessageSymbol, bool) {
 }
 
 func RelaySemantics() []string {
-	return []string{SemanticOpenStream, SemanticData, SemanticClose, SemanticAck, SemanticPadding, SemanticError}
+	return []string{
+		SemanticOpenStream,
+		SemanticData,
+		SemanticClose,
+		SemanticResetStream,
+		SemanticWindowUpdate,
+		SemanticSessionClose,
+		SemanticAck,
+		SemanticPadding,
+		SemanticError,
+	}
 }

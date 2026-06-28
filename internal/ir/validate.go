@@ -47,6 +47,9 @@ func Validate(p *Profile) error {
 	if err := validateScheduler(p.Scheduler); err != nil {
 		return err
 	}
+	if err := validateStreamPolicy(p.Stream, p.Limits); err != nil {
+		return err
+	}
 	if err := validatePadding(p.Padding); err != nil {
 		return err
 	}
@@ -258,6 +261,49 @@ func validateScheduler(p SchedulerPolicy) error {
 	}
 	if p.PriorityMode == "" {
 		return fmt.Errorf("priority mode is required")
+	}
+	return nil
+}
+
+func validateStreamPolicy(p StreamPolicy, limits SafetyLimits) error {
+	if !oneOf(p.IDStrategy, "sequential_odd_even", "randomized_bounded_ids", "table_mapped_ids", "varint_ids") {
+		return fmt.Errorf("invalid stream id strategy")
+	}
+	if !oneOf(p.IDEncodingMode, "fixed32_be", "profile_xor32", "table_mapped32_le", "varint") {
+		return fmt.Errorf("invalid stream id encoding mode")
+	}
+	if !oneOfInt(p.MaxConcurrentStreams, 2, 4, 8, 16) {
+		return fmt.Errorf("invalid max concurrent streams")
+	}
+	if !oneOfInt(p.InitialStreamWindowBytes, 16*1024, 32*1024, 64*1024, 128*1024) {
+		return fmt.Errorf("invalid stream window")
+	}
+	if p.InitialSessionWindowBytes < p.InitialStreamWindowBytes {
+		return fmt.Errorf("session window must be at least one stream window")
+	}
+	if p.InitialSessionWindowBytes > 2*1024*1024 {
+		return fmt.Errorf("session window exceeds lab safety limit")
+	}
+	if limits.MaxPayloadBytes > 0 && p.InitialSessionWindowBytes > limits.MaxPayloadBytes {
+		return fmt.Errorf("session window exceeds payload limit")
+	}
+	if !oneOf(p.WindowUpdatePolicy, "threshold_update", "periodic_update", "per_frame_update", "hybrid_update") {
+		return fmt.Errorf("invalid window update policy")
+	}
+	if !oneOf(p.PriorityPolicy, "fifo", "interactive_first", "weighted_round_robin", "smallest_pending_first") {
+		return fmt.Errorf("invalid stream priority policy")
+	}
+	if !oneOf(p.ClosePolicy, "explicit_close", "half_close", "close_after_ack") {
+		return fmt.Errorf("invalid stream close policy")
+	}
+	if !oneOf(p.ResetPolicy, "immediate_reset", "reset_with_error_code", "delayed_reset") {
+		return fmt.Errorf("invalid stream reset policy")
+	}
+	if p.MaxStreamID == 0 || p.MaxStreamID > 1<<30 {
+		return fmt.Errorf("invalid max stream id")
+	}
+	if uint64(p.MaxConcurrentStreams) > uint64(p.MaxStreamID) {
+		return fmt.Errorf("max stream id cannot represent concurrent streams")
 	}
 	return nil
 }

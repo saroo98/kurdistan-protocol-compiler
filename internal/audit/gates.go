@@ -13,6 +13,9 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
+	"kurdistan/internal/mutant"
+	"kurdistan/internal/relay"
+	"kurdistan/internal/streamadversary"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -274,6 +277,350 @@ func MalformedProbeBehaviorGate(profiles []*ir.Profile, thresholds AuditThreshol
 		"malformed_frame_ratio":  malformed.Ratio,
 		"malformed_frame_unique": malformed.UniqueValues,
 	}, failures)
+}
+
+func MultiStreamSemanticsGate(ctx context.Context, profiles []*ir.Profile, thresholds AuditThresholds) GateResult {
+	failures := []string{}
+	checked := 0
+	streamCounts := []string{}
+	for _, p := range profiles {
+		if p == nil || p.Stream.MaxConcurrentStreams < 2 {
+			continue
+		}
+		count := min(4, p.Stream.MaxConcurrentStreams)
+		if count < 2 {
+			continue
+		}
+		requests := relay.DefaultMultiStreamDemoRequests(count)
+		if count >= 3 {
+			requests[count-1].ResetAfterOpen = true
+		}
+		result, events, err := relay.SimulateMultiStreamEcho(ctx, p, requests)
+		if err != nil {
+			failures = append(failures, p.ID+": "+err.Error())
+			continue
+		}
+		checked++
+		streamCounts = append(streamCounts, fmt.Sprint(result.OpenedStreams))
+		if result.OpenedStreams != count {
+			failures = append(failures, p.ID+": opened stream count mismatch")
+		}
+		if count >= 3 && result.ResetStreams != 1 {
+			failures = append(failures, p.ID+": reset did not remain stream-local")
+		}
+		if result.ClosedStreams+result.ResetStreams != result.OpenedStreams {
+			failures = append(failures, p.ID+": streams did not close or reset independently")
+		}
+		if !traceHasStreamMetadata(events) {
+			failures = append(failures, p.ID+": missing stream trace metadata")
+		}
+		if checked >= 4 {
+			break
+		}
+	}
+	if checked == 0 {
+		failures = append(failures, "no generated profile supported multi-stream semantics")
+	}
+	return gate("multi_stream_semantics", len(failures) == 0, "required", fmt.Sprintf("%d profiles exercised with local multi-stream echo", checked), map[string]any{
+		"profiles_checked": checked,
+		"stream_counts":    streamCounts,
+	}, failures)
+}
+
+func MultiStreamDiversityGate(profiles []*ir.Profile, thresholds AuditThresholds) GateResult {
+	combinations := profileValues(profiles, func(p *ir.Profile) string {
+		return strings.Join([]string{
+			p.Stream.IDStrategy,
+			p.Stream.IDEncodingMode,
+			fmt.Sprint(p.Stream.MaxConcurrentStreams),
+			fmt.Sprint(p.Stream.InitialStreamWindowBytes),
+			fmt.Sprint(p.Stream.InitialSessionWindowBytes),
+			p.Stream.WindowUpdatePolicy,
+			p.Stream.PriorityPolicy,
+			p.Stream.ClosePolicy,
+			p.Stream.ResetPolicy,
+		}, "|")
+	})
+	encodings := profileValues(profiles, func(p *ir.Profile) string { return p.Stream.IDEncodingMode })
+	priorities := profileValues(profiles, func(p *ir.Profile) string { return p.Stream.PriorityPolicy })
+	windowUpdates := profileValues(profiles, func(p *ir.Profile) string { return p.Stream.WindowUpdatePolicy })
+	failures := []string{}
+	if uniqueStrings(combinations) < thresholds.MinStreamPolicyCombinations {
+		failures = append(failures, "stream policy combinations below threshold")
+	}
+	if uniqueStrings(encodings) < thresholds.MinStreamIDEncodingModes {
+		failures = append(failures, "stream id encoding modes below threshold")
+	}
+	if uniqueStrings(priorities) < 2 {
+		failures = append(failures, "stream priority policies below threshold")
+	}
+	if uniqueStrings(windowUpdates) < 2 {
+		failures = append(failures, "window update policies below threshold")
+	}
+	return gate("multi_stream_diversity", len(failures) == 0, "required", fmt.Sprintf("%d stream policy combinations across %d profiles", uniqueStrings(combinations), len(profiles)), map[string]any{
+		"unique_stream_policy_combinations": uniqueStrings(combinations),
+		"unique_stream_id_encodings":        uniqueStrings(encodings),
+		"unique_priority_policies":          uniqueStrings(priorities),
+		"unique_window_update_policies":     uniqueStrings(windowUpdates),
+		"min_stream_policy_combinations":    thresholds.MinStreamPolicyCombinations,
+		"min_stream_id_encoding_modes":      thresholds.MinStreamIDEncodingModes,
+	}, failures)
+}
+
+func MultiStreamBackpressureGate(ctx context.Context, profiles []*ir.Profile, thresholds AuditThresholds) GateResult {
+	failures := []string{}
+	checked := 0
+	for _, p := range profiles {
+		if p == nil || p.Stream.MaxConcurrentStreams < 2 {
+			continue
+		}
+		large := make([]byte, p.Stream.InitialStreamWindowBytes+1)
+		requests := []relay.MultiStreamRequest{
+			{Label: "interactive", Priority: "interactive", Payload: []byte("short")},
+			{Label: "backpressure", Priority: "bulk", Payload: large},
+		}
+		result, events, err := relay.SimulateMultiStreamEcho(ctx, p, requests)
+		if err != nil {
+			failures = append(failures, p.ID+": "+err.Error())
+			continue
+		}
+		checked++
+		if result.BackpressureEvents == 0 || result.WindowUpdateEvents == 0 {
+			failures = append(failures, p.ID+": backpressure/window-update not represented")
+		}
+		if !traceHasBackpressure(events) {
+			failures = append(failures, p.ID+": trace missing backpressure metadata")
+		}
+		break
+	}
+	if checked == 0 {
+		failures = append(failures, "no profile available for backpressure check")
+	}
+	return gate("multi_stream_backpressure", len(failures) == 0, "required", fmt.Sprintf("%d profile backpressure scenarios exercised", checked), map[string]any{
+		"profiles_checked": checked,
+	}, failures)
+}
+
+func MultiStreamAdversarialScenariosGate(ctx context.Context, profiles []*ir.Profile, thresholds AuditThresholds) GateResult {
+	selected := selectProfiles(profiles, 3)
+	scenarios := streamadversary.QuickScenarios()
+	runs, err := streamadversary.RunScenarioCorpus(ctx, selected, scenarios)
+	if err != nil {
+		return gate("multi_stream_adversarial_scenarios", false, "required", err.Error(), map[string]any{
+			"profile_count":  len(selected),
+			"scenario_count": len(scenarios),
+		}, []string{err.Error()})
+	}
+	report := streamadversary.AnalyzeRuns(runs, streamCollapseThresholds(thresholds))
+	failures := streamCorrectnessFailures(report)
+	return gate("multi_stream_adversarial_scenarios", len(failures) == 0, "required", fmt.Sprintf("%d scenario runs checked; %d correctness failures", report.Correctness.ScenarioRuns, len(failures)), map[string]any{
+		"profile_count":           report.ProfileCount,
+		"scenario_count":          report.ScenarioCount,
+		"correct_runs":            report.Correctness.CorrectRuns,
+		"scenario_runs":           report.Correctness.ScenarioRuns,
+		"backpressure_failures":   report.Correctness.BackpressureFailures,
+		"scheduler_failures":      report.Correctness.SchedulerFailures,
+		"reset_close_failures":    report.Correctness.ResetCloseFailures,
+		"metadata_failures":       report.Correctness.MetadataFailures,
+		"collapse_reports":        report.CollapseReports,
+		"stream_adversary_result": report.Conclusion,
+	}, failures)
+}
+
+func MultiStreamCollapseResistanceGate(ctx context.Context, profiles []*ir.Profile, thresholds AuditThresholds) GateResult {
+	selected := selectProfiles(profiles, 8)
+	scenarios := []streamadversary.Scenario{
+		streamadversary.DefaultScenario(streamadversary.ScenarioBulkVsInteractive),
+		streamadversary.DefaultScenario(streamadversary.ScenarioResetMidstream),
+	}
+	runs, err := streamadversary.RunScenarioCorpus(ctx, selected, scenarios)
+	if err != nil {
+		return gate("multi_stream_collapse_resistance", false, "required", err.Error(), map[string]any{
+			"profile_count":  len(selected),
+			"scenario_count": len(scenarios),
+		}, []string{err.Error()})
+	}
+	report := streamadversary.AnalyzeRuns(runs, streamCollapseThresholds(thresholds))
+	failures := collapseFailures(report)
+	return gate("multi_stream_collapse_resistance", len(failures) == 0, "required", fmt.Sprintf("%d scenarios scanned; %d suspicious metrics", report.ScenarioCount, len(failures)), map[string]any{
+		"profile_count":    report.ProfileCount,
+		"scenario_count":   report.ScenarioCount,
+		"collapse_reports": report.CollapseReports,
+		"correctness":      report.Correctness,
+	}, failures)
+}
+
+func MultiStreamMutantDetectionGate(ctx context.Context, thresholds AuditThresholds) GateResult {
+	modes := []string{
+		mutant.ModeFixedStreamIDStrategy,
+		mutant.ModeFixedWindowUpdatePolicy,
+		mutant.ModeFIFOSchedulerOnly,
+		mutant.ModeFixedResetClosePolicy,
+		mutant.ModeNoBackpressure,
+		mutant.ModePaddingOnlyStreamDiversity,
+	}
+	detected := []string{}
+	missed := []string{}
+	modeDetails := map[string]any{}
+	for _, mode := range modes {
+		profiles, err := mutant.GenerateProfiles(mode, 1600, 6)
+		if err != nil {
+			missed = append(missed, mode+": "+err.Error())
+			continue
+		}
+		scenarios := mutantScenarios(mode)
+		runs, err := streamadversary.RunMutantScenarioCorpus(ctx, mode, profiles, scenarios)
+		if err != nil {
+			missed = append(missed, mode+": "+err.Error())
+			continue
+		}
+		report := streamadversary.AnalyzeRuns(runs, streamCollapseThresholds(thresholds))
+		reasons := mutantDetectionReasons(mode, report)
+		modeDetails[mode] = map[string]any{
+			"reasons":          reasons,
+			"correctness":      report.Correctness,
+			"collapse_reports": report.CollapseReports,
+		}
+		if len(reasons) == 0 {
+			missed = append(missed, mode)
+		} else {
+			detected = append(detected, mode)
+		}
+	}
+	return gate("multi_stream_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d stream mutant modes detected", len(detected), len(modes)), map[string]any{
+		"detected_modes": detected,
+		"missed_modes":   missed,
+		"mode_details":   modeDetails,
+	}, missed)
+}
+
+func streamCollapseThresholds(thresholds AuditThresholds) streamadversary.CollapseThresholds {
+	defaults := streamadversary.DefaultCollapseThresholds()
+	if thresholds.MaxStreamAdversaryDominantRatio != 0 {
+		defaults.MaxDominantRatio = thresholds.MaxStreamAdversaryDominantRatio
+	}
+	if thresholds.MinStreamAdversaryDiversityScore != 0 {
+		defaults.MinDiversityScore = thresholds.MinStreamAdversaryDiversityScore
+	}
+	if thresholds.MinStreamAdversaryScenarioSuccess != 0 {
+		defaults.MinScenarioSuccess = thresholds.MinStreamAdversaryScenarioSuccess
+	}
+	return defaults
+}
+
+func selectProfiles(profiles []*ir.Profile, limit int) []*ir.Profile {
+	selected := []*ir.Profile{}
+	for _, p := range profiles {
+		if p == nil {
+			continue
+		}
+		selected = append(selected, p)
+		if len(selected) >= limit {
+			break
+		}
+	}
+	return selected
+}
+
+func streamCorrectnessFailures(report streamadversary.Report) []string {
+	failures := []string{}
+	if report.Correctness.BackpressureFailures > 0 {
+		failures = append(failures, "backpressure correctness failures")
+	}
+	if report.Correctness.SchedulerFailures > 0 {
+		failures = append(failures, "scheduler correctness failures")
+	}
+	if report.Correctness.ResetCloseFailures > 0 {
+		failures = append(failures, "reset/close correctness failures")
+	}
+	if report.Correctness.MetadataFailures > 0 {
+		failures = append(failures, "missing safe stream trace metadata")
+	}
+	if report.Correctness.ScenarioRuns == 0 {
+		failures = append(failures, "no stream adversary scenarios ran")
+	}
+	return failures
+}
+
+func collapseFailures(report streamadversary.Report) []string {
+	failures := []string{}
+	for _, collapse := range report.CollapseReports {
+		if collapse.Conclusion == "passed" {
+			continue
+		}
+		if len(collapse.SuspiciousMetrics) == 0 {
+			failures = append(failures, collapse.Scenario+": diversity score below threshold")
+			continue
+		}
+		for _, metric := range collapse.SuspiciousMetrics {
+			failures = append(failures, collapse.Scenario+": "+metric)
+		}
+	}
+	return failures
+}
+
+func mutantScenarios(mode string) []streamadversary.Scenario {
+	switch mode {
+	case mutant.ModeFIFOSchedulerOnly:
+		return []streamadversary.Scenario{streamadversary.DefaultScenario(streamadversary.ScenarioBulkVsInteractive)}
+	case mutant.ModeNoBackpressure, mutant.ModeFixedWindowUpdatePolicy:
+		return []streamadversary.Scenario{streamadversary.DefaultScenario(streamadversary.ScenarioBlockedStream)}
+	default:
+		return []streamadversary.Scenario{streamadversary.DefaultScenario(streamadversary.ScenarioResetMidstream)}
+	}
+}
+
+func mutantDetectionReasons(mode string, report streamadversary.Report) []string {
+	reasons := []string{}
+	switch mode {
+	case mutant.ModeFIFOSchedulerOnly:
+		if report.Correctness.SchedulerFailures > 0 {
+			reasons = append(reasons, "scheduler correctness failed")
+		}
+	case mutant.ModeNoBackpressure:
+		if report.Correctness.BackpressureFailures > 0 {
+			reasons = append(reasons, "backpressure correctness failed")
+		}
+	}
+	expected := map[string]string{
+		mutant.ModeFixedStreamIDStrategy:      "stream_id_sequence",
+		mutant.ModeFixedWindowUpdatePolicy:    "window_update_rhythm",
+		mutant.ModeFixedResetClosePolicy:      "close_reset_outcome",
+		mutant.ModePaddingOnlyStreamDiversity: "stream_behavior_fixed",
+	}
+	if metric := expected[mode]; metric != "" && reportHasSuspiciousMetric(report, metric) {
+		reasons = append(reasons, metric)
+	}
+	return reasons
+}
+
+func reportHasSuspiciousMetric(report streamadversary.Report, metric string) bool {
+	for _, collapse := range report.CollapseReports {
+		for _, found := range collapse.SuspiciousMetrics {
+			if found == metric {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func traceHasStreamMetadata(events []ktrace.Event) bool {
+	for _, ev := range events {
+		if ev.StreamLabel != "" && ev.StreamEvent != "" && ev.StreamState != "" && ev.StreamWindowBucket != "" && ev.SessionWindowBucket != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func traceHasBackpressure(events []ktrace.Event) bool {
+	for _, ev := range events {
+		if ev.Backpressure && ev.StreamWindowBucket != "" && ev.SessionWindowBucket != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func FuzzPresenceGate() GateResult {

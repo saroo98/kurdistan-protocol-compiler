@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/mutant"
+	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -28,14 +29,16 @@ type CodegenAuditConfig struct {
 }
 
 type GeneratedBackendTraceCorpus struct {
-	ProfileCount      int                       `json:"profile_count"`
-	GeneratedModules  int                       `json:"generated_modules"`
-	ProfileRuns       []GeneratedBackendRun     `json:"profile_runs"`
-	SourceScan        codegen.SourceScanReport  `json:"source_scan"`
-	InterpretedTraces [][]ktrace.Event          `json:"-"`
-	GeneratedTraces   [][]ktrace.Event          `json:"-"`
-	GeneratedDirs     []string                  `json:"-"`
-	Profiles          []*GeneratedProfileRecord `json:"profiles,omitempty"`
+	ProfileCount                 int                       `json:"profile_count"`
+	GeneratedModules             int                       `json:"generated_modules"`
+	ProfileRuns                  []GeneratedBackendRun     `json:"profile_runs"`
+	SourceScan                   codegen.SourceScanReport  `json:"source_scan"`
+	InterpretedTraces            [][]ktrace.Event          `json:"-"`
+	GeneratedTraces              [][]ktrace.Event          `json:"-"`
+	InterpretedMultiStreamTraces [][]ktrace.Event          `json:"-"`
+	GeneratedMultiStreamTraces   [][]ktrace.Event          `json:"-"`
+	GeneratedDirs                []string                  `json:"-"`
+	Profiles                     []*GeneratedProfileRecord `json:"profiles,omitempty"`
 }
 
 type GeneratedProfileRecord struct {
@@ -44,18 +47,22 @@ type GeneratedProfileRecord struct {
 }
 
 type GeneratedBackendRun struct {
-	ProfileID                    string  `json:"profile_id"`
-	Seed                         int64   `json:"seed"`
-	GeneratedEchoBytes           int     `json:"generated_echo_bytes"`
-	InterpretedEchoBytes         int     `json:"interpreted_echo_bytes"`
-	InterpretedFirstContactCount int     `json:"interpreted_first_contact_count"`
-	GeneratedFirstContactCount   int     `json:"generated_first_contact_count"`
-	InterpretedDataEvents        int     `json:"interpreted_data_events"`
-	GeneratedDataEvents          int     `json:"generated_data_events"`
-	SemanticSimilarity           float64 `json:"semantic_similarity"`
-	StatePathSimilarity          float64 `json:"state_path_similarity"`
-	SemanticEquivalent           bool    `json:"semantic_equivalent"`
-	PayloadLogged                bool    `json:"payload_logged"`
+	ProfileID                     string  `json:"profile_id"`
+	Seed                          int64   `json:"seed"`
+	GeneratedEchoBytes            int     `json:"generated_echo_bytes"`
+	InterpretedEchoBytes          int     `json:"interpreted_echo_bytes"`
+	InterpretedFirstContactCount  int     `json:"interpreted_first_contact_count"`
+	GeneratedFirstContactCount    int     `json:"generated_first_contact_count"`
+	InterpretedDataEvents         int     `json:"interpreted_data_events"`
+	GeneratedDataEvents           int     `json:"generated_data_events"`
+	SemanticSimilarity            float64 `json:"semantic_similarity"`
+	StatePathSimilarity           float64 `json:"state_path_similarity"`
+	SemanticEquivalent            bool    `json:"semantic_equivalent"`
+	InterpretedMultiStreamEvents  int     `json:"interpreted_multi_stream_events"`
+	GeneratedMultiStreamEvents    int     `json:"generated_multi_stream_events"`
+	GeneratedMultiStreamEchoBytes int     `json:"generated_multi_stream_echo_bytes"`
+	MultiStreamEquivalent         bool    `json:"multi_stream_equivalent"`
+	PayloadLogged                 bool    `json:"payload_logged"`
 }
 
 type GeneratedTraceSummary struct {
@@ -69,15 +76,17 @@ type GeneratedTraceSummary struct {
 }
 
 type CodegenAuditSummary struct {
-	Profiles                  int                            `json:"profiles"`
-	GeneratedModules          int                            `json:"generated_modules"`
-	SemanticEquivalence       string                         `json:"semantic_equivalence"`
-	GeneratedProfileDiversity string                         `json:"generated_profile_diversity"`
-	FixedSignature            string                         `json:"fixed_signature"`
-	MutantDetection           string                         `json:"mutant_detection"`
-	SourceScanner             string                         `json:"source_scanner"`
-	InterpretedVsGenerated    InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
-	SourceScan                codegen.SourceScanReport       `json:"source_scan"`
+	Profiles                   int                            `json:"profiles"`
+	GeneratedModules           int                            `json:"generated_modules"`
+	SemanticEquivalence        string                         `json:"semantic_equivalence"`
+	GeneratedProfileDiversity  string                         `json:"generated_profile_diversity"`
+	FixedSignature             string                         `json:"fixed_signature"`
+	MutantDetection            string                         `json:"mutant_detection"`
+	MultiStreamGeneratedParity string                         `json:"multi_stream_generated_parity"`
+	StreamAdversaryParity      string                         `json:"multi_stream_generated_backend_parity"`
+	SourceScanner              string                         `json:"source_scanner"`
+	InterpretedVsGenerated     InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
+	SourceScan                 codegen.SourceScanReport       `json:"source_scan"`
 }
 
 type InterpretedGeneratedDivergence struct {
@@ -149,6 +158,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	diversityGate := GeneratedProfileDiversityGate(corpus)
 	fixedGate := GeneratedFixedSignatureGate(corpus)
 	divergenceGate := GeneratedVsInterpretedDivergenceGate(corpus)
+	multiStreamGate := GeneratedMultiStreamParityGate(corpus)
+	streamAdversaryGate := GeneratedStreamAdversaryParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -163,6 +174,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		diversityGate,
 		fixedGate,
 		divergenceGate,
+		multiStreamGate,
+		streamAdversaryGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -212,32 +225,50 @@ func runGeneratedBackendTraceCorpusAt(ctx context.Context, cfg CodegenAuditConfi
 		if err != nil {
 			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d interpreted trace: %w", seed, err)
 		}
-		generated, summary, err := runGeneratedTraceCommand(ctx, out, payload)
+		generated, summary, err := runGeneratedTraceCommand(ctx, out, payload, false)
 		if err != nil {
 			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d generated trace: %w", seed, err)
 		}
+		streamCount := min(4, p.Stream.MaxConcurrentStreams)
+		interpretedMultiResult, interpretedMulti, err := relay.SimulateMultiStreamEcho(ctx, p, relay.DefaultMultiStreamDemoRequests(streamCount))
+		if err != nil {
+			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d interpreted multistream trace: %w", seed, err)
+		}
+		generatedMulti, multiSummary, err := runGeneratedTraceCommand(ctx, out, nil, true)
+		if err != nil {
+			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d generated multistream trace: %w", seed, err)
+		}
 		report := ktrace.CompareEvents(interpreted, generated)
 		run := GeneratedBackendRun{
-			ProfileID:                    p.ID,
-			Seed:                         seed,
-			GeneratedEchoBytes:           summary.EchoBytes,
-			InterpretedEchoBytes:         len(payload),
-			InterpretedFirstContactCount: countEvents(interpreted, "first_contact"),
-			GeneratedFirstContactCount:   summary.FirstContactCount,
-			InterpretedDataEvents:        countSemantic(interpreted, "data"),
-			GeneratedDataEvents:          summary.DataEventCount,
-			SemanticSimilarity:           report.SemanticSimilarity,
-			StatePathSimilarity:          report.StatePathSimilarity,
-			PayloadLogged:                summary.PayloadLogged || traceContainsPayload(generated, payload),
+			ProfileID:                     p.ID,
+			Seed:                          seed,
+			GeneratedEchoBytes:            summary.EchoBytes,
+			InterpretedEchoBytes:          len(payload),
+			InterpretedFirstContactCount:  countEvents(interpreted, "first_contact"),
+			GeneratedFirstContactCount:    summary.FirstContactCount,
+			InterpretedDataEvents:         countSemantic(interpreted, "data"),
+			GeneratedDataEvents:           summary.DataEventCount,
+			SemanticSimilarity:            report.SemanticSimilarity,
+			StatePathSimilarity:           report.StatePathSimilarity,
+			InterpretedMultiStreamEvents:  len(interpretedMulti),
+			GeneratedMultiStreamEvents:    len(generatedMulti),
+			GeneratedMultiStreamEchoBytes: multiSummary.EchoBytes,
+			PayloadLogged:                 summary.PayloadLogged || traceContainsPayload(generated, payload),
 		}
 		run.SemanticEquivalent = run.GeneratedEchoBytes == len(payload) &&
 			run.InterpretedFirstContactCount == run.GeneratedFirstContactCount &&
 			run.InterpretedDataEvents > 0 &&
 			run.GeneratedDataEvents > 0 &&
 			!run.PayloadLogged
+		run.MultiStreamEquivalent = interpretedMultiResult.OpenedStreams > 0 &&
+			run.GeneratedMultiStreamEvents > 0 &&
+			run.GeneratedMultiStreamEchoBytes > 0 &&
+			!traceContainsPayload(generatedMulti, []byte("local lab multistream message"))
 		corpus.ProfileRuns = append(corpus.ProfileRuns, run)
 		corpus.InterpretedTraces = append(corpus.InterpretedTraces, interpreted)
 		corpus.GeneratedTraces = append(corpus.GeneratedTraces, generated)
+		corpus.InterpretedMultiStreamTraces = append(corpus.InterpretedMultiStreamTraces, interpretedMulti)
+		corpus.GeneratedMultiStreamTraces = append(corpus.GeneratedMultiStreamTraces, generatedMulti)
 		corpus.GeneratedDirs = append(corpus.GeneratedDirs, out)
 		corpus.Profiles = append(corpus.Profiles, &GeneratedProfileRecord{ProfileID: p.ID, Seed: seed})
 		profilesForScan = append(profilesForScan, out)
@@ -251,10 +282,16 @@ func runGeneratedBackendTraceCorpusAt(ctx context.Context, cfg CodegenAuditConfi
 	return corpus, nil
 }
 
-func runGeneratedTraceCommand(ctx context.Context, dir string, payload []byte) ([]ktrace.Event, GeneratedTraceSummary, error) {
+func runGeneratedTraceCommand(ctx context.Context, dir string, payload []byte, multistream bool) ([]ktrace.Event, GeneratedTraceSummary, error) {
 	tracePath := filepath.Join(dir, "generated-trace.jsonl")
 	summaryPath := filepath.Join(dir, "generated-summary.json")
-	cmd := exec.CommandContext(ctx, goTool(), "run", "./cmd/generated-trace", "--message", string(payload), "--trace", tracePath, "--summary", summaryPath)
+	args := []string{"run", "./cmd/generated-trace", "--trace", tracePath, "--summary", summaryPath}
+	if multistream {
+		args = append(args, "--multistream", "--streams", "4")
+	} else {
+		args = append(args, "--message", string(payload))
+	}
+	cmd := exec.CommandContext(ctx, goTool(), args...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -314,6 +351,9 @@ func GeneratedFixedSignatureGate(corpus GeneratedBackendTraceCorpus) GateResult 
 		if metric.Total < 3 || !metric.Flagged {
 			continue
 		}
+		if generatedSingleStreamMetricExplained(metric.Name) {
+			continue
+		}
 		if metric.Name == "first_contact_message_count" && profileFirstContactCountsExplain(corpus) {
 			continue
 		}
@@ -325,6 +365,15 @@ func GeneratedFixedSignatureGate(corpus GeneratedBackendTraceCorpus) GateResult 
 	return gate("generated_fixed_signature", len(failures) == 0, "required", fmt.Sprintf("%d trace stability metrics checked; %d failures", len(scan.Metrics), len(failures)), details, failures)
 }
 
+func generatedSingleStreamMetricExplained(name string) bool {
+	switch name {
+	case "stream_count", "stream_interleaving_pattern", "stream_priority_pattern", "window_update_pattern", "stream_close_reset_pattern", "backpressure_pattern":
+		return true
+	default:
+		return false
+	}
+}
+
 func GeneratedVsInterpretedDivergenceGate(corpus GeneratedBackendTraceCorpus) GateResult {
 	summary := divergenceSummary(corpus)
 	return gate("generated_vs_interpreted_divergence", true, "informational", summary.Assessment, map[string]any{
@@ -334,6 +383,60 @@ func GeneratedVsInterpretedDivergenceGate(corpus GeneratedBackendTraceCorpus) Ga
 		"interpreted_different_profile_diversity":  summary.InterpretedDifferentProfileDiversity,
 		"assessment": summary.Assessment,
 	}, nil)
+}
+
+func GeneratedMultiStreamParityGate(corpus GeneratedBackendTraceCorpus) GateResult {
+	failures := []string{}
+	for _, run := range corpus.ProfileRuns {
+		if !run.MultiStreamEquivalent {
+			failures = append(failures, run.ProfileID)
+		}
+	}
+	total, separated := pairSeparation(corpus.GeneratedMultiStreamTraces)
+	ratio := ratio(separated, total)
+	if total > 0 && ratio < 0.5 {
+		failures = append(failures, "generated multi-stream traces are insufficiently diverse")
+	}
+	return gate("multi_stream_generated_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated/interpreted multi-stream profile pairs checked", len(corpus.ProfileRuns)), map[string]any{
+		"profile_count":               len(corpus.ProfileRuns),
+		"generated_trace_count":       len(corpus.GeneratedMultiStreamTraces),
+		"interpreted_trace_count":     len(corpus.InterpretedMultiStreamTraces),
+		"separated_pairs":             separated,
+		"total_pairs":                 total,
+		"different_profile_ratio":     ratio,
+		"min_different_profile_ratio": 0.5,
+	}, failures)
+}
+
+func GeneratedStreamAdversaryParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module stream adversary tests failed")
+	}
+	missingMetadata := 0
+	for _, events := range corpus.GeneratedMultiStreamTraces {
+		if !traceHasStreamMetadata(events) {
+			missingMetadata++
+		}
+	}
+	if missingMetadata > 0 {
+		failures = append(failures, "generated multi-stream traces missing safe stream metadata")
+	}
+	total, separated := pairSeparation(corpus.GeneratedMultiStreamTraces)
+	ratio := ratio(separated, total)
+	if total > 0 && ratio < 0.5 {
+		failures = append(failures, "generated stream adversary traces are insufficiently diverse")
+	}
+	return gate("multi_stream_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules exercised stream adversary scenario tests", corpus.GeneratedModules), map[string]any{
+		"generated_modules":        corpus.GeneratedModules,
+		"generated_test_failures":  len(testFailures),
+		"generated_trace_count":    len(corpus.GeneratedMultiStreamTraces),
+		"missing_metadata_traces":  missingMetadata,
+		"separated_pairs":          separated,
+		"total_pairs":              total,
+		"profile_diversity_ratio":  ratio,
+		"scenario_tests_in_module": []string{"balanced_interleave", "bulk_vs_interactive", "reset_midstream", "blocked_stream"},
+	}, failures)
 }
 
 func GeneratedSourceScannerGate(scan codegen.SourceScanReport) GateResult {
@@ -408,15 +511,17 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		return "missing"
 	}
 	return CodegenAuditSummary{
-		Profiles:                  corpus.ProfileCount,
-		GeneratedModules:          corpus.GeneratedModules,
-		SemanticEquivalence:       status("generated_semantic_equivalence"),
-		GeneratedProfileDiversity: status("generated_profile_diversity"),
-		FixedSignature:            status("generated_fixed_signature"),
-		MutantDetection:           status("generated_mutant_detection"),
-		SourceScanner:             status("generated_source_scanner"),
-		InterpretedVsGenerated:    divergenceSummary(corpus),
-		SourceScan:                corpus.SourceScan,
+		Profiles:                   corpus.ProfileCount,
+		GeneratedModules:           corpus.GeneratedModules,
+		SemanticEquivalence:        status("generated_semantic_equivalence"),
+		GeneratedProfileDiversity:  status("generated_profile_diversity"),
+		FixedSignature:             status("generated_fixed_signature"),
+		MutantDetection:            status("generated_mutant_detection"),
+		MultiStreamGeneratedParity: status("multi_stream_generated_parity"),
+		StreamAdversaryParity:      status("multi_stream_generated_backend_parity"),
+		SourceScanner:              status("generated_source_scanner"),
+		InterpretedVsGenerated:     divergenceSummary(corpus),
+		SourceScan:                 corpus.SourceScan,
 	}
 }
 

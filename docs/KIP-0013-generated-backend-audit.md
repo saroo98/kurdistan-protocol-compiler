@@ -58,6 +58,8 @@ Quick mode keeps the corpus small. Full mode runs more profiles but remains loca
 
 `generated_mutant_detection` uses small mutant fixture corpora to confirm collapsed profile families are detected. It is a regression check, not a proof of real-world behavior.
 
+`multi_stream_generated_parity` fails if generated modules cannot complete the same lab-only multi-stream semantic exercise as the interpreted runtime, or if generated multi-stream traces collapse across profiles.
+
 `generated_source_scanner` fails if generated source looks like a trivial wrapper, directly imports `internal/fsm`, loads `profile.json` at runtime, logs payloads, or lacks profile-specific constants.
 
 ## Code Skeleton Artifact Scanner
@@ -99,6 +101,7 @@ Generated modules can also run a local trace directly:
 ```bash
 cd .generated/profile-12345
 go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json
+go run ./cmd/generated-trace --multistream --streams 4 --trace generated-multistream.jsonl --summary generated-multistream-summary.json
 ```
 
 ## Limitations
@@ -106,5 +109,5 @@ go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary
 - The generated backend still reuses shared lab helpers for IO, framing, padding, scheduling, HMAC, and trace recording.
 - The source scanner is heuristic and text-based.
 - Generated mutant detection uses small synthetic fixture corpora.
-- The audit is single-stream and loopback-only.
+- Multi-stream audit behavior is still loopback-only lab semantics, not real proxy or VPN semantics.
 - Passing these gates does not prove undetectability, production safety, censorship resistance, or real-world robustness.

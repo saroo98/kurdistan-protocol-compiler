@@ -47,6 +47,12 @@ func ExtractFeaturesWithMetadata(traceID, label string, events []ktrace.Event) F
 	var states []string
 	var timings []string
 	var schedulerModes []string
+	var streamLabels []string
+	var streamEvents []string
+	var streamStates []string
+	var streamWindows []string
+	var sessionWindows []string
+	var priorityClasses []string
 	var uploadBytes, downloadBytes int
 	var firstTimestamp int64
 	var prevTimestamp int64
@@ -55,6 +61,7 @@ func ExtractFeaturesWithMetadata(traceID, label string, events []ktrace.Event) F
 	var closeBehavior string
 	var invalidInputOutcome string
 	var malformedFrameOutcome string
+	var backpressureEvents int
 
 	for _, ev := range events {
 		if ev.TimeUnixNano > 0 {
@@ -80,6 +87,27 @@ func ExtractFeaturesWithMetadata(traceID, label string, events []ktrace.Event) F
 		}
 		if ev.SchedulerMode != "" {
 			schedulerModes = append(schedulerModes, ev.SchedulerMode)
+		}
+		if ev.StreamLabel != "" {
+			streamLabels = append(streamLabels, ev.StreamLabel)
+		}
+		if ev.StreamEvent != "" {
+			streamEvents = append(streamEvents, ev.StreamEvent)
+		}
+		if ev.StreamState != "" {
+			streamStates = append(streamStates, ev.StreamState)
+		}
+		if ev.StreamWindowBucket != "" {
+			streamWindows = append(streamWindows, ev.StreamWindowBucket)
+		}
+		if ev.SessionWindowBucket != "" {
+			sessionWindows = append(sessionWindows, ev.SessionWindowBucket)
+		}
+		if ev.PriorityClass != "" {
+			priorityClasses = append(priorityClasses, ev.PriorityClass)
+		}
+		if ev.Backpressure {
+			backpressureEvents++
 		}
 		frameBytes := clampNonNegative(ev.FrameBytes)
 		payloadBytes := clampNonNegative(ev.PayloadBytes)
@@ -123,6 +151,10 @@ func ExtractFeaturesWithMetadata(traceID, label string, events []ktrace.Event) F
 	vector.Features["burst_count"] = float64(burstCount(directions))
 	vector.Features["upload_download_ratio"] = uploadDownloadRatio(uploadBytes, downloadBytes)
 	vector.Features["session_duration_bucket"] = float64(durationBucket(firstTimestamp, prevTimestamp))
+	vector.Features["stream_count"] = float64(uniqueCount(streamLabels))
+	vector.Features["stream_event_count"] = float64(len(streamEvents))
+	vector.Features["backpressure_event_count"] = float64(backpressureEvents)
+	vector.Features["direction_stream_change_count"] = float64(directionChanges(streamLabels))
 	for i := 0; i < firstNFrameCount; i++ {
 		vector.Features[fmt.Sprintf("first_frame_%d", i)] = float64(nthValue(frameSizes, i))
 	}
@@ -146,6 +178,11 @@ func ExtractFeaturesWithMetadata(traceID, label string, events []ktrace.Event) F
 	vector.Buckets["invalid_input_outcome"] = defaultBucket(invalidInputOutcome, "none")
 	vector.Buckets["malformed_frame_outcome"] = defaultBucket(malformedFrameOutcome, "none")
 	vector.Buckets["scheduler_flush_pattern"] = strings.Join(limitStrings(collapseRepeats(schedulerModes), 8), ">")
+	vector.Buckets["stream_interleaving_pattern"] = strings.Join(limitStrings(streamInterleaving(streamLabels, streamEvents), 16), ">")
+	vector.Buckets["stream_state_pattern"] = strings.Join(limitStrings(collapseRepeats(streamStates), 16), ">")
+	vector.Buckets["stream_window_pattern"] = strings.Join(limitStrings(collapseRepeats(streamWindows), 16), ">")
+	vector.Buckets["session_window_pattern"] = strings.Join(limitStrings(collapseRepeats(sessionWindows), 16), ">")
+	vector.Buckets["priority_class_pattern"] = strings.Join(limitStrings(collapseRepeats(priorityClasses), 16), ">")
 	vector.Buckets["label"] = vector.Label
 	return vector
 }
@@ -195,10 +232,11 @@ func eventClass(eventType string) string {
 }
 
 func canonicalEventKey(ev ktrace.Event) string {
-	return fmt.Sprintf("%s|%s|%s|%d|%d|%d|%s|%s",
+	return fmt.Sprintf("%s|%s|%s|%d|%d|%d|%s|%s|%s|%s|%s|%t",
 		ev.EventType, ev.Semantic, directionBucket(ev.Direction), clampNonNegative(ev.FrameBytes),
 		clampNonNegative(ev.PayloadBytes), clampNonNegative(ev.PaddingBytes), ev.SchedulerMode,
-		outcomeBucket(ev.EventType, ev.Note, ev.Semantic))
+		outcomeBucket(ev.EventType, ev.Note, ev.Semantic), ev.StreamEvent, ev.StreamState,
+		ev.PriorityClass, ev.Backpressure)
 }
 
 func earlier(a, b ktrace.Event) bool {
@@ -240,10 +278,10 @@ func inferLabel(profileID string) string {
 func traceIDForEvents(events []ktrace.Event) string {
 	h := sha256.New()
 	for _, ev := range events {
-		fmt.Fprintf(h, "%s|%s|%s|%s|%s|%d|%d|%d|%s\n",
+		fmt.Fprintf(h, "%s|%s|%s|%s|%s|%d|%d|%d|%s|%s|%s|%t\n",
 			ev.ProfileID, ev.EventType, ev.Role, ev.Semantic, directionBucket(ev.Direction),
 			clampNonNegative(ev.FrameBytes), clampNonNegative(ev.PayloadBytes),
-			clampNonNegative(ev.PaddingBytes), ev.SchedulerMode)
+			clampNonNegative(ev.PaddingBytes), ev.SchedulerMode, ev.StreamEvent, ev.PriorityClass, ev.Backpressure)
 	}
 	return "trace_" + hex.EncodeToString(h.Sum(nil))[:16]
 }
@@ -483,6 +521,25 @@ func collapseRepeats(values []string) []string {
 		}
 		out = append(out, value)
 		prev = value
+	}
+	return out
+}
+
+func uniqueCount(values []string) int {
+	seen := map[string]bool{}
+	for _, value := range values {
+		if value != "" {
+			seen[value] = true
+		}
+	}
+	return len(seen)
+}
+
+func streamInterleaving(labels, events []string) []string {
+	n := min(len(labels), len(events))
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, labels[i]+":"+events[i])
 	}
 	return out
 }

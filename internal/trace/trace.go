@@ -10,19 +10,27 @@ import (
 )
 
 type Event struct {
-	TimeUnixNano  int64  `json:"time_unix_nano"`
-	Role          string `json:"role"`
-	ProfileID     string `json:"profile_id"`
-	EventType     string `json:"event_type"`
-	State         string `json:"state,omitempty"`
-	Semantic      string `json:"semantic,omitempty"`
-	WireSymbol    string `json:"wire_symbol,omitempty"`
-	Direction     string `json:"direction,omitempty"`
-	FrameBytes    int    `json:"frame_bytes,omitempty"`
-	PayloadBytes  int    `json:"payload_bytes,omitempty"`
-	PaddingBytes  int    `json:"padding_bytes,omitempty"`
-	SchedulerMode string `json:"scheduler_mode,omitempty"`
-	Note          string `json:"note,omitempty"`
+	TimeUnixNano        int64  `json:"time_unix_nano"`
+	Role                string `json:"role"`
+	ProfileID           string `json:"profile_id"`
+	EventType           string `json:"event_type"`
+	State               string `json:"state,omitempty"`
+	Semantic            string `json:"semantic,omitempty"`
+	WireSymbol          string `json:"wire_symbol,omitempty"`
+	Direction           string `json:"direction,omitempty"`
+	FrameBytes          int    `json:"frame_bytes,omitempty"`
+	PayloadBytes        int    `json:"payload_bytes,omitempty"`
+	PaddingBytes        int    `json:"padding_bytes,omitempty"`
+	SchedulerMode       string `json:"scheduler_mode,omitempty"`
+	StreamLabel         string `json:"stream_label,omitempty"`
+	StreamEvent         string `json:"stream_event,omitempty"`
+	StreamState         string `json:"stream_state,omitempty"`
+	StreamWindowBucket  string `json:"stream_window_bucket,omitempty"`
+	SessionWindowBucket string `json:"session_window_bucket,omitempty"`
+	PriorityClass       string `json:"priority_class,omitempty"`
+	CloseResetEvent     string `json:"close_reset_event,omitempty"`
+	Backpressure        bool   `json:"backpressure,omitempty"`
+	Note                string `json:"note,omitempty"`
 }
 
 type Recorder struct {

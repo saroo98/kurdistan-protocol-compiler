@@ -33,11 +33,13 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/profile_static.go",
 		"protocol/states_generated.go",
 		"protocol/framing_generated.go",
+		"protocol/stream_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
 		"protocol/protocol.go",
 		"protocol/protocol_test.go",
+		"protocol/multistream_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -84,7 +86,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 	}
 	if !strings.Contains(protocolSource, "const ProfileID") ||
 		!strings.Contains(protocolSource, "var transitionTable") ||
-		!strings.Contains(protocolSource, "var semanticWireSymbols") {
+		!strings.Contains(protocolSource, "var semanticWireSymbols") ||
+		!strings.Contains(protocolSource, "const StreamIDEncodingMode") ||
+		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
 
@@ -133,11 +137,16 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	stateB := mustRead(t, filepath.Join(outB, "protocol", "states_generated.go"))
 	frameA := mustRead(t, filepath.Join(outA, "protocol", "framing_generated.go"))
 	frameB := mustRead(t, filepath.Join(outB, "protocol", "framing_generated.go"))
+	streamA := mustRead(t, filepath.Join(outA, "protocol", "stream_generated.go"))
+	streamB := mustRead(t, filepath.Join(outB, "protocol", "stream_generated.go"))
 	if stateA == stateB {
 		t.Fatalf("state generation did not differ across profiles")
 	}
 	if frameA == frameB {
 		t.Fatalf("framing generation did not differ across profiles")
+	}
+	if streamA == streamB {
+		t.Fatalf("stream generation did not differ across profiles")
 	}
 }
 
