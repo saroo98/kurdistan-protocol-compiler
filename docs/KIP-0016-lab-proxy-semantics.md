@@ -174,3 +174,7 @@ go test -fuzz=Fuzz ./internal/framing
 ## Limitations
 
 This milestone models proxy-style semantics only. It does not implement a production proxy adapter, external target connection logic, carrier integration, production key exchange, deployment behavior, or real-world censorship testing. The model is useful for compiler, trace, adversarial audit, and generated-backend regression work.
+
+## Next Layer
+
+KIP-0017 adds carrier abstraction modeling above these proxy semantics. Proxysem scenarios emit semantic messages, and carrier models verify that different abstract envelope shapes can preserve those semantics without adding real carrier integrations.

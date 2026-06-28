@@ -36,6 +36,14 @@ const (
 	ModeFixedResponseChunking         = "fixed_response_chunking"
 	ModeNoTargetBackpressure          = "no_target_backpressure"
 	ModePaddingOnlyProxyDiversity     = "padding_only_proxy_diversity"
+	ModeFixedCarrierFamily            = "fixed_carrier_family"
+	ModeFixedEnvelopeEncoding         = "fixed_envelope_encoding"
+	ModeFixedFlushPolicy              = "fixed_flush_policy"
+	ModeFixedBatchPolicy              = "fixed_batch_policy"
+	ModeFixedChunkingPolicy           = "fixed_chunking_policy"
+	ModeNoCarrierBackpressure         = "no_carrier_backpressure"
+	ModeNoReorderRecovery             = "no_reorder_recovery"
+	ModePaddingOnlyCarrierDiversity   = "padding_only_carrier_diversity"
 )
 
 func Modes() []string {
@@ -59,6 +67,14 @@ func Modes() []string {
 		ModeFixedResponseChunking,
 		ModeNoTargetBackpressure,
 		ModePaddingOnlyProxyDiversity,
+		ModeFixedCarrierFamily,
+		ModeFixedEnvelopeEncoding,
+		ModeFixedFlushPolicy,
+		ModeFixedBatchPolicy,
+		ModeFixedChunkingPolicy,
+		ModeNoCarrierBackpressure,
+		ModeNoReorderRecovery,
+		ModePaddingOnlyCarrierDiversity,
 	}
 }
 
@@ -135,6 +151,29 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p.Stream.InitialStreamWindowBytes = 128 * 1024
 			p.Stream.InitialSessionWindowBytes = min(2*1024*1024, 128*1024*max(4, p.Stream.MaxConcurrentStreams))
 		case ModePaddingOnlyProxyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeFixedCarrierFamily:
+			p.CarrierPolicy.CarrierFamily = base.CarrierPolicy.CarrierFamily
+		case ModeFixedEnvelopeEncoding:
+			p.CarrierPolicy.EnvelopeEncoding = base.CarrierPolicy.EnvelopeEncoding
+		case ModeFixedFlushPolicy:
+			p.CarrierPolicy.FlushPolicy = base.CarrierPolicy.FlushPolicy
+		case ModeFixedBatchPolicy:
+			p.CarrierPolicy.BatchPolicy = base.CarrierPolicy.BatchPolicy
+			p.CarrierPolicy.MaxMessagesPerEnvelope = base.CarrierPolicy.MaxMessagesPerEnvelope
+		case ModeFixedChunkingPolicy:
+			p.CarrierPolicy.ChunkingPolicy = base.CarrierPolicy.ChunkingPolicy
+			p.CarrierPolicy.MaxEnvelopeBytes = base.CarrierPolicy.MaxEnvelopeBytes
+		case ModeNoCarrierBackpressure:
+			p.CarrierPolicy.MaxCarrierQueueDepth = 128
+			p.CarrierPolicy.BackpressurePolicy = "carrier_queue_backpressure"
+		case ModeNoReorderRecovery:
+			p.CarrierPolicy.ReliabilityPolicy = "ordered_only"
+			p.CarrierPolicy.ReorderPolicy = "none"
+			p.CarrierPolicy.MaxRetryCount = 0
+		case ModePaddingOnlyCarrierDiversity:
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
