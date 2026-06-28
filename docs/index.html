@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kurdistan Protocol Compiler | Polymorphic Relay Transport Research</title>
+    <meta
+      name="description"
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+    />
+    <meta property="og:title" content="Kurdistan Protocol Compiler" />
+    <meta
+      property="og:description"
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://saroo98.github.io/kurdistan-protocol-compiler/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Kurdistan Protocol Compiler" />
+    <meta
+      name="twitter:description"
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+    />
+    <link rel="canonical" href="https://saroo98.github.io/kurdistan-protocol-compiler/" />
+    <link rel="icon" href="assets/kurdistan-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Kurdistan Protocol Compiler home">
+        <img src="assets/kurdistan-mark.svg" alt="" />
+        <span>Kurdistan</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#capabilities">Capabilities</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#milestones">Milestones</a>
+        <a href="#docs">Docs</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Protocol compiler for adversarial networks</p>
+          <h1>Production-grade polymorphic relay transport compiler in development.</h1>
+          <p class="hero-text">
+            Kurdistan generates profile-specific relay transport implementations with generated state machines,
+            framing, scheduling, padding, probing behavior, multi-stream semantics, source-code backends,
+            adversarial audits, mutation testing, and regression gates.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
+            <a class="button" href="#docs">Read the docs</a>
+            <a class="button" href="#roadmap">See roadmap</a>
+          </div>
+        </div>
+        <div class="hero-panel" aria-label="Generated transport summary">
+          <div class="panel-topline">
+            <span>compiler output</span>
+            <strong>profile-specific transport</strong>
+          </div>
+          <div class="signal-stack">
+            <div><span>state machines</span><b>generated</b></div>
+            <div><span>frame grammar</span><b>varied</b></div>
+            <div><span>scheduler</span><b>profile-bound</b></div>
+            <div><span>streams</span><b>flow-controlled</b></div>
+            <div><span>audits</span><b>adversarial</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="what">
+        <div class="section-heading">
+          <h2>What is Kurdistan?</h2>
+          <p>
+            Kurdistan is a censorship resistance and anti-censorship networking research project focused on
+            polymorphic relay transport generation.
+          </p>
+        </div>
+        <div class="split">
+          <p>
+            Instead of defining one stable relay transport protocol, Kurdistan compiles private transport
+            profiles. A profile controls first contact, state transitions, wire grammar, semantic mapping,
+            scheduling, padding, probing behavior, stream lifecycle, and error handling.
+          </p>
+          <p>
+            The current system includes both an interpreted runtime and a generated source backend. That makes
+            it possible to compare shared-runtime behavior against profile-specific Go modules while preserving
+            payload-free traces for analysis.
+          </p>
+        </div>
+      </section>
+
+      <section class="section dark-band" id="why">
+        <div class="section-heading">
+          <h2>Why this exists</h2>
+          <p>
+            Fixed protocol families can accumulate recognizable fingerprints. Kurdistan studies protocol
+            fingerprint diversity as a compiler problem.
+          </p>
+        </div>
+        <div class="wide-copy">
+          <p>
+            The long-term motivation is resilient communication in adversarial networks and censored
+            environments, including heavily filtered countries such as Iran. Kurdistan is built for
+            censorship-resistant networking research, pluggable transport research, traffic analysis resistance
+            research, and controlled experiments around internet censorship.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="capabilities">
+        <div class="section-heading">
+          <h2>Core capabilities</h2>
+          <p>Compiler, runtime, source generation, and audit layers designed to make protocol collapse visible.</p>
+        </div>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Generated protocols</h3>
+            <p>Deterministic profile generation for first contact, FSM paths, framing, semantic mapping, and probing behavior.</p>
+          </article>
+          <article class="card">
+            <h3>Frame diversity</h3>
+            <p>Profile-specific frame grammar choices for length modes, type modes, fragmentation, padding placement, and limits.</p>
+          </article>
+          <article class="card">
+            <h3>Scheduler and padding</h3>
+            <p>Generated scheduler policies, padding strategies, invalid-input behavior, and malformed-frame responses.</p>
+          </article>
+          <article class="card">
+            <h3>Multi-stream relay transport</h3>
+            <p>Stream IDs, flow-control windows, close/reset behavior, backpressure, and priority scheduling.</p>
+          </article>
+          <article class="card">
+            <h3>Generated source backend</h3>
+            <p><code>kgen</code> emits profile-specific Go modules with generated constants, tables, tests, and trace tools.</p>
+          </article>
+          <article class="card">
+            <h3>Adversarial audits</h3>
+            <p>Black-box clustering, mutation testing, fixed-signature gates, stream collapse scanning, and regression reports.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="architecture">
+        <div class="section-heading">
+          <h2>Architecture</h2>
+          <p>A compiler-centered proxy transport architecture with generated transports as the core research layer.</p>
+        </div>
+        <div class="architecture" aria-label="Architecture diagram">
+          <div class="arch-node">Application / future proxy adapter</div>
+          <div class="arch-arrow"></div>
+          <div class="arch-node">Stable internal relay semantics</div>
+          <div class="arch-arrow"></div>
+          <div class="arch-node highlight">Kurdistan generated transport</div>
+          <div class="arch-arrow"></div>
+          <div class="arch-node">Carrier abstraction</div>
+          <div class="arch-arrow"></div>
+          <div class="arch-node">Remote relay model</div>
+        </div>
+      </section>
+
+      <section class="section" id="milestones">
+        <div class="section-heading">
+          <h2>Milestones</h2>
+          <p>Current progress toward a production-grade polymorphic relay transport compiler.</p>
+        </div>
+        <div class="timeline">
+          <div><strong>Done</strong><span>Compiler/runtime scaffold</span></div>
+          <div><strong>Done</strong><span>Diversity audit and regression gates</span></div>
+          <div><strong>Done</strong><span>Adversarial lab simulator</span></div>
+          <div><strong>Done</strong><span>Mutation and longitudinal testing</span></div>
+          <div><strong>Done</strong><span>Generated source backend and parity audit</span></div>
+          <div><strong>Done</strong><span>Multi-stream semantics and stream adversary tests</span></div>
+          <div class="next"><strong>Next</strong><span>Lab-only proxy semantics</span></div>
+          <div><strong>Future</strong><span>Carrier abstraction and production security model</span></div>
+        </div>
+      </section>
+
+      <section class="section dark-band" id="research">
+        <div class="section-heading">
+          <h2>Research focus</h2>
+          <p>Protocol generation as a path toward stronger relay transport diversity.</p>
+        </div>
+        <div class="research-grid">
+          <span>censorship resistance</span>
+          <span>anti-censorship networking</span>
+          <span>pluggable transport research</span>
+          <span>protocol fingerprint diversity</span>
+          <span>traffic analysis resistance research</span>
+          <span>Iran internet censorship</span>
+        </div>
+      </section>
+
+      <section class="section" id="docs">
+        <div class="section-heading">
+          <h2>Documentation links</h2>
+          <p>Start with the README and current status, then review the latest KIPs.</p>
+        </div>
+        <div class="doc-list">
+          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/README.md">README.md</a>
+          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/STATUS.md">STATUS.md</a>
+          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/ROADMAP.md">ROADMAP.md</a>
+          <a href="KIP-0014-multi-stream-lab-semantics.md">KIP-0014: Multi-stream lab semantics</a>
+          <a href="KIP-0015-multi-stream-adversarial-testing.md">KIP-0015: Multi-stream adversarial testing</a>
+        </div>
+      </section>
+
+      <section class="section status" id="roadmap">
+        <div>
+          <h2>Status / roadmap</h2>
+          <p>
+            The current implementation centers on generated profiles, source-code backends, multi-stream
+            semantics, and adversarial audits. The next step is lab-only proxy semantics, followed by carrier
+            abstraction, production security design, and implementation hardening.
+          </p>
+        </div>
+        <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
+      </section>
+    </main>
+
+    <footer>
+      <strong>Kurdistan Protocol Compiler</strong>
+      <span>Censorship-resistance networking research</span>
+      <span>Go / protocol compiler / polymorphic relay transport</span>
+    </footer>
+  </body>
+</html>
