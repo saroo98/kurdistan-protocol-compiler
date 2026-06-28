@@ -15,9 +15,15 @@ import (
 )
 
 type Operation struct {
-	Semantic string
-	StreamID uint32
-	Payload  []byte
+	Semantic    string
+	StreamID    uint32
+	Sequence    uint64
+	Offset      uint64
+	CreditBytes int
+	Reason      string
+	Priority    string
+	EndStream   bool
+	Payload     []byte
 }
 
 type DecodedFrame struct {
@@ -51,7 +57,9 @@ func EncodeOperation(p *ir.Profile, op Operation, seed int64) ([][]byte, error) 
 		if err != nil {
 			return nil, err
 		}
-		frame, err := encodeFrame(p, op.Semantic, op.StreamID, chunk, pad, idx, len(sizes))
+		partOp := op
+		partOp.Payload = chunk
+		frame, err := encodeFrame(p, partOp, pad, idx, len(sizes))
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +99,9 @@ func DecodeFrames(p *ir.Profile, frames [][]byte) (Operation, []DecodedFrame, er
 	for _, part := range payloads {
 		payload = append(payload, part...)
 	}
-	return Operation{Semantic: decoded[0].Operation.Semantic, StreamID: decoded[0].Operation.StreamID, Payload: payload}, decoded, nil
+	result := decoded[0].Operation
+	result.Payload = payload
+	return result, decoded, nil
 }
 
 func WriteOperation(w io.Writer, p *ir.Profile, op Operation, seed int64) ([]DecodedFrame, error) {
@@ -199,24 +209,28 @@ func readPrefixBody(r io.Reader, p *ir.Profile, prefix []byte, length int) ([]by
 	return append(append([]byte(nil), prefix...), body...), nil
 }
 
-func encodeFrame(p *ir.Profile, semantic string, streamID uint32, payload, pad []byte, fragIndex, fragCount int) ([]byte, error) {
-	msg, ok := ir.MessageBySemantic(p, semantic)
+func encodeFrame(p *ir.Profile, op Operation, pad []byte, fragIndex, fragCount int) ([]byte, error) {
+	msg, ok := ir.MessageBySemantic(p, op.Semantic)
 	if !ok {
-		return nil, fmt.Errorf("unknown semantic %q", semantic)
+		return nil, fmt.Errorf("unknown semantic %q", op.Semantic)
 	}
 	if len(pad) > 0 && (len(pad) < p.Padding.MinPaddingBytes || len(pad) > p.Padding.MaxPaddingBytes) {
 		return nil, fmt.Errorf("padding outside bounds")
 	}
-	payloadSection := payload
+	meta, err := encodeOperationMetadata(op)
+	if err != nil {
+		return nil, err
+	}
+	payloadSection := append(meta, op.Payload...)
 	if len(pad) > 0 {
 		switch p.FrameGrammar.PaddingPlacement {
 		case "prefix":
-			payloadSection = append(append([]byte(nil), pad...), payload...)
+			payloadSection = append(append([]byte(nil), pad...), payloadSection...)
 		default:
-			payloadSection = append(append([]byte(nil), payload...), pad...)
+			payloadSection = append(append([]byte(nil), payloadSection...), pad...)
 		}
 	}
-	fields, err := encodeHeaderFields(p, msg, streamID, fragIndex, fragCount, len(pad))
+	fields, err := encodeHeaderFields(p, msg, op.StreamID, fragIndex, fragCount, len(pad))
 	if err != nil {
 		return nil, err
 	}
@@ -255,20 +269,27 @@ func DecodeFrame(p *ir.Profile, frame []byte) (DecodedFrame, error) {
 	if padLen > len(payloadSection) {
 		return DecodedFrame{}, fmt.Errorf("padding length exceeds payload section")
 	}
-	payload := payloadSection
+	payloadWithMeta := payloadSection
 	if padLen > 0 {
 		switch p.FrameGrammar.PaddingPlacement {
 		case "prefix":
-			payload = payloadSection[padLen:]
+			payloadWithMeta = payloadSection[padLen:]
 		default:
-			payload = payloadSection[:len(payloadSection)-padLen]
+			payloadWithMeta = payloadSection[:len(payloadSection)-padLen]
 		}
+	}
+	meta, payload, err := decodeOperationMetadata(payloadWithMeta)
+	if err != nil {
+		return DecodedFrame{}, err
 	}
 	if len(payload) > p.Limits.MaxPayloadBytes {
 		return DecodedFrame{}, fmt.Errorf("payload exceeds profile limit")
 	}
+	meta.Semantic = msg.Semantic
+	meta.StreamID = streamID
+	meta.Payload = payload
 	return DecodedFrame{
-		Operation:    Operation{Semantic: msg.Semantic, StreamID: streamID, Payload: payload},
+		Operation:    meta,
 		WireSymbol:   msg.WireSymbol,
 		FrameBytes:   len(frame),
 		PayloadBytes: len(payload),
@@ -292,9 +313,15 @@ func encodeHeaderFields(p *ir.Profile, msg ir.MessageSymbol, streamID uint32, fr
 			out = append(out, byte(len(tag)))
 			out = append(out, tag...)
 		case "stream":
-			var b [4]byte
-			binary.BigEndian.PutUint32(b[:], streamID)
-			out = append(out, b[:]...)
+			encoded, err := encodeStreamID(p, streamID)
+			if err != nil {
+				return nil, err
+			}
+			if len(encoded) > 255 {
+				return nil, fmt.Errorf("stream id encoding too long")
+			}
+			out = append(out, byte(len(encoded)))
+			out = append(out, encoded...)
 		case "flags":
 			var b [7]byte
 			if fragCount > 1 {
@@ -340,11 +367,20 @@ func decodeHeaderAndPayload(p *ir.Profile, body []byte) (ir.MessageSymbol, uint3
 			msg = found
 			hasType = true
 		case "stream":
-			if len(rest) < 4 {
+			if len(rest) < 1 {
 				return msg, 0, 0, 0, 0, nil, io.ErrUnexpectedEOF
 			}
-			streamID = binary.BigEndian.Uint32(rest[:4])
-			rest = rest[4:]
+			n := int(rest[0])
+			rest = rest[1:]
+			if n <= 0 || len(rest) < n {
+				return msg, 0, 0, 0, 0, nil, io.ErrUnexpectedEOF
+			}
+			id, err := decodeStreamID(p, rest[:n])
+			if err != nil {
+				return msg, 0, 0, 0, 0, nil, err
+			}
+			streamID = id
+			rest = rest[n:]
 		case "flags":
 			if len(rest) < 7 {
 				return msg, 0, 0, 0, 0, nil, io.ErrUnexpectedEOF
@@ -462,6 +498,115 @@ func messageByTag(p *ir.Profile, tag []byte) (ir.MessageSymbol, bool) {
 		}
 	}
 	return ir.MessageSymbol{}, false
+}
+
+func encodeOperationMetadata(op Operation) ([]byte, error) {
+	if len(op.Reason) > 255 {
+		return nil, fmt.Errorf("reason too long")
+	}
+	if len(op.Priority) > 255 {
+		return nil, fmt.Errorf("priority too long")
+	}
+	if op.CreditBytes < 0 {
+		return nil, fmt.Errorf("credit bytes cannot be negative")
+	}
+	var out []byte
+	var fixed [21]byte
+	binary.BigEndian.PutUint64(fixed[0:8], op.Sequence)
+	binary.BigEndian.PutUint64(fixed[8:16], op.Offset)
+	binary.BigEndian.PutUint32(fixed[16:20], uint32(op.CreditBytes))
+	if op.EndStream {
+		fixed[20] = 1
+	}
+	out = append(out, fixed[:]...)
+	out = append(out, byte(len(op.Reason)))
+	out = append(out, []byte(op.Reason)...)
+	out = append(out, byte(len(op.Priority)))
+	out = append(out, []byte(op.Priority)...)
+	return out, nil
+}
+
+func decodeOperationMetadata(in []byte) (Operation, []byte, error) {
+	if len(in) < 23 {
+		return Operation{}, nil, io.ErrUnexpectedEOF
+	}
+	op := Operation{
+		Sequence:    binary.BigEndian.Uint64(in[0:8]),
+		Offset:      binary.BigEndian.Uint64(in[8:16]),
+		CreditBytes: int(binary.BigEndian.Uint32(in[16:20])),
+		EndStream:   in[20] != 0,
+	}
+	rest := in[21:]
+	reasonLen := int(rest[0])
+	rest = rest[1:]
+	if len(rest) < reasonLen+1 {
+		return Operation{}, nil, io.ErrUnexpectedEOF
+	}
+	op.Reason = string(rest[:reasonLen])
+	rest = rest[reasonLen:]
+	priorityLen := int(rest[0])
+	rest = rest[1:]
+	if len(rest) < priorityLen {
+		return Operation{}, nil, io.ErrUnexpectedEOF
+	}
+	op.Priority = string(rest[:priorityLen])
+	rest = rest[priorityLen:]
+	return op, rest, nil
+}
+
+func encodeStreamID(p *ir.Profile, streamID uint32) ([]byte, error) {
+	switch p.Stream.IDEncodingMode {
+	case "fixed32_be", "":
+		var b [4]byte
+		binary.BigEndian.PutUint32(b[:], streamID)
+		return b[:], nil
+	case "profile_xor32":
+		var b [4]byte
+		binary.BigEndian.PutUint32(b[:], streamID^streamMask(p, "profile"))
+		return b[:], nil
+	case "table_mapped32_le":
+		var b [4]byte
+		binary.LittleEndian.PutUint32(b[:], streamID^streamMask(p, "table"))
+		return b[:], nil
+	case "varint":
+		buf := make([]byte, binary.MaxVarintLen32)
+		n := binary.PutUvarint(buf, uint64(streamID))
+		return buf[:n], nil
+	default:
+		return nil, fmt.Errorf("unsupported stream id encoding %q", p.Stream.IDEncodingMode)
+	}
+}
+
+func decodeStreamID(p *ir.Profile, encoded []byte) (uint32, error) {
+	switch p.Stream.IDEncodingMode {
+	case "fixed32_be", "":
+		if len(encoded) != 4 {
+			return 0, fmt.Errorf("invalid fixed stream id length")
+		}
+		return binary.BigEndian.Uint32(encoded), nil
+	case "profile_xor32":
+		if len(encoded) != 4 {
+			return 0, fmt.Errorf("invalid xor stream id length")
+		}
+		return binary.BigEndian.Uint32(encoded) ^ streamMask(p, "profile"), nil
+	case "table_mapped32_le":
+		if len(encoded) != 4 {
+			return 0, fmt.Errorf("invalid table stream id length")
+		}
+		return binary.LittleEndian.Uint32(encoded) ^ streamMask(p, "table"), nil
+	case "varint":
+		value, n := binary.Uvarint(encoded)
+		if n <= 0 || value > 1<<32-1 {
+			return 0, fmt.Errorf("invalid varint stream id")
+		}
+		return uint32(value), nil
+	default:
+		return 0, fmt.Errorf("unsupported stream id encoding %q", p.Stream.IDEncodingMode)
+	}
+}
+
+func streamMask(p *ir.Profile, salt string) uint32 {
+	return crc32.ChecksumIEEE([]byte(p.ID + ":" + salt + ":" + fmt.Sprint(p.FrameGrammar.HeaderOrder)))
 }
 
 func appendCRC(p *ir.Profile, body []byte) []byte {

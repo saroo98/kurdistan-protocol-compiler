@@ -1,6 +1,6 @@
 package audit
 
-const Version = "0.7.0-lab"
+const Version = "0.9.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`
@@ -38,6 +38,12 @@ type AuditThresholds struct {
 	MaxSameProfileDistance            float64 `json:"max_same_profile_distance"`
 	MaxNoisyFixedClusterSpread        float64 `json:"max_noisy_fixed_cluster_spread"`
 	MaxFixedControlClusterSpread      float64 `json:"max_fixed_control_cluster_spread"`
+	MinStreamPolicyCombinations       int     `json:"min_stream_policy_combinations"`
+	MinStreamIDEncodingModes          int     `json:"min_stream_id_encoding_modes"`
+	MinMultiStreamTracePatterns       int     `json:"min_multi_stream_trace_patterns"`
+	MaxStreamAdversaryDominantRatio   float64 `json:"max_stream_adversary_dominant_ratio"`
+	MinStreamAdversaryDiversityScore  float64 `json:"min_stream_adversary_diversity_score"`
+	MinStreamAdversaryScenarioSuccess float64 `json:"min_stream_adversary_scenario_success"`
 }
 
 func DefaultConfig(mode string) AuditConfig {
@@ -84,6 +90,12 @@ func DefaultThresholds() AuditThresholds {
 		MaxSameProfileDistance:            0.12,
 		MaxNoisyFixedClusterSpread:        0.25,
 		MaxFixedControlClusterSpread:      0.01,
+		MinStreamPolicyCombinations:       8,
+		MinStreamIDEncodingModes:          3,
+		MinMultiStreamTracePatterns:       2,
+		MaxStreamAdversaryDominantRatio:   0.85,
+		MinStreamAdversaryDiversityScore:  0.20,
+		MinStreamAdversaryScenarioSuccess: 0.95,
 	}
 }
 

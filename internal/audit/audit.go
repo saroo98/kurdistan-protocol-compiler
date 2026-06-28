@@ -39,6 +39,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		SameProfileConsistencyGate(ctx),
 		DifferentProfileSeparationGate(traces, cfg.Thresholds),
 		MalformedProbeBehaviorGate(profiles, cfg.Thresholds),
+		MultiStreamSemanticsGate(ctx, profiles, cfg.Thresholds),
+		MultiStreamDiversityGate(profiles, cfg.Thresholds),
+		MultiStreamBackpressureGate(ctx, profiles, cfg.Thresholds),
+		MultiStreamAdversarialScenariosGate(ctx, profiles, cfg.Thresholds),
+		MultiStreamCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
+		MultiStreamMutantDetectionGate(ctx, cfg.Thresholds),
 		FuzzPresenceGate(),
 	}
 

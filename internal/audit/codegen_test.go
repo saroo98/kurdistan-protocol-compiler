@@ -49,6 +49,9 @@ func TestGeneratedTraceCorpusSemanticEquivalence(t *testing.T) {
 	if run.GeneratedEchoBytes != len(codegenAuditPayload()) {
 		t.Fatalf("generated echo bytes = %d, want %d", run.GeneratedEchoBytes, len(codegenAuditPayload()))
 	}
+	if !run.MultiStreamEquivalent {
+		t.Fatalf("generated and interpreted multi-stream traces were not equivalent: %+v", run)
+	}
 	if run.InterpretedFirstContactCount != run.GeneratedFirstContactCount {
 		t.Fatalf("first-contact count mismatch: %+v", run)
 	}
@@ -70,6 +73,8 @@ func TestCodegenAuditQuickIncludesM7GatesAndJSON(t *testing.T) {
 		"generated_profile_diversity",
 		"generated_fixed_signature",
 		"generated_vs_interpreted_divergence",
+		"multi_stream_generated_parity",
+		"multi_stream_generated_backend_parity",
 		"generated_mutant_detection",
 		"generated_source_scanner",
 	}
@@ -85,7 +90,7 @@ func TestCodegenAuditQuickIncludesM7GatesAndJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"\"codegen\"", "semantic_equivalence", "generated_profile_diversity", "fixed_signature", "interpreted_vs_generated"} {
+	for _, want := range []string{"\"codegen\"", "semantic_equivalence", "generated_profile_diversity", "fixed_signature", "interpreted_vs_generated", "multi_stream_generated_parity", "multi_stream_generated_backend_parity"} {
 		if !containsString(string(raw), want) {
 			t.Fatalf("audit JSON missing %q: %s", want, raw)
 		}
@@ -110,7 +115,7 @@ func TestGeneratedMutantDetectionFailsCollapsedProfiles(t *testing.T) {
 
 func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 	report := AuditReport{
-		Version:      "0.7.0-lab",
+		Version:      "0.9.0-lab",
 		Mode:         "codegen-quick",
 		GeneratedAt:  "2026-06-27T00:00:00Z",
 		ProfileCount: 2,
@@ -120,22 +125,26 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 			{Name: "generated_semantic_equivalence", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_profile_diversity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_fixed_signature", Passed: true, Severity: "required", Summary: "ok"},
+			{Name: "multi_stream_generated_parity", Passed: true, Severity: "required", Summary: "ok"},
+			{Name: "multi_stream_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_mutant_detection", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_source_scanner", Passed: true, Severity: "required", Summary: "ok"},
 		},
 		CodegenSummary: CodegenAuditSummary{
-			Profiles:                  2,
-			GeneratedModules:          2,
-			SemanticEquivalence:       "passed",
-			GeneratedProfileDiversity: "passed",
-			FixedSignature:            "passed",
-			MutantDetection:           "passed",
-			SourceScanner:             "passed",
+			Profiles:                   2,
+			GeneratedModules:           2,
+			SemanticEquivalence:        "passed",
+			GeneratedProfileDiversity:  "passed",
+			FixedSignature:             "passed",
+			MultiStreamGeneratedParity: "passed",
+			StreamAdversaryParity:      "passed",
+			MutantDetection:            "passed",
+			SourceScanner:              "passed",
 		},
 		Conclusion: "passed",
 	}
 	status := RenderStatus(report)
-	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "generated_mutant_detection", "generated_source_scanner"} {
+	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "multi_stream_generated_parity", "multi_stream_generated_backend_parity", "generated_mutant_detection", "generated_source_scanner"} {
 		if !containsString(status, want) {
 			t.Fatalf("status missing %q:\n%s", want, status)
 		}

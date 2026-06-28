@@ -1,6 +1,6 @@
 # Kurdistan Protocol Compiler
 
-Kurdistan is a lab-only research prototype for compiling one-off relay protocol profiles. A profile defines a generated first-contact sequence, state machine, frame grammar, semantic wire mapping, scheduler, padding policy, invalid-input behavior, and trace expectations.
+Kurdistan is a lab-only research prototype for compiling one-off relay protocol profiles. A profile defines a generated first-contact sequence, state machine, frame grammar, semantic wire mapping, scheduler, padding policy, invalid-input behavior, lab-only multi-stream policy, and trace expectations.
 
 Kurdistan is not a VPN, a proxy, a deployment system, or a censorship bypass product. This repository does not include TUN/TAP interfaces, SOCKS, HTTP proxying, public relay service code, TLS mimicry, CDN bypass, domain-fronting, mobile apps, cloud deployment, or external target fetching. All runtime demos and tests are loopback-only.
 
@@ -18,6 +18,7 @@ In this prototype, polymorphic means two generated profiles are not just the sam
 - frame length and type encoding
 - fragmentation and padding
 - scheduler mode and flush behavior
+- multi-stream ID encoding, flow-control windows, stream priority, close/reset, and window-update behavior
 - invalid-input and probe response behavior
 - trace shape
 
@@ -91,6 +92,13 @@ Generated client and server commands accept `--trace out.jsonl` for payload-free
 go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json
 ```
 
+Run the generated local-only multi-stream demo without starting a server:
+
+```bash
+go run ./cmd/generated-client --multistream-demo --streams 3
+go run ./cmd/generated-trace --multistream --streams 4 --trace generated-multistream.jsonl --summary generated-multistream-summary.json
+```
+
 Generated output is ignored under `.generated/` and is intended for local lab inspection only.
 
 ## Traces
@@ -150,7 +158,16 @@ go run ./cmd/kcheck codegen --full --out testdata/audit/codegen.json
 go run ./cmd/kcheck codegen --quick --status STATUS.md
 ```
 
-The generated-backend audit checks semantic equivalence against the interpreted runtime, generated trace diversity across profiles, fixed-signature regressions, mutant detection, and generated source scanner results.
+The generated-backend audit checks semantic equivalence against the interpreted runtime, generated trace diversity across profiles, fixed-signature regressions, mutant detection, generated source scanner results, generated/interpreted multi-stream parity, and generated-module stream adversary scenario tests.
+
+Run the local-only multi-stream adversary audit directly:
+
+```bash
+go run ./cmd/kcheck streamadversary --quick
+go run ./cmd/kcheck streamadversary --full --out testdata/audit/stream-adversary.json
+```
+
+The stream adversary audit runs deterministic local scenarios for balanced interleaving, bulk-vs-interactive pressure, blocked streams, session-window exhaustion, reset midstream, close races, and uneven stream sizes. It extracts payload-free stream features and checks that stream behavior has not collapsed into fixed observable patterns.
 
 Compare audit reports for longitudinal regressions:
 
@@ -172,6 +189,7 @@ go test ./...
 go vet ./...
 go test -bench=. ./...
 go test -fuzz=Fuzz ./internal/framing
+go run ./cmd/kcheck streamadversary --quick
 ```
 
 Benchmarks measure profile generation, frame encode/decode, local round trips, scheduler overhead, and padding overhead. They are lab measurements only and do not imply real-world performance or detectability.
