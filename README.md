@@ -70,8 +70,8 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 | Generated backend audit | Done |
 | Multi-stream lab semantics | Done |
 | Multi-stream adversarial testing | Done |
-| Lab-only proxy semantics | Next |
-| Carrier abstraction | Future |
+| Lab-only proxy semantics | Done |
+| Carrier abstraction | Next |
 | Production security model | Future |
 | Proxy/VPN integration | Future |
 
@@ -93,6 +93,9 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 - Multi-stream relay semantics.
 - Stream ID strategies, close/reset behavior, flow control, and backpressure.
 - Stream adversary scenarios for interleaving, scheduler pressure, blocked streams, resets, close races, and uneven stream sizes.
+- Internal proxy-semantics model with synthetic target descriptors and relay intents.
+- Synthetic target registry for echo, discard, fixed, slow, chunked, large, error, reset, drip, and jittery responses.
+- Proxy adversary scenarios, proxy feature extraction, collapse scanning, and proxy mutant detection.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -113,6 +116,9 @@ internal/ir + internal/compiler
 internal/fsm + internal/framing + internal/scheduler + internal/stream
   runtime model for state machines, frames, scheduling, and streams
 
+internal/proxysem + internal/proxyrelay + internal/proxyadversary
+  synthetic proxy-semantics model, relay-intent runner, and proxy collapse scanning
+
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
@@ -132,6 +138,7 @@ go test ./...
 go vet ./...
 go run ./cmd/kcheck --quick
 go run ./cmd/kcheck streamadversary --quick
+go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -162,6 +169,7 @@ Build the generated module:
 cd .generated/profile-12345
 go test ./...
 go run ./cmd/generated-client --multistream-demo --streams 3
+go run ./cmd/generated-client --proxysem-demo --targets mixed --streams 4
 ```
 
 ## Audits And Gates
@@ -185,6 +193,7 @@ Kurdistan treats diversity as something to measure.
 - generated source scanner checks
 - multi-stream semantics and backpressure
 - stream adversary collapse resistance
+- proxy-semantics correctness, diversity, target backpressure, error/reset isolation, and mutant detection
 
 Useful commands:
 
@@ -200,6 +209,7 @@ Run adversarial analyses directly:
 ```bash
 go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck streamadversary --quick
+go run ./cmd/kcheck proxysem --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -248,14 +258,19 @@ The stream adversary audit exercises:
 
 The audit checks that padding noise alone is not mistaken for meaningful multi-stream diversity.
 
+## Proxy-Semantics Model
+
+Kurdistan now models proxy-style relay intent internally without adding a real proxy adapter. A logical stream can bind to a synthetic target descriptor, send request-like byte counts, receive response-like chunks, and record target errors, resets, close events, slow responses, and backpressure as safe trace metadata.
+
+Synthetic targets include `echo`, `discard`, `fixed_response`, `slow_response`, `chunked_response`, `large_object`, `error_response`, `reset_midstream`, `drip_response`, and `jittery_response`. The proxy adversary audit checks that these behaviors remain isolated across streams and do not collapse into fixed observable patterns.
+
 ## Roadmap
 
-1. Milestone 10: lab-only proxy-semantics modeling.
-2. Milestone 11: carrier abstraction.
-3. Milestone 12: production security design.
-4. Milestone 13: implementation hardening.
-5. Milestone 14: local proxy adapter prototype.
-6. Future: proxy/VPN transport integration after security review.
+1. Milestone 11: carrier abstraction.
+2. Milestone 12: production security design.
+3. Milestone 13: implementation hardening.
+4. Milestone 14: local proxy adapter prototype.
+5. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning
 

@@ -86,3 +86,7 @@ Milestone 9 adds `multi_stream_adversarial_scenarios`, `multi_stream_collapse_re
 - It does not implement real proxy semantics, SOCKS, VPN, HTTP carriers, external targets, deployment, production key exchange, or live-network testing.
 - The stream scheduler and flow control are deterministic research models, not production transport code.
 - Passing these gates does not prove undetectability, censorship resistance, production safety, or real-world robustness.
+
+## Next Layer
+
+Milestone 10 builds on this stream model with internal proxy-style relay intents and synthetic targets. See [KIP-0016: Lab Proxy Semantics](KIP-0016-lab-proxy-semantics.md).

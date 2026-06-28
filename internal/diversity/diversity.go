@@ -29,6 +29,7 @@ type ProfileDiversityReport struct {
 	UniqueFrameGrammarCombinations       int            `json:"unique_frame_grammar_combinations"`
 	UniqueSchedulerCombinations          int            `json:"unique_scheduler_combinations"`
 	UniqueStreamPolicyCombinations       int            `json:"unique_stream_policy_combinations"`
+	UniqueProxyPolicyCombinations        int            `json:"unique_proxy_policy_combinations"`
 	UniquePaddingCombinations            int            `json:"unique_padding_combinations"`
 	UniqueInvalidInputPolicyCombinations int            `json:"unique_invalid_input_policy_combinations"`
 	StateCountDistribution               map[int]int    `json:"state_count_distribution"`
@@ -60,6 +61,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 	frameGrammarCombinations := map[string]bool{}
 	schedulerCombinations := map[string]bool{}
 	streamPolicyCombinations := map[string]bool{}
+	proxyPolicyCombinations := map[string]bool{}
 	paddingCombinations := map[string]bool{}
 	invalidInputCombinations := map[string]bool{}
 
@@ -73,6 +75,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 		frameGrammarCombinations[frameGrammarShape(p)] = true
 		schedulerCombinations[schedulerShape(p)] = true
 		streamPolicyCombinations[streamPolicyShape(p)] = true
+		proxyPolicyCombinations[proxyPolicyShape(p)] = true
 		paddingCombinations[paddingShape(p)] = true
 		invalidInputCombinations[invalidInputShape(p)] = true
 		report.StateCountDistribution[len(p.States)]++
@@ -101,6 +104,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 	report.UniqueFrameGrammarCombinations = len(frameGrammarCombinations)
 	report.UniqueSchedulerCombinations = len(schedulerCombinations)
 	report.UniqueStreamPolicyCombinations = len(streamPolicyCombinations)
+	report.UniqueProxyPolicyCombinations = len(proxyPolicyCombinations)
 	report.UniquePaddingCombinations = len(paddingCombinations)
 	report.UniqueInvalidInputPolicyCombinations = len(invalidInputCombinations)
 	return report
@@ -134,6 +138,7 @@ func CompareProfileStructure(a, b *ir.Profile) StructuralDifferenceReport {
 	addStructural("frame grammar strategy", frameGrammarShape(a), frameGrammarShape(b))
 	addStructural("scheduler strategy", schedulerShape(a), schedulerShape(b))
 	addStructural("multi-stream strategy", streamPolicyShape(a), streamPolicyShape(b))
+	addStructural("proxy-semantics strategy", proxyPolicyShape(a), proxyPolicyShape(b))
 	addStructural("padding strategy", paddingShape(a), paddingShape(b))
 	addStructural("invalid-input policy", invalidInputShape(a), invalidInputShape(b))
 	addStructural("semantic-to-wire mapping shape", semanticMappingShape(a), semanticMappingShape(b))
@@ -216,6 +221,25 @@ func streamPolicyShape(p *ir.Profile) string {
 		p.Stream.ResetPolicy,
 		p.Stream.MaxStreamID,
 	)
+}
+
+func proxyPolicyShape(p *ir.Profile) string {
+	return strings.Join([]string{
+		p.ProxySemantics.RelayIntentEncoding,
+		p.ProxySemantics.TargetDescriptorEncoding,
+		p.ProxySemantics.RequestClassEncoding,
+		p.ProxySemantics.ResponseModeEncoding,
+		p.ProxySemantics.TargetErrorPolicy,
+		p.ProxySemantics.TargetClosePolicy,
+		p.ProxySemantics.TargetResetPolicy,
+		p.ProxySemantics.TargetMetadataPolicy,
+		p.ProxySemantics.RelayOpenOrderingPolicy,
+		p.ProxySemantics.RelayIntentPaddingPolicy,
+		p.ProxySemantics.TargetClassMapping,
+		fmt.Sprint(p.ProxySemantics.MaxRequestBytes),
+		fmt.Sprint(p.ProxySemantics.MaxResponseBytes),
+		strings.Join(p.ProxySemantics.TargetClasses, ","),
+	}, "|")
 }
 
 func paddingShape(p *ir.Profile) string {

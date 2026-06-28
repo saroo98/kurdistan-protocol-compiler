@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-28T09:48:19Z`
+- Generated at: `2026-06-28T19:54:33Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -29,13 +29,19 @@
 | `multi_stream_adversarial_scenarios` | PASS | `required` | 9 scenario runs checked; 0 correctness failures |
 | `multi_stream_collapse_resistance` | PASS | `required` | 2 scenarios scanned; 0 suspicious metrics |
 | `multi_stream_mutant_detection` | PASS | `required` | 6/6 stream mutant modes detected |
+| `proxy_semantics_correctness` | PASS | `required` | 9 proxy scenario runs checked; 0 failures |
+| `proxy_semantics_diversity` | PASS | `required` | 100 proxy policy combinations across 100 profiles |
+| `proxy_target_backpressure` | PASS | `required` | 14 target-induced backpressure events observed |
+| `proxy_error_reset_isolation` | PASS | `required` | 2 target errors and 2 target resets observed |
+| `proxy_mutant_detection` | PASS | `required` | 7/7 proxy mutant modes detected |
+| `proxy_generated_backend_parity` | PASS | `required` | generated backend proxysem support markers checked |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
 - Profile generation: `6 ms`
-- Trace generation: `21 ms`
-- Total audit runtime: `141 ms`
+- Trace generation: `15 ms`
+- Total audit runtime: `179 ms`
 
 ## Corpus Diversity Summary
 
@@ -44,8 +50,9 @@
 - `unique_frame_grammar_combinations`: `98`
 - `unique_scheduler_combinations`: `94`
 - `unique_stream_policy_combinations`: `100`
-- `unique_padding_combinations`: `64`
-- `unique_invalid_input_policy_combinations`: `100`
+- `unique_proxy_policy_combinations`: `100`
+- `unique_padding_combinations`: `66`
+- `unique_invalid_input_policy_combinations`: `99`
 - `structurally_different_pairs`: `4950`
 
 ## Trace Diversity Summary
@@ -57,8 +64,8 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.31370012509091877`
-- `same_profile_distance`: `0.015151515151515152`
+- `different_profile_average_distance`: `0.3167513429067555`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -81,9 +88,24 @@
 - `multi_stream_collapse_resistance`: `passed`
 - `multi_stream_mutant_detection`: `passed`
 
+## Proxy Semantics
+
+- Gate result: `true`
+- `profile_count`: `3`
+- `scenario_count`: `3`
+- `correct_runs`: `9`
+- `scenario_runs`: `9`
+- `target_classes`: `[echo error_response fixed_response slow_response]`
+- `proxy_semantics_diversity`: `passed`
+- `proxy_target_backpressure`: `passed`
+- `proxy_error_reset_isolation`: `passed`
+- `proxy_mutant_detection`: `passed`
+- `proxy_generated_backend_parity`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
+- Proxy-semantics support uses synthetic target descriptors and in-memory target behavior.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
@@ -91,4 +113,4 @@
 
 ## Next Milestone
 
-Milestone 10 should focus on lab-only proxy-semantics modeling without adding SOCKS, VPN mode, HTTP carriers, deployment, external targets, or live-network testing.
+Milestone 11 should focus on carrier abstraction while preserving the local/private research boundary.

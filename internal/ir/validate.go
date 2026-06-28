@@ -53,6 +53,9 @@ func Validate(p *Profile) error {
 	if err := validateStreamPolicy(p.Stream, p.Limits); err != nil {
 		return err
 	}
+	if err := validateProxySemanticsPolicy(p.ProxySemantics, p.Limits, p.Messages); err != nil {
+		return err
+	}
 	if err := validatePadding(p.Padding); err != nil {
 		return err
 	}
@@ -307,6 +310,86 @@ func validateStreamPolicy(p StreamPolicy, limits SafetyLimits) error {
 	}
 	if uint64(p.MaxConcurrentStreams) > uint64(p.MaxStreamID) {
 		return fmt.Errorf("max stream id cannot represent concurrent streams")
+	}
+	return nil
+}
+
+func validateProxySemanticsPolicy(p ProxySemanticsPolicy, limits SafetyLimits, messages []MessageSymbol) error {
+	if !oneOf(p.RelayIntentEncoding, "descriptor_before_open", "descriptor_after_open", "split_descriptor", "table_mapped_descriptor", "state_derived_descriptor") {
+		return fmt.Errorf("invalid relay intent encoding")
+	}
+	if !oneOf(p.TargetDescriptorEncoding, "compact_enum", "generated_table_index", "split_fields", "state_derived_class", "padded_descriptor_block") {
+		return fmt.Errorf("invalid target descriptor encoding")
+	}
+	if !oneOf(p.RequestClassEncoding, "interactive", "bulk", "control", "error_test", "generated_bucket") {
+		return fmt.Errorf("invalid request class encoding")
+	}
+	if !oneOf(p.ResponseModeEncoding, "immediate", "chunked", "delayed", "resettable", "errorable", "large_object") {
+		return fmt.Errorf("invalid response mode encoding")
+	}
+	if !oneOf(p.TargetErrorPolicy, "explicit_target_error", "close_with_error", "reset_with_error", "delayed_error", "metadata_error") {
+		return fmt.Errorf("invalid target error policy")
+	}
+	if !oneOf(p.TargetClosePolicy, "explicit_close", "implicit_close_after_response", "close_after_ack", "half_close_compatible") {
+		return fmt.Errorf("invalid target close policy")
+	}
+	if !oneOf(p.TargetResetPolicy, "immediate_reset", "reset_with_reason", "delayed_reset", "reset_after_partial_response") {
+		return fmt.Errorf("invalid target reset policy")
+	}
+	if !oneOf(p.TargetMetadataPolicy, "none", "pre_response_metadata", "post_response_metadata", "metadata_as_control_frame") {
+		return fmt.Errorf("invalid target metadata policy")
+	}
+	if !oneOf(p.RelayOpenOrderingPolicy, "intent_before_stream", "stream_before_intent", "descriptor_split_around_open", "metadata_before_descriptor") {
+		return fmt.Errorf("invalid relay open ordering policy")
+	}
+	if !oneOf(p.RelayIntentPaddingPolicy, "none", "bounded", "descriptor_padding", "metadata_padding") {
+		return fmt.Errorf("invalid relay intent padding policy")
+	}
+	if !oneOf(p.TargetClassMapping, "direct_generated", "table_mapped", "state_derived", "bucketed") {
+		return fmt.Errorf("invalid target class mapping")
+	}
+	if p.MaxRequestBytes <= 0 || p.MaxResponseBytes <= 0 {
+		return fmt.Errorf("proxy semantics byte limits are required")
+	}
+	if limits.MaxPayloadBytes > 0 && (p.MaxRequestBytes > limits.MaxPayloadBytes || p.MaxResponseBytes > limits.MaxPayloadBytes) {
+		return fmt.Errorf("proxy semantics limits exceed payload limit")
+	}
+	if p.MaxRequestBytes > 512*1024 || p.MaxResponseBytes > 2*1024*1024 {
+		return fmt.Errorf("proxy semantics limits exceed lab safety bound")
+	}
+	if len(p.TargetClasses) == 0 {
+		return fmt.Errorf("proxy target classes are required")
+	}
+	known := map[string]bool{}
+	for _, class := range SyntheticTargetClasses() {
+		known[class] = true
+	}
+	seenClasses := map[string]bool{}
+	for _, class := range p.TargetClasses {
+		if !known[class] {
+			return fmt.Errorf("unknown synthetic target class %q", class)
+		}
+		if seenClasses[class] {
+			return fmt.Errorf("duplicate synthetic target class %q", class)
+		}
+		seenClasses[class] = true
+	}
+	seenProxySemantics := map[string]bool{}
+	for _, msg := range messages {
+		if !seenProxySemantics[msg.Semantic] {
+			seenProxySemantics[msg.Semantic] = false
+		}
+	}
+	for _, semantic := range ProxySemantics() {
+		count := 0
+		for _, msg := range messages {
+			if msg.Semantic == semantic {
+				count++
+			}
+		}
+		if count != 1 {
+			return fmt.Errorf("proxy semantic %q has %d mappings", semantic, count)
+		}
 	}
 	return nil
 }

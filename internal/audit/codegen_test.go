@@ -115,7 +115,7 @@ func TestGeneratedMutantDetectionFailsCollapsedProfiles(t *testing.T) {
 
 func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 	report := AuditReport{
-		Version:      "0.9.0-lab",
+		Version:      "0.10.0-lab",
 		Mode:         "codegen-quick",
 		GeneratedAt:  "2026-06-27T00:00:00Z",
 		ProfileCount: 2,
@@ -127,6 +127,7 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 			{Name: "generated_fixed_signature", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "multi_stream_generated_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "multi_stream_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
+			{Name: "proxy_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_mutant_detection", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_source_scanner", Passed: true, Severity: "required", Summary: "ok"},
 		},
@@ -138,13 +139,14 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 			FixedSignature:             "passed",
 			MultiStreamGeneratedParity: "passed",
 			StreamAdversaryParity:      "passed",
+			ProxySemGeneratedParity:    "passed",
 			MutantDetection:            "passed",
 			SourceScanner:              "passed",
 		},
 		Conclusion: "passed",
 	}
 	status := RenderStatus(report)
-	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "multi_stream_generated_parity", "multi_stream_generated_backend_parity", "generated_mutant_detection", "generated_source_scanner"} {
+	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "multi_stream_generated_parity", "multi_stream_generated_backend_parity", "proxy_generated_backend_parity", "generated_mutant_detection", "generated_source_scanner"} {
 		if !containsString(status, want) {
 			t.Fatalf("status missing %q:\n%s", want, status)
 		}

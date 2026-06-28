@@ -33,6 +33,16 @@ type Event struct {
 	PriorityClass       string `json:"priority_class,omitempty"`
 	CloseResetEvent     string `json:"close_reset_event,omitempty"`
 	Backpressure        bool   `json:"backpressure,omitempty"`
+	TargetClassBucket   string `json:"target_class_bucket,omitempty"`
+	RequestClassBucket  string `json:"request_class_bucket,omitempty"`
+	ResponseModeBucket  string `json:"response_mode_bucket,omitempty"`
+	TargetEventType     string `json:"target_event_type,omitempty"`
+	TargetErrorBucket   string `json:"target_error_bucket,omitempty"`
+	TargetReset         bool   `json:"target_reset,omitempty"`
+	TargetClose         bool   `json:"target_close,omitempty"`
+	ResponseChunkBucket string `json:"response_chunk_bucket,omitempty"`
+	TargetBackpressure  bool   `json:"target_backpressure,omitempty"`
+	ProxyScenario       string `json:"proxy_scenario,omitempty"`
 	Note                string `json:"note,omitempty"`
 }
 

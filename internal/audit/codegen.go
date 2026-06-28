@@ -87,6 +87,7 @@ type CodegenAuditSummary struct {
 	MutantDetection            string                         `json:"mutant_detection"`
 	MultiStreamGeneratedParity string                         `json:"multi_stream_generated_parity"`
 	StreamAdversaryParity      string                         `json:"multi_stream_generated_backend_parity"`
+	ProxySemGeneratedParity    string                         `json:"proxy_generated_backend_parity"`
 	SourceScanner              string                         `json:"source_scanner"`
 	InterpretedVsGenerated     InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                 codegen.SourceScanReport       `json:"source_scan"`
@@ -163,6 +164,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	divergenceGate := GeneratedVsInterpretedDivergenceGate(corpus)
 	multiStreamGate := GeneratedMultiStreamParityGate(corpus)
 	streamAdversaryGate := GeneratedStreamAdversaryParityGate(corpus, testFailures)
+	proxySemGate := GeneratedProxySemParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -179,6 +181,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		divergenceGate,
 		multiStreamGate,
 		streamAdversaryGate,
+		proxySemGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -442,6 +445,31 @@ func GeneratedStreamAdversaryParityGate(corpus GeneratedBackendTraceCorpus, test
 	}, failures)
 }
 
+func GeneratedProxySemParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module proxysem tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated proxysem specialization constants missing")
+	}
+	proxyFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/proxysem_generated.go" {
+			proxyFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && proxyFiles < 2 {
+		failures = append(failures, "generated proxysem specialized files did not differ")
+	}
+	return gate("proxy_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include proxysem tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		"proxysem_unique_files":        proxyFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedSourceScannerGate(scan codegen.SourceScanReport) GateResult {
 	return gate("generated_source_scanner", scan.Passed, "required", fmt.Sprintf("%d generated modules scanned; %d failures", scan.GeneratedModules, len(scan.Failures)), map[string]any{
 		"profile_specific_constants_present": scan.ProfileSpecificConstantsPresent,
@@ -522,6 +550,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		MutantDetection:            status("generated_mutant_detection"),
 		MultiStreamGeneratedParity: status("multi_stream_generated_parity"),
 		StreamAdversaryParity:      status("multi_stream_generated_backend_parity"),
+		ProxySemGeneratedParity:    status("proxy_generated_backend_parity"),
 		SourceScanner:              status("generated_source_scanner"),
 		InterpretedVsGenerated:     divergenceSummary(corpus),
 		SourceScan:                 corpus.SourceScan,

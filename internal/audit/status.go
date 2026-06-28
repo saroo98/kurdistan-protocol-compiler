@@ -13,6 +13,9 @@ import (
 
 func RenderStatus(report AuditReport) string {
 	var b strings.Builder
+	fmt.Fprintln(&b, "<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->")
+	fmt.Fprintln(&b, "<!-- Copyright 2026 Saro -->")
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "# Kurdistan Protocol Compiler Status")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "> Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.")
@@ -54,6 +57,7 @@ func RenderStatus(report AuditReport) string {
 			"unique_frame_grammar_combinations",
 			"unique_scheduler_combinations",
 			"unique_stream_policy_combinations",
+			"unique_proxy_policy_combinations",
 			"unique_padding_combinations",
 			"unique_invalid_input_policy_combinations",
 			"structurally_different_pairs",
@@ -112,6 +116,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "generated_fixed_signature")
 		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_parity")
 		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "proxy_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -120,6 +125,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `fixed_signature`: `%s`\n", summary.FixedSignature)
 			fmt.Fprintf(&b, "- `multi_stream_generated_parity`: `%s`\n", summary.MultiStreamGeneratedParity)
 			fmt.Fprintf(&b, "- `multi_stream_generated_backend_parity`: `%s`\n", summary.StreamAdversaryParity)
+			fmt.Fprintf(&b, "- `proxy_generated_backend_parity`: `%s`\n", summary.ProxySemGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -143,9 +149,29 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck streamadversary --quick` for stream collapse checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Proxy Semantics")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "proxy_semantics_correctness"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderGateDetail(&b, gate, "profile_count")
+		renderGateDetail(&b, gate, "scenario_count")
+		renderGateDetail(&b, gate, "correct_runs")
+		renderGateDetail(&b, gate, "scenario_runs")
+		renderGateDetail(&b, gate, "target_classes")
+		renderNamedGateResult(&b, report.Gates, "proxy_semantics_diversity")
+		renderNamedGateResult(&b, report.Gates, "proxy_target_backpressure")
+		renderNamedGateResult(&b, report.Gates, "proxy_error_reset_isolation")
+		renderNamedGateResult(&b, report.Gates, "proxy_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "proxy_generated_backend_parity")
+	} else {
+		fmt.Fprintln(&b, "- Proxy-semantics gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck proxysem --quick` for proxy-semantics checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
+	fmt.Fprintln(&b, "- Proxy-semantics support uses synthetic target descriptors and in-memory target behavior.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
@@ -153,7 +179,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 10 should focus on lab-only proxy-semantics modeling without adding SOCKS, VPN mode, HTTP carriers, deployment, external targets, or live-network testing.")
+	fmt.Fprintln(&b, "Milestone 11 should focus on carrier abstraction while preserving the local/private research boundary.")
 	return b.String()
 }
 
