@@ -250,13 +250,54 @@ func SemanticWireSymbols() map[string]string {
 }
 
 func EncodeData(payload []byte) ([][]byte, error) {
-	return framing.EncodeOperation(StaticProfile(), framing.Operation{Semantic: ir.SemanticData, StreamID: StreamID, Payload: payload}, ProfileSeed+1)
+	return framing.EncodeOperation(StaticProfile(), framing.Operation{Semantic: ir.SemanticData, StreamID: DefaultStreamID, Payload: payload}, ProfileSeed+1)
 }
 
 func DecodeFrames(frames [][]byte) (framing.Operation, []framing.DecodedFrame, error) {
 	return framing.DecodeFrames(StaticProfile(), frames)
 }
 `, quote(p.FrameGrammar.LengthMode), quote(p.FrameGrammar.TypeMode), quote(p.FrameGrammar.FragmentationMode), quote(p.FrameGrammar.ChecksumMode), quote(p.FrameGrammar.PaddingPlacement), quoteSlice(p.FrameGrammar.HeaderOrder), semanticWireMap(p.Messages), messageBounds(p.Messages))
+	if err != nil {
+		return nil, err
+	}
+
+	streamSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/relay"
+	ktrace "kurdistan/internal/trace"
+)
+
+const DefaultStreamID uint32 = 1
+const StreamIDStrategy = %[1]s
+const StreamIDEncodingMode = %[2]s
+const StreamMaxConcurrentStreams = %[3]d
+const StreamInitialWindowBytes = %[4]d
+const StreamInitialSessionWindowBytes = %[5]d
+const StreamWindowUpdatePolicy = %[6]s
+const StreamPriorityPolicy = %[7]s
+const StreamClosePolicy = %[8]s
+const StreamResetPolicy = %[9]s
+const StreamMaxID uint32 = %[10]d
+
+func MultiStreamDemo(ctx context.Context, streamCount int) (relay.MultiStreamResult, []ktrace.Event, error) {
+	if streamCount <= 0 {
+		streamCount = 3
+	}
+	if streamCount > StreamMaxConcurrentStreams {
+		streamCount = StreamMaxConcurrentStreams
+	}
+	requests := relay.DefaultMultiStreamDemoRequests(streamCount)
+	return relay.SimulateMultiStreamEcho(ctx, StaticProfile(), requests)
+}
+
+func CaptureMultiStreamTrace(ctx context.Context, streamCount int) ([]ktrace.Event, relay.MultiStreamResult, error) {
+	result, events, err := MultiStreamDemo(ctx, streamCount)
+	return events, result, err
+}
+`, quote(p.Stream.IDStrategy), quote(p.Stream.IDEncodingMode), p.Stream.MaxConcurrentStreams, p.Stream.InitialStreamWindowBytes, p.Stream.InitialSessionWindowBytes, quote(p.Stream.WindowUpdatePolicy), quote(p.Stream.PriorityPolicy), quote(p.Stream.ClosePolicy), quote(p.Stream.ResetPolicy), p.Stream.MaxStreamID)
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +384,6 @@ import (
 	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/trace"
 )
-
-const StreamID uint32 = 1
 
 func ValidateProfile() error {
 	return ir.Validate(StaticProfile())
@@ -453,6 +492,98 @@ func TestGeneratedLoopbackRoundTrip(t *testing.T) {
 		return nil, err
 	}
 
+	multiStreamTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/relay"
+	"kurdistan/internal/streamadversary"
+)
+
+func TestGeneratedMultiStreamEcho(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	count := StreamMaxConcurrentStreams
+	if count > 4 {
+		count = 4
+	}
+	if count < 2 {
+		t.Fatalf("generated stream count too low: %%d", count)
+	}
+	result, events, err := MultiStreamDemo(ctx, count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OpenedStreams != count {
+		t.Fatalf("opened streams = %%d, want %%d", result.OpenedStreams, count)
+	}
+	if len(events) == 0 {
+		t.Fatalf("no stream events captured")
+	}
+}
+
+func TestGeneratedMultiStreamResetAndLimit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	requests := []relay.MultiStreamRequest{
+		{Label: "a", Priority: "interactive", Payload: []byte("generated stream a")},
+		{Label: "b", Priority: "bulk", Payload: []byte("generated stream b"), ResetAfterOpen: true},
+	}
+	result, _, err := relay.SimulateMultiStreamEcho(ctx, StaticProfile(), requests)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ResetStreams != 1 || result.ClosedStreams != 1 {
+		t.Fatalf("reset/close mismatch: %%+v", result)
+	}
+	tooMany := relay.DefaultMultiStreamDemoRequests(StreamMaxConcurrentStreams + 1)
+	if _, _, err := relay.SimulateMultiStreamEcho(ctx, StaticProfile(), tooMany); err == nil {
+		t.Fatalf("expected max concurrent stream limit")
+	}
+}
+
+func TestGeneratedStreamAdversaryScenarios(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, kind := range []string{
+		streamadversary.ScenarioBalancedInterleave,
+		streamadversary.ScenarioBulkVsInteractive,
+		streamadversary.ScenarioResetMidstream,
+		streamadversary.ScenarioBlockedStream,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			run, err := streamadversary.RunScenario(ctx, StaticProfile(), streamadversary.DefaultScenario(kind))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !run.Correct {
+				t.Fatalf("scenario failed generated static profile checks: %%+v", run.Checks)
+			}
+			if len(run.Events) == 0 {
+				t.Fatalf("scenario emitted no safe trace metadata")
+			}
+			raw, err := json.Marshal(run.Events)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, marker := range streamadversary.ScenarioPayloadMarkers(run.Scenario) {
+				if bytes.Contains(raw, []byte(marker)) {
+					t.Fatalf("trace leaked payload marker %%q", marker)
+				}
+			}
+		})
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -485,6 +616,7 @@ import (
 	"os"
 	"sort"
 
+	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -542,6 +674,26 @@ func CaptureLoopbackTrace(ctx context.Context, payload []byte) ([]ktrace.Event, 
 	return events, summary, nil
 }
 
+func CaptureGeneratedMultiStreamTrace(ctx context.Context, streamCount int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	events, result, err := CaptureMultiStreamTrace(ctx, streamCount)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	sort.SliceStable(events, func(i, j int) bool {
+		if events[i].TimeUnixNano == events[j].TimeUnixNano {
+			return events[i].EventType < events[j].EventType
+		}
+		return events[i].TimeUnixNano < events[j].TimeUnixNano
+	})
+	summary := TraceCaptureSummary{
+		ProfileID:      ProfileID,
+		EchoBytes:      totalEchoBytes(result),
+		EventCount:     len(events),
+		DataEventCount: result.OpenedStreams,
+	}
+	return events, summary, nil
+}
+
 func WriteTraceJSONL(path string, events []ktrace.Event) error {
 	if path == "" {
 		return nil
@@ -588,6 +740,14 @@ func summarizeTraceCapture(events []ktrace.Event, echoBytes int, payload []byte)
 	raw, _ := json.Marshal(events)
 	summary.PayloadLogged = len(payload) > 0 && bytes.Contains(raw, payload)
 	return summary
+}
+
+func totalEchoBytes(result relay.MultiStreamResult) int {
+	total := 0
+	for _, echo := range result.Echoes {
+		total += len(echo)
+	}
+	return total
 }
 `)
 	if err != nil {
@@ -740,12 +900,14 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/profile_static.go", Content: profileStatic, Go: true},
 		{RelPath: "protocol/states_generated.go", Content: states, Go: true},
 		{RelPath: "protocol/framing_generated.go", Content: framing, Go: true},
+		{RelPath: "protocol/stream_generated.go", Content: streamSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
 		{RelPath: "protocol/protocol.go", Content: protocol, Go: true},
 		{RelPath: "protocol/trace_capture_generated.go", Content: traceCapture, Go: true},
 		{RelPath: "protocol/protocol_test.go", Content: testSource, Go: true},
+		{RelPath: "protocol/multistream_test.go", Content: multiStreamTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -776,7 +938,24 @@ func main() {
 	server := flag.String("server", "", "loopback generated server address")
 	message := flag.String("message", "", "message to send through the local generated protocol")
 	tracePath := flag.String("trace", "", "optional payload-free trace JSONL path")
+	multiStreamDemo := flag.Bool("multistream-demo", false, "run local generated multi-stream lab demo")
+	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
 	flag.Parse()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
+	defer cancel()
+	if *multiStreamDemo {
+		result, events, err := protocol.MultiStreamDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("streams=%%d closed=%%d reset=%%d echo_bytes=%%d\n", result.OpenedStreams, result.ClosedStreams, result.ResetStreams, sumEchoBytes(result.Echoes))
+		return
+	}
 	if *server == "" {
 		fmt.Fprintln(os.Stderr, "--server is required")
 		os.Exit(2)
@@ -787,8 +966,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer rec.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
-	defer cancel()
 	payload := []byte(*message)
 	echo, err := protocol.ClientRoundTrip(ctx, *server, payload, rec)
 	if err != nil {
@@ -800,6 +977,14 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("echo_bytes=%%d\n", len(echo))
+}
+
+func sumEchoBytes(echoes map[string][]byte) int {
+	total := 0
+	for _, echo := range echoes {
+		total += len(echo)
+	}
+	return total
 }
 `, quote(importPath))
 	case "generated-server":
@@ -887,6 +1072,8 @@ import (
 	"os"
 	"time"
 
+	ktrace "kurdistan/internal/trace"
+
 	%[1]s
 )
 
@@ -894,10 +1081,19 @@ func main() {
 	message := flag.String("message", "hello generated", "message for local generated trace capture")
 	tracePath := flag.String("trace", "", "optional payload-free trace JSONL path")
 	summaryPath := flag.String("summary", "", "optional trace summary JSON path")
+	multiStream := flag.Bool("multistream", false, "capture local generated multi-stream trace")
+	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
-	events, summary, err := protocol.CaptureLoopbackTrace(ctx, []byte(*message))
+	var events []ktrace.Event
+	var summary protocol.TraceCaptureSummary
+	var err error
+	if *multiStream {
+		events, summary, err = protocol.CaptureGeneratedMultiStreamTrace(ctx, *streamCount)
+	} else {
+		events, summary, err = protocol.CaptureLoopbackTrace(ctx, []byte(*message))
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

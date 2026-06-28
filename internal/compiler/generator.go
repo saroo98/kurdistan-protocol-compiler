@@ -66,6 +66,7 @@ func Generate(seed int64) (*ir.Profile, error) {
 			ProofMessage: proofMessage,
 		},
 		Scheduler: scheduler,
+		Stream:    streamPolicy(rng),
 		Padding:   paddingForPlacement(rng, placement),
 		InvalidInput: ir.InvalidInputPolicy{
 			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
@@ -209,6 +210,40 @@ func schedulerForMode(rng *rand.Rand, mode string) ir.SchedulerPolicy {
 		FlushIntervalMs:   flush,
 		MaxInFlightFrames: []int{4, 8, 16, 32}[rng.Intn(4)],
 		PriorityMode:      map[string]string{"max_speed": "fifo", "balanced": "mixed", "interactive_first": "small_first", "bulk_first": "large_first"}[mode],
+	}
+}
+
+func streamPolicy(rng *rand.Rand) ir.StreamPolicy {
+	strategies := []string{"sequential_odd_even", "randomized_bounded_ids", "table_mapped_ids", "varint_ids"}
+	encodingByStrategy := map[string]string{
+		"sequential_odd_even":    "fixed32_be",
+		"randomized_bounded_ids": "profile_xor32",
+		"table_mapped_ids":       "table_mapped32_le",
+		"varint_ids":             "varint",
+	}
+	strategy := strategies[rng.Intn(len(strategies))]
+	maxConcurrent := []int{2, 4, 8, 16}[rng.Intn(4)]
+	streamWindow := []int{16 * 1024, 32 * 1024, 64 * 1024, 128 * 1024}[rng.Intn(4)]
+	multiplier := []int{2, 3, 4, 6, 8}[rng.Intn(5)]
+	sessionWindow := streamWindow * multiplier
+	minSession := streamWindow * min(maxConcurrent, 4)
+	if sessionWindow < minSession {
+		sessionWindow = minSession
+	}
+	if sessionWindow > 2*1024*1024 {
+		sessionWindow = 2 * 1024 * 1024
+	}
+	return ir.StreamPolicy{
+		IDStrategy:                strategy,
+		IDEncodingMode:            encodingByStrategy[strategy],
+		MaxConcurrentStreams:      maxConcurrent,
+		InitialStreamWindowBytes:  streamWindow,
+		InitialSessionWindowBytes: sessionWindow,
+		WindowUpdatePolicy:        []string{"threshold_update", "periodic_update", "per_frame_update", "hybrid_update"}[rng.Intn(4)],
+		PriorityPolicy:            []string{"fifo", "interactive_first", "weighted_round_robin", "smallest_pending_first"}[rng.Intn(4)],
+		ClosePolicy:               []string{"explicit_close", "half_close", "close_after_ack"}[rng.Intn(3)],
+		ResetPolicy:               []string{"immediate_reset", "reset_with_error_code", "delayed_reset"}[rng.Intn(3)],
+		MaxStreamID:               1 << 24,
 	}
 }
 

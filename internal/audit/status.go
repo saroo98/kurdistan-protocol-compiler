@@ -50,6 +50,7 @@ func RenderStatus(report AuditReport) string {
 			"unique_first_contact_patterns",
 			"unique_frame_grammar_combinations",
 			"unique_scheduler_combinations",
+			"unique_stream_policy_combinations",
 			"unique_padding_combinations",
 			"unique_invalid_input_policy_combinations",
 			"structurally_different_pairs",
@@ -106,12 +107,16 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "generated_semantic_equivalence")
 		renderNamedGateResult(&b, report.Gates, "generated_profile_diversity")
 		renderNamedGateResult(&b, report.Gates, "generated_fixed_signature")
+		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_parity")
+		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
 			fmt.Fprintf(&b, "- `semantic_equivalence`: `%s`\n", summary.SemanticEquivalence)
 			fmt.Fprintf(&b, "- `generated_profile_diversity`: `%s`\n", summary.GeneratedProfileDiversity)
 			fmt.Fprintf(&b, "- `fixed_signature`: `%s`\n", summary.FixedSignature)
+			fmt.Fprintf(&b, "- `multi_stream_generated_parity`: `%s`\n", summary.MultiStreamGeneratedParity)
+			fmt.Fprintf(&b, "- `multi_stream_generated_backend_parity`: `%s`\n", summary.StreamAdversaryParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -120,17 +125,32 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck codegen --quick` for generated source checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Multi-Stream Adversary")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "multi_stream_adversarial_scenarios"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderGateDetail(&b, gate, "profile_count")
+		renderGateDetail(&b, gate, "scenario_count")
+		renderGateDetail(&b, gate, "correct_runs")
+		renderGateDetail(&b, gate, "scenario_runs")
+		renderNamedGateResult(&b, report.Gates, "multi_stream_collapse_resistance")
+		renderNamedGateResult(&b, report.Gates, "multi_stream_mutant_detection")
+	} else {
+		fmt.Fprintln(&b, "- Multi-stream adversary gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck streamadversary --quick` for stream collapse checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "- Single-stream loopback-only runtime.")
+	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
-	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, scheduling, padding, auth, and traces.")
+	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
 	fmt.Fprintln(&b, "- The audit detects local regressions; it cannot prove undetectability or real-world robustness.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 7 should focus on generated-backend trace comparison depth, richer lab-only malformed-session corpora, and clearer explanations for gate failures.")
+	fmt.Fprintln(&b, "Milestone 10 should focus on lab-only proxy-semantics modeling without adding SOCKS, VPN mode, HTTP carriers, deployment, external targets, or live-network testing.")
 	return b.String()
 }
 

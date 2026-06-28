@@ -14,12 +14,18 @@ import (
 )
 
 const (
-	ModeFixedFirstContact   = "fixed_first_contact"
-	ModeFixedFrameGrammar   = "fixed_frame_grammar"
-	ModeCosmeticSymbolsOnly = "cosmetic_symbols_only"
-	ModeFixedScheduler      = "fixed_scheduler"
-	ModeFixedInvalidInput   = "fixed_invalid_input"
-	ModePaddingNoiseOnly    = "padding_noise_only"
+	ModeFixedFirstContact          = "fixed_first_contact"
+	ModeFixedFrameGrammar          = "fixed_frame_grammar"
+	ModeCosmeticSymbolsOnly        = "cosmetic_symbols_only"
+	ModeFixedScheduler             = "fixed_scheduler"
+	ModeFixedInvalidInput          = "fixed_invalid_input"
+	ModePaddingNoiseOnly           = "padding_noise_only"
+	ModeFixedStreamIDStrategy      = "fixed_stream_id_strategy"
+	ModeFixedWindowUpdatePolicy    = "fixed_window_update_policy"
+	ModeFIFOSchedulerOnly          = "fifo_scheduler_only"
+	ModeFixedResetClosePolicy      = "fixed_reset_close_policy"
+	ModeNoBackpressure             = "no_backpressure"
+	ModePaddingOnlyStreamDiversity = "padding_only_stream_diversity"
 )
 
 func Modes() []string {
@@ -30,6 +36,12 @@ func Modes() []string {
 		ModeFixedScheduler,
 		ModeFixedInvalidInput,
 		ModePaddingNoiseOnly,
+		ModeFixedStreamIDStrategy,
+		ModeFixedWindowUpdatePolicy,
+		ModeFIFOSchedulerOnly,
+		ModeFixedResetClosePolicy,
+		ModeNoBackpressure,
+		ModePaddingOnlyStreamDiversity,
 	}
 }
 
@@ -65,6 +77,26 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 		case ModeFixedInvalidInput:
 			p.InvalidInput = base.InvalidInput
 		case ModePaddingNoiseOnly:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeFixedStreamIDStrategy:
+			p.Stream.IDStrategy = base.Stream.IDStrategy
+			p.Stream.IDEncodingMode = base.Stream.IDEncodingMode
+		case ModeFixedWindowUpdatePolicy:
+			p.Stream.WindowUpdatePolicy = base.Stream.WindowUpdatePolicy
+			p.Stream.InitialStreamWindowBytes = base.Stream.InitialStreamWindowBytes
+			p.Stream.InitialSessionWindowBytes = base.Stream.InitialSessionWindowBytes
+		case ModeFIFOSchedulerOnly:
+			p.Stream.PriorityPolicy = "fifo"
+			p.Scheduler.PriorityMode = "fifo"
+		case ModeFixedResetClosePolicy:
+			p.Stream.ClosePolicy = base.Stream.ClosePolicy
+			p.Stream.ResetPolicy = base.Stream.ResetPolicy
+		case ModeNoBackpressure:
+			p.Stream.InitialStreamWindowBytes = 128 * 1024
+			p.Stream.InitialSessionWindowBytes = min(2*1024*1024, 128*1024*max(4, p.Stream.MaxConcurrentStreams))
+		case ModePaddingOnlyStreamDiversity:
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
