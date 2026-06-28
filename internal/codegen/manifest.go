@@ -6,7 +6,7 @@ package codegen
 import "kurdistan/internal/ir"
 
 const (
-	Version       = "0.10.0-lab"
+	Version       = "0.11.0-lab"
 	SourceBackend = "go-static-v0"
 )
 
@@ -22,6 +22,7 @@ type Manifest struct {
 	Scheduler        string         `json:"scheduler"`
 	Stream           string         `json:"stream"`
 	ProxySemantics   string         `json:"proxy_semantics"`
+	Carrier          string         `json:"carrier_model"`
 	Padding          string         `json:"padding"`
 	InvalidInput     string         `json:"invalid_input"`
 	Safety           ManifestSafety `json:"safety"`
@@ -46,6 +47,7 @@ func NewManifest(p *ir.Profile, generatedAt string) Manifest {
 		Scheduler:        p.Scheduler.Mode,
 		Stream:           p.Stream.IDEncodingMode + "/" + p.Stream.PriorityPolicy + "/" + p.Stream.WindowUpdatePolicy,
 		ProxySemantics:   p.ProxySemantics.RelayIntentEncoding + "/" + p.ProxySemantics.TargetDescriptorEncoding + "/" + p.ProxySemantics.ResponseModeEncoding,
+		Carrier:          p.CarrierPolicy.CarrierFamily + "/" + p.CarrierPolicy.EnvelopeEncoding + "/" + p.CarrierPolicy.FlushPolicy,
 		Padding:          p.Padding.Mode,
 		InvalidInput:     p.InvalidInput.UnknownFirstMessage + "/" + p.InvalidInput.MalformedFrame + "/" + p.InvalidInput.FailedAuth + "/" + p.InvalidInput.Replay,
 		Safety: ManifestSafety{

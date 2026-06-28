@@ -75,6 +75,7 @@ func TestCodegenAuditQuickIncludesM7GatesAndJSON(t *testing.T) {
 		"generated_vs_interpreted_divergence",
 		"multi_stream_generated_parity",
 		"multi_stream_generated_backend_parity",
+		"carrier_generated_backend_parity",
 		"generated_mutant_detection",
 		"generated_source_scanner",
 	}
@@ -128,6 +129,7 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 			{Name: "multi_stream_generated_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "multi_stream_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "proxy_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
+			{Name: "carrier_generated_backend_parity", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_mutant_detection", Passed: true, Severity: "required", Summary: "ok"},
 			{Name: "generated_source_scanner", Passed: true, Severity: "required", Summary: "ok"},
 		},
@@ -140,13 +142,14 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 			MultiStreamGeneratedParity: "passed",
 			StreamAdversaryParity:      "passed",
 			ProxySemGeneratedParity:    "passed",
+			CarrierGeneratedParity:     "passed",
 			MutantDetection:            "passed",
 			SourceScanner:              "passed",
 		},
 		Conclusion: "passed",
 	}
 	status := RenderStatus(report)
-	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "multi_stream_generated_parity", "multi_stream_generated_backend_parity", "proxy_generated_backend_parity", "generated_mutant_detection", "generated_source_scanner"} {
+	for _, want := range []string{"Generated Source Backend", "generated_semantic_equivalence", "generated_profile_diversity", "generated_fixed_signature", "multi_stream_generated_parity", "multi_stream_generated_backend_parity", "proxy_generated_backend_parity", "carrier_generated_backend_parity", "generated_mutant_detection", "generated_source_scanner"} {
 		if !containsString(status, want) {
 			t.Fatalf("status missing %q:\n%s", want, status)
 		}

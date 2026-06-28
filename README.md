@@ -55,7 +55,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer. Future proxy or VPN integration requires a separate production security design, carrier abstraction, implementation hardening, and review.
+Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling. Future proxy or VPN integration requires a separate production security design, implementation hardening, and review.
 
 ## Current Status
 
@@ -71,8 +71,8 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 | Multi-stream lab semantics | Done |
 | Multi-stream adversarial testing | Done |
 | Lab-only proxy semantics | Done |
-| Carrier abstraction | Next |
-| Production security model | Future |
+| Carrier abstraction | Done |
+| Production security model | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -96,6 +96,8 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 - Internal proxy-semantics model with synthetic target descriptors and relay intents.
 - Synthetic target registry for echo, discard, fixed, slow, chunked, large, error, reset, drip, and jittery responses.
 - Proxy adversary scenarios, proxy feature extraction, collapse scanning, and proxy mutant detection.
+- Carrier abstraction models for stream, message, datagram-like, chunked, batch, interactive, long-poll-style, and lossy/reordered carrier shapes.
+- Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -119,6 +121,9 @@ internal/fsm + internal/framing + internal/scheduler + internal/stream
 internal/proxysem + internal/proxyrelay + internal/proxyadversary
   synthetic proxy-semantics model, relay-intent runner, and proxy collapse scanning
 
+internal/carrier + internal/carrierrelay + internal/carrieradversary
+  abstract carrier envelopes, semantic reconstruction, carrier collapse scanning, and carrier mutants
+
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
@@ -139,6 +144,7 @@ go vet ./...
 go run ./cmd/kcheck --quick
 go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
+go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -170,6 +176,7 @@ cd .generated/profile-12345
 go test ./...
 go run ./cmd/generated-client --multistream-demo --streams 3
 go run ./cmd/generated-client --proxysem-demo --targets mixed --streams 4
+go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4
 ```
 
 ## Audits And Gates
@@ -194,6 +201,7 @@ Kurdistan treats diversity as something to measure.
 - multi-stream semantics and backpressure
 - stream adversary collapse resistance
 - proxy-semantics correctness, diversity, target backpressure, error/reset isolation, and mutant detection
+- carrier semantic reconstruction, carrier diversity, queue backpressure, loss/reorder recovery, proxysem parity, and carrier mutant detection
 
 Useful commands:
 
@@ -210,6 +218,7 @@ Run adversarial analyses directly:
 go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
+go run ./cmd/kcheck carrier --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -264,13 +273,18 @@ Kurdistan now models proxy-style relay intent internally without adding a real p
 
 Synthetic targets include `echo`, `discard`, `fixed_response`, `slow_response`, `chunked_response`, `large_object`, `error_response`, `reset_midstream`, `drip_response`, and `jittery_response`. The proxy adversary audit checks that these behaviors remain isolated across streams and do not collapse into fixed observable patterns.
 
+## Carrier Abstraction Model
+
+Kurdistan now separates semantic relay messages from abstract carrier envelopes. A proxysem or stream scenario can emit semantic messages, pass them through a carrier model, and verify that decoding reconstructs the same payload-free semantic shape.
+
+Carrier families include `stream_carrier`, `message_carrier`, `datagram_like_carrier`, `chunked_carrier`, `batch_carrier`, `interactive_carrier`, `long_poll_style_carrier`, and `lossy_reordered_carrier`. The model records safe metadata for envelope counts, chunking, batching, flush behavior, retry/reorder events, and carrier-induced backpressure.
+
 ## Roadmap
 
-1. Milestone 11: carrier abstraction.
-2. Milestone 12: production security design.
-3. Milestone 13: implementation hardening.
-4. Milestone 14: local proxy adapter prototype.
-5. Future: proxy/VPN transport integration after security review.
+1. Milestone 12: production security design.
+2. Milestone 13: implementation hardening.
+3. Milestone 14: local proxy adapter prototype.
+4. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning
 

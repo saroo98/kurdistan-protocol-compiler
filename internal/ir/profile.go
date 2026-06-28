@@ -54,6 +54,7 @@ type Profile struct {
 	Scheduler      SchedulerPolicy      `json:"scheduler"`
 	Stream         StreamPolicy         `json:"stream"`
 	ProxySemantics ProxySemanticsPolicy `json:"proxy_semantics"`
+	CarrierPolicy  CarrierPolicy        `json:"carrier_policy"`
 	Padding        PaddingPolicy        `json:"padding"`
 	InvalidInput   InvalidInputPolicy   `json:"invalid_input"`
 	Limits         SafetyLimits         `json:"limits"`
@@ -164,6 +165,24 @@ type ProxySemanticsPolicy struct {
 	TargetClasses            []string `json:"target_classes"`
 	MaxRequestBytes          int      `json:"max_request_bytes"`
 	MaxResponseBytes         int      `json:"max_response_bytes"`
+}
+
+type CarrierPolicy struct {
+	CarrierFamily          string `json:"carrier_family"`
+	EnvelopeEncoding       string `json:"envelope_encoding"`
+	FlushPolicy            string `json:"flush_policy"`
+	BatchPolicy            string `json:"batch_policy"`
+	ChunkingPolicy         string `json:"chunking_policy"`
+	ReliabilityPolicy      string `json:"reliability_policy"`
+	ReorderPolicy          string `json:"reorder_policy"`
+	BackpressurePolicy     string `json:"backpressure_policy"`
+	PriorityMappingPolicy  string `json:"priority_mapping_policy"`
+	EnvelopePaddingPolicy  string `json:"envelope_padding_policy"`
+	TimingBucketPolicy     string `json:"timing_bucket_policy"`
+	MaxEnvelopeBytes       int    `json:"max_envelope_bytes"`
+	MaxMessagesPerEnvelope int    `json:"max_messages_per_envelope"`
+	MaxCarrierQueueDepth   int    `json:"max_carrier_queue_depth"`
+	MaxRetryCount          int    `json:"max_retry_count"`
 }
 
 type PaddingPolicy struct {
@@ -290,5 +309,18 @@ func SyntheticTargetClasses() []string {
 		"reset_midstream",
 		"drip_response",
 		"jittery_response",
+	}
+}
+
+func CarrierFamilies() []string {
+	return []string{
+		"stream_carrier",
+		"message_carrier",
+		"datagram_like_carrier",
+		"chunked_carrier",
+		"batch_carrier",
+		"interactive_carrier",
+		"long_poll_style_carrier",
+		"lossy_reordered_carrier",
 	}
 }

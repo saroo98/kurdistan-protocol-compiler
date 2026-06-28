@@ -58,6 +58,7 @@ func RenderStatus(report AuditReport) string {
 			"unique_scheduler_combinations",
 			"unique_stream_policy_combinations",
 			"unique_proxy_policy_combinations",
+			"unique_carrier_policy_combinations",
 			"unique_padding_combinations",
 			"unique_invalid_input_policy_combinations",
 			"structurally_different_pairs",
@@ -117,6 +118,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_parity")
 		renderNamedGateResult(&b, report.Gates, "multi_stream_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "proxy_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "carrier_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -126,6 +128,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `multi_stream_generated_parity`: `%s`\n", summary.MultiStreamGeneratedParity)
 			fmt.Fprintf(&b, "- `multi_stream_generated_backend_parity`: `%s`\n", summary.StreamAdversaryParity)
 			fmt.Fprintf(&b, "- `proxy_generated_backend_parity`: `%s`\n", summary.ProxySemGeneratedParity)
+			fmt.Fprintf(&b, "- `carrier_generated_backend_parity`: `%s`\n", summary.CarrierGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -168,10 +171,31 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck proxysem --quick` for proxy-semantics checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Carrier Abstraction")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "carrier_semantics_correctness"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderGateDetail(&b, gate, "profile_count")
+		renderGateDetail(&b, gate, "scenario_count")
+		renderGateDetail(&b, gate, "carrier_families")
+		renderGateDetail(&b, gate, "correct_runs")
+		renderGateDetail(&b, gate, "scenario_runs")
+		renderNamedGateResult(&b, report.Gates, "carrier_diversity")
+		renderNamedGateResult(&b, report.Gates, "carrier_backpressure_preservation")
+		renderNamedGateResult(&b, report.Gates, "carrier_loss_reorder_recovery")
+		renderNamedGateResult(&b, report.Gates, "carrier_proxysem_parity")
+		renderNamedGateResult(&b, report.Gates, "carrier_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "carrier_generated_backend_parity")
+	} else {
+		fmt.Fprintln(&b, "- Carrier abstraction gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck carrier --quick` for carrier abstraction checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
 	fmt.Fprintln(&b, "- Proxy-semantics support uses synthetic target descriptors and in-memory target behavior.")
+	fmt.Fprintln(&b, "- Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
@@ -179,7 +203,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 11 should focus on carrier abstraction while preserving the local/private research boundary.")
+	fmt.Fprintln(&b, "Milestone 12 should focus on production security design prerequisites before any real adapter or carrier work.")
 	return b.String()
 }
 

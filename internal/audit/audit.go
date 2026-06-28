@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
@@ -55,6 +56,13 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		ProxyErrorResetIsolationGate(ctx, profiles, cfg.Thresholds),
 		ProxyMutantDetectionGate(ctx, cfg.Thresholds),
 		ProxyGeneratedBackendParityGate(),
+		CarrierSemanticsCorrectnessGate(ctx, profiles, carrieradversary.QuickScenarios(), cfg.Thresholds),
+		CarrierDiversityGate(profiles, cfg.Thresholds),
+		CarrierBackpressurePreservationGate(ctx, profiles, cfg.Thresholds),
+		CarrierLossReorderRecoveryGate(ctx, profiles, cfg.Thresholds),
+		CarrierProxySemParityGate(ctx, profiles, cfg.Thresholds),
+		CarrierMutantDetectionGate(ctx, cfg.Thresholds),
+		CarrierGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 

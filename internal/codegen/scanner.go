@@ -56,6 +56,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/framing_generated.go",
 		"protocol/stream_generated.go",
 		"protocol/proxysem_generated.go",
+		"protocol/carrier_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -148,7 +149,8 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "var transitionTable") &&
 		strings.Contains(joined, "var semanticWireSymbols") &&
 		strings.Contains(joined, "const StreamIDEncodingMode") &&
-		strings.Contains(joined, "const ProxyRelayIntentEncoding")
+		strings.Contains(joined, "const ProxyRelayIntentEncoding") &&
+		strings.Contains(joined, "const CarrierFamily")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)
