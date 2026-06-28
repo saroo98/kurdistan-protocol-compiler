@@ -10,6 +10,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
+	"kurdistan/internal/proxyadversary"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -48,6 +49,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		MultiStreamAdversarialScenariosGate(ctx, profiles, cfg.Thresholds),
 		MultiStreamCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
 		MultiStreamMutantDetectionGate(ctx, cfg.Thresholds),
+		ProxySemanticsCorrectnessGate(ctx, profiles, proxyadversary.QuickScenarios(), cfg.Thresholds),
+		ProxySemanticsDiversityGate(profiles, cfg.Thresholds),
+		ProxyTargetBackpressureGate(ctx, profiles, cfg.Thresholds),
+		ProxyErrorResetIsolationGate(ctx, profiles, cfg.Thresholds),
+		ProxyMutantDetectionGate(ctx, cfg.Thresholds),
+		ProxyGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 

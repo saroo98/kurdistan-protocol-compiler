@@ -62,6 +62,31 @@ func BenchmarkAdversarialGateQuick(b *testing.B) {
 	}
 }
 
+func BenchmarkProxySemQuickAudit(b *testing.B) {
+	cfg := DefaultConfig("quick")
+	cfg.ProfileCount = 3
+	for i := 0; i < b.N; i++ {
+		if _, err := RunProxySemanticsAudit(context.Background(), cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkProxyGateEvaluation(b *testing.B) {
+	profiles, err := generateAuditProfiles(1, 6)
+	if err != nil {
+		b.Fatal(err)
+	}
+	thresholds := DefaultThresholds()
+	thresholds.MinProxyPolicyCombinations = 2
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ProxySemanticsDiversityGate(profiles, thresholds)
+		_ = ProxyTargetBackpressureGate(context.Background(), profiles, thresholds)
+		_ = ProxyErrorResetIsolationGate(context.Background(), profiles, thresholds)
+	}
+}
+
 func BenchmarkStatusRendering(b *testing.B) {
 	report, err := Run(context.Background(), AuditConfig{
 		Mode:         "quick",

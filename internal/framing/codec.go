@@ -14,6 +14,7 @@ import (
 
 	"kurdistan/internal/ir"
 	"kurdistan/internal/padding"
+	"kurdistan/internal/proxysem"
 	"kurdistan/internal/scheduler"
 )
 
@@ -27,6 +28,19 @@ type Operation struct {
 	Priority    string
 	EndStream   bool
 	Payload     []byte
+
+	RelayIntentID      uint64
+	TargetClass        string
+	TargetVariant      string
+	RequestClass       string
+	ResponseMode       string
+	TargetErrorCode    string
+	TargetCloseReason  string
+	TargetResetReason  string
+	MetadataClass      string
+	ResponseChunkIndex int
+	PayloadByteCount   int
+	ResponseByteCount  int
 }
 
 type DecodedFrame struct {
@@ -48,6 +62,9 @@ func EncodeOperation(p *ir.Profile, op Operation, seed int64) ([][]byte, error) 
 	}
 	if _, ok := ir.MessageBySemantic(p, op.Semantic); !ok {
 		return nil, fmt.Errorf("unknown semantic %q", op.Semantic)
+	}
+	if err := validateProxyOperation(p, op); err != nil {
+		return nil, err
 	}
 	sizes := scheduler.FragmentSizes(p, len(op.Payload))
 	engine := padding.New(p.Padding, seed)
@@ -513,48 +530,116 @@ func encodeOperationMetadata(op Operation) ([]byte, error) {
 	if op.CreditBytes < 0 {
 		return nil, fmt.Errorf("credit bytes cannot be negative")
 	}
+	if op.PayloadByteCount < 0 || op.ResponseByteCount < 0 || op.ResponseChunkIndex < 0 {
+		return nil, fmt.Errorf("proxy byte counts and chunk indexes cannot be negative")
+	}
 	var out []byte
-	var fixed [21]byte
+	var fixed [41]byte
 	binary.BigEndian.PutUint64(fixed[0:8], op.Sequence)
 	binary.BigEndian.PutUint64(fixed[8:16], op.Offset)
 	binary.BigEndian.PutUint32(fixed[16:20], uint32(op.CreditBytes))
 	if op.EndStream {
 		fixed[20] = 1
 	}
+	binary.BigEndian.PutUint64(fixed[21:29], op.RelayIntentID)
+	binary.BigEndian.PutUint32(fixed[29:33], uint32(op.PayloadByteCount))
+	binary.BigEndian.PutUint32(fixed[33:37], uint32(op.ResponseByteCount))
+	binary.BigEndian.PutUint32(fixed[37:41], uint32(op.ResponseChunkIndex))
 	out = append(out, fixed[:]...)
-	out = append(out, byte(len(op.Reason)))
-	out = append(out, []byte(op.Reason)...)
-	out = append(out, byte(len(op.Priority)))
-	out = append(out, []byte(op.Priority)...)
+	for _, value := range []string{
+		op.Reason,
+		op.Priority,
+		op.TargetClass,
+		op.TargetVariant,
+		op.RequestClass,
+		op.ResponseMode,
+		op.TargetErrorCode,
+		op.TargetCloseReason,
+		op.TargetResetReason,
+		op.MetadataClass,
+	} {
+		if len(value) > 255 {
+			return nil, fmt.Errorf("proxy metadata value too long")
+		}
+		out = append(out, byte(len(value)))
+		out = append(out, []byte(value)...)
+	}
 	return out, nil
 }
 
 func decodeOperationMetadata(in []byte) (Operation, []byte, error) {
-	if len(in) < 23 {
+	if len(in) < 51 {
 		return Operation{}, nil, io.ErrUnexpectedEOF
 	}
 	op := Operation{
-		Sequence:    binary.BigEndian.Uint64(in[0:8]),
-		Offset:      binary.BigEndian.Uint64(in[8:16]),
-		CreditBytes: int(binary.BigEndian.Uint32(in[16:20])),
-		EndStream:   in[20] != 0,
+		Sequence:           binary.BigEndian.Uint64(in[0:8]),
+		Offset:             binary.BigEndian.Uint64(in[8:16]),
+		CreditBytes:        int(binary.BigEndian.Uint32(in[16:20])),
+		EndStream:          in[20] != 0,
+		RelayIntentID:      binary.BigEndian.Uint64(in[21:29]),
+		PayloadByteCount:   int(binary.BigEndian.Uint32(in[29:33])),
+		ResponseByteCount:  int(binary.BigEndian.Uint32(in[33:37])),
+		ResponseChunkIndex: int(binary.BigEndian.Uint32(in[37:41])),
 	}
-	rest := in[21:]
-	reasonLen := int(rest[0])
-	rest = rest[1:]
-	if len(rest) < reasonLen+1 {
-		return Operation{}, nil, io.ErrUnexpectedEOF
+	rest := in[41:]
+	values := []*string{
+		&op.Reason,
+		&op.Priority,
+		&op.TargetClass,
+		&op.TargetVariant,
+		&op.RequestClass,
+		&op.ResponseMode,
+		&op.TargetErrorCode,
+		&op.TargetCloseReason,
+		&op.TargetResetReason,
+		&op.MetadataClass,
 	}
-	op.Reason = string(rest[:reasonLen])
-	rest = rest[reasonLen:]
-	priorityLen := int(rest[0])
-	rest = rest[1:]
-	if len(rest) < priorityLen {
-		return Operation{}, nil, io.ErrUnexpectedEOF
+	for _, target := range values {
+		if len(rest) < 1 {
+			return Operation{}, nil, io.ErrUnexpectedEOF
+		}
+		n := int(rest[0])
+		rest = rest[1:]
+		if len(rest) < n {
+			return Operation{}, nil, io.ErrUnexpectedEOF
+		}
+		*target = string(rest[:n])
+		rest = rest[n:]
 	}
-	op.Priority = string(rest[:priorityLen])
-	rest = rest[priorityLen:]
 	return op, rest, nil
+}
+
+func validateProxyOperation(p *ir.Profile, op Operation) error {
+	switch op.Semantic {
+	case ir.SemanticOpenRelay, ir.SemanticTargetDescriptor:
+		if op.TargetClass == "" {
+			return fmt.Errorf("target class is required for %s", op.Semantic)
+		}
+		if err := proxysem.DefaultRegistry().Validate(proxysem.TargetDescriptor{Class: op.TargetClass, Variant: op.TargetVariant}); err != nil {
+			return err
+		}
+	case ir.SemanticTargetData:
+		if op.PayloadByteCount > p.ProxySemantics.MaxRequestBytes || len(op.Payload) > p.ProxySemantics.MaxRequestBytes {
+			return fmt.Errorf("proxy request exceeds profile limit")
+		}
+	case ir.SemanticTargetResponse:
+		if op.ResponseByteCount > p.ProxySemantics.MaxResponseBytes || len(op.Payload) > p.ProxySemantics.MaxResponseBytes {
+			return fmt.Errorf("proxy response exceeds profile limit")
+		}
+	case ir.SemanticTargetError:
+		if op.TargetErrorCode == "" {
+			return fmt.Errorf("target error code is required")
+		}
+	case ir.SemanticTargetClose:
+		if op.TargetCloseReason == "" && op.Reason == "" {
+			return fmt.Errorf("target close reason is required")
+		}
+	case ir.SemanticTargetReset:
+		if op.TargetResetReason == "" && op.Reason == "" {
+			return fmt.Errorf("target reset reason is required")
+		}
+	}
+	return nil
 }
 
 func encodeStreamID(p *ir.Profile, streamID uint32) ([]byte, error) {

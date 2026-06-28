@@ -107,3 +107,7 @@ go run ./cmd/kcheck codegen --quick
 - Feature extraction is heuristic and payload-free. It can detect known collapse modes but cannot prove undetectability.
 - Generated code still reuses shared lab helpers for safe IO, stream session logic, trace output, and test harnesses.
 - Passing the stream adversary audit does not imply production readiness, real-world robustness, or censorship resistance.
+
+## Next Layer
+
+Milestone 10 extends this adversarial model to proxy-style relay intents, synthetic targets, target-induced backpressure, and target error/reset isolation. See [KIP-0016: Lab Proxy Semantics](KIP-0016-lab-proxy-semantics.md).

@@ -27,26 +27,36 @@ const (
 	SemanticSessionClose = "session_close"
 	SemanticPadding      = "padding"
 	SemanticError        = "error"
+
+	SemanticOpenRelay        = "open_relay"
+	SemanticTargetDescriptor = "target_descriptor"
+	SemanticTargetData       = "target_data"
+	SemanticTargetResponse   = "target_response"
+	SemanticTargetError      = "target_error"
+	SemanticTargetClose      = "target_close"
+	SemanticTargetReset      = "target_reset"
+	SemanticTargetMetadata   = "target_metadata"
 )
 
 type Profile struct {
-	Version        string             `json:"version"`
-	ID             string             `json:"id"`
-	Seed           int64              `json:"seed"`
-	GenerationHash string             `json:"generation_hash,omitempty"`
-	RolePolicy     RolePolicy         `json:"role_policy"`
-	Carrier        CarrierSpec        `json:"carrier"`
-	States         []State            `json:"states"`
-	Transitions    []Transition       `json:"transitions"`
-	FirstContact   FirstContactSpec   `json:"first_contact"`
-	Messages       []MessageSymbol    `json:"messages"`
-	FrameGrammar   FrameGrammar       `json:"frame_grammar"`
-	Auth           AuthSpec           `json:"auth"`
-	Scheduler      SchedulerPolicy    `json:"scheduler"`
-	Stream         StreamPolicy       `json:"stream"`
-	Padding        PaddingPolicy      `json:"padding"`
-	InvalidInput   InvalidInputPolicy `json:"invalid_input"`
-	Limits         SafetyLimits       `json:"limits"`
+	Version        string               `json:"version"`
+	ID             string               `json:"id"`
+	Seed           int64                `json:"seed"`
+	GenerationHash string               `json:"generation_hash,omitempty"`
+	RolePolicy     RolePolicy           `json:"role_policy"`
+	Carrier        CarrierSpec          `json:"carrier"`
+	States         []State              `json:"states"`
+	Transitions    []Transition         `json:"transitions"`
+	FirstContact   FirstContactSpec     `json:"first_contact"`
+	Messages       []MessageSymbol      `json:"messages"`
+	FrameGrammar   FrameGrammar         `json:"frame_grammar"`
+	Auth           AuthSpec             `json:"auth"`
+	Scheduler      SchedulerPolicy      `json:"scheduler"`
+	Stream         StreamPolicy         `json:"stream"`
+	ProxySemantics ProxySemanticsPolicy `json:"proxy_semantics"`
+	Padding        PaddingPolicy        `json:"padding"`
+	InvalidInput   InvalidInputPolicy   `json:"invalid_input"`
+	Limits         SafetyLimits         `json:"limits"`
 }
 
 type RolePolicy struct {
@@ -139,6 +149,23 @@ type StreamPolicy struct {
 	MaxStreamID               uint32 `json:"max_stream_id"`
 }
 
+type ProxySemanticsPolicy struct {
+	RelayIntentEncoding      string   `json:"relay_intent_encoding"`
+	TargetDescriptorEncoding string   `json:"target_descriptor_encoding"`
+	RequestClassEncoding     string   `json:"request_class_encoding"`
+	ResponseModeEncoding     string   `json:"response_mode_encoding"`
+	TargetErrorPolicy        string   `json:"target_error_policy"`
+	TargetClosePolicy        string   `json:"target_close_policy"`
+	TargetResetPolicy        string   `json:"target_reset_policy"`
+	TargetMetadataPolicy     string   `json:"target_metadata_policy"`
+	RelayOpenOrderingPolicy  string   `json:"relay_open_ordering_policy"`
+	RelayIntentPaddingPolicy string   `json:"relay_intent_padding_policy"`
+	TargetClassMapping       string   `json:"target_class_mapping"`
+	TargetClasses            []string `json:"target_classes"`
+	MaxRequestBytes          int      `json:"max_request_bytes"`
+	MaxResponseBytes         int      `json:"max_response_bytes"`
+}
+
 type PaddingPolicy struct {
 	Mode            string  `json:"mode"`
 	MinPaddingBytes int     `json:"min_padding_bytes"`
@@ -227,5 +254,41 @@ func RelaySemantics() []string {
 		SemanticAck,
 		SemanticPadding,
 		SemanticError,
+		SemanticOpenRelay,
+		SemanticTargetDescriptor,
+		SemanticTargetData,
+		SemanticTargetResponse,
+		SemanticTargetError,
+		SemanticTargetClose,
+		SemanticTargetReset,
+		SemanticTargetMetadata,
+	}
+}
+
+func ProxySemantics() []string {
+	return []string{
+		SemanticOpenRelay,
+		SemanticTargetDescriptor,
+		SemanticTargetData,
+		SemanticTargetResponse,
+		SemanticTargetError,
+		SemanticTargetClose,
+		SemanticTargetReset,
+		SemanticTargetMetadata,
+	}
+}
+
+func SyntheticTargetClasses() []string {
+	return []string{
+		"echo",
+		"discard",
+		"fixed_response",
+		"slow_response",
+		"chunked_response",
+		"large_object",
+		"error_response",
+		"reset_midstream",
+		"drip_response",
+		"jittery_response",
 	}
 }

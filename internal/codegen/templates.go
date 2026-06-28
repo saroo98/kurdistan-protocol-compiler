@@ -93,6 +93,22 @@ func semanticWireMap(messages []ir.MessageSymbol) string {
 	return b.String()
 }
 
+func proxySemanticWireMap(messages []ir.MessageSymbol) string {
+	proxy := map[string]bool{}
+	for _, semantic := range ir.ProxySemantics() {
+		proxy[semantic] = true
+	}
+	var b strings.Builder
+	b.WriteString("map[string]string{\n")
+	for _, msg := range messages {
+		if proxy[msg.Semantic] {
+			fmt.Fprintf(&b, "\t%s: %s,\n", quote(msg.Semantic), quote(msg.WireSymbol))
+		}
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
 func messageBounds(messages []ir.MessageSymbol) string {
 	var b strings.Builder
 	b.WriteString("map[string]GeneratedMessageBounds{\n")

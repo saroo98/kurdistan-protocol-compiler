@@ -68,9 +68,10 @@ func Generate(seed int64) (*ir.Profile, error) {
 			NonceBytes:   16,
 			ProofMessage: proofMessage,
 		},
-		Scheduler: scheduler,
-		Stream:    streamPolicy(rng),
-		Padding:   paddingForPlacement(rng, placement),
+		Scheduler:      scheduler,
+		Stream:         streamPolicy(rng),
+		ProxySemantics: proxySemanticsPolicy(rng),
+		Padding:        paddingForPlacement(rng, placement),
 		InvalidInput: ir.InvalidInputPolicy{
 			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
 			MalformedFrame:      []string{"close", "ignore", "delayed_close", "generated_malformed_response"}[rng.Intn(4)],
@@ -247,6 +248,30 @@ func streamPolicy(rng *rand.Rand) ir.StreamPolicy {
 		ClosePolicy:               []string{"explicit_close", "half_close", "close_after_ack"}[rng.Intn(3)],
 		ResetPolicy:               []string{"immediate_reset", "reset_with_error_code", "delayed_reset"}[rng.Intn(3)],
 		MaxStreamID:               1 << 24,
+	}
+}
+
+func proxySemanticsPolicy(rng *rand.Rand) ir.ProxySemanticsPolicy {
+	requestLimit := []int{32 * 1024, 64 * 1024, 128 * 1024, 256 * 1024}[rng.Intn(4)]
+	responseLimit := []int{128 * 1024, 256 * 1024, 512 * 1024, 1024 * 1024}[rng.Intn(4)]
+	if responseLimit < requestLimit {
+		responseLimit = requestLimit
+	}
+	return ir.ProxySemanticsPolicy{
+		RelayIntentEncoding:      []string{"descriptor_before_open", "descriptor_after_open", "split_descriptor", "table_mapped_descriptor", "state_derived_descriptor"}[rng.Intn(5)],
+		TargetDescriptorEncoding: []string{"compact_enum", "generated_table_index", "split_fields", "state_derived_class", "padded_descriptor_block"}[rng.Intn(5)],
+		RequestClassEncoding:     []string{"interactive", "bulk", "control", "error_test", "generated_bucket"}[rng.Intn(5)],
+		ResponseModeEncoding:     []string{"immediate", "chunked", "delayed", "resettable", "errorable", "large_object"}[rng.Intn(6)],
+		TargetErrorPolicy:        []string{"explicit_target_error", "close_with_error", "reset_with_error", "delayed_error", "metadata_error"}[rng.Intn(5)],
+		TargetClosePolicy:        []string{"explicit_close", "implicit_close_after_response", "close_after_ack", "half_close_compatible"}[rng.Intn(4)],
+		TargetResetPolicy:        []string{"immediate_reset", "reset_with_reason", "delayed_reset", "reset_after_partial_response"}[rng.Intn(4)],
+		TargetMetadataPolicy:     []string{"none", "pre_response_metadata", "post_response_metadata", "metadata_as_control_frame"}[rng.Intn(4)],
+		RelayOpenOrderingPolicy:  []string{"intent_before_stream", "stream_before_intent", "descriptor_split_around_open", "metadata_before_descriptor"}[rng.Intn(4)],
+		RelayIntentPaddingPolicy: []string{"none", "bounded", "descriptor_padding", "metadata_padding"}[rng.Intn(4)],
+		TargetClassMapping:       []string{"direct_generated", "table_mapped", "state_derived", "bucketed"}[rng.Intn(4)],
+		TargetClasses:            ir.SyntheticTargetClasses(),
+		MaxRequestBytes:          requestLimit,
+		MaxResponseBytes:         responseLimit,
 	}
 }
 
