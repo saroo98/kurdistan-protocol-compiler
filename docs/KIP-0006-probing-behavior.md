@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0006: Probing Behavior
 
 Invalid-input behavior means local lab handling of malformed or unexpected traffic. It is not deployment guidance.

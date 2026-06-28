@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0007: Testing And Benchmarks
 
 The test plan covers profile validation, deterministic generation, state-machine enforcement, generated frame encode/decode, transcript authentication, scheduler behavior, padding bounds, local relay round trips, trace encoding, and trace comparison.

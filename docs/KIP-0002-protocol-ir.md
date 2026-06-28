@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0002: Protocol IR
 
 The protocol IR gives the compiler a stable internal representation while allowing generated profiles to vary structurally.

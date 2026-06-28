@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0004: Framing
 
 The framing package encodes stable semantic operations through a generated profile. Supported v0 operations are `open_stream`, `data`, `close_stream`, `padding`, and `error`.
