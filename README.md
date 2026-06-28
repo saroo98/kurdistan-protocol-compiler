@@ -1,43 +1,40 @@
 # Kurdistan Protocol Compiler
 
-![Status](https://img.shields.io/badge/status-lab--research-orange)
-![Scope](https://img.shields.io/badge/scope-local--only-blue)
+![Status](https://img.shields.io/badge/status-experimental-orange)
 ![Language](https://img.shields.io/badge/language-Go-00ADD8)
+![Area](https://img.shields.io/badge/area-protocol--compiler-blue)
 
 Kurdistan is a censorship-resistance protocol research project building toward a production-grade polymorphic relay transport compiler.
 
-> Status: Kurdistan is a lab-only research prototype. It is not a VPN, not a SOCKS proxy, not production-ready, and does not claim real-world censorship resistance or undetectability.
+Kurdistan explores a core question in anti-censorship networking: can a relay transport be generated as many structurally different protocol implementations, instead of shipping one recognizable protocol fingerprint?
 
 ## What Is Kurdistan?
 
-Kurdistan explores whether relay transport protocols can be generated as profile-specific implementations instead of being shipped as one fixed protocol family with a stable fingerprint.
+Kurdistan is a protocol compiler for generated relay transports. A generated profile defines how a private transport behaves across first contact, state transitions, framing, scheduling, padding, probing, authentication checks, stream semantics, and invalid-input handling.
 
-The project currently generates private lab transport profiles with:
+Current profile generation covers:
 
 - profile-specific first-contact sequences
 - generated client/server state machines
 - generated frame grammars and semantic wire mappings
-- scheduler, padding, and probing behavior
-- invalid-input and malformed-frame policies
-- HMAC transcript proof for lab authentication tests
+- scheduler, padding, probing, and malformed-input behavior
+- HMAC transcript proof for controlled authentication tests
 - multi-stream relay semantics with flow control and backpressure
 - payload-free trace capture
 - generated Go source modules
 - adversarial diversity, mutation, and black-box trace audits
 
-The current repository focuses on the compiler, generated transport profile model, interpreted runtime, generated source backend, and local adversarial audit harness. It is not a deployable proxy, VPN, bridge, or production censorship-circumvention tool.
+The current codebase is a research compiler, runtime harness, source generator, and audit system. Production transport integration is future work.
 
 ## Why This Project Exists
 
-Many censorship-resistant networking systems and pluggable transport designs must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.
+Many censorship-resistant networking systems and pluggable transports must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.
 
-Kurdistan investigates a different design direction: a protocol compiler that can generate structurally different relay transports per deployment or research run. The long-term motivation is resilient communication in adversarial network environments, including heavily filtered countries such as Iran and other regions affected by internet censorship.
+Kurdistan investigates a compiler-based alternative: generate structurally different relay transports per deployment or research run while preserving stable internal semantics. The long-term motivation is resilient communication in adversarial network environments, including heavily filtered countries such as Iran and other regions affected by internet censorship.
 
-This repository does not claim to work in Iran today. It does not claim to bypass filtering, evade detection, or provide production security. The current work is controlled anti-censorship research around protocol fingerprint diversity, adversarial testing, and generated relay transport design.
+Today, the repository is focused on protocol generation, local interoperability, trace diversity, and regression gates. It is not yet a deployable censorship-circumvention system.
 
 ## What Kurdistan Is Building
-
-Kurdistan is intended to sit at the generated transport layer of a future proxy transport architecture:
 
 ```text
 Application or future proxy adapter
@@ -49,13 +46,13 @@ Stable internal relay semantics
 Kurdistan generated transport
         |
         v
-Carrier layer, future or lab-only
+Carrier layer
         |
         v
-Remote relay, future or lab-only
+Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer. Future proxy or VPN transport integration would require a separate production security design, threat model, implementation hardening, independent review, and explicit scope change.
+Current work is concentrated on the generated transport/compiler layer. Future proxy or VPN integration requires a separate production security design, carrier abstraction, implementation hardening, and review.
 
 ## Current Status
 
@@ -80,8 +77,8 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 - Deterministic profile generation from seeds.
 - Generated first-contact grammar and transcript proof model.
 - Generated frame grammar with profile-specific semantic-to-wire mappings.
-- Generated scheduler, padding, malformed-input, probing, and invalid-auth behavior.
-- Standard-library-only HMAC-SHA256 transcript proof for lab testing.
+- Generated scheduler, padding, probing, and invalid-auth behavior.
+- Standard-library-only HMAC-SHA256 transcript proof for controlled tests.
 - Payload-free JSONL trace capture.
 - Profile corpus diversity metrics.
 - Black-box trace diversity scanner.
@@ -90,29 +87,16 @@ Current work is concentrated on the generated transport/compiler layer. Future p
 - Longitudinal audit comparison against baseline JSON reports.
 - Generated source backend with `kgen`.
 - Source scanner for generated-code artifacts.
-- Multi-stream lab relay semantics.
+- Multi-stream relay semantics.
 - Stream ID strategies, close/reset behavior, flow control, and backpressure.
 - Stream adversary scenarios for interleaving, scheduler pressure, blocked streams, resets, close races, and uneven stream sizes.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
-## Non-Goals And Safety Boundary
+## Current Boundary
 
-Kurdistan intentionally does not implement:
+The repository currently contains compiler, runtime, generator, and audit work. It does not contain deployment code, external targets, production key exchange, payload logging, SOCKS mode, VPN mode, HTTP carriers, TLS mimicry, CDN behavior, mobile clients, or live-network testing.
 
-- SOCKS proxy mode
-- VPN mode
-- HTTP carrier mode
-- TLS mimicry
-- CDN behavior
-- domain fronting
-- public relay deployment
-- external target fetching
-- mobile apps
-- production key exchange
-- live-network testing
-- real-world censorship deployment
-
-All current runtime behavior is loopback-only or in-memory lab behavior. Traces do not include payload contents, raw frames, secrets, proofs, keys, or external destination data.
+That boundary is intentional while the protocol model, audit gates, and generated backend are still being built.
 
 ## Architecture
 
@@ -124,7 +108,7 @@ internal/ir + internal/compiler
   protocol profile schema and deterministic profile compiler
 
 internal/fsm + internal/framing + internal/scheduler + internal/stream
-  interpreted lab runtime for state machines, frames, scheduling, and streams
+  runtime model for state machines, frames, scheduling, and streams
 
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
@@ -136,11 +120,9 @@ cmd/kcheck + internal/audit
   regression gates, generated-backend audit, stream adversary audit, STATUS.md generation
 ```
 
-The interpreted runtime is useful for research iteration. The generated source backend exists because a shared interpreter may itself introduce common implementation artifacts. `kgen` emits profile-specific Go constants and tables so generated modules can compile and interoperate locally.
+The interpreted runtime supports fast research iteration. The generated source backend exists because a shared interpreter can introduce common implementation artifacts. `kgen` emits profile-specific Go constants and tables so generated modules can compile and interoperate locally.
 
 ## Quickstart
-
-The repository is Go-based and currently uses only local lab commands.
 
 ```bash
 go test ./...
@@ -158,7 +140,7 @@ If Go is not on `PATH` in this workspace, use the bundled tool:
 .tools\go\bin\go.exe run ./cmd/kcheck --quick
 ```
 
-Generate and validate a local lab profile:
+Generate and validate a profile:
 
 ```bash
 go run ./cmd/kdc generate --seed 12345 --out profiles/examples/profile-12345.json
@@ -179,13 +161,11 @@ go test ./...
 go run ./cmd/generated-client --multistream-demo --streams 3
 ```
 
-These commands are local/lab commands only. They do not start a public service or contact external targets.
-
 ## Audits And Gates
 
-Kurdistan treats diversity as something to test, not assume.
+Kurdistan treats diversity as something to measure.
 
-`kcheck` runs local-only audit gates for:
+`kcheck` covers:
 
 - profile diversity across generated IR structures
 - black-box trace diversity
@@ -219,7 +199,7 @@ go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck streamadversary --quick
 ```
 
-`STATUS.md` is generated from the latest local audit and is intended as a compact project status snapshot. It is not a security claim.
+`STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
 
 ## Generated Source Backend
 
@@ -232,15 +212,13 @@ go run ./cmd/kcheck streamadversary --quick
 - generated stream policy constants
 - invalid-input and auth constants
 - generated tests and benchmarks
-- local-only generated client/server/echo/trace commands
+- generated client/server/echo/trace commands
 
-Generated code is not just a wrapper around `kclient` or `kserver`. It specializes profile-specific protocol data while still reusing small lab helpers for safe IO, HMAC, trace output, and deterministic local testing.
-
-The generated source backend is not a production runtime. It is evidence for the research question: can generated protocols compile and interoperate locally while preserving profile-specific behavior?
+Generated code specializes profile-specific protocol data while still reusing small helper packages for safe IO, HMAC, trace output, and deterministic testing.
 
 ## Multi-Stream Semantics
 
-Kurdistan now models multiple logical streams inside one lab session.
+Kurdistan models multiple logical streams inside one session.
 
 Current multi-stream semantics include:
 
@@ -270,47 +248,19 @@ The audit checks that padding noise alone is not mistaken for meaningful multi-s
 ## Roadmap
 
 1. Milestone 10: lab-only proxy-semantics modeling.
-2. Milestone 11: lab carrier abstraction.
+2. Milestone 11: carrier abstraction.
 3. Milestone 12: production security design.
 4. Milestone 13: implementation hardening.
-5. Milestone 14: local proxy adapter prototype, still controlled and lab-only.
+5. Milestone 14: local proxy adapter prototype.
 6. Future: proxy/VPN transport integration after security review.
-
-Proxy/VPN integration is explicitly future work. It should not be added until the security model, carrier abstraction, audit story, and deployment risks have been reviewed.
 
 ## Research Positioning
 
-Kurdistan is related to:
-
-- censorship-resistance research
-- anti-censorship networking research
-- pluggable transport research
-- protocol generation
-- polymorphic transport protocols
-- relay transport protocol design
-- proxy transport architecture
-- VPN transport research
-- adversarial network measurement
-- traffic analysis resistance research
-- protocol fingerprint diversity
-- internet censorship research, including Iran internet censorship as a motivating environment
-
-These are research categories, not claims that this code is ready for real-world deployment.
+Kurdistan is related to censorship-resistance research, anti-censorship networking, pluggable transport research, protocol generation, polymorphic transport protocols, relay transport design, proxy transport architecture, VPN transport research, adversarial network measurement, traffic analysis resistance research, protocol fingerprint diversity, and internet censorship research.
 
 ## Contributing
 
-Contributions should preserve the lab-only boundary unless a future milestone explicitly changes it.
-
-Requirements:
-
-- no deployment code
-- no external targets
-- no payload logging
-- no production key exchange
-- no SOCKS, VPN, HTTP carrier, TLS mimicry, or CDN behavior without an explicit future milestone
-- tests for behavior changes
-- docs for new commands, audit gates, or protocol semantics
-- payload-free traces only
+Contributions should keep the current repository scope intact unless a future milestone explicitly changes it. Behavior changes need tests, and new commands, audit gates, or protocol semantics need docs. Traces must remain payload-free.
 
 Run the relevant checks before submitting changes:
 
