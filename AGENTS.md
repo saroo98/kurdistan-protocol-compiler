@@ -2,11 +2,13 @@
 
 ## Project
 
-Kurdistan is a lab-only protocol compiler research prototype. It generates local, one-off relay protocol profiles with different state machines, frame grammars, scheduling policies, and invalid-input behavior.
+Kurdistan is a lab-only censorship-resistance protocol research prototype building toward a production-grade polymorphic relay transport compiler. It generates local, profile-specific relay transport profiles with different state machines, frame grammars, scheduling policies, padding/probing behavior, multi-stream semantics, generated source modules, and adversarial audit gates.
 
 ## Hard scope limits
 
-Do not implement production deployment, VPN mode, SOCKS mode, external web fetching, mobile apps, censorship bypass deployment, domain-fronting, TLS mimicry, CDN bypass, or real-world operational guidance.
+Do not implement production deployment, VPN mode, SOCKS mode, HTTP carriers, external web fetching, mobile apps, censorship bypass deployment, domain-fronting, TLS mimicry, CDN bypass, or real-world operational guidance.
+
+Documentation may mention adversarial network environments and heavily filtered countries such as Iran as long-term motivation, but it must not claim that the current repository is usable, deployed, undetectable, production-ready, or proven to resist real-world censorship.
 
 All tests must be local. No tests may require external internet.
 
