@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0003: Compiler Design
 
 The compiler takes an integer seed and produces deterministic JSON. The same seed must produce the same profile, and different seeds should usually produce structurally different profiles.

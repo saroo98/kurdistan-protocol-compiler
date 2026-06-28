@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0011: Mutation And Longitudinal Testing
 
 Passing the current audit gates is not enough. A compiler can drift into cosmetic polymorphism while still producing valid profiles. Mutation testing proves the inverse: when known bad generator shapes are introduced in the lab, the audit system catches them.

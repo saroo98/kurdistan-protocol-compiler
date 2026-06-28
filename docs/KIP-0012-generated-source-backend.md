@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0012: Generated Source Backend
 
 ## Status

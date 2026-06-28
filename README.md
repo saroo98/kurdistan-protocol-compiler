@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # Kurdistan Protocol Compiler
 
 ![Status](https://img.shields.io/badge/status-experimental-orange)
@@ -272,4 +275,11 @@ go run ./cmd/kcheck --quick
 
 ## License
 
-No license has been selected yet. Until a license is added, treat the repository as not licensed for reuse beyond the owner’s explicit permission.
+Kurdistan Protocol Compiler uses separate licenses for code and documentation:
+
+- Source code: GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`)
+- Documentation: Creative Commons Attribution-ShareAlike 4.0 International (`CC BY-SA 4.0`)
+
+Copyright 2026 Saro.
+
+Use, modification, and distribution must preserve copyright notices and comply with the applicable license terms.

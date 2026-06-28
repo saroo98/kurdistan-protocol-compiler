@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0001: Threat Model
 
 Kurdistan is a local research prototype. It studies whether a compiler can generate relay protocol profiles with different first-contact grammars, state machines, frame grammars, scheduling behavior, padding behavior, invalid-input behavior, and trace shapes.

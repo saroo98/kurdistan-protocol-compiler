@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0008: Diversity Audit
 
 The diversity audit asks whether generated profiles are structurally different protocols or merely renamed versions of the same protocol.

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0010: Adversarial Lab Simulator
 
 Structural profile diversity is necessary but not enough. Two profiles can differ in JSON and still produce traces that look like one family from the outside. The adversarial lab simulator treats trace events as black-box observations and asks whether generated traces collapse into tight observable clusters.

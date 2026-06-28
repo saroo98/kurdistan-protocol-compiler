@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0009: Regression Gates
 
 Kurdistan generates many profile structures, but profile diversity is not enough. A future change could preserve structural variation in JSON while making the observable trace behavior look stable. Regression gates exist to catch that failure mode.

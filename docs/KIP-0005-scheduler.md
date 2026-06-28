@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # KIP-0005: Scheduler
 
 The scheduler model supports `max_speed`, `balanced`, `interactive_first`, and `bulk_first`.
