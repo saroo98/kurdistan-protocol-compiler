@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Saro
+
 package stream
 
 func WindowBucket(bytes int) string {
