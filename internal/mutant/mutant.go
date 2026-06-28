@@ -17,18 +17,25 @@ import (
 )
 
 const (
-	ModeFixedFirstContact          = "fixed_first_contact"
-	ModeFixedFrameGrammar          = "fixed_frame_grammar"
-	ModeCosmeticSymbolsOnly        = "cosmetic_symbols_only"
-	ModeFixedScheduler             = "fixed_scheduler"
-	ModeFixedInvalidInput          = "fixed_invalid_input"
-	ModePaddingNoiseOnly           = "padding_noise_only"
-	ModeFixedStreamIDStrategy      = "fixed_stream_id_strategy"
-	ModeFixedWindowUpdatePolicy    = "fixed_window_update_policy"
-	ModeFIFOSchedulerOnly          = "fifo_scheduler_only"
-	ModeFixedResetClosePolicy      = "fixed_reset_close_policy"
-	ModeNoBackpressure             = "no_backpressure"
-	ModePaddingOnlyStreamDiversity = "padding_only_stream_diversity"
+	ModeFixedFirstContact             = "fixed_first_contact"
+	ModeFixedFrameGrammar             = "fixed_frame_grammar"
+	ModeCosmeticSymbolsOnly           = "cosmetic_symbols_only"
+	ModeFixedScheduler                = "fixed_scheduler"
+	ModeFixedInvalidInput             = "fixed_invalid_input"
+	ModePaddingNoiseOnly              = "padding_noise_only"
+	ModeFixedStreamIDStrategy         = "fixed_stream_id_strategy"
+	ModeFixedWindowUpdatePolicy       = "fixed_window_update_policy"
+	ModeFIFOSchedulerOnly             = "fifo_scheduler_only"
+	ModeFixedResetClosePolicy         = "fixed_reset_close_policy"
+	ModeNoBackpressure                = "no_backpressure"
+	ModePaddingOnlyStreamDiversity    = "padding_only_stream_diversity"
+	ModeFixedTargetDescriptorEncoding = "fixed_target_descriptor_encoding"
+	ModeFixedTargetOpenSequence       = "fixed_target_open_sequence"
+	ModeFixedTargetErrorPolicy        = "fixed_target_error_policy"
+	ModeFixedTargetClosePolicy        = "fixed_target_close_policy"
+	ModeFixedResponseChunking         = "fixed_response_chunking"
+	ModeNoTargetBackpressure          = "no_target_backpressure"
+	ModePaddingOnlyProxyDiversity     = "padding_only_proxy_diversity"
 )
 
 func Modes() []string {
@@ -45,6 +52,13 @@ func Modes() []string {
 		ModeFixedResetClosePolicy,
 		ModeNoBackpressure,
 		ModePaddingOnlyStreamDiversity,
+		ModeFixedTargetDescriptorEncoding,
+		ModeFixedTargetOpenSequence,
+		ModeFixedTargetErrorPolicy,
+		ModeFixedTargetClosePolicy,
+		ModeFixedResponseChunking,
+		ModeNoTargetBackpressure,
+		ModePaddingOnlyProxyDiversity,
 	}
 }
 
@@ -100,6 +114,27 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p.Stream.InitialStreamWindowBytes = 128 * 1024
 			p.Stream.InitialSessionWindowBytes = min(2*1024*1024, 128*1024*max(4, p.Stream.MaxConcurrentStreams))
 		case ModePaddingOnlyStreamDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeFixedTargetDescriptorEncoding:
+			p.ProxySemantics.TargetDescriptorEncoding = base.ProxySemantics.TargetDescriptorEncoding
+			p.ProxySemantics.TargetClassMapping = base.ProxySemantics.TargetClassMapping
+		case ModeFixedTargetOpenSequence:
+			p.ProxySemantics.RelayIntentEncoding = base.ProxySemantics.RelayIntentEncoding
+			p.ProxySemantics.RelayOpenOrderingPolicy = base.ProxySemantics.RelayOpenOrderingPolicy
+		case ModeFixedTargetErrorPolicy:
+			p.ProxySemantics.TargetErrorPolicy = base.ProxySemantics.TargetErrorPolicy
+		case ModeFixedTargetClosePolicy:
+			p.ProxySemantics.TargetClosePolicy = base.ProxySemantics.TargetClosePolicy
+		case ModeFixedResponseChunking:
+			p.ProxySemantics.ResponseModeEncoding = base.ProxySemantics.ResponseModeEncoding
+			p.FrameGrammar.FragmentationMode = base.FrameGrammar.FragmentationMode
+		case ModeNoTargetBackpressure:
+			p.ProxySemantics.TargetMetadataPolicy = base.ProxySemantics.TargetMetadataPolicy
+			p.Stream.InitialStreamWindowBytes = 128 * 1024
+			p.Stream.InitialSessionWindowBytes = min(2*1024*1024, 128*1024*max(4, p.Stream.MaxConcurrentStreams))
+		case ModePaddingOnlyProxyDiversity:
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)

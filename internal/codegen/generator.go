@@ -305,6 +305,84 @@ func CaptureMultiStreamTrace(ctx context.Context, streamCount int) ([]ktrace.Eve
 		return nil, err
 	}
 
+	proxySemSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/proxyadversary"
+	ktrace "kurdistan/internal/trace"
+)
+
+const ProxyRelayIntentEncoding = %[1]s
+const ProxyTargetDescriptorEncoding = %[2]s
+const ProxyRequestClassEncoding = %[3]s
+const ProxyResponseModeEncoding = %[4]s
+const ProxyTargetErrorPolicy = %[5]s
+const ProxyTargetClosePolicy = %[6]s
+const ProxyTargetResetPolicy = %[7]s
+const ProxyTargetMetadataPolicy = %[8]s
+const ProxyRelayOpenOrderingPolicy = %[9]s
+const ProxyRelayIntentPaddingPolicy = %[10]s
+const ProxyTargetClassMapping = %[11]s
+const ProxyMaxRequestBytes = %[12]d
+const ProxyMaxResponseBytes = %[13]d
+
+var ProxyTargetClasses = %[14]s
+var ProxySemanticWireSymbols = %[15]s
+
+type ProxySemDemoResult struct {
+	Streams            int      `+"`json:\"streams\"`"+`
+	TargetClasses      []string `+"`json:\"target_classes\"`"+`
+	TargetErrors       int      `+"`json:\"target_errors\"`"+`
+	TargetResets       int      `+"`json:\"target_resets\"`"+`
+	BackpressureEvents int      `+"`json:\"backpressure_events\"`"+`
+	EventCount          int      `+"`json:\"event_count\"`"+`
+}
+
+func ProxySemDemo(ctx context.Context, targets string, streamCount int) (ProxySemDemoResult, []ktrace.Event, error) {
+	if streamCount <= 0 {
+		streamCount = 4
+	}
+	if streamCount > StreamMaxConcurrentStreams {
+		streamCount = StreamMaxConcurrentStreams
+	}
+	scenario := proxyadversary.DefaultScenario(proxyadversary.ScenarioMixedTargets)
+	if targets == "small" {
+		scenario = proxyadversary.DefaultScenario(proxyadversary.ScenarioManySmallRequests)
+	}
+	scenario.StreamCount = streamCount
+	run, err := proxyadversary.RunScenario(ctx, StaticProfile(), scenario)
+	if err != nil {
+		return ProxySemDemoResult{}, nil, err
+	}
+	return ProxySemDemoResult{
+		Streams:            streamCount,
+		TargetClasses:      run.TargetClasses,
+		TargetErrors:       run.Checks.TargetErrorCount,
+		TargetResets:       run.Checks.TargetResetCount,
+		BackpressureEvents: run.Checks.BackpressureEvents,
+		EventCount:          len(run.Events),
+	}, run.Events, nil
+}
+
+func CaptureProxySemTrace(ctx context.Context, targets string, streamCount int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := ProxySemDemo(ctx, targets, streamCount)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	summary := TraceCaptureSummary{
+		ProfileID:      ProfileID,
+		EventCount:     len(events),
+		DataEventCount: result.Streams,
+	}
+	return events, summary, nil
+}
+`, quote(p.ProxySemantics.RelayIntentEncoding), quote(p.ProxySemantics.TargetDescriptorEncoding), quote(p.ProxySemantics.RequestClassEncoding), quote(p.ProxySemantics.ResponseModeEncoding), quote(p.ProxySemantics.TargetErrorPolicy), quote(p.ProxySemantics.TargetClosePolicy), quote(p.ProxySemantics.TargetResetPolicy), quote(p.ProxySemantics.TargetMetadataPolicy), quote(p.ProxySemantics.RelayOpenOrderingPolicy), quote(p.ProxySemantics.RelayIntentPaddingPolicy), quote(p.ProxySemantics.TargetClassMapping), p.ProxySemantics.MaxRequestBytes, p.ProxySemantics.MaxResponseBytes, quoteSlice(p.ProxySemantics.TargetClasses), proxySemanticWireMap(p.Messages))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -578,6 +656,93 @@ func TestGeneratedStreamAdversaryScenarios(t *testing.T) {
 				if bytes.Contains(raw, []byte(marker)) {
 					t.Fatalf("trace leaked payload marker %%q", marker)
 				}
+			}
+		})
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxySemTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/proxyadversary"
+)
+
+func TestGeneratedProxySemDemo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := ProxySemDemo(ctx, "mixed", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Streams == 0 || len(events) == 0 {
+		t.Fatalf("proxysem demo did not emit events: %%+v", result)
+	}
+	if len(result.TargetClasses) == 0 {
+		t.Fatalf("proxysem demo exercised no target classes")
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range proxyadversary.ScenarioPayloadMarkers(proxyadversary.ScenarioMixedTargets) {
+		if bytes.Contains(raw, []byte(marker)) {
+			t.Fatalf("proxysem trace leaked payload marker %%q", marker)
+		}
+	}
+}
+
+func TestGeneratedProxySemConstants(t *testing.T) {
+	if ProxyRelayIntentEncoding == "" || ProxyTargetDescriptorEncoding == "" || ProxyTargetClassMapping == "" {
+		t.Fatalf("proxysem specialization constants missing")
+	}
+	if len(ProxyTargetClasses) == 0 || len(ProxySemanticWireSymbols) == 0 {
+		t.Fatalf("proxysem target classes or wire symbols missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxySemAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/proxyadversary"
+)
+
+func TestGeneratedProxyAdversaryScenarios(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, kind := range []string{
+		proxyadversary.ScenarioManySmallRequests,
+		proxyadversary.ScenarioSlowTargetBackpressure,
+		proxyadversary.ScenarioErrorTargetIsolation,
+		proxyadversary.ScenarioTargetResetMidstream,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			run, err := proxyadversary.RunScenario(ctx, StaticProfile(), proxyadversary.DefaultScenario(kind))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !run.Correct {
+				t.Fatalf("generated proxy adversary scenario failed: %%+v", run.Checks)
+			}
+			if len(run.Events) == 0 {
+				t.Fatalf("scenario emitted no proxy trace metadata")
 			}
 		})
 	}
@@ -904,6 +1069,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/states_generated.go", Content: states, Go: true},
 		{RelPath: "protocol/framing_generated.go", Content: framing, Go: true},
 		{RelPath: "protocol/stream_generated.go", Content: streamSource, Go: true},
+		{RelPath: "protocol/proxysem_generated.go", Content: proxySemSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -911,6 +1077,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/trace_capture_generated.go", Content: traceCapture, Go: true},
 		{RelPath: "protocol/protocol_test.go", Content: testSource, Go: true},
 		{RelPath: "protocol/multistream_test.go", Content: multiStreamTestSource, Go: true},
+		{RelPath: "protocol/proxysem_test.go", Content: proxySemTestSource, Go: true},
+		{RelPath: "protocol/proxyadversary_test.go", Content: proxySemAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -942,10 +1110,25 @@ func main() {
 	message := flag.String("message", "", "message to send through the local generated protocol")
 	tracePath := flag.String("trace", "", "optional payload-free trace JSONL path")
 	multiStreamDemo := flag.Bool("multistream-demo", false, "run local generated multi-stream lab demo")
+	proxySemDemo := flag.Bool("proxysem-demo", false, "run local generated proxy-semantics demo")
+	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
+	if *proxySemDemo {
+		result, events, err := protocol.ProxySemDemo(ctx, *targets, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("streams=%%d target_classes=%%d target_errors=%%d target_resets=%%d backpressure_events=%%d\n", result.Streams, len(result.TargetClasses), result.TargetErrors, result.TargetResets, result.BackpressureEvents)
+		return
+	}
 	if *multiStreamDemo {
 		result, events, err := protocol.MultiStreamDemo(ctx, *streamCount)
 		if err != nil {
@@ -1085,6 +1268,8 @@ func main() {
 	tracePath := flag.String("trace", "", "optional payload-free trace JSONL path")
 	summaryPath := flag.String("summary", "", "optional trace summary JSON path")
 	multiStream := flag.Bool("multistream", false, "capture local generated multi-stream trace")
+	proxySem := flag.Bool("proxysem", false, "capture local generated proxy-semantics trace")
+	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
@@ -1092,7 +1277,9 @@ func main() {
 	var events []ktrace.Event
 	var summary protocol.TraceCaptureSummary
 	var err error
-	if *multiStream {
+	if *proxySem {
+		events, summary, err = protocol.CaptureProxySemTrace(ctx, *targets, *streamCount)
+	} else if *multiStream {
 		events, summary, err = protocol.CaptureGeneratedMultiStreamTrace(ctx, *streamCount)
 	} else {
 		events, summary, err = protocol.CaptureLoopbackTrace(ctx, []byte(*message))
