@@ -1,199 +1,325 @@
 # Kurdistan Protocol Compiler
 
-Kurdistan is a lab-only research prototype for compiling one-off relay protocol profiles. A profile defines a generated first-contact sequence, state machine, frame grammar, semantic wire mapping, scheduler, padding policy, invalid-input behavior, lab-only multi-stream policy, and trace expectations.
+![Status](https://img.shields.io/badge/status-lab--research-orange)
+![Scope](https://img.shields.io/badge/scope-local--only-blue)
+![Language](https://img.shields.io/badge/language-Go-00ADD8)
 
-Kurdistan is not a VPN, a proxy, a deployment system, or a censorship bypass product. This repository does not include TUN/TAP interfaces, SOCKS, HTTP proxying, public relay service code, TLS mimicry, CDN bypass, domain-fronting, mobile apps, cloud deployment, or external target fetching. All runtime demos and tests are loopback-only.
+Kurdistan is a censorship-resistance protocol research project building toward a production-grade polymorphic relay transport compiler.
 
-## Why A Compiler First
+> Status: Kurdistan is a lab-only research prototype. It is not a VPN, not a SOCKS proxy, not production-ready, and does not claim real-world censorship resistance or undetectability.
 
-The project starts with a compiler because the research question is whether local relay profiles can vary structurally while preserving stable internal semantics. Building a VPN first would lock the project into one transport shape too early and would add deployment concerns outside this milestone.
+## What Is Kurdistan?
 
-## Polymorphic Relay Protocols
+Kurdistan explores whether relay transport protocols can be generated as profile-specific implementations instead of being shipped as one fixed protocol family with a stable fingerprint.
 
-In this prototype, polymorphic means two generated profiles are not just the same byte protocol with different keys. Profiles can differ in:
+The project currently generates private lab transport profiles with:
 
-- first-contact message sequence and sizes
-- client/server state graph
-- semantic operation to wire symbol mapping
-- frame length and type encoding
-- fragmentation and padding
-- scheduler mode and flush behavior
-- multi-stream ID encoding, flow-control windows, stream priority, close/reset, and window-update behavior
-- invalid-input and probe response behavior
-- trace shape
+- profile-specific first-contact sequences
+- generated client/server state machines
+- generated frame grammars and semantic wire mappings
+- scheduler, padding, and probing behavior
+- invalid-input and malformed-frame policies
+- HMAC transcript proof for lab authentication tests
+- multi-stream relay semantics with flow control and backpressure
+- payload-free trace capture
+- generated Go source modules
+- adversarial diversity, mutation, and black-box trace audits
 
-The fixed global pieces are the Go runtime, JSON profile format, trace format, test harness, benchmark harness, safety limits, local-only TCP carrier, standard-library crypto, and maximum size/time limits.
+The current repository focuses on the compiler, generated transport profile model, interpreted runtime, generated source backend, and local adversarial audit harness. It is not a deployable proxy, VPN, bridge, or production censorship-circumvention tool.
 
-## Generate And Validate A Profile
+## Why This Project Exists
+
+Many censorship-resistant networking systems and pluggable transport designs must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.
+
+Kurdistan investigates a different design direction: a protocol compiler that can generate structurally different relay transports per deployment or research run. The long-term motivation is resilient communication in adversarial network environments, including heavily filtered countries such as Iran and other regions affected by internet censorship.
+
+This repository does not claim to work in Iran today. It does not claim to bypass filtering, evade detection, or provide production security. The current work is controlled anti-censorship research around protocol fingerprint diversity, adversarial testing, and generated relay transport design.
+
+## What Kurdistan Is Building
+
+Kurdistan is intended to sit at the generated transport layer of a future proxy transport architecture:
+
+```text
+Application or future proxy adapter
+        |
+        v
+Stable internal relay semantics
+        |
+        v
+Kurdistan generated transport
+        |
+        v
+Carrier layer, future or lab-only
+        |
+        v
+Remote relay, future or lab-only
+```
+
+Current work is concentrated on the generated transport/compiler layer. Future proxy or VPN transport integration would require a separate production security design, threat model, implementation hardening, independent review, and explicit scope change.
+
+## Current Status
+
+| Milestone | Status |
+|---|---|
+| Compiler/runtime scaffold | Done |
+| Diversity audit | Done |
+| Regression gates | Done |
+| Adversarial lab simulator | Done |
+| Mutation/longitudinal testing | Done |
+| Generated source backend | Done |
+| Generated backend audit | Done |
+| Multi-stream lab semantics | Done |
+| Multi-stream adversarial testing | Done |
+| Lab-only proxy semantics | Next |
+| Carrier abstraction | Future |
+| Production security model | Future |
+| Proxy/VPN integration | Future |
+
+## Features
+
+- Deterministic profile generation from seeds.
+- Generated first-contact grammar and transcript proof model.
+- Generated frame grammar with profile-specific semantic-to-wire mappings.
+- Generated scheduler, padding, malformed-input, probing, and invalid-auth behavior.
+- Standard-library-only HMAC-SHA256 transcript proof for lab testing.
+- Payload-free JSONL trace capture.
+- Profile corpus diversity metrics.
+- Black-box trace diversity scanner.
+- Adversarial clustering and synthetic controls.
+- Mutation tests for collapsed protocol behavior.
+- Longitudinal audit comparison against baseline JSON reports.
+- Generated source backend with `kgen`.
+- Source scanner for generated-code artifacts.
+- Multi-stream lab relay semantics.
+- Stream ID strategies, close/reset behavior, flow control, and backpressure.
+- Stream adversary scenarios for interleaving, scheduler pressure, blocked streams, resets, close races, and uneven stream sizes.
+- Generated-backend parity checks for interpreted vs generated behavior.
+
+## Non-Goals And Safety Boundary
+
+Kurdistan intentionally does not implement:
+
+- SOCKS proxy mode
+- VPN mode
+- HTTP carrier mode
+- TLS mimicry
+- CDN behavior
+- domain fronting
+- public relay deployment
+- external target fetching
+- mobile apps
+- production key exchange
+- live-network testing
+- real-world censorship deployment
+
+All current runtime behavior is loopback-only or in-memory lab behavior. Traces do not include payload contents, raw frames, secrets, proofs, keys, or external destination data.
+
+## Architecture
+
+```text
+cmd/kdc
+  profile generation, validation, corpus summaries
+
+internal/ir + internal/compiler
+  protocol profile schema and deterministic profile compiler
+
+internal/fsm + internal/framing + internal/scheduler + internal/stream
+  interpreted lab runtime for state machines, frames, scheduling, and streams
+
+cmd/kgen + internal/codegen
+  generated Go source backend for profile-specific modules
+
+internal/trace + internal/adversary + internal/streamadversary
+  payload-free trace features, clustering, collapse scanning, and adversarial controls
+
+cmd/kcheck + internal/audit
+  regression gates, generated-backend audit, stream adversary audit, STATUS.md generation
+```
+
+The interpreted runtime is useful for research iteration. The generated source backend exists because a shared interpreter may itself introduce common implementation artifacts. `kgen` emits profile-specific Go constants and tables so generated modules can compile and interoperate locally.
+
+## Quickstart
+
+The repository is Go-based and currently uses only local lab commands.
+
+```bash
+go test ./...
+go vet ./...
+go run ./cmd/kcheck --quick
+go run ./cmd/kcheck streamadversary --quick
+go run ./cmd/kcheck codegen --quick
+```
+
+If Go is not on `PATH` in this workspace, use the bundled tool:
+
+```bash
+.tools\go\bin\go.exe test ./...
+.tools\go\bin\go.exe vet ./...
+.tools\go\bin\go.exe run ./cmd/kcheck --quick
+```
+
+Generate and validate a local lab profile:
 
 ```bash
 go run ./cmd/kdc generate --seed 12345 --out profiles/examples/profile-12345.json
 go run ./cmd/kdc validate --profile profiles/examples/profile-12345.json
 ```
 
-## Local Echo Demo
-
-Run these in separate terminals. Every address is loopback-only.
-
-```bash
-go run ./cmd/kecho --listen 127.0.0.1:9000
-```
-
-```bash
-go run ./cmd/kserver \
-  --profile profiles/examples/profile-12345.json \
-  --listen 127.0.0.1:7000 \
-  --target 127.0.0.1:9000
-```
-
-```bash
-go run ./cmd/kclient \
-  --profile profiles/examples/profile-12345.json \
-  --server 127.0.0.1:7000 \
-  --message "hello kurdistan"
-```
-
-The client sends the message through the generated protocol to the local server, the server relays only to the local echo target, and the client verifies the echoed response. Payload contents are not logged.
-
-## Generated Source Backend
-
-Generate a lab-only profile-specific Go module from a validated profile:
-
-```bash
-go run ./cmd/kgen \
-  --profile profiles/examples/profile-12345.json \
-  --out .generated/profile-12345
-```
-
-Use `--force` to overwrite generated files in an existing output directory:
+Generate a profile-specific Go module:
 
 ```bash
 go run ./cmd/kgen --profile profiles/examples/profile-12345.json --out .generated/profile-12345 --force
 ```
 
-Build and test the generated module:
+Build the generated module:
 
 ```bash
 cd .generated/profile-12345
 go test ./...
-```
-
-Run the generated loopback-only commands in separate terminals:
-
-```bash
-go run ./cmd/generated-echo --listen 127.0.0.1:9100
-go run ./cmd/generated-server --listen 127.0.0.1:7100 --target 127.0.0.1:9100
-go run ./cmd/generated-client --server 127.0.0.1:7100 --message "hello generated"
-```
-
-Generated client and server commands accept `--trace out.jsonl` for payload-free trace events. Generated modules also include a self-contained trace runner:
-
-```bash
-go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json
-```
-
-Run the generated local-only multi-stream demo without starting a server:
-
-```bash
 go run ./cmd/generated-client --multistream-demo --streams 3
-go run ./cmd/generated-trace --multistream --streams 4 --trace generated-multistream.jsonl --summary generated-multistream-summary.json
 ```
 
-Generated output is ignored under `.generated/` and is intended for local lab inspection only.
+These commands are local/lab commands only. They do not start a public service or contact external targets.
 
-## Traces
+## Audits And Gates
 
-Both `kclient` and `kserver` accept `--trace out.jsonl`. Trace events include metadata such as state, semantic operation, frame sizes, padding sizes, and scheduler mode. Traces never include payload bytes, keys, proofs, raw frames, external destinations, or personal data.
+Kurdistan treats diversity as something to test, not assume.
 
-```bash
-go run ./cmd/ktrace compare \
-  --a testdata/traces/profile-a.jsonl \
-  --b testdata/traces/profile-b.jsonl
-```
+`kcheck` runs local-only audit gates for:
 
-The compare command exits zero when traces are meaningfully different and nonzero when they are invalid or suspiciously similar.
+- profile diversity across generated IR structures
+- black-box trace diversity
+- adversarial clustering
+- fixed-signature detection
+- malformed/probe behavior
+- cosmetic-difference controls
+- same-profile consistency
+- different-profile separation
+- fuzz-test presence
+- mutation testing
+- longitudinal audit comparison
+- generated-backend semantic equivalence
+- generated source scanner checks
+- multi-stream semantics and backpressure
+- stream adversary collapse resistance
 
-Scan a directory of traces for suspiciously stable signatures:
-
-```bash
-go run ./cmd/ktrace scan --dir testdata/traces
-```
-
-Generate a small loopback-only trace corpus and summary:
-
-```bash
-go run ./cmd/ktrace corpus --start-seed 1 --count 20 --out testdata/traces/corpus-summary.json
-```
-
-## Corpus Diversity Audit
-
-Generate an aggregate profile corpus summary without writing full profiles:
-
-```bash
-go run ./cmd/kdc corpus --start-seed 1 --count 1000 --out testdata/corpus/summary.json
-```
-
-The corpus command validates every generated profile and writes aggregate metrics only unless `--write-profiles` is explicitly provided.
-
-Run regression gates that combine profile diversity and black-box trace diversity:
+Useful commands:
 
 ```bash
 go run ./cmd/kcheck --quick
 go run ./cmd/kcheck --full --out testdata/audit/latest.json
 go run ./cmd/kcheck --quick --status STATUS.md
+go run ./cmd/kcheck compare --old testdata/audit/baseline-small.json --new testdata/audit/latest.json
 ```
 
-Run the adversarial black-box clustering analysis directly:
+Run adversarial analyses directly:
 
 ```bash
 go run ./cmd/kcheck adversary --quick
-go run ./cmd/kcheck adversary --quick --out testdata/audit/adversary.json
-```
-
-Run the optional generated-backend audit:
-
-```bash
-go run ./cmd/kcheck codegen --quick
-go run ./cmd/kcheck codegen --full --out testdata/audit/codegen.json
-go run ./cmd/kcheck codegen --quick --status STATUS.md
-```
-
-The generated-backend audit checks semantic equivalence against the interpreted runtime, generated trace diversity across profiles, fixed-signature regressions, mutant detection, generated source scanner results, generated/interpreted multi-stream parity, and generated-module stream adversary scenario tests.
-
-Run the local-only multi-stream adversary audit directly:
-
-```bash
 go run ./cmd/kcheck streamadversary --quick
-go run ./cmd/kcheck streamadversary --full --out testdata/audit/stream-adversary.json
 ```
 
-The stream adversary audit runs deterministic local scenarios for balanced interleaving, bulk-vs-interactive pressure, blocked streams, session-window exhaustion, reset midstream, close races, and uneven stream sizes. It extracts payload-free stream features and checks that stream behavior has not collapsed into fixed observable patterns.
+`STATUS.md` is generated from the latest local audit and is intended as a compact project status snapshot. It is not a security claim.
 
-Compare audit reports for longitudinal regressions:
+## Generated Source Backend
+
+`kgen` emits a buildable, profile-specific Go module with:
+
+- static profile constants
+- generated state tables
+- generated framing tables
+- generated scheduler constants
+- generated stream policy constants
+- invalid-input and auth constants
+- generated tests and benchmarks
+- local-only generated client/server/echo/trace commands
+
+Generated code is not just a wrapper around `kclient` or `kserver`. It specializes profile-specific protocol data while still reusing small lab helpers for safe IO, HMAC, trace output, and deterministic local testing.
+
+The generated source backend is not a production runtime. It is evidence for the research question: can generated protocols compile and interoperate locally while preserving profile-specific behavior?
+
+## Multi-Stream Semantics
+
+Kurdistan now models multiple logical streams inside one lab session.
+
+Current multi-stream semantics include:
+
+- `OPEN_STREAM`
+- `DATA`
+- `CLOSE_STREAM`
+- `RESET_STREAM`
+- `WINDOW_UPDATE`
+- `SESSION_CLOSE`
+- `ERROR`
+- `PADDING`
+
+Profiles vary stream ID strategy, stream ID encoding, max concurrent streams, initial stream/session windows, stream priority policy, window update policy, close policy, and reset policy.
+
+The stream adversary audit exercises:
+
+- balanced interleaving
+- bulk-vs-interactive scheduling pressure
+- blocked stream behavior
+- session-window exhaustion
+- reset midstream
+- close races
+- uneven stream sizes
+
+The audit checks that padding noise alone is not mistaken for meaningful multi-stream diversity.
+
+## Roadmap
+
+1. Milestone 10: lab-only proxy-semantics modeling.
+2. Milestone 11: lab carrier abstraction.
+3. Milestone 12: production security design.
+4. Milestone 13: implementation hardening.
+5. Milestone 14: local proxy adapter prototype, still controlled and lab-only.
+6. Future: proxy/VPN transport integration after security review.
+
+Proxy/VPN integration is explicitly future work. It should not be added until the security model, carrier abstraction, audit story, and deployment risks have been reviewed.
+
+## Research Positioning
+
+Kurdistan is related to:
+
+- censorship-resistance research
+- anti-censorship networking research
+- pluggable transport research
+- protocol generation
+- polymorphic transport protocols
+- relay transport protocol design
+- proxy transport architecture
+- VPN transport research
+- adversarial network measurement
+- traffic analysis resistance research
+- protocol fingerprint diversity
+- internet censorship research, including Iran internet censorship as a motivating environment
+
+These are research categories, not claims that this code is ready for real-world deployment.
+
+## Contributing
+
+Contributions should preserve the lab-only boundary unless a future milestone explicitly changes it.
+
+Requirements:
+
+- no deployment code
+- no external targets
+- no payload logging
+- no production key exchange
+- no SOCKS, VPN, HTTP carrier, TLS mimicry, or CDN behavior without an explicit future milestone
+- tests for behavior changes
+- docs for new commands, audit gates, or protocol semantics
+- payload-free traces only
+
+Run the relevant checks before submitting changes:
 
 ```bash
-go run ./cmd/kcheck compare --old testdata/audit/baseline-small.json --new testdata/audit/baseline-small.json
-```
-
-Generate `STATUS.md` with baseline comparison:
-
-```bash
-go run ./cmd/kcheck --quick --status STATUS.md --baseline testdata/audit/baseline-small.json
-```
-
-## Tests And Benchmarks
-
-```bash
-gofmt -w .
 go test ./...
 go vet ./...
-go test -bench=. ./...
-go test -fuzz=Fuzz ./internal/framing
-go run ./cmd/kcheck streamadversary --quick
+go run ./cmd/kcheck --quick
 ```
 
-Benchmarks measure profile generation, frame encode/decode, local round trips, scheduler overhead, and padding overhead. They are lab measurements only and do not imply real-world performance or detectability.
+## License
 
-## Safety Boundary
-
-This repository only proves local interoperability and structural variation in a lab harness. It does not prove that generated protocols are undetectable, safe for production, or effective in any real-world censorship environment.
+No license has been selected yet. Until a license is added, treat the repository as not licensed for reuse beyond the owner’s explicit permission.
