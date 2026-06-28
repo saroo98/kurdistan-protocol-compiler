@@ -1,22 +1,16 @@
-# GitHub Repository Profile Suggestions
+# GitHub Repository Profile
 
-These suggestions are for the GitHub repository UI. If the repository is private, public SEO and discovery benefits will not matter until the repository is made public.
+Use these values in the GitHub repository About box.
 
-## Suggested GitHub Repository Description
+## Description
 
-### Option 1: Short Technical
+`Kurdistan is a polymorphic relay transport compiler for censorship resistance, generating profile-specific protocols for adversarial networks and censored environments such as Iran.`
 
-`Censorship-resistance research prototype for a polymorphic relay transport compiler that generates profile-specific protocol implementations.`
+## Website
 
-### Option 2: Research-Focused
+`https://saroo98.github.io/kurdistan-protocol-compiler/`
 
-`A lab-only anti-censorship networking research project exploring generated relay transports, protocol fingerprint diversity, and adversarial trace audits.`
-
-### Option 3: Longer
-
-`Kurdistan is a lab-only protocol compiler for censorship-resistance research, designed toward profile-specific polymorphic relay transports for adversarial network environments.`
-
-## Suggested GitHub Topics
+## Topics
 
 ```text
 censorship-resistance
@@ -25,33 +19,25 @@ protocol-compiler
 polymorphic-transport
 relay-transport
 pluggable-transport
+internet-censorship
+iran
 network-research
 traffic-analysis
 protocol-fingerprinting
-internet-censorship
-iran
 golang
-go
-privacy-research
 adversarial-testing
+privacy-research
+multistream
 ```
 
-## Suggested Social Preview Text
+## Social Preview Text
 
-Option 1:
+`A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research.`
 
-`A lab-only anti-censorship networking research project for generated polymorphic relay transports and adversarial protocol diversity audits.`
+## Pinned README Tagline
 
-Option 2:
+`Generated relay transports for censorship-resistance and adversarial network research.`
 
-`Kurdistan explores protocol fingerprint diversity through a Go-based compiler for profile-specific relay transport implementations.`
+## Note
 
-## Suggested Pinned README Tagline
-
-`A lab-only censorship-resistance research project for generated polymorphic relay transport protocols.`
-
-## Notes
-
-- Do not use a CI badge unless a real CI workflow exists and is passing.
-- Do not describe the project as production-ready, deployed, undetectable, or usable for real-world censorship circumvention.
-- Keep the repository description focused on research, protocol generation, relay transport design, and adversarial testing.
+If the repository is private, public discovery and SEO benefits apply only after the repository is made public.
