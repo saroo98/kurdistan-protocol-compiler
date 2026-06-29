@@ -36,6 +36,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/stream_generated.go",
 		"protocol/carrier_generated.go",
 		"protocol/security_generated.go",
+		"protocol/runtime_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -46,6 +47,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/carrieradversary_test.go",
 		"protocol/security_test.go",
 		"protocol/securityadversary_test.go",
+		"protocol/runtime_test.go",
+		"protocol/runtimeadversary_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -96,6 +99,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const StreamIDEncodingMode") ||
 		!strings.Contains(protocolSource, "const CarrierFamily") ||
 		!strings.Contains(protocolSource, "const SecurityTranscriptMode") ||
+		!strings.Contains(protocolSource, "const RuntimeProfileID") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -151,6 +155,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	carrierB := mustRead(t, filepath.Join(outB, "protocol", "carrier_generated.go"))
 	securityA := mustRead(t, filepath.Join(outA, "protocol", "security_generated.go"))
 	securityB := mustRead(t, filepath.Join(outB, "protocol", "security_generated.go"))
+	runtimeA := mustRead(t, filepath.Join(outA, "protocol", "runtime_generated.go"))
+	runtimeB := mustRead(t, filepath.Join(outB, "protocol", "runtime_generated.go"))
 	if stateA == stateB {
 		t.Fatalf("state generation did not differ across profiles")
 	}
@@ -165,6 +171,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if securityA == securityB {
 		t.Fatalf("security generation did not differ across profiles")
+	}
+	if runtimeA == runtimeB {
+		t.Fatalf("runtime generation did not differ across profiles")
 	}
 }
 

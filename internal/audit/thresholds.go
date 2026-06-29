@@ -3,7 +3,7 @@
 
 package audit
 
-const Version = "0.12.0-lab"
+const Version = "0.13.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`
@@ -63,6 +63,9 @@ type AuditThresholds struct {
 	MinSecurityTranscriptModes        int     `json:"min_security_transcript_modes"`
 	MinSecurityNonceModes             int     `json:"min_security_nonce_modes"`
 	MinSecurityReplayPolicies         int     `json:"min_security_replay_policies"`
+	MaxRuntimeAdversaryDominantRatio  float64 `json:"max_runtime_adversary_dominant_ratio"`
+	MinRuntimeAdversaryDiversityScore float64 `json:"min_runtime_adversary_diversity_score"`
+	MinRuntimeScenarioSuccess         float64 `json:"min_runtime_scenario_success"`
 }
 
 func DefaultConfig(mode string) AuditConfig {
@@ -131,6 +134,9 @@ func DefaultThresholds() AuditThresholds {
 		MinSecurityTranscriptModes:        3,
 		MinSecurityNonceModes:             3,
 		MinSecurityReplayPolicies:         3,
+		MaxRuntimeAdversaryDominantRatio:  0.92,
+		MinRuntimeAdversaryDiversityScore: 0.12,
+		MinRuntimeScenarioSuccess:         0.90,
 	}
 }
 
