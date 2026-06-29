@@ -1,0 +1,610 @@
+[
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_5c08ba8359510872",
+    "profile_id": "control-profile-a-a",
+    "profile_seed": 12345,
+    "scenario": "control_collapsed_fixed_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_collapsed",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "fixed_feature_hash",
+    "byte_shape_hash": "1463f854bdfde262286afd6a745f2c44844c414b5280e6899d17af572c8216eb",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_928c0b5946965507",
+    "profile_id": "control-profile-a-b",
+    "profile_seed": 12345,
+    "scenario": "control_collapsed_fixed_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_collapsed",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "fixed_feature_hash",
+    "byte_shape_hash": "1463f854bdfde262286afd6a745f2c44844c414b5280e6899d17af572c8216eb",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_70a7a8e56d8a4eb3",
+    "profile_id": "control-profile-a-c",
+    "profile_seed": 12345,
+    "scenario": "control_collapsed_fixed_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_collapsed",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "backpressure_observed",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "fixed_feature_hash",
+    "byte_shape_hash": "1463f854bdfde262286afd6a745f2c44844c414b5280e6899d17af572c8216eb",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_6d00b5ec17326586",
+    "profile_id": "control-profile-a-d",
+    "profile_seed": 12345,
+    "scenario": "control_collapsed_fixed_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_collapsed",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "fixed_feature_hash",
+    "byte_shape_hash": "1463f854bdfde262286afd6a745f2c44844c414b5280e6899d17af572c8216eb",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_edf47a8ad699e34e",
+    "profile_id": "control-profile-b-a",
+    "profile_seed": 12345,
+    "scenario": "control_padding_only_variation",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_padding_only",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_33_64"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "padding_only_size_33_64",
+    "byte_shape_hash": "95074e90f5884f401c98a49ed7154338ce7a10a3ce3baa5f0fc948dd303b9d46",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_e80390cbacf44317",
+    "profile_id": "control-profile-b-b",
+    "profile_seed": 12345,
+    "scenario": "control_padding_only_variation",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_padding_only",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "padding_only_size_65_128",
+    "byte_shape_hash": "5cdd1eb7bef2744de4cd4628ba295d743e227d1677e0e19e7bfbc77814e9875d",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_0cf6923a536dcdea",
+    "profile_id": "control-profile-b-c",
+    "profile_seed": 12345,
+    "scenario": "control_padding_only_variation",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_padding_only",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_256"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "backpressure_observed",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "padding_only_size_129_256",
+    "byte_shape_hash": "fc1569dc8931302bd50fb5f87b5a56afb24e15614c8b6b0a01a509d4a6335732",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_6551dd7d4382e8c8",
+    "profile_id": "control-profile-b-d",
+    "profile_seed": 12345,
+    "scenario": "control_padding_only_variation",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_padding_only",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_33_64"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "padding_only_size_33_64",
+    "byte_shape_hash": "95074e90f5884f401c98a49ed7154338ce7a10a3ce3baa5f0fc948dd303b9d46",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_edd7d051524dd292",
+    "profile_id": "control-profile-c-a",
+    "profile_seed": 12345,
+    "scenario": "control_fixed_firstn_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_fixed_shape",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "3cf34f07bb1fab2e82f69bcb1c3de1040557bb9d5a05272b3598a0077037c6a6",
+    "byte_shape_hash": "a67a0cc5004f75f91bef37f2289c2304c5b6c89f4524be7a34bf1d364b633a52",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_4315773a629722f9",
+    "profile_id": "control-profile-c-b",
+    "profile_seed": 12345,
+    "scenario": "control_fixed_firstn_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_fixed_shape",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "b6f5fb6bb129c4bf28312777a802f56c381c4755664bc75171de54afa218c23b",
+    "byte_shape_hash": "19c189138f93f968e00675a707edadb3c45873b86a3ac9e69bd92bae9e56221b",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_78411d327fd9b795",
+    "profile_id": "control-profile-c-c",
+    "profile_seed": 12345,
+    "scenario": "control_fixed_firstn_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_fixed_shape",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "backpressure_observed",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "3e92cf84ff6b0ec98a8643f6c7713cd55c1df0032bfe56c42c92c01cd5fbc96a",
+    "byte_shape_hash": "0dcd043e0c7da0a0c477a0f979f5b3176481b17e781159feebbd31a43ac6ef3a",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_e5fda9d97bb14f74",
+    "profile_id": "control-profile-c-d",
+    "profile_seed": 12345,
+    "scenario": "control_fixed_firstn_shape",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_fixed_shape",
+    "selected_family": "structured_encrypted",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "406e69ad572e999ecb5c9b7958f0eafb367850ad7d83bea15d31f03ad9e36a33",
+    "byte_shape_hash": "efaea84e8ecf68779072c3f7638410bc03b973424c47201e28915832336a8f43",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_374cd3c659512ff4",
+    "profile_id": "control-profile-d-a",
+    "profile_seed": 12345,
+    "scenario": "control_random_bucket_noise",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_random_bucket_noise",
+    "selected_family": "control_noise",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_4_8"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "f5a2a2bd249070121ece1f758b39c50843761fc082e1cea7db976d993610c679",
+    "byte_shape_hash": "22db4ddd1d7f334d40218fb76886ea29ab81c401900aea836d542631cfc7fc2f",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_f0a30b253af74070",
+    "profile_id": "control-profile-d-b",
+    "profile_seed": 12345,
+    "scenario": "control_random_bucket_noise",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_random_bucket_noise",
+    "selected_family": "control_noise",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_17_32"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "3b1ac9f710bef0bc0310b62f9b3d63262a141bc11874b83efd74cd5918defc26",
+    "byte_shape_hash": "f250dfb4747d15ec2253f33ce8d206c8ec30faf51dbaf0acbbae852d34a73e0c",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_4b7fe5debacb24d1",
+    "profile_id": "control-profile-d-c",
+    "profile_seed": 12345,
+    "scenario": "control_random_bucket_noise",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_random_bucket_noise",
+    "selected_family": "control_noise",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_257_512"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "backpressure_observed",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "300bc340a32357aaf15d3e804467a43b676b53f037ac380cfac2fa3788c458e3",
+    "byte_shape_hash": "52b7770cd084d9f5a9a94c9e6fdad28d0a8d0791db70739a66762fa32b51f54e",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "dataset_version": "wireeval-v1",
+    "record_id": "rec_be9ba62a24eda149",
+    "profile_id": "control-profile-d-d",
+    "profile_seed": 12345,
+    "scenario": "control_random_bucket_noise",
+    "backend": "control",
+    "split": "holdout",
+    "label": "control_random_bucket_noise",
+    "selected_family": "control_noise",
+    "selected_corpus_entry": "certificate_like_handshake_family",
+    "phase_shape": "greeting-handshake-handshake-data-close",
+    "field_layout_class": "split_ordered_fields",
+    "first_n_shape_hash": "fixed_firstn_shape",
+    "direction_sequence": [
+      "client_to_server",
+      "server_to_client"
+    ],
+    "packet_size_buckets": [
+      "size_129_512",
+      "size_33_64",
+      "size_65_128"
+    ],
+    "frame_size_buckets": [
+      "size_4_8"
+    ],
+    "fragment_rhythm": "fixed_fragment",
+    "control_richness": "moderate",
+    "metadata_exposure": "fixed_metadata",
+    "backpressure_class": "bounded",
+    "reset_close_class": "control_reset/control_close",
+    "error_mapping_class": "safe_metadata",
+    "feature_hash": "e042c04a293aeacc5557ad34277e82aaba292c34ae8d480b7b2cd38521b2bc36",
+    "byte_shape_hash": "58ebd08fe3a572bc9865a52d4fc5f7127e4879ca6278e5e755b113871e47e144",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

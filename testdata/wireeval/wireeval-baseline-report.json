@@ -1,0 +1,20 @@
+{
+  "dataset_version": "wireeval-v1",
+  "profile_count": 8,
+  "scenario_count": 11,
+  "record_count": 72,
+  "unique_feature_hashes": 68,
+  "unique_first_n_shapes": 8,
+  "unique_families": 6,
+  "unique_phase_shapes": 6,
+  "unique_field_layouts": 5,
+  "unique_metadata_classes": 4,
+  "unique_fragment_rhythms": 3,
+  "padding_only_records": 4,
+  "collapsed_records": 12,
+  "control_failures_detected": 12,
+  "diversity_score": 1.0625,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,26 @@
+{
+  "dataset_version": "wireeval-v1",
+  "corpus_version": "protocorpus-v1",
+  "wiregen_policy_version": "wiregen-policy-v1",
+  "feature_schema_version": "wirefeatures-v1",
+  "generated_at": "2026-06-30T00:00:00Z",
+  "record_count": 72,
+  "profile_count": 8,
+  "scenario_count": 11,
+  "split_counts": {
+    "holdout": 30,
+    "ood": 14,
+    "test": 14,
+    "train": 14
+  },
+  "label_counts": {
+    "control_collapsed": 4,
+    "control_fixed_shape": 4,
+    "control_padding_only": 4,
+    "control_random_bucket_noise": 4,
+    "generated_kurdistan": 56
+  },
+  "payload_logged": false,
+  "secret_logged": false,
+  "dataset_hash": "b5af1dbb0f4bc1374bb549847e145713f7162e0b0af2f0dc160ee4e4b05d89f7"
+}

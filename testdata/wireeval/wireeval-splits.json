@@ -1,0 +1,92 @@
+{
+  "mode": "profile_holdout",
+  "split_counts": {
+    "holdout": 30,
+    "ood": 14,
+    "test": 14,
+    "train": 14
+  },
+  "profile_sets": {
+    "holdout": [
+      12345,
+      12346,
+      12350
+    ],
+    "ood": [
+      12348,
+      12352
+    ],
+    "test": [
+      12345,
+      12349
+    ],
+    "train": [
+      12347,
+      12351
+    ]
+  },
+  "scenario_sets": {
+    "holdout": [
+      "byte_corruption_rejection",
+      "byte_large_flow_fragmented",
+      "byte_many_small_flows",
+      "byte_mixed_flows",
+      "byte_replay_rejection",
+      "byte_reset_isolation",
+      "byte_single_flow_echo",
+      "control_collapsed_fixed_shape",
+      "control_fixed_firstn_shape",
+      "control_padding_only_variation",
+      "control_random_bucket_noise"
+    ],
+    "ood": [
+      "byte_corruption_rejection",
+      "byte_large_flow_fragmented",
+      "byte_many_small_flows",
+      "byte_mixed_flows",
+      "byte_replay_rejection",
+      "byte_reset_isolation",
+      "byte_single_flow_echo"
+    ],
+    "test": [
+      "byte_corruption_rejection",
+      "byte_large_flow_fragmented",
+      "byte_many_small_flows",
+      "byte_mixed_flows",
+      "byte_replay_rejection",
+      "byte_reset_isolation",
+      "byte_single_flow_echo"
+    ],
+    "train": [
+      "byte_corruption_rejection",
+      "byte_large_flow_fragmented",
+      "byte_many_small_flows",
+      "byte_mixed_flows",
+      "byte_replay_rejection",
+      "byte_reset_isolation",
+      "byte_single_flow_echo"
+    ]
+  },
+  "family_sets": {
+    "holdout": [
+      "control_noise",
+      "control_rich",
+      "fully_encrypted",
+      "structured_encrypted"
+    ],
+    "ood": [
+      "fully_encrypted",
+      "structured_encrypted"
+    ],
+    "test": [
+      "message_oriented",
+      "structured_encrypted"
+    ],
+    "train": [
+      "multi_round_handshake",
+      "structured_encrypted"
+    ]
+  },
+  "passed": true,
+  "conclusion": "passed"
+}
