@@ -17,65 +17,73 @@ import (
 )
 
 const (
-	ModeFixedFirstContact                 = "fixed_first_contact"
-	ModeFixedFrameGrammar                 = "fixed_frame_grammar"
-	ModeCosmeticSymbolsOnly               = "cosmetic_symbols_only"
-	ModeFixedScheduler                    = "fixed_scheduler"
-	ModeFixedInvalidInput                 = "fixed_invalid_input"
-	ModePaddingNoiseOnly                  = "padding_noise_only"
-	ModeFixedStreamIDStrategy             = "fixed_stream_id_strategy"
-	ModeFixedWindowUpdatePolicy           = "fixed_window_update_policy"
-	ModeFIFOSchedulerOnly                 = "fifo_scheduler_only"
-	ModeFixedResetClosePolicy             = "fixed_reset_close_policy"
-	ModeNoBackpressure                    = "no_backpressure"
-	ModePaddingOnlyStreamDiversity        = "padding_only_stream_diversity"
-	ModeFixedTargetDescriptorEncoding     = "fixed_target_descriptor_encoding"
-	ModeFixedTargetOpenSequence           = "fixed_target_open_sequence"
-	ModeFixedTargetErrorPolicy            = "fixed_target_error_policy"
-	ModeFixedTargetClosePolicy            = "fixed_target_close_policy"
-	ModeFixedResponseChunking             = "fixed_response_chunking"
-	ModeNoTargetBackpressure              = "no_target_backpressure"
-	ModePaddingOnlyProxyDiversity         = "padding_only_proxy_diversity"
-	ModeFixedCarrierFamily                = "fixed_carrier_family"
-	ModeFixedEnvelopeEncoding             = "fixed_envelope_encoding"
-	ModeFixedFlushPolicy                  = "fixed_flush_policy"
-	ModeFixedBatchPolicy                  = "fixed_batch_policy"
-	ModeFixedChunkingPolicy               = "fixed_chunking_policy"
-	ModeNoCarrierBackpressure             = "no_carrier_backpressure"
-	ModeNoReorderRecovery                 = "no_reorder_recovery"
-	ModePaddingOnlyCarrierDiversity       = "padding_only_carrier_diversity"
-	ModeNoTranscriptBinding               = "no_transcript_binding"
-	ModeReusedNonce                       = "reused_nonce"
-	ModeAcceptsReplay                     = "accepts_replay"
-	ModeAcceptsDowngrade                  = "accepts_downgrade"
-	ModeCapabilityMismatchAccepted        = "capability_mismatch_accepted"
-	ModeProfileMismatchAccepted           = "profile_mismatch_accepted"
-	ModeUnsafeConfigAllowed               = "unsafe_config_allowed"
-	ModeSecretTraceLeak                   = "secret_trace_leak"
-	ModeRuntimeAcceptsCapabilityDowngrade = "runtime_accepts_capability_downgrade"
-	ModeRuntimeAcceptsProfileMismatch     = "runtime_accepts_profile_mismatch"
-	ModeRuntimeAcceptsReplay              = "runtime_accepts_replay"
-	ModeRuntimeIgnoresBackpressure        = "runtime_ignores_backpressure"
-	ModeRuntimeLeaksSecretTrace           = "runtime_leaks_secret_trace"
-	ModeRuntimeLeaksPayloadTrace          = "runtime_leaks_payload_trace"
-	ModeRuntimeNoStateValidation          = "runtime_no_state_validation"
-	ModeRuntimePaddingOnlyDiversity       = "runtime_padding_only_diversity"
-	ModePanicOnMalformedFrame             = "panic_on_malformed_frame"
-	ModeUnboundedTraceEvents              = "unbounded_trace_events"
-	ModeTraceSecretLeakHardening          = "trace_secret_leak_hardening"
-	ModeIgnoresMaxStreams                 = "ignores_max_streams"
-	ModeIgnoresMaxCarrierQueue            = "ignores_max_carrier_queue"
-	ModeAcceptsInvalidProfileHash         = "accepts_invalid_profile_hash"
-	ModeGeneratedParityDrift              = "generated_parity_drift"
-	ModeAPIMisusePanic                    = "api_misuse_panic"
-	ModeAdapterAcceptsInvalidFlow         = "adapter_accepts_invalid_flow"
-	ModeAdapterIgnoresBackpressure        = "adapter_ignores_backpressure"
-	ModeAdapterLeaksPayloadTrace          = "adapter_leaks_payload_trace"
-	ModeAdapterLeaksSecretTrace           = "adapter_leaks_secret_trace"
-	ModeAdapterAcceptsCapabilityDowngrade = "adapter_accepts_capability_downgrade"
-	ModeAdapterIgnoresMaxFlows            = "adapter_ignores_max_flows"
-	ModeAdapterWrongResetMapping          = "adapter_wrong_reset_mapping"
-	ModeAdapterPaddingOnlyDiversity       = "adapter_padding_only_diversity"
+	ModeFixedFirstContact                     = "fixed_first_contact"
+	ModeFixedFrameGrammar                     = "fixed_frame_grammar"
+	ModeCosmeticSymbolsOnly                   = "cosmetic_symbols_only"
+	ModeFixedScheduler                        = "fixed_scheduler"
+	ModeFixedInvalidInput                     = "fixed_invalid_input"
+	ModePaddingNoiseOnly                      = "padding_noise_only"
+	ModeFixedStreamIDStrategy                 = "fixed_stream_id_strategy"
+	ModeFixedWindowUpdatePolicy               = "fixed_window_update_policy"
+	ModeFIFOSchedulerOnly                     = "fifo_scheduler_only"
+	ModeFixedResetClosePolicy                 = "fixed_reset_close_policy"
+	ModeNoBackpressure                        = "no_backpressure"
+	ModePaddingOnlyStreamDiversity            = "padding_only_stream_diversity"
+	ModeFixedTargetDescriptorEncoding         = "fixed_target_descriptor_encoding"
+	ModeFixedTargetOpenSequence               = "fixed_target_open_sequence"
+	ModeFixedTargetErrorPolicy                = "fixed_target_error_policy"
+	ModeFixedTargetClosePolicy                = "fixed_target_close_policy"
+	ModeFixedResponseChunking                 = "fixed_response_chunking"
+	ModeNoTargetBackpressure                  = "no_target_backpressure"
+	ModePaddingOnlyProxyDiversity             = "padding_only_proxy_diversity"
+	ModeFixedCarrierFamily                    = "fixed_carrier_family"
+	ModeFixedEnvelopeEncoding                 = "fixed_envelope_encoding"
+	ModeFixedFlushPolicy                      = "fixed_flush_policy"
+	ModeFixedBatchPolicy                      = "fixed_batch_policy"
+	ModeFixedChunkingPolicy                   = "fixed_chunking_policy"
+	ModeNoCarrierBackpressure                 = "no_carrier_backpressure"
+	ModeNoReorderRecovery                     = "no_reorder_recovery"
+	ModePaddingOnlyCarrierDiversity           = "padding_only_carrier_diversity"
+	ModeNoTranscriptBinding                   = "no_transcript_binding"
+	ModeReusedNonce                           = "reused_nonce"
+	ModeAcceptsReplay                         = "accepts_replay"
+	ModeAcceptsDowngrade                      = "accepts_downgrade"
+	ModeCapabilityMismatchAccepted            = "capability_mismatch_accepted"
+	ModeProfileMismatchAccepted               = "profile_mismatch_accepted"
+	ModeUnsafeConfigAllowed                   = "unsafe_config_allowed"
+	ModeSecretTraceLeak                       = "secret_trace_leak"
+	ModeRuntimeAcceptsCapabilityDowngrade     = "runtime_accepts_capability_downgrade"
+	ModeRuntimeAcceptsProfileMismatch         = "runtime_accepts_profile_mismatch"
+	ModeRuntimeAcceptsReplay                  = "runtime_accepts_replay"
+	ModeRuntimeIgnoresBackpressure            = "runtime_ignores_backpressure"
+	ModeRuntimeLeaksSecretTrace               = "runtime_leaks_secret_trace"
+	ModeRuntimeLeaksPayloadTrace              = "runtime_leaks_payload_trace"
+	ModeRuntimeNoStateValidation              = "runtime_no_state_validation"
+	ModeRuntimePaddingOnlyDiversity           = "runtime_padding_only_diversity"
+	ModePanicOnMalformedFrame                 = "panic_on_malformed_frame"
+	ModeUnboundedTraceEvents                  = "unbounded_trace_events"
+	ModeTraceSecretLeakHardening              = "trace_secret_leak_hardening"
+	ModeIgnoresMaxStreams                     = "ignores_max_streams"
+	ModeIgnoresMaxCarrierQueue                = "ignores_max_carrier_queue"
+	ModeAcceptsInvalidProfileHash             = "accepts_invalid_profile_hash"
+	ModeGeneratedParityDrift                  = "generated_parity_drift"
+	ModeAPIMisusePanic                        = "api_misuse_panic"
+	ModeAdapterAcceptsInvalidFlow             = "adapter_accepts_invalid_flow"
+	ModeAdapterIgnoresBackpressure            = "adapter_ignores_backpressure"
+	ModeAdapterLeaksPayloadTrace              = "adapter_leaks_payload_trace"
+	ModeAdapterLeaksSecretTrace               = "adapter_leaks_secret_trace"
+	ModeAdapterAcceptsCapabilityDowngrade     = "adapter_accepts_capability_downgrade"
+	ModeAdapterIgnoresMaxFlows                = "adapter_ignores_max_flows"
+	ModeAdapterWrongResetMapping              = "adapter_wrong_reset_mapping"
+	ModeAdapterPaddingOnlyDiversity           = "adapter_padding_only_diversity"
+	ModeLocalAdapterIgnoresSourceBackpressure = "local_adapter_ignores_source_backpressure"
+	ModeLocalAdapterAcceptsPostCloseWrite     = "local_adapter_accepts_post_close_write"
+	ModeLocalAdapterDropsFinalChunk           = "local_adapter_drops_final_chunk"
+	ModeLocalAdapterDuplicatesChunk           = "local_adapter_duplicates_chunk"
+	ModeLocalAdapterWrongFlowStreamMapping    = "local_adapter_wrong_flow_stream_mapping"
+	ModeLocalAdapterPayloadTraceLeak          = "local_adapter_payload_trace_leak"
+	ModeLocalAdapterSecretTraceLeak           = "local_adapter_secret_trace_leak"
+	ModeLocalAdapterPaddingOnlyDiversity      = "local_adapter_padding_only_diversity"
 )
 
 func Modes() []string {
@@ -139,6 +147,14 @@ func Modes() []string {
 		ModeAdapterIgnoresMaxFlows,
 		ModeAdapterWrongResetMapping,
 		ModeAdapterPaddingOnlyDiversity,
+		ModeLocalAdapterIgnoresSourceBackpressure,
+		ModeLocalAdapterAcceptsPostCloseWrite,
+		ModeLocalAdapterDropsFinalChunk,
+		ModeLocalAdapterDuplicatesChunk,
+		ModeLocalAdapterWrongFlowStreamMapping,
+		ModeLocalAdapterPayloadTraceLeak,
+		ModeLocalAdapterSecretTraceLeak,
+		ModeLocalAdapterPaddingOnlyDiversity,
 	}
 }
 
@@ -314,6 +330,25 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 		case ModeAdapterWrongResetMapping:
 			p.AdapterPolicy.ErrorMappingPolicy = "close_with_error"
 		case ModeAdapterPaddingOnlyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeLocalAdapterIgnoresSourceBackpressure:
+			p.AdapterPolicy.BackpressurePolicy = "adapter_queue"
+			p.AdapterPolicy.MaxBufferedBytes = 2 * 1024 * 1024
+		case ModeLocalAdapterAcceptsPostCloseWrite:
+			p.AdapterPolicy.FlowLifecyclePolicy = "strict"
+		case ModeLocalAdapterDropsFinalChunk:
+			p.AdapterPolicy.RuntimeMappingPolicy = "one_flow_one_stream"
+		case ModeLocalAdapterDuplicatesChunk:
+			p.AdapterPolicy.RuntimeMappingPolicy = "one_flow_one_stream"
+		case ModeLocalAdapterWrongFlowStreamMapping:
+			p.AdapterPolicy.RuntimeMappingPolicy = "metadata_bound_stream"
+		case ModeLocalAdapterPayloadTraceLeak:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeLocalAdapterSecretTraceLeak:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeLocalAdapterPaddingOnlyDiversity:
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
