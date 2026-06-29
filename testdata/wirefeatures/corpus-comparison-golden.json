@@ -4,14 +4,14 @@
   "scenario_count": 7,
   "corpus_entries": 12,
   "matched_families": [
-    "minimal_handshake",
+    "fully_encrypted",
     "structured_encrypted"
   ],
   "feature_coverage": {
-    "minimal_handshake": 12,
-    "structured_encrypted": 9
+    "fully_encrypted": 7,
+    "structured_encrypted": 14
   },
-  "diversity_score": 0.45454545454545453,
+  "diversity_score": 0.22727272727272727,
   "payload_logged": false,
   "secret_logged": false,
   "conclusion": "passed"

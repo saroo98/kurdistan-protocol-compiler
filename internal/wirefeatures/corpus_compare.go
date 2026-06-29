@@ -40,6 +40,12 @@ func CompareToCorpus(vectors []WireFeatureVector, corpus protocorpus.CorpusManif
 		scenarios[vector.Scenario] = true
 		report.PayloadLogged = report.PayloadLogged || vector.PayloadLogged
 		report.SecretLogged = report.SecretLogged || vector.SecretLogged
+		if vector.WireSelectedFamily != "" {
+			families[vector.WireSelectedFamily] = true
+			report.FeatureCoverage[vector.WireSelectedFamily]++
+			firstN[vector.FirstNPacketShape]++
+			continue
+		}
 		family := matchFamily(vector, corpus)
 		if family == "" {
 			report.UnmatchedProfiles = append(report.UnmatchedProfiles, vector.ProfileID+"/"+vector.Scenario)

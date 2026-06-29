@@ -42,6 +42,11 @@ func ValidateVector(vector WireFeatureVector) error {
 	if vector.PayloadLogged || vector.SecretLogged {
 		return fmt.Errorf("%w: hygiene leak flags", ErrTraceLeak)
 	}
+	for _, value := range []string{vector.WirePolicyID, vector.WirePolicyHash, vector.WireSelectedFamily, vector.WireCorpusEntry} {
+		if value != "" && unsafeText(value) {
+			return fmt.Errorf("%w: unsafe wiregen metadata %q", ErrInvalidFeature, value)
+		}
+	}
 	for _, bucket := range vector.FrameSizeBuckets {
 		if !validSizeBucket(bucket) {
 			return fmt.Errorf("%w: frame size bucket %s", ErrInvalidFeature, bucket)

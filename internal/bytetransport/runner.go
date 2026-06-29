@@ -10,6 +10,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wiregen"
 )
 
 type Scenario struct {
@@ -131,13 +132,21 @@ func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario, cfg Byte
 	}
 	seq := NewSequenceValidator(1024)
 	summary := ByteTransportSummary{Scenario: scenario.Name, RuntimeStreamsMapped: localRun.Summary.RuntimeStreamsOpened, TargetErrors: localRun.Summary.TargetErrors, TargetResets: localRun.Summary.TargetResets}
-	frameCount := maxInt(1, localRun.Summary.SourceChunks)
+	applyWireShapeSummary(&summary, p)
+	if p != nil && p.WireShape.PolicyHash != "" {
+		scenario.FragmentPolicy = wireFragmentPolicy(p, scenario.FragmentPolicy)
+	}
+	preDataControls := wirePreDataControls(p)
+	frameCount := maxInt(1, localRun.Summary.SourceChunks) + preDataControls
 	for i := 0; i < frameCount; i++ {
 		kind := FrameData
 		if scenario.ExpectReset && i == frameCount-1 {
 			kind = FrameReset
 		}
-		byteCount := maxInt(1, localRun.Summary.SourceBytes/maxInt(1, frameCount))
+		if i < preDataControls {
+			kind = FrameControl
+		}
+		byteCount := wireByteCount(p, i, maxInt(1, localRun.Summary.SourceBytes/maxInt(1, frameCount)))
 		if scenario.Name == ScenarioLargeFragmented {
 			byteCount = minInt(cfg.MaxPayloadBytes*2, cfg.MaxReassemblyBytes/2)
 		}
@@ -214,6 +223,76 @@ func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario, cfg Byte
 	events := append([]ktrace.Event{}, localRun.Events...)
 	events = append(events, TraceEvent(p, scenario.Name, summary))
 	return RunResult{Summary: summary, Events: events}, nil
+}
+
+func applyWireShapeSummary(summary *ByteTransportSummary, p *ir.Profile) {
+	if p == nil || p.WireShape.PolicyHash == "" {
+		return
+	}
+	summary.WirePolicyID = p.WireShape.PolicyID
+	summary.WirePolicyHash = p.WireShape.PolicyHash
+	summary.WireSelectedFamily = p.WireShape.SelectedFamily
+	summary.WireCorpusEntry = p.WireShape.SelectedCorpusEntry
+	summary.WirePhaseShape = phaseShape(p.WireShape.PhasePlan.PhaseSequence)
+	summary.WireFieldLayoutClass = p.WireShape.FieldLayoutPlan.LayoutClass
+	summary.WireFirstFlightClass = p.WireShape.FirstFlightPlan.PacketCountBucket + "/" + p.WireShape.FirstFlightPlan.DirectionPattern
+	if hash, err := wiregen.HashValue(p.WireShape.FirstNPlan); err == nil {
+		summary.WireFirstNShape = hash
+	}
+	summary.WireFrameSizeBuckets = append([]string(nil), p.WireShape.FrameSizePlan.SizeBuckets...)
+	summary.WireFragmentRhythm = p.WireShape.FragmentRhythmPlan.Strategy
+	summary.WireControlRichness = p.WireShape.ControlPlan.Richness
+	summary.WireMetadataExposure = p.WireShape.MetadataExposurePlan.ExposureClass
+}
+
+func wireFragmentPolicy(p *ir.Profile, fallback string) string {
+	switch p.WireShape.FragmentRhythmPlan.Strategy {
+	case FragmentNoFragment, FragmentFixed, FragmentProfileBucket, FragmentCarrierAware, FragmentBackpressureAware:
+		return p.WireShape.FragmentRhythmPlan.Strategy
+	case "randomized_bucket_fragment":
+		return FragmentProfileBucket
+	default:
+		if fallback != "" {
+			return fallback
+		}
+		return FragmentFixed
+	}
+}
+
+func wirePreDataControls(p *ir.Profile) int {
+	if p == nil || p.WireShape.PolicyHash == "" {
+		return 0
+	}
+	if p.WireShape.ControlPlan.PreDataControls < 0 {
+		return 0
+	}
+	if p.WireShape.ControlPlan.PreDataControls > 3 {
+		return 3
+	}
+	return p.WireShape.ControlPlan.PreDataControls
+}
+
+func wireByteCount(p *ir.Profile, index, fallback int) int {
+	if p == nil || p.WireShape.PolicyHash == "" || len(p.WireShape.FrameSizePlan.SizeBuckets) == 0 {
+		return fallback
+	}
+	bucket := p.WireShape.FrameSizePlan.SizeBuckets[index%len(p.WireShape.FrameSizePlan.SizeBuckets)]
+	count := wiregen.ByteCountForBucket(bucket)
+	if count <= 0 {
+		return fallback
+	}
+	return count
+}
+
+func phaseShape(phases []string) string {
+	if len(phases) == 0 {
+		return "unknown"
+	}
+	out := phases[0]
+	for _, phase := range phases[1:] {
+		out += "-" + phase
+	}
+	return out
 }
 
 func minInt(a, b int) int {
