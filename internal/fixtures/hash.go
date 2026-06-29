@@ -66,6 +66,10 @@ func ByteShapeHash(summary BytePathFixtureSummary) (string, error) {
 		MalformedRejected:    summary.MalformedRejected,
 		CorruptionRejected:   summary.CorruptionRejected,
 		ReplaysRejected:      summary.ReplaysRejected,
+		WirePolicyHash:       summary.WirePolicyHash,
+		WireFirstNShape:      summary.WireFirstNShape,
+		WireFragmentRhythm:   summary.WireFragmentRhythm,
+		WireMetadataExposure: summary.WireMetadataExposure,
 	})
 }
 

@@ -28,6 +28,10 @@ type WireFeatureVector struct {
 	FeatureHash         string   `json:"feature_hash"`
 	PayloadLogged       bool     `json:"payload_logged"`
 	SecretLogged        bool     `json:"secret_logged"`
+	WirePolicyID        string   `json:"wire_policy_id,omitempty"`
+	WirePolicyHash      string   `json:"wire_policy_hash,omitempty"`
+	WireSelectedFamily  string   `json:"wire_selected_family,omitempty"`
+	WireCorpusEntry     string   `json:"wire_corpus_entry,omitempty"`
 }
 
 type FeatureExtractionReport struct {

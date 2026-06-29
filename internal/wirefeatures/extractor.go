@@ -60,15 +60,15 @@ func ExtractFromSummary(summary fixtures.BytePathFixtureSummary) (WireFeatureVec
 		ProfileSeed:         summary.ProfileSeed,
 		Scenario:            summary.Scenario,
 		Backend:             summary.Backend,
-		PhaseShape:          phaseShape(summary),
-		FieldLayoutClass:    fieldLayoutClass(summary),
-		FirstFlightBucket:   BucketFromFixtureBucket(summary.BytesWrittenBucket),
-		FirstNPacketShape:   firstN.Hash,
+		PhaseShape:          prefer(summary.WirePhaseShape, phaseShape(summary)),
+		FieldLayoutClass:    prefer(summary.WireFieldLayoutClass, fieldLayoutClass(summary)),
+		FirstFlightBucket:   firstFlightBucket(summary),
+		FirstNPacketShape:   prefer(summary.WireFirstNShape, firstN.Hash),
 		DirectionPattern:    firstN.DirectionClass,
-		FrameSizeBuckets:    frameBuckets(summary),
-		FragmentRhythm:      fragmentRhythm(summary),
-		ControlRichness:     controlRichness(summary),
-		MetadataExposure:    metadataExposure(summary),
+		FrameSizeBuckets:    preferredFrameBuckets(summary),
+		FragmentRhythm:      prefer(summary.WireFragmentRhythm, fragmentRhythm(summary)),
+		ControlRichness:     prefer(summary.WireControlRichness, controlRichness(summary)),
+		MetadataExposure:    prefer(summary.WireMetadataExposure, metadataExposure(summary)),
 		PayloadVisibility:   "encrypted_payload_class",
 		SequenceBehavior:    sequenceBehavior(summary),
 		BackpressurePattern: CountBucket(summary.BackpressureEvents),
@@ -77,6 +77,10 @@ func ExtractFromSummary(summary fixtures.BytePathFixtureSummary) (WireFeatureVec
 		ByteShapeHash:       byteShapeHash,
 		PayloadLogged:       summary.PayloadLogged,
 		SecretLogged:        summary.SecretLogged,
+		WirePolicyID:        summary.WirePolicyID,
+		WirePolicyHash:      summary.WirePolicyHash,
+		WireSelectedFamily:  summary.WireSelectedFamily,
+		WireCorpusEntry:     summary.WireCorpusEntry,
 	}
 	hash, err := FeatureHash(vector)
 	if err != nil {
@@ -87,6 +91,27 @@ func ExtractFromSummary(summary fixtures.BytePathFixtureSummary) (WireFeatureVec
 		return WireFeatureVector{}, err
 	}
 	return vector, nil
+}
+
+func prefer(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func firstFlightBucket(summary fixtures.BytePathFixtureSummary) string {
+	if len(summary.WireFrameSizeBuckets) > 0 {
+		return summary.WireFrameSizeBuckets[0]
+	}
+	return BucketFromFixtureBucket(summary.BytesWrittenBucket)
+}
+
+func preferredFrameBuckets(summary fixtures.BytePathFixtureSummary) []string {
+	if len(summary.WireFrameSizeBuckets) > 0 {
+		return append([]string(nil), summary.WireFrameSizeBuckets...)
+	}
+	return frameBuckets(summary)
 }
 
 func FirstNFromSummary(summary fixtures.BytePathFixtureSummary, n int) (FirstNPacketShape, error) {

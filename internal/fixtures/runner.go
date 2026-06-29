@@ -53,6 +53,10 @@ func NormalizeSummary(profileID string, seed int, backend string, summary bytetr
 	if backend == "" {
 		backend = BackendLab
 	}
+	wireFirstNHash := ""
+	if summary.WireFirstNShape != "" {
+		wireFirstNHash = summary.WireFirstNShape
+	}
 	return BytePathFixtureSummary{
 		ProfileID:            profileID,
 		ProfileSeed:          seed,
@@ -75,6 +79,18 @@ func NormalizeSummary(profileID string, seed int, backend string, summary bytetr
 		SinkCompleted:        summary.Completed,
 		PayloadLogged:        summary.PayloadLogged,
 		SecretLogged:         summary.SecretLogged,
+		WirePolicyID:         summary.WirePolicyID,
+		WirePolicyHash:       summary.WirePolicyHash,
+		WireSelectedFamily:   summary.WireSelectedFamily,
+		WireCorpusEntry:      summary.WireCorpusEntry,
+		WirePhaseShape:       summary.WirePhaseShape,
+		WireFieldLayoutClass: summary.WireFieldLayoutClass,
+		WireFirstFlightClass: summary.WireFirstFlightClass,
+		WireFirstNShape:      wireFirstNHash,
+		WireFrameSizeBuckets: append([]string(nil), summary.WireFrameSizeBuckets...),
+		WireFragmentRhythm:   summary.WireFragmentRhythm,
+		WireControlRichness:  summary.WireControlRichness,
+		WireMetadataExposure: summary.WireMetadataExposure,
 	}
 }
 
