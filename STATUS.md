@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T14:32:36Z`
+- Generated at: `2026-06-29T16:32:57Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -96,22 +96,28 @@
 | `byte_transport_collapse_resistance` | PASS | `required` | 2 byte collapse reports evaluated |
 | `byte_transport_mutant_detection` | PASS | `required` | 8/8 byte transport mutant modes detected |
 | `byte_transport_generated_backend_parity` | PASS | `required` | generated backend byte transport support markers checked |
-| `hardening_invariant_registry` | PASS | `required` | 11 invariants checks run; 0 failures |
+| `fixture_bytepath_drift` | PASS | `required` | 21 bytepath fixtures checked for drift |
+| `bytepath_fixture_stability` | PASS | `required` | 21 bytepath fixtures match committed golden set |
+| `bytepath_generated_interpreted_parity` | PASS | `required` | 21/21 generated/interpreted bytepath summaries match semantically |
+| `bytepath_malformed_corpus` | PASS | `required` | 21 malformed byte corpus cases checked |
+| `bytepath_regression_baselines` | PASS | `required` | 21 entries across 3 seeds and 7 scenarios |
+| `bytepath_fixture_trace_hygiene` | PASS | `required` | 21 bytepath fixture entries scanned for payload/secret leakage |
+| `hardening_invariant_registry` | PASS | `required` | 12 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 8 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 9 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 18 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 22 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `8 ms`
-- Trace generation: `11 ms`
-- Total audit runtime: `457 ms`
+- Profile generation: `10 ms`
+- Trace generation: `26 ms`
+- Total audit runtime: `632 ms`
 
 ## Corpus Diversity Summary
 
@@ -136,8 +142,8 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3138657964210455`
-- `same_profile_distance`: `0`
+- `different_profile_average_distance`: `0.319771733513388`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -248,6 +254,16 @@
 - `adapter_mutant_detection`: `passed`
 - `adapter_generated_backend_parity`: `passed`
 
+## Byte-Path Fixture Freeze
+
+- Gate result: `true`
+- `fixture_bytepath_drift`: `passed`
+- `bytepath_fixture_stability`: `passed`
+- `bytepath_generated_interpreted_parity`: `passed`
+- `bytepath_malformed_corpus`: `passed`
+- `bytepath_regression_baselines`: `passed`
+- `bytepath_fixture_trace_hygiene`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -256,6 +272,7 @@
 - Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.
 - Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
 - Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.
+- Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -264,4 +281,4 @@
 
 ## Next Milestone
 
-Milestone 16 should focus on a deterministic local adapter prototype with adapter, hardening, runtime, and generated-backend gates kept mandatory.
+Milestone 19 should focus on a protocol-feature corpus and wire-shape evaluation baselines before any concrete adapter work.
