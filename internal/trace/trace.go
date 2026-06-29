@@ -115,6 +115,17 @@ type Event struct {
 	LocalBackpressureCount       int    `json:"local_backpressure_count,omitempty"`
 	LocalQueuePressureCount      int    `json:"local_queue_pressure_count,omitempty"`
 	LocalAdapterScenario         string `json:"local_adapter_scenario,omitempty"`
+	ByteTransportScenario        string `json:"byte_transport_scenario,omitempty"`
+	ByteFrameKindBucket          string `json:"byte_frame_kind_bucket,omitempty"`
+	ByteFrameCountBucket         string `json:"byte_frame_count_bucket,omitempty"`
+	ByteFragmentCountBucket      string `json:"byte_fragment_count_bucket,omitempty"`
+	ByteCountBucket              string `json:"byte_count_bucket,omitempty"`
+	BytePipeQueuePressureBucket  string `json:"byte_pipe_queue_pressure_bucket,omitempty"`
+	ByteReassemblyResult         string `json:"byte_reassembly_result,omitempty"`
+	ByteSequenceRejectionCount   int    `json:"byte_sequence_rejection_count,omitempty"`
+	ByteCorruptionRejectionCount int    `json:"byte_corruption_rejection_count,omitempty"`
+	ByteMalformedRejectionCount  int    `json:"byte_malformed_rejection_count,omitempty"`
+	ByteCloseResetEventBucket    string `json:"byte_close_reset_event_bucket,omitempty"`
 	Note                         string `json:"note,omitempty"`
 }
 
