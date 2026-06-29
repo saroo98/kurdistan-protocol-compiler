@@ -31,6 +31,7 @@ type ProfileDiversityReport struct {
 	UniqueStreamPolicyCombinations       int            `json:"unique_stream_policy_combinations"`
 	UniqueProxyPolicyCombinations        int            `json:"unique_proxy_policy_combinations"`
 	UniqueCarrierPolicyCombinations      int            `json:"unique_carrier_policy_combinations"`
+	UniqueSecurityPolicyCombinations     int            `json:"unique_security_policy_combinations"`
 	UniquePaddingCombinations            int            `json:"unique_padding_combinations"`
 	UniqueInvalidInputPolicyCombinations int            `json:"unique_invalid_input_policy_combinations"`
 	StateCountDistribution               map[int]int    `json:"state_count_distribution"`
@@ -64,6 +65,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 	streamPolicyCombinations := map[string]bool{}
 	proxyPolicyCombinations := map[string]bool{}
 	carrierPolicyCombinations := map[string]bool{}
+	securityPolicyCombinations := map[string]bool{}
 	paddingCombinations := map[string]bool{}
 	invalidInputCombinations := map[string]bool{}
 
@@ -79,6 +81,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 		streamPolicyCombinations[streamPolicyShape(p)] = true
 		proxyPolicyCombinations[proxyPolicyShape(p)] = true
 		carrierPolicyCombinations[carrierPolicyShape(p)] = true
+		securityPolicyCombinations[securityPolicyShape(p)] = true
 		paddingCombinations[paddingShape(p)] = true
 		invalidInputCombinations[invalidInputShape(p)] = true
 		report.StateCountDistribution[len(p.States)]++
@@ -109,6 +112,7 @@ func AnalyzeProfiles(profiles []*ir.Profile) ProfileDiversityReport {
 	report.UniqueStreamPolicyCombinations = len(streamPolicyCombinations)
 	report.UniqueProxyPolicyCombinations = len(proxyPolicyCombinations)
 	report.UniqueCarrierPolicyCombinations = len(carrierPolicyCombinations)
+	report.UniqueSecurityPolicyCombinations = len(securityPolicyCombinations)
 	report.UniquePaddingCombinations = len(paddingCombinations)
 	report.UniqueInvalidInputPolicyCombinations = len(invalidInputCombinations)
 	return report
@@ -144,6 +148,7 @@ func CompareProfileStructure(a, b *ir.Profile) StructuralDifferenceReport {
 	addStructural("multi-stream strategy", streamPolicyShape(a), streamPolicyShape(b))
 	addStructural("proxy-semantics strategy", proxyPolicyShape(a), proxyPolicyShape(b))
 	addStructural("carrier strategy", carrierPolicyShape(a), carrierPolicyShape(b))
+	addStructural("security strategy", securityPolicyShape(a), securityPolicyShape(b))
 	addStructural("padding strategy", paddingShape(a), paddingShape(b))
 	addStructural("invalid-input policy", invalidInputShape(a), invalidInputShape(b))
 	addStructural("semantic-to-wire mapping shape", semanticMappingShape(a), semanticMappingShape(b))
@@ -264,6 +269,27 @@ func carrierPolicyShape(p *ir.Profile) string {
 		fmt.Sprint(p.CarrierPolicy.MaxMessagesPerEnvelope),
 		fmt.Sprint(p.CarrierPolicy.MaxCarrierQueueDepth),
 		fmt.Sprint(p.CarrierPolicy.MaxRetryCount),
+	}, "|")
+}
+
+func securityPolicyShape(p *ir.Profile) string {
+	return strings.Join([]string{
+		p.Security.SecurityVersion,
+		p.Security.TranscriptMode,
+		p.Security.KDFSuite,
+		p.Security.AEADSuite,
+		p.Security.MACSuite,
+		p.Security.NonceMode,
+		p.Security.ReplayPolicy,
+		fmt.Sprint(p.Security.ReplayWindowSize),
+		p.Security.DowngradePolicy,
+		p.Security.CapabilityNegotiationPolicy,
+		p.Security.ProfileCompatibilityPolicy,
+		p.Security.KeyRotationPolicy,
+		p.Security.ConfigValidationPolicy,
+		p.Security.SecureEnvelopeMode,
+		fmt.Sprint(p.Security.MaxSessionMessages),
+		fmt.Sprint(p.Security.MaxKeyLifetimeMessages),
 	}, "|")
 }
 

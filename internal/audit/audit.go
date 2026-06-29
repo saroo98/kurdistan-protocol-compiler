@@ -63,6 +63,17 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		CarrierProxySemParityGate(ctx, profiles, cfg.Thresholds),
 		CarrierMutantDetectionGate(ctx, cfg.Thresholds),
 		CarrierGeneratedBackendParityGate(),
+		SecurityTranscriptBindingGate(profiles),
+		SecurityKeyScheduleGate(profiles),
+		SecurityNonceUniquenessGate(profiles),
+		SecurityReplayRejectionGate(),
+		SecurityDowngradeResistanceGate(profiles),
+		SecurityCapabilityNegotiationGate(profiles),
+		SecurityProfileCompatibilityGate(profiles),
+		SecurityConfigHygieneGate(profiles),
+		SecuritySecretTraceHygieneGate(profiles),
+		SecurityMutantDetectionGate(ctx),
+		SecurityGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 

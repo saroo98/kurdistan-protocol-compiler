@@ -205,6 +205,9 @@ func mustProfile(t testing.TB, seed int64) *ir.Profile {
 	if p.Stream.MaxConcurrentStreams < 4 {
 		p.Stream.MaxConcurrentStreams = 4
 	}
+	if p.Compatibility.MaxStreamCount < p.Stream.MaxConcurrentStreams {
+		p.Compatibility.MaxStreamCount = p.Stream.MaxConcurrentStreams
+	}
 	if p.Stream.InitialSessionWindowBytes < p.Stream.InitialStreamWindowBytes*4 {
 		p.Stream.InitialSessionWindowBytes = p.Stream.InitialStreamWindowBytes * 4
 	}

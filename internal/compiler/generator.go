@@ -34,6 +34,10 @@ func Generate(seed int64) (*ir.Profile, error) {
 	mode := schedulerModes[rng.Intn(len(schedulerModes))]
 	scheduler := schedulerForMode(rng, mode)
 	placement := paddingPlacements[rng.Intn(len(paddingPlacements))]
+	stream := streamPolicy(rng)
+	proxy := proxySemanticsPolicy(rng)
+	carrier := carrierPolicy(rng)
+	security := securityPolicy(rng)
 
 	p := &ir.Profile{
 		Version: ir.SupportedVersion,
@@ -69,9 +73,11 @@ func Generate(seed int64) (*ir.Profile, error) {
 			ProofMessage: proofMessage,
 		},
 		Scheduler:      scheduler,
-		Stream:         streamPolicy(rng),
-		ProxySemantics: proxySemanticsPolicy(rng),
-		CarrierPolicy:  carrierPolicy(rng),
+		Stream:         stream,
+		ProxySemantics: proxy,
+		CarrierPolicy:  carrier,
+		Security:       security,
+		Compatibility:  compatibilityMetadata(stream, carrier, security),
 		Padding:        paddingForPlacement(rng, placement),
 		InvalidInput: ir.InvalidInputPolicy{
 			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
@@ -294,6 +300,48 @@ func carrierPolicy(rng *rand.Rand) ir.CarrierPolicy {
 		MaxMessagesPerEnvelope: []int{1, 2, 4, 8}[rng.Intn(4)],
 		MaxCarrierQueueDepth:   []int{4, 8, 16, 32}[rng.Intn(4)],
 		MaxRetryCount:          []int{0, 1, 2, 3}[rng.Intn(4)],
+	}
+}
+
+func securityPolicy(rng *rand.Rand) ir.SecurityPolicy {
+	maxSession := []int{1 << 14, 1 << 15, 1 << 16, 1 << 17}[rng.Intn(4)]
+	keyLifetime := []int{1 << 12, 1 << 13, 1 << 14}[rng.Intn(3)]
+	if keyLifetime > maxSession {
+		keyLifetime = maxSession
+	}
+	return ir.SecurityPolicy{
+		SecurityVersion:             "0.12.0-lab",
+		TranscriptMode:              []string{"canonical_v1", "canonical_with_capabilities_v1", "canonical_with_carrier_binding_v1", "canonical_full_binding_v1"}[rng.Intn(4)],
+		KDFSuite:                    "kdf_hkdf_sha256",
+		AEADSuite:                   "aead_aes_256_gcm",
+		MACSuite:                    "mac_hmac_sha256",
+		NonceMode:                   []string{"counter_xor_base", "counter_append_base", "directional_counter", "stream_partitioned_counter"}[rng.Intn(4)],
+		ReplayPolicy:                []string{"ordered_only", "bounded_reorder", "windowed_replay"}[rng.Intn(3)],
+		ReplayWindowSize:            []int{32, 64, 128, 256}[rng.Intn(4)],
+		DowngradePolicy:             []string{"strict_suite_and_capabilities", "strict_capabilities", "suite_bound_transcript"}[rng.Intn(3)],
+		CapabilityNegotiationPolicy: []string{"strict_required", "intersection_with_required", "profile_declared_required"}[rng.Intn(3)],
+		ProfileCompatibilityPolicy:  []string{"strict_schema", "schema_and_feature", "full_policy_binding"}[rng.Intn(3)],
+		KeyRotationPolicy:           []string{"session_only", "message_lifetime_bound", "profile_lifetime_bound"}[rng.Intn(3)],
+		ConfigValidationPolicy:      []string{"strict_required", "strict_with_redaction", "strict_profile_bound"}[rng.Intn(3)],
+		SecureEnvelopeMode:          []string{"metadata_authenticated", "synthetic_aead_test", "full_context_bound_envelope"}[rng.Intn(3)],
+		MaxSessionMessages:          maxSession,
+		MaxKeyLifetimeMessages:      keyLifetime,
+	}
+}
+
+func compatibilityMetadata(stream ir.StreamPolicy, carrier ir.CarrierPolicy, security ir.SecurityPolicy) ir.CompatibilityMetadata {
+	return ir.CompatibilityMetadata{
+		SchemaVersion:            ir.SupportedVersion,
+		CompilerSecurityVersion:  security.SecurityVersion,
+		MinimumRuntimeVersion:    "0.12.0-lab",
+		SupportedSecuritySuites:  []string{ir.SecuritySuiteString()},
+		RequiredCapabilities:     ir.SecurityCapabilities(),
+		SupportedCarrierFamilies: ir.CarrierFamilies(),
+		SupportedProxyFeatures:   ir.ProxySemantics(),
+		SupportedStreamFeatures:  []string{"open_stream", "data", "close_stream", "reset_stream", "window_update", "session_close"},
+		MaxEnvelopeBytes:         carrier.MaxEnvelopeBytes,
+		MaxStreamCount:           stream.MaxConcurrentStreams,
+		MaxReplayWindow:          security.ReplayWindowSize,
 	}
 }
 

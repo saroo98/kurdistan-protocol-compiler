@@ -44,6 +44,14 @@ const (
 	ModeNoCarrierBackpressure         = "no_carrier_backpressure"
 	ModeNoReorderRecovery             = "no_reorder_recovery"
 	ModePaddingOnlyCarrierDiversity   = "padding_only_carrier_diversity"
+	ModeNoTranscriptBinding           = "no_transcript_binding"
+	ModeReusedNonce                   = "reused_nonce"
+	ModeAcceptsReplay                 = "accepts_replay"
+	ModeAcceptsDowngrade              = "accepts_downgrade"
+	ModeCapabilityMismatchAccepted    = "capability_mismatch_accepted"
+	ModeProfileMismatchAccepted       = "profile_mismatch_accepted"
+	ModeUnsafeConfigAllowed           = "unsafe_config_allowed"
+	ModeSecretTraceLeak               = "secret_trace_leak"
 )
 
 func Modes() []string {
@@ -75,6 +83,14 @@ func Modes() []string {
 		ModeNoCarrierBackpressure,
 		ModeNoReorderRecovery,
 		ModePaddingOnlyCarrierDiversity,
+		ModeNoTranscriptBinding,
+		ModeReusedNonce,
+		ModeAcceptsReplay,
+		ModeAcceptsDowngrade,
+		ModeCapabilityMismatchAccepted,
+		ModeProfileMismatchAccepted,
+		ModeUnsafeConfigAllowed,
+		ModeSecretTraceLeak,
 	}
 }
 
@@ -177,6 +193,25 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
+		case ModeNoTranscriptBinding:
+			p.Security.TranscriptMode = "canonical_v1"
+		case ModeReusedNonce:
+			p.Security.NonceMode = "counter_xor_base"
+			p.Security.MaxSessionMessages = 64
+			p.Security.MaxKeyLifetimeMessages = 32
+		case ModeAcceptsReplay:
+			p.Security.ReplayPolicy = "windowed_replay"
+			p.InvalidInput.Replay = "ordinary_error_shaped_response"
+		case ModeAcceptsDowngrade:
+			p.Security.DowngradePolicy = "strict_capabilities"
+		case ModeCapabilityMismatchAccepted:
+			p.Security.CapabilityNegotiationPolicy = "intersection_with_required"
+		case ModeProfileMismatchAccepted:
+			p.Security.ProfileCompatibilityPolicy = "strict_schema"
+		case ModeUnsafeConfigAllowed:
+			p.Security.ConfigValidationPolicy = "strict_required"
+		case ModeSecretTraceLeak:
+			p.Security.SecureEnvelopeMode = "metadata_authenticated"
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {

@@ -59,6 +59,12 @@ func Validate(p *Profile) error {
 	if err := validateCarrierPolicy(p.CarrierPolicy, p.Limits); err != nil {
 		return err
 	}
+	if err := validateSecurityPolicy(p.Security); err != nil {
+		return err
+	}
+	if err := validateCompatibility(p.Compatibility, p.Security, p.Stream, p.CarrierPolicy, p.Limits); err != nil {
+		return err
+	}
 	if err := validatePadding(p.Padding); err != nil {
 		return err
 	}
@@ -442,6 +448,105 @@ func validateCarrierPolicy(p CarrierPolicy, limits SafetyLimits) error {
 	}
 	if p.MaxRetryCount < 0 || p.MaxRetryCount > 8 {
 		return fmt.Errorf("invalid carrier retry count")
+	}
+	return nil
+}
+
+func validateSecurityPolicy(p SecurityPolicy) error {
+	if p.SecurityVersion == "" {
+		return fmt.Errorf("security version is required")
+	}
+	if !oneOf(p.TranscriptMode, "canonical_v1", "canonical_with_capabilities_v1", "canonical_with_carrier_binding_v1", "canonical_full_binding_v1") {
+		return fmt.Errorf("invalid transcript mode")
+	}
+	if p.KDFSuite != "kdf_hkdf_sha256" {
+		return fmt.Errorf("invalid KDF suite")
+	}
+	if p.AEADSuite != "aead_aes_256_gcm" {
+		return fmt.Errorf("invalid AEAD suite")
+	}
+	if p.MACSuite != "mac_hmac_sha256" {
+		return fmt.Errorf("invalid MAC suite")
+	}
+	if !oneOf(p.NonceMode, "counter_xor_base", "counter_append_base", "directional_counter", "stream_partitioned_counter") {
+		return fmt.Errorf("invalid nonce mode")
+	}
+	if !oneOf(p.ReplayPolicy, "ordered_only", "bounded_reorder", "windowed_replay") {
+		return fmt.Errorf("invalid replay policy")
+	}
+	if p.ReplayWindowSize <= 1 || p.ReplayWindowSize > 4096 {
+		return fmt.Errorf("invalid replay window size")
+	}
+	if !oneOf(p.DowngradePolicy, "strict_suite_and_capabilities", "strict_capabilities", "suite_bound_transcript") {
+		return fmt.Errorf("invalid downgrade policy")
+	}
+	if !oneOf(p.CapabilityNegotiationPolicy, "strict_required", "intersection_with_required", "profile_declared_required") {
+		return fmt.Errorf("invalid capability negotiation policy")
+	}
+	if !oneOf(p.ProfileCompatibilityPolicy, "strict_schema", "schema_and_feature", "full_policy_binding") {
+		return fmt.Errorf("invalid profile compatibility policy")
+	}
+	if !oneOf(p.KeyRotationPolicy, "session_only", "message_lifetime_bound", "profile_lifetime_bound") {
+		return fmt.Errorf("invalid key rotation policy")
+	}
+	if !oneOf(p.ConfigValidationPolicy, "strict_required", "strict_with_redaction", "strict_profile_bound") {
+		return fmt.Errorf("invalid config validation policy")
+	}
+	if !oneOf(p.SecureEnvelopeMode, "metadata_authenticated", "synthetic_aead_test", "full_context_bound_envelope") {
+		return fmt.Errorf("invalid secure envelope mode")
+	}
+	if p.MaxSessionMessages <= 0 || p.MaxSessionMessages > 1<<24 {
+		return fmt.Errorf("invalid max session messages")
+	}
+	if p.MaxKeyLifetimeMessages <= 0 || p.MaxKeyLifetimeMessages > p.MaxSessionMessages {
+		return fmt.Errorf("invalid max key lifetime messages")
+	}
+	return nil
+}
+
+func validateCompatibility(c CompatibilityMetadata, sec SecurityPolicy, stream StreamPolicy, carrier CarrierPolicy, limits SafetyLimits) error {
+	if c.SchemaVersion != SupportedVersion {
+		return fmt.Errorf("invalid compatibility schema version")
+	}
+	if c.CompilerSecurityVersion == "" || c.MinimumRuntimeVersion == "" {
+		return fmt.Errorf("compatibility versions are required")
+	}
+	if !oneOf(SecuritySuiteString(), c.SupportedSecuritySuites...) {
+		return fmt.Errorf("required security suite is not supported")
+	}
+	if len(c.RequiredCapabilities) == 0 {
+		return fmt.Errorf("required capabilities are missing")
+	}
+	knownCapabilities := map[string]bool{}
+	for _, capability := range SecurityCapabilities() {
+		knownCapabilities[capability] = true
+	}
+	seenCapabilities := map[string]bool{}
+	for _, capability := range c.RequiredCapabilities {
+		if !knownCapabilities[capability] {
+			return fmt.Errorf("unknown required capability %q", capability)
+		}
+		if seenCapabilities[capability] {
+			return fmt.Errorf("duplicate required capability %q", capability)
+		}
+		seenCapabilities[capability] = true
+	}
+	if !oneOf(carrier.CarrierFamily, c.SupportedCarrierFamilies...) {
+		return fmt.Errorf("profile carrier family missing from compatibility metadata")
+	}
+	for _, family := range c.SupportedCarrierFamilies {
+		if !oneOf(family, CarrierFamilies()...) {
+			return fmt.Errorf("unknown compatibility carrier family %q", family)
+		}
+	}
+	if c.MaxEnvelopeBytes <= 0 || c.MaxEnvelopeBytes > limits.MaxFrameBytes {
+		return fmt.Errorf("invalid compatibility envelope limit")
+	}
+	if c.MaxStreamCount <= 0 || c.MaxStreamCount < stream.MaxConcurrentStreams || c.MaxStreamCount > 16 {
+		return fmt.Errorf("invalid compatibility stream count")
+	}
+	if c.MaxReplayWindow <= 1 || c.MaxReplayWindow < sec.ReplayWindowSize || c.MaxReplayWindow > 4096 {
+		return fmt.Errorf("invalid compatibility replay window")
 	}
 	return nil
 }
