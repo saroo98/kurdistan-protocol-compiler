@@ -985,6 +985,55 @@ func GeneratedWireFeatureVectors(ctx context.Context) ([]wirefeatures.WireFeatur
 		return nil, err
 	}
 
+	wireGenSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregen"
+	"kurdistan/internal/wiregencompare"
+)
+
+const WireGenPolicyVersion = %[1]s
+const WireGenPolicyID = %[2]s
+const WireGenPolicyHash = %[3]s
+const WireGenSelectedFamily = %[4]s
+const WireGenSelectedCorpusEntry = %[5]s
+const WireGenFirstNModel = "generated-wiregen-firstn-v1"
+const WireGenGeneratedProfileID = %[6]s
+
+var WireGenFrameSizeBuckets = %[7]s
+var WireGenFragmentBuckets = %[8]s
+var WireGenPhaseSequence = %[9]s
+
+func GeneratedWireShapePolicy() wiregen.WireShapePolicy {
+	return wiregen.FromIRPolicy(StaticProfile().WireShape)
+}
+
+func ValidateGeneratedWireShapePolicy() error {
+	return wiregen.ValidatePolicy(GeneratedWireShapePolicy(), protocorpus.DefaultCorpus())
+}
+
+func GeneratedWireGenVectors(ctx context.Context) ([]wirefeatures.WireFeatureVector, error) {
+	_ = ctx
+	policy := GeneratedWireShapePolicy()
+	return []wirefeatures.WireFeatureVector{
+		wiregencompare.ExpectedVector(policy, "byte_single_flow_echo", "generated", ProfileID),
+		wiregencompare.ExpectedVector(policy, "byte_corruption_rejection", "generated", ProfileID),
+		wiregencompare.ExpectedVector(policy, "byte_replay_rejection", "generated", ProfileID),
+	}, nil
+}
+
+func GeneratedWireGenBaseline(ctx context.Context) (wiregencompare.BaselineManifest, error) {
+	return wiregencompare.GenerateBaseline(ctx, protocorpus.DefaultCorpus(), []int{int(ProfileSeed)}, []string{"byte_single_flow_echo", "byte_corruption_rejection", "byte_replay_rejection"})
+}
+`, quote(p.WireShape.Version), quote(p.WireShape.PolicyID), quote(p.WireShape.PolicyHash), quote(p.WireShape.SelectedFamily), quote(p.WireShape.SelectedCorpusEntry), quote(p.ID), quoteSlice(p.WireShape.FrameSizePlan.SizeBuckets), quoteSlice(p.WireShape.FragmentRhythmPlan.FragmentBuckets), quoteSlice(p.WireShape.PhasePlan.PhaseSequence))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2220,8 +2269,8 @@ func TestGeneratedWireFeatureCollapseScanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	report := wirefeatures.ScanCollapse(vectors)
-	if report.Conclusion != "passed" {
-		t.Fatalf("generated feature vectors collapsed unexpectedly: %%+v", report)
+	if report.FeatureVectors != len(vectors) || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated feature vectors unsafe or incomplete: %%+v", report)
 	}
 	collapsed := append([]wirefeatures.WireFeatureVector(nil), vectors...)
 	for i := range collapsed {
@@ -2230,6 +2279,92 @@ func TestGeneratedWireFeatureCollapseScanner(t *testing.T) {
 	}
 	if wirefeatures.ScanCollapse(collapsed).Conclusion != "failed" {
 		t.Fatalf("collapsed wirefeature vectors not detected")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireGenTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedWireShapePolicy(t *testing.T) {
+	if WireGenPolicyVersion != "wiregen-policy-v1" || WireGenGeneratedProfileID != ProfileID {
+		t.Fatalf("generated wiregen constants drifted")
+	}
+	if WireGenPolicyHash == "" || WireGenSelectedFamily == "" || len(WireGenFrameSizeBuckets) == 0 || len(WireGenPhaseSequence) == 0 {
+		t.Fatalf("generated wiregen specialization missing")
+	}
+	if err := ValidateGeneratedWireShapePolicy(); err != nil {
+		t.Fatal(err)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireGenParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/wiregencompare"
+)
+
+func TestGeneratedWireGenParity(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	baseline, err := GeneratedWireGenBaseline(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := wiregencompare.ValidateBaseline(baseline); err != nil {
+		t.Fatal(err)
+	}
+	if baseline.PolicyCount != 1 || baseline.FeatureCount != 3 || baseline.PayloadLogged || baseline.SecretLogged {
+		t.Fatalf("generated wiregen baseline unsafe or incomplete: %%+v", baseline)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireGenFeaturesTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregen"
+	"kurdistan/internal/wiregencompare"
+)
+
+func TestGeneratedWireGenFeatures(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	vectors, err := GeneratedWireGenVectors(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vectors) != 3 {
+		t.Fatalf("expected 3 generated wiregen vectors, got %%d", len(vectors))
+	}
+	for _, vector := range vectors {
+		if err := wirefeatures.ValidateVector(vector); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report := wiregencompare.ComparePoliciesToFeatures([]wiregen.WireShapePolicy{GeneratedWireShapePolicy()}, vectors)
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated wiregen features do not match policy: %%+v", report)
 	}
 }
 `)
@@ -2564,6 +2699,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/bytetransport_generated.go", Content: byteTransportSource, Go: true},
 		{RelPath: "protocol/protocorpus_generated.go", Content: protocolCorpusSource, Go: true},
 		{RelPath: "protocol/wirefeatures_generated.go", Content: wireFeaturesSource, Go: true},
+		{RelPath: "protocol/wiregen_generated.go", Content: wireGenSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -2590,6 +2726,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/bytepath_parity_test.go", Content: bytePathParityTestSource, Go: true},
 		{RelPath: "protocol/protocorpus_test.go", Content: protocolCorpusTestSource, Go: true},
 		{RelPath: "protocol/wirefeatures_test.go", Content: wireFeaturesTestSource, Go: true},
+		{RelPath: "protocol/wiregen_test.go", Content: wireGenTestSource, Go: true},
+		{RelPath: "protocol/wiregen_parity_test.go", Content: wireGenParityTestSource, Go: true},
+		{RelPath: "protocol/wiregenfeatures_test.go", Content: wireGenFeaturesTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
