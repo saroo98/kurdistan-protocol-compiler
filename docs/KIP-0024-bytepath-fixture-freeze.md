@@ -3,7 +3,7 @@
 
 # KIP-0024: Byte-Path Fixture Freeze
 
-Milestone 18 stabilizes deterministic byte-path fixtures before the project adds protocol-feature corpus work or broader wire-shape generation.
+Milestone 18 stabilizes deterministic byte-path fixtures before the project adds protocol-feature corpus work or broader wire-shape generation. Milestone 19 builds on this fixture layer with [KIP-0025](KIP-0025-protocol-feature-corpus.md).
 
 The goal is to make future byte-path drift visible without storing raw payloads, raw encoded bytes, ciphertext, secrets, keys, nonce bases, auth tags, proof material, or destination data.
 
@@ -214,4 +214,4 @@ The fixtures freeze local deterministic byte-path metadata only. They do not pro
 
 ## Next Milestone
 
-Milestone 19 should add a protocol-feature corpus and wire-shape evaluation baselines using these byte-path fixtures as stable regression anchors.
+Milestone 19 adds a protocol-feature corpus and wire-shape evaluation baselines using these byte-path fixtures as stable regression anchors. The next step is a wire-shape generation prototype that consumes those baselines.

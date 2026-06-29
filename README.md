@@ -82,7 +82,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Local adapter prototype | Done |
 | Deterministic byte transport harness | Done |
 | Byte-path parity and fixture freeze | Done |
-| Protocol feature corpus and wire-shape baselines | Next |
+| Protocol feature corpus and wire-shape baselines | Done |
+| Wire-shape generator prototype | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -115,6 +116,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Deterministic local adapter prototype with memory ingress/egress adapters, source/sink models, runtime integration, sequence checks, and safe summaries.
 - Deterministic byte transport harness with byte frame encoding/decoding, fragmentation/reassembly, bounded byte pipe, sequence checks, corruption rejection, and safe trace metadata.
 - Byte-path fixture freeze with deterministic golden summaries, malformed byte corpus metadata, generated/interpreted parity checks, and fixture drift gates.
+- Protocol-feature corpus with abstract encrypted-protocol feature taxonomy, safe wire-feature extraction, first-N packet-shape model, corpus comparison, collapse scanning, and wire-shape baselines.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -159,6 +161,9 @@ internal/bytetransport + internal/bytetransportadversary
 internal/fixtures + internal/byteparity
   byte-path fixture manifests, malformed byte corpus metadata, stable hashes, drift checks, and generated/interpreted parity reports
 
+internal/protocorpus + internal/wirefeatures
+  abstract protocol-feature taxonomy, corpus manifests, first-N packet-shape model, safe feature vectors, corpus comparison, and wire-shape baselines
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -190,6 +195,8 @@ go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck bytetransport --quick
 go run ./cmd/kcheck bytepath --quick
+go run ./cmd/kcheck protocorpus --quick
+go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -260,6 +267,8 @@ Kurdistan treats diversity as something to measure.
 - local adapter correctness, flow lifecycle, runtime integration, backpressure, error/reset isolation, sequence integrity, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 - byte transport encoding correctness, fragmentation/reassembly, pipe backpressure, sequence integrity, corruption rejection, runtime integration, error/reset isolation, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 - byte-path fixture stability, generated/interpreted parity, malformed byte corpus rejection, regression baselines, trace hygiene, and warning-only performance buckets
+- protocol corpus schema validation, taxonomy coverage, entry coverage, and corpus trace hygiene
+- wire-feature extraction, first-N packet modeling, corpus comparison, collapse resistance, generated-backend parity, mutant detection, and baseline drift
 
 Useful commands:
 
@@ -283,6 +292,8 @@ go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck bytetransport --quick
 go run ./cmd/kcheck bytepath --quick
+go run ./cmd/kcheck protocorpus --quick
+go run ./cmd/kcheck wirefeatures --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -355,6 +366,22 @@ go run ./cmd/kcheck fixtures generate --out testdata/fixtures/bytepath-golden.js
 go run ./cmd/kcheck fixtures compare --old testdata/fixtures/bytepath-golden.json --new testdata/fixtures/bytepath-golden.json
 go run ./cmd/kcheck bytepath --quick
 go run ./cmd/kcheck bytepath --full --out testdata/audit/bytepath.json
+```
+
+## Protocol Feature Corpus And Wire-Shape Baselines
+
+Milestone 19 adds the first abstract protocol-feature corpus and wire-feature baseline layer. The corpus describes coarse, safe protocol-shape features such as phases, field kinds, visibility classes, first-flight buckets, frame-size buckets, fragment rhythm, control richness, and metadata exposure. It does not copy or implement third-party protocols.
+
+`internal/wirefeatures` extracts payload-free feature vectors from deterministic byte-path fixtures, computes a first-N packet-shape model, compares generated profiles against the abstract corpus, and scans for collapse. Golden baselines live under `testdata/wirefeatures/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck protocorpus --quick
+go run ./cmd/kcheck protocorpus --full --out testdata/audit/protocorpus.json
+go run ./cmd/kcheck wirefeatures --quick
+go run ./cmd/kcheck wirefeatures --full --out testdata/audit/wirefeatures.json
+go run ./cmd/kcheck wirefeatures verify
 ```
 
 ## Multi-Stream Semantics
