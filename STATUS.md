@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T01:20:21Z`
+- Generated at: `2026-06-29T12:03:53Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -64,13 +64,22 @@
 | `runtime_trace_hygiene` | PASS | `required` | 3 runtime traces checked for payload/secret hygiene |
 | `runtime_mutant_detection` | PASS | `required` | 8/8 runtime mutant modes detected |
 | `runtime_generated_backend_parity` | PASS | `required` | generated backend runtime support markers checked |
+| `hardening_invariant_registry` | PASS | `required` | 8 invariants checks run; 0 failures |
+| `hardening_api_contracts` | PASS | `required` | 7 api_contracts checks run; 0 failures |
+| `hardening_panic_safety` | PASS | `required` | 9 panic_safety checks run; 0 failures |
+| `hardening_resource_limits` | PASS | `required` | 6 resource_limits checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 5 trace/security hygiene checks run; 0 failures |
+| `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
+| `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 15 pre_adapter_readiness checks run; 0 failures |
+| `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `10 ms`
-- Trace generation: `21 ms`
-- Total audit runtime: `434 ms`
+- Profile generation: `12 ms`
+- Trace generation: `27 ms`
+- Total audit runtime: `581 ms`
 
 ## Corpus Diversity Summary
 
@@ -93,10 +102,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.31689248395337316`
-- `same_profile_distance`: `0`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.31880645847849376`
+- `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -179,6 +188,19 @@
 - `runtime_mutant_detection`: `passed`
 - `runtime_generated_backend_parity`: `passed`
 
+## Implementation Hardening
+
+- Gate result: `true`
+- `hardening_invariant_registry`: `passed`
+- `hardening_api_contracts`: `passed`
+- `hardening_panic_safety`: `passed`
+- `hardening_resource_limits`: `passed`
+- `hardening_trace_hygiene`: `passed`
+- `hardening_concurrency_safety`: `passed`
+- `hardening_generated_parity`: `passed`
+- `hardening_pre_adapter_readiness`: `passed`
+- `hardening_mutant_detection`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -186,6 +208,7 @@
 - Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.
 - Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.
 - Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
+- Hardening gates prove local invariants and misuse resistance only; adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
@@ -193,4 +216,4 @@
 
 ## Next Milestone
 
-Milestone 14 should focus on implementation hardening, review checklists, and reducing shared helper artifacts before adapter work.
+Milestone 15 should focus on a reviewed, local-only adapter design spike with hardening gates kept mandatory.

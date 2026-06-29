@@ -626,6 +626,71 @@ func CaptureRuntimeTrace(ctx context.Context, streams int) ([]ktrace.Event, Trac
 		return nil, err
 	}
 
+	hardeningSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/ir"
+	"kurdistan/internal/hardening"
+	ktrace "kurdistan/internal/trace"
+)
+
+const HardeningProfileID = %[1]s
+const HardeningProfileHash = %[2]s
+const HardeningGeneratorVersion = %[3]s
+const HardeningMaxFrameBytes = %[4]d
+const HardeningMaxPayloadBytes = %[5]d
+const HardeningMaxStreams = %[6]d
+const HardeningMaxCarrierQueueDepth = %[7]d
+const HardeningTracePayloadHygiene = true
+const HardeningTraceSecretHygiene = true
+
+type HardeningDemoResult struct {
+	ProfileID      string `+"`json:\"profile_id\"`"+`
+	ChecksRun      int    `+"`json:\"checks_run\"`"+`
+	FailedChecks   int    `+"`json:\"failed_checks\"`"+`
+	PayloadLogged  bool   `+"`json:\"payload_logged\"`"+`
+	SecretLogged   bool   `+"`json:\"secret_logged\"`"+`
+	Generator      string `+"`json:\"generator\"`"+`
+}
+
+func HardeningDemo(ctx context.Context, streams int) (HardeningDemoResult, []ktrace.Event, error) {
+	if streams <= 0 {
+		streams = 4
+	}
+	report := hardening.Run(ctx, []*ir.Profile{StaticProfile()}, hardening.Options{Mode: "generated", ProfileCount: 1})
+	result, events, err := RuntimeDemo(ctx, streams)
+	if err != nil {
+		return HardeningDemoResult{}, nil, err
+	}
+	hygiene := hardening.ScanEvents(events)
+	failed := len(report.FailedChecks)
+	if !hygiene.Passed || result.PayloadLogged || result.SecretLogged {
+		failed++
+	}
+	return HardeningDemoResult{
+		ProfileID:     ProfileID,
+		ChecksRun:     len(report.Results),
+		FailedChecks:  failed,
+		PayloadLogged: result.PayloadLogged,
+		SecretLogged:  result.SecretLogged,
+		Generator:     HardeningGeneratorVersion,
+	}, events, nil
+}
+
+func CaptureHardeningTrace(ctx context.Context, streams int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := HardeningDemo(ctx, streams)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	return events, TraceCaptureSummary{ProfileID: ProfileID, EventCount: len(events), DataEventCount: result.ChecksRun, PayloadLogged: result.PayloadLogged || result.SecretLogged}, nil
+}
+`, quote(p.ID), quote(p.GenerationHash), quote(Version), p.Limits.MaxFrameBytes, p.Limits.MaxPayloadBytes, p.Stream.MaxConcurrentStreams, p.CarrierPolicy.MaxCarrierQueueDepth)
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -1333,6 +1398,99 @@ func TestGeneratedRuntimeTraceCapture(t *testing.T) {
 		return nil, err
 	}
 
+	hardeningTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/hardening"
+	"kurdistan/internal/security"
+)
+
+func TestGeneratedHardeningDemoAndConstants(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := HardeningDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ProfileID != ProfileID || result.Generator != GeneratorVersion || result.ChecksRun == 0 || result.FailedChecks != 0 || len(events) == 0 {
+		t.Fatalf("generated hardening summary mismatch: %%+v", result)
+	}
+	if HardeningProfileID != ProfileID || HardeningProfileHash != GenerationHash || HardeningMaxStreams != StreamMaxConcurrentStreams {
+		t.Fatalf("generated hardening constants drifted")
+	}
+}
+
+func TestGeneratedHardeningMisuseRejected(t *testing.T) {
+	ctx, err := SecurityContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := security.DeriveKeySchedule(nil, ctx.TranscriptHash, ctx.Suite); err == nil {
+		t.Fatalf("empty secret accepted")
+	}
+	if _, _, err := DecodeFrames([][]byte{{0xff, 0, 1}}); err == nil {
+		t.Fatalf("malformed frame accepted")
+	}
+	mismatch := StaticProfile()
+	mismatch.ID += "_mismatch"
+	mismatch.GenerationHash = "mismatch"
+	if mismatch.ID == ProfileID {
+		t.Fatalf("profile mismatch fixture did not mutate")
+	}
+}
+
+func TestGeneratedHardeningTraceHygiene(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := HardeningDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PayloadLogged || result.SecretLogged {
+		t.Fatalf("generated hardening reported trace leak")
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range [][]byte{
+		[]byte("generated-runtime-demo-secret"),
+		[]byte("runtime-local-bytes"),
+	} {
+		if bytes.Contains(raw, forbidden) {
+			t.Fatalf("generated hardening trace leaked forbidden bytes")
+		}
+	}
+	if report := hardening.ScanEvents(events); !report.Passed {
+		t.Fatalf("generated trace hygiene failed: %%v", report.Findings)
+	}
+	if hardening.ScanJSON([]byte(` + "`" + `{"client_write_key":"x"}` + "`" + `)).Passed {
+		t.Fatalf("secret marker accepted")
+	}
+}
+
+func TestGeneratedHardeningTraceCapture(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, summary, err := CaptureHardeningTrace(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.EventCount == 0 || summary.PayloadLogged || len(events) == 0 {
+		t.Fatalf("hardening trace capture failed: %%+v", summary)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -1654,6 +1812,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/carrier_generated.go", Content: carrierSource, Go: true},
 		{RelPath: "protocol/security_generated.go", Content: securitySource, Go: true},
 		{RelPath: "protocol/runtime_generated.go", Content: runtimeSource, Go: true},
+		{RelPath: "protocol/hardening_generated.go", Content: hardeningSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -1669,6 +1828,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/securityadversary_test.go", Content: securityAdversaryTestSource, Go: true},
 		{RelPath: "protocol/runtime_test.go", Content: runtimeTestSource, Go: true},
 		{RelPath: "protocol/runtimeadversary_test.go", Content: runtimeAdversaryTestSource, Go: true},
+		{RelPath: "protocol/hardening_test.go", Content: hardeningTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -1704,6 +1864,7 @@ func main() {
 	carrierDemo := flag.Bool("carrier-demo", false, "run local generated carrier abstraction demo")
 	securityDemo := flag.Bool("security-demo", false, "run local generated security demo")
 	runtimeDemo := flag.Bool("runtime-demo", false, "run local generated runtime session demo")
+	hardeningDemo := flag.Bool("hardening-demo", false, "run local generated hardening demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
@@ -1734,6 +1895,19 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("runtime_session=%%s streams=%%d replay_rejected=%%d backpressure_events=%%d\n", result.SessionID, result.StreamsOpened, result.ReplayRejected, result.BackpressureEvents)
+		return
+	}
+	if *hardeningDemo {
+		result, events, err := protocol.HardeningDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("hardening_checks=%%d failed=%%d\n", result.ChecksRun, result.FailedChecks)
 		return
 	}
 	if *carrierDemo {
@@ -1905,6 +2079,7 @@ func main() {
 	carrierName := flag.String("carrier", "", "capture local generated carrier trace with the selected abstract carrier")
 	securityTrace := flag.Bool("security", false, "capture local generated security trace")
 	runtimeTrace := flag.Bool("runtime", false, "capture local generated runtime trace")
+	hardeningTrace := flag.Bool("hardening", false, "capture local generated hardening trace")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
@@ -1917,6 +2092,8 @@ func main() {
 		events, summary, err = protocol.CaptureSecurityTrace(ctx, *streamCount)
 	} else if *runtimeTrace {
 		events, summary, err = protocol.CaptureRuntimeTrace(ctx, *streamCount)
+	} else if *hardeningTrace {
+		events, summary, err = protocol.CaptureHardeningTrace(ctx, *streamCount)
 	} else if *carrierName != "" {
 		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
 	} else if *proxySem {
