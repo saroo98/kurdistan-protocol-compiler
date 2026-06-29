@@ -196,4 +196,4 @@ This milestone proves interface behavior under deterministic local tests. It doe
 
 ## Next Milestone
 
-Milestone 16 should build a deterministic local adapter prototype using this contract while keeping hardening, trace hygiene, and generated-backend parity mandatory.
+Milestone 16 builds the deterministic local adapter prototype described in [KIP-0022](KIP-0022-deterministic-local-adapter-prototype.md). It uses this contract while keeping hardening, trace hygiene, and generated-backend parity mandatory.

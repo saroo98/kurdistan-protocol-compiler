@@ -11,6 +11,7 @@ import (
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/security"
@@ -56,6 +57,10 @@ func RunPanicSafetyChecks(profiles []*ir.Profile) []CheckResult {
 		MustNotPanic("adapter_config_and_flow_no_panic", func() {
 			_ = adapter.ValidateConfig(adapter.AdapterConfig{Name: "secret-token", Kind: "bad", RuntimeID: "", MaxFlows: -1})
 			_ = adapter.ValidateFlowDescriptor(adapter.FlowDescriptor{ID: "", MaxReadBytes: -1, MaxWriteBytes: -1})
+		}),
+		MustNotPanic("local_adapter_config_and_chunk_no_panic", func() {
+			_ = localadapter.ValidateConfig(localadapter.LocalAdapterConfig{Name: "secret-token", RuntimeID: "", MaxFlows: -1})
+			_ = localadapter.ValidateSourceChunk(localadapter.LocalSourceChunk{FlowID: "", Sequence: 0, ByteCount: 1 << 30}, localadapter.DefaultConfig("panic-local"))
 		}),
 		MustNotPanic("security_config_no_panic", func() {
 			_ = security.ValidateConfig(security.SecurityConfig{})

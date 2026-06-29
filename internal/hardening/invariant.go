@@ -4,12 +4,14 @@
 package hardening
 
 import (
+	"context"
 	"fmt"
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kstream "kurdistan/internal/stream"
 )
@@ -146,6 +148,21 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if err := flow.RecordWrite(1); err == nil {
 			return fmt.Errorf("adapter write after reset accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("local_adapter_runtime_scenario_hygiene", CategoryInvariants, func() error {
+		cfg := localadapter.DefaultConfig("local-hardening")
+		cfg.MaxFlows = min(3, p.AdapterPolicy.MaxFlows)
+		result, err := localadapter.RunScenario(context.Background(), p, localadapter.DefaultScenario(localadapter.ScenarioSingleFlowEcho), cfg)
+		if err != nil {
+			return err
+		}
+		if !result.Summary.Completed {
+			return fmt.Errorf("local adapter scenario did not complete")
+		}
+		if result.Summary.PayloadLogged || result.Summary.SecretLogged {
+			return fmt.Errorf("local adapter summary reported payload/secret logging")
 		}
 		return nil
 	}))

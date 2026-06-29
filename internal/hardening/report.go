@@ -171,6 +171,7 @@ func packagesChecked() []string {
 		"internal/security",
 		"internal/runtime",
 		"internal/adapter",
+		"internal/localadapter",
 		"internal/codegen",
 		"internal/trace",
 	}
