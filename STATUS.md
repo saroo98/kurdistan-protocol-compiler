@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T17:44:12Z`
+- Generated at: `2026-06-29T19:18:47Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -86,8 +86,8 @@
 | `local_adapter_mutant_detection` | PASS | `required` | 8/8 local adapter mutant modes detected |
 | `local_adapter_generated_backend_parity` | PASS | `required` | generated backend local adapter support markers checked |
 | `byte_transport_encoding_correctness` | PASS | `required` | 9 byte transport scenario runs checked |
-| `byte_transport_fragmentation_reassembly` | PASS | `required` | 96 fragments created; 0 reassemblies observed |
-| `byte_transport_pipe_backpressure` | PASS | `required` | 48 byte pipe backpressure events observed |
+| `byte_transport_fragmentation_reassembly` | PASS | `required` | 105 fragments created; 0 reassemblies observed |
+| `byte_transport_pipe_backpressure` | PASS | `required` | 54 byte pipe backpressure events observed |
 | `byte_transport_sequence_integrity` | PASS | `required` | 3 replay/sequence frames rejected |
 | `byte_transport_corruption_rejection` | PASS | `required` | 3 corrupted frames rejected |
 | `byte_transport_runtime_integration` | PASS | `required` | 9 byte runtime mappings checked |
@@ -107,17 +107,30 @@
 | `protocorpus_entry_coverage` | PASS | `required` | 12 entries across 9 families |
 | `protocorpus_trace_hygiene` | PASS | `required` | protocol corpus scanned for unsafe feature material |
 | `wirefeatures_extraction` | PASS | `required` | 21 wire feature vectors extracted from 21 fixtures |
-| `wirefeatures_firstn_model` | PASS | `required` | 8 unique first-n packet shapes found |
+| `wirefeatures_firstn_model` | PASS | `required` | 3 unique first-n packet shapes found |
 | `wirefeatures_corpus_comparison` | PASS | `required` | 2 corpus families matched by generated features |
-| `wirefeatures_collapse_resistance` | PASS | `required` | 21 feature hashes and 8 first-n shapes checked |
+| `wirefeatures_collapse_resistance` | PASS | `required` | 21 feature hashes and 3 first-n shapes checked |
 | `wirefeatures_generated_backend_parity` | PASS | `required` | generated backend protocol corpus and wirefeature markers checked |
 | `wirefeatures_mutant_detection` | PASS | `required` | 8/8 wirefeature mutant modes detected |
 | `wirefeatures_baseline_fixtures` | PASS | `required` | 21 wirefeature baseline entries checked |
-| `hardening_invariant_registry` | PASS | `required` | 13 invariants checks run; 0 failures |
+| `wiregen_policy_generation` | PASS | `required` | 100 policies and 100 unique hashes |
+| `wiregen_policy_validation` | PASS | `required` | 100 policies validated |
+| `wiregen_corpus_selection` | PASS | `required` | 12 entries across 9 families selected from 12 corpus entries |
+| `wiregen_profile_integration` | PASS | `required` | 100 profiles include wire-shape policy sections |
+| `wiregen_bytepath_application` | PASS | `required` | 700 bytepath feature vectors carry wire-shape metadata |
+| `wiregen_feature_expectation_match` | PASS | `required` | 700 policy-feature pairs compared |
+| `wiregen_firstn_diversity` | PASS | `required` | 17 unique first-n policy shapes |
+| `wiregen_metadata_exposure_diversity` | PASS | `required` | 5 metadata exposure classes |
+| `wiregen_collapse_resistance` | PASS | `required` | 100 policy hashes, 9 families, 2 fragment rhythms |
+| `wiregen_mutant_detection` | PASS | `required` | 8/8 wiregen mutant modes detected |
+| `wiregen_generated_backend_parity` | PASS | `required` | generated backend wire-shape markers checked |
+| `wiregen_trace_hygiene` | PASS | `required` | 100 policies and 700 feature vectors scanned |
+| `wiregen_baseline_fixtures` | PASS | `required` | 35 wiregen baseline entries checked |
+| `hardening_invariant_registry` | PASS | `required` | 14 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 10 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 11 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -126,9 +139,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `8 ms`
-- Trace generation: `17 ms`
-- Total audit runtime: `498 ms`
+- Profile generation: `85 ms`
+- Trace generation: `18 ms`
+- Total audit runtime: `988 ms`
 
 ## Corpus Diversity Summary
 
@@ -151,9 +164,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31871581320801046`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.32004802810373045`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -293,6 +306,23 @@
 - `wirefeatures_generated_backend_parity`: `passed`
 - `wirefeatures_mutant_detection`: `passed`
 
+## Wire-Shape Generator
+
+- Gate result: `true`
+- `wiregen_policy_generation`: `passed`
+- `wiregen_policy_validation`: `passed`
+- `wiregen_corpus_selection`: `passed`
+- `wiregen_profile_integration`: `passed`
+- `wiregen_bytepath_application`: `passed`
+- `wiregen_feature_expectation_match`: `passed`
+- `wiregen_firstn_diversity`: `passed`
+- `wiregen_metadata_exposure_diversity`: `passed`
+- `wiregen_collapse_resistance`: `passed`
+- `wiregen_mutant_detection`: `passed`
+- `wiregen_generated_backend_parity`: `passed`
+- `wiregen_trace_hygiene`: `passed`
+- `wiregen_baseline_fixtures`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -302,7 +332,7 @@
 - Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
 - Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.
 - Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.
-- Protocol corpus and wire-feature baselines are abstract feature models; they are not a wire-shape generator or classifier.
+- Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -311,4 +341,4 @@
 
 ## Next Milestone
 
-Milestone 20 should focus on a wire-shape generation prototype using the frozen protocol-feature corpus and wire-feature baselines.
+Milestone 21 should focus on a wire evaluation and classifier dataset harness.
