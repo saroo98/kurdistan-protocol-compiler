@@ -14,8 +14,10 @@ import (
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
+	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxysem"
 	kstream "kurdistan/internal/stream"
+	"kurdistan/internal/wirefeatures"
 )
 
 func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
@@ -205,6 +207,29 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if err := fixtures.ValidateManifest(manifest); err != nil {
 			return err
+		}
+		return nil
+	}))
+	results = append(results, check("protocol_corpus_and_wirefeatures_validate", CategoryInvariants, func() error {
+		corpus := protocorpus.DefaultCorpus()
+		if err := protocorpus.ValidateManifest(corpus); err != nil {
+			return err
+		}
+		manifest, err := fixtures.GenerateBytePathManifest(context.Background(), fixtures.ManifestOptions{
+			ProfileSeeds:   []int{int(p.Seed)},
+			ScenarioNames:  []string{bytetransport.ScenarioSingleFlow},
+			BackendVersion: Version,
+		})
+		if err != nil {
+			return err
+		}
+		vectors, report := wirefeatures.ExtractFromFixtureManifest(manifest)
+		if report.Conclusion != "passed" || len(vectors) == 0 {
+			return fmt.Errorf("wire feature extraction failed")
+		}
+		comparison := wirefeatures.CompareToCorpus(vectors, corpus)
+		if comparison.CorpusEntries != len(corpus.Entries) || len(comparison.MatchedFamilies) == 0 || comparison.PayloadLogged || comparison.SecretLogged {
+			return fmt.Errorf("wire feature corpus comparison failed")
 		}
 		return nil
 	}))
