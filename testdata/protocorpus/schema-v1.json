@@ -1,0 +1,26 @@
+{
+  "version": "protocorpus-v1",
+  "feature_schema_version": "wirefeatures-v1",
+  "required_sections": [
+    "entries",
+    "buckets"
+  ],
+  "entry_required_fields": [
+    "name",
+    "family",
+    "phases",
+    "first_flight_bucket",
+    "first_n_packet_bucket",
+    "frame_size_buckets",
+    "fragment_rhythm",
+    "control_richness",
+    "metadata_exposure"
+  ],
+  "rules": [
+    "abstract_descriptors_only",
+    "coarse_buckets_only",
+    "no_capture_material",
+    "no_endpoint_data",
+    "no_credential_material"
+  ]
+}

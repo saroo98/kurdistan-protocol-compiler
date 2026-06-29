@@ -1,0 +1,240 @@
+{
+  "version": "protocorpus-v1",
+  "generated_at": "2026-06-29T00:00:00Z",
+  "name": "abstract-protocol-feature-corpus",
+  "feature_schema_version": "wirefeatures-v1",
+  "payload_logged": false,
+  "secret_logged": false,
+  "entries": [
+    {
+      "name": "structured_tls_like_family",
+      "family": "structured_encrypted",
+      "phases": [
+        {
+          "phase": "greeting",
+          "message_count_bucket": "count_1",
+          "direction_pattern": "client_first",
+          "round_trip_bucket": "1rtt",
+          "fields": [
+            {"kind": "type", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": false, "safe_value_class": "clear-leading-fields"},
+            {"kind": "length", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": false, "safe_value_class": "bucketed-length"}
+          ]
+        },
+        {
+          "phase": "handshake",
+          "message_count_bucket": "count_2_3",
+          "direction_pattern": "alternating",
+          "round_trip_bucket": "1rtt",
+          "fields": [
+            {"kind": "nonce_like", "visibility": "derived", "size_bucket": "size_17_32", "position_bucket": "middle", "required": false, "repeats": false, "safe_value_class": "nonce-class"},
+            {"kind": "key_like", "visibility": "derived", "size_bucket": "size_33_64", "position_bucket": "middle", "required": false, "repeats": false, "safe_value_class": "key-material-class"}
+          ]
+        },
+        {
+          "phase": "data",
+          "message_count_bucket": "count_1",
+          "direction_pattern": "alternating",
+          "round_trip_bucket": "1rtt",
+          "fields": [
+            {"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}
+          ]
+        },
+        {
+          "phase": "close",
+          "message_count_bucket": "count_2_3",
+          "direction_pattern": "alternating",
+          "round_trip_bucket": "1rtt",
+          "fields": [
+            {"kind": "auth_tag_like", "visibility": "derived", "size_bucket": "size_9_16", "position_bucket": "trailing", "required": false, "repeats": false, "safe_value_class": "integrity-class"}
+          ]
+        }
+      ],
+      "first_flight_bucket": "size_129_512",
+      "first_n_packet_bucket": "firstn_mixed_small",
+      "frame_size_buckets": ["size_33_64", "size_65_128", "size_129_512"],
+      "fragment_rhythm": "profile_bucket_fragment",
+      "control_richness": "moderate",
+      "metadata_exposure": "mixed_visible_encrypted",
+      "notes": ["abstract comparative shape", "not an implementation"]
+    },
+    {
+      "name": "ssh_like_greeting_family",
+      "family": "greeting_based",
+      "phases": [
+        {"phase": "greeting", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1_5rtt", "fields": [{"kind": "version", "visibility": "cleartext", "size_bucket": "size_4_8", "position_bucket": "leading", "required": false, "repeats": false, "safe_value_class": "abstract-version"}]},
+        {"phase": "handshake", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1_5rtt", "fields": [{"kind": "length", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": false, "safe_value_class": "bucketed-length"}]},
+        {"phase": "data", "message_count_bucket": "count_1", "direction_pattern": "alternating", "round_trip_bucket": "1_5rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_129_512",
+      "first_n_packet_bucket": "firstn_greeting_binary",
+      "frame_size_buckets": ["size_33_64", "size_129_512"],
+      "fragment_rhythm": "line_then_binary",
+      "control_richness": "moderate",
+      "metadata_exposure": "cleartext_header_encrypted_payload",
+      "notes": ["abstract greeting plus binary shape"]
+    },
+    {
+      "name": "noise_like_minimal_handshake_family",
+      "family": "minimal_handshake",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1rtt", "fields": [{"kind": "nonce_like", "visibility": "derived", "size_bucket": "size_17_32", "position_bucket": "middle", "required": false, "repeats": false, "safe_value_class": "nonce-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]},
+        {"phase": "close", "message_count_bucket": "count_1", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "type", "visibility": "encrypted", "size_bucket": "size_1_3", "position_bucket": "leading", "required": false, "repeats": false, "safe_value_class": "close-class"}]}
+      ],
+      "first_flight_bucket": "size_33_64",
+      "first_n_packet_bucket": "firstn_compact",
+      "frame_size_buckets": ["size_33_64", "size_65_128"],
+      "fragment_rhythm": "single_frame",
+      "control_richness": "low",
+      "metadata_exposure": "encrypted_header_encrypted_payload",
+      "notes": ["abstract minimal handshake shape"]
+    },
+    {
+      "name": "fully_encrypted_randomized_family",
+      "family": "fully_encrypted",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "unknown", "fields": [{"kind": "unknown_encrypted", "visibility": "encrypted", "size_bucket": "size_65_128", "position_bucket": "middle", "required": true, "repeats": true, "safe_value_class": "opaque-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "bidirectional_interleaved", "round_trip_bucket": "unknown", "fields": [{"kind": "unknown_encrypted", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-class"}]}
+      ],
+      "first_flight_bucket": "size_65_128",
+      "first_n_packet_bucket": "firstn_opaque_randomized",
+      "frame_size_buckets": ["size_65_128", "size_129_512", "size_513_1500"],
+      "fragment_rhythm": "randomized_bucket_fragment",
+      "control_richness": "low",
+      "metadata_exposure": "none_visible",
+      "notes": ["abstract opaque randomized shape"]
+    },
+    {
+      "name": "length_prefixed_secure_channel_family",
+      "family": "length_prefixed",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1rtt", "fields": [{"kind": "length", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": false, "safe_value_class": "bucketed-length"}]},
+        {"phase": "control", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "type", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": true, "safe_value_class": "control-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "bidirectional_interleaved", "round_trip_bucket": "1rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_33_64",
+      "first_n_packet_bucket": "firstn_length_prefixed",
+      "frame_size_buckets": ["size_17_32", "size_65_128", "size_129_512"],
+      "fragment_rhythm": "fixed_chunk",
+      "control_richness": "moderate",
+      "metadata_exposure": "minimal_visible",
+      "notes": ["abstract visible length prefix shape"]
+    },
+    {
+      "name": "message_oriented_secure_channel_family",
+      "family": "message_oriented",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1rtt", "fields": [{"kind": "type", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": true, "safe_value_class": "message-type"}]},
+        {"phase": "control", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "reserved", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "reserved-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_65_128",
+      "first_n_packet_bucket": "firstn_message_boundaries",
+      "frame_size_buckets": ["size_33_64", "size_65_128", "size_129_512"],
+      "fragment_rhythm": "message_bucket_fragment",
+      "control_richness": "moderate",
+      "metadata_exposure": "minimal_visible",
+      "notes": ["abstract message boundary shape"]
+    },
+    {
+      "name": "control_rich_secure_channel_family",
+      "family": "control_rich",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "2rtt", "fields": [{"kind": "type", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": true, "safe_value_class": "control-type"}]},
+        {"phase": "control", "message_count_bucket": "count_4_8", "direction_pattern": "bidirectional_interleaved", "round_trip_bucket": "2rtt", "fields": [{"kind": "reserved", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "reserved-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "bidirectional_interleaved", "round_trip_bucket": "2rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_65_128", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_129_512",
+      "first_n_packet_bucket": "firstn_control_dense",
+      "frame_size_buckets": ["size_17_32", "size_33_64", "size_65_128", "size_129_512"],
+      "fragment_rhythm": "control_interleaved",
+      "control_richness": "high",
+      "metadata_exposure": "mixed_visible_encrypted",
+      "notes": ["abstract control-rich shape"]
+    },
+    {
+      "name": "multi_round_handshake_family",
+      "family": "multi_round_handshake",
+      "phases": [
+        {"phase": "greeting", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "multi_rtt", "fields": [{"kind": "version", "visibility": "cleartext", "size_bucket": "size_4_8", "position_bucket": "leading", "required": false, "repeats": false, "safe_value_class": "abstract-version"}]},
+        {"phase": "handshake", "message_count_bucket": "count_4_8", "direction_pattern": "alternating", "round_trip_bucket": "multi_rtt", "fields": [{"kind": "key_like", "visibility": "derived", "size_bucket": "size_33_64", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "key-material-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "multi_rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_129_512",
+      "first_n_packet_bucket": "firstn_multi_round",
+      "frame_size_buckets": ["size_65_128", "size_129_512", "size_513_1500"],
+      "fragment_rhythm": "multi_round_fragment",
+      "control_richness": "moderate",
+      "metadata_exposure": "mixed_visible_encrypted",
+      "notes": ["abstract multi-round shape"]
+    },
+    {
+      "name": "minimal_roundtrip_handshake_family",
+      "family": "minimal_handshake",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "0rtt", "fields": [{"kind": "unknown_encrypted", "visibility": "encrypted", "size_bucket": "size_33_64", "position_bucket": "middle", "required": true, "repeats": false, "safe_value_class": "opaque-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "client_burst", "round_trip_bucket": "0rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_65_128", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_33_64",
+      "first_n_packet_bucket": "firstn_compact",
+      "frame_size_buckets": ["size_33_64", "size_65_128"],
+      "fragment_rhythm": "single_frame",
+      "control_richness": "low",
+      "metadata_exposure": "encrypted_header_encrypted_payload",
+      "notes": ["abstract minimal roundtrip shape"]
+    },
+    {
+      "name": "certificate_like_handshake_family",
+      "family": "structured_encrypted",
+      "phases": [
+        {"phase": "greeting", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "2rtt", "fields": [{"kind": "version", "visibility": "cleartext", "size_bucket": "size_4_8", "position_bucket": "leading", "required": false, "repeats": false, "safe_value_class": "abstract-version"}]},
+        {"phase": "handshake", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "2rtt", "fields": [{"kind": "certificate_like", "visibility": "derived", "size_bucket": "size_129_512", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "certificate-like-class"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "2rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_129_512",
+      "first_n_packet_bucket": "firstn_certificate_like",
+      "frame_size_buckets": ["size_129_512", "size_513_1500"],
+      "fragment_rhythm": "profile_bucket_fragment",
+      "control_richness": "moderate",
+      "metadata_exposure": "mixed_visible_encrypted",
+      "notes": ["abstract certificate-shaped handshake"]
+    },
+    {
+      "name": "reserved_field_handshake_family",
+      "family": "structured_encrypted",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1rtt", "fields": [{"kind": "reserved", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "reserved-class"}]},
+        {"phase": "control", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "type", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": true, "repeats": true, "safe_value_class": "control-type"}]},
+        {"phase": "data", "message_count_bucket": "count_2_3", "direction_pattern": "alternating", "round_trip_bucket": "1rtt", "fields": [{"kind": "payload", "visibility": "encrypted", "size_bucket": "size_65_128", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_33_64",
+      "first_n_packet_bucket": "firstn_reserved_control",
+      "frame_size_buckets": ["size_17_32", "size_65_128"],
+      "fragment_rhythm": "state_bucket_fragment",
+      "control_richness": "moderate",
+      "metadata_exposure": "minimal_visible",
+      "notes": ["abstract reserved-field handshake"]
+    },
+    {
+      "name": "padding_rich_data_family",
+      "family": "stream_oriented",
+      "phases": [
+        {"phase": "handshake", "message_count_bucket": "count_1", "direction_pattern": "client_first", "round_trip_bucket": "1rtt", "fields": [{"kind": "padding_length", "visibility": "cleartext", "size_bucket": "size_1_3", "position_bucket": "leading", "required": false, "repeats": true, "safe_value_class": "padding-length-class"}]},
+        {"phase": "data", "message_count_bucket": "count_4_8", "direction_pattern": "bidirectional_interleaved", "round_trip_bucket": "1rtt", "fields": [{"kind": "padding", "visibility": "encrypted", "size_bucket": "size_33_64", "position_bucket": "middle", "required": false, "repeats": true, "safe_value_class": "padding-class"}, {"kind": "payload", "visibility": "encrypted", "size_bucket": "size_129_512", "position_bucket": "trailing", "required": true, "repeats": true, "safe_value_class": "opaque-data-class"}]}
+      ],
+      "first_flight_bucket": "size_65_128",
+      "first_n_packet_bucket": "firstn_padding_rich",
+      "frame_size_buckets": ["size_33_64", "size_129_512", "size_513_1500"],
+      "fragment_rhythm": "padding_bucket_fragment",
+      "control_richness": "low",
+      "metadata_exposure": "encrypted_header_encrypted_payload",
+      "notes": ["abstract padding-rich data shape"]
+    }
+  ],
+  "buckets": {
+    "size": ["size_0", "size_1_3", "size_4_8", "size_9_16", "size_17_32", "size_33_64", "size_65_128", "size_129_512", "size_513_1500", "size_1501_4096", "size_4097_plus"],
+    "round_trip": ["0rtt", "1rtt", "1_5rtt", "2rtt", "multi_rtt", "unknown"],
+    "direction_pattern": ["client_first", "server_first", "alternating", "client_burst", "server_burst", "bidirectional_interleaved", "unknown"],
+    "metadata_exposure": ["none_visible", "minimal_visible", "mixed_visible_encrypted", "cleartext_header_encrypted_payload", "encrypted_header_encrypted_payload", "unknown"]
+  }
+}

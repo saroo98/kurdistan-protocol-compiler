@@ -15,6 +15,12 @@ testdata/audit/*.json
 !testdata/fixtures/
 !testdata/fixtures/*.json
 !testdata/fixtures/README.md
+!testdata/protocorpus/
+!testdata/protocorpus/*.json
+!testdata/protocorpus/README.md
+!testdata/wirefeatures/
+!testdata/wirefeatures/*.json
+!testdata/wirefeatures/README.md
 testdata/traces/*.json
 testdata/traces/*.jsonl
 !profiles/examples/.gitkeep
