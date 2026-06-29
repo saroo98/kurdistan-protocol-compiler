@@ -34,27 +34,39 @@ type FixtureEntry struct {
 }
 
 type BytePathFixtureSummary struct {
-	ProfileID            string `json:"profile_id"`
-	ProfileSeed          int    `json:"profile_seed"`
-	Scenario             string `json:"scenario"`
-	Backend              string `json:"backend"`
-	FramesEncoded        int    `json:"frames_encoded"`
-	FramesDecoded        int    `json:"frames_decoded"`
-	FragmentsCreated     int    `json:"fragments_created"`
-	FragmentsReassembled int    `json:"fragments_reassembled"`
-	BytesWrittenBucket   string `json:"bytes_written_bucket"`
-	BytesReadBucket      string `json:"bytes_read_bucket"`
-	BackpressureEvents   int    `json:"backpressure_events"`
-	SequenceRejected     int    `json:"sequence_rejected"`
-	MalformedRejected    int    `json:"malformed_rejected"`
-	CorruptionRejected   int    `json:"corruption_rejected"`
-	ReplaysRejected      int    `json:"replays_rejected"`
-	RuntimeStreamsMapped int    `json:"runtime_streams_mapped"`
-	TargetErrors         int    `json:"target_errors"`
-	TargetResets         int    `json:"target_resets"`
-	SinkCompleted        bool   `json:"sink_completed"`
-	PayloadLogged        bool   `json:"payload_logged"`
-	SecretLogged         bool   `json:"secret_logged"`
+	ProfileID            string   `json:"profile_id"`
+	ProfileSeed          int      `json:"profile_seed"`
+	Scenario             string   `json:"scenario"`
+	Backend              string   `json:"backend"`
+	FramesEncoded        int      `json:"frames_encoded"`
+	FramesDecoded        int      `json:"frames_decoded"`
+	FragmentsCreated     int      `json:"fragments_created"`
+	FragmentsReassembled int      `json:"fragments_reassembled"`
+	BytesWrittenBucket   string   `json:"bytes_written_bucket"`
+	BytesReadBucket      string   `json:"bytes_read_bucket"`
+	BackpressureEvents   int      `json:"backpressure_events"`
+	SequenceRejected     int      `json:"sequence_rejected"`
+	MalformedRejected    int      `json:"malformed_rejected"`
+	CorruptionRejected   int      `json:"corruption_rejected"`
+	ReplaysRejected      int      `json:"replays_rejected"`
+	RuntimeStreamsMapped int      `json:"runtime_streams_mapped"`
+	TargetErrors         int      `json:"target_errors"`
+	TargetResets         int      `json:"target_resets"`
+	SinkCompleted        bool     `json:"sink_completed"`
+	PayloadLogged        bool     `json:"payload_logged"`
+	SecretLogged         bool     `json:"secret_logged"`
+	WirePolicyID         string   `json:"wire_policy_id,omitempty"`
+	WirePolicyHash       string   `json:"wire_policy_hash,omitempty"`
+	WireSelectedFamily   string   `json:"wire_selected_family,omitempty"`
+	WireCorpusEntry      string   `json:"wire_corpus_entry,omitempty"`
+	WirePhaseShape       string   `json:"wire_phase_shape,omitempty"`
+	WireFieldLayoutClass string   `json:"wire_field_layout_class,omitempty"`
+	WireFirstFlightClass string   `json:"wire_first_flight_class,omitempty"`
+	WireFirstNShape      string   `json:"wire_first_n_shape,omitempty"`
+	WireFrameSizeBuckets []string `json:"wire_frame_size_buckets,omitempty"`
+	WireFragmentRhythm   string   `json:"wire_fragment_rhythm,omitempty"`
+	WireControlRichness  string   `json:"wire_control_richness,omitempty"`
+	WireMetadataExposure string   `json:"wire_metadata_exposure,omitempty"`
 }
 
 type ByteShapeSummary struct {
@@ -71,6 +83,10 @@ type ByteShapeSummary struct {
 	MalformedRejected    int    `json:"malformed_rejected"`
 	CorruptionRejected   int    `json:"corruption_rejected"`
 	ReplaysRejected      int    `json:"replays_rejected"`
+	WirePolicyHash       string `json:"wire_policy_hash,omitempty"`
+	WireFirstNShape      string `json:"wire_first_n_shape,omitempty"`
+	WireFragmentRhythm   string `json:"wire_fragment_rhythm,omitempty"`
+	WireMetadataExposure string `json:"wire_metadata_exposure,omitempty"`
 }
 
 type ManifestOptions struct {
