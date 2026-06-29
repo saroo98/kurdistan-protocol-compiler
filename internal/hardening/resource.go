@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"kurdistan/internal/adapter"
+	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
@@ -133,6 +134,32 @@ func RunResourceLimitChecks(ctx context.Context, profiles []*ir.Profile, opts Op
 			}
 			if _, err := pipe.Ingress.ReadSource(localadapter.LocalSourceChunk{FlowID: "local-hardening", Sequence: 1, ByteCount: 256}); err == nil {
 				return fmt.Errorf("local adapter chunk limit ignored")
+			}
+			return nil
+		}),
+		check("byte_transport_resource_limits_enforced", CategoryResourceLimits, func() error {
+			cfg := bytetransport.DefaultConfig("byte-resource")
+			cfg.MaxFrameBytes = 512
+			cfg.MaxPayloadBytes = 256
+			if _, err := bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: bytetransport.FrameData, ByteCount: 512}); err == nil {
+				return fmt.Errorf("oversized byte payload accepted")
+			}
+			pipe, err := bytetransport.NewBytePipe(cfg)
+			if err != nil {
+				return err
+			}
+			encoded, err := bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: bytetransport.FrameData, ByteCount: 32})
+			if err != nil {
+				return err
+			}
+			for i := 0; i < cfg.MaxPipeQueueDepth; i++ {
+				encoded.Sequence = uint64(i + 1)
+				if err := pipe.Write(encoded); err != nil {
+					return err
+				}
+			}
+			if err := pipe.Write(encoded); err != bytetransport.ErrBackpressure {
+				return fmt.Errorf("byte pipe backpressure not surfaced")
 			}
 			return nil
 		}),

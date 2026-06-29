@@ -80,7 +80,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Implementation hardening | Done |
 | Adapter interface architecture | Done |
 | Local adapter prototype | Done |
-| Deterministic byte transport harness | Next |
+| Deterministic byte transport harness | Done |
+| Expanded byte-path hardening | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -111,6 +112,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
 - Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
 - Deterministic local adapter prototype with memory ingress/egress adapters, source/sink models, runtime integration, sequence checks, and safe summaries.
+- Deterministic byte transport harness with byte frame encoding/decoding, fragmentation/reassembly, bounded byte pipe, sequence checks, corruption rejection, and safe trace metadata.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -149,6 +151,9 @@ internal/adapter + internal/adapteradversary
 internal/localadapter + internal/localadapteradversary
   memory ingress/egress adapters, deterministic source/sink models, runtime runner, local adapter traces, and collapse scanning
 
+internal/bytetransport + internal/bytetransportadversary
+  byte frame encoder/decoder, fragmentation/reassembly, bounded byte pipe, sequence checks, byte transport traces, and collapse scanning
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -178,6 +183,7 @@ go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck hardening --quick
 go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
+go run ./cmd/kcheck bytetransport --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -215,6 +221,7 @@ go run ./cmd/generated-client --runtime-demo --streams 4
 go run ./cmd/generated-client --hardening-demo --streams 4
 go run ./cmd/generated-client --adapter-demo --flows 4
 go run ./cmd/generated-client --localadapter-demo --flows 4
+go run ./cmd/generated-client --bytetransport-demo --flows 4
 ```
 
 ## Audits And Gates
@@ -245,6 +252,7 @@ Kurdistan treats diversity as something to measure.
 - implementation hardening for invariant registry, API contracts, panic safety, resource bounds, trace hygiene, concurrency checks, generated parity, pre-adapter readiness, and hardening mutant detection
 - adapter interface contracts, config validation, flow lifecycle, runtime boundary mapping, capability compatibility, backpressure, error/reset mapping, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 - local adapter correctness, flow lifecycle, runtime integration, backpressure, error/reset isolation, sequence integrity, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
+- byte transport encoding correctness, fragmentation/reassembly, pipe backpressure, sequence integrity, corruption rejection, runtime integration, error/reset isolation, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 
 Useful commands:
 
@@ -266,6 +274,7 @@ go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
+go run ./cmd/kcheck bytetransport --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -309,6 +318,19 @@ Run:
 ```bash
 go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck localadapter --full --out testdata/audit/localadapter.json
+```
+
+## Deterministic Byte Transport Harness
+
+Milestone 17 adds the first deterministic byte-oriented transport harness. It encodes runtime/local-adapter output into bounded byte frames, moves them through an in-memory byte pipe, decodes and reconstructs receiver-side metadata, enforces sequence and corruption checks, and preserves payload-free traces.
+
+The harness includes bounded fragmentation/reassembly, queue backpressure, replay/duplicate sequence rejection, corruption rejection, malformed byte rejection, byte transport adversary scenarios, byte transport mutants, and generated-backend parity checks.
+
+Run:
+
+```bash
+go run ./cmd/kcheck bytetransport --quick
+go run ./cmd/kcheck bytetransport --full --out testdata/audit/bytetransport.json
 ```
 
 ## Multi-Stream Semantics
@@ -378,8 +400,8 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 17: deterministic byte transport harness.
-2. Milestone 18: expanded byte-path hardening and generated-backend parity.
+1. Milestone 18: expanded byte-path hardening and generated-backend parity.
+2. Milestone 19: concrete local ingress adapter design review.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning

@@ -156,6 +156,10 @@
             <p>Memory ingress/egress adapters, deterministic source and sink models, runtime integration, sequence checks, and safe traces.</p>
           </article>
           <article class="card">
+            <h3>Byte transport harness</h3>
+            <p>Deterministic byte frames, fragmentation, bounded local pipe, sequence integrity, corruption rejection, and payload-free traces.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -201,7 +205,8 @@
           <div><strong>Done</strong><span>Implementation hardening</span></div>
           <div><strong>Done</strong><span>Adapter interface architecture</span></div>
           <div><strong>Done</strong><span>Deterministic local adapter prototype</span></div>
-          <div class="next"><strong>Next</strong><span>Deterministic byte transport harness</span></div>
+          <div><strong>Done</strong><span>Deterministic byte transport harness</span></div>
+          <div class="next"><strong>Next</strong><span>Expanded byte-path hardening</span></div>
         </div>
       </section>
 
@@ -241,6 +246,7 @@
           <a href="KIP-0020-implementation-hardening.md">KIP-0020: Implementation hardening</a>
           <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
           <a href="KIP-0022-deterministic-local-adapter-prototype.md">KIP-0022: Deterministic local adapter prototype</a>
+          <a href="KIP-0023-deterministic-byte-transport-harness.md">KIP-0023: Deterministic byte transport harness</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -273,7 +279,8 @@
             The current implementation centers on generated profiles, source-code backends, multi-stream
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
             architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
-            prototype, and adversarial audits. The next step is a deterministic byte transport harness.
+            prototype, a deterministic byte transport harness, and adversarial audits. The next step is expanded
+            byte-path hardening.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>

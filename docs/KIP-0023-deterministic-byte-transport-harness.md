@@ -1,0 +1,170 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
+# KIP-0023: Deterministic Byte Transport Harness
+
+Milestone 17 adds a deterministic byte-oriented transport harness below the local adapter/runtime/carrier layers. It proves that semantic runtime output can be encoded into bounded byte frames, moved through an in-memory byte pipe, decoded, reconstructed, and audited without logging payloads or secrets.
+
+## Purpose
+
+The byte transport harness moves Kurdistan one layer closer to a real adapter path while remaining deterministic and local.
+
+```text
+local source
+  -> local adapter ingress
+  -> runtime stream/session
+  -> proxy semantics and carrier metadata
+  -> byte transport encoder
+  -> deterministic byte pipe
+  -> byte transport decoder
+  -> receiver-side reconstruction
+  -> local adapter egress
+  -> local sink
+```
+
+## Byte Frame Model
+
+`internal/bytetransport` defines metadata-only byte frames with:
+
+- session ID class
+- stream ID
+- sequence
+- frame kind
+- fragment index/count
+- byte count
+- final/reset flags
+- metadata class
+- checksum class
+
+Encoded frames may contain deterministic test bytes internally. Public summaries, traces, status output, audits, and generated artifacts never include raw encoded bytes or raw payloads.
+
+## Encoder And Decoder
+
+The encoder writes a deterministic binary representation with bounded metadata and a lightweight checksum for local corruption detection. The decoder rejects:
+
+- unknown frame kind
+- truncated input
+- malformed length fields
+- inconsistent fragment fields
+- oversized payloads
+- checksum mismatch
+- trailing or truncated payload data
+
+Decoder fuzz tests use bounded inputs and require no panics.
+
+## Fragmentation And Reassembly
+
+Fragment policies include:
+
+- `no_fragment`
+- `fixed_fragment`
+- `profile_bucket_fragment`
+- `carrier_aware_fragment`
+- `backpressure_aware_fragment`
+
+The reassembler enforces fragment counts, duplicate fragment rejection, optional out-of-order handling, and bounded total reassembly bytes.
+
+## Deterministic Byte Pipe
+
+The byte pipe is a bounded in-memory queue. It supports deterministic write/read, close, reset, queue-depth limits, buffered-byte limits, and backpressure events. It performs no socket or external network I/O.
+
+## Sequence And Integrity Checks
+
+The sequence validator rejects duplicate, old, too-far-future, and post-terminal data frames. The checksum detects deterministic local corruption and returns safe error classes only.
+
+## Runtime And Local Adapter Integration
+
+The byte transport runner uses local adapter scenarios, maps local flows to runtime streams, encodes byte frames, moves them through the byte pipe, decodes them, validates sequences, reassembles fragments, and produces safe summaries.
+
+Required scenario coverage includes:
+
+- byte single-flow echo
+- many small flows
+- large fragmented flow
+- slow drip flow
+- mixed flows
+- reset isolation
+- target error mapping
+- target reset mapping
+- queue backpressure
+- corruption rejection
+- replay rejection
+
+## Byte Transport Adversary
+
+`internal/bytetransportadversary` extracts payload-free features:
+
+- frame count
+- fragment count
+- reassembly count
+- byte count bucket
+- pipe pressure count
+- sequence rejection count
+- corruption rejection count
+- malformed rejection count
+- runtime stream mapping count
+- reset/error propagation
+- hygiene flags
+- failure reason bucket
+
+The collapse scanner flags suspiciously fixed byte behavior across profiles, including fixed frame distributions, fixed fragment rhythms, fixed sequence behavior, fixed backpressure patterns, and padding-only byte diversity.
+
+## Mutants
+
+Milestone 17 adds test-only byte transport mutants:
+
+- `byte_transport_accepts_malformed_frame`
+- `byte_transport_ignores_max_frame_size`
+- `byte_transport_ignores_backpressure`
+- `byte_transport_reuses_sequence`
+- `byte_transport_accepts_corruption`
+- `byte_transport_drops_fragment_silently`
+- `byte_transport_payload_trace_leak`
+- `byte_transport_padding_only_diversity`
+
+Audit gates must detect these regressions.
+
+## Audit Gates
+
+`kcheck bytetransport` reports:
+
+- `byte_transport_encoding_correctness`
+- `byte_transport_fragmentation_reassembly`
+- `byte_transport_pipe_backpressure`
+- `byte_transport_sequence_integrity`
+- `byte_transport_corruption_rejection`
+- `byte_transport_runtime_integration`
+- `byte_transport_error_reset_isolation`
+- `byte_transport_trace_hygiene`
+- `byte_transport_collapse_resistance`
+- `byte_transport_mutant_detection`
+- `byte_transport_generated_backend_parity`
+
+## Generated Backend Parity
+
+Generated modules include:
+
+```text
+protocol/bytetransport_generated.go
+protocol/bytetransport_test.go
+protocol/bytetransportadversary_test.go
+```
+
+Generated code specializes byte transport constants, frame limits, fragment counts, reassembly limits, pipe limits, sequence policy, trace hygiene constants, and generated backend version `0.17.0-lab`.
+
+## Commands
+
+```bash
+go run ./cmd/kcheck bytetransport --quick
+go run ./cmd/kcheck bytetransport --full --out testdata/audit/bytetransport.json
+go run ./cmd/kcheck codegen --quick
+go run ./cmd/generated-client --bytetransport-demo --flows 4
+```
+
+## Limitations
+
+This harness uses deterministic in-memory byte pipes only. It does not implement sockets, SOCKS, TUN, VPN, HTTP, TLS, WebSocket, CDN behavior, deployment behavior, external targets, live-network testing, or production byte transport security. It is a pre-adapter correctness and audit layer.
+
+## Next Milestone
+
+Milestone 18 should deepen byte-path hardening, add more generated/interpreted parity checks, and prepare a concrete local ingress adapter design review without adding production network adapters.
