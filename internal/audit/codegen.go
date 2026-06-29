@@ -96,6 +96,7 @@ type CodegenAuditSummary struct {
 	LocalAdapterGeneratedParity  string                         `json:"local_adapter_generated_backend_parity"`
 	ByteTransportGeneratedParity string                         `json:"byte_transport_generated_backend_parity"`
 	BytePathFixtureParity        string                         `json:"bytepath_fixture_generated_backend_parity"`
+	WireFeaturesGeneratedParity  string                         `json:"wirefeatures_generated_backend_parity"`
 	SourceScanner                string                         `json:"source_scanner"`
 	InterpretedVsGenerated       InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                   codegen.SourceScanReport       `json:"source_scan"`
@@ -181,6 +182,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localAdapterGate := GeneratedLocalAdapterParityGate(corpus, testFailures)
 	byteTransportGate := GeneratedByteTransportParityGate(corpus, testFailures)
 	bytePathFixtureGate := GeneratedBytePathFixtureParityGate(corpus, testFailures)
+	wireFeaturesGate := WireFeaturesGeneratedBackendParityGate()
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -206,6 +208,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localAdapterGate,
 		byteTransportGate,
 		bytePathFixtureGate,
+		wireFeaturesGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -789,6 +792,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalAdapterGeneratedParity:  status("local_adapter_generated_backend_parity"),
 		ByteTransportGeneratedParity: status("byte_transport_generated_backend_parity"),
 		BytePathFixtureParity:        status("bytepath_fixture_generated_backend_parity"),
+		WireFeaturesGeneratedParity:  status("wirefeatures_generated_backend_parity"),
 		SourceScanner:                status("generated_source_scanner"),
 		InterpretedVsGenerated:       divergenceSummary(corpus),
 		SourceScan:                   corpus.SourceScan,
