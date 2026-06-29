@@ -12,6 +12,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
+	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
@@ -99,6 +100,16 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		AdapterCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
 		AdapterMutantDetectionGate(ctx, cfg.Thresholds),
 		AdapterGeneratedBackendParityGate(),
+		LocalAdapterCorrectnessGate(ctx, profiles, localadapteradversary.QuickScenarios(), cfg.Thresholds),
+		LocalAdapterFlowLifecycleGate(ctx, profiles),
+		LocalAdapterRuntimeIntegrationGate(ctx, profiles, localadapteradversary.QuickScenarios(), cfg.Thresholds),
+		LocalAdapterBackpressureGate(ctx, profiles),
+		LocalAdapterErrorResetIsolationGate(ctx, profiles),
+		LocalAdapterSequenceIntegrityGate(ctx, profiles),
+		LocalAdapterTraceHygieneGate(ctx, profiles),
+		LocalAdapterCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
+		LocalAdapterMutantDetectionGate(ctx, cfg.Thresholds),
+		LocalAdapterGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
