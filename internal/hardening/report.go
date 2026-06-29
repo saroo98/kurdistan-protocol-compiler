@@ -11,7 +11,7 @@ import (
 	"kurdistan/internal/ir"
 )
 
-const Version = "0.19.0-lab"
+const Version = "0.20.0-lab"
 
 const (
 	CategoryInvariants          = "invariants"
@@ -177,6 +177,8 @@ func packagesChecked() []string {
 		"internal/byteparity",
 		"internal/protocorpus",
 		"internal/wirefeatures",
+		"internal/wiregen",
+		"internal/wiregencompare",
 		"internal/codegen",
 		"internal/trace",
 	}
