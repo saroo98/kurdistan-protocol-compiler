@@ -6,6 +6,7 @@ package hardening
 import (
 	"fmt"
 
+	"kurdistan/internal/adapter"
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
@@ -120,6 +121,31 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 	results = append(results, check("proxy_unknown_target_rejected", CategoryInvariants, func() error {
 		if err := proxysem.DefaultRegistry().Validate(proxysem.TargetDescriptor{Class: "unknown"}); err == nil {
 			return fmt.Errorf("unknown target accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("adapter_config_lifecycle_and_hygiene", CategoryInvariants, func() error {
+		cfg := adapter.DefaultConfig("adapter-hardening", adapter.AdapterKindIngress)
+		cfg.MaxFlows = min(3, p.Stream.MaxConcurrentStreams)
+		if err := adapter.ValidateConfig(cfg); err != nil {
+			return err
+		}
+		if err := adapter.RequireCapabilities(p.AdapterPolicy.RequiredCapabilities, cfg.Capabilities); err != nil {
+			return err
+		}
+		desc := adapter.FlowDescriptor{ID: "hardening-flow", Class: "synthetic", Direction: "bidirectional", RequestClass: "interactive", PriorityClass: "interactive", MaxReadBytes: 1024, MaxWriteBytes: 1024, MetadataPolicy: "bucketed"}
+		flow, err := adapter.NewFlow(desc)
+		if err != nil {
+			return err
+		}
+		if err := flow.Open(adapter.DefaultCapabilities()); err != nil {
+			return err
+		}
+		if err := flow.Reset(adapter.DefaultCapabilities(), "hardening"); err != nil {
+			return err
+		}
+		if err := flow.RecordWrite(1); err == nil {
+			return fmt.Errorf("adapter write after reset accepted")
 		}
 		return nil
 	}))

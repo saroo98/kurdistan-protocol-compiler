@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"kurdistan/internal/adapter"
 	"kurdistan/internal/ir"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
@@ -121,6 +122,20 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		report := ScanEvents(events)
 		if !report.Passed {
 			return fmt.Errorf("trace hygiene failed: %v", report.Findings)
+		}
+		return nil
+	}))
+	results = append(results, check("adapter_trace_hygiene", CategoryTraceHygiene, func() error {
+		evs := []ktrace.Event{{EventType: "adapter", AdapterKind: "ingress", FlowState: "open", FlowEvent: "flow_progress", PayloadHygiene: true, SecretHygiene: true}}
+		report := ScanEvents(evs)
+		if !report.Passed {
+			return fmt.Errorf("adapter trace rejected: %v", report.Findings)
+		}
+		if ScanValue(adapter.AdapterHarnessSummary{PayloadLogged: true}).Passed {
+			return fmt.Errorf("adapter payload leak flag accepted")
+		}
+		if ScanValue(adapter.AdapterHarnessSummary{SecretLogged: true}).Passed {
+			return fmt.Errorf("adapter secret leak flag accepted")
 		}
 		return nil
 	}))

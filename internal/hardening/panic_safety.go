@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"kurdistan/internal/adapter"
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
@@ -51,6 +52,10 @@ func RunPanicSafetyChecks(profiles []*ir.Profile) []CheckResult {
 		}),
 		MustNotPanic("carrier_envelope_no_panic", func() {
 			_ = carrier.ValidateEnvelope(p, carrier.Envelope{CarrierFamily: p.CarrierPolicy.CarrierFamily, Sequence: 0, Kind: "", ByteCount: p.CarrierPolicy.MaxEnvelopeBytes + 1})
+		}),
+		MustNotPanic("adapter_config_and_flow_no_panic", func() {
+			_ = adapter.ValidateConfig(adapter.AdapterConfig{Name: "secret-token", Kind: "bad", RuntimeID: "", MaxFlows: -1})
+			_ = adapter.ValidateFlowDescriptor(adapter.FlowDescriptor{ID: "", MaxReadBytes: -1, MaxWriteBytes: -1})
 		}),
 		MustNotPanic("security_config_no_panic", func() {
 			_ = security.ValidateConfig(security.SecurityConfig{})

@@ -37,6 +37,7 @@ func Generate(seed int64) (*ir.Profile, error) {
 	stream := streamPolicy(rng)
 	proxy := proxySemanticsPolicy(rng)
 	carrier := carrierPolicy(rng)
+	adapter := adapterPolicy(rng, stream)
 	security := securityPolicy(rng)
 
 	p := &ir.Profile{
@@ -76,8 +77,9 @@ func Generate(seed int64) (*ir.Profile, error) {
 		Stream:         stream,
 		ProxySemantics: proxy,
 		CarrierPolicy:  carrier,
+		AdapterPolicy:  adapter,
 		Security:       security,
-		Compatibility:  compatibilityMetadata(stream, carrier, security),
+		Compatibility:  compatibilityMetadata(stream, carrier, adapter, security),
 		Padding:        paddingForPlacement(rng, placement),
 		InvalidInput: ir.InvalidInputPolicy{
 			UnknownFirstMessage: []string{"silent_close", "delayed_close", "generated_decoy_response", "ordinary_error_shaped_response"}[rng.Intn(4)],
@@ -303,6 +305,26 @@ func carrierPolicy(rng *rand.Rand) ir.CarrierPolicy {
 	}
 }
 
+func adapterPolicy(rng *rand.Rand, stream ir.StreamPolicy) ir.AdapterPolicy {
+	maxFlows := []int{2, 4, 8, 16}[rng.Intn(4)]
+	if maxFlows > stream.MaxConcurrentStreams {
+		maxFlows = stream.MaxConcurrentStreams
+	}
+	maxFlowBytes := []int{64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024}[rng.Intn(4)]
+	return ir.AdapterPolicy{
+		RequiredCapabilities: append([]string(nil), ir.AdapterCapabilities()...),
+		FlowLifecyclePolicy:  []string{"strict", "half_close_aware", "drain_before_close", "reset_terminal"}[rng.Intn(4)],
+		RuntimeMappingPolicy: []string{"one_flow_one_stream", "priority_mapped_stream", "metadata_bound_stream", "state_derived_mapping"}[rng.Intn(4)],
+		TracePolicy:          []string{"safe_buckets", "metadata_only", "strict_hygiene"}[rng.Intn(3)],
+		ErrorMappingPolicy:   []string{"flow_error", "flow_reset", "metadata_error", "close_with_error"}[rng.Intn(4)],
+		BackpressurePolicy:   []string{"adapter_queue", "runtime_stream", "carrier_chain", "priority_backpressure"}[rng.Intn(4)],
+		MaxFlows:             maxFlows,
+		MaxFlowBytes:         maxFlowBytes,
+		MaxBufferedBytes:     []int{256 * 1024, 512 * 1024, 1024 * 1024, 2 * 1024 * 1024}[rng.Intn(4)],
+		MaxEvents:            []int{1024, 2048, 4096, 8192}[rng.Intn(4)],
+	}
+}
+
 func securityPolicy(rng *rand.Rand) ir.SecurityPolicy {
 	maxSession := []int{1 << 14, 1 << 15, 1 << 16, 1 << 17}[rng.Intn(4)]
 	keyLifetime := []int{1 << 12, 1 << 13, 1 << 14}[rng.Intn(3)]
@@ -329,7 +351,7 @@ func securityPolicy(rng *rand.Rand) ir.SecurityPolicy {
 	}
 }
 
-func compatibilityMetadata(stream ir.StreamPolicy, carrier ir.CarrierPolicy, security ir.SecurityPolicy) ir.CompatibilityMetadata {
+func compatibilityMetadata(stream ir.StreamPolicy, carrier ir.CarrierPolicy, adapter ir.AdapterPolicy, security ir.SecurityPolicy) ir.CompatibilityMetadata {
 	return ir.CompatibilityMetadata{
 		SchemaVersion:            ir.SupportedVersion,
 		CompilerSecurityVersion:  security.SecurityVersion,

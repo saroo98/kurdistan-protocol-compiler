@@ -3,7 +3,7 @@
 
 package audit
 
-const Version = "0.14.0-lab"
+const Version = "0.15.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`
@@ -66,6 +66,10 @@ type AuditThresholds struct {
 	MaxRuntimeAdversaryDominantRatio  float64 `json:"max_runtime_adversary_dominant_ratio"`
 	MinRuntimeAdversaryDiversityScore float64 `json:"min_runtime_adversary_diversity_score"`
 	MinRuntimeScenarioSuccess         float64 `json:"min_runtime_scenario_success"`
+	MinAdapterPolicyCombinations      int     `json:"min_adapter_policy_combinations"`
+	MaxAdapterAdversaryDominantRatio  float64 `json:"max_adapter_adversary_dominant_ratio"`
+	MinAdapterAdversaryDiversityScore float64 `json:"min_adapter_adversary_diversity_score"`
+	MinAdapterScenarioSuccess         float64 `json:"min_adapter_scenario_success"`
 }
 
 func DefaultConfig(mode string) AuditConfig {
@@ -137,6 +141,10 @@ func DefaultThresholds() AuditThresholds {
 		MaxRuntimeAdversaryDominantRatio:  0.92,
 		MinRuntimeAdversaryDiversityScore: 0.12,
 		MinRuntimeScenarioSuccess:         0.90,
+		MinAdapterPolicyCombinations:      6,
+		MaxAdapterAdversaryDominantRatio:  0.94,
+		MinAdapterAdversaryDiversityScore: 0.12,
+		MinAdapterScenarioSuccess:         0.90,
 	}
 }
 

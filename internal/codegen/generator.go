@@ -691,6 +691,86 @@ func CaptureHardeningTrace(ctx context.Context, streams int) ([]ktrace.Event, Tr
 		return nil, err
 	}
 
+	adapterSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/adapter"
+	"kurdistan/internal/adapteradversary"
+	kruntime "kurdistan/internal/runtime"
+	ktrace "kurdistan/internal/trace"
+)
+
+const AdapterGeneratedProfileID = %[1]s
+const AdapterFlowLifecyclePolicy = %[2]s
+const AdapterRuntimeMappingPolicy = %[3]s
+const AdapterTracePolicy = %[4]s
+const AdapterErrorMappingPolicy = %[5]s
+const AdapterBackpressurePolicy = %[6]s
+const AdapterMaxFlows = %[7]d
+const AdapterMaxFlowBytes = %[8]d
+const AdapterMaxBufferedBytes = %[9]d
+const AdapterMaxEvents = %[10]d
+const AdapterTracePayloadHygiene = true
+const AdapterTraceSecretHygiene = true
+
+var AdapterRequiredCapabilities = %[11]s
+
+func AdapterConfig() adapter.AdapterConfig {
+	return adapter.AdapterConfig{
+		Name: "generated-adapter",
+		Kind: adapter.AdapterKindIngress,
+		RuntimeID: "generated-runtime",
+		MaxFlows: AdapterMaxFlows,
+		MaxFlowBytes: AdapterMaxFlowBytes,
+		MaxBufferedBytes: AdapterMaxBufferedBytes,
+		MaxEvents: AdapterMaxEvents,
+		TraceEnabled: true,
+		Capabilities: append([]string(nil), AdapterRequiredCapabilities...),
+	}
+}
+
+func AdapterDemo(ctx context.Context, flows int) (adapter.AdapterHarnessSummary, []ktrace.Event, error) {
+	if flows <= 0 {
+		flows = 4
+	}
+	if flows > AdapterMaxFlows {
+		flows = AdapterMaxFlows
+	}
+	result, err := kruntime.RunAdapterBoundary(ctx, StaticProfile(), kruntime.AdapterBoundaryOptions{
+		Scenario: "generated_adapter_demo",
+		FlowCount: flows,
+		BytesPerFlow: 256,
+		Backpressure: flows > 1,
+		MaxFlows: AdapterMaxFlows,
+		MaxStreams: StreamMaxConcurrentStreams,
+	})
+	if err != nil {
+		return adapter.AdapterHarnessSummary{}, nil, err
+	}
+	return result.Summary, result.Events, nil
+}
+
+func CaptureAdapterTrace(ctx context.Context, flows int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := AdapterDemo(ctx, flows)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	return events, TraceCaptureSummary{ProfileID: ProfileID, EventCount: len(events), DataEventCount: result.FlowsOpened, PayloadLogged: result.PayloadLogged || result.SecretLogged}, nil
+}
+
+func AdapterAdversaryDemo(ctx context.Context, scenario string) (adapteradversary.ScenarioRun, error) {
+	if scenario == "" {
+		scenario = adapteradversary.ScenarioManySmallFlows
+	}
+	return adapteradversary.RunScenario(ctx, StaticProfile(), adapteradversary.DefaultScenario(scenario)), nil
+}
+`, quote(p.ID), quote(p.AdapterPolicy.FlowLifecyclePolicy), quote(p.AdapterPolicy.RuntimeMappingPolicy), quote(p.AdapterPolicy.TracePolicy), quote(p.AdapterPolicy.ErrorMappingPolicy), quote(p.AdapterPolicy.BackpressurePolicy), p.AdapterPolicy.MaxFlows, p.AdapterPolicy.MaxFlowBytes, p.AdapterPolicy.MaxBufferedBytes, p.AdapterPolicy.MaxEvents, quoteSlice(p.AdapterPolicy.RequiredCapabilities))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -1491,6 +1571,118 @@ func TestGeneratedHardeningTraceCapture(t *testing.T) {
 		return nil, err
 	}
 
+	adapterTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/adapter"
+	"kurdistan/internal/adapteradversary"
+)
+
+func TestGeneratedAdapterConfigAndDemo(t *testing.T) {
+	if AdapterGeneratedProfileID != ProfileID || AdapterMaxFlows <= 0 || AdapterMaxBufferedBytes <= 0 {
+		t.Fatalf("adapter specialization constants missing")
+	}
+	if err := adapter.ValidateConfig(AdapterConfig()); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := AdapterDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.FlowsOpened == 0 || result.RuntimeStreamsOpened == 0 || len(events) == 0 {
+		t.Fatalf("adapter demo did not exercise runtime mapping: %%+v", result)
+	}
+	if result.PayloadLogged || result.SecretLogged {
+		t.Fatalf("adapter demo reported trace leak")
+	}
+}
+
+func TestGeneratedAdapterCapabilityAndInvalidFlowRejected(t *testing.T) {
+	if err := adapter.RequireCapabilities(AdapterRequiredCapabilities, []string{adapter.CapabilityIngress}); err == nil {
+		t.Fatalf("adapter capability downgrade accepted")
+	}
+	bad := adapter.FlowDescriptor{ID: "", Class: "synthetic", Direction: "bidirectional", RequestClass: "interactive", PriorityClass: "interactive", MaxReadBytes: 128, MaxWriteBytes: 128, MetadataPolicy: "bucketed"}
+	if err := adapter.ValidateFlowDescriptor(bad); err == nil {
+		t.Fatalf("invalid flow descriptor accepted")
+	}
+}
+
+func TestGeneratedAdapterAdversaryScenarios(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, kind := range []string{
+		adapteradversary.ScenarioSingleFlowHappyPath,
+		adapteradversary.ScenarioLargeFlowBackpressure,
+		adapteradversary.ScenarioFlowResetIsolation,
+	} {
+		run, err := AdapterAdversaryDemo(ctx, kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !run.Correct {
+			t.Fatalf("generated adapter adversary scenario failed: %%+v", run)
+		}
+	}
+}
+
+func TestGeneratedAdapterTraceHygiene(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, summary, err := CaptureAdapterTrace(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.EventCount == 0 || summary.PayloadLogged || len(events) == 0 {
+		t.Fatalf("adapter trace capture failed: %%+v", summary)
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range [][]byte{[]byte("generated-runtime-demo-secret"), []byte("runtime-local-bytes")} {
+		if bytes.Contains(raw, forbidden) {
+			t.Fatalf("adapter trace leaked forbidden bytes")
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	adapterAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/ir"
+)
+
+func TestGeneratedAdapterAdversaryQuickCorpus(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	runs := adapteradversary.RunScenarioCorpus(ctx, []*ir.Profile{StaticProfile()}, adapteradversary.QuickScenarios())
+	report := adapteradversary.AnalyzeRuns(runs, adapteradversary.DefaultCollapseThresholds())
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated adapter adversary quick corpus failed: %%+v", report)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -1813,6 +2005,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/security_generated.go", Content: securitySource, Go: true},
 		{RelPath: "protocol/runtime_generated.go", Content: runtimeSource, Go: true},
 		{RelPath: "protocol/hardening_generated.go", Content: hardeningSource, Go: true},
+		{RelPath: "protocol/adapter_generated.go", Content: adapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -1829,6 +2022,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/runtime_test.go", Content: runtimeTestSource, Go: true},
 		{RelPath: "protocol/runtimeadversary_test.go", Content: runtimeAdversaryTestSource, Go: true},
 		{RelPath: "protocol/hardening_test.go", Content: hardeningTestSource, Go: true},
+		{RelPath: "protocol/adapter_test.go", Content: adapterTestSource, Go: true},
+		{RelPath: "protocol/adapteradversary_test.go", Content: adapterAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -1865,10 +2060,15 @@ func main() {
 	securityDemo := flag.Bool("security-demo", false, "run local generated security demo")
 	runtimeDemo := flag.Bool("runtime-demo", false, "run local generated runtime session demo")
 	hardeningDemo := flag.Bool("hardening-demo", false, "run local generated hardening demo")
+	adapterDemo := flag.Bool("adapter-demo", false, "run local generated adapter boundary demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
+	flowCount := flag.Int("flows", 0, "logical flows for the local adapter demo")
 	flag.Parse()
+	if *flowCount > 0 {
+		*streamCount = *flowCount
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
 	if *securityDemo {
@@ -1908,6 +2108,19 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("hardening_checks=%%d failed=%%d\n", result.ChecksRun, result.FailedChecks)
+		return
+	}
+	if *adapterDemo {
+		result, events, err := protocol.AdapterDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("adapter_flows=%%d runtime_streams=%%d backpressure_events=%%d resets=%%d\n", result.FlowsOpened, result.RuntimeStreamsOpened, result.BackpressureEvents, result.FlowsReset)
 		return
 	}
 	if *carrierDemo {
@@ -2080,9 +2293,14 @@ func main() {
 	securityTrace := flag.Bool("security", false, "capture local generated security trace")
 	runtimeTrace := flag.Bool("runtime", false, "capture local generated runtime trace")
 	hardeningTrace := flag.Bool("hardening", false, "capture local generated hardening trace")
+	adapterTrace := flag.Bool("adapter", false, "capture local generated adapter trace")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
+	flowCount := flag.Int("flows", 0, "logical flows for adapter trace capture")
 	flag.Parse()
+	if *flowCount > 0 {
+		*streamCount = *flowCount
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
 	var events []ktrace.Event
@@ -2094,6 +2312,8 @@ func main() {
 		events, summary, err = protocol.CaptureRuntimeTrace(ctx, *streamCount)
 	} else if *hardeningTrace {
 		events, summary, err = protocol.CaptureHardeningTrace(ctx, *streamCount)
+	} else if *adapterTrace {
+		events, summary, err = protocol.CaptureAdapterTrace(ctx, *streamCount)
 	} else if *carrierName != "" {
 		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
 	} else if *proxySem {
