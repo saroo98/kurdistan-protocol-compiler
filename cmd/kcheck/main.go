@@ -13,9 +13,11 @@ import (
 
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/audit"
+	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregencompare"
 )
@@ -71,6 +73,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "wiregen" {
 		os.Exit(runWireGen(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "wireeval" {
+		os.Exit(runWireEval(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -1210,6 +1215,247 @@ func writeWireGenCompanions(out string, baseline wiregencompare.BaselineManifest
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "wiregen-collapse-baseline.json"), raw, 0o600)
+}
+
+func runWireEval(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runWireEvalGenerate(args[1:])
+		case "verify":
+			return runWireEvalVerify(args[1:])
+		case "compare":
+			return runWireEvalCompare(args[1:])
+		case "export":
+			return runWireEvalExport(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck wireeval", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick wire evaluation audit")
+	full := flags.Bool("full", false, "run full wire evaluation audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunWireEvalAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runWireEvalGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck wireeval generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "wireeval", "wireeval-dataset-golden.json"), "wireeval dataset output path")
+	force := flags.Bool("force", false, "overwrite existing wireeval output")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	dataset, err := wireeval.GenerateGoldenDataset(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := wireeval.WriteDataset(*out, dataset, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeWireEvalCompanions(*out, dataset, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote wireeval dataset: %s (%d records)\n", *out, len(dataset.Records))
+	return 0
+}
+
+func runWireEvalVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck wireeval verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "wireeval", "wireeval-dataset-golden.json"), "wireeval dataset baseline path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	report, err := wireeval.VerifyDataset(context.Background(), *baseline)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runWireEvalCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck wireeval compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old wireeval dataset path")
+	newPath := flags.String("new", "", "new wireeval dataset path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldDataset, err := wireeval.LoadDataset(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newDataset, err := wireeval.LoadDataset(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := wireeval.CompareDatasets(oldDataset, newDataset)
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runWireEvalExport(args []string) int {
+	flags := flag.NewFlagSet("kcheck wireeval export", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	format := flags.String("format", "jsonl", "export format: jsonl or csv")
+	out := flags.String("out", "", "export output path")
+	force := flags.Bool("force", false, "overwrite existing export")
+	baseline := flags.String("dataset", filepath.Join("testdata", "wireeval", "wireeval-dataset-golden.json"), "wireeval dataset path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *out == "" {
+		fmt.Fprintln(os.Stderr, "--out is required")
+		return 2
+	}
+	if !*force {
+		if _, err := os.Stat(*out); err == nil {
+			fmt.Fprintln(os.Stderr, "refusing to overwrite existing export; use --force")
+			return 1
+		}
+	}
+	dataset, err := wireeval.LoadDataset(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	var raw []byte
+	switch *format {
+	case "jsonl":
+		raw, err = classifierdata.ExportJSONL(dataset.Records)
+	case "csv":
+		raw, err = classifierdata.ExportCSV(dataset.Records)
+	default:
+		err = fmt.Errorf("unsupported wireeval export format %q", *format)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := os.WriteFile(*out, raw, 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote wireeval %s export: %s (%d records)\n", *format, *out, len(dataset.Records))
+	return 0
+}
+
+func writeWireEvalCompanions(out string, dataset wireeval.Dataset, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name string
+		raw  []byte
+	}{
+		{"wireeval-manifest.json", mustJSON(dataset.Manifest)},
+		{"wireeval-splits.json", mustJSON(wireeval.BuildSplitManifest(dataset.Records, wireeval.DefaultSplitMode()))},
+		{"wireeval-controls.json", mustJSON(wireeval.ControlRecords(dataset.Records))},
+		{"wireeval-baseline-report.json", mustJSON(wireeval.AnalyzeObservableDiversity(dataset.Records))},
+	}
+	csvRaw, err := classifierdata.ExportCSV(dataset.Records)
+	if err != nil {
+		return err
+	}
+	jsonlRaw, err := classifierdata.ExportJSONL(dataset.Records)
+	if err != nil {
+		return err
+	}
+	writes = append(writes, struct {
+		name string
+		raw  []byte
+	}{"wireeval-dataset-golden.csv", csvRaw}, struct {
+		name string
+		raw  []byte
+	}{"wireeval-dataset-golden.jsonl", jsonlRaw})
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return wireeval.ErrRefuseOverwrite
+			}
+		}
+		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mustJSON(value any) []byte {
+	raw, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return []byte("{}\n")
+	}
+	return append(raw, '\n')
 }
 
 func runFixtures(args []string) int {
