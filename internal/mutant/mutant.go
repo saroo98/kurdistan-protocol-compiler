@@ -92,6 +92,14 @@ const (
 	ModeByteTransportDropsFragmentSilently    = "byte_transport_drops_fragment_silently"
 	ModeByteTransportPayloadTraceLeak         = "byte_transport_payload_trace_leak"
 	ModeByteTransportPaddingOnlyDiversity     = "byte_transport_padding_only_diversity"
+	ModeProtocolCorpusMissingPhaseTaxonomy    = "protocorpus_missing_phase_taxonomy"
+	ModeProtocolCorpusInvalidFieldVisibility  = "protocorpus_invalid_field_visibility"
+	ModeProtocolCorpusUnsafePayloadFeature    = "protocorpus_unsafe_payload_feature"
+	ModeWireFeaturesIdenticalFirstNShape      = "wirefeatures_identical_firstn_shape"
+	ModeWireFeaturesPaddingOnlyVariation      = "wirefeatures_padding_only_variation"
+	ModeWireFeaturesMissingMetadataExposure   = "wirefeatures_missing_metadata_exposure"
+	ModeWireFeaturesGeneratedInterpretedDrift = "wirefeatures_generated_interpreted_drift"
+	ModeWireFeaturesSecretLeak                = "wirefeatures_secret_leak"
 )
 
 func Modes() []string {
@@ -171,6 +179,14 @@ func Modes() []string {
 		ModeByteTransportDropsFragmentSilently,
 		ModeByteTransportPayloadTraceLeak,
 		ModeByteTransportPaddingOnlyDiversity,
+		ModeProtocolCorpusMissingPhaseTaxonomy,
+		ModeProtocolCorpusInvalidFieldVisibility,
+		ModeProtocolCorpusUnsafePayloadFeature,
+		ModeWireFeaturesIdenticalFirstNShape,
+		ModeWireFeaturesPaddingOnlyVariation,
+		ModeWireFeaturesMissingMetadataExposure,
+		ModeWireFeaturesGeneratedInterpretedDrift,
+		ModeWireFeaturesSecretLeak,
 	}
 }
 
@@ -387,6 +403,25 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
+		case ModeProtocolCorpusMissingPhaseTaxonomy:
+			p.InvalidInput.UnknownFirstMessage = "ordinary_error_shaped_response"
+		case ModeProtocolCorpusInvalidFieldVisibility:
+			p.InvalidInput.MalformedFrame = "generated_malformed_response"
+		case ModeProtocolCorpusUnsafePayloadFeature:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeWireFeaturesIdenticalFirstNShape:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+		case ModeWireFeaturesPaddingOnlyVariation:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeWireFeaturesMissingMetadataExposure:
+			p.FrameGrammar.TypeMode = base.FrameGrammar.TypeMode
+		case ModeWireFeaturesGeneratedInterpretedDrift:
+			p.Security.SecureEnvelopeMode = "metadata_authenticated"
+		case ModeWireFeaturesSecretLeak:
+			p.Security.ConfigValidationPolicy = "strict_required"
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {
