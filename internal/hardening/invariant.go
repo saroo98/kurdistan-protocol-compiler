@@ -18,6 +18,8 @@ import (
 	"kurdistan/internal/proxysem"
 	kstream "kurdistan/internal/stream"
 	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregen"
+	"kurdistan/internal/wiregencompare"
 )
 
 func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
@@ -230,6 +232,22 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		comparison := wirefeatures.CompareToCorpus(vectors, corpus)
 		if comparison.CorpusEntries != len(corpus.Entries) || len(comparison.MatchedFamilies) == 0 || comparison.PayloadLogged || comparison.SecretLogged {
 			return fmt.Errorf("wire feature corpus comparison failed")
+		}
+		return nil
+	}))
+	results = append(results, check("wiregen_policy_and_feature_expectations_validate", CategoryInvariants, func() error {
+		corpus := protocorpus.DefaultCorpus()
+		policy, err := wiregen.SamplePolicy(p.Seed, corpus)
+		if err != nil {
+			return err
+		}
+		if err := wiregen.ValidatePolicy(policy, corpus); err != nil {
+			return err
+		}
+		vector := wiregencompare.ExpectedVector(policy, bytetransport.ScenarioSingleFlow, "interpreted", p.ID)
+		comparison := wiregencompare.ComparePoliciesToFeatures([]wiregen.WireShapePolicy{policy}, []wirefeatures.WireFeatureVector{vector})
+		if comparison.Conclusion != "passed" || comparison.PayloadLogged || comparison.SecretLogged {
+			return fmt.Errorf("wiregen expectation comparison failed")
 		}
 		return nil
 	}))
