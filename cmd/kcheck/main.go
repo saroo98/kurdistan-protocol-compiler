@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregencompare"
 )
 
 func main() {
@@ -67,6 +68,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "wirefeatures" {
 		os.Exit(runWireFeatures(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "wiregen" {
+		os.Exit(runWireGen(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -1033,6 +1037,179 @@ func writeWireFeatureCompanions(out string, baseline wirefeatures.BaselineManife
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "collapse-baseline.json"), collapseRaw, 0o600)
+}
+
+func runWireGen(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runWireGenGenerate(args[1:])
+		case "verify":
+			return runWireGenVerify(args[1:])
+		case "compare":
+			return runWireGenCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck wiregen", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick wire-shape generation audit")
+	full := flags.Bool("full", false, "run full wire-shape generation audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunWireGenAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runWireGenGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck wiregen generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "wiregen", "wiregen-policy-golden.json"), "wiregen baseline output path")
+	force := flags.Bool("force", false, "overwrite existing wiregen output")
+	corpusPath := flags.String("corpus", defaultProtocolCorpusPath("corpus-v1.json"), "protocol corpus path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	corpus, err := protocorpus.LoadManifest(*corpusPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	baseline, err := wiregencompare.GenerateBaseline(context.Background(), corpus, wiregencompare.DefaultSeeds(), wiregencompare.DefaultScenarios())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := wiregencompare.WriteBaseline(*out, baseline, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeWireGenCompanions(*out, baseline); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote wiregen baseline: %s (%d policies, %d vectors)\n", *out, baseline.PolicyCount, baseline.FeatureCount)
+	return 0
+}
+
+func runWireGenVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck wiregen verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baselinePath := flags.String("baseline", filepath.Join("testdata", "wiregen", "wiregen-policy-golden.json"), "wiregen baseline path")
+	corpusPath := flags.String("corpus", defaultProtocolCorpusPath("corpus-v1.json"), "protocol corpus path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	corpus, err := protocorpus.LoadManifest(*corpusPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report, err := wiregencompare.VerifyBaseline(context.Background(), *baselinePath, corpus)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runWireGenCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck wiregen compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old wiregen baseline path")
+	newPath := flags.String("new", "", "new wiregen baseline path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldBaseline, err := wiregencompare.LoadBaseline(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newBaseline, err := wiregencompare.LoadBaseline(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := wiregencompare.CompareBaselines(oldBaseline, newBaseline)
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if !report.Passed {
+		return 1
+	}
+	return 0
+}
+
+func writeWireGenCompanions(out string, baseline wiregencompare.BaselineManifest) error {
+	dir := filepath.Dir(out)
+	raw, err := wiregencompare.StableJSON(baseline.FeatureVectors)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "wiregen-bytepath-golden.json"), raw, 0o600); err != nil {
+		return err
+	}
+	raw, err = wiregencompare.StableJSON(baseline.Comparison)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "wiregen-corpus-comparison.json"), raw, 0o600); err != nil {
+		return err
+	}
+	raw, err = wiregencompare.StableJSON(baseline.Collapse)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "wiregen-collapse-baseline.json"), raw, 0o600)
 }
 
 func runFixtures(args []string) int {

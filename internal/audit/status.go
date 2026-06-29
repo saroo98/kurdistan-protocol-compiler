@@ -140,6 +140,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `byte_transport_generated_backend_parity`: `%s`\n", summary.ByteTransportGeneratedParity)
 			fmt.Fprintf(&b, "- `bytepath_fixture_generated_backend_parity`: `%s`\n", summary.BytePathFixtureParity)
 			fmt.Fprintf(&b, "- `wirefeatures_generated_backend_parity`: `%s`\n", summary.WireFeaturesGeneratedParity)
+			fmt.Fprintf(&b, "- `wiregen_generated_backend_parity`: `%s`\n", summary.WireGenGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -404,6 +405,39 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck wirefeatures --quick` for feature baseline checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Wire-Shape Generator")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "wiregen_policy_generation"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "wiregen_policy_generation")
+		renderNamedGateResult(&b, report.Gates, "wiregen_policy_validation")
+		renderNamedGateResult(&b, report.Gates, "wiregen_corpus_selection")
+		renderNamedGateResult(&b, report.Gates, "wiregen_profile_integration")
+		renderNamedGateResult(&b, report.Gates, "wiregen_bytepath_application")
+		renderNamedGateResult(&b, report.Gates, "wiregen_feature_expectation_match")
+		renderNamedGateResult(&b, report.Gates, "wiregen_firstn_diversity")
+		renderNamedGateResult(&b, report.Gates, "wiregen_metadata_exposure_diversity")
+		renderNamedGateResult(&b, report.Gates, "wiregen_collapse_resistance")
+		renderNamedGateResult(&b, report.Gates, "wiregen_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "wiregen_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "wiregen_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "wiregen_baseline_fixtures")
+		if strings.HasPrefix(report.Mode, "wiregen-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"corpus_version",
+				"policies",
+				"feature_vectors",
+				"profile_count",
+				"scenario_count",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Wire-shape generator gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck wiregen --quick` for wire-shape generator checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -413,7 +447,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.")
 	fmt.Fprintln(&b, "- Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.")
 	fmt.Fprintln(&b, "- Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.")
-	fmt.Fprintln(&b, "- Protocol corpus and wire-feature baselines are abstract feature models; they are not a wire-shape generator or classifier.")
+	fmt.Fprintln(&b, "- Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -422,7 +456,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 20 should focus on a wire-shape generation prototype using the frozen protocol-feature corpus and wire-feature baselines.")
+	fmt.Fprintln(&b, "Milestone 21 should focus on a wire evaluation and classifier dataset harness.")
 	return b.String()
 }
 
