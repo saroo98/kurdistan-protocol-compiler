@@ -172,6 +172,7 @@ func packagesChecked() []string {
 		"internal/runtime",
 		"internal/adapter",
 		"internal/localadapter",
+		"internal/bytetransport",
 		"internal/codegen",
 		"internal/trace",
 	}

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/ir"
@@ -81,6 +82,16 @@ func RunAPIContractChecks(ctx context.Context, profiles []*ir.Profile) []CheckRe
 			}
 			if err := localadapter.ValidateSourceChunk(localadapter.LocalSourceChunk{FlowID: "", Sequence: 0, ByteCount: cfg.MaxChunkBytes + 1}, cfg); err == nil {
 				return fmt.Errorf("invalid local source chunk accepted")
+			}
+			return nil
+		}),
+		check("invalid_byte_transport_inputs_rejected", CategoryAPIContracts, func() error {
+			cfg := bytetransport.DefaultConfig("byte-contract")
+			if err := bytetransport.ValidateConfig(bytetransport.ByteTransportConfig{Name: "secret-token", RuntimeID: "rt", MaxFrameBytes: 1, MaxPayloadBytes: 1, MaxBufferedBytes: 1, MaxFragments: 1, MaxReassemblyBytes: 1, MaxPipeQueueDepth: 1, MaxEvents: 1}); err == nil {
+				return fmt.Errorf("secret-like byte transport name accepted")
+			}
+			if _, err := bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: "bad", ByteCount: 1}); err == nil {
+				return fmt.Errorf("unknown byte frame kind accepted")
 			}
 			return nil
 		}),

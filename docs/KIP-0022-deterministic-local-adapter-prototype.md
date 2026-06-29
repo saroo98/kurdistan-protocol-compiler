@@ -157,4 +157,4 @@ The prototype is deterministic and in-memory. It does not implement sockets, pac
 
 ## Next Milestone
 
-Milestone 17 should add a deterministic byte transport harness that moves encoded byte frames through a bounded local byte pipe and reconstructs receiver-side semantic events.
+Milestone 17 adds the deterministic byte transport harness described in [KIP-0023](KIP-0023-deterministic-byte-transport-harness.md). It moves encoded byte frames through a bounded local byte pipe and reconstructs receiver-side semantic events.

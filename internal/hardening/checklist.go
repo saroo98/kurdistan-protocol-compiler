@@ -41,6 +41,7 @@ func PreAdapterReadinessMatrix() []ReadinessItem {
 		item("runtime session lifecycle", "lifecycle, compatibility, link queue, and summary hygiene checks"),
 		item("adapter interface architecture", "config, capability, lifecycle, runtime-boundary, backpressure, and trace-hygiene checks"),
 		item("deterministic local adapter prototype", "local source/sink models, runtime integration, sequence, backpressure, and trace-hygiene checks"),
+		item("deterministic byte transport harness", "byte frame encode/decode, fragmentation, pipe backpressure, sequence, corruption, and trace-hygiene checks"),
 		item("generated backend parity", "version, constants, hardening fixture, and scanner checks"),
 		item("trace hygiene", "structured trace/audit/report forbidden marker scanner"),
 		item("resource bounds", "profile, frame, stream, queue, target, envelope, and event bounds"),

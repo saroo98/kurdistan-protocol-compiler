@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"kurdistan/internal/adapter"
+	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
@@ -163,6 +164,29 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if result.Summary.PayloadLogged || result.Summary.SecretLogged {
 			return fmt.Errorf("local adapter summary reported payload/secret logging")
+		}
+		return nil
+	}))
+	results = append(results, check("byte_transport_encode_decode_and_hygiene", CategoryInvariants, func() error {
+		cfg := bytetransport.DefaultConfig("byte-hardening")
+		frame := bytetransport.ByteFrame{SessionID: cfg.RuntimeID, StreamID: 1, Sequence: 1, Kind: bytetransport.FrameData, ByteCount: 64, FragmentCount: 1, MetadataClass: "hardening"}
+		encoded, err := bytetransport.EncodeFrame(cfg, frame)
+		if err != nil {
+			return err
+		}
+		decoded, err := bytetransport.DecodeFrameBytes(cfg, encoded.Bytes)
+		if err != nil {
+			return err
+		}
+		if decoded.Frame.Kind != frame.Kind || decoded.Frame.ByteCount != frame.ByteCount {
+			return fmt.Errorf("byte frame round trip mismatch")
+		}
+		result, err := bytetransport.RunScenario(context.Background(), p, bytetransport.DefaultScenario(bytetransport.ScenarioSingleFlow), cfg)
+		if err != nil {
+			return err
+		}
+		if result.Summary.PayloadLogged || result.Summary.SecretLogged {
+			return fmt.Errorf("byte transport summary reported payload/secret logging")
 		}
 		return nil
 	}))
