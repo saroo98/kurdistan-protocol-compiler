@@ -55,6 +55,7 @@ type Profile struct {
 	Stream         StreamPolicy          `json:"stream"`
 	ProxySemantics ProxySemanticsPolicy  `json:"proxy_semantics"`
 	CarrierPolicy  CarrierPolicy         `json:"carrier_policy"`
+	AdapterPolicy  AdapterPolicy         `json:"adapter_policy"`
 	Security       SecurityPolicy        `json:"security"`
 	Compatibility  CompatibilityMetadata `json:"compatibility"`
 	Padding        PaddingPolicy         `json:"padding"`
@@ -185,6 +186,19 @@ type CarrierPolicy struct {
 	MaxMessagesPerEnvelope int    `json:"max_messages_per_envelope"`
 	MaxCarrierQueueDepth   int    `json:"max_carrier_queue_depth"`
 	MaxRetryCount          int    `json:"max_retry_count"`
+}
+
+type AdapterPolicy struct {
+	RequiredCapabilities []string `json:"required_capabilities"`
+	FlowLifecyclePolicy  string   `json:"flow_lifecycle_policy"`
+	RuntimeMappingPolicy string   `json:"runtime_mapping_policy"`
+	TracePolicy          string   `json:"trace_policy"`
+	ErrorMappingPolicy   string   `json:"error_mapping_policy"`
+	BackpressurePolicy   string   `json:"backpressure_policy"`
+	MaxFlows             int      `json:"max_flows"`
+	MaxFlowBytes         int      `json:"max_flow_bytes"`
+	MaxBufferedBytes     int      `json:"max_buffered_bytes"`
+	MaxEvents            int      `json:"max_events"`
 }
 
 type SecurityPolicy struct {
@@ -365,12 +379,28 @@ func SecurityCapabilities() []string {
 		"multi_stream",
 		"proxy_semantics",
 		"carrier_abstraction",
+		"adapter_interface",
 		"carrier_loss_recovery",
 		"carrier_backpressure",
 		"generated_backend",
 		"transcript_binding",
 		"replay_window",
 		"nonce_schedule",
+	}
+}
+
+func AdapterCapabilities() []string {
+	return []string{
+		"adapter_ingress",
+		"adapter_egress",
+		"flow_lifecycle",
+		"flow_reset",
+		"flow_half_close",
+		"flow_backpressure",
+		"flow_priority",
+		"flow_metadata_only",
+		"runtime_stream_mapping",
+		"trace_safe_adapter_summary",
 	}
 }
 

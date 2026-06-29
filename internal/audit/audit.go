@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"kurdistan/internal/adapteradversary"
 	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
@@ -87,6 +88,17 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		RuntimeTraceHygieneGate(ctx, profiles),
 		RuntimeMutantDetectionGate(ctx),
 		RuntimeGeneratedBackendParityGate(),
+		AdapterInterfaceContractsGate(),
+		AdapterConfigValidationGate(),
+		AdapterFlowLifecycleGate(),
+		AdapterRuntimeBoundaryGate(ctx, profiles, adapteradversary.QuickScenarios(), cfg.Thresholds),
+		AdapterCapabilityCompatibilityGate(profiles),
+		AdapterBackpressureGate(ctx, profiles),
+		AdapterErrorResetMappingGate(ctx, profiles),
+		AdapterTraceHygieneGate(ctx, profiles),
+		AdapterCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
+		AdapterMutantDetectionGate(ctx, cfg.Thresholds),
+		AdapterGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

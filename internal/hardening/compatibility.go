@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"kurdistan/internal/adapter"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/mutant"
@@ -46,6 +47,12 @@ func RunCompatibilityChecks(profiles []*ir.Profile) []CheckResult {
 			}
 			return nil
 		}),
+		check("adapter_capability_mismatch_rejected", CategoryCompatibility, func() error {
+			if err := adapter.RequireCapabilities(p.AdapterPolicy.RequiredCapabilities, []string{adapter.CapabilityIngress}); err == nil {
+				return fmt.Errorf("adapter capability downgrade accepted")
+			}
+			return nil
+		}),
 	}
 }
 
@@ -53,14 +60,14 @@ func RunGeneratedParityChecks(ctx context.Context, profiles []*ir.Profile) []Che
 	_ = ctx
 	p := firstProfile(profiles)
 	return []CheckResult{
-		check("generated_backend_version_014", CategoryGeneratedParity, func() error {
+		check("generated_backend_version_015", CategoryGeneratedParity, func() error {
 			if codegen.Version != Version {
 				return fmt.Errorf("codegen version %s != %s", codegen.Version, Version)
 			}
 			return nil
 		}),
 		check("generated_profile_constants_specialized", CategoryGeneratedParity, func() error {
-			if p.ID == "" || p.GenerationHash == "" || p.Security.TranscriptMode == "" || p.CarrierPolicy.CarrierFamily == "" {
+			if p.ID == "" || p.GenerationHash == "" || p.Security.TranscriptMode == "" || p.CarrierPolicy.CarrierFamily == "" || p.AdapterPolicy.RuntimeMappingPolicy == "" {
 				return fmt.Errorf("profile constants incomplete")
 			}
 			return nil

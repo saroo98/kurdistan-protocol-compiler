@@ -135,6 +135,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `security_generated_backend_parity`: `%s`\n", summary.SecurityGeneratedParity)
 			fmt.Fprintf(&b, "- `runtime_generated_backend_parity`: `%s`\n", summary.RuntimeGeneratedParity)
 			fmt.Fprintf(&b, "- `hardening_generated_backend_parity`: `%s`\n", summary.HardeningGeneratedParity)
+			fmt.Fprintf(&b, "- `adapter_generated_backend_parity`: `%s`\n", summary.AdapterGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -289,6 +290,35 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck hardening --quick` for implementation hardening checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Adapter Interface Architecture")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "adapter_interface_contracts"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "adapter_interface_contracts")
+		renderNamedGateResult(&b, report.Gates, "adapter_config_validation")
+		renderNamedGateResult(&b, report.Gates, "adapter_flow_lifecycle")
+		renderNamedGateResult(&b, report.Gates, "adapter_runtime_boundary")
+		renderNamedGateResult(&b, report.Gates, "adapter_capability_compatibility")
+		renderNamedGateResult(&b, report.Gates, "adapter_backpressure")
+		renderNamedGateResult(&b, report.Gates, "adapter_error_reset_mapping")
+		renderNamedGateResult(&b, report.Gates, "adapter_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "adapter_collapse_resistance")
+		renderNamedGateResult(&b, report.Gates, "adapter_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "adapter_generated_backend_parity")
+		if strings.HasPrefix(report.Mode, "adapter-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"profile_count",
+				"scenario_count",
+				"adapter_kinds",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Adapter interface gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck adapter --quick` for adapter boundary checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -296,7 +326,8 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.")
 	fmt.Fprintln(&b, "- Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.")
 	fmt.Fprintln(&b, "- Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.")
-	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; adapter work still needs separate review.")
+	fmt.Fprintln(&b, "- Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.")
+	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
@@ -304,7 +335,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 15 should focus on a reviewed, local-only adapter design spike with hardening gates kept mandatory.")
+	fmt.Fprintln(&b, "Milestone 16 should focus on a deterministic local adapter prototype with adapter, hardening, runtime, and generated-backend gates kept mandatory.")
 	return b.String()
 }
 

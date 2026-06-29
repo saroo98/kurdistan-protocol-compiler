@@ -66,6 +66,7 @@
             <div><span>scheduler</span><b>profile-bound</b></div>
             <div><span>streams</span><b>flow-controlled</b></div>
             <div><span>runtime</span><b>session-aware</b></div>
+            <div><span>adapter boundary</span><b>contract-checked</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -146,6 +147,10 @@
             <p>Role validation, lifecycle transitions, compatibility negotiation, secure channel setup, in-memory links, and safe traces.</p>
           </article>
           <article class="card">
+            <h3>Adapter interface</h3>
+            <p>Bounded ingress/egress contracts, flow lifecycle, capability checks, runtime mapping, backpressure, and safe summaries.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -158,7 +163,9 @@
           <p>A compiler-centered proxy transport architecture with generated transports as the core research layer.</p>
         </div>
         <div class="architecture" aria-label="Architecture diagram">
-          <div class="arch-node">Application / future proxy adapter</div>
+          <div class="arch-node">Local application / future packet source</div>
+          <div class="arch-arrow"></div>
+          <div class="arch-node">Adapter ingress/egress interface</div>
           <div class="arch-arrow"></div>
           <div class="arch-node">Stable internal relay semantics</div>
           <div class="arch-arrow"></div>
@@ -187,7 +194,8 @@
           <div><strong>Done</strong><span>Production security prerequisites</span></div>
           <div><strong>Done</strong><span>Runtime session architecture</span></div>
           <div><strong>Done</strong><span>Implementation hardening</span></div>
-          <div class="next"><strong>Next</strong><span>Reviewed local adapter design spike</span></div>
+          <div><strong>Done</strong><span>Adapter interface architecture</span></div>
+          <div class="next"><strong>Next</strong><span>Deterministic local adapter prototype</span></div>
         </div>
       </section>
 
@@ -225,6 +233,7 @@
           <a href="KIP-0018-production-security-prerequisites.md">KIP-0018: Production security prerequisites</a>
           <a href="KIP-0019-runtime-session-architecture.md">KIP-0019: Runtime session architecture</a>
           <a href="KIP-0020-implementation-hardening.md">KIP-0020: Implementation hardening</a>
+          <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -256,8 +265,8 @@
           <p>
             The current implementation centers on generated profiles, source-code backends, multi-stream
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
-            architecture, implementation hardening, and adversarial audits. The next step is a reviewed
-            local-only adapter design spike.
+            architecture, implementation hardening, adapter interface contracts, and adversarial audits. The next
+            step is a deterministic local adapter prototype.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>

@@ -11,7 +11,7 @@ This milestone is about misuse resistance and regression detection. It does not 
 
 ## Hardening Model
 
-The new `internal/hardening` package provides reusable checks:
+The `internal/hardening` package provides reusable checks:
 
 - invariant registry
 - API contract and misuse checks
@@ -22,6 +22,7 @@ The new `internal/hardening` package provides reusable checks:
 - compatibility checks
 - generated/interpreted parity checks
 - pre-adapter readiness matrix
+- adapter interface checks
 
 Each check returns a structured result with category, severity, evidence, and pass/fail state.
 
@@ -75,7 +76,7 @@ protocol/hardening_generated.go
 protocol/hardening_test.go
 ```
 
-Generated hardening tests cover config misuse, replay/profile mismatch fixtures, malformed frames, trace hygiene, and generated hardening summaries. The generated backend version is `0.14.0-lab`.
+Generated hardening tests cover config misuse, replay/profile mismatch fixtures, malformed frames, trace hygiene, and generated hardening summaries. The generated backend version is now `0.15.0-lab`.
 
 ## Hardening Mutants
 
@@ -121,5 +122,4 @@ Hardening gates prove local deterministic behavior only. They do not prove produ
 
 ## Next Milestone
 
-Milestone 15 should be a reviewed local-only adapter design spike that treats hardening gates as mandatory preconditions.
-
+Milestone 15 adds the adapter interface architecture described in [KIP-0021](KIP-0021-adapter-interface-architecture.md). The next milestone should build a deterministic local adapter prototype that treats adapter and hardening gates as mandatory preconditions.

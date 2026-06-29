@@ -72,7 +72,7 @@ func TestTranscriptBindingAndCanonicalization(t *testing.T) {
 		t.Fatalf("map key order changed transcript hash: %s != %s", hashA, hashMap)
 	}
 	reorderedCapabilities := in
-	reorderedCapabilities.Capabilities = []string{"nonce_schedule", "multi_stream", "carrier_abstraction", "proxy_semantics", "generated_backend", "replay_window", "transcript_binding", "carrier_backpressure", "carrier_loss_recovery"}
+	reorderedCapabilities.Capabilities = []string{"nonce_schedule", "multi_stream", "carrier_abstraction", "adapter_interface", "proxy_semantics", "generated_backend", "replay_window", "transcript_binding", "carrier_backpressure", "carrier_loss_recovery"}
 	hashCaps, err := TranscriptHash(reorderedCapabilities)
 	if err != nil {
 		t.Fatal(err)
