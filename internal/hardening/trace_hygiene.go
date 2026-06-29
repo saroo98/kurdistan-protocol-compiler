@@ -12,12 +12,14 @@ import (
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/protocorpus"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregencompare"
 )
@@ -304,6 +306,42 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanJSON([]byte(`{"raw_bytes":"abc"}`)).Passed {
 			return fmt.Errorf("raw byte marker accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("wireeval_dataset_trace_hygiene", CategoryTraceHygiene, func() error {
+		dataset, err := wireeval.BuildDataset(ctx, protocorpus.DefaultCorpus(), wireeval.BuildOptions{
+			Seeds:    wireeval.DefaultSeeds(),
+			Controls: true,
+		})
+		if err != nil {
+			return err
+		}
+		if report := wireeval.ScanDatasetForLeakage(dataset); !report.Passed {
+			return fmt.Errorf("wireeval dataset rejected: %v", report.Findings)
+		}
+		csvRaw, err := classifierdata.ExportCSV(dataset.Records)
+		if err != nil {
+			return err
+		}
+		if err := classifierdata.ValidateCSV(csvRaw); err != nil {
+			return err
+		}
+		jsonlRaw, err := classifierdata.ExportJSONL(dataset.Records)
+		if err != nil {
+			return err
+		}
+		if err := classifierdata.ValidateJSONL(jsonlRaw); err != nil {
+			return err
+		}
+		if ScanJSON([]byte(`{"raw_payload":"abc"}`)).Passed {
+			return fmt.Errorf("raw payload wireeval field accepted")
+		}
+		if ScanJSON([]byte(`{"encoded_bytes":"abc"}`)).Passed {
+			return fmt.Errorf("encoded bytes wireeval field accepted")
+		}
+		if ScanJSON([]byte(`{"destination_address":"127.0.0.1"}`)).Passed {
+			return fmt.Errorf("endpoint wireeval field accepted")
 		}
 		return nil
 	}))

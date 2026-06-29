@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxysem"
 	kstream "kurdistan/internal/stream"
+	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregen"
 	"kurdistan/internal/wiregencompare"
@@ -248,6 +249,23 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		comparison := wiregencompare.ComparePoliciesToFeatures([]wiregen.WireShapePolicy{policy}, []wirefeatures.WireFeatureVector{vector})
 		if comparison.Conclusion != "passed" || comparison.PayloadLogged || comparison.SecretLogged {
 			return fmt.Errorf("wiregen expectation comparison failed")
+		}
+		return nil
+	}))
+	results = append(results, check("wireeval_dataset_and_split_validate", CategoryInvariants, func() error {
+		dataset, err := wireeval.BuildDataset(context.Background(), protocorpus.DefaultCorpus(), wireeval.BuildOptions{
+			Seeds:    wireeval.DefaultSeeds(),
+			Controls: true,
+		})
+		if err != nil {
+			return err
+		}
+		if err := wireeval.ValidateDataset(dataset); err != nil {
+			return err
+		}
+		splits := wireeval.BuildSplitManifest(dataset.Records, wireeval.DefaultSplitMode())
+		if !splits.Passed || splits.SplitCounts["train"] == 0 || splits.SplitCounts["test"] == 0 || splits.SplitCounts["ood"] == 0 {
+			return fmt.Errorf("wireeval split manifest failed")
 		}
 		return nil
 	}))
