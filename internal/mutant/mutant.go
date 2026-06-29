@@ -109,6 +109,18 @@ const (
 	ModeWireGenLengthOnlyDiversity            = "wiregen_length_only_diversity"
 	ModeWireGenPayloadLeakFeature             = "wiregen_payload_leak_feature"
 	ModeWireGenGeneratedInterpretedDrift      = "wiregen_generated_interpreted_drift"
+	ModeWireEvalRawPayloadColumn              = "wireeval_raw_payload_column"
+	ModeWireEvalRawBytesColumn                = "wireeval_raw_bytes_column"
+	ModeWireEvalEndpointLeak                  = "wireeval_endpoint_leak"
+	ModeWireEvalTrainTestSeedOverlap          = "wireeval_train_test_seed_overlap"
+	ModeWireEvalOODSeedOverlap                = "wireeval_ood_seed_overlap"
+	ModeWireEvalMissingRequiredFeature        = "wireeval_missing_required_feature"
+	ModeWireEvalUnstableRecordID              = "wireeval_unstable_record_id"
+	ModeWireEvalPaddingOnlyDataset            = "wireeval_padding_only_dataset"
+	ModeWireEvalCollapsedFirstNDataset        = "wireeval_collapsed_firstn_dataset"
+	ModeWireEvalControlNotDetected            = "wireeval_control_not_detected"
+	ModeWireEvalGeneratedBackendDatasetDrift  = "wireeval_generated_backend_dataset_drift"
+	ModeWireEvalSecretLeak                    = "wireeval_secret_leak"
 )
 
 func Modes() []string {
@@ -204,6 +216,18 @@ func Modes() []string {
 		ModeWireGenLengthOnlyDiversity,
 		ModeWireGenPayloadLeakFeature,
 		ModeWireGenGeneratedInterpretedDrift,
+		ModeWireEvalRawPayloadColumn,
+		ModeWireEvalRawBytesColumn,
+		ModeWireEvalEndpointLeak,
+		ModeWireEvalTrainTestSeedOverlap,
+		ModeWireEvalOODSeedOverlap,
+		ModeWireEvalMissingRequiredFeature,
+		ModeWireEvalUnstableRecordID,
+		ModeWireEvalPaddingOnlyDataset,
+		ModeWireEvalCollapsedFirstNDataset,
+		ModeWireEvalControlNotDetected,
+		ModeWireEvalGeneratedBackendDatasetDrift,
+		ModeWireEvalSecretLeak,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/ir"
@@ -21,6 +22,7 @@ import (
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregen"
 	"kurdistan/internal/wiregencompare"
@@ -72,11 +74,18 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	wireFeatureComparison := wirefeatures.CompareToCorpus(wireFeatureVectors, protocolCorpus)
 	wireFeatureCollapse := wirefeatures.ScanCollapse(wireFeatureVectors)
 	wireGenBaselinePath := filepath.Join(fixtureRoot, "testdata", "wiregen", "wiregen-policy-golden.json")
+	wireEvalBaselinePath := filepath.Join(fixtureRoot, "testdata", "wireeval", "wireeval-dataset-golden.json")
 	wireGenPolicies := make([]wiregen.WireShapePolicy, 0, len(profiles))
 	for _, profile := range profiles {
 		wireGenPolicies = append(wireGenPolicies, wiregen.FromIRPolicy(profile.WireShape))
 	}
 	wireGenVectors := expectedVectorsForProfiles(wireGenPolicies, wiregencompare.DefaultScenarios())
+	wireEvalDataset, wireEvalErr := wireeval.BuildDataset(ctx, protocolCorpus, wireeval.BuildOptions{Seeds: wireeval.DefaultSeeds(), Scenarios: wireeval.DefaultScenarios(), SplitMode: wireeval.DefaultSplitMode(), Controls: true})
+	wireEvalCSV, wireEvalJSONL := []byte{}, []byte{}
+	if wireEvalErr == nil {
+		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
+		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
+	}
 
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
@@ -179,6 +188,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		WireFeaturesBaselineGate(ctx, wireFeatureBaselinePath, bytepathFixturePath, protocolCorpusPath),
 	}
 	gates = append(gates, WireGenGates(ctx, profiles, wireGenPolicies, wireGenVectors, protocolCorpus, wireGenBaselinePath)...)
+	if wireEvalErr == nil {
+		gates = append(gates, WireEvalGates(ctx, wireEvalDataset, wireEvalCSV, wireEvalJSONL, wireEvalBaselinePath)...)
+	} else {
+		gates = append(gates, gate("wireeval_dataset_build", false, "required", wireEvalErr.Error(), nil, []string{wireEvalErr.Error()}))
+	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
 
