@@ -91,6 +91,7 @@ type CodegenAuditSummary struct {
 	CarrierGeneratedParity     string                         `json:"carrier_generated_backend_parity"`
 	SecurityGeneratedParity    string                         `json:"security_generated_backend_parity"`
 	RuntimeGeneratedParity     string                         `json:"runtime_generated_backend_parity"`
+	HardeningGeneratedParity   string                         `json:"hardening_generated_backend_parity"`
 	SourceScanner              string                         `json:"source_scanner"`
 	InterpretedVsGenerated     InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                 codegen.SourceScanReport       `json:"source_scan"`
@@ -171,6 +172,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	carrierGate := GeneratedCarrierParityGate(corpus, testFailures)
 	securityGate := GeneratedSecurityParityGate(corpus, testFailures)
 	runtimeGate := GeneratedRuntimeParityGate(corpus, testFailures)
+	hardeningGate := GeneratedHardeningParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -191,6 +193,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		carrierGate,
 		securityGate,
 		runtimeGate,
+		hardeningGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -554,6 +557,31 @@ func GeneratedRuntimeParityGate(corpus GeneratedBackendTraceCorpus, testFailures
 	}, failures)
 }
 
+func GeneratedHardeningParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module hardening tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated hardening specialization constants missing")
+	}
+	hardeningFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/hardening_generated.go" {
+			hardeningFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && hardeningFiles < 2 {
+		failures = append(failures, "generated hardening specialized files did not differ")
+	}
+	return gate("hardening_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include hardening tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		"hardening_unique_files":       hardeningFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedSourceScannerGate(scan codegen.SourceScanReport) GateResult {
 	return gate("generated_source_scanner", scan.Passed, "required", fmt.Sprintf("%d generated modules scanned; %d failures", scan.GeneratedModules, len(scan.Failures)), map[string]any{
 		"profile_specific_constants_present": scan.ProfileSpecificConstantsPresent,
@@ -638,6 +666,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		CarrierGeneratedParity:     status("carrier_generated_backend_parity"),
 		SecurityGeneratedParity:    status("security_generated_backend_parity"),
 		RuntimeGeneratedParity:     status("runtime_generated_backend_parity"),
+		HardeningGeneratedParity:   status("hardening_generated_backend_parity"),
 		SourceScanner:              status("generated_source_scanner"),
 		InterpretedVsGenerated:     divergenceSummary(corpus),
 		SourceScan:                 corpus.SourceScan,

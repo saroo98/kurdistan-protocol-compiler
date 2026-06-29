@@ -181,4 +181,4 @@ This milestone defines prerequisite security architecture and regression checks.
 
 Milestone 13 builds on this layer with runtime session architecture: role validation, session lifecycle, capability negotiation, compatibility checks, secure channel setup, in-memory links, runtime adversary scenarios, and generated-backend runtime parity.
 
-Milestone 14 should focus on implementation hardening: reducing shared helper artifacts, tightening generated backend tests, improving negative controls, and preparing review checklists before any future adapter work.
+Milestone 14 adds implementation hardening, generated-backend parity fixtures, trace hygiene gates, and pre-adapter readiness review. See [KIP-0020](KIP-0020-implementation-hardening.md).

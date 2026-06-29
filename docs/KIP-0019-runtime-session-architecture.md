@@ -9,6 +9,8 @@ Milestone 13 adds an internal runtime session architecture for Kurdistan. The ru
 
 This milestone does not add production adapters or live network transports. It provides a deterministic architecture and audit surface for future implementation hardening.
 
+Implementation hardening is covered next in [KIP-0020](KIP-0020-implementation-hardening.md), including invariant checks, panic-safety wrappers, resource bounds, trace hygiene, and pre-adapter readiness.
+
 ## Runtime Layer
 
 The runtime package defines:
@@ -199,4 +201,3 @@ go run ./cmd/kcheck codegen --quick
 ## Relationship To Earlier KIPs
 
 KIP-0018 defines transcript binding, nonce/replay checks, capability negotiation primitives, and secure envelope metadata. KIP-0019 composes those pieces into runtime sessions and adversarial runtime gates.
-

@@ -35,6 +35,7 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	}
 	traceMillis := time.Since(traceStart).Milliseconds()
 	traceScan := ktrace.ScanTraces(traces, ktrace.DefaultStabilityThreshold)
+	hardeningGates := HardeningGates(ctx, profiles, cfg)
 
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
@@ -88,6 +89,7 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		RuntimeGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
+	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
 
 	benchmark := BenchmarkSummary{
 		ProfileGenerationMillis: profileMillis,

@@ -60,6 +60,14 @@ const (
 	ModeRuntimeLeaksPayloadTrace          = "runtime_leaks_payload_trace"
 	ModeRuntimeNoStateValidation          = "runtime_no_state_validation"
 	ModeRuntimePaddingOnlyDiversity       = "runtime_padding_only_diversity"
+	ModePanicOnMalformedFrame             = "panic_on_malformed_frame"
+	ModeUnboundedTraceEvents              = "unbounded_trace_events"
+	ModeTraceSecretLeakHardening          = "trace_secret_leak_hardening"
+	ModeIgnoresMaxStreams                 = "ignores_max_streams"
+	ModeIgnoresMaxCarrierQueue            = "ignores_max_carrier_queue"
+	ModeAcceptsInvalidProfileHash         = "accepts_invalid_profile_hash"
+	ModeGeneratedParityDrift              = "generated_parity_drift"
+	ModeAPIMisusePanic                    = "api_misuse_panic"
 )
 
 func Modes() []string {
@@ -107,6 +115,14 @@ func Modes() []string {
 		ModeRuntimeLeaksPayloadTrace,
 		ModeRuntimeNoStateValidation,
 		ModeRuntimePaddingOnlyDiversity,
+		ModePanicOnMalformedFrame,
+		ModeUnboundedTraceEvents,
+		ModeTraceSecretLeakHardening,
+		ModeIgnoresMaxStreams,
+		ModeIgnoresMaxCarrierQueue,
+		ModeAcceptsInvalidProfileHash,
+		ModeGeneratedParityDrift,
+		ModeAPIMisusePanic,
 	}
 }
 
@@ -249,6 +265,23 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
+		case ModePanicOnMalformedFrame:
+			p.InvalidInput.MalformedFrame = "generated_malformed_response"
+		case ModeUnboundedTraceEvents:
+			p.Limits.MaxSessionMillis = max(p.Limits.MaxSessionMillis, 60_000)
+		case ModeTraceSecretLeakHardening:
+			p.Security.ConfigValidationPolicy = "strict_required"
+		case ModeIgnoresMaxStreams:
+			p.Stream.MaxConcurrentStreams = min(16, max(2, p.Stream.MaxConcurrentStreams))
+			p.Compatibility.MaxStreamCount = p.Stream.MaxConcurrentStreams
+		case ModeIgnoresMaxCarrierQueue:
+			p.CarrierPolicy.MaxCarrierQueueDepth = 128
+		case ModeAcceptsInvalidProfileHash:
+			p.Security.ProfileCompatibilityPolicy = "strict_schema"
+		case ModeGeneratedParityDrift:
+			p.Security.SecureEnvelopeMode = "metadata_authenticated"
+		case ModeAPIMisusePanic:
+			p.InvalidInput.UnknownFirstMessage = "ordinary_error_shaped_response"
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {
