@@ -153,3 +153,7 @@ go test ./...
 ## Limitations
 
 Carrier abstraction is a local model, not a production transport. It does not implement HTTP, TLS, CDN behavior, deployment, external targets, or live network testing. It provides deterministic regression evidence for semantic preservation and fingerprint diversity within the repository.
+
+## Next Layer
+
+KIP-0018 adds production security prerequisites above the carrier abstraction: transcript binding, nonce/replay policy, capability negotiation, profile compatibility, secure envelope metadata, and security regression gates.

@@ -62,6 +62,11 @@ func BenchmarkMultiStreamEchoFourStreams(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	p.GenerationHash = ""
+	p.Stream.MaxConcurrentStreams = 4
+	if p.Compatibility.MaxStreamCount < p.Stream.MaxConcurrentStreams {
+		p.Compatibility.MaxStreamCount = p.Stream.MaxConcurrentStreams
+	}
 	requests := relay.DefaultMultiStreamDemoRequests(4)
 	for i := 0; i < b.N; i++ {
 		if _, _, err := relay.SimulateMultiStreamEcho(context.Background(), p, requests); err != nil {

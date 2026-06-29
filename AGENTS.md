@@ -33,6 +33,7 @@ Run:
 - go run ./cmd/kcheck streamadversary --quick when changing stream scheduling, flow control, stream traces, stream mutants, or multi-stream audit code
 - go run ./cmd/kcheck proxysem --quick when changing proxy semantics, synthetic targets, proxy traces, proxy mutants, or proxy audit code
 - go run ./cmd/kcheck carrier --quick when changing carrier models, carrier traces, carrier mutants, or carrier audit code
+- go run ./cmd/kcheck security --quick when changing transcript binding, key schedules, nonce/replay logic, compatibility, security traces, security mutants, or security audit code
 - go run ./cmd/kgen --profile <profile.json> --out .generated/<name> when verifying generated source output
 - go run ./cmd/kcheck codegen --quick when changing the generated source backend
 - from a generated output directory, go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json when verifying generated trace capture
@@ -42,6 +43,8 @@ Run:
 - from a generated output directory, go run ./cmd/generated-trace --proxysem --targets mixed --streams 4 --trace generated-proxysem.jsonl --summary generated-proxysem-summary.json when verifying generated proxy-semantics traces
 - from a generated output directory, go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4 when verifying generated carrier abstraction modeling
 - from a generated output directory, go run ./cmd/generated-trace --carrier mixed --proxysem --streams 4 --trace generated-carrier.jsonl --summary generated-carrier-summary.json when verifying generated carrier traces
+- from a generated output directory, go run ./cmd/generated-client --security-demo --streams 4 when verifying generated security prerequisite modeling
+- from a generated output directory, go run ./cmd/generated-trace --security --carrier mixed --proxysem --streams 4 --trace generated-security.jsonl --summary generated-security-summary.json when verifying generated security traces
 
 ## Style
 

@@ -39,25 +39,27 @@ const (
 )
 
 type Profile struct {
-	Version        string               `json:"version"`
-	ID             string               `json:"id"`
-	Seed           int64                `json:"seed"`
-	GenerationHash string               `json:"generation_hash,omitempty"`
-	RolePolicy     RolePolicy           `json:"role_policy"`
-	Carrier        CarrierSpec          `json:"carrier"`
-	States         []State              `json:"states"`
-	Transitions    []Transition         `json:"transitions"`
-	FirstContact   FirstContactSpec     `json:"first_contact"`
-	Messages       []MessageSymbol      `json:"messages"`
-	FrameGrammar   FrameGrammar         `json:"frame_grammar"`
-	Auth           AuthSpec             `json:"auth"`
-	Scheduler      SchedulerPolicy      `json:"scheduler"`
-	Stream         StreamPolicy         `json:"stream"`
-	ProxySemantics ProxySemanticsPolicy `json:"proxy_semantics"`
-	CarrierPolicy  CarrierPolicy        `json:"carrier_policy"`
-	Padding        PaddingPolicy        `json:"padding"`
-	InvalidInput   InvalidInputPolicy   `json:"invalid_input"`
-	Limits         SafetyLimits         `json:"limits"`
+	Version        string                `json:"version"`
+	ID             string                `json:"id"`
+	Seed           int64                 `json:"seed"`
+	GenerationHash string                `json:"generation_hash,omitempty"`
+	RolePolicy     RolePolicy            `json:"role_policy"`
+	Carrier        CarrierSpec           `json:"carrier"`
+	States         []State               `json:"states"`
+	Transitions    []Transition          `json:"transitions"`
+	FirstContact   FirstContactSpec      `json:"first_contact"`
+	Messages       []MessageSymbol       `json:"messages"`
+	FrameGrammar   FrameGrammar          `json:"frame_grammar"`
+	Auth           AuthSpec              `json:"auth"`
+	Scheduler      SchedulerPolicy       `json:"scheduler"`
+	Stream         StreamPolicy          `json:"stream"`
+	ProxySemantics ProxySemanticsPolicy  `json:"proxy_semantics"`
+	CarrierPolicy  CarrierPolicy         `json:"carrier_policy"`
+	Security       SecurityPolicy        `json:"security"`
+	Compatibility  CompatibilityMetadata `json:"compatibility"`
+	Padding        PaddingPolicy         `json:"padding"`
+	InvalidInput   InvalidInputPolicy    `json:"invalid_input"`
+	Limits         SafetyLimits          `json:"limits"`
 }
 
 type RolePolicy struct {
@@ -183,6 +185,39 @@ type CarrierPolicy struct {
 	MaxMessagesPerEnvelope int    `json:"max_messages_per_envelope"`
 	MaxCarrierQueueDepth   int    `json:"max_carrier_queue_depth"`
 	MaxRetryCount          int    `json:"max_retry_count"`
+}
+
+type SecurityPolicy struct {
+	SecurityVersion             string `json:"security_version"`
+	TranscriptMode              string `json:"transcript_mode"`
+	KDFSuite                    string `json:"kdf_suite"`
+	AEADSuite                   string `json:"aead_suite"`
+	MACSuite                    string `json:"mac_suite"`
+	NonceMode                   string `json:"nonce_mode"`
+	ReplayPolicy                string `json:"replay_policy"`
+	ReplayWindowSize            int    `json:"replay_window_size"`
+	DowngradePolicy             string `json:"downgrade_policy"`
+	CapabilityNegotiationPolicy string `json:"capability_negotiation_policy"`
+	ProfileCompatibilityPolicy  string `json:"profile_compatibility_policy"`
+	KeyRotationPolicy           string `json:"key_rotation_policy"`
+	ConfigValidationPolicy      string `json:"config_validation_policy"`
+	SecureEnvelopeMode          string `json:"secure_envelope_mode"`
+	MaxSessionMessages          int    `json:"max_session_messages"`
+	MaxKeyLifetimeMessages      int    `json:"max_key_lifetime_messages"`
+}
+
+type CompatibilityMetadata struct {
+	SchemaVersion            string   `json:"schema_version"`
+	CompilerSecurityVersion  string   `json:"compiler_security_version"`
+	MinimumRuntimeVersion    string   `json:"minimum_runtime_version"`
+	SupportedSecuritySuites  []string `json:"supported_security_suites"`
+	RequiredCapabilities     []string `json:"required_capabilities"`
+	SupportedCarrierFamilies []string `json:"supported_carrier_families"`
+	SupportedProxyFeatures   []string `json:"supported_proxy_features"`
+	SupportedStreamFeatures  []string `json:"supported_stream_features"`
+	MaxEnvelopeBytes         int      `json:"max_envelope_bytes"`
+	MaxStreamCount           int      `json:"max_stream_count"`
+	MaxReplayWindow          int      `json:"max_replay_window"`
 }
 
 type PaddingPolicy struct {
@@ -323,4 +358,22 @@ func CarrierFamilies() []string {
 		"long_poll_style_carrier",
 		"lossy_reordered_carrier",
 	}
+}
+
+func SecurityCapabilities() []string {
+	return []string{
+		"multi_stream",
+		"proxy_semantics",
+		"carrier_abstraction",
+		"carrier_loss_recovery",
+		"carrier_backpressure",
+		"generated_backend",
+		"transcript_binding",
+		"replay_window",
+		"nonce_schedule",
+	}
+}
+
+func SecuritySuiteString() string {
+	return "kdf_hkdf_sha256/aead_aes_256_gcm/mac_hmac_sha256/transcript_sha256_v1"
 }
