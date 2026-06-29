@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T19:18:47Z`
+- Generated at: `2026-06-29T23:38:42Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -126,11 +126,22 @@
 | `wiregen_generated_backend_parity` | PASS | `required` | generated backend wire-shape markers checked |
 | `wiregen_trace_hygiene` | PASS | `required` | 100 policies and 700 feature vectors scanned |
 | `wiregen_baseline_fixtures` | PASS | `required` | 35 wiregen baseline entries checked |
-| `hardening_invariant_registry` | PASS | `required` | 14 invariants checks run; 0 failures |
+| `wireeval_dataset_build` | PASS | `required` | 72 records across 8 profiles |
+| `wireeval_dataset_schema` | PASS | `required` | 72 records validated against wireeval-v1 |
+| `wireeval_split_integrity` | PASS | `required` | train=14 test=14 ood=14 holdout=30 |
+| `wireeval_export_consistency` | PASS | `required` | 72 records exported as CSV and JSONL |
+| `wireeval_observable_diversity` | PASS | `required` | 68 unique feature hashes and 8 first-n shapes |
+| `wireeval_control_detection` | PASS | `required` | 12 collapsed controls and 4 padding-only controls detected |
+| `wireeval_classifier_readiness` | PASS | `required` | 72 records, 23 feature columns |
+| `wireeval_dataset_drift` | PASS | `required` | 72 old records compared to 72 new records |
+| `wireeval_generated_backend_parity` | PASS | `required` | generated backend wireeval markers checked |
+| `wireeval_trace_hygiene` | PASS | `required` | 72 records and classifier exports scanned |
+| `wireeval_mutant_detection` | PASS | `required` | 12/12 wireeval mutant modes detected |
+| `hardening_invariant_registry` | PASS | `required` | 15 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 11 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 12 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -139,9 +150,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `85 ms`
-- Trace generation: `18 ms`
-- Total audit runtime: `988 ms`
+- Profile generation: `87 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `1068 ms`
 
 ## Corpus Diversity Summary
 
@@ -166,7 +177,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.32004802810373045`
+- `different_profile_average_distance`: `0.31882291237626675`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
