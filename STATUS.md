@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T12:53:11Z`
+- Generated at: `2026-06-29T14:32:36Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -75,22 +75,43 @@
 | `adapter_collapse_resistance` | PASS | `required` | 2 adapter collapse reports evaluated |
 | `adapter_mutant_detection` | PASS | `required` | 8/8 adapter mutant modes detected |
 | `adapter_generated_backend_parity` | PASS | `required` | generated backend adapter support markers checked |
-| `hardening_invariant_registry` | PASS | `required` | 9 invariants checks run; 0 failures |
-| `hardening_api_contracts` | PASS | `required` | 7 api_contracts checks run; 0 failures |
-| `hardening_panic_safety` | PASS | `required` | 10 panic_safety checks run; 0 failures |
-| `hardening_resource_limits` | PASS | `required` | 7 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 6 trace/security hygiene checks run; 0 failures |
+| `local_adapter_correctness` | PASS | `required` | 9 local adapter scenario runs checked |
+| `local_adapter_flow_lifecycle` | PASS | `required` | 3 local adapter lifecycle runs checked |
+| `local_adapter_runtime_integration` | PASS | `required` | 9 runtime/local adapter mappings checked |
+| `local_adapter_backpressure` | PASS | `required` | 36 local adapter backpressure events observed |
+| `local_adapter_error_reset_isolation` | PASS | `required` | 3 target errors and 3 target resets mapped locally |
+| `local_adapter_sequence_integrity` | PASS | `required` | 3 malformed local chunks rejected |
+| `local_adapter_trace_hygiene` | PASS | `required` | 3 local adapter traces checked |
+| `local_adapter_collapse_resistance` | PASS | `required` | 2 local adapter collapse reports evaluated |
+| `local_adapter_mutant_detection` | PASS | `required` | 8/8 local adapter mutant modes detected |
+| `local_adapter_generated_backend_parity` | PASS | `required` | generated backend local adapter support markers checked |
+| `byte_transport_encoding_correctness` | PASS | `required` | 9 byte transport scenario runs checked |
+| `byte_transport_fragmentation_reassembly` | PASS | `required` | 96 fragments created; 0 reassemblies observed |
+| `byte_transport_pipe_backpressure` | PASS | `required` | 48 byte pipe backpressure events observed |
+| `byte_transport_sequence_integrity` | PASS | `required` | 3 replay/sequence frames rejected |
+| `byte_transport_corruption_rejection` | PASS | `required` | 3 corrupted frames rejected |
+| `byte_transport_runtime_integration` | PASS | `required` | 9 byte runtime mappings checked |
+| `byte_transport_error_reset_isolation` | PASS | `required` | 0 byte reset/error paths observed |
+| `byte_transport_trace_hygiene` | PASS | `required` | 3 byte transport traces checked |
+| `byte_transport_collapse_resistance` | PASS | `required` | 2 byte collapse reports evaluated |
+| `byte_transport_mutant_detection` | PASS | `required` | 8/8 byte transport mutant modes detected |
+| `byte_transport_generated_backend_parity` | PASS | `required` | generated backend byte transport support markers checked |
+| `hardening_invariant_registry` | PASS | `required` | 11 invariants checks run; 0 failures |
+| `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
+| `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
+| `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 8 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 16 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 18 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `9 ms`
-- Trace generation: `18 ms`
-- Total audit runtime: `420 ms`
+- Profile generation: `8 ms`
+- Trace generation: `11 ms`
+- Total audit runtime: `457 ms`
 
 ## Corpus Diversity Summary
 
@@ -113,10 +134,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31973189611159863`
-- `same_profile_distance`: `0.014925373134328358`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3138657964210455`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
