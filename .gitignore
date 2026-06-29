@@ -12,6 +12,9 @@ testdata/corpus/profiles/
 testdata/audit/*.json
 !testdata/audit/baseline-small.json
 !testdata/audit/failing-fixed-small.json
+!testdata/fixtures/
+!testdata/fixtures/*.json
+!testdata/fixtures/README.md
 testdata/traces/*.json
 testdata/traces/*.jsonl
 !profiles/examples/.gitkeep

@@ -1,0 +1,152 @@
+{
+  "version": "bytepath-fixture-v1",
+  "cases": [
+    {
+      "name": "empty_input",
+      "input_class": "empty",
+      "expected_reject": true,
+      "reject_bucket": "truncated",
+      "panic_allowed": false
+    },
+    {
+      "name": "truncated_header",
+      "input_class": "truncated_header",
+      "expected_reject": true,
+      "reject_bucket": "truncated",
+      "panic_allowed": false
+    },
+    {
+      "name": "unknown_frame_kind",
+      "input_class": "unknown_kind",
+      "expected_reject": true,
+      "reject_bucket": "unknown_kind",
+      "panic_allowed": false
+    },
+    {
+      "name": "oversized_frame",
+      "input_class": "oversized_frame",
+      "expected_reject": true,
+      "reject_bucket": "oversized",
+      "panic_allowed": false
+    },
+    {
+      "name": "oversized_payload",
+      "input_class": "oversized_payload",
+      "expected_reject": true,
+      "reject_bucket": "payload_length",
+      "panic_allowed": false
+    },
+    {
+      "name": "invalid_length_field",
+      "input_class": "invalid_length",
+      "expected_reject": true,
+      "reject_bucket": "payload_length",
+      "panic_allowed": false
+    },
+    {
+      "name": "trailing_invalid_bytes",
+      "input_class": "trailing_invalid",
+      "expected_reject": true,
+      "reject_bucket": "payload_bounds",
+      "panic_allowed": false
+    },
+    {
+      "name": "negative_or_invalid_fragment_index",
+      "input_class": "invalid_fragment",
+      "expected_reject": true,
+      "reject_bucket": "validate",
+      "panic_allowed": false
+    },
+    {
+      "name": "fragment_count_mismatch",
+      "input_class": "fragment_mismatch",
+      "expected_reject": true,
+      "reject_bucket": "fragment_count_mismatch",
+      "panic_allowed": false
+    },
+    {
+      "name": "duplicate_fragment",
+      "input_class": "duplicate_fragment",
+      "expected_reject": true,
+      "reject_bucket": "duplicate_fragment",
+      "panic_allowed": false
+    },
+    {
+      "name": "missing_fragment",
+      "input_class": "missing_fragment",
+      "expected_reject": true,
+      "reject_bucket": "incomplete_reassembly",
+      "panic_allowed": false
+    },
+    {
+      "name": "oversized_reassembly",
+      "input_class": "oversized_reassembly",
+      "expected_reject": true,
+      "reject_bucket": "oversized_reassembly",
+      "panic_allowed": false
+    },
+    {
+      "name": "sequence_replay",
+      "input_class": "sequence_replay",
+      "expected_reject": true,
+      "reject_bucket": "sequence_replay",
+      "panic_allowed": false
+    },
+    {
+      "name": "old_sequence",
+      "input_class": "old_sequence",
+      "expected_reject": true,
+      "reject_bucket": "sequence_replay",
+      "panic_allowed": false
+    },
+    {
+      "name": "future_sequence_jump",
+      "input_class": "future_sequence",
+      "expected_reject": true,
+      "reject_bucket": "sequence_future",
+      "panic_allowed": false
+    },
+    {
+      "name": "post_close_data",
+      "input_class": "post_close_data",
+      "expected_reject": true,
+      "reject_bucket": "terminal",
+      "panic_allowed": false
+    },
+    {
+      "name": "post_reset_data",
+      "input_class": "post_reset_data",
+      "expected_reject": true,
+      "reject_bucket": "terminal",
+      "panic_allowed": false
+    },
+    {
+      "name": "corrupted_checksum",
+      "input_class": "corrupted_checksum",
+      "expected_reject": true,
+      "reject_bucket": "checksum",
+      "panic_allowed": false
+    },
+    {
+      "name": "invalid_metadata_class",
+      "input_class": "invalid_metadata",
+      "expected_reject": true,
+      "reject_bucket": "metadata",
+      "panic_allowed": false
+    },
+    {
+      "name": "oversized_metadata",
+      "input_class": "oversized_metadata",
+      "expected_reject": true,
+      "reject_bucket": "metadata",
+      "panic_allowed": false
+    },
+    {
+      "name": "random_bounded_noise",
+      "input_class": "random_noise",
+      "expected_reject": true,
+      "reject_bucket": "truncated",
+      "panic_allowed": false
+    }
+  ]
+}

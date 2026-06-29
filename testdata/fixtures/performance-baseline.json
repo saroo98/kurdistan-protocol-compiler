@@ -1,0 +1,9 @@
+{
+  "version": "bytepath-fixture-v1",
+  "byte_frame_encode_decode_max_bucket": "sub_ms",
+  "byte_pipe_write_read_max_bucket": "sub_ms",
+  "local_adapter_scenario_max_bucket": "sub_100ms",
+  "byte_transport_quick_audit_max_bucket": "sub_10s",
+  "fixture_verify_max_bucket": "sub_10s",
+  "warning_only": true
+}
