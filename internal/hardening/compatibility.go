@@ -60,7 +60,7 @@ func RunGeneratedParityChecks(ctx context.Context, profiles []*ir.Profile) []Che
 	_ = ctx
 	p := firstProfile(profiles)
 	return []CheckResult{
-		check("generated_backend_version_016", CategoryGeneratedParity, func() error {
+		check("generated_backend_version_017", CategoryGeneratedParity, func() error {
 			if codegen.Version != Version {
 				return fmt.Errorf("codegen version %s != %s", codegen.Version, Version)
 			}

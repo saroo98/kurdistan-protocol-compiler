@@ -40,6 +40,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/hardening_generated.go",
 		"protocol/adapter_generated.go",
 		"protocol/localadapter_generated.go",
+		"protocol/bytetransport_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -57,6 +58,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/adapteradversary_test.go",
 		"protocol/localadapter_test.go",
 		"protocol/localadapteradversary_test.go",
+		"protocol/bytetransport_test.go",
+		"protocol/bytetransportadversary_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -111,6 +114,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const HardeningProfileID") ||
 		!strings.Contains(protocolSource, "const AdapterGeneratedProfileID") ||
 		!strings.Contains(protocolSource, "const LocalAdapterGeneratedProfileID") ||
+		!strings.Contains(protocolSource, "const ByteTransportGeneratedProfileID") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -174,6 +178,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	adapterB := mustRead(t, filepath.Join(outB, "protocol", "adapter_generated.go"))
 	localAdapterA := mustRead(t, filepath.Join(outA, "protocol", "localadapter_generated.go"))
 	localAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localadapter_generated.go"))
+	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
+	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	if stateA == stateB {
 		t.Fatalf("state generation did not differ across profiles")
 	}
@@ -200,6 +206,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if localAdapterA == localAdapterB {
 		t.Fatalf("local adapter generation did not differ across profiles")
+	}
+	if byteTransportA == byteTransportB {
+		t.Fatalf("byte transport generation did not differ across profiles")
 	}
 }
 
