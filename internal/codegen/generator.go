@@ -1034,6 +1034,53 @@ func GeneratedWireGenBaseline(ctx context.Context) (wiregencompare.BaselineManif
 		return nil, err
 	}
 
+	wireEvalSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/classifierdata"
+	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wireeval"
+)
+
+const WireEvalDatasetVersion = "wireeval-v1"
+const WireEvalGeneratedProfileID = %[1]s
+const WireEvalSplitMode = "profile_holdout"
+
+var WireEvalRequiredColumns = classifierdata.Columns()
+var WireEvalForbiddenColumns = classifierdata.ForbiddenColumns()
+
+func GeneratedWireEvalDataset(ctx context.Context) (wireeval.Dataset, error) {
+	return wireeval.BuildDataset(ctx, protocorpus.DefaultCorpus(), wireeval.BuildOptions{
+		Seeds: []int{int(ProfileSeed), int(ProfileSeed) + 1, int(ProfileSeed) + 2, int(ProfileSeed) + 3},
+		Scenarios: []string{"byte_single_flow_echo", "byte_corruption_rejection", "byte_replay_rejection"},
+		SplitMode: WireEvalSplitMode,
+		Backend: "generated",
+		Controls: true,
+	})
+}
+
+func GeneratedWireEvalCSV(ctx context.Context) ([]byte, error) {
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return classifierdata.ExportCSV(dataset.Records)
+}
+
+func GeneratedWireEvalJSONL(ctx context.Context) ([]byte, error) {
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return classifierdata.ExportJSONL(dataset.Records)
+}
+`, quote(p.ID))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2372,6 +2419,102 @@ func TestGeneratedWireGenFeatures(t *testing.T) {
 		return nil, err
 	}
 
+	wireEvalTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/wireeval"
+)
+
+func TestGeneratedWireEvalDataset(t *testing.T) {
+	if WireEvalDatasetVersion != "wireeval-v1" || WireEvalGeneratedProfileID != ProfileID {
+		t.Fatalf("generated wireeval constants drifted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := wireeval.ValidateDataset(dataset); err != nil {
+		t.Fatal(err)
+	}
+	if dataset.Manifest.RecordCount == 0 || dataset.Manifest.PayloadLogged || dataset.Manifest.SecretLogged {
+		t.Fatalf("generated wireeval dataset unsafe or empty: %%+v", dataset.Manifest)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireEvalExportTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/classifierdata"
+)
+
+func TestGeneratedWireEvalExports(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	csvRaw, err := GeneratedWireEvalCSV(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := classifierdata.ValidateCSV(csvRaw); err != nil {
+		t.Fatal(err)
+	}
+	jsonlRaw, err := GeneratedWireEvalJSONL(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := classifierdata.ValidateJSONL(jsonlRaw); err != nil {
+		t.Fatal(err)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireEvalParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/wireeval"
+)
+
+func TestGeneratedWireEvalParity(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := wireeval.ClassifierReadiness(dataset.Records, WireEvalRequiredColumns, []string{"csv", "jsonl"})
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated wireeval readiness failed: %%+v", report)
+	}
+	diversity := wireeval.AnalyzeObservableDiversity(dataset.Records)
+	if diversity.PayloadLogged || diversity.SecretLogged || diversity.ControlFailuresDetected == 0 {
+		t.Fatalf("generated wireeval diversity unsafe or weak: %%+v", diversity)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -2700,6 +2843,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/protocorpus_generated.go", Content: protocolCorpusSource, Go: true},
 		{RelPath: "protocol/wirefeatures_generated.go", Content: wireFeaturesSource, Go: true},
 		{RelPath: "protocol/wiregen_generated.go", Content: wireGenSource, Go: true},
+		{RelPath: "protocol/wireeval_generated.go", Content: wireEvalSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -2729,6 +2873,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/wiregen_test.go", Content: wireGenTestSource, Go: true},
 		{RelPath: "protocol/wiregen_parity_test.go", Content: wireGenParityTestSource, Go: true},
 		{RelPath: "protocol/wiregenfeatures_test.go", Content: wireGenFeaturesTestSource, Go: true},
+		{RelPath: "protocol/wireeval_test.go", Content: wireEvalTestSource, Go: true},
+		{RelPath: "protocol/wireeval_export_test.go", Content: wireEvalExportTestSource, Go: true},
+		{RelPath: "protocol/wireeval_parity_test.go", Content: wireEvalParityTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
