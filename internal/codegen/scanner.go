@@ -162,7 +162,8 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const HardeningProfileID") &&
 		strings.Contains(joined, "const AdapterGeneratedProfileID") &&
 		strings.Contains(joined, "const LocalAdapterGeneratedProfileID") &&
-		strings.Contains(joined, "const ByteTransportGeneratedProfileID")
+		strings.Contains(joined, "const ByteTransportGeneratedProfileID") &&
+		strings.Contains(joined, "const BytePathFixtureSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)
