@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"kurdistan/internal/adapter"
+	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	kruntime "kurdistan/internal/runtime"
@@ -167,6 +168,31 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanValue(localadapter.LocalAdapterSummary{SecretLogged: true}).Passed {
 			return fmt.Errorf("local adapter secret leak flag accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("byte_transport_trace_hygiene", CategoryTraceHygiene, func() error {
+		evs := []ktrace.Event{{
+			EventType:                   "byte_transport",
+			ByteTransportScenario:       bytetransport.ScenarioSingleFlow,
+			ByteFrameKindBucket:         "data",
+			ByteFrameCountBucket:        "small",
+			ByteFragmentCountBucket:     "small",
+			ByteCountBucket:             "small",
+			BytePipeQueuePressureBucket: "zero",
+			ByteReassemblyResult:        "passed",
+			PayloadHygiene:              true,
+			SecretHygiene:               true,
+		}}
+		report := ScanEvents(evs)
+		if !report.Passed {
+			return fmt.Errorf("byte transport trace rejected: %v", report.Findings)
+		}
+		if ScanValue(bytetransport.ByteTransportSummary{PayloadLogged: true}).Passed {
+			return fmt.Errorf("byte transport payload leak flag accepted")
+		}
+		if ScanValue(bytetransport.ByteTransportSummary{SecretLogged: true}).Passed {
+			return fmt.Errorf("byte transport secret leak flag accepted")
 		}
 		return nil
 	}))

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"kurdistan/internal/adapter"
+	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
@@ -61,6 +62,11 @@ func RunPanicSafetyChecks(profiles []*ir.Profile) []CheckResult {
 		MustNotPanic("local_adapter_config_and_chunk_no_panic", func() {
 			_ = localadapter.ValidateConfig(localadapter.LocalAdapterConfig{Name: "secret-token", RuntimeID: "", MaxFlows: -1})
 			_ = localadapter.ValidateSourceChunk(localadapter.LocalSourceChunk{FlowID: "", Sequence: 0, ByteCount: 1 << 30}, localadapter.DefaultConfig("panic-local"))
+		}),
+		MustNotPanic("byte_transport_decoder_no_panic", func() {
+			cfg := bytetransport.DefaultConfig("panic-byte")
+			_, _ = bytetransport.DecodeFrameBytes(cfg, []byte{1, 2, 3, 4, 5})
+			_, _ = bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: "bad", ByteCount: 1})
 		}),
 		MustNotPanic("security_config_no_panic", func() {
 			_ = security.ValidateConfig(security.SecurityConfig{})
