@@ -20,6 +20,7 @@ func DefaultCapabilities() CapabilitySet {
 		"multi_stream",
 		"proxy_semantics",
 		"carrier_abstraction",
+		"adapter_interface",
 		"carrier_loss_recovery",
 		"carrier_backpressure",
 		"generated_backend",

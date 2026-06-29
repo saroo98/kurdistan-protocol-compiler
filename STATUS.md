@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T12:03:53Z`
+- Generated at: `2026-06-29T12:53:11Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -47,7 +47,7 @@
 | `security_nonce_uniqueness` | PASS | `required` | 2 nonce modes exercised |
 | `security_replay_rejection` | PASS | `required` | duplicate and out-of-order replay checks evaluated |
 | `security_downgrade_resistance` | PASS | `required` | 2 downgrade policies exercised |
-| `security_capability_negotiation` | PASS | `required` | 2 capability policies exercised |
+| `security_capability_negotiation` | PASS | `required` | 3 capability policies exercised |
 | `security_profile_compatibility` | PASS | `required` | 6 compatibility checks run |
 | `security_config_hygiene` | PASS | `required` | 6 config hygiene checks run |
 | `security_secret_trace_hygiene` | PASS | `required` | 3 secret trace hygiene checks run |
@@ -59,39 +59,50 @@
 | `runtime_security_context` | PASS | `required` | 6 security contexts created and matched |
 | `runtime_replay_rejection` | PASS | `required` | 3 replay attempts rejected |
 | `runtime_stream_management` | PASS | `required` | 72 runtime stream messages managed |
-| `runtime_backpressure` | PASS | `required` | 152 runtime backpressure events observed |
+| `runtime_backpressure` | PASS | `required` | 137 runtime backpressure events observed |
 | `runtime_error_reset_isolation` | PASS | `required` | 6 target errors and 6 target resets isolated |
 | `runtime_trace_hygiene` | PASS | `required` | 3 runtime traces checked for payload/secret hygiene |
 | `runtime_mutant_detection` | PASS | `required` | 8/8 runtime mutant modes detected |
 | `runtime_generated_backend_parity` | PASS | `required` | generated backend runtime support markers checked |
-| `hardening_invariant_registry` | PASS | `required` | 8 invariants checks run; 0 failures |
+| `adapter_interface_contracts` | PASS | `required` | adapter ingress/egress contract inputs validated |
+| `adapter_config_validation` | PASS | `required` | adapter config validation and redaction checks run |
+| `adapter_flow_lifecycle` | PASS | `required` | adapter flow lifecycle transitions checked |
+| `adapter_runtime_boundary` | PASS | `required` | 9 adapter/runtime scenario runs checked |
+| `adapter_capability_compatibility` | PASS | `required` | adapter capability compatibility and downgrade checks run |
+| `adapter_backpressure` | PASS | `required` | 18 adapter backpressure events observed |
+| `adapter_error_reset_mapping` | PASS | `required` | 3 target errors and 3 target resets mapped to adapter-safe outcomes |
+| `adapter_trace_hygiene` | PASS | `required` | 3 adapter traces checked for payload/secret hygiene |
+| `adapter_collapse_resistance` | PASS | `required` | 2 adapter collapse reports evaluated |
+| `adapter_mutant_detection` | PASS | `required` | 8/8 adapter mutant modes detected |
+| `adapter_generated_backend_parity` | PASS | `required` | generated backend adapter support markers checked |
+| `hardening_invariant_registry` | PASS | `required` | 9 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 7 api_contracts checks run; 0 failures |
-| `hardening_panic_safety` | PASS | `required` | 9 panic_safety checks run; 0 failures |
-| `hardening_resource_limits` | PASS | `required` | 6 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 5 trace/security hygiene checks run; 0 failures |
+| `hardening_panic_safety` | PASS | `required` | 10 panic_safety checks run; 0 failures |
+| `hardening_resource_limits` | PASS | `required` | 7 resource_limits checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 6 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 15 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 16 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `12 ms`
-- Trace generation: `27 ms`
-- Total audit runtime: `581 ms`
+- Profile generation: `9 ms`
+- Trace generation: `18 ms`
+- Total audit runtime: `420 ms`
 
 ## Corpus Diversity Summary
 
 - `number_of_profiles`: `100`
 - `unique_first_contact_patterns`: `4`
-- `unique_frame_grammar_combinations`: `98`
+- `unique_frame_grammar_combinations`: `99`
 - `unique_scheduler_combinations`: `94`
 - `unique_stream_policy_combinations`: `100`
 - `unique_proxy_policy_combinations`: `100`
 - `unique_carrier_policy_combinations`: `100`
 - `unique_security_policy_combinations`: `100`
-- `unique_padding_combinations`: `68`
+- `unique_padding_combinations`: `67`
 - `unique_invalid_input_policy_combinations`: `100`
 - `structurally_different_pairs`: `4950`
 
@@ -104,7 +115,7 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31880645847849376`
+- `different_profile_average_distance`: `0.31973189611159863`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -201,6 +212,21 @@
 - `hardening_pre_adapter_readiness`: `passed`
 - `hardening_mutant_detection`: `passed`
 
+## Adapter Interface Architecture
+
+- Gate result: `true`
+- `adapter_interface_contracts`: `passed`
+- `adapter_config_validation`: `passed`
+- `adapter_flow_lifecycle`: `passed`
+- `adapter_runtime_boundary`: `passed`
+- `adapter_capability_compatibility`: `passed`
+- `adapter_backpressure`: `passed`
+- `adapter_error_reset_mapping`: `passed`
+- `adapter_trace_hygiene`: `passed`
+- `adapter_collapse_resistance`: `passed`
+- `adapter_mutant_detection`: `passed`
+- `adapter_generated_backend_parity`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -208,7 +234,8 @@
 - Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.
 - Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.
 - Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
-- Hardening gates prove local invariants and misuse resistance only; adapter work still needs separate review.
+- Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.
+- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
@@ -216,4 +243,4 @@
 
 ## Next Milestone
 
-Milestone 15 should focus on a reviewed, local-only adapter design spike with hardening gates kept mandatory.
+Milestone 16 should focus on a deterministic local adapter prototype with adapter, hardening, runtime, and generated-backend gates kept mandatory.

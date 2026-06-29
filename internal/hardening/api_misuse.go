@@ -13,5 +13,8 @@ func APIMisuseCases() []string {
 		"invalid_runtime_config_rejected",
 		"empty_session_id_rejected",
 		"malformed_profile_json_rejected",
+		"invalid_adapter_config_rejected",
+		"invalid_adapter_flow_rejected",
+		"adapter_capability_downgrade_rejected",
 	}
 }

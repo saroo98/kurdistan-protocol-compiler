@@ -38,6 +38,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/security_generated.go",
 		"protocol/runtime_generated.go",
 		"protocol/hardening_generated.go",
+		"protocol/adapter_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -51,6 +52,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/runtime_test.go",
 		"protocol/runtimeadversary_test.go",
 		"protocol/hardening_test.go",
+		"protocol/adapter_test.go",
+		"protocol/adapteradversary_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -103,6 +106,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const SecurityTranscriptMode") ||
 		!strings.Contains(protocolSource, "const RuntimeProfileID") ||
 		!strings.Contains(protocolSource, "const HardeningProfileID") ||
+		!strings.Contains(protocolSource, "const AdapterGeneratedProfileID") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -162,6 +166,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	runtimeB := mustRead(t, filepath.Join(outB, "protocol", "runtime_generated.go"))
 	hardeningA := mustRead(t, filepath.Join(outA, "protocol", "hardening_generated.go"))
 	hardeningB := mustRead(t, filepath.Join(outB, "protocol", "hardening_generated.go"))
+	adapterA := mustRead(t, filepath.Join(outA, "protocol", "adapter_generated.go"))
+	adapterB := mustRead(t, filepath.Join(outB, "protocol", "adapter_generated.go"))
 	if stateA == stateB {
 		t.Fatalf("state generation did not differ across profiles")
 	}
@@ -182,6 +188,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if hardeningA == hardeningB {
 		t.Fatalf("hardening generation did not differ across profiles")
+	}
+	if adapterA == adapterB {
+		t.Fatalf("adapter generation did not differ across profiles")
 	}
 }
 

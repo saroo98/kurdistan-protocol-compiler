@@ -39,6 +39,7 @@ func PreAdapterReadinessMatrix() []ReadinessItem {
 		item("carrier abstraction", "envelope validation, semantic reconstruction, and queue checks"),
 		item("security context", "transcript, key schedule, nonce, replay, and redaction checks"),
 		item("runtime session lifecycle", "lifecycle, compatibility, link queue, and summary hygiene checks"),
+		item("adapter interface architecture", "config, capability, lifecycle, runtime-boundary, backpressure, and trace-hygiene checks"),
 		item("generated backend parity", "version, constants, hardening fixture, and scanner checks"),
 		item("trace hygiene", "structured trace/audit/report forbidden marker scanner"),
 		item("resource bounds", "profile, frame, stream, queue, target, envelope, and event bounds"),

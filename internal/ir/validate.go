@@ -59,6 +59,9 @@ func Validate(p *Profile) error {
 	if err := validateCarrierPolicy(p.CarrierPolicy, p.Limits); err != nil {
 		return err
 	}
+	if err := validateAdapterPolicy(p.AdapterPolicy, p.Stream, p.Limits); err != nil {
+		return err
+	}
 	if err := validateSecurityPolicy(p.Security); err != nil {
 		return err
 	}
@@ -448,6 +451,54 @@ func validateCarrierPolicy(p CarrierPolicy, limits SafetyLimits) error {
 	}
 	if p.MaxRetryCount < 0 || p.MaxRetryCount > 8 {
 		return fmt.Errorf("invalid carrier retry count")
+	}
+	return nil
+}
+
+func validateAdapterPolicy(p AdapterPolicy, _ StreamPolicy, limits SafetyLimits) error {
+	if !oneOf(p.FlowLifecyclePolicy, "strict", "half_close_aware", "drain_before_close", "reset_terminal") {
+		return fmt.Errorf("invalid adapter flow lifecycle policy")
+	}
+	if !oneOf(p.RuntimeMappingPolicy, "one_flow_one_stream", "priority_mapped_stream", "metadata_bound_stream", "state_derived_mapping") {
+		return fmt.Errorf("invalid adapter runtime mapping policy")
+	}
+	if !oneOf(p.TracePolicy, "safe_buckets", "metadata_only", "strict_hygiene") {
+		return fmt.Errorf("invalid adapter trace policy")
+	}
+	if !oneOf(p.ErrorMappingPolicy, "flow_error", "flow_reset", "metadata_error", "close_with_error") {
+		return fmt.Errorf("invalid adapter error mapping policy")
+	}
+	if !oneOf(p.BackpressurePolicy, "adapter_queue", "runtime_stream", "carrier_chain", "priority_backpressure") {
+		return fmt.Errorf("invalid adapter backpressure policy")
+	}
+	if p.MaxFlows <= 0 || p.MaxFlows > 256 {
+		return fmt.Errorf("invalid adapter max flows")
+	}
+	if p.MaxFlowBytes <= 0 || p.MaxFlowBytes > limits.MaxPayloadBytes {
+		return fmt.Errorf("invalid adapter max flow bytes")
+	}
+	if p.MaxBufferedBytes <= 0 || p.MaxBufferedBytes > 16*1024*1024 {
+		return fmt.Errorf("invalid adapter max buffered bytes")
+	}
+	if p.MaxEvents <= 0 || p.MaxEvents > 1<<20 {
+		return fmt.Errorf("invalid adapter max events")
+	}
+	if len(p.RequiredCapabilities) == 0 {
+		return fmt.Errorf("adapter required capabilities are missing")
+	}
+	known := map[string]bool{}
+	for _, capability := range AdapterCapabilities() {
+		known[capability] = true
+	}
+	seen := map[string]bool{}
+	for _, capability := range p.RequiredCapabilities {
+		if !known[capability] {
+			return fmt.Errorf("unknown adapter capability %q", capability)
+		}
+		if seen[capability] {
+			return fmt.Errorf("duplicate adapter capability %q", capability)
+		}
+		seen[capability] = true
 	}
 	return nil
 }

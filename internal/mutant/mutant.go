@@ -68,6 +68,14 @@ const (
 	ModeAcceptsInvalidProfileHash         = "accepts_invalid_profile_hash"
 	ModeGeneratedParityDrift              = "generated_parity_drift"
 	ModeAPIMisusePanic                    = "api_misuse_panic"
+	ModeAdapterAcceptsInvalidFlow         = "adapter_accepts_invalid_flow"
+	ModeAdapterIgnoresBackpressure        = "adapter_ignores_backpressure"
+	ModeAdapterLeaksPayloadTrace          = "adapter_leaks_payload_trace"
+	ModeAdapterLeaksSecretTrace           = "adapter_leaks_secret_trace"
+	ModeAdapterAcceptsCapabilityDowngrade = "adapter_accepts_capability_downgrade"
+	ModeAdapterIgnoresMaxFlows            = "adapter_ignores_max_flows"
+	ModeAdapterWrongResetMapping          = "adapter_wrong_reset_mapping"
+	ModeAdapterPaddingOnlyDiversity       = "adapter_padding_only_diversity"
 )
 
 func Modes() []string {
@@ -123,6 +131,14 @@ func Modes() []string {
 		ModeAcceptsInvalidProfileHash,
 		ModeGeneratedParityDrift,
 		ModeAPIMisusePanic,
+		ModeAdapterAcceptsInvalidFlow,
+		ModeAdapterIgnoresBackpressure,
+		ModeAdapterLeaksPayloadTrace,
+		ModeAdapterLeaksSecretTrace,
+		ModeAdapterAcceptsCapabilityDowngrade,
+		ModeAdapterIgnoresMaxFlows,
+		ModeAdapterWrongResetMapping,
+		ModeAdapterPaddingOnlyDiversity,
 	}
 }
 
@@ -282,6 +298,25 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p.Security.SecureEnvelopeMode = "metadata_authenticated"
 		case ModeAPIMisusePanic:
 			p.InvalidInput.UnknownFirstMessage = "ordinary_error_shaped_response"
+		case ModeAdapterAcceptsInvalidFlow:
+			p.AdapterPolicy.FlowLifecyclePolicy = "strict"
+		case ModeAdapterIgnoresBackpressure:
+			p.AdapterPolicy.BackpressurePolicy = "adapter_queue"
+			p.AdapterPolicy.MaxBufferedBytes = 2 * 1024 * 1024
+		case ModeAdapterLeaksPayloadTrace:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeAdapterLeaksSecretTrace:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeAdapterAcceptsCapabilityDowngrade:
+			p.AdapterPolicy.RequiredCapabilities = []string{"adapter_ingress", "flow_lifecycle"}
+		case ModeAdapterIgnoresMaxFlows:
+			p.AdapterPolicy.MaxFlows = p.Stream.MaxConcurrentStreams
+		case ModeAdapterWrongResetMapping:
+			p.AdapterPolicy.ErrorMappingPolicy = "close_with_error"
+		case ModeAdapterPaddingOnlyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {

@@ -25,7 +25,7 @@ Current profile generation covers:
 - multi-stream relay semantics with flow control and backpressure
 - payload-free trace capture
 - generated Go source modules
-- adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, and implementation hardening gates
+- adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, implementation hardening gates, and adapter contract gates
 
 The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
 
@@ -40,7 +40,10 @@ Today, the repository is focused on protocol generation, local interoperability,
 ## What Kurdistan Is Building
 
 ```text
-Application or future proxy adapter
+Local application or future packet source
+        |
+        v
+Adapter ingress/egress interface
         |
         v
 Stable internal relay semantics
@@ -55,7 +58,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, and pre-adapter hardening. Future proxy or VPN integration still requires separate design review.
+Current work is concentrated on the generated transport/compiler layer and its deterministic runtime boundaries, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, hardening, and adapter interface contracts. Concrete proxy or VPN integration still requires separate design review.
 
 ## Current Status
 
@@ -75,7 +78,8 @@ Current work is concentrated on the generated transport/compiler layer, includin
 | Production security prerequisites | Done |
 | Runtime session architecture | Done |
 | Implementation hardening | Done |
-| Local adapter design review | Next |
+| Adapter interface architecture | Done |
+| Local adapter prototype | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -104,6 +108,7 @@ Current work is concentrated on the generated transport/compiler layer, includin
 - Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
 - Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
 - Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
+- Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -136,8 +141,11 @@ internal/security
 internal/runtime + internal/runtimeadversary
   runtime roles, session lifecycle, compatibility negotiation, in-memory links, runtime traces, and runtime collapse scanning
 
+internal/adapter + internal/adapteradversary
+  ingress/egress contracts, flow lifecycle, deterministic harness, runtime boundary checks, adapter traces, and collapse scanning
+
 internal/hardening
-  invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, and readiness matrix
+  invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
@@ -163,6 +171,7 @@ go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck hardening --quick
+go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -198,6 +207,7 @@ go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4
 go run ./cmd/generated-client --security-demo --streams 4
 go run ./cmd/generated-client --runtime-demo --streams 4
 go run ./cmd/generated-client --hardening-demo --streams 4
+go run ./cmd/generated-client --adapter-demo --flows 4
 ```
 
 ## Audits And Gates
@@ -226,6 +236,7 @@ Kurdistan treats diversity as something to measure.
 - security transcript binding, key schedule, nonce uniqueness, replay rejection, downgrade resistance, capability negotiation, profile compatibility, config hygiene, trace hygiene, and security mutant detection
 - runtime session lifecycle, capability negotiation, profile compatibility, security context creation, replay rejection, stream management, backpressure, error/reset isolation, trace hygiene, and runtime mutant detection
 - implementation hardening for invariant registry, API contracts, panic safety, resource bounds, trace hygiene, concurrency checks, generated parity, pre-adapter readiness, and hardening mutant detection
+- adapter interface contracts, config validation, flow lifecycle, runtime boundary mapping, capability compatibility, backpressure, error/reset mapping, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 
 Useful commands:
 
@@ -245,6 +256,7 @@ go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
+go run ./cmd/kcheck adapter --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -263,6 +275,19 @@ go run ./cmd/kcheck runtime --quick
 - generated client/server/echo/trace commands
 
 Generated code specializes profile-specific protocol data while still reusing small helper packages for safe IO, HMAC, trace output, and deterministic testing.
+
+## Adapter Interface Architecture
+
+Milestone 15 defines the boundary that future local ingress and byte-transport implementations will plug into. It adds adapter kinds, bounded flow descriptors, config validation, canonical capability hashes, explicit flow lifecycle transitions, a deterministic in-memory harness, runtime stream mapping, backpressure propagation, safe adapter trace metadata, adapter adversary scenarios, adapter mutants, and generated-backend parity checks.
+
+This is an interface and contract layer. It does not implement concrete SOCKS, TUN, VPN, HTTP, TLS, WebSocket, CDN, deployment, or external-network adapters.
+
+Run:
+
+```bash
+go run ./cmd/kcheck adapter --quick
+go run ./cmd/kcheck adapter --full --out testdata/audit/adapter.json
+```
 
 ## Multi-Stream Semantics
 
@@ -319,7 +344,7 @@ The runtime adversary audit exercises happy-path sessions, capability downgrade 
 
 ## Implementation Hardening
 
-Milestone 14 adds a hardening layer before adapter work. It checks cross-package invariants, API misuse behavior, panic safety, resource limits, trace hygiene, deterministic concurrency/race-prep behavior, generated/interpreted parity, compatibility, hardening mutants, and a pre-adapter readiness matrix.
+Milestone 14 adds a hardening layer before adapter work. It checks cross-package invariants, API misuse behavior, panic safety, resource limits, trace hygiene, deterministic concurrency/race-prep behavior, generated/interpreted parity, compatibility, hardening mutants, and a pre-adapter readiness matrix. Milestone 15 extends those checks to the adapter interface boundary.
 
 Run:
 
@@ -331,8 +356,8 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 15: reviewed local-only adapter design spike.
-2. Milestone 16: local adapter prototype, gated by hardening checks.
+1. Milestone 16: deterministic local adapter prototype, gated by adapter and hardening checks.
+2. Milestone 17: adapter implementation hardening and expanded generated-backend parity.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning
