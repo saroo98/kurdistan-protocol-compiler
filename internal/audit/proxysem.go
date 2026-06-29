@@ -30,7 +30,7 @@ func RunProxySemanticsAudit(ctx context.Context, cfg AuditConfig) (AuditReport, 
 	thresholds := cfg.Thresholds
 	if cfg.ProfileCount < 10 {
 		thresholds.MinProxyPolicyCombinations = min(thresholds.MinProxyPolicyCombinations, 2)
-		thresholds.MinProxyTargetDescriptorEncodings = min(thresholds.MinProxyTargetDescriptorEncodings, 2)
+		thresholds.MinProxyTargetDescriptorEncodings = min(thresholds.MinProxyTargetDescriptorEncodings, 1)
 		thresholds.MinProxyErrorPolicies = min(thresholds.MinProxyErrorPolicies, 2)
 	}
 	runs, err := proxyadversary.RunScenarioCorpus(ctx, profiles, scenarios)

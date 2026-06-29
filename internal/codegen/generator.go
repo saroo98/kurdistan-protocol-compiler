@@ -464,6 +464,121 @@ func CaptureCarrierTrace(ctx context.Context, carrierName string, streamCount in
 		return nil, err
 	}
 
+	securitySource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/security"
+	ktrace "kurdistan/internal/trace"
+)
+
+const SecurityVersion = %[1]s
+const SecurityTranscriptMode = %[2]s
+const SecurityKDFSuite = %[3]s
+const SecurityAEADSuite = %[4]s
+const SecurityMACSuite = %[5]s
+const SecurityNonceMode = %[6]s
+const SecurityReplayPolicy = %[7]s
+const SecurityReplayWindowSize = %[8]d
+const SecurityDowngradePolicy = %[9]s
+const SecurityCapabilityNegotiationPolicy = %[10]s
+const SecurityProfileCompatibilityPolicy = %[11]s
+const SecurityKeyRotationPolicy = %[12]s
+const SecurityConfigValidationPolicy = %[13]s
+const SecuritySecureEnvelopeMode = %[14]s
+const SecurityMaxSessionMessages = %[15]d
+const SecurityMaxKeyLifetimeMessages = %[16]d
+
+var RequiredCapabilities = %[17]s
+
+func SecuritySuite() security.Suite {
+	return security.Suite{KDF: SecurityKDFSuite, AEAD: SecurityAEADSuite, MAC: SecurityMACSuite, Transcript: "transcript_sha256_v1"}
+}
+
+func SecurityTranscriptInput() (security.TranscriptInput, error) {
+	p := StaticProfile()
+	hash, err := security.ProfileHash(p)
+	if err != nil {
+		return security.TranscriptInput{}, err
+	}
+	return security.TranscriptInput{
+		ProfileID:           ProfileID,
+		ProfileHash:         hash,
+		CompilerHash:        GeneratorVersion,
+		SemanticMappingHash: GenerationHash,
+		FSMPolicy:           "generated-state-table",
+		FramingPolicy:       FrameLengthMode + "/" + FrameTypeMode + "/" + FrameFragmentationMode,
+		SchedulerPolicy:     SchedulerMode + "/" + SchedulerPriorityMode,
+		PaddingPolicy:       p.Padding.Mode,
+		StreamPolicy:        StreamIDStrategy + "/" + StreamPriorityPolicy + "/" + StreamWindowUpdatePolicy,
+		ProxyPolicy:         ProxyTargetDescriptorEncoding + "/" + ProxyResponseModeEncoding,
+		CarrierPolicy:       CarrierFamily + "/" + CarrierEnvelopeEncoding + "/" + CarrierFlushPolicy,
+		Capabilities:        RequiredCapabilities,
+		SessionNonce:        []byte("generated-security-session"),
+		Suite:               SecuritySuite(),
+		OrderedStatePath:    []string{FirstContactSequence()[0].FromState, FirstContactSequence()[len(FirstContactSequence())-1].ToState},
+	}, nil
+}
+
+func SecurityContext() (security.SecurityContext, error) {
+	input, err := SecurityTranscriptInput()
+	if err != nil {
+		return security.SecurityContext{}, err
+	}
+	return security.BuildContext(input)
+}
+
+func SecurityDemo(ctx context.Context, streams int) (SecurityDemoResult, []ktrace.Event, error) {
+	_ = ctx
+	if streams <= 0 {
+		streams = 4
+	}
+	securityContext, err := SecurityContext()
+	if err != nil {
+		return SecurityDemoResult{}, nil, err
+	}
+	keys, err := security.DeriveKeySchedule([]byte("generated-security-demo-secret"), securityContext.TranscriptHash, securityContext.Suite)
+	if err != nil {
+		return SecurityDemoResult{}, nil, err
+	}
+	codec, err := security.NewEnvelopeCodec(securityContext, keys, "client")
+	if err != nil {
+		return SecurityDemoResult{}, nil, err
+	}
+	events := make([]ktrace.Event, 0, streams)
+	for i := 0; i < streams; i++ {
+		env, err := codec.Seal(security.EnvelopeMetadata{StreamID: uint64(i + 1), Semantic: "target_response", CarrierFamily: CarrierFamily, MetadataClass: "generated"}, make([]byte, 16+i))
+		if err != nil {
+			return SecurityDemoResult{}, nil, err
+		}
+		events = append(events, security.SecureEnvelopeTrace(securityContext, env))
+	}
+	return SecurityDemoResult{
+		TranscriptHash: securityContext.TranscriptHash,
+		CapabilityHash: securityContext.CapabilityHash,
+		EnvelopeCount:  len(events),
+	}, events, nil
+}
+
+func CaptureSecurityTrace(ctx context.Context, streamCount int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := SecurityDemo(ctx, streamCount)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	return events, TraceCaptureSummary{ProfileID: ProfileID, EventCount: len(events), DataEventCount: result.EnvelopeCount}, nil
+}
+
+type SecurityDemoResult struct {
+	TranscriptHash string
+	CapabilityHash string
+	EnvelopeCount  int
+}
+`, quote(p.Security.SecurityVersion), quote(p.Security.TranscriptMode), quote(p.Security.KDFSuite), quote(p.Security.AEADSuite), quote(p.Security.MACSuite), quote(p.Security.NonceMode), quote(p.Security.ReplayPolicy), p.Security.ReplayWindowSize, quote(p.Security.DowngradePolicy), quote(p.Security.CapabilityNegotiationPolicy), quote(p.Security.ProfileCompatibilityPolicy), quote(p.Security.KeyRotationPolicy), quote(p.Security.ConfigValidationPolicy), quote(p.Security.SecureEnvelopeMode), p.Security.MaxSessionMessages, p.Security.MaxKeyLifetimeMessages, quoteSlice(p.Compatibility.RequiredCapabilities))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -897,6 +1012,168 @@ func TestGeneratedCarrierAdversaryScenarios(t *testing.T) {
 		return nil, err
 	}
 
+	securityTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/security"
+)
+
+func TestGeneratedSecurityTranscriptAndCapabilityParity(t *testing.T) {
+	input, err := SecurityTranscriptInput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := security.TranscriptHash(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := SecurityContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.TranscriptHash != hash {
+		t.Fatalf("generated transcript mismatch")
+	}
+	capabilityHash, err := (security.CapabilitySet{Features: RequiredCapabilities}).Hash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.CapabilityHash != capabilityHash {
+		t.Fatalf("generated capability hash mismatch")
+	}
+	if SecurityVersion == "" || SecurityTranscriptMode == "" || SecurityNonceMode == "" {
+		t.Fatalf("security specialization constants missing")
+	}
+}
+
+func TestGeneratedSecurityEnvelopeRejectsReplayAndMismatch(t *testing.T) {
+	ctx, err := SecurityContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := security.DeriveKeySchedule([]byte("generated-security-test-secret"), ctx.TranscriptHash, ctx.Suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	codec, err := security.NewEnvelopeCodec(ctx, keys, "client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := codec.Seal(security.EnvelopeMetadata{StreamID: 1, Semantic: "target_response", CarrierFamily: CarrierFamily}, []byte("controlled generated security payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := codec.Open(env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := codec.Open(env); err == nil {
+		t.Fatalf("replayed envelope accepted")
+	}
+	mismatch := env
+	mismatch.TranscriptHash = "different"
+	fresh, err := security.NewEnvelopeCodec(ctx, keys, "client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fresh.Open(mismatch); err == nil {
+		t.Fatalf("transcript mismatch accepted")
+	}
+}
+
+func TestGeneratedSecurityTraceHygiene(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := SecurityDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.EnvelopeCount == 0 || len(events) == 0 {
+		t.Fatalf("security demo emitted no events")
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range [][]byte{
+		[]byte("generated-security-demo-secret"),
+		[]byte("controlled generated security payload"),
+	} {
+		if bytes.Contains(raw, forbidden) {
+			t.Fatalf("security trace leaked forbidden material")
+		}
+	}
+	for _, ev := range events {
+		if ev.SecuritySuiteBucket == "" || ev.SecretHygieneResult == "" {
+			t.Fatalf("security trace missing safe metadata: %%+v", ev)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	securityAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/security"
+)
+
+func TestGeneratedSecurityAdversaryRejectsDowngradeAndBadConfig(t *testing.T) {
+	ctx, err := SecurityContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := security.DetectSuiteDowngrade(ctx.Suite, security.Suite{KDF: "kdf_hkdf_sha1"}, ctx.TranscriptHash); err == nil {
+		t.Fatalf("suite downgrade accepted")
+	}
+	cfg := security.SecurityConfig{
+		ProfileID:       ProfileID,
+		ProfileHash:     ctx.ProfileHash,
+		InputSecret:     []byte("generated config secret"),
+		Suite:           ctx.Suite,
+		ReplayWindow:    SecurityReplayWindowSize,
+		MaxEnvelopeBytes: CarrierMaxEnvelopeBytes,
+		QueueDepth:      CarrierMaxQueueDepth,
+		Capabilities:    RequiredCapabilities,
+		TranscriptHash:  ctx.TranscriptHash,
+		CapabilityHash:  ctx.CapabilityHash,
+	}
+	if err := security.ValidateConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg.InputSecret = make([]byte, len(cfg.InputSecret))
+	if err := security.ValidateConfig(cfg); err == nil {
+		t.Fatalf("unsafe generated config accepted")
+	}
+}
+
+func TestGeneratedSecurityAdversaryTraceCapture(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, summary, err := CaptureSecurityTrace(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.EventCount == 0 || len(events) == 0 {
+		t.Fatalf("security trace capture emitted no events")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -1216,6 +1493,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/stream_generated.go", Content: streamSource, Go: true},
 		{RelPath: "protocol/proxysem_generated.go", Content: proxySemSource, Go: true},
 		{RelPath: "protocol/carrier_generated.go", Content: carrierSource, Go: true},
+		{RelPath: "protocol/security_generated.go", Content: securitySource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -1227,6 +1505,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/proxyadversary_test.go", Content: proxySemAdversaryTestSource, Go: true},
 		{RelPath: "protocol/carrier_test.go", Content: carrierTestSource, Go: true},
 		{RelPath: "protocol/carrieradversary_test.go", Content: carrierAdversaryTestSource, Go: true},
+		{RelPath: "protocol/security_test.go", Content: securityTestSource, Go: true},
+		{RelPath: "protocol/securityadversary_test.go", Content: securityAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -1260,12 +1540,26 @@ func main() {
 	multiStreamDemo := flag.Bool("multistream-demo", false, "run local generated multi-stream lab demo")
 	proxySemDemo := flag.Bool("proxysem-demo", false, "run local generated proxy-semantics demo")
 	carrierDemo := flag.Bool("carrier-demo", false, "run local generated carrier abstraction demo")
+	securityDemo := flag.Bool("security-demo", false, "run local generated security demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
 	flag.Parse()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(protocol.MaxSessionMillis)*time.Millisecond)
 	defer cancel()
+	if *securityDemo {
+		result, events, err := protocol.SecurityDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("security_envelopes=%%d transcript=%%s capability=%%s\n", result.EnvelopeCount, result.TranscriptHash[:12], result.CapabilityHash[:12])
+		return
+	}
 	if *carrierDemo {
 		result, events, err := protocol.CarrierDemo(ctx, *carrierName, *streamCount)
 		if err != nil {
@@ -1433,6 +1727,7 @@ func main() {
 	multiStream := flag.Bool("multistream", false, "capture local generated multi-stream trace")
 	proxySem := flag.Bool("proxysem", false, "capture local generated proxy-semantics trace")
 	carrierName := flag.String("carrier", "", "capture local generated carrier trace with the selected abstract carrier")
+	securityTrace := flag.Bool("security", false, "capture local generated security trace")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
@@ -1441,7 +1736,9 @@ func main() {
 	var events []ktrace.Event
 	var summary protocol.TraceCaptureSummary
 	var err error
-	if *carrierName != "" {
+	if *securityTrace {
+		events, summary, err = protocol.CaptureSecurityTrace(ctx, *streamCount)
+	} else if *carrierName != "" {
 		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
 	} else if *proxySem {
 		events, summary, err = protocol.CaptureProxySemTrace(ctx, *targets, *streamCount)

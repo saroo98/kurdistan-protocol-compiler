@@ -72,6 +72,16 @@ func BenchmarkProxySemQuickAudit(b *testing.B) {
 	}
 }
 
+func BenchmarkSecurityQuickAudit(b *testing.B) {
+	cfg := DefaultConfig("quick")
+	cfg.ProfileCount = 3
+	for i := 0; i < b.N; i++ {
+		if _, err := RunSecurityAudit(context.Background(), cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkProxyGateEvaluation(b *testing.B) {
 	profiles, err := generateAuditProfiles(1, 6)
 	if err != nil {

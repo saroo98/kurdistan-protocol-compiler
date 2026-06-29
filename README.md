@@ -25,7 +25,7 @@ Current profile generation covers:
 - multi-stream relay semantics with flow control and backpressure
 - payload-free trace capture
 - generated Go source modules
-- adversarial diversity, mutation, and black-box trace audits
+- adversarial diversity, mutation, black-box trace audits, and security invariant gates
 
 The current codebase is a research compiler, runtime harness, source generator, and audit system. Production transport integration is future work.
 
@@ -55,7 +55,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling. Future proxy or VPN integration requires a separate production security design, implementation hardening, and review.
+Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling and production security prerequisites. Future proxy or VPN integration still requires implementation hardening and review.
 
 ## Current Status
 
@@ -72,7 +72,8 @@ Current work is concentrated on the generated transport/compiler layer, includin
 | Multi-stream adversarial testing | Done |
 | Lab-only proxy semantics | Done |
 | Carrier abstraction | Done |
-| Production security model | Next |
+| Production security prerequisites | Done |
+| Implementation hardening | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -98,6 +99,7 @@ Current work is concentrated on the generated transport/compiler layer, includin
 - Proxy adversary scenarios, proxy feature extraction, collapse scanning, and proxy mutant detection.
 - Carrier abstraction models for stream, message, datagram-like, chunked, batch, interactive, long-poll-style, and lossy/reordered carrier shapes.
 - Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
+- Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -124,6 +126,9 @@ internal/proxysem + internal/proxyrelay + internal/proxyadversary
 internal/carrier + internal/carrierrelay + internal/carrieradversary
   abstract carrier envelopes, semantic reconstruction, carrier collapse scanning, and carrier mutants
 
+internal/security
+  transcript binding, key schedule, nonce/replay policy, capability negotiation, compatibility, config hygiene, and secure envelope model
+
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
@@ -145,6 +150,7 @@ go run ./cmd/kcheck --quick
 go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
+go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -177,6 +183,7 @@ go test ./...
 go run ./cmd/generated-client --multistream-demo --streams 3
 go run ./cmd/generated-client --proxysem-demo --targets mixed --streams 4
 go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4
+go run ./cmd/generated-client --security-demo --streams 4
 ```
 
 ## Audits And Gates
@@ -202,6 +209,7 @@ Kurdistan treats diversity as something to measure.
 - stream adversary collapse resistance
 - proxy-semantics correctness, diversity, target backpressure, error/reset isolation, and mutant detection
 - carrier semantic reconstruction, carrier diversity, queue backpressure, loss/reorder recovery, proxysem parity, and carrier mutant detection
+- security transcript binding, key schedule, nonce uniqueness, replay rejection, downgrade resistance, capability negotiation, profile compatibility, config hygiene, trace hygiene, and security mutant detection
 
 Useful commands:
 
@@ -219,6 +227,7 @@ go run ./cmd/kcheck adversary --quick
 go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
+go run ./cmd/kcheck security --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -279,12 +288,17 @@ Kurdistan now separates semantic relay messages from abstract carrier envelopes.
 
 Carrier families include `stream_carrier`, `message_carrier`, `datagram_like_carrier`, `chunked_carrier`, `batch_carrier`, `interactive_carrier`, `long_poll_style_carrier`, and `lossy_reordered_carrier`. The model records safe metadata for envelope counts, chunking, batching, flush behavior, retry/reorder events, and carrier-induced backpressure.
 
+## Security Prerequisite Layer
+
+Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
+
+This layer uses standard Go cryptographic primitives for deterministic tests and synthetic secure envelopes. It is not a complete production transport security protocol.
+
 ## Roadmap
 
-1. Milestone 12: production security design.
-2. Milestone 13: implementation hardening.
-3. Milestone 14: local proxy adapter prototype.
-4. Future: proxy/VPN transport integration after security review.
+1. Milestone 13: implementation hardening.
+2. Milestone 14: local proxy adapter prototype.
+3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning
 

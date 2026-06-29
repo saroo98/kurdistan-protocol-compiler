@@ -6,7 +6,7 @@ package codegen
 import "kurdistan/internal/ir"
 
 const (
-	Version       = "0.11.0-lab"
+	Version       = "0.12.0-lab"
 	SourceBackend = "go-static-v0"
 )
 
@@ -23,6 +23,7 @@ type Manifest struct {
 	Stream           string         `json:"stream"`
 	ProxySemantics   string         `json:"proxy_semantics"`
 	Carrier          string         `json:"carrier_model"`
+	Security         string         `json:"security"`
 	Padding          string         `json:"padding"`
 	InvalidInput     string         `json:"invalid_input"`
 	Safety           ManifestSafety `json:"safety"`
@@ -48,6 +49,7 @@ func NewManifest(p *ir.Profile, generatedAt string) Manifest {
 		Stream:           p.Stream.IDEncodingMode + "/" + p.Stream.PriorityPolicy + "/" + p.Stream.WindowUpdatePolicy,
 		ProxySemantics:   p.ProxySemantics.RelayIntentEncoding + "/" + p.ProxySemantics.TargetDescriptorEncoding + "/" + p.ProxySemantics.ResponseModeEncoding,
 		Carrier:          p.CarrierPolicy.CarrierFamily + "/" + p.CarrierPolicy.EnvelopeEncoding + "/" + p.CarrierPolicy.FlushPolicy,
+		Security:         p.Security.TranscriptMode + "/" + p.Security.NonceMode + "/" + p.Security.ReplayPolicy,
 		Padding:          p.Padding.Mode,
 		InvalidInput:     p.InvalidInput.UnknownFirstMessage + "/" + p.InvalidInput.MalformedFrame + "/" + p.InvalidInput.FailedAuth + "/" + p.InvalidInput.Replay,
 		Safety: ManifestSafety{
