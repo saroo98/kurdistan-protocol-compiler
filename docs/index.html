@@ -70,6 +70,7 @@
             <div><span>local adapter</span><b>deterministic</b></div>
             <div><span>byte fixtures</span><b>frozen</b></div>
             <div><span>wire features</span><b>baselined</b></div>
+            <div><span>wire shapes</span><b>generated</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -170,6 +171,10 @@
             <p>Abstract protocol-feature corpus, first-N packet-shape model, safe feature vectors, corpus comparison, and collapse gates.</p>
           </article>
           <article class="card">
+            <h3>Wire-shape generator</h3>
+            <p>Deterministic policy sampling, profile integration, bytepath application, expected feature matching, and fixture baselines.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -218,7 +223,8 @@
           <div><strong>Done</strong><span>Deterministic byte transport harness</span></div>
           <div><strong>Done</strong><span>Byte-path parity and fixture freeze</span></div>
           <div><strong>Done</strong><span>Protocol feature corpus and wire-shape baselines</span></div>
-          <div class="next"><strong>Next</strong><span>Wire-shape generator prototype</span></div>
+          <div><strong>Done</strong><span>Wire-shape generator prototype</span></div>
+          <div class="next"><strong>Next</strong><span>Wire evaluation and classifier dataset harness</span></div>
         </div>
       </section>
 
@@ -261,6 +267,7 @@
           <a href="KIP-0023-deterministic-byte-transport-harness.md">KIP-0023: Deterministic byte transport harness</a>
           <a href="KIP-0024-bytepath-fixture-freeze.md">KIP-0024: Byte-path fixture freeze</a>
           <a href="KIP-0025-protocol-feature-corpus.md">KIP-0025: Protocol feature corpus</a>
+          <a href="KIP-0026-wire-shape-generator-prototype.md">KIP-0026: Wire-shape generator prototype</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -294,7 +301,8 @@
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
             architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
             prototype, a deterministic byte transport harness, byte-path fixture freeze, protocol-feature corpus,
-            wire-shape baselines, and adversarial audits. The next step is a wire-shape generator prototype.
+            wire-shape baselines, the wire-shape generator prototype, and adversarial audits. The next step is
+            wire evaluation and a classifier dataset harness.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
