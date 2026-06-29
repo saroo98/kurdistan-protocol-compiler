@@ -280,4 +280,4 @@ This milestone defines feature vocabulary and baselines. It does not generate ne
 
 ## Next Milestone
 
-Milestone 20 should implement a wire-shape generation prototype that consumes the protocol-feature corpus and is tested against the M19 baseline and collapse gates.
+Milestone 20 implements the first wire-shape generation prototype in [KIP-0026](KIP-0026-wire-shape-generator-prototype.md). The next step is a wire evaluation and classifier dataset harness built on top of the M19 corpus and M20 generator fixtures.
