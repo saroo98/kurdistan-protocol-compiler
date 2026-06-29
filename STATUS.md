@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T16:32:57Z`
+- Generated at: `2026-06-29T17:44:12Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -102,22 +102,33 @@
 | `bytepath_malformed_corpus` | PASS | `required` | 21 malformed byte corpus cases checked |
 | `bytepath_regression_baselines` | PASS | `required` | 21 entries across 3 seeds and 7 scenarios |
 | `bytepath_fixture_trace_hygiene` | PASS | `required` | 21 bytepath fixture entries scanned for payload/secret leakage |
-| `hardening_invariant_registry` | PASS | `required` | 12 invariants checks run; 0 failures |
+| `protocorpus_schema_valid` | PASS | `required` | 12 protocol corpus entries validated |
+| `protocorpus_feature_taxonomy` | PASS | `required` | 12 field kinds and 6 phase kinds checked |
+| `protocorpus_entry_coverage` | PASS | `required` | 12 entries across 9 families |
+| `protocorpus_trace_hygiene` | PASS | `required` | protocol corpus scanned for unsafe feature material |
+| `wirefeatures_extraction` | PASS | `required` | 21 wire feature vectors extracted from 21 fixtures |
+| `wirefeatures_firstn_model` | PASS | `required` | 8 unique first-n packet shapes found |
+| `wirefeatures_corpus_comparison` | PASS | `required` | 2 corpus families matched by generated features |
+| `wirefeatures_collapse_resistance` | PASS | `required` | 21 feature hashes and 8 first-n shapes checked |
+| `wirefeatures_generated_backend_parity` | PASS | `required` | generated backend protocol corpus and wirefeature markers checked |
+| `wirefeatures_mutant_detection` | PASS | `required` | 8/8 wirefeature mutant modes detected |
+| `wirefeatures_baseline_fixtures` | PASS | `required` | 21 wirefeature baseline entries checked |
+| `hardening_invariant_registry` | PASS | `required` | 13 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 9 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 10 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 22 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `10 ms`
-- Trace generation: `26 ms`
-- Total audit runtime: `632 ms`
+- Profile generation: `8 ms`
+- Trace generation: `17 ms`
+- Total audit runtime: `498 ms`
 
 ## Corpus Diversity Summary
 
@@ -140,10 +151,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.319771733513388`
-- `same_profile_distance`: `0.007462686567164179`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.31871581320801046`
+- `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -264,6 +275,24 @@
 - `bytepath_regression_baselines`: `passed`
 - `bytepath_fixture_trace_hygiene`: `passed`
 
+## Protocol Feature Corpus
+
+- Gate result: `true`
+- `protocorpus_schema_valid`: `passed`
+- `protocorpus_feature_taxonomy`: `passed`
+- `protocorpus_entry_coverage`: `passed`
+- `protocorpus_trace_hygiene`: `passed`
+
+## Wire Feature Baselines
+
+- Gate result: `true`
+- `wirefeatures_extraction`: `passed`
+- `wirefeatures_firstn_model`: `passed`
+- `wirefeatures_corpus_comparison`: `passed`
+- `wirefeatures_collapse_resistance`: `passed`
+- `wirefeatures_generated_backend_parity`: `passed`
+- `wirefeatures_mutant_detection`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -273,6 +302,7 @@
 - Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
 - Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.
 - Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.
+- Protocol corpus and wire-feature baselines are abstract feature models; they are not a wire-shape generator or classifier.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -281,4 +311,4 @@
 
 ## Next Milestone
 
-Milestone 19 should focus on a protocol-feature corpus and wire-shape evaluation baselines before any concrete adapter work.
+Milestone 20 should focus on a wire-shape generation prototype using the frozen protocol-feature corpus and wire-feature baselines.
