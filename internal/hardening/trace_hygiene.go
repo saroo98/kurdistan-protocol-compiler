@@ -19,6 +19,7 @@ import (
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregencompare"
 )
 
 type TraceHygieneReport struct {
@@ -290,6 +291,19 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanJSON([]byte(`{"proxy_ip":"127.0.0.1"}`)).Passed {
 			return fmt.Errorf("proxy IP marker accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("wiregen_fixture_trace_hygiene", CategoryTraceHygiene, func() error {
+		baseline, err := wiregencompare.GenerateBaseline(ctx, protocorpus.DefaultCorpus(), []int{int(p.Seed)}, []string{bytetransport.ScenarioSingleFlow})
+		if err != nil {
+			return err
+		}
+		if report := ScanValue(baseline); !report.Passed {
+			return fmt.Errorf("wiregen baseline rejected: %v", report.Findings)
+		}
+		if ScanJSON([]byte(`{"raw_bytes":"abc"}`)).Passed {
+			return fmt.Errorf("raw byte marker accepted")
 		}
 		return nil
 	}))
