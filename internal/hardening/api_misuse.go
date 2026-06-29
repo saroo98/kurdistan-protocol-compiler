@@ -16,5 +16,7 @@ func APIMisuseCases() []string {
 		"invalid_adapter_config_rejected",
 		"invalid_adapter_flow_rejected",
 		"adapter_capability_downgrade_rejected",
+		"invalid_local_adapter_config_rejected",
+		"invalid_local_adapter_chunk_rejected",
 	}
 }

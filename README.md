@@ -79,7 +79,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Runtime session architecture | Done |
 | Implementation hardening | Done |
 | Adapter interface architecture | Done |
-| Local adapter prototype | Next |
+| Local adapter prototype | Done |
+| Deterministic byte transport harness | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -109,6 +110,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
 - Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
 - Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
+- Deterministic local adapter prototype with memory ingress/egress adapters, source/sink models, runtime integration, sequence checks, and safe summaries.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -144,6 +146,9 @@ internal/runtime + internal/runtimeadversary
 internal/adapter + internal/adapteradversary
   ingress/egress contracts, flow lifecycle, deterministic harness, runtime boundary checks, adapter traces, and collapse scanning
 
+internal/localadapter + internal/localadapteradversary
+  memory ingress/egress adapters, deterministic source/sink models, runtime runner, local adapter traces, and collapse scanning
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -172,6 +177,7 @@ go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck hardening --quick
 go run ./cmd/kcheck adapter --quick
+go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -208,6 +214,7 @@ go run ./cmd/generated-client --security-demo --streams 4
 go run ./cmd/generated-client --runtime-demo --streams 4
 go run ./cmd/generated-client --hardening-demo --streams 4
 go run ./cmd/generated-client --adapter-demo --flows 4
+go run ./cmd/generated-client --localadapter-demo --flows 4
 ```
 
 ## Audits And Gates
@@ -237,6 +244,7 @@ Kurdistan treats diversity as something to measure.
 - runtime session lifecycle, capability negotiation, profile compatibility, security context creation, replay rejection, stream management, backpressure, error/reset isolation, trace hygiene, and runtime mutant detection
 - implementation hardening for invariant registry, API contracts, panic safety, resource bounds, trace hygiene, concurrency checks, generated parity, pre-adapter readiness, and hardening mutant detection
 - adapter interface contracts, config validation, flow lifecycle, runtime boundary mapping, capability compatibility, backpressure, error/reset mapping, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
+- local adapter correctness, flow lifecycle, runtime integration, backpressure, error/reset isolation, sequence integrity, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 
 Useful commands:
 
@@ -257,6 +265,7 @@ go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck adapter --quick
+go run ./cmd/kcheck localadapter --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -287,6 +296,19 @@ Run:
 ```bash
 go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck adapter --full --out testdata/audit/adapter.json
+```
+
+## Deterministic Local Adapter Prototype
+
+Milestone 16 implements the first concrete local adapter prototype on top of the adapter contracts. `internal/localadapter` provides memory ingress, memory egress, a combined local pipe, deterministic source models, sink sequence validation, runtime-boundary execution, safe trace metadata, and bounded summaries.
+
+The prototype exercises single-flow echo, many small flows, large-flow backpressure, slow drip input, mixed flows, reset isolation, target error/reset mapping, half-close behavior, queue pressure, and malformed source chunks. It remains an in-memory deterministic harness, not a concrete network adapter.
+
+Run:
+
+```bash
+go run ./cmd/kcheck localadapter --quick
+go run ./cmd/kcheck localadapter --full --out testdata/audit/localadapter.json
 ```
 
 ## Multi-Stream Semantics
@@ -356,8 +378,8 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 16: deterministic local adapter prototype, gated by adapter and hardening checks.
-2. Milestone 17: adapter implementation hardening and expanded generated-backend parity.
+1. Milestone 17: deterministic byte transport harness.
+2. Milestone 18: expanded byte-path hardening and generated-backend parity.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning

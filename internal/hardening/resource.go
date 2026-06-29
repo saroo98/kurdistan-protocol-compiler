@@ -11,6 +11,7 @@ import (
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
 	kstream "kurdistan/internal/stream"
@@ -108,6 +109,30 @@ func RunResourceLimitChecks(ctx context.Context, profiles []*ir.Profile, opts Op
 			}
 			if _, err := h.ReadFlow("flow-1", 256); err != adapter.ErrBackpressure {
 				return fmt.Errorf("adapter buffered byte limit was not surfaced")
+			}
+			return nil
+		}),
+		check("local_adapter_resource_limits_enforced", CategoryResourceLimits, func() error {
+			cfg := localadapter.DefaultConfig("hardening-local")
+			cfg.MaxFlows = 1
+			cfg.MaxBufferedBytes = 64
+			cfg.MaxChunkBytes = 128
+			if err := localadapter.ValidateConfig(cfg); err != nil {
+				return err
+			}
+			if _, err := localadapter.GenerateSourcePlan(localadapter.SourceSmallBurst, 2, cfg); err == nil {
+				return fmt.Errorf("local adapter source flow limit ignored")
+			}
+			pipe, err := localadapter.NewMemoryPipe(cfg)
+			if err != nil {
+				return err
+			}
+			desc := localadapter.FlowDescriptor("local-hardening", 128)
+			if err := pipe.Ingress.OpenFlow(desc); err != nil {
+				return err
+			}
+			if _, err := pipe.Ingress.ReadSource(localadapter.LocalSourceChunk{FlowID: "local-hardening", Sequence: 1, ByteCount: 256}); err == nil {
+				return fmt.Errorf("local adapter chunk limit ignored")
 			}
 			return nil
 		}),

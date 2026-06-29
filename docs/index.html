@@ -67,6 +67,7 @@
             <div><span>streams</span><b>flow-controlled</b></div>
             <div><span>runtime</span><b>session-aware</b></div>
             <div><span>adapter boundary</span><b>contract-checked</b></div>
+            <div><span>local adapter</span><b>deterministic</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -151,6 +152,10 @@
             <p>Bounded ingress/egress contracts, flow lifecycle, capability checks, runtime mapping, backpressure, and safe summaries.</p>
           </article>
           <article class="card">
+            <h3>Local adapter prototype</h3>
+            <p>Memory ingress/egress adapters, deterministic source and sink models, runtime integration, sequence checks, and safe traces.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -195,7 +200,8 @@
           <div><strong>Done</strong><span>Runtime session architecture</span></div>
           <div><strong>Done</strong><span>Implementation hardening</span></div>
           <div><strong>Done</strong><span>Adapter interface architecture</span></div>
-          <div class="next"><strong>Next</strong><span>Deterministic local adapter prototype</span></div>
+          <div><strong>Done</strong><span>Deterministic local adapter prototype</span></div>
+          <div class="next"><strong>Next</strong><span>Deterministic byte transport harness</span></div>
         </div>
       </section>
 
@@ -234,6 +240,7 @@
           <a href="KIP-0019-runtime-session-architecture.md">KIP-0019: Runtime session architecture</a>
           <a href="KIP-0020-implementation-hardening.md">KIP-0020: Implementation hardening</a>
           <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
+          <a href="KIP-0022-deterministic-local-adapter-prototype.md">KIP-0022: Deterministic local adapter prototype</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -265,8 +272,8 @@
           <p>
             The current implementation centers on generated profiles, source-code backends, multi-stream
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
-            architecture, implementation hardening, adapter interface contracts, and adversarial audits. The next
-            step is a deterministic local adapter prototype.
+            architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
+            prototype, and adversarial audits. The next step is a deterministic byte transport harness.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
