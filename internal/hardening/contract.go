@@ -11,6 +11,7 @@ import (
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/security"
@@ -70,6 +71,16 @@ func RunAPIContractChecks(ctx context.Context, profiles []*ir.Profile) []CheckRe
 			p, err := compiler.Generate(99)
 			if err != nil || p == nil || p.ID == "" {
 				return fmt.Errorf("compiler generated invalid profile")
+			}
+			return nil
+		}),
+		check("invalid_local_adapter_inputs_rejected", CategoryAPIContracts, func() error {
+			cfg := localadapter.DefaultConfig("local-contract")
+			if err := localadapter.ValidateConfig(localadapter.LocalAdapterConfig{Name: "secret-token", RuntimeID: "rt", MaxFlows: 1, MaxBufferedBytes: 1, MaxChunkBytes: 1, MaxEvents: 1}); err == nil {
+				return fmt.Errorf("secret-like local adapter name accepted")
+			}
+			if err := localadapter.ValidateSourceChunk(localadapter.LocalSourceChunk{FlowID: "", Sequence: 0, ByteCount: cfg.MaxChunkBytes + 1}, cfg); err == nil {
+				return fmt.Errorf("invalid local source chunk accepted")
 			}
 			return nil
 		}),

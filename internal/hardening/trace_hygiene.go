@@ -12,6 +12,7 @@ import (
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapter"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
 )
@@ -136,6 +137,36 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanValue(adapter.AdapterHarnessSummary{SecretLogged: true}).Passed {
 			return fmt.Errorf("adapter secret leak flag accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("local_adapter_trace_hygiene", CategoryTraceHygiene, func() error {
+		evs := []ktrace.Event{{
+			EventType:                    "local_adapter",
+			LocalAdapterSourceModel:      localadapter.SourceSmallBurst,
+			LocalAdapterSinkModel:        "memory_sink",
+			LocalFlowState:               "open",
+			LocalSequenceIntegrityResult: "passed",
+			LocalAdapterScenario:         localadapter.ScenarioSingleFlowEcho,
+			PayloadHygiene:               true,
+			SecretHygiene:                true,
+			LocalSourceChunkCountBucket:  "1",
+			LocalSinkChunkCountBucket:    "1",
+			LocalSourceByteBucket:        "small",
+			LocalSinkByteBucket:          "small",
+			LocalPostCloseRejections:     0,
+			LocalBackpressureCount:       0,
+			LocalQueuePressureCount:      0,
+		}}
+		report := ScanEvents(evs)
+		if !report.Passed {
+			return fmt.Errorf("local adapter trace rejected: %v", report.Findings)
+		}
+		if ScanValue(localadapter.LocalAdapterSummary{PayloadLogged: true}).Passed {
+			return fmt.Errorf("local adapter payload leak flag accepted")
+		}
+		if ScanValue(localadapter.LocalAdapterSummary{SecretLogged: true}).Passed {
+			return fmt.Errorf("local adapter secret leak flag accepted")
 		}
 		return nil
 	}))
