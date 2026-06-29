@@ -1,0 +1,18 @@
+{
+  "corpus_version": "protocorpus-v1",
+  "profile_count": 3,
+  "scenario_count": 7,
+  "corpus_entries": 12,
+  "matched_families": [
+    "minimal_handshake",
+    "structured_encrypted"
+  ],
+  "feature_coverage": {
+    "minimal_handshake": 12,
+    "structured_encrypted": 9
+  },
+  "diversity_score": 0.45454545454545453,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
