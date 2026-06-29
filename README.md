@@ -81,7 +81,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Adapter interface architecture | Done |
 | Local adapter prototype | Done |
 | Deterministic byte transport harness | Done |
-| Expanded byte-path hardening | Next |
+| Byte-path parity and fixture freeze | Done |
+| Protocol feature corpus and wire-shape baselines | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -113,6 +114,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
 - Deterministic local adapter prototype with memory ingress/egress adapters, source/sink models, runtime integration, sequence checks, and safe summaries.
 - Deterministic byte transport harness with byte frame encoding/decoding, fragmentation/reassembly, bounded byte pipe, sequence checks, corruption rejection, and safe trace metadata.
+- Byte-path fixture freeze with deterministic golden summaries, malformed byte corpus metadata, generated/interpreted parity checks, and fixture drift gates.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -154,6 +156,9 @@ internal/localadapter + internal/localadapteradversary
 internal/bytetransport + internal/bytetransportadversary
   byte frame encoder/decoder, fragmentation/reassembly, bounded byte pipe, sequence checks, byte transport traces, and collapse scanning
 
+internal/fixtures + internal/byteparity
+  byte-path fixture manifests, malformed byte corpus metadata, stable hashes, drift checks, and generated/interpreted parity reports
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -184,6 +189,7 @@ go run ./cmd/kcheck hardening --quick
 go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck bytetransport --quick
+go run ./cmd/kcheck bytepath --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -253,6 +259,7 @@ Kurdistan treats diversity as something to measure.
 - adapter interface contracts, config validation, flow lifecycle, runtime boundary mapping, capability compatibility, backpressure, error/reset mapping, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 - local adapter correctness, flow lifecycle, runtime integration, backpressure, error/reset isolation, sequence integrity, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
 - byte transport encoding correctness, fragmentation/reassembly, pipe backpressure, sequence integrity, corruption rejection, runtime integration, error/reset isolation, trace hygiene, collapse resistance, mutant detection, and generated-backend parity
+- byte-path fixture stability, generated/interpreted parity, malformed byte corpus rejection, regression baselines, trace hygiene, and warning-only performance buckets
 
 Useful commands:
 
@@ -275,6 +282,7 @@ go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck adapter --quick
 go run ./cmd/kcheck localadapter --quick
 go run ./cmd/kcheck bytetransport --quick
+go run ./cmd/kcheck bytepath --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -331,6 +339,22 @@ Run:
 ```bash
 go run ./cmd/kcheck bytetransport --quick
 go run ./cmd/kcheck bytetransport --full --out testdata/audit/bytetransport.json
+```
+
+## Byte-Path Fixture Freeze
+
+Milestone 18 freezes deterministic byte-path baselines before broader wire-shape work. `internal/fixtures` stores safe byte-path summaries, stable hashes, malformed byte corpus metadata, and broad performance buckets. `internal/byteparity` compares interpreted and generated backend summaries at the semantic level while reporting safe byte-shape differences separately.
+
+Committed fixtures live under `testdata/fixtures/` and contain only summaries, buckets, scenario names, hashes, and expected results.
+
+Run:
+
+```bash
+go run ./cmd/kcheck fixtures verify
+go run ./cmd/kcheck fixtures generate --out testdata/fixtures/bytepath-golden.json --force
+go run ./cmd/kcheck fixtures compare --old testdata/fixtures/bytepath-golden.json --new testdata/fixtures/bytepath-golden.json
+go run ./cmd/kcheck bytepath --quick
+go run ./cmd/kcheck bytepath --full --out testdata/audit/bytepath.json
 ```
 
 ## Multi-Stream Semantics
@@ -400,8 +424,8 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 18: expanded byte-path hardening and generated-backend parity.
-2. Milestone 19: concrete local ingress adapter design review.
+1. Milestone 19: protocol feature corpus and wire-shape evaluation baselines.
+2. Milestone 20: concrete local ingress adapter design review.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning
