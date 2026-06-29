@@ -15,6 +15,8 @@ import (
 	"kurdistan/internal/audit"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/fixtures"
+	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wirefeatures"
 )
 
 func main() {
@@ -59,6 +61,12 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "bytepath" {
 		os.Exit(runBytePath(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "protocorpus" {
+		os.Exit(runProtocolCorpus(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "wirefeatures" {
+		os.Exit(runWireFeatures(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -819,6 +827,214 @@ func runBytePath(args []string) int {
 	return 0
 }
 
+func runProtocolCorpus(args []string) int {
+	flags := flag.NewFlagSet("kcheck protocorpus", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick protocol corpus audit")
+	full := flags.Bool("full", false, "run full protocol corpus audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunProtocolCorpusAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runWireFeatures(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runWireFeaturesGenerate(args[1:])
+		case "verify":
+			return runWireFeaturesVerify(args[1:])
+		case "compare":
+			return runWireFeaturesCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck wirefeatures", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick wire feature audit")
+	full := flags.Bool("full", false, "run full wire feature audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunWireFeaturesAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runWireFeaturesGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck wirefeatures generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "wirefeatures", "wirefeatures-golden.json"), "wirefeature baseline output path")
+	force := flags.Bool("force", false, "overwrite existing wirefeature output")
+	fixturePath := flags.String("fixture", defaultFixturePath("bytepath-golden.json"), "bytepath fixture manifest path")
+	corpusPath := flags.String("corpus", defaultProtocolCorpusPath("corpus-v1.json"), "protocol corpus path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	fixtureManifest, err := fixtures.LoadManifest(*fixturePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	corpus, err := protocorpus.LoadManifest(*corpusPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	baseline, err := wirefeatures.GenerateBaseline(context.Background(), fixtureManifest, corpus)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := wirefeatures.WriteBaseline(*out, baseline, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeWireFeatureCompanions(*out, baseline); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote wirefeature baseline: %s (%d vectors)\n", *out, baseline.FeatureCount)
+	return 0
+}
+
+func runWireFeaturesVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck wirefeatures verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baselinePath := flags.String("baseline", filepath.Join("testdata", "wirefeatures", "wirefeatures-golden.json"), "wirefeature baseline path")
+	fixturePath := flags.String("fixture", defaultFixturePath("bytepath-golden.json"), "bytepath fixture manifest path")
+	corpusPath := flags.String("corpus", defaultProtocolCorpusPath("corpus-v1.json"), "protocol corpus path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	report, err := wirefeatures.VerifyBaseline(context.Background(), *baselinePath, *fixturePath, *corpusPath)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runWireFeaturesCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck wirefeatures compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old wirefeature baseline path")
+	newPath := flags.String("new", "", "new wirefeature baseline path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldBaseline, err := wirefeatures.LoadBaseline(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newBaseline, err := wirefeatures.LoadBaseline(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := wirefeatures.CompareBaselines(oldBaseline, newBaseline)
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if !report.Passed {
+		return 1
+	}
+	return 0
+}
+
+func writeWireFeatureCompanions(out string, baseline wirefeatures.BaselineManifest) error {
+	dir := filepath.Dir(out)
+	comparisonRaw, err := wirefeatures.StableJSON(baseline.Comparison)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "corpus-comparison-golden.json"), comparisonRaw, 0o600); err != nil {
+		return err
+	}
+	collapseRaw, err := wirefeatures.StableJSON(baseline.Collapse)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "collapse-baseline.json"), collapseRaw, 0o600)
+}
+
 func runFixtures(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "fixtures subcommand required: generate, verify, compare")
@@ -932,4 +1148,8 @@ func runFixturesCompare(args []string) int {
 
 func defaultFixturePath(name string) string {
 	return filepath.Join("testdata", "fixtures", name)
+}
+
+func defaultProtocolCorpusPath(name string) string {
+	return filepath.Join("testdata", "protocorpus", name)
 }
