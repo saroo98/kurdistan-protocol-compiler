@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
@@ -110,6 +111,17 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		LocalAdapterCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
 		LocalAdapterMutantDetectionGate(ctx, cfg.Thresholds),
 		LocalAdapterGeneratedBackendParityGate(),
+		ByteTransportEncodingCorrectnessGate(ctx, profiles, bytetransportadversary.QuickScenarios(), cfg.Thresholds),
+		ByteTransportFragmentationReassemblyGate(ctx, profiles),
+		ByteTransportPipeBackpressureGate(ctx, profiles),
+		ByteTransportSequenceIntegrityGate(ctx, profiles),
+		ByteTransportCorruptionRejectionGate(ctx, profiles),
+		ByteTransportRuntimeIntegrationGate(ctx, profiles, bytetransportadversary.QuickScenarios(), cfg.Thresholds),
+		ByteTransportErrorResetIsolationGate(ctx, profiles),
+		ByteTransportTraceHygieneGate(ctx, profiles),
+		ByteTransportCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
+		ByteTransportMutantDetectionGate(ctx, cfg.Thresholds),
+		ByteTransportGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
