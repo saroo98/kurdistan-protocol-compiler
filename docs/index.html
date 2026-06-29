@@ -68,6 +68,7 @@
             <div><span>runtime</span><b>session-aware</b></div>
             <div><span>adapter boundary</span><b>contract-checked</b></div>
             <div><span>local adapter</span><b>deterministic</b></div>
+            <div><span>byte fixtures</span><b>frozen</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -160,6 +161,10 @@
             <p>Deterministic byte frames, fragmentation, bounded local pipe, sequence integrity, corruption rejection, and payload-free traces.</p>
           </article>
           <article class="card">
+            <h3>Byte-path fixtures</h3>
+            <p>Golden byte-path summaries, malformed byte corpus metadata, fixture drift gates, and generated/interpreted parity checks.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -206,7 +211,8 @@
           <div><strong>Done</strong><span>Adapter interface architecture</span></div>
           <div><strong>Done</strong><span>Deterministic local adapter prototype</span></div>
           <div><strong>Done</strong><span>Deterministic byte transport harness</span></div>
-          <div class="next"><strong>Next</strong><span>Expanded byte-path hardening</span></div>
+          <div><strong>Done</strong><span>Byte-path parity and fixture freeze</span></div>
+          <div class="next"><strong>Next</strong><span>Protocol feature corpus and wire-shape baselines</span></div>
         </div>
       </section>
 
@@ -247,6 +253,7 @@
           <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
           <a href="KIP-0022-deterministic-local-adapter-prototype.md">KIP-0022: Deterministic local adapter prototype</a>
           <a href="KIP-0023-deterministic-byte-transport-harness.md">KIP-0023: Deterministic byte transport harness</a>
+          <a href="KIP-0024-bytepath-fixture-freeze.md">KIP-0024: Byte-path fixture freeze</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -279,8 +286,8 @@
             The current implementation centers on generated profiles, source-code backends, multi-stream
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
             architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
-            prototype, a deterministic byte transport harness, and adversarial audits. The next step is expanded
-            byte-path hardening.
+            prototype, a deterministic byte transport harness, byte-path fixture freeze, and adversarial audits.
+            The next step is a protocol-feature corpus and wire-shape evaluation baselines.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>

@@ -55,7 +55,7 @@ Resource checks cover audit profile counts, frame sizes, stream and session limi
 
 ## Trace Hygiene
 
-The trace hygiene scanner rejects forbidden structured fields or marker classes such as raw secrets, derived keys, nonce bases, proof material, payload fields, client/server write keys, exporter secrets, and leak flags. It scans trace events, JSON summaries, audit reports, generated traces, and error strings.
+The trace hygiene scanner rejects forbidden structured fields or marker classes such as raw secrets, derived keys, nonce bases, proof material, payload fields, raw byte fields, client/server write keys, exporter secrets, and leak flags. It scans trace events, JSON summaries, audit reports, generated traces, fixture manifests, parity reports, malformed corpus metadata, and error strings.
 
 Allowed safe metadata includes byte counts, buckets, hygiene booleans, and redacted values.
 
@@ -76,7 +76,7 @@ protocol/hardening_generated.go
 protocol/hardening_test.go
 ```
 
-Generated hardening tests cover config misuse, replay/profile mismatch fixtures, malformed frames, trace hygiene, and generated hardening summaries. The generated backend version is now `0.15.0-lab`.
+Generated hardening tests cover config misuse, replay/profile mismatch fixtures, malformed frames, trace hygiene, generated hardening summaries, byte-path fixture tests, and generated/interpreted bytepath parity. The generated backend version is now `0.18.0-lab`.
 
 ## Hardening Mutants
 
@@ -114,7 +114,7 @@ The companion matrix is in:
 docs/PRE_ADAPTER_READINESS.md
 ```
 
-It records review status, evidence, remaining risk, and next action for compiler, profile validation, framing, streams, proxy semantics, carrier abstraction, security context, runtime lifecycle, generated backend parity, trace hygiene, resource bounds, panic safety, API misuse resistance, concurrency/race prep, and documentation.
+It records review status, evidence, remaining risk, and next action for compiler, profile validation, framing, streams, proxy semantics, carrier abstraction, security context, runtime lifecycle, deterministic byte transport, byte-path fixtures and parity, generated backend parity, trace hygiene, resource bounds, panic safety, API misuse resistance, concurrency/race prep, and documentation.
 
 ## Limitations
 
