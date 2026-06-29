@@ -1,0 +1,37 @@
+{
+  "version": "bytepath-fixture-v1",
+  "backend_version": "0.18.0-lab",
+  "report": {
+    "profile_count": 3,
+    "scenario_count": 7,
+    "compared_pairs": 21,
+    "semantic_matches": 21,
+    "byte_shape_matches": 0,
+    "allowed_differences": [
+      "kp_6c8ed2bb8afcabdc|byte_corruption_rejection: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_large_flow_fragmented: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_many_small_flows: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_mixed_flows: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_replay_rejection: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_reset_isolation: byte shape differs",
+      "kp_6c8ed2bb8afcabdc|byte_single_flow_echo: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_corruption_rejection: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_large_flow_fragmented: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_many_small_flows: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_mixed_flows: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_replay_rejection: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_reset_isolation: byte shape differs",
+      "kp_0e4c4dde225b15a3|byte_single_flow_echo: byte shape differs",
+      "kp_71adf9f00b805de4|byte_corruption_rejection: byte shape differs",
+      "kp_71adf9f00b805de4|byte_large_flow_fragmented: byte shape differs",
+      "kp_71adf9f00b805de4|byte_many_small_flows: byte shape differs",
+      "kp_71adf9f00b805de4|byte_mixed_flows: byte shape differs",
+      "kp_71adf9f00b805de4|byte_replay_rejection: byte shape differs",
+      "kp_71adf9f00b805de4|byte_reset_isolation: byte shape differs",
+      "kp_71adf9f00b805de4|byte_single_flow_echo: byte shape differs"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+}
