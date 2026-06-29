@@ -1,0 +1,8 @@
+{
+  "policies_compared": 5,
+  "features_compared": 35,
+  "policy_feature_matches": 35,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

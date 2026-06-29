@@ -1,0 +1,16 @@
+{
+  "profile_count": 5,
+  "scenario_count": 7,
+  "policy_count": 5,
+  "feature_vectors": 35,
+  "unique_policy_hashes": 5,
+  "unique_families": 3,
+  "unique_first_n_shapes": 4,
+  "unique_frame_plans": 4,
+  "unique_fragment_rhythms": 4,
+  "unique_metadata_classes": 3,
+  "diversity_score": 0.7666666666666667,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
