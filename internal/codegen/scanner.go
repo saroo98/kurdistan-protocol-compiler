@@ -63,6 +63,8 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/adapter_generated.go",
 		"protocol/localadapter_generated.go",
 		"protocol/bytetransport_generated.go",
+		"protocol/protocorpus_generated.go",
+		"protocol/wirefeatures_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -163,7 +165,9 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const AdapterGeneratedProfileID") &&
 		strings.Contains(joined, "const LocalAdapterGeneratedProfileID") &&
 		strings.Contains(joined, "const ByteTransportGeneratedProfileID") &&
-		strings.Contains(joined, "const BytePathFixtureSchemaVersion")
+		strings.Contains(joined, "const BytePathFixtureSchemaVersion") &&
+		strings.Contains(joined, "const ProtocolCorpusSchemaVersion") &&
+		strings.Contains(joined, "const WireFeatureSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)
