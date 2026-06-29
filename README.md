@@ -84,7 +84,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Byte-path parity and fixture freeze | Done |
 | Protocol feature corpus and wire-shape baselines | Done |
 | Wire-shape generator prototype | Done |
-| Wire evaluation and classifier dataset harness | Next |
+| Wire evaluation and classifier dataset harness | Done |
+| Host-based detection resistance | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -119,6 +120,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Byte-path fixture freeze with deterministic golden summaries, malformed byte corpus metadata, generated/interpreted parity checks, and fixture drift gates.
 - Protocol-feature corpus with abstract encrypted-protocol feature taxonomy, safe wire-feature extraction, first-N packet-shape model, corpus comparison, collapse scanning, and wire-shape baselines.
 - Wire-shape generator prototype with deterministic policy sampling, profile integration, bytepath application, expected feature matching, collapse scanning, fixtures, and generated-backend parity.
+- Wire evaluation and classifier dataset harness with deterministic CSV/JSONL exports, train/test/OOD splits, synthetic controls, drift checks, and classifier-readiness gates.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -169,6 +171,9 @@ internal/protocorpus + internal/wirefeatures
 internal/wiregen + internal/wiregencompare
   deterministic wire-shape policy sampling, profile policy integration, expected feature comparison, fixture baselines, and collapse scanning
 
+internal/wireeval + internal/classifierdata
+  payload-free wire evaluation records, classifier-ready CSV/JSONL exports, deterministic splits, control datasets, drift checks, and readiness reports
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -203,6 +208,7 @@ go run ./cmd/kcheck bytepath --quick
 go run ./cmd/kcheck protocorpus --quick
 go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
+go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -276,6 +282,7 @@ Kurdistan treats diversity as something to measure.
 - protocol corpus schema validation, taxonomy coverage, entry coverage, and corpus trace hygiene
 - wire-feature extraction, first-N packet modeling, corpus comparison, collapse resistance, generated-backend parity, mutant detection, and baseline drift
 - wire-shape policy generation, profile integration, bytepath feature application, expected feature matching, collapse resistance, generated-backend parity, mutant detection, and baseline drift
+- wire evaluation dataset build, schema validation, split integrity, CSV/JSONL export consistency, observable diversity, control detection, classifier readiness, drift detection, trace hygiene, and mutant detection
 
 Useful commands:
 
@@ -302,6 +309,7 @@ go run ./cmd/kcheck bytepath --quick
 go run ./cmd/kcheck protocorpus --quick
 go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
+go run ./cmd/kcheck wireeval --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -408,6 +416,21 @@ go run ./cmd/kcheck wiregen verify
 go run ./cmd/kcheck wiregen compare --old testdata/wiregen/wiregen-policy-golden.json --new testdata/wiregen/wiregen-policy-golden.json
 ```
 
+## Wire Evaluation And Classifier Datasets
+
+Milestone 21 exports deterministic wire-shape observations as offline classifier-ready datasets. `internal/wireeval` builds safe records from generated profiles and bytepath scenarios, while `internal/classifierdata` emits deterministic CSV and JSONL with stable columns.
+
+The fixture set under `testdata/wireeval/` stores safe summaries, split metadata, control records, and hashes only. It does not store raw bytes, payloads, endpoint addresses, captures, or secrets.
+
+Run:
+
+```bash
+go run ./cmd/kcheck wireeval --quick
+go run ./cmd/kcheck wireeval --full --out testdata/audit/wireeval.json
+go run ./cmd/kcheck wireeval verify
+go run ./cmd/kcheck wireeval compare --old testdata/wireeval/wireeval-dataset-golden.json --new testdata/wireeval/wireeval-dataset-golden.json
+```
+
 ## Multi-Stream Semantics
 
 Kurdistan models multiple logical streams inside one session.
@@ -475,11 +498,10 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 20: wire-shape generator prototype.
-2. Milestone 21: wire evaluation and classifier dataset harness.
-3. Milestone 22: host-based detection resistance.
-4. Milestone 23: relay churn, migration, and fleet lifecycle model.
-5. Milestone 24: concrete local proxy ingress design review.
+1. Milestone 21: wire evaluation and classifier dataset harness.
+2. Milestone 22: host-based detection resistance.
+3. Milestone 23: relay churn, migration, and fleet lifecycle model.
+4. Milestone 24: concrete local proxy ingress design review.
 
 ## Research Positioning
 

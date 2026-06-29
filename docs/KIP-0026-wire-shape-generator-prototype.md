@@ -23,6 +23,8 @@ Milestone 20 adds:
 - audit gates and CLI commands
 - generated-backend constants and tests
 
+Milestone 21 builds on this by exporting generated wire-shape observations into deterministic classifier-ready datasets. See [KIP-0027](KIP-0027-wire-evaluation-classifier-datasets.md).
+
 ## Policy Model
 
 `internal/wiregen` defines a versioned `WireShapePolicy` with:
@@ -158,4 +160,4 @@ This milestone is a deterministic local generator prototype. It does not train c
 
 ## Next Milestone
 
-Milestone 21 should build a wire evaluation and classifier dataset harness that can consume the M20 wiregen fixtures and evaluate feature separability under controlled local experiments.
+Milestone 21 consumes these wiregen fixtures through the wire evaluation and classifier dataset harness. The next research step is host-based detection resistance over repeated synthetic destination observations.
