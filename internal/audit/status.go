@@ -137,6 +137,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `hardening_generated_backend_parity`: `%s`\n", summary.HardeningGeneratedParity)
 			fmt.Fprintf(&b, "- `adapter_generated_backend_parity`: `%s`\n", summary.AdapterGeneratedParity)
 			fmt.Fprintf(&b, "- `local_adapter_generated_backend_parity`: `%s`\n", summary.LocalAdapterGeneratedParity)
+			fmt.Fprintf(&b, "- `byte_transport_generated_backend_parity`: `%s`\n", summary.ByteTransportGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
