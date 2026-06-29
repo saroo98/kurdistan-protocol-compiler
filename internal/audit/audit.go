@@ -17,9 +17,11 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wirefeatures"
 )
 
 func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
@@ -48,10 +50,25 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	}
 	bytepathFixturePath := filepath.Join(fixtureRoot, "testdata", "fixtures", "bytepath-golden.json")
 	bytepathMalformedPath := filepath.Join(fixtureRoot, "testdata", "fixtures", "malformed-byte-corpus.json")
+	protocolCorpusPath := filepath.Join(fixtureRoot, "testdata", "protocorpus", "corpus-v1.json")
+	protocolBucketsPath := filepath.Join(fixtureRoot, "testdata", "protocorpus", "feature-buckets-v1.json")
+	wireFeatureBaselinePath := filepath.Join(fixtureRoot, "testdata", "wirefeatures", "wirefeatures-golden.json")
 	bytepathParity, parityErr := byteparity.Run(ctx, fixtures.DefaultSeeds(), fixtures.DefaultScenarios())
 	if parityErr != nil {
 		bytepathParity = byteparity.ByteParityReport{Conclusion: "failed", UnexpectedDifferences: []string{parityErr.Error()}}
 	}
+	protocolCorpus, corpusErr := protocorpus.LoadManifest(protocolCorpusPath)
+	if corpusErr != nil {
+		protocolCorpus = protocorpus.CorpusManifest{Version: protocorpus.CorpusSchemaVersion}
+	}
+	bytepathManifest, fixtureErr := fixtures.LoadManifest(bytepathFixturePath)
+	wireFeatureVectors := []wirefeatures.WireFeatureVector{}
+	wireFeatureExtraction := wirefeatures.FeatureExtractionReport{Conclusion: "failed", InvalidFeatures: []string{"bytepath fixture load failed"}}
+	if fixtureErr == nil {
+		wireFeatureVectors, wireFeatureExtraction = wirefeatures.ExtractFromFixtureManifest(bytepathManifest)
+	}
+	wireFeatureComparison := wirefeatures.CompareToCorpus(wireFeatureVectors, protocolCorpus)
+	wireFeatureCollapse := wirefeatures.ScanCollapse(wireFeatureVectors)
 
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
@@ -141,6 +158,17 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		BytePathMalformedCorpusGate(bytepathMalformedPath, fixtures.DefaultMalformedCorpus()),
 		BytePathRegressionBaselinesGate(bytepathFixturePath),
 		BytePathFixtureTraceHygieneGate(bytepathFixturePath),
+		ProtocolCorpusSchemaValidGate(protocolCorpusPath),
+		ProtocolCorpusFeatureTaxonomyGate(protocolCorpus, protocolBucketsPath),
+		ProtocolCorpusEntryCoverageGate(protocolCorpus),
+		ProtocolCorpusTraceHygieneGate(protocolCorpus),
+		WireFeaturesExtractionGate(wireFeatureExtraction),
+		WireFeaturesFirstNModelGate(wireFeatureVectors),
+		WireFeaturesCorpusComparisonGate(wireFeatureComparison),
+		WireFeaturesCollapseResistanceGate(wireFeatureCollapse),
+		WireFeaturesGeneratedBackendParityGate(),
+		WireFeaturesMutantDetectionGate(),
+		WireFeaturesBaselineGate(ctx, wireFeatureBaselinePath, bytepathFixturePath, protocolCorpusPath),
 		FuzzPresenceGate(),
 	}
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

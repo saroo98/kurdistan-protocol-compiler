@@ -139,6 +139,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `local_adapter_generated_backend_parity`: `%s`\n", summary.LocalAdapterGeneratedParity)
 			fmt.Fprintf(&b, "- `byte_transport_generated_backend_parity`: `%s`\n", summary.ByteTransportGeneratedParity)
 			fmt.Fprintf(&b, "- `bytepath_fixture_generated_backend_parity`: `%s`\n", summary.BytePathFixtureParity)
+			fmt.Fprintf(&b, "- `wirefeatures_generated_backend_parity`: `%s`\n", summary.WireFeaturesGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -350,6 +351,59 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck bytepath --quick` or `go run ./cmd/kcheck fixtures verify` for fixture stability checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Protocol Feature Corpus")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "protocorpus_schema_valid"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "protocorpus_schema_valid")
+		renderNamedGateResult(&b, report.Gates, "protocorpus_feature_taxonomy")
+		renderNamedGateResult(&b, report.Gates, "protocorpus_entry_coverage")
+		renderNamedGateResult(&b, report.Gates, "protocorpus_trace_hygiene")
+		if strings.HasPrefix(report.Mode, "protocorpus-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"corpus_version",
+				"entry_count",
+				"phase_kinds",
+				"field_kinds",
+				"visibility_classes",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Protocol corpus gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck protocorpus --quick` for corpus taxonomy checks.")
+	}
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Wire Feature Baselines")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "wirefeatures_extraction"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_extraction")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_firstn_model")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_corpus_comparison")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_collapse_resistance")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "wirefeatures_baseline")
+		if strings.HasPrefix(report.Mode, "wirefeatures-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"feature_schema_version",
+				"feature_count",
+				"profile_count",
+				"scenario_count",
+				"unique_first_n_shapes",
+				"unique_feature_hashes",
+				"matched_families",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Wire-feature gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck wirefeatures --quick` for feature baseline checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -359,6 +413,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.")
 	fmt.Fprintln(&b, "- Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.")
 	fmt.Fprintln(&b, "- Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.")
+	fmt.Fprintln(&b, "- Protocol corpus and wire-feature baselines are abstract feature models; they are not a wire-shape generator or classifier.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -367,7 +422,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 19 should focus on a protocol-feature corpus and wire-shape evaluation baselines before any concrete adapter work.")
+	fmt.Fprintln(&b, "Milestone 20 should focus on a wire-shape generation prototype using the frozen protocol-feature corpus and wire-feature baselines.")
 	return b.String()
 }
 
