@@ -55,6 +55,7 @@ type Profile struct {
 	Stream         StreamPolicy          `json:"stream"`
 	ProxySemantics ProxySemanticsPolicy  `json:"proxy_semantics"`
 	CarrierPolicy  CarrierPolicy         `json:"carrier_policy"`
+	WireShape      WireShapePolicy       `json:"wire_shape"`
 	AdapterPolicy  AdapterPolicy         `json:"adapter_policy"`
 	Security       SecurityPolicy        `json:"security"`
 	Compatibility  CompatibilityMetadata `json:"compatibility"`
@@ -186,6 +187,88 @@ type CarrierPolicy struct {
 	MaxMessagesPerEnvelope int    `json:"max_messages_per_envelope"`
 	MaxCarrierQueueDepth   int    `json:"max_carrier_queue_depth"`
 	MaxRetryCount          int    `json:"max_retry_count"`
+}
+
+type WireShapePolicy struct {
+	Version              string                   `json:"version"`
+	CorpusVersion        string                   `json:"corpus_version"`
+	PolicyID             string                   `json:"policy_id"`
+	ProfileSeed          int                      `json:"profile_seed"`
+	SelectedFamily       string                   `json:"selected_family"`
+	SelectedCorpusEntry  string                   `json:"selected_corpus_entry"`
+	PhasePlan            WirePhasePlan            `json:"phase_plan"`
+	FieldLayoutPlan      WireFieldLayoutPlan      `json:"field_layout_plan"`
+	FirstFlightPlan      WireFirstFlightPlan      `json:"first_flight_plan"`
+	FirstNPlan           WireFirstNPlan           `json:"first_n_plan"`
+	FrameSizePlan        WireFrameSizePlan        `json:"frame_size_plan"`
+	FragmentRhythmPlan   WireFragmentRhythmPlan   `json:"fragment_rhythm_plan"`
+	ControlPlan          WireControlPlan          `json:"control_plan"`
+	MetadataExposurePlan WireMetadataExposurePlan `json:"metadata_exposure_plan"`
+	LengthAlonePlan      WireLengthAlonePlan      `json:"length_alone_plan"`
+	PolicyHash           string                   `json:"policy_hash"`
+}
+
+type WirePhasePlan struct {
+	PhaseSequence       []string `json:"phase_sequence"`
+	HandshakeRTTBucket  string   `json:"handshake_rtt_bucket"`
+	DirectionPattern    string   `json:"direction_pattern"`
+	ControlPhaseEnabled bool     `json:"control_phase_enabled"`
+}
+
+type WireFieldLayoutPlan struct {
+	LayoutClass       string            `json:"layout_class"`
+	FieldOrder        []string          `json:"field_order"`
+	VisibilityByField map[string]string `json:"visibility_by_field"`
+	SizeBucketByField map[string]string `json:"size_bucket_by_field"`
+	PayloadPosition   string            `json:"payload_position"`
+}
+
+type WireFirstFlightPlan struct {
+	PacketCountBucket string   `json:"packet_count_bucket"`
+	DirectionPattern  string   `json:"direction_pattern"`
+	SizeBuckets       []string `json:"size_buckets"`
+	ControlIncluded   bool     `json:"control_included"`
+}
+
+type WireFirstNPlan struct {
+	N              int    `json:"n"`
+	ShapeClass     string `json:"shape_class"`
+	DirectionClass string `json:"direction_class"`
+	SizeClass      string `json:"size_class"`
+}
+
+type WireFrameSizePlan struct {
+	Strategy      string   `json:"strategy"`
+	SizeBuckets   []string `json:"size_buckets"`
+	PaddingBudget string   `json:"padding_budget"`
+	PayloadSplit  string   `json:"payload_split"`
+}
+
+type WireFragmentRhythmPlan struct {
+	Strategy          string   `json:"strategy"`
+	FragmentBuckets   []string `json:"fragment_buckets"`
+	ReorderPermitted  bool     `json:"reorder_permitted"`
+	ReassemblyPattern string   `json:"reassembly_pattern"`
+}
+
+type WireControlPlan struct {
+	Richness        string `json:"richness"`
+	PreDataControls int    `json:"pre_data_controls"`
+	InterleaveClass string `json:"interleave_class"`
+	CloseClass      string `json:"close_class"`
+	ResetClass      string `json:"reset_class"`
+}
+
+type WireMetadataExposurePlan struct {
+	ExposureClass     string   `json:"exposure_class"`
+	CleartextFields   []string `json:"cleartext_fields"`
+	EncryptedFields   []string `json:"encrypted_fields"`
+	DerivedOnlyFields []string `json:"derived_only_fields"`
+}
+
+type WireLengthAlonePlan struct {
+	Enabled      bool   `json:"enabled"`
+	TriggerClass string `json:"trigger_class"`
 }
 
 type AdapterPolicy struct {

@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"kurdistan/internal/ir"
+	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wiregen"
 )
 
 func Generate(seed int64) (*ir.Profile, error) {
@@ -39,6 +41,10 @@ func Generate(seed int64) (*ir.Profile, error) {
 	carrier := carrierPolicy(rng)
 	adapter := adapterPolicy(rng, stream)
 	security := securityPolicy(rng)
+	wireShape, err := wiregen.SamplePolicy(seed, protocorpus.DefaultCorpus())
+	if err != nil {
+		return nil, err
+	}
 
 	p := &ir.Profile{
 		Version: ir.SupportedVersion,
@@ -77,6 +83,7 @@ func Generate(seed int64) (*ir.Profile, error) {
 		Stream:         stream,
 		ProxySemantics: proxy,
 		CarrierPolicy:  carrier,
+		WireShape:      wiregen.ToIRPolicy(wireShape),
 		AdapterPolicy:  adapter,
 		Security:       security,
 		Compatibility:  compatibilityMetadata(stream, carrier, adapter, security),

@@ -4,6 +4,9 @@
 package ir
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -57,6 +60,9 @@ func Validate(p *Profile) error {
 		return err
 	}
 	if err := validateCarrierPolicy(p.CarrierPolicy, p.Limits); err != nil {
+		return err
+	}
+	if err := validateWireShapePolicy(p.WireShape); err != nil {
 		return err
 	}
 	if err := validateAdapterPolicy(p.AdapterPolicy, p.Stream, p.Limits); err != nil {
@@ -455,6 +461,90 @@ func validateCarrierPolicy(p CarrierPolicy, limits SafetyLimits) error {
 	return nil
 }
 
+func validateWireShapePolicy(p WireShapePolicy) error {
+	if p.Version != "wiregen-policy-v1" {
+		return fmt.Errorf("invalid wire-shape policy version")
+	}
+	if p.CorpusVersion != "protocorpus-v1" {
+		return fmt.Errorf("invalid wire-shape corpus version")
+	}
+	if !safeWireToken(p.PolicyID) || !safeWireToken(p.SelectedFamily) || !safeWireToken(p.SelectedCorpusEntry) || p.ProfileSeed == 0 {
+		return fmt.Errorf("invalid wire-shape policy identity")
+	}
+	if !oneOf(p.SelectedFamily, "structured_encrypted", "fully_encrypted", "greeting_based", "length_prefixed", "message_oriented", "stream_oriented", "control_rich", "minimal_handshake", "multi_round_handshake") {
+		return fmt.Errorf("invalid wire-shape selected family")
+	}
+	if len(p.PhasePlan.PhaseSequence) == 0 || !oneOf(p.PhasePlan.HandshakeRTTBucket, "0rtt", "1rtt", "1_5rtt", "2rtt", "multi_rtt", "unknown") || !oneOf(p.PhasePlan.DirectionPattern, "client_first", "server_first", "alternating", "client_burst", "server_burst", "bidirectional_interleaved", "unknown") {
+		return fmt.Errorf("invalid wire-shape phase plan")
+	}
+	for _, phase := range p.PhasePlan.PhaseSequence {
+		if !oneOf(phase, "greeting", "handshake", "control", "data", "close", "reset") {
+			return fmt.Errorf("invalid wire-shape phase")
+		}
+	}
+	if !safeWireToken(p.FieldLayoutPlan.LayoutClass) || len(p.FieldLayoutPlan.FieldOrder) == 0 || !safeWireToken(p.FieldLayoutPlan.PayloadPosition) {
+		return fmt.Errorf("invalid wire-shape field layout")
+	}
+	for _, field := range p.FieldLayoutPlan.FieldOrder {
+		if !oneOf(field, "type", "length", "version", "nonce_like", "key_like", "certificate_like", "reserved", "padding_length", "padding", "payload", "auth_tag_like", "unknown_encrypted") {
+			return fmt.Errorf("invalid wire-shape field kind")
+		}
+		if !oneOf(p.FieldLayoutPlan.VisibilityByField[field], "cleartext", "encrypted", "derived", "absent") {
+			return fmt.Errorf("invalid wire-shape field visibility")
+		}
+		if !validWireSizeBucket(p.FieldLayoutPlan.SizeBucketByField[field]) {
+			return fmt.Errorf("invalid wire-shape field size bucket")
+		}
+	}
+	if !safeWireToken(p.FirstFlightPlan.PacketCountBucket) || !oneOf(p.FirstFlightPlan.DirectionPattern, "client_first", "server_first", "alternating", "client_burst", "server_burst", "bidirectional_interleaved", "unknown") || len(p.FirstFlightPlan.SizeBuckets) == 0 {
+		return fmt.Errorf("invalid wire-shape first-flight plan")
+	}
+	for _, bucket := range p.FirstFlightPlan.SizeBuckets {
+		if !validWireSizeBucket(bucket) {
+			return fmt.Errorf("invalid wire-shape first-flight bucket")
+		}
+	}
+	if p.FirstNPlan.N <= 0 || p.FirstNPlan.N > 16 || !safeWireToken(p.FirstNPlan.ShapeClass) || !safeWireToken(p.FirstNPlan.DirectionClass) || !safeWireToken(p.FirstNPlan.SizeClass) {
+		return fmt.Errorf("invalid wire-shape first-n plan")
+	}
+	if !safeWireToken(p.FrameSizePlan.Strategy) || !safeWireToken(p.FrameSizePlan.PaddingBudget) || !safeWireToken(p.FrameSizePlan.PayloadSplit) || len(p.FrameSizePlan.SizeBuckets) == 0 {
+		return fmt.Errorf("invalid wire-shape frame-size plan")
+	}
+	for _, bucket := range p.FrameSizePlan.SizeBuckets {
+		if !validWireSizeBucket(bucket) {
+			return fmt.Errorf("invalid wire-shape frame-size bucket")
+		}
+	}
+	if !safeWireToken(p.FragmentRhythmPlan.Strategy) || !safeWireToken(p.FragmentRhythmPlan.ReassemblyPattern) || len(p.FragmentRhythmPlan.FragmentBuckets) == 0 {
+		return fmt.Errorf("invalid wire-shape fragment rhythm")
+	}
+	for _, bucket := range p.FragmentRhythmPlan.FragmentBuckets {
+		if !validWireSizeBucket(bucket) {
+			return fmt.Errorf("invalid wire-shape fragment bucket")
+		}
+	}
+	if !safeWireToken(p.ControlPlan.Richness) || p.ControlPlan.PreDataControls < 0 || p.ControlPlan.PreDataControls > 8 || !safeWireToken(p.ControlPlan.InterleaveClass) || !safeWireToken(p.ControlPlan.CloseClass) || !safeWireToken(p.ControlPlan.ResetClass) {
+		return fmt.Errorf("invalid wire-shape control plan")
+	}
+	if !oneOf(p.MetadataExposurePlan.ExposureClass, "none_visible", "minimal_visible", "mixed_visible_encrypted", "cleartext_header_encrypted_payload", "encrypted_header_encrypted_payload", "unknown") {
+		return fmt.Errorf("invalid wire-shape metadata exposure")
+	}
+	if !safeWireToken(p.LengthAlonePlan.TriggerClass) {
+		return fmt.Errorf("invalid wire-shape length-alone plan")
+	}
+	if p.PolicyHash == "" {
+		return fmt.Errorf("wire-shape policy hash is required")
+	}
+	expected, err := wireShapePolicyHash(p)
+	if err != nil {
+		return err
+	}
+	if expected != p.PolicyHash {
+		return fmt.Errorf("wire-shape policy hash mismatch")
+	}
+	return nil
+}
+
 func validateAdapterPolicy(p AdapterPolicy, _ StreamPolicy, limits SafetyLimits) error {
 	if !oneOf(p.FlowLifecyclePolicy, "strict", "half_close_aware", "drain_before_close", "reset_terminal") {
 		return fmt.Errorf("invalid adapter flow lifecycle policy")
@@ -653,4 +743,40 @@ func oneOfInt(value int, allowed ...int) bool {
 		}
 	}
 	return false
+}
+
+func safeWireToken(value string) bool {
+	if value == "" {
+		return false
+	}
+	lower := strings.ToLower(value)
+	if lower == "auth_tag_like" {
+		return true
+	}
+	for _, marker := range []string{"raw_payload", "raw_bytes", "encoded_bytes", "decoded_bytes", "ciphertext", "plaintext", "pcap", "packet_dump", "capture_bytes", "auth_tag", "nonce_base", "secret", "derived_key", "client_write_key", "server_write_key", "proof_material", "private_key", "session_secret", "destination_address", "proxy_ip", "server_ip", "domain", "sni", "host_header"} {
+		if strings.Contains(lower, marker) {
+			return false
+		}
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validWireSizeBucket(bucket string) bool {
+	return oneOf(bucket, "size_0", "size_1_3", "size_4_8", "size_9_16", "size_17_32", "size_33_64", "size_65_128", "size_129_512", "size_513_1500", "size_1501_4096", "size_4097_plus")
+}
+
+func wireShapePolicyHash(p WireShapePolicy) (string, error) {
+	p.PolicyHash = ""
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
 }
