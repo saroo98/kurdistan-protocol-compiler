@@ -15,8 +15,10 @@ import (
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
+	"kurdistan/internal/protocorpus"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wirefeatures"
 )
 
 type TraceHygieneReport struct {
@@ -42,6 +44,12 @@ var forbiddenTraceKeys = []string{
 	"raw_bytes",
 	"encoded_bytes",
 	"decoded_bytes",
+	"pcap",
+	"packet_dump",
+	"capture_bytes",
+	"destination_address",
+	"proxy_ip",
+	"server_ip",
 	"plaintext",
 	"ciphertext",
 	"secret",
@@ -247,6 +255,44 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		return nil
 	}))
+	results = append(results, check("protocol_corpus_wirefeatures_trace_hygiene", CategoryTraceHygiene, func() error {
+		corpus := protocorpus.DefaultCorpus()
+		if err := protocorpus.ValidateManifest(corpus); err != nil {
+			return err
+		}
+		if report := ScanValue(corpus); !report.Passed {
+			return fmt.Errorf("protocol corpus rejected: %v", report.Findings)
+		}
+		manifest, err := fixtures.GenerateBytePathManifest(ctx, fixtures.ManifestOptions{
+			ProfileSeeds:   []int{int(p.Seed)},
+			ScenarioNames:  []string{bytetransport.ScenarioSingleFlow},
+			BackendVersion: Version,
+		})
+		if err != nil {
+			return err
+		}
+		_, extraction := wirefeatures.ExtractFromFixtureManifest(manifest)
+		if extraction.Conclusion != "passed" {
+			return fmt.Errorf("wire feature extraction failed")
+		}
+		baseline, err := wirefeatures.GenerateBaseline(ctx, manifest, corpus)
+		if err != nil {
+			return err
+		}
+		if report := ScanValue(baseline); !report.Passed {
+			return fmt.Errorf("wire feature baseline rejected: %v", report.Findings)
+		}
+		if ScanJSON([]byte(`{"encoded_bytes":"abc"}`)).Passed {
+			return fmt.Errorf("encoded byte marker accepted")
+		}
+		if ScanJSON([]byte(`{"destination_address":"127.0.0.1"}`)).Passed {
+			return fmt.Errorf("destination address marker accepted")
+		}
+		if ScanJSON([]byte(`{"proxy_ip":"127.0.0.1"}`)).Passed {
+			return fmt.Errorf("proxy IP marker accepted")
+		}
+		return nil
+	}))
 	return results
 }
 
@@ -270,6 +316,12 @@ func scanValue(value any, path string, findings *[]string) {
 	case string:
 		lower := strings.ToLower(v)
 		for _, marker := range forbiddenTraceKeys {
+			if marker == "payload" || marker == "secret" {
+				continue
+			}
+			if marker == "auth_tag" && lower == "auth_tag_like" {
+				continue
+			}
 			if strings.Contains(lower, marker) {
 				*findings = append(*findings, marker)
 			}
@@ -281,7 +333,7 @@ func forbiddenKey(key string) bool {
 	for _, marker := range forbiddenTraceKeys {
 		if key == marker || strings.Contains(key, marker) {
 			switch key {
-			case "payload_bytes", "payload_hygiene", "payload_logged", "secret_logged", "secret_hygiene", "secret_hygiene_result", "ciphertext_bytes", "auth_tag_bytes":
+			case "payload_bytes", "payload_hygiene", "payload_logged", "payload_visibility", "secret_logged", "secret_hygiene", "secret_hygiene_result", "ciphertext_bytes", "auth_tag_bytes":
 				return false
 			}
 			return true
