@@ -41,6 +41,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/adapter_generated.go",
 		"protocol/localadapter_generated.go",
 		"protocol/bytetransport_generated.go",
+		"protocol/protocorpus_generated.go",
+		"protocol/wirefeatures_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -62,6 +64,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/bytetransportadversary_test.go",
 		"protocol/bytepath_fixture_test.go",
 		"protocol/bytepath_parity_test.go",
+		"protocol/protocorpus_test.go",
+		"protocol/wirefeatures_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -118,6 +122,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const LocalAdapterGeneratedProfileID") ||
 		!strings.Contains(protocolSource, "const ByteTransportGeneratedProfileID") ||
 		!strings.Contains(protocolSource, "const BytePathFixtureSchemaVersion") ||
+		!strings.Contains(protocolSource, "const ProtocolCorpusSchemaVersion") ||
+		!strings.Contains(protocolSource, "const WireFeatureSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}

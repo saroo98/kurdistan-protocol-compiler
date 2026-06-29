@@ -921,6 +921,70 @@ func ByteTransportAdversaryDemo(ctx context.Context, scenario string) (bytetrans
 		return nil, err
 	}
 
+	protocolCorpusSource, err := renderGo(`package protocol
+
+import "kurdistan/internal/protocorpus"
+
+const ProtocolCorpusSchemaVersion = "protocorpus-v1"
+const ProtocolCorpusFeatureSchemaVersion = "wirefeatures-v1"
+const ProtocolCorpusGeneratedProfileID = %[1]s
+
+var GeneratedProtocolPhases = []string{"greeting", "handshake", "control", "data", "close", "reset"}
+var GeneratedProtocolFieldKinds = []string{"type", "length", "version", "nonce_like", "key_like", "certificate_like", "reserved", "padding_length", "padding", "payload", "auth_tag_like", "unknown_encrypted"}
+
+func GeneratedProtocolCorpus() protocorpus.CorpusManifest {
+	return protocorpus.DefaultCorpus()
+}
+
+func GeneratedProtocolCorpusSummary() protocorpus.CorpusSummary {
+	return protocorpus.Summarize(GeneratedProtocolCorpus())
+}
+`, quote(p.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	wireFeaturesSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/fixtures"
+	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/wirefeatures"
+)
+
+const WireFeatureSchemaVersion = "wirefeatures-v1"
+const WireFeatureGeneratedProfileID = %[1]s
+const WireFeatureFirstNModel = "bucketed-firstn-v1"
+const WireFeatureSummarySchema = "wirefeature-summary-v1"
+
+func GeneratedWireFeatureBaseline(ctx context.Context) (wirefeatures.BaselineManifest, error) {
+	manifest, err := fixtures.GenerateBytePathManifest(ctx, fixtures.ManifestOptions{
+		FixtureSet: "generated-wirefeatures",
+		Backend: fixtures.BackendGen,
+		ProfileSeeds: []int{int(ProfileSeed)},
+		ScenarioNames: []string{"byte_single_flow_echo", "byte_corruption_rejection", "byte_replay_rejection"},
+		BackendVersion: GeneratorVersion,
+	})
+	if err != nil {
+		return wirefeatures.BaselineManifest{}, err
+	}
+	return wirefeatures.GenerateBaseline(ctx, manifest, protocorpus.DefaultCorpus())
+}
+
+func GeneratedWireFeatureVectors(ctx context.Context) ([]wirefeatures.WireFeatureVector, error) {
+	baseline, err := GeneratedWireFeatureBaseline(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return baseline.FeatureVectors, nil
+}
+`, quote(p.ID))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2092,6 +2156,87 @@ func TestGeneratedBytePathParity(t *testing.T) {
 		return nil, err
 	}
 
+	protocolCorpusTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/protocorpus"
+)
+
+func TestGeneratedProtocolCorpusConstants(t *testing.T) {
+	if ProtocolCorpusSchemaVersion != string(protocorpus.CorpusSchemaVersion) || ProtocolCorpusFeatureSchemaVersion != protocorpus.FeatureSchemaVersion {
+		t.Fatalf("generated protocol corpus schema constants drifted")
+	}
+	if ProtocolCorpusGeneratedProfileID != ProfileID || len(GeneratedProtocolPhases) < 6 || len(GeneratedProtocolFieldKinds) < 12 {
+		t.Fatalf("generated protocol corpus specialization missing")
+	}
+	corpus := GeneratedProtocolCorpus()
+	if err := protocorpus.ValidateManifest(corpus); err != nil {
+		t.Fatal(err)
+	}
+	if report := protocorpus.ValidateRedaction(corpus); !report.Passed {
+		t.Fatalf("generated protocol corpus hygiene failed: %%v", report.Findings)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	wireFeaturesTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/wirefeatures"
+)
+
+func TestGeneratedWireFeatureExtraction(t *testing.T) {
+	if WireFeatureSchemaVersion != wirefeatures.SchemaVersion || WireFeatureGeneratedProfileID != ProfileID {
+		t.Fatalf("generated wirefeature constants drifted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	baseline, err := GeneratedWireFeatureBaseline(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := wirefeatures.ValidateBaseline(baseline); err != nil {
+		t.Fatal(err)
+	}
+	if baseline.FeatureCount != 3 || baseline.PayloadLogged || baseline.SecretLogged {
+		t.Fatalf("generated wirefeature baseline unsafe or incomplete: %%+v", baseline)
+	}
+}
+
+func TestGeneratedWireFeatureCollapseScanner(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	vectors, err := GeneratedWireFeatureVectors(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := wirefeatures.ScanCollapse(vectors)
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated feature vectors collapsed unexpectedly: %%+v", report)
+	}
+	collapsed := append([]wirefeatures.WireFeatureVector(nil), vectors...)
+	for i := range collapsed {
+		collapsed[i] = vectors[0]
+		collapsed[i].ProfileID = vectors[i].ProfileID
+	}
+	if wirefeatures.ScanCollapse(collapsed).Conclusion != "failed" {
+		t.Fatalf("collapsed wirefeature vectors not detected")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -2417,6 +2562,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/adapter_generated.go", Content: adapterSource, Go: true},
 		{RelPath: "protocol/localadapter_generated.go", Content: localAdapterSource, Go: true},
 		{RelPath: "protocol/bytetransport_generated.go", Content: byteTransportSource, Go: true},
+		{RelPath: "protocol/protocorpus_generated.go", Content: protocolCorpusSource, Go: true},
+		{RelPath: "protocol/wirefeatures_generated.go", Content: wireFeaturesSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -2441,6 +2588,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/bytetransportadversary_test.go", Content: byteTransportAdversaryTestSource, Go: true},
 		{RelPath: "protocol/bytepath_fixture_test.go", Content: bytePathFixtureTestSource, Go: true},
 		{RelPath: "protocol/bytepath_parity_test.go", Content: bytePathParityTestSource, Go: true},
+		{RelPath: "protocol/protocorpus_test.go", Content: protocolCorpusTestSource, Go: true},
+		{RelPath: "protocol/wirefeatures_test.go", Content: wireFeaturesTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
