@@ -5,12 +5,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/audit"
+	"kurdistan/internal/codegen"
+	"kurdistan/internal/fixtures"
 )
 
 func main() {
@@ -49,6 +53,12 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "bytetransport" {
 		os.Exit(runByteTransport(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "fixtures" {
+		os.Exit(runFixtures(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "bytepath" {
+		os.Exit(runBytePath(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -752,4 +762,174 @@ func runByteTransport(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+func runBytePath(args []string) int {
+	flags := flag.NewFlagSet("kcheck bytepath", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick bytepath fixture audit")
+	full := flags.Bool("full", false, "run full bytepath fixture audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
+	profiles := flags.Int("profiles", 0, "optional profile count override")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	if mode == "quick" {
+		cfg.ProfileCount = 3
+		cfg.TraceCount = 0
+	} else {
+		cfg.ProfileCount = 20
+		cfg.TraceCount = 0
+	}
+	if *startSeed != 0 {
+		cfg.StartSeed = *startSeed
+	}
+	if *profiles != 0 {
+		cfg.ProfileCount = *profiles
+	}
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunBytePathAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runFixtures(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "fixtures subcommand required: generate, verify, compare")
+		return 2
+	}
+	switch args[0] {
+	case "generate":
+		return runFixturesGenerate(args[1:])
+	case "verify":
+		return runFixturesVerify(args[1:])
+	case "compare":
+		return runFixturesCompare(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown fixtures subcommand %q\n", args[0])
+		return 2
+	}
+}
+
+func runFixturesGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck fixtures generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", "", "fixture output path")
+	force := flags.Bool("force", false, "overwrite existing fixture output")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *out == "" {
+		fmt.Fprintln(os.Stderr, "--out is required")
+		return 2
+	}
+	manifest, err := fixtures.GenerateBytePathManifest(context.Background(), fixtures.ManifestOptions{
+		FixtureSet:     "bytepath-golden",
+		Backend:        fixtures.BackendLab,
+		BackendVersion: codegen.Version,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := fixtures.WriteManifest(*out, manifest, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote bytepath fixture manifest: %s (%d entries)\n", *out, len(manifest.Entries))
+	return 0
+}
+
+func runFixturesVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck fixtures verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	fixturePath := flags.String("fixture", defaultFixturePath("bytepath-golden.json"), "fixture manifest path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	report, err := fixtures.VerifyManifest(context.Background(), *fixturePath)
+	if err != nil {
+		fmt.Print(report.HumanSummary())
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	fmt.Printf("fixture verification passed: %s\n", *fixturePath)
+	return 0
+}
+
+func runFixturesCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck fixtures compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old fixture manifest path")
+	newPath := flags.String("new", "", "new fixture manifest path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldManifest, err := fixtures.LoadManifest(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newManifest, err := fixtures.LoadManifest(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := fixtures.CompareManifests(oldManifest, newManifest)
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		raw, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed {
+		return 1
+	}
+	return 0
+}
+
+func defaultFixturePath(name string) string {
+	return filepath.Join("testdata", "fixtures", name)
 }
