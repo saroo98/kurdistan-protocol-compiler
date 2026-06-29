@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Saro
+
+package hardening
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"kurdistan/internal/ir"
+	kruntime "kurdistan/internal/runtime"
+	ktrace "kurdistan/internal/trace"
+)
+
+type TraceHygieneReport struct {
+	Passed   bool     `json:"passed"`
+	Findings []string `json:"findings,omitempty"`
+}
+
+var forbiddenTraceKeys = []string{
+	"raw_secret",
+	"derived_key",
+	"nonce_base",
+	"plaintext_payload",
+	"ciphertext_payload",
+	"auth_tag",
+	"proof_material",
+	"private_key",
+	"session_secret",
+	"client_write_key",
+	"server_write_key",
+	"exporter_secret",
+	"payload",
+	"plaintext",
+	"ciphertext",
+}
+
+func ScanJSON(raw []byte) TraceHygieneReport {
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return TraceHygieneReport{Passed: false, Findings: []string{"invalid_json"}}
+	}
+	findings := []string{}
+	scanValue(value, "", &findings)
+	return TraceHygieneReport{Passed: len(findings) == 0, Findings: findings}
+}
+
+func ScanValue(value any) TraceHygieneReport {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return TraceHygieneReport{Passed: false, Findings: []string{"marshal_failed"}}
+	}
+	return ScanJSON(raw)
+}
+
+func ScanEvents(events []ktrace.Event) TraceHygieneReport {
+	return ScanValue(events)
+}
+
+func ScanErrorString(value string) TraceHygieneReport {
+	lower := strings.ToLower(value)
+	findings := []string{}
+	for _, marker := range forbiddenTraceKeys {
+		if strings.Contains(lower, marker) {
+			findings = append(findings, marker)
+		}
+	}
+	return TraceHygieneReport{Passed: len(findings) == 0, Findings: findings}
+}
+
+func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckResult {
+	p := firstProfile(profiles)
+	results := []CheckResult{}
+	results = append(results, check("clean_trace_hygiene_passes", CategoryTraceHygiene, func() error {
+		evs := []ktrace.Event{{ProfileID: p.ID, EventType: "runtime", PayloadHygiene: true, SecretHygiene: true}}
+		report := ScanEvents(evs)
+		if !report.Passed {
+			return fmt.Errorf("clean trace rejected: %v", report.Findings)
+		}
+		return nil
+	}))
+	results = append(results, check("secret_marker_rejected", CategoryTraceHygiene, func() error {
+		if ScanJSON([]byte(`{"client_write_key":"abc"}`)).Passed {
+			return fmt.Errorf("client_write_key accepted")
+		}
+		if ScanJSON([]byte(`{"raw_secret":"abc"}`)).Passed {
+			return fmt.Errorf("raw_secret accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("payload_marker_rejected", CategoryTraceHygiene, func() error {
+		if ScanJSON([]byte(`{"payload":"hello"}`)).Passed {
+			return fmt.Errorf("payload field accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("runtime_summary_leak_flags_rejected", CategoryTraceHygiene, func() error {
+		if ScanValue(kruntime.HarnessSummary{PayloadLogged: true}).Passed {
+			return fmt.Errorf("PayloadLogged=true accepted")
+		}
+		if ScanValue(kruntime.HarnessSummary{SecretLogged: true}).Passed {
+			return fmt.Errorf("SecretLogged=true accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("generated_runtime_trace_hygiene", CategorySecurityHygiene, func() error {
+		summary, events, err := kruntime.RunLocalHarness(ctx, p, kruntime.HarnessOptions{ClientSecret: []byte("hardening-secret"), ServerSecret: []byte("hardening-secret")})
+		if err != nil {
+			return err
+		}
+		if summary.PayloadLogged || summary.SecretLogged {
+			return fmt.Errorf("runtime reported leak")
+		}
+		raw, _ := json.Marshal(events)
+		if bytes.Contains(raw, []byte("hardening-secret")) || bytes.Contains(raw, []byte("runtime-local-bytes")) {
+			return fmt.Errorf("trace contained sensitive bytes")
+		}
+		report := ScanEvents(events)
+		if !report.Passed {
+			return fmt.Errorf("trace hygiene failed: %v", report.Findings)
+		}
+		return nil
+	}))
+	return results
+}
+
+func scanValue(value any, path string, findings *[]string) {
+	switch v := value.(type) {
+	case map[string]any:
+		for key, child := range v {
+			lower := strings.ToLower(key)
+			if forbiddenKey(lower) {
+				*findings = append(*findings, key)
+			}
+			if (lower == "payload_logged" || lower == "secret_logged") && child == true {
+				*findings = append(*findings, key+"_true")
+			}
+			scanValue(child, key, findings)
+		}
+	case []any:
+		for _, child := range v {
+			scanValue(child, path, findings)
+		}
+	case string:
+		lower := strings.ToLower(v)
+		for _, marker := range forbiddenTraceKeys {
+			if strings.Contains(lower, marker) {
+				*findings = append(*findings, marker)
+			}
+		}
+	}
+}
+
+func forbiddenKey(key string) bool {
+	for _, marker := range forbiddenTraceKeys {
+		if key == marker || strings.Contains(key, marker) {
+			switch key {
+			case "payload_bytes", "payload_hygiene", "payload_logged", "secret_logged", "secret_hygiene", "secret_hygiene_result", "ciphertext_bytes", "auth_tag_bytes":
+				return false
+			}
+			return true
+		}
+	}
+	return false
+}

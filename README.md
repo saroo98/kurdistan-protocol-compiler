@@ -25,7 +25,7 @@ Current profile generation covers:
 - multi-stream relay semantics with flow control and backpressure
 - payload-free trace capture
 - generated Go source modules
-- adversarial diversity, mutation, black-box trace audits, security invariant gates, and runtime session audits
+- adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, and implementation hardening gates
 
 The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
 
@@ -55,7 +55,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling, production security prerequisites, and runtime session architecture. Future proxy or VPN integration still requires implementation hardening and review.
+Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, and pre-adapter hardening. Future proxy or VPN integration still requires separate design review.
 
 ## Current Status
 
@@ -74,7 +74,8 @@ Current work is concentrated on the generated transport/compiler layer, includin
 | Carrier abstraction | Done |
 | Production security prerequisites | Done |
 | Runtime session architecture | Done |
-| Implementation hardening | Next |
+| Implementation hardening | Done |
+| Local adapter design review | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -102,6 +103,7 @@ Current work is concentrated on the generated transport/compiler layer, includin
 - Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
 - Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
 - Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
+- Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -134,6 +136,9 @@ internal/security
 internal/runtime + internal/runtimeadversary
   runtime roles, session lifecycle, compatibility negotiation, in-memory links, runtime traces, and runtime collapse scanning
 
+internal/hardening
+  invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, and readiness matrix
+
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
@@ -157,6 +162,7 @@ go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
 go run ./cmd/kcheck runtime --quick
+go run ./cmd/kcheck hardening --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -191,6 +197,7 @@ go run ./cmd/generated-client --proxysem-demo --targets mixed --streams 4
 go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4
 go run ./cmd/generated-client --security-demo --streams 4
 go run ./cmd/generated-client --runtime-demo --streams 4
+go run ./cmd/generated-client --hardening-demo --streams 4
 ```
 
 ## Audits And Gates
@@ -218,6 +225,7 @@ Kurdistan treats diversity as something to measure.
 - carrier semantic reconstruction, carrier diversity, queue backpressure, loss/reorder recovery, proxysem parity, and carrier mutant detection
 - security transcript binding, key schedule, nonce uniqueness, replay rejection, downgrade resistance, capability negotiation, profile compatibility, config hygiene, trace hygiene, and security mutant detection
 - runtime session lifecycle, capability negotiation, profile compatibility, security context creation, replay rejection, stream management, backpressure, error/reset isolation, trace hygiene, and runtime mutant detection
+- implementation hardening for invariant registry, API contracts, panic safety, resource bounds, trace hygiene, concurrency checks, generated parity, pre-adapter readiness, and hardening mutant detection
 
 Useful commands:
 
@@ -309,10 +317,22 @@ Milestone 13 adds an internal runtime layer above compiled profiles and below sc
 
 The runtime adversary audit exercises happy-path sessions, capability downgrade attempts, profile mismatch, replay injection, carrier queue pressure, target error/reset isolation, large object pressure, malformed link frames, and close races. The generated backend includes runtime constants, runtime tests, runtime trace capture, and a local `--runtime-demo` command.
 
+## Implementation Hardening
+
+Milestone 14 adds a hardening layer before adapter work. It checks cross-package invariants, API misuse behavior, panic safety, resource limits, trace hygiene, deterministic concurrency/race-prep behavior, generated/interpreted parity, compatibility, hardening mutants, and a pre-adapter readiness matrix.
+
+Run:
+
+```bash
+go run ./cmd/kcheck hardening --quick
+go run ./cmd/kcheck hardening --full --out testdata/audit/hardening.json
+go run ./cmd/kcheck hardening --race-advice
+```
+
 ## Roadmap
 
-1. Milestone 14: implementation hardening and review checklists.
-2. Milestone 15: local proxy adapter prototype.
+1. Milestone 15: reviewed local-only adapter design spike.
+2. Milestone 16: local adapter prototype, gated by hardening checks.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning

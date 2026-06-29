@@ -92,6 +92,20 @@ func BenchmarkRuntimeQuickAudit(b *testing.B) {
 	}
 }
 
+func BenchmarkHardeningAuditQuickMode(b *testing.B) {
+	cfg := DefaultConfig("quick")
+	cfg.ProfileCount = 3
+	for i := 0; i < b.N; i++ {
+		report, err := RunHardeningAudit(context.Background(), cfg)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if !report.Passed() {
+			b.Fatal(report.Conclusion)
+		}
+	}
+}
+
 func BenchmarkProxyGateEvaluation(b *testing.B) {
 	profiles, err := generateAuditProfiles(1, 6)
 	if err != nil {
