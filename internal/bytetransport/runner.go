@@ -141,7 +141,10 @@ func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario, cfg Byte
 		if scenario.Name == ScenarioLargeFragmented {
 			byteCount = minInt(cfg.MaxPayloadBytes*2, cfg.MaxReassemblyBytes/2)
 		}
-		base := ByteFrame{SessionID: cfg.RuntimeID, StreamID: uint64(i%maxInt(1, scenario.FlowCount)) + 1, Sequence: uint64(i + 1), Kind: kind, ByteCount: minInt(byteCount, cfg.MaxPayloadBytes), Final: i == frameCount-1, Reset: kind == FrameReset, MetadataClass: scenario.Name, ChecksumClass: "fnv32a"}
+		if scenario.Name != ScenarioLargeFragmented {
+			byteCount = minInt(byteCount, cfg.MaxPayloadBytes)
+		}
+		base := ByteFrame{SessionID: cfg.RuntimeID, StreamID: uint64(i%maxInt(1, scenario.FlowCount)) + 1, Sequence: uint64(i + 1), Kind: kind, ByteCount: byteCount, Final: i == frameCount-1, Reset: kind == FrameReset, MetadataClass: scenario.Name, ChecksumClass: "fnv32a"}
 		fragments, err := FragmentFrame(cfg, base, scenario.FragmentPolicy)
 		if err != nil {
 			return RunResult{Summary: summary}, err

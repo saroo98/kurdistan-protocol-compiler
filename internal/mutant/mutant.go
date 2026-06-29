@@ -84,6 +84,14 @@ const (
 	ModeLocalAdapterPayloadTraceLeak          = "local_adapter_payload_trace_leak"
 	ModeLocalAdapterSecretTraceLeak           = "local_adapter_secret_trace_leak"
 	ModeLocalAdapterPaddingOnlyDiversity      = "local_adapter_padding_only_diversity"
+	ModeByteTransportAcceptsMalformedFrame    = "byte_transport_accepts_malformed_frame"
+	ModeByteTransportIgnoresMaxFrameSize      = "byte_transport_ignores_max_frame_size"
+	ModeByteTransportIgnoresBackpressure      = "byte_transport_ignores_backpressure"
+	ModeByteTransportReusesSequence           = "byte_transport_reuses_sequence"
+	ModeByteTransportAcceptsCorruption        = "byte_transport_accepts_corruption"
+	ModeByteTransportDropsFragmentSilently    = "byte_transport_drops_fragment_silently"
+	ModeByteTransportPayloadTraceLeak         = "byte_transport_payload_trace_leak"
+	ModeByteTransportPaddingOnlyDiversity     = "byte_transport_padding_only_diversity"
 )
 
 func Modes() []string {
@@ -155,6 +163,14 @@ func Modes() []string {
 		ModeLocalAdapterPayloadTraceLeak,
 		ModeLocalAdapterSecretTraceLeak,
 		ModeLocalAdapterPaddingOnlyDiversity,
+		ModeByteTransportAcceptsMalformedFrame,
+		ModeByteTransportIgnoresMaxFrameSize,
+		ModeByteTransportIgnoresBackpressure,
+		ModeByteTransportReusesSequence,
+		ModeByteTransportAcceptsCorruption,
+		ModeByteTransportDropsFragmentSilently,
+		ModeByteTransportPayloadTraceLeak,
+		ModeByteTransportPaddingOnlyDiversity,
 	}
 }
 
@@ -349,6 +365,25 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 		case ModeLocalAdapterSecretTraceLeak:
 			p.AdapterPolicy.TracePolicy = "metadata_only"
 		case ModeLocalAdapterPaddingOnlyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
+		case ModeByteTransportAcceptsMalformedFrame:
+			p.InvalidInput.MalformedFrame = "generated_malformed_response"
+		case ModeByteTransportIgnoresMaxFrameSize:
+			p.Limits.MaxFrameBytes = max(p.Limits.MaxFrameBytes, 256*1024)
+		case ModeByteTransportIgnoresBackpressure:
+			p.CarrierPolicy.MaxCarrierQueueDepth = 128
+			p.AdapterPolicy.MaxBufferedBytes = 2 * 1024 * 1024
+		case ModeByteTransportReusesSequence:
+			p.Security.ReplayPolicy = "windowed_replay"
+		case ModeByteTransportAcceptsCorruption:
+			p.Security.SecureEnvelopeMode = "metadata_authenticated"
+		case ModeByteTransportDropsFragmentSilently:
+			p.FrameGrammar.FragmentationMode = base.FrameGrammar.FragmentationMode
+		case ModeByteTransportPayloadTraceLeak:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeByteTransportPaddingOnlyDiversity:
 			p = cloneProfile(base)
 			renameWireSymbols(p, mode, i)
 			p.Padding = paddingForIndex(i)
