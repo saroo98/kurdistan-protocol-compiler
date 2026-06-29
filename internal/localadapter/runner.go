@@ -36,7 +36,7 @@ func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario, cfg Loca
 		cfg.MaxChunkBytes = min(p.AdapterPolicy.MaxFlowBytes, MaxLocalChunkBytes)
 	}
 	if scenario.ExpectBackpressure || scenario.Name == ScenarioQueuePressure {
-		cfg.MaxBufferedBytes = max(128, cfg.MaxChunkBytes/2)
+		cfg.MaxBufferedBytes = max(64, cfg.MaxChunkBytes/4)
 	}
 	if err := ValidateConfig(cfg); err != nil {
 		return RunResult{}, err
@@ -64,7 +64,7 @@ func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario, cfg Loca
 	backpressure := 0
 	for _, chunk := range plan.Chunks {
 		if !opened[chunk.FlowID] {
-			desc := FlowDescriptor(chunk.FlowID, max(1, chunk.ByteCount))
+			desc := FlowDescriptor(chunk.FlowID, max(cfg.MaxChunkBytes, totalBytes(plan)))
 			if err := pipe.Ingress.OpenFlow(desc); err != nil {
 				return RunResult{Summary: pipe.Summary(), Events: events}, err
 			}
