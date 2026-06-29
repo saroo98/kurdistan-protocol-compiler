@@ -771,6 +771,76 @@ func AdapterAdversaryDemo(ctx context.Context, scenario string) (adapteradversar
 		return nil, err
 	}
 
+	localAdapterMaxChunk := p.AdapterPolicy.MaxFlowBytes
+	if localAdapterMaxChunk > 256*1024 {
+		localAdapterMaxChunk = 256 * 1024
+	}
+	localAdapterSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/localadapter"
+	"kurdistan/internal/localadapteradversary"
+	ktrace "kurdistan/internal/trace"
+)
+
+const LocalAdapterGeneratedProfileID = %[1]s
+const LocalAdapterSourceModel = %[2]s
+const LocalAdapterSinkModel = "memory_sink"
+const LocalAdapterFlowLifecyclePolicy = %[3]s
+const LocalAdapterRuntimeMappingPolicy = %[4]s
+const LocalAdapterBackpressurePolicy = %[5]s
+const LocalAdapterMaxFlows = %[6]d
+const LocalAdapterMaxChunkBytes = %[7]d
+const LocalAdapterMaxBufferedBytes = %[8]d
+const LocalAdapterMaxEvents = %[9]d
+const LocalAdapterTracePayloadHygiene = true
+const LocalAdapterTraceSecretHygiene = true
+
+func LocalAdapterConfig() localadapter.LocalAdapterConfig {
+	cfg := localadapter.DefaultConfig("generated-local-adapter")
+	cfg.RuntimeID = "generated-runtime"
+	cfg.MaxFlows = LocalAdapterMaxFlows
+	cfg.MaxChunkBytes = LocalAdapterMaxChunkBytes
+	cfg.MaxBufferedBytes = LocalAdapterMaxBufferedBytes
+	cfg.MaxEvents = LocalAdapterMaxEvents
+	cfg.DeterministicSeed = uint64(ProfileSeed)
+	return cfg
+}
+
+func LocalAdapterDemo(ctx context.Context, flows int) (localadapter.LocalAdapterSummary, []ktrace.Event, error) {
+	if flows <= 0 {
+		flows = 4
+	}
+	if flows > LocalAdapterMaxFlows {
+		flows = LocalAdapterMaxFlows
+	}
+	scenario := localadapter.DefaultScenario(localadapter.ScenarioManySmallFlows)
+	scenario.FlowCount = flows
+	result, err := localadapter.RunScenario(ctx, StaticProfile(), scenario, LocalAdapterConfig())
+	return result.Summary, result.Events, err
+}
+
+func CaptureLocalAdapterTrace(ctx context.Context, flows int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := LocalAdapterDemo(ctx, flows)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	return events, TraceCaptureSummary{ProfileID: ProfileID, EventCount: len(events), DataEventCount: result.FlowsOpened, PayloadLogged: result.PayloadLogged || result.SecretLogged}, nil
+}
+
+func LocalAdapterAdversaryDemo(ctx context.Context, scenario string) (localadapteradversary.ScenarioRun, error) {
+	if scenario == "" {
+		scenario = localadapteradversary.ScenarioManySmall
+	}
+	return localadapteradversary.RunScenario(ctx, StaticProfile(), localadapteradversary.DefaultScenario(scenario)), nil
+}
+`, quote(p.ID), quote("small_burst_source"), quote(p.AdapterPolicy.FlowLifecyclePolicy), quote(p.AdapterPolicy.RuntimeMappingPolicy), quote(p.AdapterPolicy.BackpressurePolicy), p.AdapterPolicy.MaxFlows, localAdapterMaxChunk, p.AdapterPolicy.MaxBufferedBytes, p.AdapterPolicy.MaxEvents)
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -1683,6 +1753,97 @@ func TestGeneratedAdapterAdversaryQuickCorpus(t *testing.T) {
 		return nil, err
 	}
 
+	localAdapterTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/localadapter"
+)
+
+func TestGeneratedLocalAdapterDemo(t *testing.T) {
+	if LocalAdapterGeneratedProfileID != ProfileID || LocalAdapterMaxFlows <= 0 || LocalAdapterMaxChunkBytes <= 0 {
+		t.Fatalf("local adapter specialization constants missing")
+	}
+	if err := localadapter.ValidateConfig(LocalAdapterConfig()); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := LocalAdapterDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Completed || result.RuntimeStreamsOpened == 0 || result.SinkChunks == 0 || len(events) == 0 {
+		t.Fatalf("generated local adapter demo failed: %%+v", result)
+	}
+	if result.PayloadLogged || result.SecretLogged {
+		t.Fatalf("local adapter trace leak reported")
+	}
+}
+
+func TestGeneratedLocalAdapterInvalidSourceRejected(t *testing.T) {
+	cfg := LocalAdapterConfig()
+	chunk := localadapter.LocalSourceChunk{FlowID: "flow-1", Sequence: 0, ByteCount: 1}
+	if err := localadapter.ValidateSourceChunk(chunk, cfg); err == nil {
+		t.Fatalf("invalid source chunk accepted")
+	}
+}
+
+func TestGeneratedLocalAdapterTraceHygiene(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, summary, err := CaptureLocalAdapterTrace(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.EventCount == 0 || summary.PayloadLogged || len(events) == 0 {
+		t.Fatalf("local adapter trace capture failed: %%+v", summary)
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range [][]byte{[]byte("generated-runtime-demo-secret"), []byte("runtime-local-bytes")} {
+		if bytes.Contains(raw, forbidden) {
+			t.Fatalf("local adapter trace leaked forbidden bytes")
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localAdapterAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/ir"
+	"kurdistan/internal/localadapteradversary"
+)
+
+func TestGeneratedLocalAdapterAdversaryQuickCorpus(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	runs := localadapteradversary.RunScenarioCorpus(ctx, []*ir.Profile{StaticProfile()}, localadapteradversary.QuickScenarios())
+	report := localadapteradversary.AnalyzeRuns(runs, localadapteradversary.DefaultCollapseThresholds())
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated local adapter adversary quick corpus failed: %%+v", report)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -2006,6 +2167,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/runtime_generated.go", Content: runtimeSource, Go: true},
 		{RelPath: "protocol/hardening_generated.go", Content: hardeningSource, Go: true},
 		{RelPath: "protocol/adapter_generated.go", Content: adapterSource, Go: true},
+		{RelPath: "protocol/localadapter_generated.go", Content: localAdapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -2024,6 +2186,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/hardening_test.go", Content: hardeningTestSource, Go: true},
 		{RelPath: "protocol/adapter_test.go", Content: adapterTestSource, Go: true},
 		{RelPath: "protocol/adapteradversary_test.go", Content: adapterAdversaryTestSource, Go: true},
+		{RelPath: "protocol/localadapter_test.go", Content: localAdapterTestSource, Go: true},
+		{RelPath: "protocol/localadapteradversary_test.go", Content: localAdapterAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -2061,6 +2225,7 @@ func main() {
 	runtimeDemo := flag.Bool("runtime-demo", false, "run local generated runtime session demo")
 	hardeningDemo := flag.Bool("hardening-demo", false, "run local generated hardening demo")
 	adapterDemo := flag.Bool("adapter-demo", false, "run local generated adapter boundary demo")
+	localAdapterDemo := flag.Bool("localadapter-demo", false, "run local generated deterministic local adapter demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
@@ -2121,6 +2286,19 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("adapter_flows=%%d runtime_streams=%%d backpressure_events=%%d resets=%%d\n", result.FlowsOpened, result.RuntimeStreamsOpened, result.BackpressureEvents, result.FlowsReset)
+		return
+	}
+	if *localAdapterDemo {
+		result, events, err := protocol.LocalAdapterDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("local_adapter_flows=%%d source_chunks=%%d sink_chunks=%%d backpressure_events=%%d\n", result.FlowsOpened, result.SourceChunks, result.SinkChunks, result.BackpressureEvents)
 		return
 	}
 	if *carrierDemo {
@@ -2294,6 +2472,7 @@ func main() {
 	runtimeTrace := flag.Bool("runtime", false, "capture local generated runtime trace")
 	hardeningTrace := flag.Bool("hardening", false, "capture local generated hardening trace")
 	adapterTrace := flag.Bool("adapter", false, "capture local generated adapter trace")
+	localAdapterTrace := flag.Bool("localadapter", false, "capture local generated deterministic local adapter trace")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flowCount := flag.Int("flows", 0, "logical flows for adapter trace capture")
@@ -2314,6 +2493,8 @@ func main() {
 		events, summary, err = protocol.CaptureHardeningTrace(ctx, *streamCount)
 	} else if *adapterTrace {
 		events, summary, err = protocol.CaptureAdapterTrace(ctx, *streamCount)
+	} else if *localAdapterTrace {
+		events, summary, err = protocol.CaptureLocalAdapterTrace(ctx, *streamCount)
 	} else if *carrierName != "" {
 		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
 	} else if *proxySem {

@@ -79,23 +79,24 @@ type GeneratedTraceSummary struct {
 }
 
 type CodegenAuditSummary struct {
-	Profiles                   int                            `json:"profiles"`
-	GeneratedModules           int                            `json:"generated_modules"`
-	SemanticEquivalence        string                         `json:"semantic_equivalence"`
-	GeneratedProfileDiversity  string                         `json:"generated_profile_diversity"`
-	FixedSignature             string                         `json:"fixed_signature"`
-	MutantDetection            string                         `json:"mutant_detection"`
-	MultiStreamGeneratedParity string                         `json:"multi_stream_generated_parity"`
-	StreamAdversaryParity      string                         `json:"multi_stream_generated_backend_parity"`
-	ProxySemGeneratedParity    string                         `json:"proxy_generated_backend_parity"`
-	CarrierGeneratedParity     string                         `json:"carrier_generated_backend_parity"`
-	SecurityGeneratedParity    string                         `json:"security_generated_backend_parity"`
-	RuntimeGeneratedParity     string                         `json:"runtime_generated_backend_parity"`
-	HardeningGeneratedParity   string                         `json:"hardening_generated_backend_parity"`
-	AdapterGeneratedParity     string                         `json:"adapter_generated_backend_parity"`
-	SourceScanner              string                         `json:"source_scanner"`
-	InterpretedVsGenerated     InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
-	SourceScan                 codegen.SourceScanReport       `json:"source_scan"`
+	Profiles                    int                            `json:"profiles"`
+	GeneratedModules            int                            `json:"generated_modules"`
+	SemanticEquivalence         string                         `json:"semantic_equivalence"`
+	GeneratedProfileDiversity   string                         `json:"generated_profile_diversity"`
+	FixedSignature              string                         `json:"fixed_signature"`
+	MutantDetection             string                         `json:"mutant_detection"`
+	MultiStreamGeneratedParity  string                         `json:"multi_stream_generated_parity"`
+	StreamAdversaryParity       string                         `json:"multi_stream_generated_backend_parity"`
+	ProxySemGeneratedParity     string                         `json:"proxy_generated_backend_parity"`
+	CarrierGeneratedParity      string                         `json:"carrier_generated_backend_parity"`
+	SecurityGeneratedParity     string                         `json:"security_generated_backend_parity"`
+	RuntimeGeneratedParity      string                         `json:"runtime_generated_backend_parity"`
+	HardeningGeneratedParity    string                         `json:"hardening_generated_backend_parity"`
+	AdapterGeneratedParity      string                         `json:"adapter_generated_backend_parity"`
+	LocalAdapterGeneratedParity string                         `json:"local_adapter_generated_backend_parity"`
+	SourceScanner               string                         `json:"source_scanner"`
+	InterpretedVsGenerated      InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
+	SourceScan                  codegen.SourceScanReport       `json:"source_scan"`
 }
 
 type InterpretedGeneratedDivergence struct {
@@ -175,6 +176,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	runtimeGate := GeneratedRuntimeParityGate(corpus, testFailures)
 	hardeningGate := GeneratedHardeningParityGate(corpus, testFailures)
 	adapterGate := GeneratedAdapterParityGate(corpus, testFailures)
+	localAdapterGate := GeneratedLocalAdapterParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -197,6 +199,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		runtimeGate,
 		hardeningGate,
 		adapterGate,
+		localAdapterGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -610,6 +613,31 @@ func GeneratedAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFailures
 	}, failures)
 }
 
+func GeneratedLocalAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module local adapter tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated local adapter specialization constants missing")
+	}
+	localAdapterFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/localadapter_generated.go" {
+			localAdapterFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && localAdapterFiles < 2 {
+		failures = append(failures, "generated local adapter specialized files did not differ")
+	}
+	return gate("local_adapter_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include local adapter tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		"local_adapter_unique_files":   localAdapterFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedSourceScannerGate(scan codegen.SourceScanReport) GateResult {
 	return gate("generated_source_scanner", scan.Passed, "required", fmt.Sprintf("%d generated modules scanned; %d failures", scan.GeneratedModules, len(scan.Failures)), map[string]any{
 		"profile_specific_constants_present": scan.ProfileSpecificConstantsPresent,
@@ -682,23 +710,24 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		return "missing"
 	}
 	return CodegenAuditSummary{
-		Profiles:                   corpus.ProfileCount,
-		GeneratedModules:           corpus.GeneratedModules,
-		SemanticEquivalence:        status("generated_semantic_equivalence"),
-		GeneratedProfileDiversity:  status("generated_profile_diversity"),
-		FixedSignature:             status("generated_fixed_signature"),
-		MutantDetection:            status("generated_mutant_detection"),
-		MultiStreamGeneratedParity: status("multi_stream_generated_parity"),
-		StreamAdversaryParity:      status("multi_stream_generated_backend_parity"),
-		ProxySemGeneratedParity:    status("proxy_generated_backend_parity"),
-		CarrierGeneratedParity:     status("carrier_generated_backend_parity"),
-		SecurityGeneratedParity:    status("security_generated_backend_parity"),
-		RuntimeGeneratedParity:     status("runtime_generated_backend_parity"),
-		HardeningGeneratedParity:   status("hardening_generated_backend_parity"),
-		AdapterGeneratedParity:     status("adapter_generated_backend_parity"),
-		SourceScanner:              status("generated_source_scanner"),
-		InterpretedVsGenerated:     divergenceSummary(corpus),
-		SourceScan:                 corpus.SourceScan,
+		Profiles:                    corpus.ProfileCount,
+		GeneratedModules:            corpus.GeneratedModules,
+		SemanticEquivalence:         status("generated_semantic_equivalence"),
+		GeneratedProfileDiversity:   status("generated_profile_diversity"),
+		FixedSignature:              status("generated_fixed_signature"),
+		MutantDetection:             status("generated_mutant_detection"),
+		MultiStreamGeneratedParity:  status("multi_stream_generated_parity"),
+		StreamAdversaryParity:       status("multi_stream_generated_backend_parity"),
+		ProxySemGeneratedParity:     status("proxy_generated_backend_parity"),
+		CarrierGeneratedParity:      status("carrier_generated_backend_parity"),
+		SecurityGeneratedParity:     status("security_generated_backend_parity"),
+		RuntimeGeneratedParity:      status("runtime_generated_backend_parity"),
+		HardeningGeneratedParity:    status("hardening_generated_backend_parity"),
+		AdapterGeneratedParity:      status("adapter_generated_backend_parity"),
+		LocalAdapterGeneratedParity: status("local_adapter_generated_backend_parity"),
+		SourceScanner:               status("generated_source_scanner"),
+		InterpretedVsGenerated:      divergenceSummary(corpus),
+		SourceScan:                  corpus.SourceScan,
 	}
 }
 
