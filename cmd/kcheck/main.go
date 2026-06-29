@@ -35,6 +35,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "security" {
 		os.Exit(runSecurity(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "runtime" {
+		os.Exit(runRuntime(os.Args[2:]))
+	}
 	os.Exit(runAudit(os.Args[1:]))
 }
 
@@ -439,6 +442,61 @@ func runSecurity(args []string) int {
 	cfg.OutputPath = *out
 	cfg.StatusPath = *status
 	report, err := audit.RunSecurityAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runRuntime(args []string) int {
+	flags := flag.NewFlagSet("kcheck runtime", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local runtime audit")
+	full := flags.Bool("full", false, "run full local runtime audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
+	profiles := flags.Int("profiles", 0, "optional profile count override")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	if mode == "quick" {
+		cfg.ProfileCount = 3
+		cfg.TraceCount = 0
+	} else {
+		cfg.ProfileCount = 20
+		cfg.TraceCount = 0
+	}
+	if *startSeed != 0 {
+		cfg.StartSeed = *startSeed
+	}
+	if *profiles != 0 {
+		cfg.ProfileCount = *profiles
+	}
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunRuntimeAudit(context.Background(), cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

@@ -25,9 +25,9 @@ Current profile generation covers:
 - multi-stream relay semantics with flow control and backpressure
 - payload-free trace capture
 - generated Go source modules
-- adversarial diversity, mutation, black-box trace audits, and security invariant gates
+- adversarial diversity, mutation, black-box trace audits, security invariant gates, and runtime session audits
 
-The current codebase is a research compiler, runtime harness, source generator, and audit system. Production transport integration is future work.
+The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
 
 ## Why This Project Exists
 
@@ -55,7 +55,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling and production security prerequisites. Future proxy or VPN integration still requires implementation hardening and review.
+Current work is concentrated on the generated transport/compiler layer, including internal carrier-shape modeling, production security prerequisites, and runtime session architecture. Future proxy or VPN integration still requires implementation hardening and review.
 
 ## Current Status
 
@@ -73,6 +73,7 @@ Current work is concentrated on the generated transport/compiler layer, includin
 | Lab-only proxy semantics | Done |
 | Carrier abstraction | Done |
 | Production security prerequisites | Done |
+| Runtime session architecture | Done |
 | Implementation hardening | Next |
 | Proxy/VPN integration | Future |
 
@@ -100,6 +101,7 @@ Current work is concentrated on the generated transport/compiler layer, includin
 - Carrier abstraction models for stream, message, datagram-like, chunked, batch, interactive, long-poll-style, and lossy/reordered carrier shapes.
 - Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
 - Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
+- Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -129,6 +131,9 @@ internal/carrier + internal/carrierrelay + internal/carrieradversary
 internal/security
   transcript binding, key schedule, nonce/replay policy, capability negotiation, compatibility, config hygiene, and secure envelope model
 
+internal/runtime + internal/runtimeadversary
+  runtime roles, session lifecycle, compatibility negotiation, in-memory links, runtime traces, and runtime collapse scanning
+
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
@@ -151,6 +156,7 @@ go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
+go run ./cmd/kcheck runtime --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -184,6 +190,7 @@ go run ./cmd/generated-client --multistream-demo --streams 3
 go run ./cmd/generated-client --proxysem-demo --targets mixed --streams 4
 go run ./cmd/generated-client --carrier-demo --carrier mixed --streams 4
 go run ./cmd/generated-client --security-demo --streams 4
+go run ./cmd/generated-client --runtime-demo --streams 4
 ```
 
 ## Audits And Gates
@@ -210,6 +217,7 @@ Kurdistan treats diversity as something to measure.
 - proxy-semantics correctness, diversity, target backpressure, error/reset isolation, and mutant detection
 - carrier semantic reconstruction, carrier diversity, queue backpressure, loss/reorder recovery, proxysem parity, and carrier mutant detection
 - security transcript binding, key schedule, nonce uniqueness, replay rejection, downgrade resistance, capability negotiation, profile compatibility, config hygiene, trace hygiene, and security mutant detection
+- runtime session lifecycle, capability negotiation, profile compatibility, security context creation, replay rejection, stream management, backpressure, error/reset isolation, trace hygiene, and runtime mutant detection
 
 Useful commands:
 
@@ -228,6 +236,7 @@ go run ./cmd/kcheck streamadversary --quick
 go run ./cmd/kcheck proxysem --quick
 go run ./cmd/kcheck carrier --quick
 go run ./cmd/kcheck security --quick
+go run ./cmd/kcheck runtime --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -294,10 +303,16 @@ Milestone 12 adds the security architecture that future real adapters would need
 
 This layer uses standard Go cryptographic primitives for deterministic tests and synthetic secure envelopes. It is not a complete production transport security protocol.
 
+## Runtime Session Architecture
+
+Milestone 13 adds an internal runtime layer above compiled profiles and below scenario runners. It models client/server roles, session lifecycle transitions, capability negotiation, profile compatibility checks, security context creation, in-memory link delivery, secure envelope exchange, stream manager integration, and runtime trace metadata.
+
+The runtime adversary audit exercises happy-path sessions, capability downgrade attempts, profile mismatch, replay injection, carrier queue pressure, target error/reset isolation, large object pressure, malformed link frames, and close races. The generated backend includes runtime constants, runtime tests, runtime trace capture, and a local `--runtime-demo` command.
+
 ## Roadmap
 
-1. Milestone 13: implementation hardening.
-2. Milestone 14: local proxy adapter prototype.
+1. Milestone 14: implementation hardening and review checklists.
+2. Milestone 15: local proxy adapter prototype.
 3. Future: proxy/VPN transport integration after security review.
 
 ## Research Positioning

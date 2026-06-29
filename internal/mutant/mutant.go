@@ -17,41 +17,49 @@ import (
 )
 
 const (
-	ModeFixedFirstContact             = "fixed_first_contact"
-	ModeFixedFrameGrammar             = "fixed_frame_grammar"
-	ModeCosmeticSymbolsOnly           = "cosmetic_symbols_only"
-	ModeFixedScheduler                = "fixed_scheduler"
-	ModeFixedInvalidInput             = "fixed_invalid_input"
-	ModePaddingNoiseOnly              = "padding_noise_only"
-	ModeFixedStreamIDStrategy         = "fixed_stream_id_strategy"
-	ModeFixedWindowUpdatePolicy       = "fixed_window_update_policy"
-	ModeFIFOSchedulerOnly             = "fifo_scheduler_only"
-	ModeFixedResetClosePolicy         = "fixed_reset_close_policy"
-	ModeNoBackpressure                = "no_backpressure"
-	ModePaddingOnlyStreamDiversity    = "padding_only_stream_diversity"
-	ModeFixedTargetDescriptorEncoding = "fixed_target_descriptor_encoding"
-	ModeFixedTargetOpenSequence       = "fixed_target_open_sequence"
-	ModeFixedTargetErrorPolicy        = "fixed_target_error_policy"
-	ModeFixedTargetClosePolicy        = "fixed_target_close_policy"
-	ModeFixedResponseChunking         = "fixed_response_chunking"
-	ModeNoTargetBackpressure          = "no_target_backpressure"
-	ModePaddingOnlyProxyDiversity     = "padding_only_proxy_diversity"
-	ModeFixedCarrierFamily            = "fixed_carrier_family"
-	ModeFixedEnvelopeEncoding         = "fixed_envelope_encoding"
-	ModeFixedFlushPolicy              = "fixed_flush_policy"
-	ModeFixedBatchPolicy              = "fixed_batch_policy"
-	ModeFixedChunkingPolicy           = "fixed_chunking_policy"
-	ModeNoCarrierBackpressure         = "no_carrier_backpressure"
-	ModeNoReorderRecovery             = "no_reorder_recovery"
-	ModePaddingOnlyCarrierDiversity   = "padding_only_carrier_diversity"
-	ModeNoTranscriptBinding           = "no_transcript_binding"
-	ModeReusedNonce                   = "reused_nonce"
-	ModeAcceptsReplay                 = "accepts_replay"
-	ModeAcceptsDowngrade              = "accepts_downgrade"
-	ModeCapabilityMismatchAccepted    = "capability_mismatch_accepted"
-	ModeProfileMismatchAccepted       = "profile_mismatch_accepted"
-	ModeUnsafeConfigAllowed           = "unsafe_config_allowed"
-	ModeSecretTraceLeak               = "secret_trace_leak"
+	ModeFixedFirstContact                 = "fixed_first_contact"
+	ModeFixedFrameGrammar                 = "fixed_frame_grammar"
+	ModeCosmeticSymbolsOnly               = "cosmetic_symbols_only"
+	ModeFixedScheduler                    = "fixed_scheduler"
+	ModeFixedInvalidInput                 = "fixed_invalid_input"
+	ModePaddingNoiseOnly                  = "padding_noise_only"
+	ModeFixedStreamIDStrategy             = "fixed_stream_id_strategy"
+	ModeFixedWindowUpdatePolicy           = "fixed_window_update_policy"
+	ModeFIFOSchedulerOnly                 = "fifo_scheduler_only"
+	ModeFixedResetClosePolicy             = "fixed_reset_close_policy"
+	ModeNoBackpressure                    = "no_backpressure"
+	ModePaddingOnlyStreamDiversity        = "padding_only_stream_diversity"
+	ModeFixedTargetDescriptorEncoding     = "fixed_target_descriptor_encoding"
+	ModeFixedTargetOpenSequence           = "fixed_target_open_sequence"
+	ModeFixedTargetErrorPolicy            = "fixed_target_error_policy"
+	ModeFixedTargetClosePolicy            = "fixed_target_close_policy"
+	ModeFixedResponseChunking             = "fixed_response_chunking"
+	ModeNoTargetBackpressure              = "no_target_backpressure"
+	ModePaddingOnlyProxyDiversity         = "padding_only_proxy_diversity"
+	ModeFixedCarrierFamily                = "fixed_carrier_family"
+	ModeFixedEnvelopeEncoding             = "fixed_envelope_encoding"
+	ModeFixedFlushPolicy                  = "fixed_flush_policy"
+	ModeFixedBatchPolicy                  = "fixed_batch_policy"
+	ModeFixedChunkingPolicy               = "fixed_chunking_policy"
+	ModeNoCarrierBackpressure             = "no_carrier_backpressure"
+	ModeNoReorderRecovery                 = "no_reorder_recovery"
+	ModePaddingOnlyCarrierDiversity       = "padding_only_carrier_diversity"
+	ModeNoTranscriptBinding               = "no_transcript_binding"
+	ModeReusedNonce                       = "reused_nonce"
+	ModeAcceptsReplay                     = "accepts_replay"
+	ModeAcceptsDowngrade                  = "accepts_downgrade"
+	ModeCapabilityMismatchAccepted        = "capability_mismatch_accepted"
+	ModeProfileMismatchAccepted           = "profile_mismatch_accepted"
+	ModeUnsafeConfigAllowed               = "unsafe_config_allowed"
+	ModeSecretTraceLeak                   = "secret_trace_leak"
+	ModeRuntimeAcceptsCapabilityDowngrade = "runtime_accepts_capability_downgrade"
+	ModeRuntimeAcceptsProfileMismatch     = "runtime_accepts_profile_mismatch"
+	ModeRuntimeAcceptsReplay              = "runtime_accepts_replay"
+	ModeRuntimeIgnoresBackpressure        = "runtime_ignores_backpressure"
+	ModeRuntimeLeaksSecretTrace           = "runtime_leaks_secret_trace"
+	ModeRuntimeLeaksPayloadTrace          = "runtime_leaks_payload_trace"
+	ModeRuntimeNoStateValidation          = "runtime_no_state_validation"
+	ModeRuntimePaddingOnlyDiversity       = "runtime_padding_only_diversity"
 )
 
 func Modes() []string {
@@ -91,6 +99,14 @@ func Modes() []string {
 		ModeProfileMismatchAccepted,
 		ModeUnsafeConfigAllowed,
 		ModeSecretTraceLeak,
+		ModeRuntimeAcceptsCapabilityDowngrade,
+		ModeRuntimeAcceptsProfileMismatch,
+		ModeRuntimeAcceptsReplay,
+		ModeRuntimeIgnoresBackpressure,
+		ModeRuntimeLeaksSecretTrace,
+		ModeRuntimeLeaksPayloadTrace,
+		ModeRuntimeNoStateValidation,
+		ModeRuntimePaddingOnlyDiversity,
 	}
 }
 
@@ -212,6 +228,27 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p.Security.ConfigValidationPolicy = "strict_required"
 		case ModeSecretTraceLeak:
 			p.Security.SecureEnvelopeMode = "metadata_authenticated"
+		case ModeRuntimeAcceptsCapabilityDowngrade:
+			p.Security.CapabilityNegotiationPolicy = "intersection_with_required"
+		case ModeRuntimeAcceptsProfileMismatch:
+			p.Security.ProfileCompatibilityPolicy = "strict_schema"
+		case ModeRuntimeAcceptsReplay:
+			p.Security.ReplayPolicy = "windowed_replay"
+			p.InvalidInput.Replay = "ordinary_error_shaped_response"
+		case ModeRuntimeIgnoresBackpressure:
+			p.Stream.InitialStreamWindowBytes = 128 * 1024
+			p.Stream.InitialSessionWindowBytes = min(2*1024*1024, 128*1024*max(4, p.Stream.MaxConcurrentStreams))
+			p.CarrierPolicy.MaxCarrierQueueDepth = 128
+		case ModeRuntimeLeaksSecretTrace:
+			p.Security.ConfigValidationPolicy = "strict_required"
+		case ModeRuntimeLeaksPayloadTrace:
+			p.Security.SecureEnvelopeMode = "metadata_authenticated"
+		case ModeRuntimeNoStateValidation:
+			p.InvalidInput.UnknownFirstMessage = "ordinary_error_shaped_response"
+		case ModeRuntimePaddingOnlyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			p.Padding = paddingForIndex(i)
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {

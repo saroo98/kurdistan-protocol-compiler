@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-28T23:55:08Z`
+- Generated at: `2026-06-29T01:20:21Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -53,13 +53,24 @@
 | `security_secret_trace_hygiene` | PASS | `required` | 3 secret trace hygiene checks run |
 | `security_mutant_detection` | PASS | `required` | 8/8 security mutant modes detected |
 | `security_generated_backend_parity` | PASS | `required` | generated backend security support markers checked |
+| `runtime_session_lifecycle` | PASS | `required` | 9 runtime sessions checked |
+| `runtime_capability_negotiation` | PASS | `required` | 3 capability downgrade attempts rejected |
+| `runtime_profile_compatibility` | PASS | `required` | 3 profile mismatch attempts rejected |
+| `runtime_security_context` | PASS | `required` | 6 security contexts created and matched |
+| `runtime_replay_rejection` | PASS | `required` | 3 replay attempts rejected |
+| `runtime_stream_management` | PASS | `required` | 72 runtime stream messages managed |
+| `runtime_backpressure` | PASS | `required` | 152 runtime backpressure events observed |
+| `runtime_error_reset_isolation` | PASS | `required` | 6 target errors and 6 target resets isolated |
+| `runtime_trace_hygiene` | PASS | `required` | 3 runtime traces checked for payload/secret hygiene |
+| `runtime_mutant_detection` | PASS | `required` | 8/8 runtime mutant modes detected |
+| `runtime_generated_backend_parity` | PASS | `required` | generated backend runtime support markers checked |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `9 ms`
-- Trace generation: `25 ms`
-- Total audit runtime: `358 ms`
+- Profile generation: `10 ms`
+- Trace generation: `21 ms`
+- Total audit runtime: `434 ms`
 
 ## Corpus Diversity Summary
 
@@ -82,10 +93,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31888376539500357`
-- `same_profile_distance`: `0.014925373134328358`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.31689248395337316`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -152,12 +163,29 @@
 - `security_mutant_detection`: `passed`
 - `security_generated_backend_parity`: `passed`
 
+## Runtime Session Architecture
+
+- Gate result: `true`
+- `sessions`: `9`
+- `runtime_session_lifecycle`: `passed`
+- `runtime_capability_negotiation`: `passed`
+- `runtime_profile_compatibility`: `passed`
+- `runtime_security_context`: `passed`
+- `runtime_replay_rejection`: `passed`
+- `runtime_stream_management`: `passed`
+- `runtime_backpressure`: `passed`
+- `runtime_error_reset_isolation`: `passed`
+- `runtime_trace_hygiene`: `passed`
+- `runtime_mutant_detection`: `passed`
+- `runtime_generated_backend_parity`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
 - Proxy-semantics support uses synthetic target descriptors and in-memory target behavior.
 - Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.
 - Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.
+- Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
@@ -165,4 +193,4 @@
 
 ## Next Milestone
 
-Milestone 13 should focus on implementation hardening after the security prerequisite layer.
+Milestone 14 should focus on implementation hardening, review checklists, and reducing shared helper artifacts before adapter work.

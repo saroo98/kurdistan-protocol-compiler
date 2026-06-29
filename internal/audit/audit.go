@@ -12,6 +12,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
 )
 
@@ -74,6 +75,17 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		SecuritySecretTraceHygieneGate(profiles),
 		SecurityMutantDetectionGate(ctx),
 		SecurityGeneratedBackendParityGate(),
+		RuntimeSessionLifecycleGate(ctx, profiles, runtimeadversary.QuickScenarios()),
+		RuntimeCapabilityNegotiationGate(ctx, profiles),
+		RuntimeProfileCompatibilityGate(ctx, profiles),
+		RuntimeSecurityContextGate(ctx, profiles),
+		RuntimeReplayRejectionGate(ctx, profiles),
+		RuntimeStreamManagementGate(ctx, profiles),
+		RuntimeBackpressureGate(ctx, profiles),
+		RuntimeErrorResetIsolationGate(ctx, profiles),
+		RuntimeTraceHygieneGate(ctx, profiles),
+		RuntimeMutantDetectionGate(ctx),
+		RuntimeGeneratedBackendParityGate(),
 		FuzzPresenceGate(),
 	}
 

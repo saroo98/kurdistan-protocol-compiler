@@ -90,6 +90,7 @@ type CodegenAuditSummary struct {
 	ProxySemGeneratedParity    string                         `json:"proxy_generated_backend_parity"`
 	CarrierGeneratedParity     string                         `json:"carrier_generated_backend_parity"`
 	SecurityGeneratedParity    string                         `json:"security_generated_backend_parity"`
+	RuntimeGeneratedParity     string                         `json:"runtime_generated_backend_parity"`
 	SourceScanner              string                         `json:"source_scanner"`
 	InterpretedVsGenerated     InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                 codegen.SourceScanReport       `json:"source_scan"`
@@ -169,6 +170,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	proxySemGate := GeneratedProxySemParityGate(corpus, testFailures)
 	carrierGate := GeneratedCarrierParityGate(corpus, testFailures)
 	securityGate := GeneratedSecurityParityGate(corpus, testFailures)
+	runtimeGate := GeneratedRuntimeParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -188,6 +190,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		proxySemGate,
 		carrierGate,
 		securityGate,
+		runtimeGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -526,6 +529,31 @@ func GeneratedSecurityParityGate(corpus GeneratedBackendTraceCorpus, testFailure
 	}, failures)
 }
 
+func GeneratedRuntimeParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module runtime tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated runtime specialization constants missing")
+	}
+	runtimeFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/runtime_generated.go" {
+			runtimeFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && runtimeFiles < 2 {
+		failures = append(failures, "generated runtime specialized files did not differ")
+	}
+	return gate("runtime_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include runtime tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		"runtime_unique_files":         runtimeFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedSourceScannerGate(scan codegen.SourceScanReport) GateResult {
 	return gate("generated_source_scanner", scan.Passed, "required", fmt.Sprintf("%d generated modules scanned; %d failures", scan.GeneratedModules, len(scan.Failures)), map[string]any{
 		"profile_specific_constants_present": scan.ProfileSpecificConstantsPresent,
@@ -609,6 +637,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		ProxySemGeneratedParity:    status("proxy_generated_backend_parity"),
 		CarrierGeneratedParity:     status("carrier_generated_backend_parity"),
 		SecurityGeneratedParity:    status("security_generated_backend_parity"),
+		RuntimeGeneratedParity:     status("runtime_generated_backend_parity"),
 		SourceScanner:              status("generated_source_scanner"),
 		InterpretedVsGenerated:     divergenceSummary(corpus),
 		SourceScan:                 corpus.SourceScan,
