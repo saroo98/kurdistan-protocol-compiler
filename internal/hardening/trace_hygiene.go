@@ -12,6 +12,7 @@ import (
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/fixtures"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	kruntime "kurdistan/internal/runtime"
@@ -37,8 +38,13 @@ var forbiddenTraceKeys = []string{
 	"server_write_key",
 	"exporter_secret",
 	"payload",
+	"raw_payload",
+	"raw_bytes",
+	"encoded_bytes",
+	"decoded_bytes",
 	"plaintext",
 	"ciphertext",
+	"secret",
 }
 
 func ScanJSON(raw []byte) TraceHygieneReport {
@@ -193,6 +199,51 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanValue(bytetransport.ByteTransportSummary{SecretLogged: true}).Passed {
 			return fmt.Errorf("byte transport secret leak flag accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("bytepath_fixture_trace_hygiene", CategoryTraceHygiene, func() error {
+		manifest := fixtures.NewManifest(fixtures.ManifestOptions{BackendVersion: Version})
+		summary := fixtures.BytePathFixtureSummary{
+			ProfileID:            p.ID,
+			ProfileSeed:          int(p.Seed),
+			Scenario:             "byte_single_flow_echo",
+			Backend:              fixtures.BackendLab,
+			FramesEncoded:        1,
+			FramesDecoded:        1,
+			FragmentsCreated:     1,
+			FragmentsReassembled: 1,
+			BytesWrittenBucket:   "tiny",
+			BytesReadBucket:      "tiny",
+			RuntimeStreamsMapped: 1,
+			SinkCompleted:        true,
+		}
+		entry, err := fixtures.EntryForSummary(summary)
+		if err != nil {
+			return err
+		}
+		manifest.ProfileSeeds = []int{int(p.Seed)}
+		manifest.ScenarioNames = []string{summary.Scenario}
+		manifest.Summaries = []fixtures.BytePathFixtureSummary{summary}
+		manifest.Entries = []fixtures.FixtureEntry{entry}
+		manifest.Normalize()
+		if err := fixtures.ValidateManifest(manifest); err != nil {
+			return err
+		}
+		if ScanValue(manifest).Passed == false {
+			return fmt.Errorf("clean fixture rejected")
+		}
+		if ScanJSON([]byte(`{"encoded_bytes":"abcd"}`)).Passed {
+			return fmt.Errorf("encoded_bytes fixture field accepted")
+		}
+		if fixtures.ValidateRedaction(map[string]string{"raw_payload": "x"}).Passed {
+			return fmt.Errorf("fixture redaction accepted raw_payload")
+		}
+		if ScanValue(fixtures.BytePathFixtureSummary{PayloadLogged: true}).Passed {
+			return fmt.Errorf("fixture payload leak flag accepted")
+		}
+		if ScanValue(fixtures.BytePathFixtureSummary{SecretLogged: true}).Passed {
+			return fmt.Errorf("fixture secret leak flag accepted")
 		}
 		return nil
 	}))
