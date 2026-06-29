@@ -1,0 +1,42 @@
+{
+  "version": "protocorpus-v1",
+  "feature_schema_version": "wirefeatures-v1",
+  "size": [
+    "size_0",
+    "size_1_3",
+    "size_4_8",
+    "size_9_16",
+    "size_17_32",
+    "size_33_64",
+    "size_65_128",
+    "size_129_512",
+    "size_513_1500",
+    "size_1501_4096",
+    "size_4097_plus"
+  ],
+  "round_trip": [
+    "0rtt",
+    "1rtt",
+    "1_5rtt",
+    "2rtt",
+    "multi_rtt",
+    "unknown"
+  ],
+  "direction_pattern": [
+    "client_first",
+    "server_first",
+    "alternating",
+    "client_burst",
+    "server_burst",
+    "bidirectional_interleaved",
+    "unknown"
+  ],
+  "metadata_exposure": [
+    "none_visible",
+    "minimal_visible",
+    "mixed_visible_encrypted",
+    "cleartext_header_encrypted_payload",
+    "encrypted_header_encrypted_payload",
+    "unknown"
+  ]
+}
