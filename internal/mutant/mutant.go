@@ -14,6 +14,7 @@ import (
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/ir"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/wiregen"
 )
 
 const (
@@ -100,6 +101,14 @@ const (
 	ModeWireFeaturesMissingMetadataExposure   = "wirefeatures_missing_metadata_exposure"
 	ModeWireFeaturesGeneratedInterpretedDrift = "wirefeatures_generated_interpreted_drift"
 	ModeWireFeaturesSecretLeak                = "wirefeatures_secret_leak"
+	ModeWireGenFixedCorpusFamily              = "wiregen_fixed_corpus_family"
+	ModeWireGenFixedFirstNShape               = "wiregen_fixed_firstn_shape"
+	ModeWireGenFixedFrameSizePlan             = "wiregen_fixed_frame_size_plan"
+	ModeWireGenFixedFragmentRhythm            = "wiregen_fixed_fragment_rhythm"
+	ModeWireGenFixedMetadataExposure          = "wiregen_fixed_metadata_exposure"
+	ModeWireGenLengthOnlyDiversity            = "wiregen_length_only_diversity"
+	ModeWireGenPayloadLeakFeature             = "wiregen_payload_leak_feature"
+	ModeWireGenGeneratedInterpretedDrift      = "wiregen_generated_interpreted_drift"
 )
 
 func Modes() []string {
@@ -187,6 +196,14 @@ func Modes() []string {
 		ModeWireFeaturesMissingMetadataExposure,
 		ModeWireFeaturesGeneratedInterpretedDrift,
 		ModeWireFeaturesSecretLeak,
+		ModeWireGenFixedCorpusFamily,
+		ModeWireGenFixedFirstNShape,
+		ModeWireGenFixedFrameSizePlan,
+		ModeWireGenFixedFragmentRhythm,
+		ModeWireGenFixedMetadataExposure,
+		ModeWireGenLengthOnlyDiversity,
+		ModeWireGenPayloadLeakFeature,
+		ModeWireGenGeneratedInterpretedDrift,
 	}
 }
 
@@ -422,6 +439,26 @@ func GenerateProfiles(mode string, startSeed int64, count int) ([]*ir.Profile, e
 			p.Security.SecureEnvelopeMode = "metadata_authenticated"
 		case ModeWireFeaturesSecretLeak:
 			p.Security.ConfigValidationPolicy = "strict_required"
+		case ModeWireGenFixedCorpusFamily:
+			p.WireShape.SelectedFamily = base.WireShape.SelectedFamily
+			p.WireShape.SelectedCorpusEntry = base.WireShape.SelectedCorpusEntry
+		case ModeWireGenFixedFirstNShape:
+			p.WireShape.FirstNPlan = base.WireShape.FirstNPlan
+		case ModeWireGenFixedFrameSizePlan:
+			p.WireShape.FrameSizePlan = base.WireShape.FrameSizePlan
+		case ModeWireGenFixedFragmentRhythm:
+			p.WireShape.FragmentRhythmPlan = base.WireShape.FragmentRhythmPlan
+		case ModeWireGenFixedMetadataExposure:
+			p.WireShape.MetadataExposurePlan = base.WireShape.MetadataExposurePlan
+		case ModeWireGenLengthOnlyDiversity:
+			p = cloneProfile(base)
+			renameWireSymbols(p, mode, i)
+			buckets := []string{"size_4_8", "size_9_16", "size_17_32", "size_33_64"}
+			p.WireShape.FrameSizePlan.SizeBuckets = []string{buckets[i%len(buckets)]}
+		case ModeWireGenPayloadLeakFeature:
+			p.AdapterPolicy.TracePolicy = "metadata_only"
+		case ModeWireGenGeneratedInterpretedDrift:
+			p.WireShape.ControlPlan.Richness = base.WireShape.ControlPlan.Richness
 		}
 		refreshMetadata(p, mode, seed, i)
 		if err := ir.Validate(p); err != nil {
@@ -468,6 +505,7 @@ func renameWireSymbols(p *ir.Profile, mode string, index int) {
 }
 
 func refreshMetadata(p *ir.Profile, mode string, seed int64, index int) {
+	refreshWireShapeHash(p)
 	p.ID = fmt.Sprintf("mutant_%s_%03d", strings.ReplaceAll(mode, "-", "_"), index)
 	p.Seed = seed
 	p.GenerationHash = ""
@@ -476,6 +514,18 @@ func refreshMetadata(p *ir.Profile, mode string, seed int64, index int) {
 	hash, err := ir.CanonicalHash(p)
 	if err == nil {
 		p.GenerationHash = hash
+	}
+}
+
+func refreshWireShapeHash(p *ir.Profile) {
+	if p == nil || p.WireShape.Version == "" {
+		return
+	}
+	policy := wiregen.FromIRPolicy(p.WireShape)
+	policy.PolicyHash = ""
+	hash, err := wiregen.PolicyHash(policy)
+	if err == nil {
+		p.WireShape.PolicyHash = hash
 	}
 }
 
