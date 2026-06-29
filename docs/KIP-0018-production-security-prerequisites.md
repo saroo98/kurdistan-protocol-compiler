@@ -179,5 +179,6 @@ This milestone defines prerequisite security architecture and regression checks.
 
 ## Next Milestone
 
-Milestone 13 should focus on implementation hardening: reducing shared helper artifacts, tightening generated backend tests, improving negative controls, and preparing review checklists before any future adapter work.
+Milestone 13 builds on this layer with runtime session architecture: role validation, session lifecycle, capability negotiation, compatibility checks, secure channel setup, in-memory links, runtime adversary scenarios, and generated-backend runtime parity.
 
+Milestone 14 should focus on implementation hardening: reducing shared helper artifacts, tightening generated backend tests, improving negative controls, and preparing review checklists before any future adapter work.

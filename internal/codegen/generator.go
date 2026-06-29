@@ -579,6 +579,53 @@ type SecurityDemoResult struct {
 		return nil, err
 	}
 
+	runtimeSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/proxyadversary"
+	kruntime "kurdistan/internal/runtime"
+	ktrace "kurdistan/internal/trace"
+)
+
+const RuntimeProfileID = %[1]s
+const RuntimeProfileHash = %[2]s
+const RuntimeCompatibilitySchema = %[3]s
+const RuntimeSecurityVersion = %[4]s
+const RuntimeCarrierPolicy = %[5]s
+const RuntimeStreamPolicy = %[6]s
+const RuntimeProxyPolicy = %[7]s
+const RuntimeMaxSessions = 4
+const RuntimeMaxStreams = %[8]d
+const RuntimeMaxEvents = 4096
+const RuntimeTracePayloadHygiene = true
+const RuntimeTraceSecretHygiene = true
+
+func RuntimeDemo(ctx context.Context, streams int) (kruntime.HarnessSummary, []ktrace.Event, error) {
+	if streams <= 0 {
+		streams = 4
+	}
+	return kruntime.RunLocalHarness(ctx, StaticProfile(), kruntime.HarnessOptions{
+		Scenario: proxyadversary.DefaultScenario(proxyadversary.ScenarioMixedTargets),
+		StreamCount: streams,
+		ClientSecret: []byte("generated-runtime-demo-secret"),
+		ServerSecret: []byte("generated-runtime-demo-secret"),
+	})
+}
+
+func CaptureRuntimeTrace(ctx context.Context, streams int) ([]ktrace.Event, TraceCaptureSummary, error) {
+	result, events, err := RuntimeDemo(ctx, streams)
+	if err != nil {
+		return nil, TraceCaptureSummary{}, err
+	}
+	return events, TraceCaptureSummary{ProfileID: ProfileID, EventCount: len(events), DataEventCount: result.StreamsOpened}, nil
+}
+`, quote(p.ID), quote(p.GenerationHash), quote(p.Compatibility.SchemaVersion), quote(p.Security.SecurityVersion), quote(p.CarrierPolicy.CarrierFamily+"/"+p.CarrierPolicy.EnvelopeEncoding+"/"+p.CarrierPolicy.FlushPolicy), quote(p.Stream.IDStrategy+"/"+p.Stream.PriorityPolicy+"/"+p.Stream.WindowUpdatePolicy), quote(p.ProxySemantics.RelayIntentEncoding+"/"+p.ProxySemantics.TargetDescriptorEncoding+"/"+p.ProxySemantics.ResponseModeEncoding), p.Stream.MaxConcurrentStreams)
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -1174,6 +1221,118 @@ func TestGeneratedSecurityAdversaryTraceCapture(t *testing.T) {
 		return nil, err
 	}
 
+	runtimeTestSource, err := renderGo(`package protocol
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"kurdistan/internal/proxyadversary"
+	kruntime "kurdistan/internal/runtime"
+)
+
+func TestGeneratedRuntimeHappyPath(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, events, err := RuntimeDemo(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ClientState != "closed" || result.ServerState != "closed" || !result.TranscriptMatched || !result.CapabilityMatched {
+		t.Fatalf("generated runtime summary mismatch: %%+v", result)
+	}
+	if len(events) == 0 {
+		t.Fatalf("generated runtime emitted no trace metadata")
+	}
+}
+
+func TestGeneratedRuntimeRejectsReplayAndProfileMismatch(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, _, err := kruntime.RunLocalHarness(ctx, StaticProfile(), kruntime.HarnessOptions{
+		Scenario: proxyadversary.DefaultScenario(proxyadversary.ScenarioMixedTargets),
+		ReplayInject: true,
+		ClientSecret: []byte("generated-runtime-test-secret"),
+		ServerSecret: []byte("generated-runtime-test-secret"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ReplayRejected == 0 {
+		t.Fatalf("generated runtime accepted replay")
+	}
+	mismatch := StaticProfile()
+	mismatch.ID = mismatch.ID + "_mismatch"
+	mismatch.GenerationHash = ""
+	if _, _, err := kruntime.RunLocalHarness(ctx, StaticProfile(), kruntime.HarnessOptions{ProfileMismatch: mismatch}); err == nil {
+		t.Fatalf("generated runtime accepted profile mismatch")
+	}
+}
+
+func TestGeneratedRuntimeTraceHygiene(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	secret := []byte("generated-runtime-hygiene-secret")
+	result, events, err := kruntime.RunLocalHarness(ctx, StaticProfile(), kruntime.HarnessOptions{
+		ClientSecret: secret,
+		ServerSecret: secret,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PayloadLogged || result.SecretLogged || bytes.Contains(raw, secret) || bytes.Contains(raw, []byte("runtime-local-bytes")) {
+		t.Fatalf("generated runtime trace leaked forbidden material")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	runtimeAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/runtimeadversary"
+)
+
+func TestGeneratedRuntimeAdversaryScenarios(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, scenario := range runtimeadversary.QuickScenarios() {
+		run := runtimeadversary.RunScenario(ctx, StaticProfile(), scenario)
+		if !run.Correct {
+			t.Fatalf("generated runtime adversary scenario failed: %%+v", run)
+		}
+	}
+}
+
+func TestGeneratedRuntimeTraceCapture(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, summary, err := CaptureRuntimeTrace(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.EventCount == 0 || len(events) == 0 {
+		t.Fatalf("runtime trace capture emitted no events")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -1494,6 +1653,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/proxysem_generated.go", Content: proxySemSource, Go: true},
 		{RelPath: "protocol/carrier_generated.go", Content: carrierSource, Go: true},
 		{RelPath: "protocol/security_generated.go", Content: securitySource, Go: true},
+		{RelPath: "protocol/runtime_generated.go", Content: runtimeSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -1507,6 +1667,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/carrieradversary_test.go", Content: carrierAdversaryTestSource, Go: true},
 		{RelPath: "protocol/security_test.go", Content: securityTestSource, Go: true},
 		{RelPath: "protocol/securityadversary_test.go", Content: securityAdversaryTestSource, Go: true},
+		{RelPath: "protocol/runtime_test.go", Content: runtimeTestSource, Go: true},
+		{RelPath: "protocol/runtimeadversary_test.go", Content: runtimeAdversaryTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -1541,6 +1703,7 @@ func main() {
 	proxySemDemo := flag.Bool("proxysem-demo", false, "run local generated proxy-semantics demo")
 	carrierDemo := flag.Bool("carrier-demo", false, "run local generated carrier abstraction demo")
 	securityDemo := flag.Bool("security-demo", false, "run local generated security demo")
+	runtimeDemo := flag.Bool("runtime-demo", false, "run local generated runtime session demo")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	carrierName := flag.String("carrier", "mixed", "abstract carrier model for carrier demo")
 	streamCount := flag.Int("streams", 3, "logical streams for the local multi-stream demo")
@@ -1558,6 +1721,19 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("security_envelopes=%%d transcript=%%s capability=%%s\n", result.EnvelopeCount, result.TranscriptHash[:12], result.CapabilityHash[:12])
+		return
+	}
+	if *runtimeDemo {
+		result, events, err := protocol.RuntimeDemo(ctx, *streamCount)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := protocol.WriteTraceJSONL(*tracePath, events); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("runtime_session=%%s streams=%%d replay_rejected=%%d backpressure_events=%%d\n", result.SessionID, result.StreamsOpened, result.ReplayRejected, result.BackpressureEvents)
 		return
 	}
 	if *carrierDemo {
@@ -1728,6 +1904,7 @@ func main() {
 	proxySem := flag.Bool("proxysem", false, "capture local generated proxy-semantics trace")
 	carrierName := flag.String("carrier", "", "capture local generated carrier trace with the selected abstract carrier")
 	securityTrace := flag.Bool("security", false, "capture local generated security trace")
+	runtimeTrace := flag.Bool("runtime", false, "capture local generated runtime trace")
 	targets := flag.String("targets", "mixed", "synthetic proxysem target set")
 	streamCount := flag.Int("streams", 3, "logical streams for multi-stream trace capture")
 	flag.Parse()
@@ -1738,6 +1915,8 @@ func main() {
 	var err error
 	if *securityTrace {
 		events, summary, err = protocol.CaptureSecurityTrace(ctx, *streamCount)
+	} else if *runtimeTrace {
+		events, summary, err = protocol.CaptureRuntimeTrace(ctx, *streamCount)
 	} else if *carrierName != "" {
 		events, summary, err = protocol.CaptureCarrierTrace(ctx, *carrierName, *streamCount)
 	} else if *proxySem {

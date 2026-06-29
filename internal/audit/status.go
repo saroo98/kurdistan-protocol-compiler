@@ -121,6 +121,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "proxy_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "carrier_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "security_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "runtime_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -132,6 +133,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `proxy_generated_backend_parity`: `%s`\n", summary.ProxySemGeneratedParity)
 			fmt.Fprintf(&b, "- `carrier_generated_backend_parity`: `%s`\n", summary.CarrierGeneratedParity)
 			fmt.Fprintf(&b, "- `security_generated_backend_parity`: `%s`\n", summary.SecurityGeneratedParity)
+			fmt.Fprintf(&b, "- `runtime_generated_backend_parity`: `%s`\n", summary.RuntimeGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -224,12 +226,43 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck security --quick` for security prerequisite checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Runtime Session Architecture")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "runtime_session_lifecycle"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderGateDetail(&b, gate, "sessions")
+		renderNamedGateResult(&b, report.Gates, "runtime_session_lifecycle")
+		renderNamedGateResult(&b, report.Gates, "runtime_capability_negotiation")
+		renderNamedGateResult(&b, report.Gates, "runtime_profile_compatibility")
+		renderNamedGateResult(&b, report.Gates, "runtime_security_context")
+		renderNamedGateResult(&b, report.Gates, "runtime_replay_rejection")
+		renderNamedGateResult(&b, report.Gates, "runtime_stream_management")
+		renderNamedGateResult(&b, report.Gates, "runtime_backpressure")
+		renderNamedGateResult(&b, report.Gates, "runtime_error_reset_isolation")
+		renderNamedGateResult(&b, report.Gates, "runtime_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "runtime_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "runtime_generated_backend_parity")
+		if strings.HasPrefix(report.Mode, "runtime-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"runtime_families",
+				"diversity_score",
+				"conclusion",
+				"runs",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Runtime session gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck runtime --quick` for runtime session checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
 	fmt.Fprintln(&b, "- Proxy-semantics support uses synthetic target descriptors and in-memory target behavior.")
 	fmt.Fprintln(&b, "- Carrier abstraction models envelope shapes, retry/reorder metadata, and queue pressure without real carrier integrations.")
 	fmt.Fprintln(&b, "- Security prerequisites model transcript binding, key schedules, nonce/replay checks, compatibility, and secure envelope metadata before real adapter integration.")
+	fmt.Fprintln(&b, "- Runtime session architecture uses deterministic in-memory links and synthetic scenarios, not OS sockets or live peers.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
@@ -237,7 +270,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 13 should focus on implementation hardening after the security prerequisite layer.")
+	fmt.Fprintln(&b, "Milestone 14 should focus on implementation hardening, review checklists, and reducing shared helper artifacts before adapter work.")
 	return b.String()
 }
 

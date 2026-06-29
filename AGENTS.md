@@ -34,6 +34,7 @@ Run:
 - go run ./cmd/kcheck proxysem --quick when changing proxy semantics, synthetic targets, proxy traces, proxy mutants, or proxy audit code
 - go run ./cmd/kcheck carrier --quick when changing carrier models, carrier traces, carrier mutants, or carrier audit code
 - go run ./cmd/kcheck security --quick when changing transcript binding, key schedules, nonce/replay logic, compatibility, security traces, security mutants, or security audit code
+- go run ./cmd/kcheck runtime --quick when changing runtime session lifecycle, capability negotiation, compatibility checks, runtime links, runtime traces, or runtime audit code
 - go run ./cmd/kgen --profile <profile.json> --out .generated/<name> when verifying generated source output
 - go run ./cmd/kcheck codegen --quick when changing the generated source backend
 - from a generated output directory, go run ./cmd/generated-trace --trace generated.jsonl --summary generated-summary.json when verifying generated trace capture
@@ -45,6 +46,8 @@ Run:
 - from a generated output directory, go run ./cmd/generated-trace --carrier mixed --proxysem --streams 4 --trace generated-carrier.jsonl --summary generated-carrier-summary.json when verifying generated carrier traces
 - from a generated output directory, go run ./cmd/generated-client --security-demo --streams 4 when verifying generated security prerequisite modeling
 - from a generated output directory, go run ./cmd/generated-trace --security --carrier mixed --proxysem --streams 4 --trace generated-security.jsonl --summary generated-security-summary.json when verifying generated security traces
+- from a generated output directory, go run ./cmd/generated-client --runtime-demo --streams 4 when verifying generated runtime session architecture
+- from a generated output directory, go run ./cmd/generated-trace --runtime --streams 4 --trace generated-runtime.jsonl --summary generated-runtime-summary.json when verifying generated runtime traces
 
 ## Style
 

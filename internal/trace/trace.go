@@ -69,6 +69,28 @@ type Event struct {
 	ConfigHygieneResult       string `json:"config_hygiene_result,omitempty"`
 	SecretHygieneResult       string `json:"secret_hygiene_result,omitempty"`
 	GeneratedParityResult     string `json:"generated_parity_result,omitempty"`
+	RuntimeRole               string `json:"runtime_role,omitempty"`
+	RuntimeState              string `json:"runtime_state,omitempty"`
+	SessionState              string `json:"session_state,omitempty"`
+	LifecycleTransition       string `json:"lifecycle_transition,omitempty"`
+	NegotiationResultBucket   string `json:"negotiation_result_bucket,omitempty"`
+	CompatibilityResult       string `json:"compatibility_result,omitempty"`
+	SecurityContextResult     string `json:"security_context_result,omitempty"`
+	TranscriptMatch           bool   `json:"transcript_match,omitempty"`
+	CapabilityMatch           bool   `json:"capability_match,omitempty"`
+	FrameDirectionBucket      string `json:"frame_direction_bucket,omitempty"`
+	RuntimeFrameBucket        string `json:"runtime_frame_bucket,omitempty"`
+	RuntimeFrameCount         string `json:"runtime_frame_count,omitempty"`
+	StreamEventBucket         string `json:"stream_event_bucket,omitempty"`
+	RuntimeReplayRejections   int    `json:"runtime_replay_rejections,omitempty"`
+	RuntimeBackpressureCount  int    `json:"runtime_backpressure_count,omitempty"`
+	RuntimeTargetErrorCount   int    `json:"runtime_target_error_count,omitempty"`
+	RuntimeTargetResetCount   int    `json:"runtime_target_reset_count,omitempty"`
+	CloseReasonBucket         string `json:"close_reason_bucket,omitempty"`
+	FailureReasonBucket       string `json:"failure_reason_bucket,omitempty"`
+	PayloadHygiene            bool   `json:"payload_hygiene,omitempty"`
+	SecretHygiene             bool   `json:"secret_hygiene,omitempty"`
+	RuntimeScenario           string `json:"runtime_scenario,omitempty"`
 	Note                      string `json:"note,omitempty"`
 }
 
