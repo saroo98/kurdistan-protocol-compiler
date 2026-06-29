@@ -5,12 +5,15 @@ package audit
 
 import (
 	"context"
+	"path/filepath"
 	"time"
 
 	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/diversity"
+	"kurdistan/internal/fixtures"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
@@ -39,6 +42,16 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	traceMillis := time.Since(traceStart).Milliseconds()
 	traceScan := ktrace.ScanTraces(traces, ktrace.DefaultStabilityThreshold)
 	hardeningGates := HardeningGates(ctx, profiles, cfg)
+	fixtureRoot, fixtureRootErr := repoRoot()
+	if fixtureRootErr != nil {
+		fixtureRoot = "."
+	}
+	bytepathFixturePath := filepath.Join(fixtureRoot, "testdata", "fixtures", "bytepath-golden.json")
+	bytepathMalformedPath := filepath.Join(fixtureRoot, "testdata", "fixtures", "malformed-byte-corpus.json")
+	bytepathParity, parityErr := byteparity.Run(ctx, fixtures.DefaultSeeds(), fixtures.DefaultScenarios())
+	if parityErr != nil {
+		bytepathParity = byteparity.ByteParityReport{Conclusion: "failed", UnexpectedDifferences: []string{parityErr.Error()}}
+	}
 
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
@@ -122,6 +135,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		ByteTransportCollapseResistanceGate(ctx, profiles, cfg.Thresholds),
 		ByteTransportMutantDetectionGate(ctx, cfg.Thresholds),
 		ByteTransportGeneratedBackendParityGate(),
+		BytePathFixtureDriftGate(ctx, bytepathFixturePath),
+		BytePathFixtureStabilityGate(ctx, bytepathFixturePath),
+		BytePathGeneratedInterpretedParityGate(bytepathParity),
+		BytePathMalformedCorpusGate(bytepathMalformedPath, fixtures.DefaultMalformedCorpus()),
+		BytePathRegressionBaselinesGate(bytepathFixturePath),
+		BytePathFixtureTraceHygieneGate(bytepathFixturePath),
 		FuzzPresenceGate(),
 	}
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
