@@ -22,6 +22,8 @@ import (
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/wiregen"
+	"kurdistan/internal/wiregencompare"
 )
 
 func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
@@ -69,6 +71,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	}
 	wireFeatureComparison := wirefeatures.CompareToCorpus(wireFeatureVectors, protocolCorpus)
 	wireFeatureCollapse := wirefeatures.ScanCollapse(wireFeatureVectors)
+	wireGenBaselinePath := filepath.Join(fixtureRoot, "testdata", "wiregen", "wiregen-policy-golden.json")
+	wireGenPolicies := make([]wiregen.WireShapePolicy, 0, len(profiles))
+	for _, profile := range profiles {
+		wireGenPolicies = append(wireGenPolicies, wiregen.FromIRPolicy(profile.WireShape))
+	}
+	wireGenVectors := expectedVectorsForProfiles(wireGenPolicies, wiregencompare.DefaultScenarios())
 
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
@@ -169,8 +177,9 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		WireFeaturesGeneratedBackendParityGate(),
 		WireFeaturesMutantDetectionGate(),
 		WireFeaturesBaselineGate(ctx, wireFeatureBaselinePath, bytepathFixturePath, protocolCorpusPath),
-		FuzzPresenceGate(),
 	}
+	gates = append(gates, WireGenGates(ctx, profiles, wireGenPolicies, wireGenVectors, protocolCorpus, wireGenBaselinePath)...)
+	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
 
 	benchmark := BenchmarkSummary{
