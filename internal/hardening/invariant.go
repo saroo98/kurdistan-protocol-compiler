@@ -10,6 +10,7 @@ import (
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/compiler"
+	"kurdistan/internal/fixtures"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
@@ -187,6 +188,23 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if result.Summary.PayloadLogged || result.Summary.SecretLogged {
 			return fmt.Errorf("byte transport summary reported payload/secret logging")
+		}
+		return nil
+	}))
+	results = append(results, check("bytepath_fixture_manifest_validates", CategoryInvariants, func() error {
+		manifest, err := fixtures.GenerateBytePathManifest(context.Background(), fixtures.ManifestOptions{
+			ProfileSeeds:   []int{int(p.Seed)},
+			ScenarioNames:  []string{bytetransport.ScenarioSingleFlow},
+			BackendVersion: Version,
+		})
+		if err != nil {
+			return err
+		}
+		if len(manifest.Entries) != 1 {
+			return fmt.Errorf("unexpected fixture entries")
+		}
+		if err := fixtures.ValidateManifest(manifest); err != nil {
+			return err
 		}
 		return nil
 	}))
