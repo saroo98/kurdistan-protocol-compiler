@@ -1113,6 +1113,58 @@ func GeneratedHostDetectSummary(ctx context.Context) (hostdetect.HostDetectSumma
 		return nil, err
 	}
 
+	relayFleetSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/relayfleet"
+)
+
+const RelayFleetSchemaVersion = "relayfleet-v1"
+const RelayFleetGeneratedProfileID = %[1]s
+const RelayFleetProfileSeedAnchor = %[2]d
+const RelayFleetWirePolicyHash = %[3]s
+const RelayFleetSelectedFamily = %[4]s
+const RelayFleetAssignmentMode = %[5]s
+const RelayFleetChurnMode = %[6]s
+const RelayFleetMigrationMode = %[7]s
+const RelayFleetMaxActiveRelays = %[8]d
+const RelayFleetProfileReuseLimit = 2
+const RelayFleetWirePolicyReuseLimit = 2
+
+var RelayFleetForbiddenMarkers = []string{"raw_payload", "raw_bytes", "encoded_bytes", "decoded_bytes", "endpoint", "real_host", "cloud_provider", "secret"}
+
+func GeneratedRelayFleetSummary(ctx context.Context) (relayfleet.RelayFleetSummary, error) {
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		return relayfleet.RelayFleetSummary{}, err
+	}
+	hostSummary, err := GeneratedHostDetectSummary(ctx)
+	if err != nil {
+		return relayfleet.RelayFleetSummary{}, err
+	}
+	policy := relayfleet.DefaultPolicy()
+	policy.Name = "generated_relayfleet_" + RelayFleetGeneratedProfileID
+	policy.AssignmentMode = RelayFleetAssignmentMode
+	policy.ChurnMode = RelayFleetChurnMode
+	policy.MigrationMode = RelayFleetMigrationMode
+	policy.MaxActiveRelays = RelayFleetMaxActiveRelays
+	policy.ProfileReuseLimit = RelayFleetProfileReuseLimit
+	policy.WirePolicyReuseLimit = RelayFleetWirePolicyReuseLimit
+	return relayfleet.Run(dataset, hostSummary, relayfleet.Options{
+		RelayCount: 6,
+		ProfileSeeds: []int{int(ProfileSeed), int(ProfileSeed) + 1, int(ProfileSeed) + 2, int(ProfileSeed) + 3, int(ProfileSeed) + 4, int(ProfileSeed) + 5, int(ProfileSeed) + 6, int(ProfileSeed) + 7},
+		Policy: policy,
+		IncludeControls: true,
+		GeneratedBackend: true,
+	})
+}
+`, quote(p.ID), p.Seed, quote(p.WireShape.PolicyHash), quote(p.WireShape.SelectedFamily), quote(relayFleetAssignmentMode(p.Seed)), quote(relayFleetChurnMode(p.Seed)), quote(relayFleetMigrationMode(p.Seed)), min(8, max(6, p.Stream.MaxConcurrentStreams)))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2638,6 +2690,99 @@ func TestGeneratedHostDetectHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	relayFleetTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/relayfleet"
+)
+
+func TestGeneratedRelayFleetSummary(t *testing.T) {
+	if RelayFleetSchemaVersion != "relayfleet-v1" || RelayFleetGeneratedProfileID != ProfileID {
+		t.Fatalf("generated relayfleet constants drifted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	summary, err := GeneratedRelayFleetSummary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relayfleet.ValidateSummary(summary); err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Fleet.Relays) == 0 || len(summary.ChurnEvents) == 0 || summary.PayloadLogged || summary.SecretLogged {
+		t.Fatalf("generated relayfleet summary unsafe or empty: %%+v", summary)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayFleetParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/relayfleet"
+)
+
+func TestGeneratedRelayFleetParity(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	summary, err := GeneratedRelayFleetSummary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := relayfleet.CompareFleets(summary, summary)
+	if report.Conclusion != "passed" || report.ComparedRelays == 0 || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated relayfleet parity failed: %%+v", report)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayFleetHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relayfleet"
+)
+
+func TestGeneratedRelayFleetHygiene(t *testing.T) {
+	if err := relayfleet.ScanForLeak(map[string]string{"relay_id": "relay_0001", "risk_bucket": "low"}); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "x"},
+		{"cloud_provider": "x"},
+		{"raw_payload": "x"},
+		{"secret": "x"},
+	}
+	for _, tc := range unsafeCases {
+		if err := relayfleet.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe relayfleet field accepted: %%v", tc)
+		}
+	}
+	for _, marker := range RelayFleetForbiddenMarkers {
+		if marker == "" {
+			t.Fatalf("empty forbidden marker")
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -2968,6 +3113,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/wiregen_generated.go", Content: wireGenSource, Go: true},
 		{RelPath: "protocol/wireeval_generated.go", Content: wireEvalSource, Go: true},
 		{RelPath: "protocol/hostdetect_generated.go", Content: hostDetectSource, Go: true},
+		{RelPath: "protocol/relayfleet_generated.go", Content: relayFleetSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3003,6 +3149,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/hostdetect_test.go", Content: hostDetectTestSource, Go: true},
 		{RelPath: "protocol/hostdetect_parity_test.go", Content: hostDetectParityTestSource, Go: true},
 		{RelPath: "protocol/hostdetect_hygiene_test.go", Content: hostDetectHygieneTestSource, Go: true},
+		{RelPath: "protocol/relayfleet_test.go", Content: relayFleetTestSource, Go: true},
+		{RelPath: "protocol/relayfleet_parity_test.go", Content: relayFleetParityTestSource, Go: true},
+		{RelPath: "protocol/relayfleet_hygiene_test.go", Content: relayFleetHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -3389,4 +3538,19 @@ func IsGeneratedWrapperOnly(source string) bool {
 		}
 	}
 	return false
+}
+
+func relayFleetAssignmentMode(seed int64) string {
+	modes := []string{"one_profile_per_relay", "profile_rotation", "family_rotation", "wire_policy_rotation", "risk_aware_profile_refresh"}
+	return modes[int(seed)%len(modes)]
+}
+
+func relayFleetChurnMode(seed int64) string {
+	modes := []string{"fixed_interval_churn", "risk_threshold_churn", "observation_count_churn", "profile_reuse_churn", "mixed_policy_churn"}
+	return modes[int(seed)%len(modes)]
+}
+
+func relayFleetMigrationMode(seed int64) string {
+	modes := []string{"graceful_profile_migration", "relay_to_relay_migration", "risk_triggered_migration", "session_boundary_migration"}
+	return modes[int(seed)%len(modes)]
 }
