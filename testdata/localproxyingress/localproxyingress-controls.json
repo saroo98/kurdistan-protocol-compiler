@@ -1,0 +1,810 @@
+[
+  {
+    "scenario": "fixed_target_descriptor",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "single_connect_echo",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_alpha",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_name",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "b93bc1aacbf2d791a1b29647a6c7b4063f02a0d4b4b1ff07cef31829051cf58e",
+          "proxysem_intent_hash": "5cf219130993ce5bce8734ead68678fd94c8975be951decde35f5ec487663780",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080"
+    },
+    "features": {
+      "scenario": "single_connect_echo",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "fixed_target_descriptor",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "same_target_binding"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  },
+  {
+    "scenario": "fixed_stream_mapping",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "single_connect_echo",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_alpha",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_name",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "b93bc1aacbf2d791a1b29647a6c7b4063f02a0d4b4b1ff07cef31829051cf58e",
+          "proxysem_intent_hash": "5cf219130993ce5bce8734ead68678fd94c8975be951decde35f5ec487663780",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080"
+    },
+    "features": {
+      "scenario": "single_connect_echo",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "fixed_stream_mapping",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "same_mapping_for_every_request"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  },
+  {
+    "scenario": "fixed_lifecycle_pattern",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "single_connect_echo",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_alpha",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_name",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "b93bc1aacbf2d791a1b29647a6c7b4063f02a0d4b4b1ff07cef31829051cf58e",
+          "proxysem_intent_hash": "5cf219130993ce5bce8734ead68678fd94c8975be951decde35f5ec487663780",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080"
+    },
+    "features": {
+      "scenario": "single_connect_echo",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "fixed_lifecycle_pattern",
+      "profile_count": 1,
+      "diversity_score": 1,
+      "conclusion": "passed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "passed"
+  },
+  {
+    "scenario": "backpressure_ignored",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "backpressure_pressure",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 5,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 5,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 5,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_pressure",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_service",
+          "events_processed": 5,
+          "data_events": 2,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 1,
+          "runtime_mapping_hash": "27922776f91cc440043305934d953b0ea60c775f5c60e417eff7195f39fb48be",
+          "proxysem_intent_hash": "3c096985b9c244aff73b372f94a49cc641b8ab8e5977a0fa0dc5b084f0fcb6d4",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "b51a20b0b846d5b0b8bbbd55aeda8b7e3eafeddbec6057b6df1076bc41cb1933"
+    },
+    "features": {
+      "scenario": "backpressure_pressure",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "b51a20b0b846d5b0b8bbbd55aeda8b7e3eafeddbec6057b6df1076bc41cb1933",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "backpressure_ignored",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "backpressure_ignored"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  },
+  {
+    "scenario": "reset_leaks_across_requests",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "reset_mid_request",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 1,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_reset",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "reset",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_service",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 0,
+          "reset_events": 1,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "76d8d16732b38a9549f59d6626655eb64477eafe096365cb43de5c5f762c6d41",
+          "proxysem_intent_hash": "44f7f2d92d8d6dce1f11678bbd81f96134bc1dae5917d5f35d740b691b7b1955",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "8c6af912852c6a9407ba97798b0ff70ea7d964ea9103da635c54f11ba953dc21"
+    },
+    "features": {
+      "scenario": "reset_mid_request",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 1,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "8c6af912852c6a9407ba97798b0ff70ea7d964ea9103da635c54f11ba953dc21",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "reset_leaks_across_requests",
+      "profile_count": 1,
+      "diversity_score": 1,
+      "conclusion": "passed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "passed"
+  },
+  {
+    "scenario": "target_error_leaks_descriptor",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "target_error_after_open",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 2,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 1,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 2,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 2,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_error",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "failed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "opaque_descriptor",
+          "events_processed": 2,
+          "data_events": 0,
+          "close_events": 0,
+          "reset_events": 0,
+          "error_events": 1,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "35d7cf97b919bcaf1a361d27cbfa3a3883fad0b6cba6ff757bc1604d3f1b8259",
+          "proxysem_intent_hash": "9d992f932e813f29299cf0c2c07958b1afd575eeb77e9a1760407b5ff05918a3",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "e869ac6229536debddc3e0412e7f857bb1dc0739d6bdc7549dce19339d0a5a60"
+    },
+    "features": {
+      "scenario": "target_error_after_open",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 1,
+      "lifecycle_violations": 0,
+      "summary_hash": "e869ac6229536debddc3e0412e7f857bb1dc0739d6bdc7549dce19339d0a5a60",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "target_error_leaks_descriptor",
+      "profile_count": 1,
+      "diversity_score": 1,
+      "conclusion": "passed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "passed"
+  },
+  {
+    "scenario": "invalid_targets_accepted",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "invalid_target_rejection",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 1,
+      "stream_mappings": 0,
+      "target_bindings": 0,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 1,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 1,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_invalid",
+          "accepted": false,
+          "rejected": true,
+          "final_state": "rejected",
+          "stream_class": "",
+          "target_descriptor_class": "",
+          "events_processed": 1,
+          "data_events": 0,
+          "close_events": 0,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "",
+          "proxysem_intent_hash": "",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "target_rejected"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "bbace5e5b8005db20de5cad2ea4bff04e7548678cb67ba10c5c70371f4569da5"
+    },
+    "features": {
+      "scenario": "invalid_target_rejection",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 0,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "bbace5e5b8005db20de5cad2ea4bff04e7548678cb67ba10c5c70371f4569da5",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "invalid_targets_accepted",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "invalid_targets_accepted"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  },
+  {
+    "scenario": "queue_unbounded",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "queue_overflow_rejection",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 0,
+      "rejected_requests": 15,
+      "events_processed": 0,
+      "stream_mappings": 0,
+      "target_bindings": 0,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 96,
+        "events_dropped": 14,
+        "overflow_rejected": 14,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 96,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_overflow",
+          "accepted": false,
+          "rejected": true,
+          "final_state": "rejected",
+          "stream_class": "",
+          "target_descriptor_class": "",
+          "events_processed": 0,
+          "data_events": 0,
+          "close_events": 0,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "",
+          "proxysem_intent_hash": "",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "request_limit"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "summary_hash": "91bf1bf061e72da1ea196c64f63b34cf6482c23bc9e4097876096439941115c0"
+    },
+    "features": {
+      "scenario": "queue_overflow_rejection",
+      "request_count": 1,
+      "accepted_requests": 0,
+      "rejected_requests": 15,
+      "stream_mappings": 0,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "91bf1bf061e72da1ea196c64f63b34cf6482c23bc9e4097876096439941115c0",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "queue_unbounded",
+      "profile_count": 1,
+      "diversity_score": 1,
+      "conclusion": "passed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "passed"
+  },
+  {
+    "scenario": "payload_logged_control",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "single_connect_echo",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_alpha",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_name",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "b93bc1aacbf2d791a1b29647a6c7b4063f02a0d4b4b1ff07cef31829051cf58e",
+          "proxysem_intent_hash": "5cf219130993ce5bce8734ead68678fd94c8975be951decde35f5ec487663780",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": true,
+      "secret_logged": false,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080"
+    },
+    "features": {
+      "scenario": "single_connect_echo",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": true,
+      "secret_logged": false
+    },
+    "collapse": {
+      "scenario": "payload_logged_control",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "payload_hygiene_failed"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": true,
+      "secret_logged": false
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  },
+  {
+    "scenario": "secret_logged_control",
+    "summary": {
+      "version": "localproxyingress-v1",
+      "scenario": "single_connect_echo",
+      "contract_id": "proxyingress_contract_v1",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "events_processed": 3,
+      "stream_mappings": 1,
+      "target_bindings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "queue_stats": {
+        "events_queued": 3,
+        "events_dropped": 0,
+        "overflow_rejected": 0,
+        "duplicate_rejected": 0,
+        "max_depth_observed": 3,
+        "payload_logged": false,
+        "secret_logged": false
+      },
+      "results": [
+        {
+          "request_id": "req_local_alpha",
+          "accepted": true,
+          "rejected": false,
+          "final_state": "closed",
+          "stream_class": "interactive",
+          "target_descriptor_class": "synthetic_name",
+          "events_processed": 3,
+          "data_events": 1,
+          "close_events": 1,
+          "reset_events": 0,
+          "error_events": 0,
+          "backpressure_events": 0,
+          "runtime_mapping_hash": "b93bc1aacbf2d791a1b29647a6c7b4063f02a0d4b4b1ff07cef31829051cf58e",
+          "proxysem_intent_hash": "5cf219130993ce5bce8734ead68678fd94c8975be951decde35f5ec487663780",
+          "payload_logged": false,
+          "secret_logged": false,
+          "conclusion": "passed"
+        }
+      ],
+      "payload_logged": false,
+      "secret_logged": true,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080"
+    },
+    "features": {
+      "scenario": "single_connect_echo",
+      "request_count": 1,
+      "accepted_requests": 1,
+      "rejected_requests": 0,
+      "stream_mappings": 1,
+      "backpressure_events": 0,
+      "reset_events": 0,
+      "target_error_events": 0,
+      "lifecycle_violations": 0,
+      "summary_hash": "45f7e693f7d5d033f5b73ca7293fa8a67724c248d178d0939f01f6c142855080",
+      "buckets": {
+        "backpressure": "zero",
+        "request_count": "small"
+      },
+      "payload_logged": false,
+      "secret_logged": true
+    },
+    "collapse": {
+      "scenario": "secret_logged_control",
+      "profile_count": 1,
+      "suspicious_metrics": [
+        "secret_hygiene_failed"
+      ],
+      "diversity_score": 0,
+      "conclusion": "failed",
+      "payload_logged": false,
+      "secret_logged": true
+    },
+    "expected_failure": true,
+    "conclusion": "failed"
+  }
+]
