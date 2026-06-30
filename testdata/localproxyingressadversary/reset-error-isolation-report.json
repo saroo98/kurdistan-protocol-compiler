@@ -1,0 +1,14 @@
+{
+  "scenario_count": 12,
+  "requests_checked": 18,
+  "reset_events": 5,
+  "target_error_events": 5,
+  "isolated_resets": 5,
+  "isolated_target_errors": 5,
+  "cross_request_leaks": 0,
+  "descriptor_leaks": 0,
+  "report_hash": "a7fc94a56c16272850450a782f230fc590916e3924a167a5317e17491ebdd5a2",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,11 @@
+{
+  "scenario_count": 14,
+  "violations_attempted": 14,
+  "violations_rejected": 14,
+  "violations_accepted": 0,
+  "terminal_violations": 7,
+  "report_hash": "a5a4c7fe469be40c555a3254dbd869de55034f22b968bc3074e2daba2790e19a",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
