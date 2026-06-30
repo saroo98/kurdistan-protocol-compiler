@@ -1,0 +1,18 @@
+{
+  "version": "relayfleet-v1",
+  "fleet_id": "fleet_2e380a269770",
+  "relay_count": 9,
+  "active_relays": 4,
+  "low_risk_relays": 5,
+  "medium_risk_relays": 1,
+  "high_risk_relays": 1,
+  "critical_risk_relays": 2,
+  "burned_relays": 1,
+  "quarantined_relays": 1,
+  "risk_triggered_churn_events": 0,
+  "avg_relay_age_bucket": "small",
+  "avg_observation_bucket": "large",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
