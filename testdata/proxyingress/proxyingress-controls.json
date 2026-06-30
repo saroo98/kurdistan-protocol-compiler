@@ -1,0 +1,27 @@
+{
+  "misuse": {
+    "contract_id": "proxyingress_contract_v1",
+    "request_count": 3,
+    "target_count": 3,
+    "lifecycle_events": 12,
+    "blocking_issues": 0,
+    "unsafe_targets": 0,
+    "unbounded_limits": 0,
+    "mapping_failures": 0,
+    "hygiene_failures": 0,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "compared_contracts": 1,
+    "compared_checklist_items": 11,
+    "compared_failure_modes": 19,
+    "contract_matches": 1,
+    "checklist_matches": 11,
+    "failure_matrix_matches": 19,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+}
