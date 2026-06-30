@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T00:10:49Z`
+- Generated at: `2026-06-30T09:07:08Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -148,11 +148,22 @@
 | `hostdetect_trace_hygiene` | PASS | `required` | 72 host observations scanned |
 | `hostdetect_mutant_detection` | PASS | `required` | 12/12 hostdetect mutant modes detected |
 | `hostdetect_fixture_drift` | PASS | `required` | 72 old observations compared to 72 new observations |
-| `hardening_invariant_registry` | PASS | `required` | 16 invariants checks run; 0 failures |
+| `relayfleet_lifecycle_integrity` | PASS | `required` | 9 relays, 4 active |
+| `relayfleet_profile_assignment` | PASS | `required` | 8 profile seeds, 8 wire policies |
+| `relayfleet_churn_schedule` | PASS | `required` | 6 churn events using mixed_policy_churn |
+| `relayfleet_migration_model` | PASS | `required` | 2 migration events using risk_triggered_migration |
+| `relayfleet_burn_risk` | PASS | `required` | 1 high-risk and 2 critical relays |
+| `relayfleet_collapse_detection` | PASS | `required` | 8 profile seeds, 8 wire policies, 0.85 diversity |
+| `relayfleet_control_detection` | PASS | `required` | 3/3 control relays high-risk |
+| `relayfleet_generated_backend_parity` | PASS | `required` | generated backend relayfleet markers checked |
+| `relayfleet_trace_hygiene` | PASS | `required` | 9 relay records scanned |
+| `relayfleet_mutant_detection` | PASS | `required` | 15/15 relayfleet mutant modes detected |
+| `relayfleet_fixture_drift` | PASS | `required` | 9 old relays compared to 9 new relays |
+| `hardening_invariant_registry` | PASS | `required` | 17 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 13 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 14 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -161,9 +172,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `85 ms`
-- Trace generation: `17 ms`
-- Total audit runtime: `1093 ms`
+- Profile generation: `112 ms`
+- Trace generation: `22 ms`
+- Total audit runtime: `1256 ms`
 
 ## Corpus Diversity Summary
 
@@ -188,8 +199,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3195276466235823`
-- `same_profile_distance`: `0`
+- `different_profile_average_distance`: `0.31781128256929475`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -345,6 +356,21 @@
 - `wiregen_trace_hygiene`: `passed`
 - `wiregen_baseline_fixtures`: `passed`
 
+## Relay Fleet Lifecycle
+
+- Gate result: `true`
+- `relayfleet_lifecycle_integrity`: `passed`
+- `relayfleet_profile_assignment`: `passed`
+- `relayfleet_churn_schedule`: `passed`
+- `relayfleet_migration_model`: `passed`
+- `relayfleet_burn_risk`: `passed`
+- `relayfleet_collapse_detection`: `passed`
+- `relayfleet_control_detection`: `passed`
+- `relayfleet_generated_backend_parity`: `passed`
+- `relayfleet_trace_hygiene`: `passed`
+- `relayfleet_mutant_detection`: `passed`
+- `relayfleet_fixture_drift`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -355,6 +381,7 @@
 - Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.
 - Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.
 - Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.
+- Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -363,4 +390,4 @@
 
 ## Next Milestone
 
-Milestone 21 should focus on a wire evaluation and classifier dataset harness.
+Milestone 24 should focus on concrete local proxy ingress design review.
