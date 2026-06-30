@@ -176,6 +176,21 @@ const (
 	ModeLocalProxyIngressPayloadLeak                = "localproxyingress_payload_leak"
 	ModeLocalProxyIngressSecretLeak                 = "localproxyingress_secret_leak"
 	ModeLocalProxyIngressGeneratedBackendDrift      = "localproxyingress_generated_backend_drift"
+	ModeLocalProxyIngressAdvAcceptsDescriptorAbuse  = "localproxyingressadv_accepts_descriptor_abuse"
+	ModeLocalProxyIngressAdvAcceptsDataBeforeOpen   = "localproxyingressadv_accepts_data_before_open"
+	ModeLocalProxyIngressAdvAcceptsDataAfterClose   = "localproxyingressadv_accepts_data_after_close"
+	ModeLocalProxyIngressAdvAcceptsTerminalReopen   = "localproxyingressadv_accepts_terminal_reopen"
+	ModeLocalProxyIngressAdvUnboundedQueueGrowth    = "localproxyingressadv_unbounded_queue_growth"
+	ModeLocalProxyIngressAdvIgnoresBackpressure     = "localproxyingressadv_ignores_backpressure"
+	ModeLocalProxyIngressAdvResetCrossRequestLeak   = "localproxyingressadv_reset_cross_request_leak"
+	ModeLocalProxyIngressAdvErrorCrossRequestLeak   = "localproxyingressadv_error_cross_request_leak"
+	ModeLocalProxyIngressAdvDescriptorLeak          = "localproxyingressadv_descriptor_leak"
+	ModeLocalProxyIngressAdvFixedMapping            = "localproxyingressadv_fixed_mapping"
+	ModeLocalProxyIngressAdvCollapseNotDetected     = "localproxyingressadv_collapse_not_detected"
+	ModeLocalProxyIngressAdvReviewGoDespiteBlocker  = "localproxyingressadv_review_go_despite_blocker"
+	ModeLocalProxyIngressAdvPayloadLeak             = "localproxyingressadv_payload_leak"
+	ModeLocalProxyIngressAdvSecretLeak              = "localproxyingressadv_secret_leak"
+	ModeLocalProxyIngressAdvGeneratedBackendDrift   = "localproxyingressadv_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -338,6 +353,21 @@ func Modes() []string {
 		ModeLocalProxyIngressPayloadLeak,
 		ModeLocalProxyIngressSecretLeak,
 		ModeLocalProxyIngressGeneratedBackendDrift,
+		ModeLocalProxyIngressAdvAcceptsDescriptorAbuse,
+		ModeLocalProxyIngressAdvAcceptsDataBeforeOpen,
+		ModeLocalProxyIngressAdvAcceptsDataAfterClose,
+		ModeLocalProxyIngressAdvAcceptsTerminalReopen,
+		ModeLocalProxyIngressAdvUnboundedQueueGrowth,
+		ModeLocalProxyIngressAdvIgnoresBackpressure,
+		ModeLocalProxyIngressAdvResetCrossRequestLeak,
+		ModeLocalProxyIngressAdvErrorCrossRequestLeak,
+		ModeLocalProxyIngressAdvDescriptorLeak,
+		ModeLocalProxyIngressAdvFixedMapping,
+		ModeLocalProxyIngressAdvCollapseNotDetected,
+		ModeLocalProxyIngressAdvReviewGoDespiteBlocker,
+		ModeLocalProxyIngressAdvPayloadLeak,
+		ModeLocalProxyIngressAdvSecretLeak,
+		ModeLocalProxyIngressAdvGeneratedBackendDrift,
 	}
 }
 
