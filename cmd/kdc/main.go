@@ -4,6 +4,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/transportbundle"
 )
 
 func main() {
@@ -28,6 +31,12 @@ func main() {
 		err = validate(os.Args[2:])
 	case "corpus":
 		err = corpus(os.Args[2:])
+	case "bundle":
+		err = bundle(os.Args[2:])
+	case "validate-bundle":
+		err = validateBundle(os.Args[2:])
+	case "summarize-bundle":
+		err = summarizeBundle(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -36,6 +45,84 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func bundle(args []string) error {
+	fs := flag.NewFlagSet("bundle", flag.ContinueOnError)
+	seed := fs.Int("seed", 12345, "deterministic bundle seed")
+	mode := fs.String("mode", string(transportbundle.BundleModeBalancedAdaptive), "transport bundle mode")
+	out := fs.String("out", "profiles/examples/bundle-12345.json", "output bundle manifest path")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	policy := transportbundle.DefaultPolicy(*seed, transportbundle.BundleMode(*mode))
+	compiled, err := transportbundle.Compile(context.Background(), policy)
+	if err != nil {
+		return err
+	}
+	if err := transportbundle.ScanForLeak(compiled.Manifest); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+		return err
+	}
+	raw, err := json.MarshalIndent(compiled.Manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+		return err
+	}
+	printBundleSummary(compiled.Manifest)
+	return nil
+}
+
+func validateBundle(args []string) error {
+	fs := flag.NewFlagSet("validate-bundle", flag.ContinueOnError)
+	bundlePath := fs.String("bundle", "", "bundle manifest path")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *bundlePath == "" {
+		return fmt.Errorf("--bundle is required")
+	}
+	raw, err := os.ReadFile(*bundlePath)
+	if err != nil {
+		return err
+	}
+	var manifest transportbundle.TransportBundleManifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return err
+	}
+	if err := transportbundle.ValidateManifest(manifest); err != nil {
+		return err
+	}
+	printBundleSummary(manifest)
+	return nil
+}
+
+func summarizeBundle(args []string) error {
+	fs := flag.NewFlagSet("summarize-bundle", flag.ContinueOnError)
+	bundlePath := fs.String("bundle", "", "bundle manifest path")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *bundlePath == "" {
+		return fmt.Errorf("--bundle is required")
+	}
+	raw, err := os.ReadFile(*bundlePath)
+	if err != nil {
+		return err
+	}
+	var manifest transportbundle.TransportBundleManifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return err
+	}
+	if err := transportbundle.ValidateManifest(manifest); err != nil {
+		return err
+	}
+	printBundleSummary(manifest)
+	return nil
 }
 
 func generate(args []string) error {
@@ -142,6 +229,16 @@ func printSummary(p *ir.Profile) {
 	fmt.Printf("padding_policy: %s min=%d max=%d probability=%.2f\n", p.Padding.Mode, p.Padding.MinPaddingBytes, p.Padding.MaxPaddingBytes, p.Padding.Probability)
 }
 
+func printBundleSummary(manifest transportbundle.TransportBundleManifest) {
+	fmt.Printf("bundle_id: %s\n", manifest.BundleID)
+	fmt.Printf("mode: %s\n", manifest.Mode)
+	fmt.Printf("candidates: %d\n", len(manifest.Candidates))
+	fmt.Printf("fallback_hints: %d\n", len(manifest.FallbackPlan.OrderedCandidateIDs))
+	fmt.Printf("family_counts: %v\n", manifest.FamilyCounts)
+	fmt.Printf("role_counts: %v\n", manifest.RoleCounts)
+	fmt.Printf("bundle_hash: %s\n", manifest.BundleHash)
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: kdc generate --seed 12345 --out profile.json | kdc validate --profile profile.json | kdc corpus --start-seed 1 --count 1000 --out testdata/corpus/summary.json")
+	fmt.Fprintln(os.Stderr, "usage: kdc generate --seed 12345 --out profile.json | kdc validate --profile profile.json | kdc corpus --start-seed 1 --count 1000 --out testdata/corpus/summary.json | kdc bundle --seed 12345 --mode balanced_adaptive --out profiles/examples/bundle-12345.json | kdc validate-bundle --bundle profiles/examples/bundle-12345.json")
 }
