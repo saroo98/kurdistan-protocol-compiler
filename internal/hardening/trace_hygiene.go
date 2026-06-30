@@ -18,6 +18,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
@@ -454,6 +455,24 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanJSON([]byte(`{"endpoint":"x"}`)).Passed {
 			return fmt.Errorf("unsafe localproxyingress field accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("localproxyingressadv_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := localproxyingressadversary.GenerateAdversarialFixtureSet(ctx)
+		if err != nil {
+			return err
+		}
+		if err := localproxyingressadversary.ValidateAdversarialFixtureSet(set); err != nil {
+			return err
+		}
+		if err := localproxyingressadversary.ScanFixtureHygiene(set); err != nil {
+			return err
+		}
+		for _, tc := range []map[string]string{{"endpoint": "x"}, {"payload": "x"}, {"raw_bytes": "x"}, {"secret": "x"}} {
+			if err := localproxyingressadversary.ScanFixtureHygiene(tc); err == nil {
+				return fmt.Errorf("unsafe localproxyingressadv metadata accepted")
+			}
 		}
 		return nil
 	}))
