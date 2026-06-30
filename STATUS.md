@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T11:20:19Z`
+- Generated at: `2026-06-30T14:52:35Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -183,11 +183,22 @@
 | `localproxyingress_trace_hygiene` | PASS | `required` | summaries contain safe metadata only |
 | `localproxyingress_mutant_detection` | PASS | `required` | 14 mutants represented |
 | `localproxyingress_fixture_drift` | PASS | `required` | passed |
+| `localproxyingressadv_corpus_validation` | PASS | `required` | localproxyingressadv-v1: 30 scenarios |
+| `localproxyingressadv_descriptor_abuse` | PASS | `required` | 22 descriptor cases rejected |
+| `localproxyingressadv_lifecycle_hardening` | PASS | `required` | 14/14 invalid transitions rejected |
+| `localproxyingressadv_pressure_hardening` | PASS | `required` | 14 pressure scenarios; 4 overflows rejected |
+| `localproxyingressadv_reset_error_isolation` | PASS | `required` | 5 resets and 5 errors isolated |
+| `localproxyingressadv_mapping_collapse` | PASS | `required` | 3 unique target bindings; control findings=11 |
+| `localproxyingressadv_generated_backend_parity` | PASS | `required` | 30 scenarios compared |
+| `localproxyingressadv_m27_readiness` | PASS | `required` | go_for_local_proxy_egress_model |
+| `localproxyingressadv_trace_hygiene` | PASS | `required` | adversarial fixtures contain safe metadata only |
+| `localproxyingressadv_mutant_detection` | PASS | `required` | 15 mutants represented |
+| `localproxyingressadv_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 17 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 16 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 17 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -196,9 +207,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `101 ms`
-- Trace generation: `23 ms`
-- Total audit runtime: `1416 ms`
+- Profile generation: `88 ms`
+- Trace generation: `18 ms`
+- Total audit runtime: `1210 ms`
 
 ## Corpus Diversity Summary
 
@@ -223,7 +234,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.31886702875097384`
+- `different_profile_average_distance`: `0.3198915498377609`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -414,4 +425,4 @@
 
 ## Next Milestone
 
-Milestone 26 should focus on proxy ingress adversarial parity and hardening.
+Milestone 27 should focus on the local proxy egress and relay bridge model.

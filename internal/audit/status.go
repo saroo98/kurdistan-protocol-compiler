@@ -492,7 +492,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 26 should focus on proxy ingress adversarial parity and hardening.")
+	fmt.Fprintln(&b, "Milestone 27 should focus on the local proxy egress and relay bridge model.")
 	return b.String()
 }
 
