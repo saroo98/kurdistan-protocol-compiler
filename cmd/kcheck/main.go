@@ -95,6 +95,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "localproxyingress" {
 		os.Exit(runLocalProxyIngress(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "localproxyingressadv" {
+		os.Exit(runLocalProxyIngressAdversarial(os.Args[2:]))
+	}
 	os.Exit(runAudit(os.Args[1:]))
 }
 
@@ -2121,6 +2124,172 @@ func writeLocalProxyIngressCompanions(out string, set localproxyingress.FixtureS
 		if !force {
 			if _, err := os.Stat(path); err == nil {
 				return localproxyingress.ErrRefuseOverwrite
+			}
+		}
+		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalProxyIngressAdversarial(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalProxyIngressAdversarialGenerate(args[1:])
+		case "verify":
+			return runLocalProxyIngressAdversarialVerify(args[1:])
+		case "compare":
+			return runLocalProxyIngressAdversarialCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localproxyingressadv", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local proxy ingress adversarial audit")
+	full := flags.Bool("full", false, "run full local proxy ingress adversarial audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	report, err := audit.RunLocalProxyIngressAdversarialAudit(context.Background(), audit.DefaultConfig(mode))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(*out, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyIngressAdversarialGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingressadv generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localproxyingressadversary", "adversarial-corpus-golden.json"), "local proxy ingress adversarial fixture path")
+	force := flags.Bool("force", false, "overwrite fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localproxyingressadversary.GenerateAdversarialFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localproxyingressadversary.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalProxyIngressAdversarialCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localproxyingressadv fixtures: %s (%d scenarios)\n", *out, set.Corpus.ScenarioCount)
+	return 0
+}
+
+func runLocalProxyIngressAdversarialVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingressadv verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localproxyingressadversary", "adversarial-corpus-golden.json"), "local proxy ingress adversarial fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localproxyingressadversary.LoadAdversarialFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyingressadversary.GenerateAdversarialFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyingressadversary.CompareAdversarialFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyIngressAdversarialCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingressadv compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local proxy ingress adversarial fixture path")
+	newPath := flags.String("new", "", "new local proxy ingress adversarial fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localproxyingressadversary.LoadAdversarialFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyingressadversary.LoadAdversarialFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyingressadversary.CompareAdversarialFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalProxyIngressAdversarialCompanions(out string, set localproxyingressadversary.AdversarialFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name string
+		raw  []byte
+	}{
+		{"descriptor-abuse-golden.json", mustJSON(set.DescriptorAbuse)},
+		{"lifecycle-hardening-report.json", mustJSON(set.Lifecycle)},
+		{"pressure-hardening-report.json", mustJSON(set.Pressure)},
+		{"reset-error-isolation-report.json", mustJSON(set.ResetError)},
+		{"mapping-collapse-report.json", mustJSON(set.MappingCollapse)},
+		{"parity-hardening-report.json", mustJSON(set.Parity)},
+		{"m27-readiness-report.json", mustJSON(set.Readiness)},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return localproxyingressadversary.ErrRefuseOverwrite
 			}
 		}
 		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
