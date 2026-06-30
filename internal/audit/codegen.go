@@ -104,6 +104,7 @@ type CodegenAuditSummary struct {
 	LocalProxyIngressGeneratedParity string                         `json:"localproxyingress_generated_backend_parity"`
 	LocalProxyIngressAdvParity       string                         `json:"localproxyingressadv_generated_backend_parity"`
 	AdaptivePathGeneratedParity      string                         `json:"adaptivepath_generated_backend_parity"`
+	TransportBundleGeneratedParity   string                         `json:"transportbundle_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -197,6 +198,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localProxyIngressGate := GeneratedLocalProxyIngressParityGate(corpus, testFailures)
 	localProxyIngressAdvGate := GeneratedLocalProxyIngressAdvParityGate(corpus, testFailures)
 	adaptivePathGate := GeneratedAdaptivePathParityGate(corpus, testFailures)
+	transportBundleGate := GeneratedTransportBundleParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -230,6 +232,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localProxyIngressGate,
 		localProxyIngressAdvGate,
 		adaptivePathGate,
+		transportBundleGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -792,6 +795,44 @@ func GeneratedAdaptivePathParityGate(corpus GeneratedBackendTraceCorpus, testFai
 	}, failures)
 }
 
+func GeneratedTransportBundleParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module transportbundle tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated transportbundle specialization constants missing")
+	}
+	transportBundleFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/transportbundle_generated.go" {
+			transportBundleFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && transportBundleFiles < 2 {
+		failures = append(failures, "generated transportbundle specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{"transportbundle_generated.go", "transportbundle_test.go", "transportbundle_parity_test.go", "transportbundle_hygiene_test.go", "TransportBundleSchemaVersion"} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated transportbundle marker "+marker)
+				}
+			}
+		}
+	}
+	return gate("transportbundle_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include transportbundle tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":                   corpus.GeneratedModules,
+		"generated_test_failures":             len(testFailures),
+		"transportbundle_unique_files":        transportBundleFiles,
+		"generated_source_specialized":        corpus.SourceScan.ProfileSpecificConstantsPresent,
+		"transportbundle_generated_artifacts": []string{"transportbundle_generated.go", "transportbundle_test.go", "transportbundle_parity_test.go", "transportbundle_hygiene_test.go"},
+	}, failures)
+}
+
 func GeneratedByteTransportParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -945,6 +986,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalProxyIngressGeneratedParity: status("localproxyingress_generated_backend_parity"),
 		LocalProxyIngressAdvParity:       status("localproxyingressadv_generated_backend_parity"),
 		AdaptivePathGeneratedParity:      status("adaptivepath_generated_backend_parity"),
+		TransportBundleGeneratedParity:   status("transportbundle_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
