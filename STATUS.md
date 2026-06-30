@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T14:52:35Z`
+- Generated at: `2026-06-30T15:39:29Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -194,11 +194,22 @@
 | `localproxyingressadv_trace_hygiene` | PASS | `required` | adversarial fixtures contain safe metadata only |
 | `localproxyingressadv_mutant_detection` | PASS | `required` | 15 mutants represented |
 | `localproxyingressadv_fixture_drift` | PASS | `required` | passed |
+| `adaptivepath_candidate_taxonomy` | PASS | `required` | 7 candidate families checked |
+| `adaptivepath_condition_model` | PASS | `required` | 21 synthetic conditions checked |
+| `adaptivepath_freshness_uncertainty` | PASS | `required` | 6 fresh, 2 stale, 5 expired observations |
+| `adaptivepath_viability_evaluation` | PASS | `required` | 7 viability reports generated |
+| `adaptivepath_decision_inputs` | PASS | `required` | 7 decision inputs built; no winner selected |
+| `adaptivepath_misuse_detection` | PASS | `required` | healthy findings=0; control findings=2 |
+| `adaptivepath_generated_backend_parity` | PASS | `required` | 7 candidates and 21 conditions compared |
+| `adaptivepath_trace_hygiene` | PASS | `required` | adaptive path fixtures contain safe metadata only |
+| `adaptivepath_mutant_detection` | PASS | `required` | 13 mutants represented |
+| `adaptivepath_fixture_drift` | PASS | `required` | passed |
+| `adaptivepath_roadmap_public_docs` | PASS | `required` | public README/site status table cleanup and adaptive roadmap checked |
 | `hardening_invariant_registry` | PASS | `required` | 17 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 17 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 18 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -207,9 +218,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `88 ms`
-- Trace generation: `18 ms`
-- Total audit runtime: `1210 ms`
+- Profile generation: `91 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `1255 ms`
 
 ## Corpus Diversity Summary
 
@@ -232,10 +243,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3198915498377609`
-- `same_profile_distance`: `0.014925373134328358`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.319765850804996`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -406,6 +417,20 @@
 - `relayfleet_mutant_detection`: `passed`
 - `relayfleet_fixture_drift`: `passed`
 
+## Adaptive Path Model
+
+- Gate result: `true`
+- `adaptivepath_candidate_taxonomy`: `passed`
+- `adaptivepath_condition_model`: `passed`
+- `adaptivepath_freshness_uncertainty`: `passed`
+- `adaptivepath_viability_evaluation`: `passed`
+- `adaptivepath_decision_inputs`: `passed`
+- `adaptivepath_misuse_detection`: `passed`
+- `adaptivepath_generated_backend_parity`: `passed`
+- `adaptivepath_trace_hygiene`: `passed`
+- `adaptivepath_mutant_detection`: `passed`
+- `adaptivepath_roadmap_public_docs`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -425,4 +450,4 @@
 
 ## Next Milestone
 
-Milestone 27 should focus on the local proxy egress and relay bridge model.
+Milestone 28 should focus on the generated transport bundle compiler.
