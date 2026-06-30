@@ -7,9 +7,9 @@
 ![Language](https://img.shields.io/badge/language-Go-00ADD8)
 ![Area](https://img.shields.io/badge/area-protocol--compiler-blue)
 
-Kurdistan is a censorship-resistance protocol research project building toward a production-grade polymorphic relay transport compiler.
+Kurdistan is a censorship-resistance protocol research project building toward a production-grade polymorphic relay transport compiler with an adaptive-runtime direction.
 
-Kurdistan explores a core question in anti-censorship networking: can a relay transport be generated as many structurally different protocol implementations, instead of shipping one recognizable protocol fingerprint?
+Kurdistan explores two connected questions in anti-censorship networking: can a relay transport be generated as many structurally different protocol implementations, and can future runtimes reason about volatile candidate paths without collapsing into one stable fingerprint?
 
 ## What Is Kurdistan?
 
@@ -26,6 +26,7 @@ Current profile generation covers:
 - payload-free trace capture
 - generated Go source modules
 - adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, implementation hardening gates, and adapter contract gates
+- adaptive path candidates and generated transport bundles for future path-selection research
 
 The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
 
@@ -33,7 +34,9 @@ The current codebase is a research compiler, runtime session harness, source gen
 
 Many censorship-resistant networking systems and pluggable transports must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.
 
-Kurdistan investigates a compiler-based alternative: generate structurally different relay transports per deployment or research run while preserving stable internal semantics. The long-term motivation is resilient communication in adversarial network environments, including heavily filtered countries such as Iran and other regions affected by internet censorship.
+Kurdistan investigates a compiler-based alternative: generate structurally different relay transports per deployment or research run while preserving stable internal semantics. It also treats censorship as a volatile path-selection problem: a path may work briefly, fail seconds later, or behave differently across devices and access networks.
+
+The long-term motivation is resilient communication in adversarial network environments, including heavily filtered countries such as Iran and other regions affected by internet censorship. Iran is one motivating example, not a hard-coded country-specific operating mode.
 
 Today, the repository is focused on protocol generation, local interoperability, trace diversity, and regression gates. It is not yet a deployable censorship-circumvention system.
 
@@ -52,13 +55,16 @@ Stable internal relay semantics
 Kurdistan generated transport
         |
         v
+Adaptive path and transport bundle model
+        |
+        v
 Carrier layer
         |
         v
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer and its deterministic runtime boundaries, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, hardening, adapter interface contracts, proxy-ingress prototypes, and the adaptive-runtime direction. Concrete proxy or VPN integration still requires separate design review.
+Current work is concentrated on the generated transport/compiler layer, deterministic runtime boundaries, and adaptive-path modeling. This includes internal carrier-shape modeling, production security prerequisites, runtime session architecture, hardening, adapter interface contracts, proxy-ingress prototypes, candidate path taxonomy, and generated transport bundles. Concrete proxy or VPN integration still requires separate design review.
 
 ## Features
 
@@ -632,16 +638,16 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. M27: adaptive path model and candidate taxonomy.
-2. M28: generated transport bundle compiler.
-3. M29: path racing and short-lived scoring harness.
-4. M30: continuous health monitoring and failover model.
-5. M31: carrier-family design reviews.
-6. M32: safe measurement-client design and privacy review.
-7. M33: local proxy egress and relay bridge model.
-8. M34: end-to-end local proxy pipeline.
-9. M35: production integration readiness review.
-10. M36: Android client architecture review.
+1. Phase 1: adaptive candidate modeling.
+   M27: adaptive path model and candidate taxonomy.
+2. Phase 2: bundle and race layer.
+   M28: generated transport bundle compiler. M29: path racing and short-lived scoring harness. M30: continuous health monitoring and failover model.
+3. Phase 3: carrier and measurement review.
+   M31: carrier-family design reviews. M32: safe measurement-client design and privacy review.
+4. Phase 4: local proxy pipeline.
+   M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
+5. Phase 5: readiness and client architecture.
+   M35: production integration readiness review. M36: Android client architecture review.
 
 ## Research Positioning
 
