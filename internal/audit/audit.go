@@ -29,6 +29,7 @@ import (
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregen"
@@ -105,6 +106,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localProxyIngressAdvComparison := localProxyIngressAdversarialFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingressadversary", "adversarial-corpus-golden.json"), localProxyIngressAdvSet)
 	adaptivePathSet, adaptivePathErr := adaptivepath.GenerateFixtureSet(ctx)
 	adaptivePathComparison := adaptivePathFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "adaptivepath", "path-candidates-golden.json"), adaptivePathSet)
+	transportBundleSet, transportBundleErr := transportbundle.GenerateFixtureSet(ctx)
+	transportBundleComparison := transportBundleFixtureComparison(filepath.Join(fixtureRoot, "testdata", "transportbundle", "bundle-manifest-golden.json"), transportBundleSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -259,6 +262,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, AdaptivePathRoadmapPublicDocsGate())
 	} else {
 		gates = append(gates, gate("adaptivepath_candidate_taxonomy", false, "required", adaptivePathErr.Error(), nil, []string{adaptivePathErr.Error()}))
+	}
+	if transportBundleErr == nil {
+		gates = append(gates, TransportBundleGates(transportBundleSet, transportBundleComparison)...)
+	} else {
+		gates = append(gates, gate("transportbundle_policy_validation", false, "required", transportBundleErr.Error(), nil, []string{transportBundleErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
