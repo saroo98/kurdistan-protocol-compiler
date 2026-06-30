@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -287,12 +288,14 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	}
 	readme := read("README.md")
 	index := read("docs/index.html")
+	indexText := htmlText(index)
+	siteJS := read("docs/site.js")
 	kip34 := read("docs/KIP-0034-generated-transport-bundle-compiler.md")
 	kip34Lower := strings.ToLower(kip34)
 	if strings.Contains(readme, "## Current Status") || strings.Contains(readme, "| Milestone | Status |") {
 		failures = append(failures, "README still contains public current-status table")
 	}
-	if strings.Contains(index, "Current Status") || strings.Contains(index, `id="milestones"`) || strings.Contains(index, "<h2>Milestones</h2>") {
+	if strings.Contains(index, "Current Status") || strings.Contains(index, `id="milestones"`) || strings.Contains(index, "<h2>Milestones</h2>") || strings.Contains(index, "| Milestone | Status |") {
 		failures = append(failures, "docs site still contains public milestone/status table")
 	}
 	for _, required := range []string{
@@ -306,12 +309,24 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 		}
 	}
 	for _, required := range []string{
+		"Polymorphic transport compiler",
+		"adaptive censorship-resistance",
 		"Adaptive runtime direction",
-		"KIP-0034-generated-transport-bundle-compiler.md",
 		"Boundaries and safety",
+		"Compiler lane",
+		"Adaptive lane",
+		"Safety lane",
 	} {
-		if !strings.Contains(index, required) {
+		if !strings.Contains(indexText, required) {
 			failures = append(failures, "docs site missing "+required)
+		}
+	}
+	if !strings.Contains(index, "KIP-0034-generated-transport-bundle-compiler.md") {
+		failures = append(failures, "docs site missing KIP-0034-generated-transport-bundle-compiler.md")
+	}
+	for _, required := range []string{"M27", "M28", "M29", "M30", "M31", "M32", "M33", "M34", "M35", "M36"} {
+		if !strings.Contains(index, required) {
+			failures = append(failures, "docs site missing roadmap marker "+required)
 		}
 	}
 	for _, required := range []string{
@@ -326,7 +341,109 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	if strings.Contains(readme, "M27: local proxy egress") || strings.Contains(index, "M27: local proxy egress") {
 		failures = append(failures, "old M27 local proxy egress roadmap remains")
 	}
-	return gate("adaptivepath_roadmap_public_docs", len(failures) == 0, "required", "public README/site status table cleanup and adaptive roadmap checked", nil, failures)
+	failures = append(failures, publicClaimFailures("README.md", readme)...)
+	failures = append(failures, publicClaimFailures("docs/index.html", index)...)
+	failures = append(failures, siteStructureFailures(root, index)...)
+	if strings.Contains(readme, "AGENTS.md") || strings.Contains(index, "AGENTS.md") {
+		failures = append(failures, "public docs reference local-only instruction file")
+	}
+	for _, forbidden := range []string{"src=\"http://", "src=\"https://", "googletagmanager", "google-analytics", "analytics", "cdn.jsdelivr", "unpkg.com", "fonts.googleapis", "fonts.gstatic"} {
+		if strings.Contains(strings.ToLower(index), forbidden) || strings.Contains(strings.ToLower(siteJS), forbidden) {
+			failures = append(failures, "public site includes external dependency or analytics marker "+forbidden)
+		}
+	}
+	for _, forbidden := range []string{"raw payload", "raw bytes", "endpoint", "resolver", "dns query"} {
+		if strings.Contains(strings.ToLower(index), forbidden) {
+			failures = append(failures, "public site includes unsafe fixture-like term "+forbidden)
+		}
+	}
+	return gate("adaptivepath_roadmap_public_docs", len(failures) == 0, "required", "public adaptive site, roadmap, links, and claim-safety checked", nil, failures)
+}
+
+func publicClaimFailures(name, content string) []string {
+	failures := []string{}
+	for _, line := range strings.Split(content, "\n") {
+		lower := strings.ToLower(line)
+		for _, phrase := range []string{
+			"guaranteed bypass",
+			"undetectable",
+			"impossible to detect",
+			"field-ready",
+			"production vpn",
+			"working vpn app",
+			"live probing",
+			"real dns probing",
+			"real https probing",
+			"real udp probing",
+		} {
+			if strings.Contains(lower, phrase) && !negatesUnsafeClaim(lower) {
+				failures = append(failures, name+" contains unsafe public claim phrase "+phrase)
+			}
+		}
+	}
+	return failures
+}
+
+func negatesUnsafeClaim(line string) bool {
+	for _, marker := range []string{"no ", "not ", "does not ", "without ", "distinct from ", "doesn't "} {
+		if strings.Contains(line, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func htmlText(content string) string {
+	withoutTags := regexp.MustCompile(`<[^>]+>`).ReplaceAllString(content, " ")
+	return strings.Join(strings.Fields(withoutTags), " ")
+}
+
+func siteStructureFailures(root, index string) []string {
+	failures := []string{}
+	ids := map[string]int{}
+	for _, match := range regexp.MustCompile(`\sid="([^"]+)"`).FindAllStringSubmatch(index, -1) {
+		ids[match[1]]++
+	}
+	for id, count := range ids {
+		if count > 1 {
+			failures = append(failures, "docs site has duplicate id "+id)
+		}
+	}
+	hrefRE := regexp.MustCompile(`href="([^"]+)"`)
+	for _, match := range hrefRE.FindAllStringSubmatch(index, -1) {
+		href := match[1]
+		if strings.HasPrefix(href, "#") {
+			id := strings.TrimPrefix(href, "#")
+			if id != "" && ids[id] == 0 {
+				failures = append(failures, "nav/local anchor missing section id "+href)
+			}
+			continue
+		}
+		if strings.HasPrefix(href, "https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/") {
+			rel := strings.TrimPrefix(href, "https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/")
+			if !fileExists(root, rel) {
+				failures = append(failures, "GitHub docs link target missing "+rel)
+			}
+			continue
+		}
+		if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "mailto:") {
+			continue
+		}
+		clean := strings.Split(strings.Split(href, "#")[0], "?")[0]
+		if clean == "" || strings.HasPrefix(clean, "assets/") {
+			continue
+		}
+		rel := filepath.ToSlash(filepath.Join("docs", filepath.FromSlash(clean)))
+		if !fileExists(root, rel) {
+			failures = append(failures, "docs site link target missing "+clean)
+		}
+	}
+	return failures
+}
+
+func fileExists(root, rel string) bool {
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+	return err == nil && !info.IsDir()
 }
 
 func adaptivePathFixtureComparison(ctx context.Context, path string, current adaptivepath.AdaptivePathFixtureSet) adaptivepath.AdaptivePathComparisonReport {
