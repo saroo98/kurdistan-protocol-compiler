@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kurdistan Protocol Compiler | Adaptive Polymorphic Relay Transport Research</title>
+    <title>Kurdistan Protocol Compiler | Adaptive Censorship-Resistance Research</title>
     <meta
       name="description"
-      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
     />
     <meta property="og:title" content="Kurdistan Protocol Compiler" />
     <meta
       property="og:description"
-      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://saroo98.github.io/kurdistan-protocol-compiler/" />
@@ -19,332 +19,422 @@
     <meta name="twitter:title" content="Kurdistan Protocol Compiler" />
     <meta
       name="twitter:description"
-      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
+      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
     />
     <link rel="canonical" href="https://saroo98.github.io/kurdistan-protocol-compiler/" />
     <link rel="icon" href="assets/kurdistan-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="site.js" defer></script>
   </head>
   <body>
+    <div class="ambient" aria-hidden="true">
+      <span class="ambient-sweep"></span>
+      <span class="ambient-grid"></span>
+    </div>
+
     <header class="site-header">
-      <a class="brand" href="#top" aria-label="Kurdistan Protocol Compiler home">
-        <img src="assets/kurdistan-mark.svg" alt="" />
-        <span>Kurdistan</span>
-      </a>
-      <nav aria-label="Primary navigation">
-        <a href="#capabilities">Capabilities</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#direction">Adaptive runtime</a>
-        <a href="#roadmap">Roadmap</a>
-        <a href="#docs">Docs</a>
-      </nav>
+      <div class="nav-shell">
+        <a class="brand" href="#top" aria-label="Kurdistan Protocol Compiler home">
+          <img src="assets/kurdistan-mark.svg" alt="" />
+          <span>Kurdistan</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="#what">What</a>
+          <a href="#direction">Adaptive</a>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#roadmap">Roadmap</a>
+          <a href="#docs">Docs</a>
+          <a href="#boundaries">Boundaries</a>
+        </nav>
+      </div>
     </header>
 
     <main id="top">
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Protocol compiler for adversarial networks</p>
-          <h1>Adaptive polymorphic relay transport compiler in development.</h1>
+      <section class="hero section-shell" aria-labelledby="hero-title">
+        <div class="hero-mesh" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="hero-copy" data-reveal>
+          <p class="eyebrow">Adaptive transport research system</p>
+          <h1 id="hero-title">
+            <span class="hero-title-line">Polymorphic transport</span>
+            <span class="hero-title-line">compiler for adaptive</span>
+            <span class="hero-title-line">censorship-resistance research.</span>
+          </h1>
           <p class="hero-text">
-            Kurdistan generates profile-specific relay transport implementations with generated state machines,
-            framing, scheduling, padding, probing behavior, multi-stream semantics, source-code backends,
-            adversarial audits, mutation testing, and regression gates.
+            Kurdistan generates profile-specific relay transports and is evolving toward an adaptive runtime
+            that can model candidate bundles, volatile path conditions, short-lived scoring, and failover decisions.
           </p>
-          <div class="hero-actions">
-            <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
-            <a class="button" href="#docs">Read the docs</a>
-            <a class="button" href="#roadmap">See roadmap</a>
+          <div class="hero-actions" aria-label="Primary project actions">
+            <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler" aria-label="View Kurdistan Protocol Compiler on GitHub">
+              <span>View on GitHub</span>
+              <i aria-hidden="true">↗</i>
+            </a>
+            <a class="button" href="#docs" aria-label="Read Kurdistan documentation">
+              <span>Read the docs</span>
+              <i aria-hidden="true">↓</i>
+            </a>
+            <a class="button" href="#roadmap" aria-label="See Kurdistan roadmap">
+              <span>See roadmap</span>
+              <i aria-hidden="true">↓</i>
+            </a>
+            <a class="button ghost" href="#architecture" aria-label="View Kurdistan architecture">
+              <span>Architecture</span>
+              <i aria-hidden="true">→</i>
+            </a>
+          </div>
+          <div class="hero-assurance" aria-label="Project scope summary">
+            <span>Research prototype</span>
+            <span>Payload-free synthetic evaluation</span>
+            <span>No live carrier implementation yet</span>
           </div>
         </div>
-        <div class="hero-panel" aria-label="Generated transport summary">
-          <div class="panel-topline">
-            <span>compiler output</span>
-            <strong>profile-specific transport</strong>
+
+        <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
+          <div class="stack-header">
+            <span>research stack</span>
+            <strong>0.28.0-lab</strong>
           </div>
-          <div class="signal-stack">
-            <div><span>state machines</span><b>generated</b></div>
-            <div><span>frame grammar</span><b>varied</b></div>
-            <div><span>scheduler</span><b>profile-bound</b></div>
-            <div><span>streams</span><b>flow-controlled</b></div>
-            <div><span>runtime</span><b>session-aware</b></div>
-            <div><span>adapter boundary</span><b>contract-checked</b></div>
-            <div><span>local adapter</span><b>deterministic</b></div>
-            <div><span>byte fixtures</span><b>frozen</b></div>
-            <div><span>wire features</span><b>baselined</b></div>
-            <div><span>wire shapes</span><b>generated</b></div>
-            <div><span>wire evaluation</span><b>dataset-ready</b></div>
-            <div><span>host detection</span><b>modeled</b></div>
-            <div><span>relay fleet</span><b>lifecycle-modeled</b></div>
-            <div><span>transport bundle</span><b>compiled</b></div>
-            <div><span>hardening</span><b>gate-driven</b></div>
+          <div class="stack-rows">
+            <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>wire grammar</span><b>polymorphic</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>proxy ingress</span><b>hardened</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>adaptive path</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>transport bundles</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot next"></span><span>path racing</span><b>planned</b></div>
+            <div class="stack-row"><span class="status-dot next"></span><span>health failover</span><b>planned</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
+        </aside>
+      </section>
+
+      <section class="chapter section-shell" id="what" data-reveal>
+        <div class="section-heading">
+          <p class="eyebrow">What is Kurdistan?</p>
+          <h2>A generated-transport compiler with an adaptive-runtime direction.</h2>
+        </div>
+        <div class="two-track">
+          <article class="shell-card">
+            <span class="track-label">Compiler layer</span>
+            <h3>Profile-specific transport behavior</h3>
+            <p>
+              Profiles define generated source backends, frame grammars, schedulers, padding behavior,
+              stream semantics, probing behavior, malformed-input policy, and audit-visible safe metadata.
+            </p>
+          </article>
+          <article class="shell-card">
+            <span class="track-label">Adaptive runtime direction</span>
+            <h3>Candidate paths under volatile conditions</h3>
+            <p>
+              The adaptive model represents path families, freshness, uncertainty, generated bundles,
+              future racing, scoring, monitoring, and failover without implying a finished proxy or VPN product.
+            </p>
+          </article>
         </div>
       </section>
 
-      <section class="section" id="what">
+      <section class="chapter dark-panel section-shell" id="why" data-reveal>
         <div class="section-heading">
-          <h2>What is Kurdistan?</h2>
+          <p class="eyebrow">Why this exists</p>
+          <h2>Censorship can be both fingerprint-based and fast-changing.</h2>
+        </div>
+        <p class="wide-copy">
+          In heavily filtered environments, a path may work on one device and fail on another, or work briefly
+          and fail seconds later. Kurdistan treats censorship not only as a fingerprinting problem, but also as
+          a fast-changing path-selection problem.
+        </p>
+        <p class="wide-copy muted-copy">
+          Iran is one motivating example of a volatile censorship environment, but the project does not hard-code
+          a country-specific mode. The work remains a research prototype using synthetic, payload-free evaluation.
+        </p>
+      </section>
+
+      <section class="chapter section-shell" id="direction" data-reveal>
+        <div class="section-heading">
+          <p class="eyebrow">Adaptive runtime direction</p>
+          <h2>The target is not one fixed best transport.</h2>
           <p>
-            Kurdistan is a censorship resistance and anti-censorship networking research project focused on
-            polymorphic relay transport generation.
+            The long-term goal is to generate candidate bundles, evaluate short-lived path evidence, race
+            candidates, monitor health, and fail over when conditions change.
           </p>
         </div>
-        <div class="split">
-          <p>
-            Instead of defining one stable relay transport protocol, Kurdistan compiles private transport
-            profiles. A profile controls first contact, state transitions, wire grammar, semantic mapping,
-            scheduling, padding, probing behavior, stream lifecycle, and error handling.
-          </p>
-          <p>
-            The current system includes both an interpreted runtime and a generated source backend. That makes
-            it possible to compare shared-runtime behavior against profile-specific Go modules while preserving
-            payload-free traces for analysis.
-          </p>
+        <div class="adaptive-flow" aria-label="Adaptive runtime flow">
+          <article class="flow-node">
+            <span class="status-chip implemented">implemented</span>
+            <h3>adaptive path candidates</h3>
+            <p>Candidate families, condition observations, freshness, uncertainty, and viability.</p>
+          </article>
+          <span class="flow-edge" aria-hidden="true"></span>
+          <article class="flow-node">
+            <span class="status-chip implemented">implemented</span>
+            <h3>candidate bundle</h3>
+            <p>Generated bundle policies, candidate roles, synthetic relay binding, and fallback hints.</p>
+          </article>
+          <span class="flow-edge" aria-hidden="true"></span>
+          <article class="flow-node">
+            <span class="status-chip planned">planned</span>
+            <h3>path racing</h3>
+            <p>Future deterministic competition between short-lived candidate observations.</p>
+          </article>
+          <span class="flow-edge" aria-hidden="true"></span>
+          <article class="flow-node">
+            <span class="status-chip planned">planned</span>
+            <h3>short-lived scoring</h3>
+            <p>Future scoring designed around volatility rather than static path labels.</p>
+          </article>
+          <span class="flow-edge" aria-hidden="true"></span>
+          <article class="flow-node">
+            <span class="status-chip planned">planned</span>
+            <h3>health monitoring</h3>
+            <p>Future local evidence windows for path health, stale data, and uncertainty.</p>
+          </article>
+          <span class="flow-edge" aria-hidden="true"></span>
+          <article class="flow-node">
+            <span class="status-chip planned">planned</span>
+            <h3>failover decision</h3>
+            <p>Future bounded decision model for changing path conditions.</p>
+          </article>
         </div>
       </section>
 
-      <section class="section dark-band" id="why">
+      <section class="chapter section-shell" id="capabilities" data-reveal>
         <div class="section-heading">
-          <h2>Why this exists</h2>
-          <p>
-            Fixed protocol families can accumulate recognizable fingerprints. Kurdistan studies protocol
-            fingerprint diversity as a compiler problem.
-          </p>
+          <p class="eyebrow">Core capabilities</p>
+          <h2>Compiler, runtime, byte-path, and audit systems in one research loop.</h2>
         </div>
-        <div class="wide-copy">
-          <p>
-            The long-term motivation is resilient communication in adversarial networks and censored
-            environments, including heavily filtered countries such as Iran. Kurdistan is built for
-            censorship-resistant networking research, pluggable transport research, traffic analysis resistance
-            research, and controlled experiments around internet censorship.
-          </p>
+        <div class="capability-grid">
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Generated protocols</h3><p>Profile-specific state machines, first-contact behavior, semantic mappings, and controlled auth checks.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Frame diversity</h3><p>Generated length modes, type modes, fragmentation, padding placement, and malformed-frame policies.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Scheduler and padding</h3><p>Profile-bound scheduling, flush policy, batching, padding, and invalid-input behavior.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Multi-stream relay transport</h3><p>Flow control, backpressure, stream IDs, close/reset handling, and priority scheduling.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Generated source backend</h3><p><code>kgen</code> emits profile-specific Go modules with generated constants, tables, and tests.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Adversarial audits</h3><p>Black-box clustering, mutation testing, collapse scanners, and generated/interpreted parity gates.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Runtime sessions</h3><p>Lifecycle, compatibility, capability negotiation, secure-channel metadata, in-memory links, and traces.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Adapter interface</h3><p>Bounded ingress/egress contracts, flow lifecycle, capability checks, and runtime mapping.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local adapter prototype</h3><p>Memory ingress and egress adapters, deterministic source/sink models, and safe summaries.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Byte transport harness</h3><p>Frame encoding, fragmentation, bounded local byte pipe, sequence checks, and corruption rejection.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Byte-path fixtures</h3><p>Golden summaries, malformed byte corpus metadata, fixture drift checks, and parity reports.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Wire-feature baselines</h3><p>Feature vectors, first-N packet-shape modeling, safe corpus comparison, and collapse controls.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Wire-shape generator</h3><p>Deterministic policy sampling, bytepath application, expected-feature matching, and fixtures.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Wire evaluation datasets</h3><p>Payload-free CSV/JSONL exports, deterministic splits, synthetic controls, and drift checks.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Host detection resistance</h3><p>Synthetic host observations, timeline windows, confidence scoring, and resistance metrics.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Relay fleet lifecycle</h3><p>Synthetic relay states, churn schedules, migration events, burn-risk scoring, and controls.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Proxy ingress design</h3><p>Request contracts, target descriptor checks, lifecycle constraints, and failure-mode matrices.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local proxy ingress prototype</h3><p>Deterministic request events, target binding, runtime mapping, bounded queues, and isolation checks.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Ingress adversarial hardening</h3><p>Descriptor abuse, invalid lifecycle sequences, pressure stress, reset/error isolation, and parity.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Adaptive path model</h3><p>Candidate taxonomy, condition observations, freshness buckets, uncertainty, and viability reports.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Transport bundle compiler</h3><p>Bundle modes, candidate roles, seed plans, synthetic relay binding, and fallback hints.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Hardening gates</h3><p>Invariant registry, API misuse, panic safety, resource bounds, trace hygiene, and readiness checks.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Safety and trace hygiene</h3><p>Payload-free summaries, forbidden-field scanning, generated parity, and fixture drift controls.</p></article>
+          <article class="capability-card"><span class="status-chip planned">planned</span><h3>Path racing and scoring</h3><p>Future short-lived path evidence, racing, scoring, and uncertainty windows.</p></article>
+          <article class="capability-card"><span class="status-chip planned">planned</span><h3>Health monitoring and failover</h3><p>Future deterministic monitoring and failover models for changing path conditions.</p></article>
+          <article class="capability-card"><span class="status-chip review">review</span><h3>Carrier-family design reviews</h3><p>Future review of carrier-family assumptions before concrete carrier implementations.</p></article>
+          <article class="capability-card"><span class="status-chip review">review</span><h3>Measurement-client privacy review</h3><p>Future privacy review before any measurement-client architecture moves beyond design.</p></article>
+          <article class="capability-card"><span class="status-chip review">review</span><h3>Android client architecture</h3><p>Future client architecture review after readiness and safety checks mature.</p></article>
         </div>
       </section>
 
-      <section class="section status" id="direction">
-        <div>
-          <h2>Adaptive runtime direction</h2>
-          <p>
-            Kurdistan is moving from single generated profiles toward adaptive transport sets: candidate paths,
-            synthetic condition evidence, relay lifecycle risk, generated transport bundles, fallback hints, and
-            future deterministic path racing. The model remains based on safe local metadata and audit fixtures,
-            not real path probing or public-network measurement.
-          </p>
-        </div>
-        <a class="button primary" href="KIP-0034-generated-transport-bundle-compiler.md">Read KIP-0034</a>
-      </section>
-
-      <section class="section" id="capabilities">
+      <section class="chapter section-shell" id="architecture" data-reveal>
         <div class="section-heading">
-          <h2>Core capabilities</h2>
-          <p>Compiler, runtime, source generation, and audit layers designed to make protocol collapse visible.</p>
+          <p class="eyebrow">Architecture</p>
+          <h2>Three lanes: generation, adaptation, and verification.</h2>
+          <p>Kurdistan separates transport generation, adaptive decision modeling, and safety verification.</p>
         </div>
-        <div class="card-grid">
-          <article class="card">
-            <h3>Generated protocols</h3>
-            <p>Deterministic profile generation for first contact, FSM paths, framing, semantic mapping, and probing behavior.</p>
+        <div class="lane-diagram" aria-label="Multi-lane architecture diagram">
+          <article class="lane">
+            <header>Compiler lane</header>
+            <div class="lane-nodes">
+              <span>IR</span>
+              <span>profile generation</span>
+              <span>wire-shape policy</span>
+              <span>generated source backend</span>
+            </div>
           </article>
-          <article class="card">
-            <h3>Frame diversity</h3>
-            <p>Profile-specific frame grammar choices for length modes, type modes, fragmentation, padding placement, and limits.</p>
+          <article class="lane featured">
+            <header>Adaptive lane</header>
+            <div class="lane-nodes">
+              <span>adaptive path model</span>
+              <span>transport bundles</span>
+              <span>path racing</span>
+              <span>health/failover</span>
+            </div>
           </article>
-          <article class="card">
-            <h3>Scheduler and padding</h3>
-            <p>Generated scheduler policies, padding strategies, invalid-input behavior, and malformed-frame responses.</p>
+          <article class="lane">
+            <header>Safety lane</header>
+            <div class="lane-nodes">
+              <span>fixtures</span>
+              <span>trace hygiene</span>
+              <span>adversarial gates</span>
+              <span>generated/interpreted parity</span>
+            </div>
           </article>
-          <article class="card">
-            <h3>Multi-stream relay transport</h3>
-            <p>Stream IDs, flow-control windows, close/reset behavior, backpressure, and priority scheduling.</p>
+          <div class="lane-connector c1" aria-hidden="true"></div>
+          <div class="lane-connector c2" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="chapter section-shell" id="roadmap" data-reveal>
+        <div class="section-heading">
+          <p class="eyebrow">Roadmap</p>
+          <h2>Adaptive phases instead of a static status table.</h2>
+        </div>
+        <div class="phase-grid">
+          <article class="phase-card">
+            <span class="phase-kicker">Phase 1</span>
+            <h3>Adaptive candidate modeling</h3>
+            <p><b>M27:</b> adaptive path model and candidate taxonomy</p>
+            <span class="status-chip implemented">implemented</span>
           </article>
-          <article class="card">
-            <h3>Generated source backend</h3>
-            <p><code>kgen</code> emits profile-specific Go modules with generated constants, tables, tests, and trace tools.</p>
+          <article class="phase-card active">
+            <span class="phase-kicker">Phase 2</span>
+            <h3>Bundle and race layer</h3>
+            <p><b>M28:</b> generated transport bundle compiler</p>
+            <p><b>M29:</b> path racing and short-lived scoring harness</p>
+            <p><b>M30:</b> continuous health monitoring and failover model</p>
+            <span class="status-chip implemented">M28 implemented</span>
+            <span class="status-chip planned">M29-M30 planned</span>
           </article>
-          <article class="card">
-            <h3>Adversarial audits</h3>
-            <p>Black-box clustering, mutation testing, fixed-signature gates, stream collapse scanning, and regression reports.</p>
+          <article class="phase-card">
+            <span class="phase-kicker">Phase 3</span>
+            <h3>Carrier and measurement review</h3>
+            <p><b>M31:</b> carrier-family design reviews</p>
+            <p><b>M32:</b> safe measurement-client design and privacy review</p>
+            <span class="status-chip review">review</span>
           </article>
-          <article class="card">
-            <h3>Runtime sessions</h3>
-            <p>Role validation, lifecycle transitions, compatibility negotiation, secure channel setup, in-memory links, and safe traces.</p>
+          <article class="phase-card">
+            <span class="phase-kicker">Phase 4</span>
+            <h3>Local proxy pipeline</h3>
+            <p><b>M33:</b> local proxy egress and relay bridge model</p>
+            <p><b>M34:</b> end-to-end local proxy pipeline</p>
+            <span class="status-chip planned">planned</span>
           </article>
-          <article class="card">
-            <h3>Adapter interface</h3>
-            <p>Bounded ingress/egress contracts, flow lifecycle, capability checks, runtime mapping, backpressure, and safe summaries.</p>
-          </article>
-          <article class="card">
-            <h3>Local adapter prototype</h3>
-            <p>Memory ingress/egress adapters, deterministic source and sink models, runtime integration, sequence checks, and safe traces.</p>
-          </article>
-          <article class="card">
-            <h3>Byte transport harness</h3>
-            <p>Deterministic byte frames, fragmentation, bounded local pipe, sequence integrity, corruption rejection, and payload-free traces.</p>
-          </article>
-          <article class="card">
-            <h3>Byte-path fixtures</h3>
-            <p>Golden byte-path summaries, malformed byte corpus metadata, fixture drift gates, and generated/interpreted parity checks.</p>
-          </article>
-          <article class="card">
-            <h3>Wire-feature baselines</h3>
-            <p>Abstract protocol-feature corpus, first-N packet-shape model, safe feature vectors, corpus comparison, and collapse gates.</p>
-          </article>
-          <article class="card">
-            <h3>Wire-shape generator</h3>
-            <p>Deterministic policy sampling, profile integration, bytepath application, expected feature matching, and fixture baselines.</p>
-          </article>
-          <article class="card">
-            <h3>Wire evaluation datasets</h3>
-            <p>Payload-free CSV/JSONL exports, deterministic splits, synthetic controls, drift checks, and classifier-readiness reports.</p>
-          </article>
-          <article class="card">
-            <h3>Host detection resistance</h3>
-            <p>Synthetic host observations, timeline windows, confidence scoring, resistance metrics, collapse controls, and fixture drift gates.</p>
-          </article>
-          <article class="card">
-            <h3>Relay fleet lifecycle</h3>
-            <p>Synthetic relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapse controls, and fixture drift gates.</p>
-          </article>
-          <article class="card">
-            <h3>Transport bundles</h3>
-            <p>Deterministic bundle modes, candidate roles, profile and wire-policy references, synthetic relay binding, fallback hints, and collapse controls.</p>
-          </article>
-          <article class="card">
-            <h3>Hardening gates</h3>
-            <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
+          <article class="phase-card">
+            <span class="phase-kicker">Phase 5</span>
+            <h3>Readiness and client architecture</h3>
+            <p><b>M35:</b> production integration readiness review</p>
+            <p><b>M36:</b> Android client architecture review</p>
+            <span class="status-chip review">review</span>
           </article>
         </div>
       </section>
 
-      <section class="section" id="architecture">
+      <section class="chapter dark-panel section-shell" id="research" data-reveal>
         <div class="section-heading">
-          <h2>Architecture</h2>
-          <p>A compiler-centered proxy transport architecture with generated transports as the core research layer.</p>
+          <p class="eyebrow">Research focus</p>
+          <h2>Systems questions around protocol diversity and volatile path choice.</h2>
         </div>
-        <div class="architecture" aria-label="Architecture diagram">
-          <div class="arch-node">Local application / future packet source</div>
-          <div class="arch-arrow"></div>
-          <div class="arch-node">Adapter ingress/egress interface</div>
-          <div class="arch-arrow"></div>
-          <div class="arch-node">Stable internal relay semantics</div>
-          <div class="arch-arrow"></div>
-          <div class="arch-node highlight">Kurdistan generated transport</div>
-          <div class="arch-arrow"></div>
-          <div class="arch-node">Carrier abstraction</div>
-          <div class="arch-arrow"></div>
-          <div class="arch-node">Remote relay model</div>
-        </div>
-      </section>
-
-      <section class="section" id="roadmap">
-        <div class="section-heading">
-          <h2>Roadmap</h2>
-          <p>The next workstream moves Kurdistan from deterministic ingress prototypes toward adaptive runtime modeling.</p>
-        </div>
-        <div class="timeline">
-          <div><strong>M27</strong><span>Adaptive path model and candidate taxonomy</span></div>
-          <div class="next"><strong>M28</strong><span>Generated transport bundle compiler</span></div>
-          <div><strong>M29</strong><span>Planned: path racing and short-lived scoring harness</span></div>
-          <div><strong>M30</strong><span>Planned: continuous health monitoring and failover model</span></div>
-          <div><strong>M31</strong><span>Carrier-family design reviews</span></div>
-          <div><strong>M32</strong><span>Safe measurement-client design and privacy review</span></div>
-          <div><strong>M33</strong><span>Local proxy egress and relay bridge model</span></div>
-          <div><strong>M34</strong><span>End-to-end local proxy pipeline</span></div>
-          <div><strong>M35</strong><span>Production integration readiness review</span></div>
-          <div><strong>M36</strong><span>Android client architecture review</span></div>
-        </div>
-      </section>
-
-      <section class="section dark-band" id="research">
-        <div class="section-heading">
-          <h2>Research focus</h2>
-          <p>Protocol generation as a path toward stronger relay transport diversity.</p>
-        </div>
-        <div class="research-grid">
-          <span>censorship resistance</span>
-          <span>anti-censorship networking</span>
-          <span>pluggable transport research</span>
+        <div class="research-cloud">
           <span>protocol fingerprint diversity</span>
-          <span>traffic analysis resistance research</span>
-          <span>Iran internet censorship</span>
+          <span>adaptive censorship-path modeling</span>
+          <span>payload-free traffic analysis resistance</span>
+          <span>generated transport bundles</span>
+          <span>host and relay burn-risk modeling</span>
+          <span>Iran-style volatility as a motivating environment</span>
+          <span>pluggable transport research</span>
+          <span>multi-stream relay transport</span>
         </div>
       </section>
 
-      <section class="section" id="docs">
+      <section class="chapter section-shell" id="docs" data-reveal>
         <div class="section-heading">
-          <h2>Documentation links</h2>
-          <p>Start with the README and audit snapshot, then review the latest KIPs.</p>
+          <p class="eyebrow">Documentation links</p>
+          <h2>Grouped entry points for the research system.</h2>
         </div>
-        <div class="doc-list">
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/README.md">README.md</a>
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/STATUS.md">STATUS.md</a>
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/ROADMAP.md">ROADMAP.md</a>
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/LICENSE">License</a>
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/COPYRIGHT.md">Copyright</a>
-          <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/NOTICE">Notice</a>
-          <a href="KIP-0014-multi-stream-lab-semantics.md">KIP-0014: Multi-stream lab semantics</a>
-          <a href="KIP-0015-multi-stream-adversarial-testing.md">KIP-0015: Multi-stream adversarial testing</a>
-          <a href="KIP-0016-lab-proxy-semantics.md">KIP-0016: Lab proxy semantics</a>
-          <a href="KIP-0017-carrier-abstraction-modeling.md">KIP-0017: Carrier abstraction modeling</a>
-          <a href="KIP-0018-production-security-prerequisites.md">KIP-0018: Production security prerequisites</a>
-          <a href="KIP-0019-runtime-session-architecture.md">KIP-0019: Runtime session architecture</a>
-          <a href="KIP-0020-implementation-hardening.md">KIP-0020: Implementation hardening</a>
-          <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
-          <a href="KIP-0022-deterministic-local-adapter-prototype.md">KIP-0022: Deterministic local adapter prototype</a>
-          <a href="KIP-0023-deterministic-byte-transport-harness.md">KIP-0023: Deterministic byte transport harness</a>
-          <a href="KIP-0024-bytepath-fixture-freeze.md">KIP-0024: Byte-path fixture freeze</a>
-          <a href="KIP-0025-protocol-feature-corpus.md">KIP-0025: Protocol feature corpus</a>
-          <a href="KIP-0026-wire-shape-generator-prototype.md">KIP-0026: Wire-shape generator prototype</a>
-          <a href="KIP-0027-wire-evaluation-classifier-datasets.md">KIP-0027: Wire evaluation datasets</a>
-          <a href="KIP-0028-host-based-detection-resistance.md">KIP-0028: Host-based detection resistance</a>
-          <a href="KIP-0029-relay-churn-fleet-lifecycle.md">KIP-0029: Relay churn and fleet lifecycle</a>
-          <a href="KIP-0030-concrete-local-proxy-ingress-design-review.md">KIP-0030: Concrete local proxy ingress design review</a>
-          <a href="KIP-0031-deterministic-local-proxy-ingress-prototype.md">KIP-0031: Deterministic local proxy ingress prototype</a>
-          <a href="KIP-0032-proxy-ingress-adversarial-parity-hardening.md">KIP-0032: Proxy ingress adversarial hardening</a>
-          <a href="KIP-0033-adaptive-path-model-candidate-taxonomy.md">KIP-0033: Adaptive path model and candidate taxonomy</a>
-          <a href="KIP-0034-generated-transport-bundle-compiler.md">KIP-0034: Generated transport bundle compiler</a>
-          <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
-        </div>
-      </section>
-
-      <section class="section dark-band" id="boundaries">
-        <div class="section-heading">
-          <h2>Boundaries and safety</h2>
-          <p>
-            Current work is deterministic, offline, synthetic, and payload-free. The repository does not implement
-            real path probing, concrete proxy/VPN adapters, deployment, DNS/resolver tests, TLS mimicry, CDN
-            behavior, endpoint handling, or public-network measurement.
-          </p>
-        </div>
-      </section>
-
-      <section class="section" id="license">
-        <div class="section-heading">
-          <h2>License</h2>
-          <p>Kurdistan uses separate licenses for source code and documentation.</p>
-        </div>
-        <div class="card-grid">
-          <article class="card">
-            <h3>Source code</h3>
-            <p>GNU Affero General Public License v3.0 or later (<code>AGPL-3.0-or-later</code>).</p>
+        <div class="docs-board">
+          <article class="docs-group">
+            <h3>Foundation</h3>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/README.md">README.md</a>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/STATUS.md">STATUS.md</a>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/ROADMAP.md">ROADMAP.md</a>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/LICENSE">License</a>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/COPYRIGHT.md">Copyright</a>
+            <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/NOTICE">Notice</a>
           </article>
-          <article class="card">
-            <h3>Documentation</h3>
-            <p>Creative Commons Attribution-ShareAlike 4.0 International (<code>CC BY-SA 4.0</code>).</p>
+          <article class="docs-group">
+            <h3>Runtime and adapter</h3>
+            <a href="KIP-0019-runtime-session-architecture.md">KIP-0019: Runtime session architecture</a>
+            <a href="KIP-0020-implementation-hardening.md">KIP-0020: Implementation hardening</a>
+            <a href="KIP-0021-adapter-interface-architecture.md">KIP-0021: Adapter interface architecture</a>
+            <a href="KIP-0022-deterministic-local-adapter-prototype.md">KIP-0022: Local adapter prototype</a>
+            <a href="KIP-0023-deterministic-byte-transport-harness.md">KIP-0023: Byte transport harness</a>
+            <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
           </article>
-          <article class="card">
-            <h3>Copyright</h3>
-            <p>Copyright 2026 Saro. Preserve copyright and license notices when using or modifying the project.</p>
+          <article class="docs-group">
+            <h3>Wire evaluation</h3>
+            <a href="KIP-0024-bytepath-fixture-freeze.md">KIP-0024: Byte-path fixture freeze</a>
+            <a href="KIP-0025-protocol-feature-corpus.md">KIP-0025: Protocol feature corpus</a>
+            <a href="KIP-0026-wire-shape-generator-prototype.md">KIP-0026: Wire-shape generator</a>
+            <a href="KIP-0027-wire-evaluation-classifier-datasets.md">KIP-0027: Wire evaluation datasets</a>
+          </article>
+          <article class="docs-group">
+            <h3>Host and relay risk</h3>
+            <a href="KIP-0028-host-based-detection-resistance.md">KIP-0028: Host detection resistance</a>
+            <a href="KIP-0029-relay-churn-fleet-lifecycle.md">KIP-0029: Relay churn and fleet lifecycle</a>
+          </article>
+          <article class="docs-group highlight">
+            <h3>Proxy ingress</h3>
+            <a href="KIP-0030-concrete-local-proxy-ingress-design-review.md">KIP-0030: Concrete local proxy ingress design review</a>
+            <a href="KIP-0031-deterministic-local-proxy-ingress-prototype.md">KIP-0031: Deterministic local proxy ingress prototype</a>
+            <a href="KIP-0032-proxy-ingress-adversarial-parity-hardening.md">KIP-0032: Proxy ingress adversarial hardening</a>
+          </article>
+          <article class="docs-group highlight">
+            <h3>Adaptive runtime</h3>
+            <a href="KIP-0033-adaptive-path-model-candidate-taxonomy.md">KIP-0033: Adaptive path model and candidate taxonomy</a>
+            <a href="KIP-0034-generated-transport-bundle-compiler.md">KIP-0034: Generated transport bundle compiler</a>
+          </article>
+          <article class="docs-group">
+            <h3>Readiness</h3>
+            <a href="KIP-0018-production-security-prerequisites.md">KIP-0018: Security prerequisites</a>
+            <a href="KIP-0014-multi-stream-lab-semantics.md">KIP-0014: Multi-stream lab semantics</a>
+            <a href="KIP-0015-multi-stream-adversarial-testing.md">KIP-0015: Multi-stream adversarial testing</a>
+            <a href="KIP-0016-lab-proxy-semantics.md">KIP-0016: Lab proxy semantics</a>
+            <a href="KIP-0017-carrier-abstraction-modeling.md">KIP-0017: Carrier abstraction modeling</a>
           </article>
         </div>
       </section>
 
+      <section class="chapter safety-console section-shell" id="boundaries" data-reveal>
+        <div class="section-heading">
+          <p class="eyebrow">Boundaries and safety</p>
+          <h2>Safety controls stay visible in the public face of the project.</h2>
+        </div>
+        <div class="safety-grid" role="list" aria-label="Boundary checklist">
+          <div role="listitem"><span></span>Payload-free audit traces</div>
+          <div role="listitem"><span></span>No raw packet capture fixtures</div>
+          <div role="listitem"><span></span>No secrets, keys, nonces, auth tags, or proof material in traces</div>
+          <div role="listitem"><span></span>No bypass guarantees</div>
+          <div role="listitem"><span></span>No undetectability claims</div>
+          <div role="listitem"><span></span>Lab readiness is distinct from readiness for field use</div>
+          <div role="listitem"><span></span>High-risk carriers require separate review</div>
+          <div role="listitem"><span></span>No concrete proxy, VPN, TLS, CDN, or public-network carrier implementation yet</div>
+        </div>
+      </section>
+
+      <section class="chapter section-shell" id="license" data-reveal>
+        <div class="section-heading">
+          <p class="eyebrow">License</p>
+          <h2>Separate licenses for source and documentation.</h2>
+        </div>
+        <div class="license-grid">
+          <article class="shell-card"><h3>Source code</h3><p>GNU Affero General Public License v3.0 or later (<code>AGPL-3.0-or-later</code>).</p></article>
+          <article class="shell-card"><h3>Documentation</h3><p>Creative Commons Attribution-ShareAlike 4.0 International (<code>CC BY-SA 4.0</code>).</p></article>
+          <article class="shell-card"><h3>Copyright</h3><p>Copyright 2026 Saro. Preserve copyright and license notices when using or modifying the project.</p></article>
+        </div>
+      </section>
     </main>
 
-    <footer>
-      <strong>Kurdistan Protocol Compiler</strong>
-      <span>Censorship-resistance networking research</span>
-      <span>Go / protocol compiler / polymorphic relay transport</span>
-      <span>AGPL-3.0-or-later / CC BY-SA 4.0</span>
+    <footer class="site-footer">
+      <div>
+        <strong>Kurdistan Protocol Compiler</strong>
+        <span>Censorship-resistance networking research</span>
+      </div>
+      <div>
+        <span>Go / protocol compiler / polymorphic relay transport</span>
+        <span>AGPL-3.0-or-later / CC BY-SA 4.0</span>
+      </div>
     </footer>
   </body>
 </html>
