@@ -1,0 +1,27 @@
+{
+  "assignment": {
+    "relay_count": 9,
+    "assigned_profiles": 9,
+    "unique_profile_seeds": 8,
+    "unique_wire_policy_hashes": 8,
+    "unique_selected_families": 7,
+    "profile_reuse_violations": 0,
+    "policy_reuse_violations": 0,
+    "risk_triggered_refreshes": 0,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "compared_fleets": 2,
+    "compared_relays": 9,
+    "lifecycle_matches": 9,
+    "assignment_matches": 9,
+    "churn_matches": 6,
+    "migration_matches": 2,
+    "risk_bucket_matches": 9,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+}
