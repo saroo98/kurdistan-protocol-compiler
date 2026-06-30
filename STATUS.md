@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T21:44:36Z`
+- Generated at: `2026-06-30T22:41:25Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -204,7 +204,7 @@
 | `adaptivepath_trace_hygiene` | PASS | `required` | adaptive path fixtures contain safe metadata only |
 | `adaptivepath_mutant_detection` | PASS | `required` | 13 mutants represented |
 | `adaptivepath_fixture_drift` | PASS | `required` | passed |
-| `adaptivepath_roadmap_public_docs` | PASS | `required` | public README/site status table cleanup and adaptive roadmap checked |
+| `adaptivepath_roadmap_public_docs` | PASS | `required` | public adaptive site, roadmap, links, and claim-safety checked |
 | `transportbundle_policy_validation` | PASS | `required` | 6 bundle policy modes checked |
 | `transportbundle_seed_planning` | PASS | `required` | 6 unique profile seeds |
 | `transportbundle_family_coverage` | PASS | `required` | 5 families covered |
@@ -229,9 +229,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `131 ms`
-- Trace generation: `30 ms`
-- Total audit runtime: `2057 ms`
+- Profile generation: `87 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `1476 ms`
 
 ## Corpus Diversity Summary
 
@@ -256,8 +256,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31748988543062934`
-- `same_profile_distance`: `0.014925373134328358`
+- `different_profile_average_distance`: `0.31928058498876116`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
