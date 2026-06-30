@@ -172,4 +172,4 @@ This milestone does not train a detector, perform live traffic measurement, mode
 
 ## Next Milestone
 
-KIP-0029 builds on this host-level model with synthetic relay churn and fleet lifecycle checks. The next design step after KIP-0029 is concrete local proxy ingress review.
+KIP-0029 builds on this host-level model with synthetic relay churn and fleet lifecycle checks. KIP-0030 and KIP-0031 then define and prototype deterministic local proxy ingress behavior.

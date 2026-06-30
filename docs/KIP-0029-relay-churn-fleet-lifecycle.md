@@ -219,4 +219,4 @@ This milestone does not implement host rotation, service orchestration, deployme
 
 ## Next Milestone
 
-Milestone 24 should focus on concrete local proxy ingress design review: defining what a future local ingress prototype must prove before any real adapter implementation is considered.
+Milestone 24 defines the concrete local proxy ingress design review in [KIP-0030](KIP-0030-concrete-local-proxy-ingress-design-review.md), and Milestone 25 turns that contract into the deterministic local proxy ingress prototype in [KIP-0031](KIP-0031-deterministic-local-proxy-ingress-prototype.md).

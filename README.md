@@ -87,7 +87,9 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Wire evaluation and classifier dataset harness | Done |
 | Host-based detection resistance | Done |
 | Relay churn and host rotation modeling | Done |
-| Concrete local proxy ingress design review | Next |
+| Concrete local proxy ingress design review | Done |
+| Deterministic local proxy ingress prototype | Done |
+| Proxy ingress adversarial parity and hardening | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -125,6 +127,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Wire evaluation and classifier dataset harness with deterministic CSV/JSONL exports, train/test/OOD splits, synthetic controls, drift checks, and classifier-readiness gates.
 - Host-based detection resistance modeling with synthetic host observations, timeline windows, confidence scoring, resistance metrics, collapse controls, fixture drift gates, and generated-backend parity.
 - Synthetic relay fleet lifecycle modeling with relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapsed controls, fixture drift gates, and generated-backend parity.
+- Concrete local proxy ingress design review with request contracts, target descriptor safety checks, capability mapping, lifecycle constraints, failure-mode matrices, misuse controls, and fixture drift gates.
+- Deterministic local proxy ingress prototype with synthetic CONNECT-like request events, target binding, runtime stream mapping, bounded queues, backpressure, reset/error isolation, collapse controls, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -184,6 +188,12 @@ internal/hostdetect
 internal/relayfleet
   synthetic relay fleet lifecycle, profile assignment, churn schedules, migration events, burn-risk scoring, collapse detection, and relay-fleet fixtures
 
+internal/proxyingress + internal/proxyingressreview
+  local proxy ingress request contracts, target descriptor validation, capability mapping, design review matrix, and misuse checks
+
+internal/localproxyingress + internal/localproxyingressadversary
+  deterministic local proxy ingress prototype, synthetic request events, runtime stream mapping, bounded queue pressure, collapse controls, and fixtures
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -221,6 +231,8 @@ go run ./cmd/kcheck wiregen --quick
 go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck hostdetect --quick
 go run ./cmd/kcheck relayfleet --quick
+go run ./cmd/kcheck proxyingress --quick
+go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -296,6 +308,8 @@ Kurdistan treats diversity as something to measure.
 - wire-shape policy generation, profile integration, bytepath feature application, expected feature matching, collapse resistance, generated-backend parity, mutant detection, and baseline drift
 - wire evaluation dataset build, schema validation, split integrity, CSV/JSONL export consistency, observable diversity, control detection, classifier readiness, drift detection, trace hygiene, and mutant detection
 - relay fleet lifecycle integrity, profile assignment, churn schedule, migration model, burn risk, collapse detection, control detection, fixture drift, trace hygiene, and generated-backend parity
+- proxy ingress contract validation, target descriptor safety, capability mapping, runtime mapping, lifecycle integrity, failure-mode matrix coverage, design review, misuse detection, trace hygiene, fixture drift, and generated-backend parity
+- local proxy ingress contract compliance, target validation, lifecycle execution, runtime mapping, backpressure, error/reset isolation, queue bounds, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -324,6 +338,8 @@ go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
 go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck relayfleet --quick
+go run ./cmd/kcheck proxyingress --quick
+go run ./cmd/kcheck localproxyingress --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -476,6 +492,38 @@ go run ./cmd/kcheck relayfleet verify
 go run ./cmd/kcheck relayfleet compare --old testdata/relayfleet/relayfleet-golden.json --new testdata/relayfleet/relayfleet-golden.json
 ```
 
+## Concrete Local Proxy Ingress Design Review
+
+Milestone 24 defines the contract a future local proxy ingress must satisfy before any concrete adapter is implemented. `internal/proxyingress` models safe request descriptors, target descriptor validation, lifecycle states, capability mappings, runtime mapping metadata, and bounded summaries. `internal/proxyingressreview` freezes the design-review checklist and failure-mode matrix.
+
+The committed fixtures under `testdata/proxyingress/` contain only safe contracts, request classes, target classes, mapping summaries, lifecycle summaries, review outcomes, and hashes.
+
+Run:
+
+```bash
+go run ./cmd/kcheck proxyingress --quick
+go run ./cmd/kcheck proxyingress --full --out testdata/audit/proxyingress.json
+go run ./cmd/kcheck proxyingress generate --out testdata/proxyingress/proxyingress-contract-golden.json --force
+go run ./cmd/kcheck proxyingress verify
+go run ./cmd/kcheck proxyingress compare --old testdata/proxyingress/proxyingress-contract-golden.json --new testdata/proxyingress/proxyingress-contract-golden.json
+```
+
+## Deterministic Local Proxy Ingress Prototype
+
+Milestone 25 implements a deterministic local proxy ingress prototype without introducing concrete network adapters. `internal/localproxyingress` consumes synthetic CONNECT-like request events, validates target descriptors, maps requests to runtime stream metadata, exercises bounded queue pressure, propagates backpressure, isolates reset/error behavior, and emits trace-safe summaries.
+
+`internal/localproxyingressadversary` extracts payload-free features, scans for collapse, and provides controls for fixed descriptors, fixed stream mappings, ignored backpressure, cross-request reset leakage, unbounded queues, and trace hygiene failures. Fixtures live under `testdata/localproxyingress/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck localproxyingress --quick
+go run ./cmd/kcheck localproxyingress --full --out testdata/audit/localproxyingress.json
+go run ./cmd/kcheck localproxyingress generate --out testdata/localproxyingress/localproxyingress-summary-golden.json --force
+go run ./cmd/kcheck localproxyingress verify
+go run ./cmd/kcheck localproxyingress compare --old testdata/localproxyingress/localproxyingress-summary-golden.json --new testdata/localproxyingress/localproxyingress-summary-golden.json
+```
+
 ## Multi-Stream Semantics
 
 Kurdistan models multiple logical streams inside one session.
@@ -543,9 +591,10 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 23: relay churn, migration, and fleet lifecycle model. Done.
-2. Milestone 24: concrete local proxy ingress design review. Next.
-3. Later milestones: concrete adapter prototypes only after separate design review.
+1. Milestone 24: concrete local proxy ingress design review. Done.
+2. Milestone 25: deterministic local proxy ingress prototype. Done.
+3. Milestone 26: proxy ingress adversarial parity and hardening. Next.
+4. Later milestones: concrete adapter prototypes only after separate design review.
 
 ## Research Positioning
 
