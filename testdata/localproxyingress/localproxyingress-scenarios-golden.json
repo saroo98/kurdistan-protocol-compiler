@@ -1,0 +1,14 @@
+[
+  "single_connect_echo",
+  "many_small_connects",
+  "large_request_fragmented",
+  "mixed_request_classes",
+  "slow_drip_request",
+  "reset_mid_request",
+  "target_error_after_open",
+  "backpressure_pressure",
+  "invalid_target_rejection",
+  "lifecycle_violation_rejection",
+  "queue_overflow_rejection",
+  "duplicate_event_rejection"
+]
