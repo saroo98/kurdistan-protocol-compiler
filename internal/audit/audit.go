@@ -15,6 +15,7 @@ import (
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
+	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
@@ -82,9 +83,13 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	wireGenVectors := expectedVectorsForProfiles(wireGenPolicies, wiregencompare.DefaultScenarios())
 	wireEvalDataset, wireEvalErr := wireeval.BuildDataset(ctx, protocolCorpus, wireeval.BuildOptions{Seeds: wireeval.DefaultSeeds(), Scenarios: wireeval.DefaultScenarios(), SplitMode: wireeval.DefaultSplitMode(), Controls: true})
 	wireEvalCSV, wireEvalJSONL := []byte{}, []byte{}
+	hostDetectBaselinePath := filepath.Join(fixtureRoot, "testdata", "hostdetect", "host-observations-golden.json")
+	hostDetectSummary := hostdetect.HostDetectSummary{}
+	hostDetectErr := wireEvalErr
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
+		hostDetectSummary, hostDetectErr = hostdetect.Run(wireEvalDataset, hostdetect.DefaultBuildOptions())
 	}
 
 	gates := []GateResult{
@@ -192,6 +197,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, WireEvalGates(ctx, wireEvalDataset, wireEvalCSV, wireEvalJSONL, wireEvalBaselinePath)...)
 	} else {
 		gates = append(gates, gate("wireeval_dataset_build", false, "required", wireEvalErr.Error(), nil, []string{wireEvalErr.Error()}))
+	}
+	if hostDetectErr == nil {
+		gates = append(gates, HostDetectGates(ctx, wireEvalDataset, hostDetectSummary, hostdetect.DefaultAssignmentModes(), hostdetect.DefaultTimelineWindows(), hostDetectBaselinePath)...)
+	} else {
+		gates = append(gates, gate("hostdetect_observation_build", false, "required", hostDetectErr.Error(), nil, []string{hostDetectErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

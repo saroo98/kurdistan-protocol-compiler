@@ -16,6 +16,7 @@ import (
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/fixtures"
+	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
@@ -76,6 +77,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "wireeval" {
 		os.Exit(runWireEval(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "hostdetect" {
+		os.Exit(runHostDetect(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -1441,6 +1445,170 @@ func writeWireEvalCompanions(out string, dataset wireeval.Dataset, force bool) e
 		if !force {
 			if _, err := os.Stat(path); err == nil {
 				return wireeval.ErrRefuseOverwrite
+			}
+		}
+		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runHostDetect(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runHostDetectGenerate(args[1:])
+		case "verify":
+			return runHostDetectVerify(args[1:])
+		case "compare":
+			return runHostDetectCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck hostdetect", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick host detection audit")
+	full := flags.Bool("full", false, "run full host detection audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunHostDetectAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runHostDetectGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck hostdetect generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "hostdetect", "host-observations-golden.json"), "host observation output path")
+	force := flags.Bool("force", false, "overwrite existing hostdetect output")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	summary, err := hostdetect.GenerateGoldenSummary(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := hostdetect.WriteObservationSet(*out, summary.ObservationSet, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeHostDetectCompanions(*out, summary, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote hostdetect observations: %s (%d observations)\n", *out, summary.ObservationSet.ObservationCount)
+	return 0
+}
+
+func runHostDetectVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck hostdetect verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "hostdetect", "host-observations-golden.json"), "host observation baseline path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	report, err := hostdetect.VerifyObservationSet(context.Background(), *baseline)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runHostDetectCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck hostdetect compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old host observation path")
+	newPath := flags.String("new", "", "new host observation path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := hostdetect.LoadObservationSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := hostdetect.LoadObservationSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := hostdetect.CompareObservationSets(oldSet, newSet)
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeHostDetectCompanions(out string, summary hostdetect.HostDetectSummary, force bool) error {
+	dir := filepath.Dir(out)
+	writes := []struct {
+		name string
+		raw  []byte
+	}{
+		{"host-aggregates-golden.json", mustJSON(summary.Aggregates)},
+		{"host-detection-report.json", mustJSON(summary.Detection)},
+		{"host-resistance-report.json", mustJSON(summary.Resistance)},
+		{"host-controls.json", mustJSON(summary.Collapse)},
+		{"host-splits.json", mustJSON(map[string]any{"assignment_mode": summary.ObservationSet.AssignmentMode, "window": summary.ObservationSet.Window, "host_count": summary.ObservationSet.HostCount})},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return hostdetect.ErrRefuseOverwrite
 			}
 		}
 		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
