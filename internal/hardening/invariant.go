@@ -19,6 +19,7 @@ import (
 	"kurdistan/internal/proxysem"
 	"kurdistan/internal/relayfleet"
 	kstream "kurdistan/internal/stream"
+	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregen"
@@ -297,6 +298,19 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if summary.BurnRisk.HighRiskRelays+summary.BurnRisk.CriticalRiskRelays == 0 {
 			return fmt.Errorf("relayfleet high-risk controls missing")
+		}
+		return nil
+	}))
+	results = append(results, check("transportbundle_manifest_and_controls_validate", CategoryInvariants, func() error {
+		set, err := transportbundle.GenerateFixtureSet(context.Background())
+		if err != nil {
+			return err
+		}
+		if err := transportbundle.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		if set.CollapseReport.Conclusion != "passed" || set.ControlCollapseReport.Conclusion != "failed" {
+			return fmt.Errorf("transport bundle collapse controls failed")
 		}
 		return nil
 	}))
