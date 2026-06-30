@@ -102,6 +102,7 @@ type CodegenAuditSummary struct {
 	RelayFleetGeneratedParity        string                         `json:"relayfleet_generated_backend_parity"`
 	ProxyIngressGeneratedParity      string                         `json:"proxyingress_generated_backend_parity"`
 	LocalProxyIngressGeneratedParity string                         `json:"localproxyingress_generated_backend_parity"`
+	LocalProxyIngressAdvParity       string                         `json:"localproxyingressadv_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -193,6 +194,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	relayFleetGate := RelayFleetGeneratedBackendParityGate()
 	proxyIngressGate := GeneratedProxyIngressParityGate(corpus, testFailures)
 	localProxyIngressGate := GeneratedLocalProxyIngressParityGate(corpus, testFailures)
+	localProxyIngressAdvGate := GeneratedLocalProxyIngressAdvParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -224,6 +226,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		relayFleetGate,
 		proxyIngressGate,
 		localProxyIngressGate,
+		localProxyIngressAdvGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -712,6 +715,43 @@ func GeneratedLocalProxyIngressParityGate(corpus GeneratedBackendTraceCorpus, te
 	}, failures)
 }
 
+func GeneratedLocalProxyIngressAdvParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module localproxyingressadv tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated localproxyingressadv specialization constants missing")
+	}
+	localProxyIngressAdvFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/localproxyingressadv_generated.go" {
+			localProxyIngressAdvFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && localProxyIngressAdvFiles < 2 {
+		failures = append(failures, "generated localproxyingressadv specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{"localproxyingressadv_generated.go", "localproxyingressadv_test.go", "localproxyingressadv_parity_test.go", "localproxyingressadv_hygiene_test.go", "LocalProxyIngressAdversarialSchemaVersion"} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated localproxyingressadv marker "+marker)
+				}
+			}
+		}
+	}
+	return gate("localproxyingressadv_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include localproxyingressadv tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":                 corpus.GeneratedModules,
+		"generated_test_failures":           len(testFailures),
+		"localproxyingressadv_unique_files": localProxyIngressAdvFiles,
+		"generated_source_specialized":      corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedByteTransportParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -863,6 +903,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		RelayFleetGeneratedParity:        status("relayfleet_generated_backend_parity"),
 		ProxyIngressGeneratedParity:      status("proxyingress_generated_backend_parity"),
 		LocalProxyIngressGeneratedParity: status("localproxyingress_generated_backend_parity"),
+		LocalProxyIngressAdvParity:       status("localproxyingressadv_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

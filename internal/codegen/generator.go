@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/proxyingressreview"
 )
 
@@ -1241,6 +1242,44 @@ func GeneratedLocalProxyIngressFixtureSet(ctx context.Context) (localproxyingres
 	return localproxyingress.GenerateFixtureSet(ctx, localproxyingress.QuickScenarios())
 }
 `, quote(p.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressAdvDescriptorClasses := localProxyIngressAdversarialDescriptorClasses(localproxyingressadversary.DescriptorAbuseCases())
+	localProxyIngressAdvSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/localproxyingressadversary"
+)
+
+const LocalProxyIngressAdversarialSchemaVersion = %[1]s
+const LocalProxyIngressAdversarialGeneratedProfileID = %[2]s
+const LocalProxyIngressAdversarialCorpusID = %[3]s
+const LocalProxyIngressAdversarialReadinessDecision = "go_for_local_proxy_egress_model"
+
+var LocalProxyIngressAdversarialScenarioClasses = %[4]s
+var LocalProxyIngressAdversarialDescriptorClasses = %[5]s
+var LocalProxyIngressAdversarialLifecycleClasses = %[6]s
+var LocalProxyIngressAdversarialPressureClasses = %[7]s
+var LocalProxyIngressAdversarialResetErrorClasses = %[8]s
+var LocalProxyIngressAdversarialCollapseFindings = []string{"all_targets_same_binding", "all_requests_same_stream_class", "all_scenarios_same_lifecycle_pattern", "all_error_cases_same_error_bucket", "all_reset_cases_same_reset_bucket", "backpressure_never_mapped", "invalid_targets_mapped_as_valid", "mapping_hash_changes_but_features_same", "features_change_but_policy_constant", "padding_only_event_variation", "generated_backend_ignores_mapping"}
+var LocalProxyIngressAdversarialForbiddenFields = []string{"endpoint", "payload", "raw_bytes", "secret", "dns_query", "host_header", "sni", "cloud_provider"}
+
+func GeneratedLocalProxyIngressAdversarialFixtureSet(ctx context.Context) (localproxyingressadversary.AdversarialFixtureSet, error) {
+	return localproxyingressadversary.GenerateAdversarialFixtureSet(ctx)
+}
+
+func GeneratedLocalProxyIngressAdversarialReadiness(ctx context.Context) (localproxyingressadversary.ProxyIngressM27ReadinessReport, error) {
+	set, err := localproxyingressadversary.GenerateAdversarialFixtureSet(ctx)
+	if err != nil {
+		return localproxyingressadversary.ProxyIngressM27ReadinessReport{}, err
+	}
+	return set.Readiness, nil
+}
+`, quote(localproxyingressadversary.Version), quote(p.ID), quote(localproxyingressadversary.CorpusID), quoteSlice(localproxyingressadversary.RequiredScenarioIDs()), quoteSlice(localProxyIngressAdvDescriptorClasses), quoteSlice(localproxyingressadversary.LifecycleAbuseScenarios()), quoteSlice(localproxyingressadversary.PressureScenarios()), quoteSlice(localproxyingressadversary.ResetErrorScenarios()))
 	if err != nil {
 		return nil, err
 	}
@@ -3037,6 +3076,110 @@ func TestGeneratedLocalProxyIngressHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	localProxyIngressAdvTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/localproxyingressadversary"
+)
+
+func TestGeneratedLocalProxyIngressAdversarialFixtureSet(t *testing.T) {
+	if LocalProxyIngressAdversarialSchemaVersion != localproxyingressadversary.Version || LocalProxyIngressAdversarialGeneratedProfileID != ProfileID {
+		t.Fatalf("generated local proxy ingress adversarial constants drifted")
+	}
+	set, err := GeneratedLocalProxyIngressAdversarialFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingressadversary.ValidateAdversarialFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if set.Corpus.CorpusID != LocalProxyIngressAdversarialCorpusID || set.Corpus.ScenarioCount != len(LocalProxyIngressAdversarialScenarioClasses) {
+		t.Fatalf("generated adversarial corpus metadata drifted")
+	}
+	if set.Readiness.GoNoGoDecision != LocalProxyIngressAdversarialReadinessDecision {
+		t.Fatalf("generated readiness decision drifted: %%s", set.Readiness.GoNoGoDecision)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressAdvParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/localproxyingressadversary"
+)
+
+func TestGeneratedLocalProxyIngressAdversarialParity(t *testing.T) {
+	set, err := GeneratedLocalProxyIngressAdversarialFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingressadversary.ValidateParityReport(set.Parity); err != nil {
+		t.Fatal(err)
+	}
+	if localproxyingressadversary.CompareAdversarialFixtureSets(set, set).Conclusion != "passed" {
+		t.Fatalf("generated local proxy ingress adversarial parity failed")
+	}
+	readiness, err := GeneratedLocalProxyIngressAdversarialReadiness(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingressadversary.ValidateReadinessReport(readiness); err != nil {
+		t.Fatal(err)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressAdvHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/localproxyingressadversary"
+)
+
+func TestGeneratedLocalProxyIngressAdversarialHygiene(t *testing.T) {
+	set, err := GeneratedLocalProxyIngressAdversarialFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingressadversary.ScanFixtureHygiene(set); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range LocalProxyIngressAdversarialForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"payload": "synthetic"},
+		{"raw_bytes": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := localproxyingressadversary.ScanFixtureHygiene(tc); err == nil {
+			t.Fatalf("unsafe generated adversarial metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3370,6 +3513,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relayfleet_generated.go", Content: relayFleetSource, Go: true},
 		{RelPath: "protocol/proxyingress_generated.go", Content: proxyIngressSource, Go: true},
 		{RelPath: "protocol/localproxyingress_generated.go", Content: localProxyIngressSource, Go: true},
+		{RelPath: "protocol/localproxyingressadv_generated.go", Content: localProxyIngressAdvSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3414,6 +3558,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyingress_test.go", Content: localProxyIngressTestSource, Go: true},
 		{RelPath: "protocol/localproxyingress_parity_test.go", Content: localProxyIngressParityTestSource, Go: true},
 		{RelPath: "protocol/localproxyingress_hygiene_test.go", Content: localProxyIngressHygieneTestSource, Go: true},
+		{RelPath: "protocol/localproxyingressadv_test.go", Content: localProxyIngressAdvTestSource, Go: true},
+		{RelPath: "protocol/localproxyingressadv_parity_test.go", Content: localProxyIngressAdvParityTestSource, Go: true},
+		{RelPath: "protocol/localproxyingressadv_hygiene_test.go", Content: localProxyIngressAdvHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -3773,6 +3920,14 @@ func main() {
 func derivedAuthTestKeyHex(id string, seed int64) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("test-only-key:%s:%d", id, seed)))
 	return hex.EncodeToString(sum[:])
+}
+
+func localProxyIngressAdversarialDescriptorClasses(cases []localproxyingressadversary.DescriptorAbuseCase) []string {
+	classes := make([]string, 0, len(cases))
+	for _, tc := range cases {
+		classes = append(classes, tc.InputClass)
+	}
+	return classes
 }
 
 func findRepoRoot() (string, error) {
