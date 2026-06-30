@@ -1,0 +1,41 @@
+{
+  "bundle_seed": 12345,
+  "candidate_seeds": [
+    12345101,
+    12345118,
+    12345135,
+    12345152,
+    12345169,
+    12345186
+  ],
+  "profile_seeds": [
+    12345108,
+    12345125,
+    12345142,
+    12345159,
+    12345176,
+    12345193
+  ],
+  "family_seed_map": {
+    "baseline_control": [
+      12345176
+    ],
+    "dns_survival": [
+      12345125
+    ],
+    "experimental_udp_quic": [
+      12345142
+    ],
+    "https_like_tcp": [
+      12345108,
+      12345193
+    ],
+    "relay_rotation": [
+      12345159
+    ]
+  },
+  "unique_profile_seeds": 6,
+  "seed_plan_hash": "97639f3c98298583352f3609df0e8c60072bed97c81baff271c971f557cd0dea",
+  "payload_logged": false,
+  "secret_logged": false
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_01_https_like_tcp_45101",
+    "fallback_class": "primary_try_first",
+    "applies_after_failure": "primary_try_first",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": false,
+    "hint_hash": "fecf4e11b0fcdc19ee13bb9cae1405873112ed5ab524f042024e06bce11943a4",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_02_dns_survival_45118",
+    "fallback_class": "fallback_after_poisoning_signal",
+    "applies_after_failure": "fallback_after_poisoning_signal",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": false,
+    "hint_hash": "940a3e8df6cab6adf892a64fa103d8433f9ef404c612b392d090f2d8d7496773",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_03_experimental_udp_quic_45135",
+    "fallback_class": "fallback_after_udp_block_signal",
+    "applies_after_failure": "fallback_after_udp_block_signal",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": true,
+    "hint_hash": "e601aadf913a08ed0248736aa0abb186a5fd4c908f589f2314b5b23f08b0f177",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_04_relay_rotation_45152",
+    "fallback_class": "fallback_after_relay_burn",
+    "applies_after_failure": "fallback_after_relay_burn",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": false,
+    "hint_hash": "49c111c5ce8fb12cc6c77783e5a169f4518d41b5de687b4f53668a10ad6a25bc",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_05_baseline_control_45169",
+    "fallback_class": "fallback_after_stall",
+    "applies_after_failure": "fallback_after_stall",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": false,
+    "hint_hash": "940507a69b0043aed7a1850a470d4dd8240dcc46e1c1ef5367b33adbc10ffcf8",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "candidate_id": "bundle_candidate_balanced_adaptive_06_https_like_tcp_45186",
+    "fallback_class": "primary_try_first",
+    "applies_after_failure": "primary_try_first",
+    "requires_fresh_probe": true,
+    "high_risk": false,
+    "experimental": false,
+    "hint_hash": "9e78b6832fd1712b624852db964d25a8441bb6d31db563da139eb093e8c00a83",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

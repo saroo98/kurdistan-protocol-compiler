@@ -204,6 +204,21 @@ const (
 	ModeAdaptivePathPayloadLeak                     = "adaptivepath_payload_leak"
 	ModeAdaptivePathSecretLeak                      = "adaptivepath_secret_leak"
 	ModeAdaptivePathGeneratedBackendDrift           = "adaptivepath_generated_backend_drift"
+	ModeTransportBundleMissingRequiredFamily        = "transportbundle_missing_required_family"
+	ModeTransportBundleAllCandidatesSameFamily      = "transportbundle_all_candidates_same_family"
+	ModeTransportBundleAllCandidatesSameProfile     = "transportbundle_all_candidates_same_profile"
+	ModeTransportBundleAllCandidatesSameWirePolicy  = "transportbundle_all_candidates_same_wire_policy"
+	ModeTransportBundleHighRiskPrimary              = "transportbundle_high_risk_primary"
+	ModeTransportBundleExperimentalPrimary          = "transportbundle_experimental_primary"
+	ModeTransportBundleBurnedRelayPrimary           = "transportbundle_burned_relay_primary"
+	ModeTransportBundleMissingFallbackPlan          = "transportbundle_missing_fallback_plan"
+	ModeTransportBundleFinalWinnerSelected          = "transportbundle_final_winner_selected"
+	ModeTransportBundleEndpointLeak                 = "transportbundle_endpoint_leak"
+	ModeTransportBundleResolverLeak                 = "transportbundle_resolver_leak"
+	ModeTransportBundlePayloadLeak                  = "transportbundle_payload_leak"
+	ModeTransportBundleSecretLeak                   = "transportbundle_secret_leak"
+	ModeTransportBundleGeneratedBackendDrift        = "transportbundle_generated_backend_drift"
+	ModeTransportBundleControlNotDetected           = "transportbundle_control_not_detected"
 )
 
 func Modes() []string {
@@ -394,6 +409,21 @@ func Modes() []string {
 		ModeAdaptivePathPayloadLeak,
 		ModeAdaptivePathSecretLeak,
 		ModeAdaptivePathGeneratedBackendDrift,
+		ModeTransportBundleMissingRequiredFamily,
+		ModeTransportBundleAllCandidatesSameFamily,
+		ModeTransportBundleAllCandidatesSameProfile,
+		ModeTransportBundleAllCandidatesSameWirePolicy,
+		ModeTransportBundleHighRiskPrimary,
+		ModeTransportBundleExperimentalPrimary,
+		ModeTransportBundleBurnedRelayPrimary,
+		ModeTransportBundleMissingFallbackPlan,
+		ModeTransportBundleFinalWinnerSelected,
+		ModeTransportBundleEndpointLeak,
+		ModeTransportBundleResolverLeak,
+		ModeTransportBundlePayloadLeak,
+		ModeTransportBundleSecretLeak,
+		ModeTransportBundleGeneratedBackendDrift,
+		ModeTransportBundleControlNotDetected,
 	}
 }
 

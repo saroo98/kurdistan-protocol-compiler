@@ -1,0 +1,33 @@
+{
+  "control_collapse": {
+    "bundle_id": "bundle_balanced_adaptive_12345",
+    "candidate_count": 6,
+    "unique_families": 1,
+    "unique_profile_seeds": 1,
+    "unique_wire_policy_hashes": 1,
+    "primary_eligible_candidates": 0,
+    "high_risk_candidates": 0,
+    "experimental_candidates": 1,
+    "collapse_findings": [
+      "all_candidates_same_family",
+      "all_candidates_same_profile_seed",
+      "all_candidates_same_wire_policy"
+    ],
+    "diversity_score": 0.16666666666666666,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "failed"
+  },
+  "parity": {
+    "compared_bundles": 1,
+    "compared_candidates": 6,
+    "policy_matches": 1,
+    "candidate_count_matches": 1,
+    "family_count_matches": 1,
+    "role_count_matches": 1,
+    "fallback_plan_matches": 1,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+}

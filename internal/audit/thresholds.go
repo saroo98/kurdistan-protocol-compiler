@@ -3,7 +3,7 @@
 
 package audit
 
-const Version = "0.27.0-lab"
+const Version = "0.28.0-lab"
 
 type AuditConfig struct {
 	Mode         string          `json:"mode"`

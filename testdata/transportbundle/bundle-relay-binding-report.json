@@ -1,0 +1,14 @@
+{
+  "candidate_count": 6,
+  "synthetic_relays": 6,
+  "synthetic_hosts": 5,
+  "low_risk_candidates": 3,
+  "medium_risk_candidates": 3,
+  "high_risk_candidates": 0,
+  "burned_candidates": 0,
+  "quarantined_candidates": 0,
+  "primary_eligible": 2,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
