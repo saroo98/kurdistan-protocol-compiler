@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/transportbundle"
 )
 
 type Options struct {
@@ -1336,6 +1337,55 @@ func GeneratedAdaptivePathMisuse(ctx context.Context) (adaptivepath.AdaptivePath
 	return set.MisuseReport, nil
 }
 `, quote(string(adaptivepath.Version)), quote(p.ID), p.Seed, quoteSlice(adaptivePathCandidateFamilies()), quoteSlice(adaptivePathConditionClasses()), quoteSlice(adaptivePathObservationKinds()), quoteSlice(adaptivePathFreshnessClasses()), quoteSlice(adaptivePathTTLClasses()), quoteSlice(adaptivePathUncertaintyBuckets()), quoteSlice(adaptivePathViabilityStates()), quoteSlice(adaptivePathHighRiskFamilies()), quoteSlice(adaptivePathGatedFamilies()), quoteSlice(adaptivepath.ForbiddenMarkers()))
+	if err != nil {
+		return nil, err
+	}
+
+	transportBundleSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/transportbundle"
+)
+
+const TransportBundleSchemaVersion = %[1]s
+const TransportBundleGeneratedProfileID = %[2]s
+const TransportBundleGeneratedProfileSeed int64 = %[3]d
+
+var TransportBundleModes = %[4]s
+var TransportBundleCandidateRoles = %[5]s
+var TransportBundleForbiddenFields = %[6]s
+var TransportBundlePrimaryPolicyHash = %[7]s
+
+func GeneratedTransportBundleFixtureSet(ctx context.Context) (transportbundle.TransportBundleFixtureSet, error) {
+	return transportbundle.GenerateFixtureSet(ctx)
+}
+
+func GeneratedTransportBundleManifest(ctx context.Context) (transportbundle.TransportBundleManifest, error) {
+	set, err := transportbundle.GenerateFixtureSet(ctx)
+	if err != nil {
+		return transportbundle.TransportBundleManifest{}, err
+	}
+	return set.Manifest, nil
+}
+
+func GeneratedTransportBundleParity(ctx context.Context) (transportbundle.TransportBundleParityReport, error) {
+	set, err := transportbundle.GenerateFixtureSet(ctx)
+	if err != nil {
+		return transportbundle.TransportBundleParityReport{}, err
+	}
+	return set.Parity, nil
+}
+
+func GeneratedTransportBundleCollapse(ctx context.Context) (transportbundle.BundleCollapseReport, error) {
+	set, err := transportbundle.GenerateFixtureSet(ctx)
+	if err != nil {
+		return transportbundle.BundleCollapseReport{}, err
+	}
+	return set.CollapseReport, nil
+}
+`, quote(string(transportbundle.Version)), quote(p.ID), p.Seed, quoteSlice(transportBundleModeStrings()), quoteSlice(transportBundleCandidateRoles()), quoteSlice(transportbundle.ForbiddenMarkers()), quote(transportbundle.DefaultPolicy(12345, transportbundle.BundleModeBalancedAdaptive).PolicyHash))
 	if err != nil {
 		return nil, err
 	}
@@ -3338,6 +3388,108 @@ func TestGeneratedAdaptivePathHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	transportBundleTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/transportbundle"
+)
+
+func TestGeneratedTransportBundleFixtureSet(t *testing.T) {
+	if TransportBundleSchemaVersion != string(transportbundle.Version) || TransportBundleGeneratedProfileID != ProfileID {
+		t.Fatalf("generated transport bundle constants drifted")
+	}
+	set, err := GeneratedTransportBundleFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transportbundle.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(TransportBundleModes) != len(transportbundle.RequiredBundleModes()) || len(TransportBundleCandidateRoles) == 0 {
+		t.Fatalf("generated transport bundle taxonomy markers drifted")
+	}
+	if set.PayloadLogged || set.SecretLogged {
+		t.Fatalf("generated transport bundle fixture leaked sensitive flags")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	transportBundleParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/transportbundle"
+)
+
+func TestGeneratedTransportBundleParity(t *testing.T) {
+	report, err := GeneratedTransportBundleParity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Conclusion != "passed" || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated transport bundle parity failed: %%+v", report)
+	}
+	set, err := GeneratedTransportBundleFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transportbundle.CompareFixtureSets(set, set).Conclusion != "passed" {
+		t.Fatalf("generated transport bundle fixture self-compare failed")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	transportBundleHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/transportbundle"
+)
+
+func TestGeneratedTransportBundleHygiene(t *testing.T) {
+	set, err := GeneratedTransportBundleFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transportbundle.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range TransportBundleForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty transport bundle forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"payload": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := transportbundle.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe transport bundle metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3673,6 +3825,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyingress_generated.go", Content: localProxyIngressSource, Go: true},
 		{RelPath: "protocol/localproxyingressadv_generated.go", Content: localProxyIngressAdvSource, Go: true},
 		{RelPath: "protocol/adaptivepath_generated.go", Content: adaptivePathSource, Go: true},
+		{RelPath: "protocol/transportbundle_generated.go", Content: transportBundleSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3723,6 +3876,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/adaptivepath_test.go", Content: adaptivePathTestSource, Go: true},
 		{RelPath: "protocol/adaptivepath_parity_test.go", Content: adaptivePathParityTestSource, Go: true},
 		{RelPath: "protocol/adaptivepath_hygiene_test.go", Content: adaptivePathHygieneTestSource, Go: true},
+		{RelPath: "protocol/transportbundle_test.go", Content: transportBundleTestSource, Go: true},
+		{RelPath: "protocol/transportbundle_parity_test.go", Content: transportBundleParityTestSource, Go: true},
+		{RelPath: "protocol/transportbundle_hygiene_test.go", Content: transportBundleHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -4168,6 +4324,26 @@ func adaptivePathGatedFamilies() []string {
 		}
 	}
 	return out
+}
+
+func transportBundleModeStrings() []string {
+	out := make([]string, 0, len(transportbundle.RequiredBundleModes()))
+	for _, mode := range transportbundle.RequiredBundleModes() {
+		out = append(out, string(mode))
+	}
+	return out
+}
+
+func transportBundleCandidateRoles() []string {
+	return []string{
+		string(transportbundle.CandidateRolePrimaryEligible),
+		string(transportbundle.CandidateRoleFallback),
+		string(transportbundle.CandidateRoleSurvival),
+		string(transportbundle.CandidateRoleExperimental),
+		string(transportbundle.CandidateRoleHighRiskGated),
+		string(transportbundle.CandidateRoleControl),
+		string(transportbundle.CandidateRoleRejected),
+	}
 }
 
 func findRepoRoot() (string, error) {
