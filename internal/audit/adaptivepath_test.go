@@ -76,6 +76,13 @@ func TestAdaptivePathAuditQuickIncludesRequiredGates(t *testing.T) {
 	}
 }
 
+func TestAdaptivePathRoadmapPublicDocsGatePasses(t *testing.T) {
+	gate := AdaptivePathRoadmapPublicDocsGate()
+	if !gate.Passed {
+		t.Fatalf("public docs gate failed: %v", gate.Details["failures"])
+	}
+}
+
 func BenchmarkAdaptivePathQuickAudit(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		report, err := RunAdaptivePathAudit(context.Background(), DefaultConfig("quick"))
