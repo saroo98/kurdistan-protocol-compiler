@@ -34,7 +34,7 @@
       <nav aria-label="Primary navigation">
         <a href="#capabilities">Capabilities</a>
         <a href="#architecture">Architecture</a>
-        <a href="#milestones">Milestones</a>
+        <a href="#roadmap">Roadmap</a>
         <a href="#docs">Docs</a>
       </nav>
     </header>
@@ -216,36 +216,22 @@
         </div>
       </section>
 
-      <section class="section" id="milestones">
+      <section class="section" id="roadmap">
         <div class="section-heading">
-          <h2>Milestones</h2>
-          <p>Current progress toward a production-grade polymorphic relay transport compiler.</p>
+          <h2>Roadmap</h2>
+          <p>The next workstream moves Kurdistan from deterministic ingress prototypes toward adaptive runtime modeling.</p>
         </div>
         <div class="timeline">
-          <div><strong>Done</strong><span>Compiler/runtime scaffold</span></div>
-          <div><strong>Done</strong><span>Diversity audit and regression gates</span></div>
-          <div><strong>Done</strong><span>Adversarial lab simulator</span></div>
-          <div><strong>Done</strong><span>Mutation and longitudinal testing</span></div>
-          <div><strong>Done</strong><span>Generated source backend and parity audit</span></div>
-          <div><strong>Done</strong><span>Multi-stream semantics and stream adversary tests</span></div>
-          <div><strong>Done</strong><span>Lab-only proxy semantics</span></div>
-          <div><strong>Done</strong><span>Carrier abstraction</span></div>
-          <div><strong>Done</strong><span>Production security prerequisites</span></div>
-          <div><strong>Done</strong><span>Runtime session architecture</span></div>
-          <div><strong>Done</strong><span>Implementation hardening</span></div>
-          <div><strong>Done</strong><span>Adapter interface architecture</span></div>
-          <div><strong>Done</strong><span>Deterministic local adapter prototype</span></div>
-          <div><strong>Done</strong><span>Deterministic byte transport harness</span></div>
-          <div><strong>Done</strong><span>Byte-path parity and fixture freeze</span></div>
-          <div><strong>Done</strong><span>Protocol feature corpus and wire-shape baselines</span></div>
-          <div><strong>Done</strong><span>Wire-shape generator prototype</span></div>
-          <div><strong>Done</strong><span>Wire evaluation and classifier dataset harness</span></div>
-          <div><strong>Done</strong><span>Host-based detection resistance</span></div>
-          <div><strong>Done</strong><span>Relay churn and host rotation modeling</span></div>
-          <div><strong>Done</strong><span>Concrete local proxy ingress design review</span></div>
-          <div><strong>Done</strong><span>Deterministic local proxy ingress prototype</span></div>
-          <div><strong>Done</strong><span>Proxy ingress adversarial parity and hardening</span></div>
-          <div class="next"><strong>Next</strong><span>Local proxy egress and relay bridge model</span></div>
+          <div class="next"><strong>M27</strong><span>Adaptive path model and candidate taxonomy</span></div>
+          <div><strong>M28</strong><span>Generated transport bundle compiler</span></div>
+          <div><strong>M29</strong><span>Path racing and short-lived scoring harness</span></div>
+          <div><strong>M30</strong><span>Continuous health monitoring and failover model</span></div>
+          <div><strong>M31</strong><span>Carrier-family design reviews</span></div>
+          <div><strong>M32</strong><span>Safe measurement-client design and privacy review</span></div>
+          <div><strong>M33</strong><span>Local proxy egress and relay bridge model</span></div>
+          <div><strong>M34</strong><span>End-to-end local proxy pipeline</span></div>
+          <div><strong>M35</strong><span>Production integration readiness review</span></div>
+          <div><strong>M36</strong><span>Android client architecture review</span></div>
         </div>
       </section>
 
@@ -267,7 +253,7 @@
       <section class="section" id="docs">
         <div class="section-heading">
           <h2>Documentation links</h2>
-          <p>Start with the README and current status, then review the latest KIPs.</p>
+          <p>Start with the README and audit snapshot, then review the latest KIPs.</p>
         </div>
         <div class="doc-list">
           <a href="https://github.com/saroo98/kurdistan-protocol-compiler/blob/main/README.md">README.md</a>
@@ -295,6 +281,7 @@
           <a href="KIP-0030-concrete-local-proxy-ingress-design-review.md">KIP-0030: Concrete local proxy ingress design review</a>
           <a href="KIP-0031-deterministic-local-proxy-ingress-prototype.md">KIP-0031: Deterministic local proxy ingress prototype</a>
           <a href="KIP-0032-proxy-ingress-adversarial-parity-hardening.md">KIP-0032: Proxy ingress adversarial hardening</a>
+          <a href="KIP-0033-adaptive-path-model-candidate-taxonomy.md">KIP-0033: Adaptive path model and candidate taxonomy</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -320,9 +307,9 @@
         </div>
       </section>
 
-      <section class="section status" id="roadmap">
+      <section class="section status" id="direction">
         <div>
-          <h2>Status / roadmap</h2>
+          <h2>Adaptive runtime direction</h2>
           <p>
             The current implementation centers on generated profiles, source-code backends, multi-stream
             semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
@@ -330,8 +317,9 @@
             prototype, a deterministic byte transport harness, byte-path fixture freeze, protocol-feature corpus,
             wire-shape baselines, the wire-shape generator prototype, wire evaluation datasets, host-based detection
             resistance, relay fleet lifecycle modeling, concrete local proxy ingress design review, deterministic
-            local proxy ingress prototyping, proxy ingress adversarial hardening, and adversarial audits. The next
-            step is the local proxy egress and relay bridge model.
+            local proxy ingress prototyping, proxy ingress adversarial hardening, adaptive path modeling, and
+            adversarial audits. The next roadmap phase is generated transport bundle compilation, followed by path
+            racing and short-lived scoring.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>

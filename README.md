@@ -58,41 +58,7 @@ Carrier layer
 Remote relay
 ```
 
-Current work is concentrated on the generated transport/compiler layer and its deterministic runtime boundaries, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, hardening, and adapter interface contracts. Concrete proxy or VPN integration still requires separate design review.
-
-## Current Status
-
-| Milestone | Status |
-|---|---|
-| Compiler/runtime scaffold | Done |
-| Diversity audit | Done |
-| Regression gates | Done |
-| Adversarial lab simulator | Done |
-| Mutation/longitudinal testing | Done |
-| Generated source backend | Done |
-| Generated backend audit | Done |
-| Multi-stream lab semantics | Done |
-| Multi-stream adversarial testing | Done |
-| Lab-only proxy semantics | Done |
-| Carrier abstraction | Done |
-| Production security prerequisites | Done |
-| Runtime session architecture | Done |
-| Implementation hardening | Done |
-| Adapter interface architecture | Done |
-| Local adapter prototype | Done |
-| Deterministic byte transport harness | Done |
-| Byte-path parity and fixture freeze | Done |
-| Protocol feature corpus and wire-shape baselines | Done |
-| Wire-shape generator prototype | Done |
-| Wire evaluation and classifier dataset harness | Done |
-| Host-based detection resistance | Done |
-| Relay churn and host rotation modeling | Done |
-| Concrete local proxy ingress design review | Done |
-| Deterministic local proxy ingress prototype | Done |
-| Proxy ingress adversarial parity and hardening | Done |
-| Local proxy egress and relay bridge model | Next |
-| End-to-end local proxy pipeline | Future |
-| Production integration readiness review | Future |
+Current work is concentrated on the generated transport/compiler layer and its deterministic runtime boundaries, including internal carrier-shape modeling, production security prerequisites, runtime session architecture, hardening, adapter interface contracts, proxy-ingress prototypes, and the adaptive-runtime direction. Concrete proxy or VPN integration still requires separate design review.
 
 ## Features
 
@@ -132,6 +98,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Concrete local proxy ingress design review with request contracts, target descriptor safety checks, capability mapping, lifecycle constraints, failure-mode matrices, misuse controls, and fixture drift gates.
 - Deterministic local proxy ingress prototype with synthetic CONNECT-like request events, target binding, runtime stream mapping, bounded queues, backpressure, reset/error isolation, collapse controls, and generated-backend parity.
 - Proxy ingress adversarial parity and hardening with malformed event sequences, descriptor-abuse rejection, lifecycle and pressure stress, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness reporting.
+- Adaptive path modeling with candidate families, synthetic condition observations, freshness and uncertainty buckets, viability evaluation, decision-input summaries, misuse detection, and generated/interpreted parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -197,6 +164,9 @@ internal/proxyingress + internal/proxyingressreview
 internal/localproxyingress + internal/localproxyingressadversary
   deterministic local proxy ingress prototype, adversarial request corpus, descriptor-abuse hardening, lifecycle/pressure stress, reset/error isolation, mapping collapse controls, parity checks, and fixtures
 
+internal/adaptivepath
+  candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -237,6 +207,7 @@ go run ./cmd/kcheck relayfleet --quick
 go run ./cmd/kcheck proxyingress --quick
 go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck localproxyingressadv --quick
+go run ./cmd/kcheck adaptivepath --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -314,6 +285,7 @@ Kurdistan treats diversity as something to measure.
 - relay fleet lifecycle integrity, profile assignment, churn schedule, migration model, burn risk, collapse detection, control detection, fixture drift, trace hygiene, and generated-backend parity
 - proxy ingress contract validation, target descriptor safety, capability mapping, runtime mapping, lifecycle integrity, failure-mode matrix coverage, design review, misuse detection, trace hygiene, fixture drift, and generated-backend parity
 - local proxy ingress contract compliance, target validation, lifecycle execution, runtime mapping, backpressure, error/reset isolation, queue bounds, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
+- adaptive path candidate taxonomy, synthetic condition model, freshness and uncertainty evaluation, viability reports, decision inputs, misuse detection, trace hygiene, fixture drift, public roadmap cleanup, and generated-backend parity
 
 Useful commands:
 
@@ -344,6 +316,8 @@ go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck relayfleet --quick
 go run ./cmd/kcheck proxyingress --quick
 go run ./cmd/kcheck localproxyingress --quick
+go run ./cmd/kcheck localproxyingressadv --quick
+go run ./cmd/kcheck adaptivepath --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -530,7 +504,7 @@ go run ./cmd/kcheck localproxyingress compare --old testdata/localproxyingress/l
 
 ## Proxy Ingress Adversarial Parity And Hardening
 
-Milestone 26 hardens the deterministic local proxy ingress prototype before local egress modeling begins. It validates a committed adversarial corpus for malformed event order, descriptor abuse, lifecycle misuse, queue pressure, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness.
+Milestone 26 hardens the deterministic local proxy ingress prototype before the adaptive-runtime layer begins. It validates a committed adversarial corpus for malformed event order, descriptor abuse, lifecycle misuse, queue pressure, reset/error isolation, mapping collapse controls, generated/interpreted parity, and readiness reporting.
 
 The fixtures under `testdata/localproxyingressadversary/` store safe classes, counters, hashes, buckets, and conclusions only.
 
@@ -542,6 +516,24 @@ go run ./cmd/kcheck localproxyingressadv --full --out testdata/audit/localproxyi
 go run ./cmd/kcheck localproxyingressadv generate --out testdata/localproxyingressadversary/adversarial-corpus-golden.json --force
 go run ./cmd/kcheck localproxyingressadv verify
 go run ./cmd/kcheck localproxyingressadv compare --old testdata/localproxyingressadversary/adversarial-corpus-golden.json --new testdata/localproxyingressadversary/adversarial-corpus-golden.json
+```
+
+## Adaptive Path Model
+
+Milestone 27 introduces the first adaptive-runtime abstraction. `internal/adaptivepath` represents generated transports as candidate paths with carrier families, relay-risk buckets, synthetic condition observations, short-lived freshness metadata, uncertainty buckets, viability states, and future decision inputs.
+
+The model is deterministic and synthetic. It records safe classes and hashes only, and it does not perform real probing, resolver testing, endpoint handling, or path racing.
+
+Committed fixtures live under `testdata/adaptivepath/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck adaptivepath --quick
+go run ./cmd/kcheck adaptivepath --full --out testdata/audit/adaptivepath.json
+go run ./cmd/kcheck adaptivepath generate --out testdata/adaptivepath/path-candidates-golden.json --force
+go run ./cmd/kcheck adaptivepath verify
+go run ./cmd/kcheck adaptivepath compare --old testdata/adaptivepath/path-candidates-golden.json --new testdata/adaptivepath/path-candidates-golden.json
 ```
 
 ## Multi-Stream Semantics
@@ -611,11 +603,16 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 24: concrete local proxy ingress design review. Done.
-2. Milestone 25: deterministic local proxy ingress prototype. Done.
-3. Milestone 26: proxy ingress adversarial parity and hardening. Done.
-4. Milestone 27: local proxy egress and relay bridge model. Next.
-5. Later milestones: end-to-end local proxy pipeline and production integration readiness review.
+1. M27: adaptive path model and candidate taxonomy.
+2. M28: generated transport bundle compiler.
+3. M29: path racing and short-lived scoring harness.
+4. M30: continuous health monitoring and failover model.
+5. M31: carrier-family design reviews.
+6. M32: safe measurement-client design and privacy review.
+7. M33: local proxy egress and relay bridge model.
+8. M34: end-to-end local proxy pipeline.
+9. M35: production integration readiness review.
+10. M36: Android client architecture review.
 
 ## Research Positioning
 
