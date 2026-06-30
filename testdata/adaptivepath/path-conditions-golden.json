@@ -1,0 +1,351 @@
+[
+  {
+    "condition_id": "condition_dns_udp_usable",
+    "condition_class": "dns_udp_usable",
+    "affected_families": [
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "short_success"
+    ],
+    "expected_state": "likely_usable",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "1f2327bb699f48576ef483748c45473f488e1b1227674dfd5abbf30667b97a86",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_dns_udp_poisoned",
+    "condition_class": "dns_udp_poisoned",
+    "affected_families": [
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "poisoning_like_signal"
+    ],
+    "expected_state": "rejected",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "ee7c1f76d98cf06b0fa1357dfbc937d9ec755b7d56679a733aa22213411afe62",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_dns_udp_truncated",
+    "condition_class": "dns_udp_truncated",
+    "affected_families": [
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "truncation_like_signal"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "19508ca972120376f6979013b7e7e27418e14dc921cca90f940e733bfb702873",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_dns_udp_rate_limited",
+    "condition_class": "dns_udp_rate_limited",
+    "affected_families": [
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "unstable",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "e09716976398a3da397945f2e158be781b1e4377935c4c486a23efae84e7bbdf",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_tcp_443_usable",
+    "condition_class": "tcp_443_usable",
+    "affected_families": [
+      "https_like_tcp"
+    ],
+    "observation_kinds": [
+      "handshake_ok",
+      "first_useful_byte_ok"
+    ],
+    "expected_state": "likely_usable",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_short_session",
+    "condition_hash": "815a369dee40c5a62f2e9b4f2b163833b6b3a4bedb8b39ef8bc7397e3d78288c",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_tcp_443_blackholed",
+    "condition_class": "tcp_443_blackholed",
+    "affected_families": [
+      "https_like_tcp"
+    ],
+    "observation_kinds": [
+      "blackhole_like_failure"
+    ],
+    "expected_state": "blocked",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "7b41e29deb82bca7b9da91cd055ee435e5f123150aeef044110a2fc1722d349a",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_http_connect_shaped_usable",
+    "condition_class": "http_connect_shaped_usable",
+    "affected_families": [
+      "https_like_tcp"
+    ],
+    "observation_kinds": [
+      "short_success"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "bfcec4d4b21e7f99d52cc29b8fafece791b1a112b349c06c3263583833b3b5c0",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_http_connect_shaped_rejected",
+    "condition_class": "http_connect_shaped_rejected",
+    "affected_families": [
+      "https_like_tcp"
+    ],
+    "observation_kinds": [
+      "handshake_failed"
+    ],
+    "expected_state": "blocked",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "c31b6ee777de9cdc055d99cd01dc4227e5c61eedb91f01ee5feaf2b166f18c3e",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_udp_443_blocked",
+    "condition_class": "udp_443_blocked",
+    "affected_families": [
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "blocked",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "dd0ccec6a45f87c6ce350c2258a7ee995c62d13e2b0991ab5b67f7755ec16776",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_udp_443_throttled",
+    "condition_class": "udp_443_throttled",
+    "affected_families": [
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "stall_after_data"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "0092fa9ff1b82ebf0b652e3919a44cd2e853f6a78b29e6c285987b1100050ad4",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_udp_443_unstable",
+    "condition_class": "udp_443_unstable",
+    "affected_families": [
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "reset_like_failure"
+    ],
+    "expected_state": "unstable",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "9066339b58d439942a74ba369e5f9e597cd2047f6635813f8a8c026582ad1366",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_relay_unreachable",
+    "condition_class": "relay_unreachable",
+    "affected_families": [
+      "relay_rotation",
+      "https_like_tcp"
+    ],
+    "observation_kinds": [
+      "handshake_failed"
+    ],
+    "expected_state": "blocked",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "f48f50e0dd52c7c8ed0c0e39180b00da6df3f31bebb69cb4f7c1ca838decebea",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_relay_burned",
+    "condition_class": "relay_burned",
+    "affected_families": [
+      "relay_rotation",
+      "https_like_tcp",
+      "domestic_media_risk"
+    ],
+    "observation_kinds": [
+      "relay_burn_risk"
+    ],
+    "expected_state": "burned",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_expired",
+    "condition_hash": "d7c297b5ab98677afc6f2f98bd62ef77c64703aa34f809877473777f0190f537",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_handshake_stalls",
+    "condition_class": "handshake_stalls",
+    "affected_families": [
+      "https_like_tcp",
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "stall_after_handshake"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "32731e4c6762a1d1b3bb103103a716dc5b7f1bafa22429755e4d19208fa0fae7",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_data_stalls_after_success",
+    "condition_class": "data_stalls_after_success",
+    "affected_families": [
+      "https_like_tcp",
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "stall_after_data"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "120dc2a51cce897f1c6a5238586771add0bdea01b24b1d9d30d2c6ed1cbd9ee3",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_route_briefly_usable",
+    "condition_class": "route_briefly_usable",
+    "affected_families": [
+      "https_like_tcp",
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "short_success"
+    ],
+    "expected_state": "unstable",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "cc150604ed4c6e678180503856cc366339097a71229d851b5c36de9444fbd7a2",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_route_flaps",
+    "condition_class": "route_flaps",
+    "affected_families": [
+      "https_like_tcp",
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "short_success",
+      "short_failure"
+    ],
+    "expected_state": "unstable",
+    "volatility_bucket": "high_volatility",
+    "confidence_ttl_class": "ttl_seconds",
+    "condition_hash": "15bb91961d732374d18060182274df67fc99446142d9292a8845eb44f1644798",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_sim_or_apn_variance",
+    "condition_class": "sim_or_apn_variance",
+    "affected_families": [
+      "https_like_tcp",
+      "dns_survival",
+      "experimental_udp_quic"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "unstable",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "4299c36233e4a981f4b817a575e961b49f0e28fe4784fdfa8a7bd81f2c795060",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_device_variance",
+    "condition_class": "device_variance",
+    "affected_families": [
+      "https_like_tcp",
+      "dns_survival"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "unknown",
+    "volatility_bucket": "medium_volatility",
+    "confidence_ttl_class": "ttl_one_minute",
+    "condition_hash": "69ede7cd399a689168c108abdefdde075c32dc4eb7889b5712b3c5f370690f71",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_recent_flow_history_penalty",
+    "condition_class": "recent_flow_history_penalty",
+    "affected_families": [
+      "https_like_tcp",
+      "relay_rotation"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "degraded",
+    "volatility_bucket": "low_volatility",
+    "confidence_ttl_class": "ttl_five_minutes",
+    "condition_hash": "297d51b11eb408a4288d2a489f47f1fda05c5c99b2c187ca7e9bd3da90f90dcd",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "condition_id": "condition_unknown",
+    "condition_class": "unknown",
+    "affected_families": [
+      "baseline_control"
+    ],
+    "observation_kinds": [
+      "short_failure"
+    ],
+    "expected_state": "unknown",
+    "volatility_bucket": "unknown_volatility",
+    "confidence_ttl_class": "ttl_expired",
+    "condition_hash": "43043009175d3eb4f77a805ebbcdb2c8e92cdad9fcfaa661ca7d3529f7981f94",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

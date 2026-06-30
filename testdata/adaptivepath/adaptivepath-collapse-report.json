@@ -1,0 +1,14 @@
+{
+  "candidate_count": 7,
+  "observation_count": 13,
+  "unique_families": 1,
+  "unique_states": 1,
+  "high_risk_candidates": 0,
+  "misuse_findings": [
+    "all_candidates_same_family",
+    "all_candidates_same_state"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "failed"
+}

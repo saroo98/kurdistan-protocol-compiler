@@ -1,0 +1,32 @@
+{
+  "freshness": {
+    "observation_count": 13,
+    "fresh_observations": 6,
+    "stale_observations": 2,
+    "expired_observations": 5,
+    "uncertainty_bucket": "high_uncertainty",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "candidate_count": 7,
+    "observation_count": 13,
+    "unique_families": 7,
+    "unique_states": 5,
+    "high_risk_candidates": 1,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "compared_candidates": 7,
+    "compared_conditions": 21,
+    "family_matches": 7,
+    "viability_matches": 7,
+    "decision_input_matches": 7,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+}
