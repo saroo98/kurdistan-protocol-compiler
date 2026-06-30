@@ -1,0 +1,15 @@
+{
+  "fleet_id": "fleet_2e380a269770",
+  "relay_count": 9,
+  "active_relays": 4,
+  "unique_profile_seeds": 8,
+  "unique_wire_policy_hashes": 8,
+  "unique_families": 7,
+  "churn_events": 6,
+  "migration_events": 2,
+  "high_risk_relays": 3,
+  "diversity_score": 0.8518518518518519,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

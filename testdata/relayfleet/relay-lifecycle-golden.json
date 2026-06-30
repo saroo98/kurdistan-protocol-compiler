@@ -1,0 +1,38 @@
+[
+  {
+    "relay_id": "relay_0002",
+    "tick": 4,
+    "old_state": "cooling",
+    "new_state": "active",
+    "reason_bucket": "cooling_complete",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "relay_id": "relay_0003",
+    "tick": 10,
+    "old_state": "rotating",
+    "new_state": "active",
+    "reason_bucket": "rotation_complete",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "relay_id": "relay_0004",
+    "tick": 12,
+    "old_state": "migrating",
+    "new_state": "active",
+    "reason_bucket": "migration_complete",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "relay_id": "relay_0005",
+    "tick": 14,
+    "old_state": "quarantined",
+    "new_state": "retired",
+    "reason_bucket": "quarantine_retire",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "event_id": "churn_adc46f2835fb",
+    "tick": 4,
+    "relay_id": "relay_0001",
+    "event_type": "profile_refresh",
+    "old_state": "active",
+    "new_state": "rotating",
+    "old_profile_seed": 12345,
+    "new_profile_seed": 13345,
+    "reason_bucket": "interval_bucket",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "churn_8fe75e2d3b61",
+    "tick": 8,
+    "relay_id": "relay_0002",
+    "event_type": "profile_refresh",
+    "old_state": "cooling",
+    "new_state": "rotating",
+    "old_profile_seed": 12346,
+    "new_profile_seed": 13347,
+    "reason_bucket": "interval_bucket",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "churn_ad347106914e",
+    "tick": 12,
+    "relay_id": "relay_0003",
+    "event_type": "profile_refresh",
+    "old_state": "rotating",
+    "new_state": "rotating",
+    "old_profile_seed": 12347,
+    "new_profile_seed": 13349,
+    "reason_bucket": "observation_count",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "churn_27234997dee4",
+    "tick": 16,
+    "relay_id": "relay_0004",
+    "event_type": "profile_refresh",
+    "old_state": "migrating",
+    "new_state": "rotating",
+    "old_profile_seed": 12348,
+    "new_profile_seed": 13351,
+    "reason_bucket": "observation_count",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "churn_d124fed27bef",
+    "tick": 20,
+    "relay_id": "relay_0005",
+    "event_type": "profile_refresh",
+    "old_state": "quarantined",
+    "new_state": "rotating",
+    "old_profile_seed": 12349,
+    "new_profile_seed": 13353,
+    "reason_bucket": "observation_count",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "churn_388e91b4e266",
+    "tick": 24,
+    "relay_id": "relay_0006",
+    "event_type": "profile_refresh",
+    "old_state": "active",
+    "new_state": "rotating",
+    "old_profile_seed": 12350,
+    "new_profile_seed": 13355,
+    "reason_bucket": "observation_count",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

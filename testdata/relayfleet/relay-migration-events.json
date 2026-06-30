@@ -1,0 +1,32 @@
+[
+  {
+    "event_id": "migration_f0c0954502b7",
+    "tick": 20,
+    "source_relay_id": "relay_0001",
+    "target_relay_id": "relay_0006",
+    "old_profile_seed": 12345,
+    "new_profile_seed": 12350,
+    "old_wire_policy_hash": "dd5abaaadd355be0",
+    "new_wire_policy_hash": "968766ccfc4e8a70",
+    "session_continuity_class": "session_boundary_safe",
+    "migration_result": "semantic_continuity_preserved",
+    "reason_bucket": "rotation_bucket",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "migration_526133270fbf",
+    "tick": 22,
+    "source_relay_id": "relay_0007",
+    "target_relay_id": "relay_0009",
+    "old_profile_seed": 9001,
+    "new_profile_seed": 9002,
+    "old_wire_policy_hash": "controlfixedhash",
+    "new_wire_policy_hash": "controlpaddinghash",
+    "session_continuity_class": "session_boundary_safe",
+    "migration_result": "semantic_continuity_preserved",
+    "reason_bucket": "risk_triggered",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]
