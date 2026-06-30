@@ -24,6 +24,7 @@ import (
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregencompare"
@@ -101,6 +102,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "adaptivepath" {
 		os.Exit(runAdaptivePath(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "transportbundle" {
+		os.Exit(runTransportBundle(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -2467,6 +2471,177 @@ func writeAdaptivePathCompanions(out string, set adaptivepath.AdaptivePathFixtur
 	for _, write := range writes {
 		path := filepath.Join(dir, write.name)
 		if err := adaptivepath.WriteJSON(path, write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runTransportBundle(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runTransportBundleGenerate(args[1:])
+		case "verify":
+			return runTransportBundleVerify(args[1:])
+		case "compare":
+			return runTransportBundleCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck transportbundle", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick transport bundle audit")
+	full := flags.Bool("full", false, "run full transport bundle audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunTransportBundleAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runTransportBundleGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck transportbundle generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "transportbundle", "bundle-manifest-golden.json"), "transport bundle fixture path")
+	force := flags.Bool("force", false, "overwrite fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := transportbundle.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := transportbundle.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeTransportBundleCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote transportbundle fixtures: %s (%d candidates, %d modes)\n", *out, len(set.Candidates), len(set.ModeManifests))
+	return 0
+}
+
+func runTransportBundleVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck transportbundle verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "transportbundle", "bundle-manifest-golden.json"), "transport bundle fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := transportbundle.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := transportbundle.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := transportbundle.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runTransportBundleCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck transportbundle compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old transport bundle fixture path")
+	newPath := flags.String("new", "", "new transport bundle fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := transportbundle.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := transportbundle.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := transportbundle.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeTransportBundleCompanions(out string, set transportbundle.TransportBundleFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"bundle-policy-golden.json", set.Policies},
+		{"bundle-seedplan-golden.json", set.SeedPlan},
+		{"bundle-candidates-golden.json", set.Candidates},
+		{"bundle-adaptivepath-mapping.json", set.AdaptivePathCandidates},
+		{"bundle-relay-binding-report.json", set.RelayBinding},
+		{"bundle-fallback-hints.json", set.FallbackHints},
+		{"bundle-collapse-report.json", set.CollapseReport},
+		{"bundle-controls.json", map[string]any{"control_collapse": set.ControlCollapseReport, "parity": set.Parity}},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if err := transportbundle.WriteJSON(path, write.value, force); err != nil {
 			return err
 		}
 	}
