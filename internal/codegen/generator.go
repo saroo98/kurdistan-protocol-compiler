@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/ir"
+	"kurdistan/internal/proxyingressreview"
 )
 
 type Options struct {
@@ -1161,6 +1162,85 @@ func GeneratedRelayFleetSummary(ctx context.Context) (relayfleet.RelayFleetSumma
 	})
 }
 `, quote(p.ID), p.Seed, quote(p.WireShape.PolicyHash), quote(p.WireShape.SelectedFamily), quote(relayFleetAssignmentMode(p.Seed)), quote(relayFleetChurnMode(p.Seed)), quote(relayFleetMigrationMode(p.Seed)), min(8, max(6, p.Stream.MaxConcurrentStreams)))
+	if err != nil {
+		return nil, err
+	}
+
+	proxyIngressSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/proxyingressreview"
+)
+
+const ProxyIngressSchemaVersion = "proxyingress-v1"
+const ProxyIngressGeneratedProfileID = %[1]s
+const ProxyIngressContractID = "proxyingress_contract_v1"
+const ProxyIngressMaxConcurrentRequests = 16
+const ProxyIngressMaxTargetDescriptorBytes = 256
+const ProxyIngressDesignDecision = "go_for_deterministic_prototype"
+
+var ProxyIngressSupportedKinds = []string{"synthetic_connect", "synthetic_associate", "synthetic_bind"}
+var ProxyIngressSupportedTargetKinds = []string{"synthetic_name", "synthetic_service", "opaque_descriptor"}
+var ProxyIngressRequiredCapabilities = []string{"stream_open", "stream_data", "stream_close", "stream_reset", "backpressure", "target_descriptor", "target_error", "target_reset", "target_close", "secure_context_required", "replay_rejection_required", "trace_hygiene_required", "bounded_queue_required"}
+var ProxyIngressForbiddenFields = []string{"raw_content", "network_address", "lookup", "listener", "sensitive_material", "provider_metadata"}
+var ProxyIngressFailureModeMatrixHash = %[2]s
+
+func GeneratedProxyIngressContract() proxyingress.ProxyIngressContract {
+	return proxyingress.DefaultContract()
+}
+
+func GeneratedProxyIngressReview() (proxyingressreview.ProxyIngressDesignReview, error) {
+	set, err := proxyingress.GoldenFixtureSet()
+	if err != nil {
+		return proxyingressreview.ProxyIngressDesignReview{}, err
+	}
+	return proxyingressreview.RunReview(set.Contract, set.Requests, set.Mappings, set.Lifecycle, proxyingressreview.DefaultFailureModes())
+}
+`, quote(p.ID), quote(proxyingressreview.HashValue(proxyingressreview.DefaultFailureModes())))
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/localproxyingress"
+)
+
+const LocalProxyIngressSchemaVersion = "localproxyingress-v1"
+const LocalProxyIngressGeneratedProfileID = %[1]s
+const LocalProxyIngressMaxConcurrentRequests = 16
+const LocalProxyIngressMaxQueuedEvents = 96
+const LocalProxyIngressMaxEventsPerRequest = 24
+const LocalProxyIngressTracePayloadHygiene = true
+const LocalProxyIngressTraceSecretHygiene = true
+
+var LocalProxyIngressScenarios = []string{"single_connect_echo", "many_small_connects", "large_request_fragmented", "mixed_request_classes", "slow_drip_request", "reset_mid_request", "target_error_after_open", "backpressure_pressure", "invalid_target_rejection", "lifecycle_violation_rejection", "queue_overflow_rejection", "duplicate_event_rejection"}
+var LocalProxyIngressEventKinds = []string{"open", "data", "close", "reset", "target_error", "backpressure"}
+var LocalProxyIngressForbiddenFields = []string{"raw_content", "network_address", "lookup", "listener", "sensitive_material", "provider_metadata"}
+
+func GeneratedLocalProxyIngressConfig() localproxyingress.LocalProxyIngressConfig {
+	cfg := localproxyingress.DefaultConfig()
+	cfg.MaxConcurrentRequests = LocalProxyIngressMaxConcurrentRequests
+	cfg.MaxQueuedEvents = LocalProxyIngressMaxQueuedEvents
+	cfg.MaxEventsPerRequest = LocalProxyIngressMaxEventsPerRequest
+	return cfg
+}
+
+func GeneratedLocalProxyIngressSummary(ctx context.Context, scenario string) (localproxyingress.LocalProxyIngressSummary, error) {
+	if scenario == "" {
+		scenario = localproxyingress.ScenarioSingleConnectEcho
+	}
+	return localproxyingress.RunScenario(ctx, scenario, GeneratedLocalProxyIngressConfig())
+}
+
+func GeneratedLocalProxyIngressFixtureSet(ctx context.Context) (localproxyingress.FixtureSet, error) {
+	return localproxyingress.GenerateFixtureSet(ctx, localproxyingress.QuickScenarios())
+}
+`, quote(p.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -2783,6 +2863,180 @@ func TestGeneratedRelayFleetHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	proxyIngressTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyingress"
+)
+
+func TestGeneratedProxyIngressContract(t *testing.T) {
+	if ProxyIngressSchemaVersion != string(proxyingress.Version) || ProxyIngressGeneratedProfileID != ProfileID {
+		t.Fatalf("generated proxy ingress constants drifted")
+	}
+	contract := GeneratedProxyIngressContract()
+	if err := proxyingress.ValidateContract(contract); err != nil {
+		t.Fatal(err)
+	}
+	if len(ProxyIngressSupportedKinds) != len(contract.SupportedKinds) || len(ProxyIngressSupportedTargetKinds) != len(contract.SupportedTargetKinds) {
+		t.Fatalf("generated proxy ingress kind markers drifted")
+	}
+	for _, target := range proxyingress.InvalidTargetDescriptors() {
+		if err := proxyingress.ValidateTargetDescriptor(target, contract.Limits); err == nil {
+			t.Fatalf("unsafe target descriptor accepted")
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyIngressParityTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyingressreview"
+)
+
+func TestGeneratedProxyIngressParity(t *testing.T) {
+	review, err := GeneratedProxyIngressReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.GoNoGoDecision != proxyingressreview.DecisionGo || review.PayloadLogged || review.SecretLogged {
+		t.Fatalf("generated proxy ingress review failed: %%+v", review)
+	}
+	report := proxyingressreview.CompareParity(review, review, GeneratedProxyIngressContract(), GeneratedProxyIngressContract())
+	if report.Conclusion != "passed" {
+		t.Fatalf("generated proxy ingress parity failed: %%+v", report)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyIngressHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyingress"
+)
+
+func TestGeneratedProxyIngressHygiene(t *testing.T) {
+	if err := proxyingress.ScanForLeak(GeneratedProxyIngressContract()); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "x"},
+		{"domain": "x"},
+		{"payload": "x"},
+		{"secret": "x"},
+	}
+	for _, tc := range unsafeCases {
+		if err := proxyingress.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe proxy ingress metadata accepted: %%v", tc)
+		}
+	}
+	if ProxyIngressFailureModeMatrixHash == "" {
+		t.Fatalf("missing failure matrix hash")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/localproxyingress"
+)
+
+func TestGeneratedLocalProxyIngressSummary(t *testing.T) {
+	if LocalProxyIngressSchemaVersion != string(localproxyingress.Version) || LocalProxyIngressGeneratedProfileID != ProfileID {
+		t.Fatalf("generated local proxy ingress constants drifted")
+	}
+	summary, err := GeneratedLocalProxyIngressSummary(context.Background(), localproxyingress.ScenarioSingleConnectEcho)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingress.ValidateSummary(summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.PayloadLogged || summary.SecretLogged || summary.AcceptedRequests == 0 {
+		t.Fatalf("unsafe generated local proxy ingress summary: %%+v", summary)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/localproxyingress"
+)
+
+func TestGeneratedLocalProxyIngressParity(t *testing.T) {
+	set, err := GeneratedLocalProxyIngressFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyingress.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if localproxyingress.CompareFixtureSets(set, set).Conclusion != "passed" {
+		t.Fatalf("generated local proxy ingress parity failed")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyIngressHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyingress"
+)
+
+func TestGeneratedLocalProxyIngressHygiene(t *testing.T) {
+	for _, marker := range LocalProxyIngressForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "x"},
+		{"dns_query": "x"},
+		{"payload": "x"},
+		{"secret": "x"},
+	}
+	for _, tc := range unsafeCases {
+		if err := proxyingress.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe local proxy ingress metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3114,6 +3368,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/wireeval_generated.go", Content: wireEvalSource, Go: true},
 		{RelPath: "protocol/hostdetect_generated.go", Content: hostDetectSource, Go: true},
 		{RelPath: "protocol/relayfleet_generated.go", Content: relayFleetSource, Go: true},
+		{RelPath: "protocol/proxyingress_generated.go", Content: proxyIngressSource, Go: true},
+		{RelPath: "protocol/localproxyingress_generated.go", Content: localProxyIngressSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3152,6 +3408,12 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relayfleet_test.go", Content: relayFleetTestSource, Go: true},
 		{RelPath: "protocol/relayfleet_parity_test.go", Content: relayFleetParityTestSource, Go: true},
 		{RelPath: "protocol/relayfleet_hygiene_test.go", Content: relayFleetHygieneTestSource, Go: true},
+		{RelPath: "protocol/proxyingress_test.go", Content: proxyIngressTestSource, Go: true},
+		{RelPath: "protocol/proxyingress_parity_test.go", Content: proxyIngressParityTestSource, Go: true},
+		{RelPath: "protocol/proxyingress_hygiene_test.go", Content: proxyIngressHygieneTestSource, Go: true},
+		{RelPath: "protocol/localproxyingress_test.go", Content: localProxyIngressTestSource, Go: true},
+		{RelPath: "protocol/localproxyingress_parity_test.go", Content: localProxyIngressParityTestSource, Go: true},
+		{RelPath: "protocol/localproxyingress_hygiene_test.go", Content: localProxyIngressHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
