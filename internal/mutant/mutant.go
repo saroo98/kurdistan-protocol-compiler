@@ -121,6 +121,18 @@ const (
 	ModeWireEvalControlNotDetected            = "wireeval_control_not_detected"
 	ModeWireEvalGeneratedBackendDatasetDrift  = "wireeval_generated_backend_dataset_drift"
 	ModeWireEvalSecretLeak                    = "wireeval_secret_leak"
+	ModeHostDetectSameFeatureEveryHost        = "hostdetect_same_feature_every_host"
+	ModeHostDetectSameFirstNEveryHost         = "hostdetect_same_firstn_every_host"
+	ModeHostDetectIgnoresObservationCount     = "hostdetect_ignores_observation_count"
+	ModeHostDetectIgnoresProfileReuse         = "hostdetect_ignores_profile_reuse"
+	ModeHostDetectIgnoresPaddingOnlyHosts     = "hostdetect_ignores_padding_only_hosts"
+	ModeHostDetectControlNotDetected          = "hostdetect_control_not_detected"
+	ModeHostDetectTrainTestHostOverlap        = "hostdetect_train_test_host_overlap"
+	ModeHostDetectEndpointLeak                = "hostdetect_endpoint_leak"
+	ModeHostDetectPayloadLeak                 = "hostdetect_payload_leak"
+	ModeHostDetectSecretLeak                  = "hostdetect_secret_leak"
+	ModeHostDetectGeneratedBackendDrift       = "hostdetect_generated_backend_drift"
+	ModeHostDetectUnstableHostAssignment      = "hostdetect_unstable_host_assignment"
 )
 
 func Modes() []string {
@@ -228,6 +240,18 @@ func Modes() []string {
 		ModeWireEvalControlNotDetected,
 		ModeWireEvalGeneratedBackendDatasetDrift,
 		ModeWireEvalSecretLeak,
+		ModeHostDetectSameFeatureEveryHost,
+		ModeHostDetectSameFirstNEveryHost,
+		ModeHostDetectIgnoresObservationCount,
+		ModeHostDetectIgnoresProfileReuse,
+		ModeHostDetectIgnoresPaddingOnlyHosts,
+		ModeHostDetectControlNotDetected,
+		ModeHostDetectTrainTestHostOverlap,
+		ModeHostDetectEndpointLeak,
+		ModeHostDetectPayloadLeak,
+		ModeHostDetectSecretLeak,
+		ModeHostDetectGeneratedBackendDrift,
+		ModeHostDetectUnstableHostAssignment,
 	}
 }
 
