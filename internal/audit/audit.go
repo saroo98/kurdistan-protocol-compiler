@@ -19,8 +19,11 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
@@ -91,6 +94,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	relayFleetErr := wireEvalErr
 	relayFleetBaselinePath := filepath.Join(fixtureRoot, "testdata", "relayfleet", "relayfleet-golden.json")
 	relayFleetComparison := relayfleet.RelayFleetComparisonReport{Version: string(relayfleet.Version), Conclusion: "failed"}
+	proxyIngressSet, proxyIngressErr := proxyingress.GoldenFixtureSet()
+	proxyIngressReview, proxyIngressMisuse, proxyIngressParity, proxyIngressReviewErr := proxyingressreview.GenerateGoldenReview()
+	proxyIngressComparison, _ := proxyingress.VerifyContract(ctx, filepath.Join(fixtureRoot, "testdata", "proxyingress", "proxyingress-contract-golden.json"))
+	localProxyIngressSet, localProxyIngressErr := localproxyingress.GenerateFixtureSet(ctx, localproxyingress.QuickScenarios())
+	localProxyIngressComparison := localProxyIngressFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingress", "localproxyingress-summary-golden.json"), localProxyIngressSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -218,6 +226,22 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, RelayFleetGates(relayFleetSummary, relayFleetComparison)...)
 	} else {
 		gates = append(gates, gate("relayfleet_lifecycle_integrity", false, "required", relayFleetErr.Error(), nil, []string{relayFleetErr.Error()}))
+	}
+	if proxyIngressErr == nil && proxyIngressReviewErr == nil {
+		gates = append(gates, ProxyIngressGates(proxyIngressSet, proxyIngressReview, proxyIngressMisuse, proxyIngressParity, proxyIngressComparison)...)
+	} else {
+		msg := "proxyingress fixture build failed"
+		if proxyIngressErr != nil {
+			msg = proxyIngressErr.Error()
+		} else if proxyIngressReviewErr != nil {
+			msg = proxyIngressReviewErr.Error()
+		}
+		gates = append(gates, gate("proxyingress_contract_validation", false, "required", msg, nil, []string{msg}))
+	}
+	if localProxyIngressErr == nil {
+		gates = append(gates, LocalProxyIngressGates(localProxyIngressSet, localProxyIngressComparison)...)
+	} else {
+		gates = append(gates, gate("localproxyingress_contract_compliance", false, "required", localProxyIngressErr.Error(), nil, []string{localProxyIngressErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
