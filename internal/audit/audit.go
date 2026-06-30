@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
@@ -102,6 +103,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localProxyIngressComparison := localProxyIngressFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingress", "localproxyingress-summary-golden.json"), localProxyIngressSet)
 	localProxyIngressAdvSet, localProxyIngressAdvErr := localproxyingressadversary.GenerateAdversarialFixtureSet(ctx)
 	localProxyIngressAdvComparison := localProxyIngressAdversarialFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingressadversary", "adversarial-corpus-golden.json"), localProxyIngressAdvSet)
+	adaptivePathSet, adaptivePathErr := adaptivepath.GenerateFixtureSet(ctx)
+	adaptivePathComparison := adaptivePathFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "adaptivepath", "path-candidates-golden.json"), adaptivePathSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -250,6 +253,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalProxyIngressAdversarialGates(localProxyIngressAdvSet, localProxyIngressAdvComparison)...)
 	} else {
 		gates = append(gates, gate("localproxyingressadv_corpus_validation", false, "required", localProxyIngressAdvErr.Error(), nil, []string{localProxyIngressAdvErr.Error()}))
+	}
+	if adaptivePathErr == nil {
+		gates = append(gates, AdaptivePathGates(adaptivePathSet, adaptivePathComparison)...)
+		gates = append(gates, AdaptivePathRoadmapPublicDocsGate())
+	} else {
+		gates = append(gates, gate("adaptivepath_candidate_taxonomy", false, "required", adaptivePathErr.Error(), nil, []string{adaptivePathErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

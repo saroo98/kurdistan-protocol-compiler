@@ -123,6 +123,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "security_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "runtime_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "hostdetect_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -144,6 +145,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `wiregen_generated_backend_parity`: `%s`\n", summary.WireGenGeneratedParity)
 			fmt.Fprintf(&b, "- `hostdetect_generated_backend_parity`: `%s`\n", summary.HostDetectGeneratedParity)
 			fmt.Fprintf(&b, "- `relayfleet_generated_backend_parity`: `%s`\n", summary.RelayFleetGeneratedParity)
+			fmt.Fprintf(&b, "- `adaptivepath_generated_backend_parity`: `%s`\n", summary.AdaptivePathGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -473,6 +475,40 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck relayfleet --quick` for relay churn and lifecycle checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Adaptive Path Model")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "adaptivepath_candidate_taxonomy"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_candidate_taxonomy")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_condition_model")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_freshness_uncertainty")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_viability_evaluation")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_decision_inputs")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_misuse_detection")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_roadmap_public_docs")
+		if strings.HasPrefix(report.Mode, "adaptivepath-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"version",
+				"candidate_families",
+				"condition_classes",
+				"candidate_count",
+				"observation_count",
+				"rejected_candidates",
+				"high_risk_candidates",
+				"stale_observations",
+				"expired_observations",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Adaptive path gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck adaptivepath --quick` for candidate taxonomy checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -492,7 +528,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 27 should focus on the local proxy egress and relay bridge model.")
+	fmt.Fprintln(&b, "Milestone 28 should focus on the generated transport bundle compiler.")
 	return b.String()
 }
 
