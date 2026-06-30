@@ -72,6 +72,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/proxyingress_generated.go",
 		"protocol/localproxyingress_generated.go",
 		"protocol/localproxyingressadv_generated.go",
+		"protocol/adaptivepath_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -182,7 +183,8 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const RelayFleetSchemaVersion") &&
 		strings.Contains(joined, "const ProxyIngressSchemaVersion") &&
 		strings.Contains(joined, "const LocalProxyIngressSchemaVersion") &&
-		strings.Contains(joined, "const LocalProxyIngressAdversarialSchemaVersion")
+		strings.Contains(joined, "const LocalProxyIngressAdversarialSchemaVersion") &&
+		strings.Contains(joined, "const AdaptivePathSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)

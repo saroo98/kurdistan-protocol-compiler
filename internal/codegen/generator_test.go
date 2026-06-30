@@ -44,6 +44,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/protocorpus_generated.go",
 		"protocol/wirefeatures_generated.go",
 		"protocol/relayfleet_generated.go",
+		"protocol/adaptivepath_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -70,6 +71,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/relayfleet_test.go",
 		"protocol/relayfleet_parity_test.go",
 		"protocol/relayfleet_hygiene_test.go",
+		"protocol/adaptivepath_test.go",
+		"protocol/adaptivepath_parity_test.go",
+		"protocol/adaptivepath_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -129,6 +133,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const ProtocolCorpusSchemaVersion") ||
 		!strings.Contains(protocolSource, "const WireFeatureSchemaVersion") ||
 		!strings.Contains(protocolSource, "const RelayFleetSchemaVersion") ||
+		!strings.Contains(protocolSource, "const AdaptivePathSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
