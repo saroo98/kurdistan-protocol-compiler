@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/proxyingress"
@@ -99,6 +100,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	proxyIngressComparison, _ := proxyingress.VerifyContract(ctx, filepath.Join(fixtureRoot, "testdata", "proxyingress", "proxyingress-contract-golden.json"))
 	localProxyIngressSet, localProxyIngressErr := localproxyingress.GenerateFixtureSet(ctx, localproxyingress.QuickScenarios())
 	localProxyIngressComparison := localProxyIngressFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingress", "localproxyingress-summary-golden.json"), localProxyIngressSet)
+	localProxyIngressAdvSet, localProxyIngressAdvErr := localproxyingressadversary.GenerateAdversarialFixtureSet(ctx)
+	localProxyIngressAdvComparison := localProxyIngressAdversarialFixtureComparison(ctx, filepath.Join(fixtureRoot, "testdata", "localproxyingressadversary", "adversarial-corpus-golden.json"), localProxyIngressAdvSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -242,6 +245,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalProxyIngressGates(localProxyIngressSet, localProxyIngressComparison)...)
 	} else {
 		gates = append(gates, gate("localproxyingress_contract_compliance", false, "required", localProxyIngressErr.Error(), nil, []string{localProxyIngressErr.Error()}))
+	}
+	if localProxyIngressAdvErr == nil {
+		gates = append(gates, LocalProxyIngressAdversarialGates(localProxyIngressAdvSet, localProxyIngressAdvComparison)...)
+	} else {
+		gates = append(gates, gate("localproxyingressadv_corpus_validation", false, "required", localProxyIngressAdvErr.Error(), nil, []string{localProxyIngressAdvErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
