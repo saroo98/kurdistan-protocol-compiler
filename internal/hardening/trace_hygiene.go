@@ -14,6 +14,7 @@ import (
 	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/fixtures"
+	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/protocorpus"
@@ -342,6 +343,30 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		if ScanJSON([]byte(`{"destination_address":"127.0.0.1"}`)).Passed {
 			return fmt.Errorf("endpoint wireeval field accepted")
+		}
+		return nil
+	}))
+	results = append(results, check("hostdetect_trace_hygiene", CategoryTraceHygiene, func() error {
+		summary, err := hostdetect.GenerateGoldenSummary(ctx)
+		if err != nil {
+			return err
+		}
+		if err := hostdetect.ScanForLeak(summary); err != nil {
+			return fmt.Errorf("hostdetect summary rejected: %w", err)
+		}
+		if report := ScanValue(summary); !report.Passed {
+			return fmt.Errorf("hostdetect summary failed generic hygiene: %v", report.Findings)
+		}
+		unsafeCases := []map[string]string{
+			{"raw_payload": "x"},
+			{"encoded_bytes": "x"},
+			{"destination_address": "127.0.0.1"},
+			{"secret": "x"},
+		}
+		for _, tc := range unsafeCases {
+			if err := hostdetect.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe hostdetect metadata accepted: %v", tc)
+			}
 		}
 		return nil
 	}))
