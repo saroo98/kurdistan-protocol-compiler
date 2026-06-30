@@ -1,0 +1,149 @@
+[
+  {
+    "candidate_id": "candidate_01_https_like_tcp",
+    "family": "https_like_tcp",
+    "observation_count": 2,
+    "current_state": "blocked",
+    "viability_bucket": "viability_not_usable",
+    "freshness_class": "fresh_seconds",
+    "uncertainty_bucket": "medium_uncertainty",
+    "recent_success_bucket": "one",
+    "recent_failure_bucket": "one",
+    "last_failure_bucket": "blackhole_like_failure",
+    "relay_risk_bucket": "relay_risk_low",
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "blocking_reasons": [
+      "tcp_blackhole_like_signal"
+    ],
+    "report_hash": "56a236ef041e7582386c5f1eea7ba4c30da3bc772c37951b133e1e7cfb553ffe",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_02_dns_survival",
+    "family": "dns_survival",
+    "observation_count": 3,
+    "current_state": "rejected",
+    "viability_bucket": "viability_not_usable",
+    "freshness_class": "fresh_seconds",
+    "uncertainty_bucket": "high_uncertainty",
+    "recent_success_bucket": "one",
+    "recent_failure_bucket": "few",
+    "last_failure_bucket": "truncation_like_signal",
+    "relay_risk_bucket": "relay_risk_medium",
+    "metadata_risk_bucket": "high_metadata_risk",
+    "blocking_reasons": [
+      "dns_poisoning_like_signal"
+    ],
+    "report_hash": "4b793a109b1bca174c1bdb46e0679402a1fe70c901a69813aeb32ce366b423a6",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_03_experimental_udp_quic",
+    "family": "experimental_udp_quic",
+    "observation_count": 2,
+    "current_state": "degraded",
+    "viability_bucket": "viability_degraded",
+    "freshness_class": "fresh_seconds",
+    "uncertainty_bucket": "high_uncertainty",
+    "recent_success_bucket": "zero",
+    "recent_failure_bucket": "few",
+    "last_failure_bucket": "udp_throttled",
+    "relay_risk_bucket": "relay_risk_medium",
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "warnings": [
+      "udp_unstable_or_blocked_signal"
+    ],
+    "report_hash": "03394f6dcfec7f72320804b724194a7217cc5991c7f2ec92675b09f5821dd661",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_04_domestic_media_risk",
+    "family": "domestic_media_risk",
+    "observation_count": 2,
+    "current_state": "burned",
+    "viability_bucket": "viability_not_usable",
+    "freshness_class": "expired",
+    "uncertainty_bucket": "medium_uncertainty",
+    "recent_success_bucket": "one",
+    "recent_failure_bucket": "one",
+    "last_failure_bucket": "relay_burned",
+    "relay_risk_bucket": "relay_risk_critical",
+    "metadata_risk_bucket": "critical_metadata_risk",
+    "blocking_reasons": [
+      "relay_burn_risk"
+    ],
+    "warnings": [
+      "high_metadata_risk_not_default_eligible"
+    ],
+    "report_hash": "56b8a21278d672e03afb76d9e3e391a932b47ea8e22a710de2100a8c28dc27d1",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_05_relay_rotation",
+    "family": "relay_rotation",
+    "observation_count": 1,
+    "current_state": "burned",
+    "viability_bucket": "viability_not_usable",
+    "freshness_class": "expired",
+    "uncertainty_bucket": "medium_uncertainty",
+    "recent_success_bucket": "zero",
+    "recent_failure_bucket": "one",
+    "last_failure_bucket": "relay_burned",
+    "relay_risk_bucket": "relay_risk_high",
+    "metadata_risk_bucket": "low_metadata_risk",
+    "blocking_reasons": [
+      "relay_burn_risk"
+    ],
+    "report_hash": "99f88d1a86460dc29d79f3b1f5cf8856cc007e7bf8ffad86dc881d5029043c15",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_06_baseline_control",
+    "family": "baseline_control",
+    "observation_count": 2,
+    "current_state": "likely_usable",
+    "viability_bucket": "viability_likely",
+    "freshness_class": "fresh_short",
+    "uncertainty_bucket": "low_uncertainty",
+    "recent_success_bucket": "few",
+    "recent_failure_bucket": "zero",
+    "last_failure_bucket": "none",
+    "relay_risk_bucket": "relay_risk_low",
+    "metadata_risk_bucket": "low_metadata_risk",
+    "report_hash": "22b9e9322b1ac1ed11eaf0bd8872392871e92a603c71c70a05e6114629804e9b",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  {
+    "candidate_id": "candidate_07_collapsed_control",
+    "family": "collapsed_control",
+    "observation_count": 1,
+    "current_state": "rejected",
+    "viability_bucket": "viability_not_usable",
+    "freshness_class": "expired",
+    "uncertainty_bucket": "medium_uncertainty",
+    "recent_success_bucket": "zero",
+    "recent_failure_bucket": "one",
+    "last_failure_bucket": "collapse_control",
+    "relay_risk_bucket": "relay_risk_high",
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "blocking_reasons": [
+      "collapsed_control"
+    ],
+    "report_hash": "0cfe9b9a7b3d77745f9f372ba9f4f90ac9f4b6380a1ebf5ed4e703cffddf13e1",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  }
+]

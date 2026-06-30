@@ -1,0 +1,165 @@
+[
+  {
+    "family": "https_like_tcp",
+    "role": "baseline stream-shaped candidate",
+    "carrier_class": "ordered_stream_shape",
+    "expected_signals": [
+      "handshake_ok",
+      "first_useful_byte_ok",
+      "blackhole_like_failure"
+    ],
+    "expected_failures": [
+      "blackhole_like_failure",
+      "stall_after_handshake"
+    ],
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "default_ttl_class": "ttl_short_session",
+    "default_eligible": true,
+    "high_risk": false,
+    "gated": false,
+    "experimental": false,
+    "notes": [
+      "default eligible only when fresh and not degraded"
+    ],
+    "descriptor_hash": "ce1961e857f4107a9177d85faa32a98c6e73f352a486e84b3bac1498a4196b95"
+  },
+  {
+    "family": "dns_survival",
+    "role": "survival-class name-service-shaped candidate",
+    "carrier_class": "message_survival_shape",
+    "expected_signals": [
+      "short_success",
+      "poisoning_like_signal",
+      "truncation_like_signal"
+    ],
+    "expected_failures": [
+      "poisoning_like_signal",
+      "truncation_like_signal",
+      "rate_limited_signal"
+    ],
+    "metadata_risk_bucket": "high_metadata_risk",
+    "default_ttl_class": "ttl_one_minute",
+    "default_eligible": false,
+    "high_risk": false,
+    "gated": true,
+    "experimental": false,
+    "notes": [
+      "gated survival model only; no real name-service queries"
+    ],
+    "descriptor_hash": "ff8afa75e78da0e0c566316d7e3a276d414c0b7dc3e7852e8883e22a23eaff4f"
+  },
+  {
+    "family": "experimental_udp_quic",
+    "role": "experimental datagram-shaped candidate",
+    "carrier_class": "datagram_experimental_shape",
+    "expected_signals": [
+      "short_success",
+      "short_failure",
+      "reset_like_failure"
+    ],
+    "expected_failures": [
+      "udp_blocked",
+      "udp_throttled",
+      "udp_unstable"
+    ],
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "default_ttl_class": "ttl_one_minute",
+    "default_eligible": false,
+    "high_risk": false,
+    "gated": true,
+    "experimental": true,
+    "notes": [
+      "deterministic model only; no UDP probing"
+    ],
+    "descriptor_hash": "41e60fde80b178335d6d800f8e34d40b8b1681119b5c39a35f17857be63eb921"
+  },
+  {
+    "family": "domestic_media_risk",
+    "role": "high-risk domestic media-shaped control",
+    "carrier_class": "domestic_media_synthetic_shape",
+    "expected_signals": [
+      "short_success",
+      "short_failure",
+      "relay_burn_risk"
+    ],
+    "expected_failures": [
+      "metadata_risk_high",
+      "relay_burn_risk"
+    ],
+    "metadata_risk_bucket": "critical_metadata_risk",
+    "default_ttl_class": "ttl_expired",
+    "default_eligible": false,
+    "high_risk": true,
+    "gated": true,
+    "experimental": false,
+    "notes": [
+      "cannot be default winner"
+    ],
+    "descriptor_hash": "d0d454ac2003837c1eaffa0886003405ebeb8f79e41afb7273467667bd451388"
+  },
+  {
+    "family": "relay_rotation",
+    "role": "supporting relay lifecycle candidate",
+    "carrier_class": "relay_rotation_support_shape",
+    "expected_signals": [
+      "relay_burn_risk",
+      "short_success"
+    ],
+    "expected_failures": [
+      "relay_burned"
+    ],
+    "metadata_risk_bucket": "low_metadata_risk",
+    "default_ttl_class": "ttl_five_minutes",
+    "default_eligible": false,
+    "high_risk": false,
+    "gated": true,
+    "experimental": false,
+    "notes": [
+      "supporting infrastructure model"
+    ],
+    "descriptor_hash": "7058e66488be2d33a471cbe5bda5d643ae285953a1617c73f8432de6b0b23cb9"
+  },
+  {
+    "family": "baseline_control",
+    "role": "healthy control candidate",
+    "carrier_class": "baseline_control_shape",
+    "expected_signals": [
+      "handshake_ok",
+      "first_useful_byte_ok"
+    ],
+    "expected_failures": [
+      "none"
+    ],
+    "metadata_risk_bucket": "low_metadata_risk",
+    "default_ttl_class": "ttl_five_minutes",
+    "default_eligible": true,
+    "high_risk": false,
+    "gated": false,
+    "experimental": false,
+    "notes": [
+      "control fixture"
+    ],
+    "descriptor_hash": "63863585380063bd864eae1be4b80c91e67a4ace760c3036a5d17c21cc8be43e"
+  },
+  {
+    "family": "collapsed_control",
+    "role": "collapsed control candidate",
+    "carrier_class": "collapsed_control_shape",
+    "expected_signals": [
+      "short_failure"
+    ],
+    "expected_failures": [
+      "collapse_control"
+    ],
+    "metadata_risk_bucket": "medium_metadata_risk",
+    "default_ttl_class": "ttl_expired",
+    "default_eligible": false,
+    "high_risk": false,
+    "gated": false,
+    "experimental": false,
+    "notes": [
+      "must be detected by misuse scanner"
+    ],
+    "descriptor_hash": "47fcfbb7a04f229fa979e5830be7b69f6dcac4d4d22d70caaae9bcf574437a8b"
+  }
+]
