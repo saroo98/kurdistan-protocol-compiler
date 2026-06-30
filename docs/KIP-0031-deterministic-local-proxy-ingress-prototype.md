@@ -144,7 +144,9 @@ protocol/localproxyingress_parity_test.go
 protocol/localproxyingress_hygiene_test.go
 ```
 
-The generated backend version is `0.25.0-lab`.
+The generated backend version for this milestone was `0.25.0-lab`; Milestone 26 updates it to `0.26.0-lab`.
+
+See also [KIP-0032: Proxy Ingress Adversarial Parity Hardening](KIP-0032-proxy-ingress-adversarial-parity-hardening.md).
 
 ## Limitations
 
@@ -154,4 +156,4 @@ The prototype validates local contracts and regression gates. It does not prove 
 
 ## Next Milestone
 
-Milestone 26 should harden proxy ingress parity and adversarial checks across interpreted and generated backends before any concrete adapter work.
+Milestone 27 should model local proxy egress and the relay bridge boundary after the M26 adversarial hardening gates pass.

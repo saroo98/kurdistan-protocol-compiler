@@ -89,8 +89,10 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Relay churn and host rotation modeling | Done |
 | Concrete local proxy ingress design review | Done |
 | Deterministic local proxy ingress prototype | Done |
-| Proxy ingress adversarial parity and hardening | Next |
-| Proxy/VPN integration | Future |
+| Proxy ingress adversarial parity and hardening | Done |
+| Local proxy egress and relay bridge model | Next |
+| End-to-end local proxy pipeline | Future |
+| Production integration readiness review | Future |
 
 ## Features
 
@@ -129,6 +131,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Synthetic relay fleet lifecycle modeling with relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapsed controls, fixture drift gates, and generated-backend parity.
 - Concrete local proxy ingress design review with request contracts, target descriptor safety checks, capability mapping, lifecycle constraints, failure-mode matrices, misuse controls, and fixture drift gates.
 - Deterministic local proxy ingress prototype with synthetic CONNECT-like request events, target binding, runtime stream mapping, bounded queues, backpressure, reset/error isolation, collapse controls, and generated-backend parity.
+- Proxy ingress adversarial parity and hardening with malformed event sequences, descriptor-abuse rejection, lifecycle and pressure stress, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness reporting.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -192,7 +195,7 @@ internal/proxyingress + internal/proxyingressreview
   local proxy ingress request contracts, target descriptor validation, capability mapping, design review matrix, and misuse checks
 
 internal/localproxyingress + internal/localproxyingressadversary
-  deterministic local proxy ingress prototype, synthetic request events, runtime stream mapping, bounded queue pressure, collapse controls, and fixtures
+  deterministic local proxy ingress prototype, adversarial request corpus, descriptor-abuse hardening, lifecycle/pressure stress, reset/error isolation, mapping collapse controls, parity checks, and fixtures
 
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
@@ -233,6 +236,7 @@ go run ./cmd/kcheck hostdetect --quick
 go run ./cmd/kcheck relayfleet --quick
 go run ./cmd/kcheck proxyingress --quick
 go run ./cmd/kcheck localproxyingress --quick
+go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -512,7 +516,7 @@ go run ./cmd/kcheck proxyingress compare --old testdata/proxyingress/proxyingres
 
 Milestone 25 implements a deterministic local proxy ingress prototype without introducing concrete network adapters. `internal/localproxyingress` consumes synthetic CONNECT-like request events, validates target descriptors, maps requests to runtime stream metadata, exercises bounded queue pressure, propagates backpressure, isolates reset/error behavior, and emits trace-safe summaries.
 
-`internal/localproxyingressadversary` extracts payload-free features, scans for collapse, and provides controls for fixed descriptors, fixed stream mappings, ignored backpressure, cross-request reset leakage, unbounded queues, and trace hygiene failures. Fixtures live under `testdata/localproxyingress/`.
+`internal/localproxyingressadversary` extracts payload-free features, scans for collapse, and provides controls for fixed descriptors, fixed stream mappings, ignored backpressure, cross-request reset leakage, unbounded queues, and trace hygiene failures. M25 fixtures live under `testdata/localproxyingress/`.
 
 Run:
 
@@ -522,6 +526,22 @@ go run ./cmd/kcheck localproxyingress --full --out testdata/audit/localproxyingr
 go run ./cmd/kcheck localproxyingress generate --out testdata/localproxyingress/localproxyingress-summary-golden.json --force
 go run ./cmd/kcheck localproxyingress verify
 go run ./cmd/kcheck localproxyingress compare --old testdata/localproxyingress/localproxyingress-summary-golden.json --new testdata/localproxyingress/localproxyingress-summary-golden.json
+```
+
+## Proxy Ingress Adversarial Parity And Hardening
+
+Milestone 26 hardens the deterministic local proxy ingress prototype before local egress modeling begins. It validates a committed adversarial corpus for malformed event order, descriptor abuse, lifecycle misuse, queue pressure, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness.
+
+The fixtures under `testdata/localproxyingressadversary/` store safe classes, counters, hashes, buckets, and conclusions only.
+
+Run:
+
+```bash
+go run ./cmd/kcheck localproxyingressadv --quick
+go run ./cmd/kcheck localproxyingressadv --full --out testdata/audit/localproxyingressadv.json
+go run ./cmd/kcheck localproxyingressadv generate --out testdata/localproxyingressadversary/adversarial-corpus-golden.json --force
+go run ./cmd/kcheck localproxyingressadv verify
+go run ./cmd/kcheck localproxyingressadv compare --old testdata/localproxyingressadversary/adversarial-corpus-golden.json --new testdata/localproxyingressadversary/adversarial-corpus-golden.json
 ```
 
 ## Multi-Stream Semantics
@@ -593,8 +613,9 @@ go run ./cmd/kcheck hardening --race-advice
 
 1. Milestone 24: concrete local proxy ingress design review. Done.
 2. Milestone 25: deterministic local proxy ingress prototype. Done.
-3. Milestone 26: proxy ingress adversarial parity and hardening. Next.
-4. Later milestones: concrete adapter prototypes only after separate design review.
+3. Milestone 26: proxy ingress adversarial parity and hardening. Done.
+4. Milestone 27: local proxy egress and relay bridge model. Next.
+5. Later milestones: end-to-end local proxy pipeline and production integration readiness review.
 
 ## Research Positioning
 
