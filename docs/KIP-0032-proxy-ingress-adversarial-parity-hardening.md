@@ -145,9 +145,10 @@ report, and M27 readiness report.
 
 The milestone hardens deterministic local ingress behavior only. It does not
 prove behavior for concrete proxy clients, operating system proxy APIs, target
-networks, or deployed relay paths. M27 must model local proxy egress and relay
-bridge semantics before an end-to-end local proxy pipeline is evaluated.
+networks, or deployed relay paths. M27 moves into adaptive path modeling so
+future runtime work can reason about volatile candidate-path viability before
+local egress and relay bridge modeling.
 
 ## Next Milestone
 
-M27: local proxy egress and relay bridge model.
+M27: adaptive path model and candidate taxonomy.
