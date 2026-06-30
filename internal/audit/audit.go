@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/wireeval"
@@ -86,10 +87,20 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	hostDetectBaselinePath := filepath.Join(fixtureRoot, "testdata", "hostdetect", "host-observations-golden.json")
 	hostDetectSummary := hostdetect.HostDetectSummary{}
 	hostDetectErr := wireEvalErr
+	relayFleetSummary := relayfleet.RelayFleetSummary{}
+	relayFleetErr := wireEvalErr
+	relayFleetBaselinePath := filepath.Join(fixtureRoot, "testdata", "relayfleet", "relayfleet-golden.json")
+	relayFleetComparison := relayfleet.RelayFleetComparisonReport{Version: string(relayfleet.Version), Conclusion: "failed"}
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
 		hostDetectSummary, hostDetectErr = hostdetect.Run(wireEvalDataset, hostdetect.DefaultBuildOptions())
+		if hostDetectErr == nil {
+			relayFleetSummary, relayFleetErr = relayfleet.Run(wireEvalDataset, hostDetectSummary, relayfleet.DefaultOptions())
+			relayFleetComparison, _ = relayfleet.VerifyFleet(ctx, relayFleetBaselinePath)
+		} else {
+			relayFleetErr = hostDetectErr
+		}
 	}
 
 	gates := []GateResult{
@@ -202,6 +213,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, HostDetectGates(ctx, wireEvalDataset, hostDetectSummary, hostdetect.DefaultAssignmentModes(), hostdetect.DefaultTimelineWindows(), hostDetectBaselinePath)...)
 	} else {
 		gates = append(gates, gate("hostdetect_observation_build", false, "required", hostDetectErr.Error(), nil, []string{hostDetectErr.Error()}))
+	}
+	if relayFleetErr == nil {
+		gates = append(gates, RelayFleetGates(relayFleetSummary, relayFleetComparison)...)
+	} else {
+		gates = append(gates, gate("relayfleet_lifecycle_integrity", false, "required", relayFleetErr.Error(), nil, []string{relayFleetErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
