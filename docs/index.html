@@ -73,6 +73,7 @@
             <div><span>wire shapes</span><b>generated</b></div>
             <div><span>wire evaluation</span><b>dataset-ready</b></div>
             <div><span>host detection</span><b>modeled</b></div>
+            <div><span>relay fleet</span><b>lifecycle-modeled</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -185,6 +186,10 @@
             <p>Synthetic host observations, timeline windows, confidence scoring, resistance metrics, collapse controls, and fixture drift gates.</p>
           </article>
           <article class="card">
+            <h3>Relay fleet lifecycle</h3>
+            <p>Synthetic relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapse controls, and fixture drift gates.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -236,7 +241,8 @@
           <div><strong>Done</strong><span>Wire-shape generator prototype</span></div>
           <div><strong>Done</strong><span>Wire evaluation and classifier dataset harness</span></div>
           <div><strong>Done</strong><span>Host-based detection resistance</span></div>
-          <div class="next"><strong>Next</strong><span>Relay churn and host rotation modeling</span></div>
+          <div><strong>Done</strong><span>Relay churn and host rotation modeling</span></div>
+          <div class="next"><strong>Next</strong><span>Concrete local proxy ingress design review</span></div>
         </div>
       </section>
 
@@ -282,6 +288,7 @@
           <a href="KIP-0026-wire-shape-generator-prototype.md">KIP-0026: Wire-shape generator prototype</a>
           <a href="KIP-0027-wire-evaluation-classifier-datasets.md">KIP-0027: Wire evaluation datasets</a>
           <a href="KIP-0028-host-based-detection-resistance.md">KIP-0028: Host-based detection resistance</a>
+          <a href="KIP-0029-relay-churn-fleet-lifecycle.md">KIP-0029: Relay churn and fleet lifecycle</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
         </div>
       </section>
@@ -316,7 +323,8 @@
             architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
             prototype, a deterministic byte transport harness, byte-path fixture freeze, protocol-feature corpus,
             wire-shape baselines, the wire-shape generator prototype, wire evaluation datasets, host-based detection
-            resistance, and adversarial audits. The next step is relay churn and host rotation modeling.
+            resistance, relay fleet lifecycle modeling, and adversarial audits. The next step is concrete local
+            proxy ingress design review.
           </p>
         </div>
         <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>

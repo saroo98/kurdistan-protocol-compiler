@@ -172,4 +172,4 @@ This milestone does not train a detector, perform live traffic measurement, mode
 
 ## Next Milestone
 
-The next milestone should model relay churn and host rotation policies: how synthetic host reuse, rotation cadence, and profile assignment affect repeated-observation risk.
+KIP-0029 builds on this host-level model with synthetic relay churn and fleet lifecycle checks. The next design step after KIP-0029 is concrete local proxy ingress review.

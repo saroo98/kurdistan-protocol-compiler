@@ -86,7 +86,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Wire-shape generator prototype | Done |
 | Wire evaluation and classifier dataset harness | Done |
 | Host-based detection resistance | Done |
-| Relay churn and host rotation modeling | Next |
+| Relay churn and host rotation modeling | Done |
+| Concrete local proxy ingress design review | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -123,6 +124,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Wire-shape generator prototype with deterministic policy sampling, profile integration, bytepath application, expected feature matching, collapse scanning, fixtures, and generated-backend parity.
 - Wire evaluation and classifier dataset harness with deterministic CSV/JSONL exports, train/test/OOD splits, synthetic controls, drift checks, and classifier-readiness gates.
 - Host-based detection resistance modeling with synthetic host observations, timeline windows, confidence scoring, resistance metrics, collapse controls, fixture drift gates, and generated-backend parity.
+- Synthetic relay fleet lifecycle modeling with relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapsed controls, fixture drift gates, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -179,6 +181,9 @@ internal/wireeval + internal/classifierdata
 internal/hostdetect
   synthetic host observation aggregation, timeline windows, confidence scoring, resistance reports, collapse detection, fixture drift checks, and host-level hygiene scans
 
+internal/relayfleet
+  synthetic relay fleet lifecycle, profile assignment, churn schedules, migration events, burn-risk scoring, collapse detection, and relay-fleet fixtures
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -215,6 +220,7 @@ go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
 go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck hostdetect --quick
+go run ./cmd/kcheck relayfleet --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -289,6 +295,7 @@ Kurdistan treats diversity as something to measure.
 - wire-feature extraction, first-N packet modeling, corpus comparison, collapse resistance, generated-backend parity, mutant detection, and baseline drift
 - wire-shape policy generation, profile integration, bytepath feature application, expected feature matching, collapse resistance, generated-backend parity, mutant detection, and baseline drift
 - wire evaluation dataset build, schema validation, split integrity, CSV/JSONL export consistency, observable diversity, control detection, classifier readiness, drift detection, trace hygiene, and mutant detection
+- relay fleet lifecycle integrity, profile assignment, churn schedule, migration model, burn risk, collapse detection, control detection, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -316,6 +323,7 @@ go run ./cmd/kcheck protocorpus --quick
 go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
 go run ./cmd/kcheck wireeval --quick
+go run ./cmd/kcheck relayfleet --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -452,6 +460,22 @@ go run ./cmd/kcheck hostdetect verify
 go run ./cmd/kcheck hostdetect compare --old testdata/hostdetect/host-observations-golden.json --new testdata/hostdetect/host-observations-golden.json
 ```
 
+## Relay Churn And Fleet Lifecycle
+
+Milestone 23 models synthetic relay fleets above host-level observations. `internal/relayfleet` assigns generated profiles to synthetic relays, enforces lifecycle transitions, builds deterministic churn schedules, models migration events, scores burn risk, detects collapsed fleet behavior, and freezes small safe fixtures under `testdata/relayfleet/`.
+
+The model uses only synthetic relay IDs, synthetic host IDs, policy buckets, hashes, state names, and aggregate counts. It does not contain real endpoints, cloud providers, deployment data, packet captures, payloads, or secrets.
+
+Run:
+
+```bash
+go run ./cmd/kcheck relayfleet --quick
+go run ./cmd/kcheck relayfleet --full --out testdata/audit/relayfleet.json
+go run ./cmd/kcheck relayfleet generate --out testdata/relayfleet/relayfleet-golden.json --force
+go run ./cmd/kcheck relayfleet verify
+go run ./cmd/kcheck relayfleet compare --old testdata/relayfleet/relayfleet-golden.json --new testdata/relayfleet/relayfleet-golden.json
+```
+
 ## Multi-Stream Semantics
 
 Kurdistan models multiple logical streams inside one session.
@@ -519,10 +543,9 @@ go run ./cmd/kcheck hardening --race-advice
 
 ## Roadmap
 
-1. Milestone 21: wire evaluation and classifier dataset harness.
-2. Milestone 22: host-based detection resistance.
-3. Milestone 23: relay churn, migration, and fleet lifecycle model.
-4. Milestone 24: concrete local proxy ingress design review.
+1. Milestone 23: relay churn, migration, and fleet lifecycle model. Done.
+2. Milestone 24: concrete local proxy ingress design review. Next.
+3. Later milestones: concrete adapter prototypes only after separate design review.
 
 ## Research Positioning
 
