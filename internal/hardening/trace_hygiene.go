@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"kurdistan/internal/adapter"
+	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/bytetransport"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/fixtures"
@@ -65,6 +66,10 @@ var forbiddenTraceKeys = []string{
 	"sni",
 	"host_header",
 	"url",
+	"dns_query",
+	"resolver",
+	"resolver_ip",
+	"nameserver",
 	"ip_address",
 	"cloud_provider",
 	"aws",
@@ -476,6 +481,33 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		}
 		return nil
 	}))
+	results = append(results, check("adaptivepath_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := adaptivepath.GenerateFixtureSet(ctx)
+		if err != nil {
+			return err
+		}
+		if err := adaptivepath.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		if err := adaptivepath.ScanForLeak(set); err != nil {
+			return err
+		}
+		if report := ScanValue(set); !report.Passed {
+			return fmt.Errorf("adaptivepath fixture failed generic hygiene: %v", report.Findings)
+		}
+		for _, tc := range []map[string]string{
+			{"endpoint": "x"},
+			{"dns_query": "x"},
+			{"resolver_ip": "x"},
+			{"payload": "x"},
+			{"secret": "x"},
+		} {
+			if err := adaptivepath.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe adaptivepath metadata accepted")
+			}
+		}
+		return nil
+	}))
 	return results
 }
 
@@ -516,7 +548,7 @@ func forbiddenKey(key string) bool {
 	for _, marker := range forbiddenTraceKeys {
 		if key == marker || strings.Contains(key, marker) {
 			switch key {
-			case "payload_bytes", "payload_hygiene", "payload_logged", "payload_visibility", "secret_logged", "secret_hygiene", "secret_hygiene_result", "ciphertext_bytes", "auth_tag_bytes":
+			case "payload_bytes", "payload_hygiene", "payload_logged", "payload_visibility", "secret_logged", "secret_hygiene", "secret_hygiene_result", "ciphertext_bytes", "auth_tag_bytes", "name_service_class":
 				return false
 			}
 			return true
