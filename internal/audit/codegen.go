@@ -79,30 +79,32 @@ type GeneratedTraceSummary struct {
 }
 
 type CodegenAuditSummary struct {
-	Profiles                     int                            `json:"profiles"`
-	GeneratedModules             int                            `json:"generated_modules"`
-	SemanticEquivalence          string                         `json:"semantic_equivalence"`
-	GeneratedProfileDiversity    string                         `json:"generated_profile_diversity"`
-	FixedSignature               string                         `json:"fixed_signature"`
-	MutantDetection              string                         `json:"mutant_detection"`
-	MultiStreamGeneratedParity   string                         `json:"multi_stream_generated_parity"`
-	StreamAdversaryParity        string                         `json:"multi_stream_generated_backend_parity"`
-	ProxySemGeneratedParity      string                         `json:"proxy_generated_backend_parity"`
-	CarrierGeneratedParity       string                         `json:"carrier_generated_backend_parity"`
-	SecurityGeneratedParity      string                         `json:"security_generated_backend_parity"`
-	RuntimeGeneratedParity       string                         `json:"runtime_generated_backend_parity"`
-	HardeningGeneratedParity     string                         `json:"hardening_generated_backend_parity"`
-	AdapterGeneratedParity       string                         `json:"adapter_generated_backend_parity"`
-	LocalAdapterGeneratedParity  string                         `json:"local_adapter_generated_backend_parity"`
-	ByteTransportGeneratedParity string                         `json:"byte_transport_generated_backend_parity"`
-	BytePathFixtureParity        string                         `json:"bytepath_fixture_generated_backend_parity"`
-	WireFeaturesGeneratedParity  string                         `json:"wirefeatures_generated_backend_parity"`
-	WireGenGeneratedParity       string                         `json:"wiregen_generated_backend_parity"`
-	HostDetectGeneratedParity    string                         `json:"hostdetect_generated_backend_parity"`
-	RelayFleetGeneratedParity    string                         `json:"relayfleet_generated_backend_parity"`
-	SourceScanner                string                         `json:"source_scanner"`
-	InterpretedVsGenerated       InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
-	SourceScan                   codegen.SourceScanReport       `json:"source_scan"`
+	Profiles                         int                            `json:"profiles"`
+	GeneratedModules                 int                            `json:"generated_modules"`
+	SemanticEquivalence              string                         `json:"semantic_equivalence"`
+	GeneratedProfileDiversity        string                         `json:"generated_profile_diversity"`
+	FixedSignature                   string                         `json:"fixed_signature"`
+	MutantDetection                  string                         `json:"mutant_detection"`
+	MultiStreamGeneratedParity       string                         `json:"multi_stream_generated_parity"`
+	StreamAdversaryParity            string                         `json:"multi_stream_generated_backend_parity"`
+	ProxySemGeneratedParity          string                         `json:"proxy_generated_backend_parity"`
+	CarrierGeneratedParity           string                         `json:"carrier_generated_backend_parity"`
+	SecurityGeneratedParity          string                         `json:"security_generated_backend_parity"`
+	RuntimeGeneratedParity           string                         `json:"runtime_generated_backend_parity"`
+	HardeningGeneratedParity         string                         `json:"hardening_generated_backend_parity"`
+	AdapterGeneratedParity           string                         `json:"adapter_generated_backend_parity"`
+	LocalAdapterGeneratedParity      string                         `json:"local_adapter_generated_backend_parity"`
+	ByteTransportGeneratedParity     string                         `json:"byte_transport_generated_backend_parity"`
+	BytePathFixtureParity            string                         `json:"bytepath_fixture_generated_backend_parity"`
+	WireFeaturesGeneratedParity      string                         `json:"wirefeatures_generated_backend_parity"`
+	WireGenGeneratedParity           string                         `json:"wiregen_generated_backend_parity"`
+	HostDetectGeneratedParity        string                         `json:"hostdetect_generated_backend_parity"`
+	RelayFleetGeneratedParity        string                         `json:"relayfleet_generated_backend_parity"`
+	ProxyIngressGeneratedParity      string                         `json:"proxyingress_generated_backend_parity"`
+	LocalProxyIngressGeneratedParity string                         `json:"localproxyingress_generated_backend_parity"`
+	SourceScanner                    string                         `json:"source_scanner"`
+	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
+	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
 }
 
 type InterpretedGeneratedDivergence struct {
@@ -189,6 +191,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	wireGenGate := WireGenGeneratedBackendParityGate()
 	hostDetectGate := HostDetectGeneratedBackendParityGate()
 	relayFleetGate := RelayFleetGeneratedBackendParityGate()
+	proxyIngressGate := GeneratedProxyIngressParityGate(corpus, testFailures)
+	localProxyIngressGate := GeneratedLocalProxyIngressParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -218,6 +222,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		wireGenGate,
 		hostDetectGate,
 		relayFleetGate,
+		proxyIngressGate,
+		localProxyIngressGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -656,6 +662,56 @@ func GeneratedLocalAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFai
 	}, failures)
 }
 
+func GeneratedProxyIngressParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module proxyingress tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated proxyingress specialization constants missing")
+	}
+	proxyIngressFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/proxyingress_generated.go" {
+			proxyIngressFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && proxyIngressFiles < 2 {
+		failures = append(failures, "generated proxyingress specialized files did not differ")
+	}
+	return gate("proxyingress_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include proxyingress tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		"proxyingress_unique_files":    proxyIngressFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
+func GeneratedLocalProxyIngressParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module localproxyingress tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated localproxyingress specialization constants missing")
+	}
+	localProxyIngressFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/localproxyingress_generated.go" {
+			localProxyIngressFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && localProxyIngressFiles < 2 {
+		failures = append(failures, "generated localproxyingress specialized files did not differ")
+	}
+	return gate("localproxyingress_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include localproxyingress tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":              corpus.GeneratedModules,
+		"generated_test_failures":        len(testFailures),
+		"localproxyingress_unique_files": localProxyIngressFiles,
+		"generated_source_specialized":   corpus.SourceScan.ProfileSpecificConstantsPresent,
+	}, failures)
+}
+
 func GeneratedByteTransportParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -784,30 +840,32 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		return "missing"
 	}
 	return CodegenAuditSummary{
-		Profiles:                     corpus.ProfileCount,
-		GeneratedModules:             corpus.GeneratedModules,
-		SemanticEquivalence:          status("generated_semantic_equivalence"),
-		GeneratedProfileDiversity:    status("generated_profile_diversity"),
-		FixedSignature:               status("generated_fixed_signature"),
-		MutantDetection:              status("generated_mutant_detection"),
-		MultiStreamGeneratedParity:   status("multi_stream_generated_parity"),
-		StreamAdversaryParity:        status("multi_stream_generated_backend_parity"),
-		ProxySemGeneratedParity:      status("proxy_generated_backend_parity"),
-		CarrierGeneratedParity:       status("carrier_generated_backend_parity"),
-		SecurityGeneratedParity:      status("security_generated_backend_parity"),
-		RuntimeGeneratedParity:       status("runtime_generated_backend_parity"),
-		HardeningGeneratedParity:     status("hardening_generated_backend_parity"),
-		AdapterGeneratedParity:       status("adapter_generated_backend_parity"),
-		LocalAdapterGeneratedParity:  status("local_adapter_generated_backend_parity"),
-		ByteTransportGeneratedParity: status("byte_transport_generated_backend_parity"),
-		BytePathFixtureParity:        status("bytepath_fixture_generated_backend_parity"),
-		WireFeaturesGeneratedParity:  status("wirefeatures_generated_backend_parity"),
-		WireGenGeneratedParity:       status("wiregen_generated_backend_parity"),
-		HostDetectGeneratedParity:    status("hostdetect_generated_backend_parity"),
-		RelayFleetGeneratedParity:    status("relayfleet_generated_backend_parity"),
-		SourceScanner:                status("generated_source_scanner"),
-		InterpretedVsGenerated:       divergenceSummary(corpus),
-		SourceScan:                   corpus.SourceScan,
+		Profiles:                         corpus.ProfileCount,
+		GeneratedModules:                 corpus.GeneratedModules,
+		SemanticEquivalence:              status("generated_semantic_equivalence"),
+		GeneratedProfileDiversity:        status("generated_profile_diversity"),
+		FixedSignature:                   status("generated_fixed_signature"),
+		MutantDetection:                  status("generated_mutant_detection"),
+		MultiStreamGeneratedParity:       status("multi_stream_generated_parity"),
+		StreamAdversaryParity:            status("multi_stream_generated_backend_parity"),
+		ProxySemGeneratedParity:          status("proxy_generated_backend_parity"),
+		CarrierGeneratedParity:           status("carrier_generated_backend_parity"),
+		SecurityGeneratedParity:          status("security_generated_backend_parity"),
+		RuntimeGeneratedParity:           status("runtime_generated_backend_parity"),
+		HardeningGeneratedParity:         status("hardening_generated_backend_parity"),
+		AdapterGeneratedParity:           status("adapter_generated_backend_parity"),
+		LocalAdapterGeneratedParity:      status("local_adapter_generated_backend_parity"),
+		ByteTransportGeneratedParity:     status("byte_transport_generated_backend_parity"),
+		BytePathFixtureParity:            status("bytepath_fixture_generated_backend_parity"),
+		WireFeaturesGeneratedParity:      status("wirefeatures_generated_backend_parity"),
+		WireGenGeneratedParity:           status("wiregen_generated_backend_parity"),
+		HostDetectGeneratedParity:        status("hostdetect_generated_backend_parity"),
+		RelayFleetGeneratedParity:        status("relayfleet_generated_backend_parity"),
+		ProxyIngressGeneratedParity:      status("proxyingress_generated_backend_parity"),
+		LocalProxyIngressGeneratedParity: status("localproxyingress_generated_backend_parity"),
+		SourceScanner:                    status("generated_source_scanner"),
+		InterpretedVsGenerated:           divergenceSummary(corpus),
+		SourceScan:                       corpus.SourceScan,
 	}
 }
 
