@@ -85,7 +85,8 @@ Current work is concentrated on the generated transport/compiler layer and its d
 | Protocol feature corpus and wire-shape baselines | Done |
 | Wire-shape generator prototype | Done |
 | Wire evaluation and classifier dataset harness | Done |
-| Host-based detection resistance | Next |
+| Host-based detection resistance | Done |
+| Relay churn and host rotation modeling | Next |
 | Proxy/VPN integration | Future |
 
 ## Features
@@ -121,6 +122,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Protocol-feature corpus with abstract encrypted-protocol feature taxonomy, safe wire-feature extraction, first-N packet-shape model, corpus comparison, collapse scanning, and wire-shape baselines.
 - Wire-shape generator prototype with deterministic policy sampling, profile integration, bytepath application, expected feature matching, collapse scanning, fixtures, and generated-backend parity.
 - Wire evaluation and classifier dataset harness with deterministic CSV/JSONL exports, train/test/OOD splits, synthetic controls, drift checks, and classifier-readiness gates.
+- Host-based detection resistance modeling with synthetic host observations, timeline windows, confidence scoring, resistance metrics, collapse controls, fixture drift gates, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -174,6 +176,9 @@ internal/wiregen + internal/wiregencompare
 internal/wireeval + internal/classifierdata
   payload-free wire evaluation records, classifier-ready CSV/JSONL exports, deterministic splits, control datasets, drift checks, and readiness reports
 
+internal/hostdetect
+  synthetic host observation aggregation, timeline windows, confidence scoring, resistance reports, collapse detection, fixture drift checks, and host-level hygiene scans
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -209,6 +214,7 @@ go run ./cmd/kcheck protocorpus --quick
 go run ./cmd/kcheck wirefeatures --quick
 go run ./cmd/kcheck wiregen --quick
 go run ./cmd/kcheck wireeval --quick
+go run ./cmd/kcheck hostdetect --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -429,6 +435,21 @@ go run ./cmd/kcheck wireeval --quick
 go run ./cmd/kcheck wireeval --full --out testdata/audit/wireeval.json
 go run ./cmd/kcheck wireeval verify
 go run ./cmd/kcheck wireeval compare --old testdata/wireeval/wireeval-dataset-golden.json --new testdata/wireeval/wireeval-dataset-golden.json
+```
+
+## Host-Based Detection Resistance
+
+Milestone 22 models repeated observations of generated relay behavior against synthetic host identities. `internal/hostdetect` groups safe wire-evaluation records by synthetic host, applies deterministic timeline windows, scores consistency, flags collapsed controls, and reports whether generated profiles are becoming too stable at a host level.
+
+The fixture set under `testdata/hostdetect/` stores synthetic host IDs, bucketed features, hashes, aggregate reports, and expected detection outcomes. It does not store raw bytes, payloads, endpoint addresses, captures, or secrets.
+
+Run:
+
+```bash
+go run ./cmd/kcheck hostdetect --quick
+go run ./cmd/kcheck hostdetect --full --out testdata/audit/hostdetect.json
+go run ./cmd/kcheck hostdetect verify
+go run ./cmd/kcheck hostdetect compare --old testdata/hostdetect/host-observations-golden.json --new testdata/hostdetect/host-observations-golden.json
 ```
 
 ## Multi-Stream Semantics

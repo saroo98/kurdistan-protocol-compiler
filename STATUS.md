@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-29T23:38:42Z`
+- Generated at: `2026-06-30T00:10:49Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -137,11 +137,22 @@
 | `wireeval_generated_backend_parity` | PASS | `required` | generated backend wireeval markers checked |
 | `wireeval_trace_hygiene` | PASS | `required` | 72 records and classifier exports scanned |
 | `wireeval_mutant_detection` | PASS | `required` | 12/12 wireeval mutant modes detected |
-| `hardening_invariant_registry` | PASS | `required` | 15 invariants checks run; 0 failures |
+| `hostdetect_observation_build` | PASS | `required` | 72 observations across 9 synthetic hosts |
+| `hostdetect_assignment_integrity` | PASS | `required` | 3 assignment modes checked |
+| `hostdetect_timeline_integrity` | PASS | `required` | 2 timeline windows checked |
+| `hostdetect_confidence_model` | PASS | `required` | 3/9 hosts flagged |
+| `hostdetect_resistance_metrics` | PASS | `required` | 9 hosts, 0.51 average consistency |
+| `hostdetect_collapse_detection` | PASS | `required` | 0 high-consistency hosts, 1 padding-only hosts |
+| `hostdetect_control_detection` | PASS | `required` | 3 control hosts flagged |
+| `hostdetect_generated_backend_parity` | PASS | `required` | generated backend hostdetect markers checked |
+| `hostdetect_trace_hygiene` | PASS | `required` | 72 host observations scanned |
+| `hostdetect_mutant_detection` | PASS | `required` | 12/12 hostdetect mutant modes detected |
+| `hostdetect_fixture_drift` | PASS | `required` | 72 old observations compared to 72 new observations |
+| `hardening_invariant_registry` | PASS | `required` | 16 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 12 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 13 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -150,9 +161,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `87 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `1068 ms`
+- Profile generation: `85 ms`
+- Trace generation: `17 ms`
+- Total audit runtime: `1093 ms`
 
 ## Corpus Diversity Summary
 
@@ -175,10 +186,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.31882291237626675`
-- `same_profile_distance`: `0.014925373134328358`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.3195276466235823`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
