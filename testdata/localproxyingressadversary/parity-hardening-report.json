@@ -1,0 +1,14 @@
+{
+  "compared_scenarios": 30,
+  "classification_matches": 30,
+  "accept_reject_matches": 30,
+  "lifecycle_matches": 14,
+  "descriptor_rejection_matches": 22,
+  "pressure_matches": 14,
+  "reset_error_matches": 12,
+  "collapse_matches": 12,
+  "report_hash": "ea764f6c326c4322934d388e69c829554cf85f1978d89086d0c02df7b34b7769",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

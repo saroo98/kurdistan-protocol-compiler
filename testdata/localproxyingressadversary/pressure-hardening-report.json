@@ -1,0 +1,13 @@
+{
+  "scenario_count": 14,
+  "queue_limit_hits": 3,
+  "request_limit_hits": 3,
+  "overflow_rejected": 4,
+  "dropped_events": 4,
+  "backpressure_mapped": 4,
+  "unbounded_behavior_found": false,
+  "report_hash": "aad418a7986f70886357f35469f989561c177a992b06c8ee2884a0e665b3a7f8",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
