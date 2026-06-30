@@ -169,7 +169,12 @@ func unsafeValue(value string) bool {
 	if lower == "" {
 		return false
 	}
-	if strings.Contains(lower, "://") || strings.HasPrefix(lower, "www.") || strings.Contains(lower, "host_header") || strings.Contains(lower, "sni") || strings.Contains(lower, "credential") || strings.Contains(lower, "secret") || strings.Contains(lower, "cloud") || strings.Contains(lower, "resolver") || strings.Contains(lower, "dns") {
+	for _, r := range value {
+		if r < 32 || r > 126 {
+			return true
+		}
+	}
+	if strings.Contains(lower, "://") || strings.HasPrefix(lower, "www.") || strings.Contains(lower, "/") || strings.Contains(lower, "\\") || strings.Contains(lower, "host_header") || strings.Contains(lower, "sni") || strings.Contains(lower, "credential") || strings.Contains(lower, "secret") || strings.Contains(lower, "payload") || strings.Contains(lower, "raw_bytes") || strings.Contains(lower, "cloud") || strings.Contains(lower, "resolver") || strings.Contains(lower, "dns") || strings.Contains(lower, "region") || strings.Contains(lower, "instance_id") || strings.Contains(lower, "aws") || strings.Contains(lower, "gcp") || strings.Contains(lower, "azure") {
 		return true
 	}
 	if ip := net.ParseIP(lower); ip != nil {
