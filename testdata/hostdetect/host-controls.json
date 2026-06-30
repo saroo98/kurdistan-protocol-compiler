@@ -1,0 +1,18 @@
+{
+  "host_count": 9,
+  "observation_count": 72,
+  "unique_feature_hashes": 9,
+  "unique_first_n_shapes": 9,
+  "high_consistency_hosts": 0,
+  "padding_only_hosts": 1,
+  "collapsed_control_detected": true,
+  "suspicious_metrics": [
+    "dominant_first_n_shape",
+    "dominant_first_n_shape",
+    "dominant_first_n_shape"
+  ],
+  "diversity_score": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

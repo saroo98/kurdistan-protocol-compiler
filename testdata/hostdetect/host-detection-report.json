@@ -1,0 +1,23 @@
+{
+  "version": "hostdetect-v1",
+  "host_count": 9,
+  "observation_count": 72,
+  "window": "medium",
+  "threshold": "deterministic-consistency-v1",
+  "hosts_flagged": 3,
+  "generated_hosts_flagged": 0,
+  "control_hosts_flagged": 3,
+  "baseline_hosts_flagged": 0,
+  "false_positive_estimate": 0,
+  "false_negative_estimate": 0,
+  "precision_estimate": 1,
+  "recall_estimate": 1,
+  "high_risk_hosts": [
+    "host_9000",
+    "host_9001",
+    "host_9002"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
