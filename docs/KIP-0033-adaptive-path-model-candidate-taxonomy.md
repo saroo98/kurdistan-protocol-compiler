@@ -11,8 +11,8 @@ profile. It can also be represented as one candidate among several possible
 paths, each with a carrier family, relay-risk bucket, synthetic condition
 observations, freshness metadata, uncertainty, and safe decision-input fields.
 
-This KIP defines the deterministic taxonomy that later bundle compilation,
-path racing, health monitoring, and failover work can consume.
+This KIP defines the deterministic taxonomy that bundle compilation, path
+racing, health monitoring, and failover work can consume.
 
 ## Why Stable Path Assumptions Are Insufficient
 
@@ -91,9 +91,11 @@ hashes, without importing real hostnames, addresses, resolver data, or captures.
 
 ## Future Path Racing And Scoring
 
-M29 is expected to consume M27 decision inputs for path racing and short-lived
-scoring. M30 is expected to build a continuous health and failover model. Those
-milestones must preserve the same payload-free, endpoint-free trace discipline.
+M28 consumes M27 decision inputs through the generated transport bundle
+compiler. M29 is expected to consume those bundle candidates for path racing and
+short-lived scoring. M30 is expected to build a continuous health and failover
+model. Those milestones must preserve the same payload-free, endpoint-free trace
+discipline.
 
 ## Non-Network Boundary
 
@@ -149,9 +151,10 @@ go run ./cmd/kcheck --quick --status STATUS.md
 
 The model proves only deterministic local behavior. It cannot prove real-world
 reachability, censorship resistance, stealth, safety in a specific country, or
-field readiness. It also does not define a generated transport bundle, path
-racing algorithm, health monitoring loop, measurement client, or egress bridge.
+field readiness. It also does not define a path racing algorithm, health
+monitoring loop, measurement client, or egress bridge.
 
 ## Next Milestone
 
-M28 should focus on the generated transport bundle compiler.
+M29 should focus on path racing and short-lived scoring over generated transport
+bundle candidates.

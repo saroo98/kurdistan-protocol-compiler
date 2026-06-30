@@ -99,6 +99,7 @@ Current work is concentrated on the generated transport/compiler layer and its d
 - Deterministic local proxy ingress prototype with synthetic CONNECT-like request events, target binding, runtime stream mapping, bounded queues, backpressure, reset/error isolation, collapse controls, and generated-backend parity.
 - Proxy ingress adversarial parity and hardening with malformed event sequences, descriptor-abuse rejection, lifecycle and pressure stress, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness reporting.
 - Adaptive path modeling with candidate families, synthetic condition observations, freshness and uncertainty buckets, viability evaluation, decision-input summaries, misuse detection, and generated/interpreted parity.
+- Generated transport bundle compiler with deterministic bundle modes, candidate roles, profile/wire-policy references, synthetic relay binding, fallback hints, collapse controls, fixtures, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -167,6 +168,9 @@ internal/localproxyingress + internal/localproxyingressadversary
 internal/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
+internal/transportbundle
+  generated transport bundle policies, seed plans, candidate manifests, adaptive-path mapping, synthetic relay binding, fallback hints, collapse controls, and fixture drift gates
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -208,6 +212,7 @@ go run ./cmd/kcheck proxyingress --quick
 go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
+go run ./cmd/kcheck transportbundle --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -224,6 +229,8 @@ Generate and validate a profile:
 ```bash
 go run ./cmd/kdc generate --seed 12345 --out profiles/examples/profile-12345.json
 go run ./cmd/kdc validate --profile profiles/examples/profile-12345.json
+go run ./cmd/kdc bundle --seed 12345 --mode balanced_adaptive --out profiles/examples/bundle-12345.json
+go run ./cmd/kdc validate-bundle --bundle profiles/examples/bundle-12345.json
 ```
 
 Generate a profile-specific Go module:
@@ -318,6 +325,7 @@ go run ./cmd/kcheck proxyingress --quick
 go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
+go run ./cmd/kcheck transportbundle --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -534,6 +542,27 @@ go run ./cmd/kcheck adaptivepath --full --out testdata/audit/adaptivepath.json
 go run ./cmd/kcheck adaptivepath generate --out testdata/adaptivepath/path-candidates-golden.json --force
 go run ./cmd/kcheck adaptivepath verify
 go run ./cmd/kcheck adaptivepath compare --old testdata/adaptivepath/path-candidates-golden.json --new testdata/adaptivepath/path-candidates-golden.json
+```
+
+## Generated Transport Bundle Compiler
+
+Milestone 28 compiles adaptive-path candidates into deterministic transport bundles. `internal/transportbundle` creates bundle policies, profile seed plans, candidate manifests, safe adaptive-path mappings, synthetic relay binding reports, fallback hints, collapsed controls, and generated/interpreted parity summaries.
+
+The bundle compiler produces candidate plans for review and future path racing. It does not select a live winner, probe paths, dial relays, resolve DNS, or use real endpoints.
+
+Committed fixtures live under `testdata/transportbundle/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck transportbundle --quick
+go run ./cmd/kcheck transportbundle --full --out testdata/audit/transportbundle.json
+go run ./cmd/kcheck transportbundle generate --out testdata/transportbundle/bundle-manifest-golden.json --force
+go run ./cmd/kcheck transportbundle verify
+go run ./cmd/kcheck transportbundle compare --old testdata/transportbundle/bundle-manifest-golden.json --new testdata/transportbundle/bundle-manifest-golden.json
+go run ./cmd/kdc bundle --seed 12345 --mode balanced_adaptive --out profiles/examples/bundle-12345.json
+go run ./cmd/kdc validate-bundle --bundle profiles/examples/bundle-12345.json
+go run ./cmd/kdc summarize-bundle --bundle profiles/examples/bundle-12345.json
 ```
 
 ## Multi-Stream Semantics

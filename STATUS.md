@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T15:39:29Z`
+- Generated at: `2026-06-30T21:44:36Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -205,11 +205,22 @@
 | `adaptivepath_mutant_detection` | PASS | `required` | 13 mutants represented |
 | `adaptivepath_fixture_drift` | PASS | `required` | passed |
 | `adaptivepath_roadmap_public_docs` | PASS | `required` | public README/site status table cleanup and adaptive roadmap checked |
-| `hardening_invariant_registry` | PASS | `required` | 17 invariants checks run; 0 failures |
+| `transportbundle_policy_validation` | PASS | `required` | 6 bundle policy modes checked |
+| `transportbundle_seed_planning` | PASS | `required` | 6 unique profile seeds |
+| `transportbundle_family_coverage` | PASS | `required` | 5 families covered |
+| `transportbundle_adaptivepath_mapping` | PASS | `required` | 6 candidates mapped to adaptivepath |
+| `transportbundle_relay_binding` | PASS | `required` | 6 synthetic relays and 5 synthetic hosts |
+| `transportbundle_fallback_hints` | PASS | `required` | 6 fallback hints checked |
+| `transportbundle_collapse_detection` | PASS | `required` | diversity score 0.94; control findings=3 |
+| `transportbundle_generated_backend_parity` | PASS | `required` | 6 candidates compared |
+| `transportbundle_trace_hygiene` | PASS | `required` | transport bundle fixtures contain safe metadata only |
+| `transportbundle_mutant_detection` | PASS | `required` | 15 mutants represented |
+| `transportbundle_fixture_drift` | PASS | `required` | passed |
+| `hardening_invariant_registry` | PASS | `required` | 18 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 18 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 19 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -218,9 +229,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `91 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `1255 ms`
+- Profile generation: `131 ms`
+- Trace generation: `30 ms`
+- Total audit runtime: `2057 ms`
 
 ## Corpus Diversity Summary
 
@@ -245,8 +256,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.319765850804996`
-- `same_profile_distance`: `0.007462686567164179`
+- `different_profile_average_distance`: `0.31748988543062934`
+- `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -431,6 +442,21 @@
 - `adaptivepath_mutant_detection`: `passed`
 - `adaptivepath_roadmap_public_docs`: `passed`
 
+## Transport Bundle Compiler
+
+- Gate result: `true`
+- `transportbundle_policy_validation`: `passed`
+- `transportbundle_seed_planning`: `passed`
+- `transportbundle_family_coverage`: `passed`
+- `transportbundle_adaptivepath_mapping`: `passed`
+- `transportbundle_relay_binding`: `passed`
+- `transportbundle_fallback_hints`: `passed`
+- `transportbundle_collapse_detection`: `passed`
+- `transportbundle_generated_backend_parity`: `passed`
+- `transportbundle_trace_hygiene`: `passed`
+- `transportbundle_mutant_detection`: `passed`
+- `transportbundle_fixture_drift`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -442,6 +468,7 @@
 - Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.
 - Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.
 - Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.
+- Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -450,4 +477,4 @@
 
 ## Next Milestone
 
-Milestone 28 should focus on the generated transport bundle compiler.
+Milestone 29 should focus on path-racing and revalidation within the deterministic local model.

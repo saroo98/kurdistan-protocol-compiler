@@ -287,6 +287,8 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	}
 	readme := read("README.md")
 	index := read("docs/index.html")
+	kip34 := read("docs/KIP-0034-generated-transport-bundle-compiler.md")
+	kip34Lower := strings.ToLower(kip34)
 	if strings.Contains(readme, "## Current Status") || strings.Contains(readme, "| Milestone | Status |") {
 		failures = append(failures, "README still contains public current-status table")
 	}
@@ -301,6 +303,24 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	} {
 		if !strings.Contains(readme, required) && !strings.Contains(index, required) {
 			failures = append(failures, "roadmap missing "+required)
+		}
+	}
+	for _, required := range []string{
+		"Adaptive runtime direction",
+		"KIP-0034-generated-transport-bundle-compiler.md",
+		"Boundaries and safety",
+	} {
+		if !strings.Contains(index, required) {
+			failures = append(failures, "docs site missing "+required)
+		}
+	}
+	for _, required := range []string{
+		"generated transport bundle compiler",
+		"transportbundle_policy_validation",
+		"path racing and short-lived revalidation",
+	} {
+		if !strings.Contains(kip34Lower, required) {
+			failures = append(failures, "KIP-0034 missing "+required)
 		}
 	}
 	if strings.Contains(readme, "M27: local proxy egress") || strings.Contains(index, "M27: local proxy egress") {
