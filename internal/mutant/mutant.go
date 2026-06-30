@@ -133,6 +133,21 @@ const (
 	ModeHostDetectSecretLeak                  = "hostdetect_secret_leak"
 	ModeHostDetectGeneratedBackendDrift       = "hostdetect_generated_backend_drift"
 	ModeHostDetectUnstableHostAssignment      = "hostdetect_unstable_host_assignment"
+	ModeRelayFleetReusesSameProfile           = "relayfleet_reuses_same_profile"
+	ModeRelayFleetReusesSameWirePolicy        = "relayfleet_reuses_same_wire_policy"
+	ModeRelayFleetNeverChurns                 = "relayfleet_never_churns"
+	ModeRelayFleetOverChurns                  = "relayfleet_over_churns"
+	ModeRelayFleetIgnoresHostRisk             = "relayfleet_ignores_host_risk"
+	ModeRelayFleetKeepsBurnedRelayActive      = "relayfleet_keeps_burned_relay_active"
+	ModeRelayFleetMigratesToRetiredRelay      = "relayfleet_migrates_to_retired_relay"
+	ModeRelayFleetIgnoresProfileReuseLimit    = "relayfleet_ignores_profile_reuse_limit"
+	ModeRelayFleetIgnoresPolicyReuseLimit     = "relayfleet_ignores_policy_reuse_limit"
+	ModeRelayFleetControlNotDetected          = "relayfleet_control_not_detected"
+	ModeRelayFleetEndpointLeak                = "relayfleet_endpoint_leak"
+	ModeRelayFleetPayloadLeak                 = "relayfleet_payload_leak"
+	ModeRelayFleetSecretLeak                  = "relayfleet_secret_leak"
+	ModeRelayFleetGeneratedBackendDrift       = "relayfleet_generated_backend_drift"
+	ModeRelayFleetUnstableSchedule            = "relayfleet_unstable_schedule"
 )
 
 func Modes() []string {
@@ -252,6 +267,21 @@ func Modes() []string {
 		ModeHostDetectSecretLeak,
 		ModeHostDetectGeneratedBackendDrift,
 		ModeHostDetectUnstableHostAssignment,
+		ModeRelayFleetReusesSameProfile,
+		ModeRelayFleetReusesSameWirePolicy,
+		ModeRelayFleetNeverChurns,
+		ModeRelayFleetOverChurns,
+		ModeRelayFleetIgnoresHostRisk,
+		ModeRelayFleetKeepsBurnedRelayActive,
+		ModeRelayFleetMigratesToRetiredRelay,
+		ModeRelayFleetIgnoresProfileReuseLimit,
+		ModeRelayFleetIgnoresPolicyReuseLimit,
+		ModeRelayFleetControlNotDetected,
+		ModeRelayFleetEndpointLeak,
+		ModeRelayFleetPayloadLeak,
+		ModeRelayFleetSecretLeak,
+		ModeRelayFleetGeneratedBackendDrift,
+		ModeRelayFleetUnstableSchedule,
 	}
 }
 

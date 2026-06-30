@@ -143,6 +143,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `wirefeatures_generated_backend_parity`: `%s`\n", summary.WireFeaturesGeneratedParity)
 			fmt.Fprintf(&b, "- `wiregen_generated_backend_parity`: `%s`\n", summary.WireGenGeneratedParity)
 			fmt.Fprintf(&b, "- `hostdetect_generated_backend_parity`: `%s`\n", summary.HostDetectGeneratedParity)
+			fmt.Fprintf(&b, "- `relayfleet_generated_backend_parity`: `%s`\n", summary.RelayFleetGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -440,6 +441,38 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck wiregen --quick` for wire-shape generator checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Relay Fleet Lifecycle")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "relayfleet_lifecycle_integrity"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "relayfleet_lifecycle_integrity")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_profile_assignment")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_churn_schedule")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_migration_model")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_burn_risk")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_collapse_detection")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_control_detection")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "relayfleet_fixture_drift")
+		if strings.HasPrefix(report.Mode, "relayfleet-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"version",
+				"fleet_id",
+				"relays",
+				"active_relays",
+				"churn_events",
+				"migration_events",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Relay fleet gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck relayfleet --quick` for relay churn and lifecycle checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -450,6 +483,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Adapter interface architecture defines contracts and an in-memory harness, not concrete adapter implementations.")
 	fmt.Fprintln(&b, "- Byte-path fixtures freeze safe metadata and hashes, not raw packet captures or production wire behavior.")
 	fmt.Fprintln(&b, "- Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.")
+	fmt.Fprintln(&b, "- Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -458,7 +492,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 21 should focus on a wire evaluation and classifier dataset harness.")
+	fmt.Fprintln(&b, "Milestone 24 should focus on concrete local proxy ingress design review.")
 	return b.String()
 }
 
