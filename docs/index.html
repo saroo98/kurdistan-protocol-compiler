@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kurdistan Protocol Compiler | Polymorphic Relay Transport Research</title>
+    <title>Kurdistan Protocol Compiler | Adaptive Polymorphic Relay Transport Research</title>
     <meta
       name="description"
-      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
     />
     <meta property="og:title" content="Kurdistan Protocol Compiler" />
     <meta
       property="og:description"
-      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://saroo98.github.io/kurdistan-protocol-compiler/" />
@@ -19,7 +19,7 @@
     <meta name="twitter:title" content="Kurdistan Protocol Compiler" />
     <meta
       name="twitter:description"
-      content="A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research."
+      content="An adaptive polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, generated transport bundles, and adversarial network research."
     />
     <link rel="canonical" href="https://saroo98.github.io/kurdistan-protocol-compiler/" />
     <link rel="icon" href="assets/kurdistan-mark.svg" type="image/svg+xml" />
@@ -34,6 +34,7 @@
       <nav aria-label="Primary navigation">
         <a href="#capabilities">Capabilities</a>
         <a href="#architecture">Architecture</a>
+        <a href="#direction">Adaptive runtime</a>
         <a href="#roadmap">Roadmap</a>
         <a href="#docs">Docs</a>
       </nav>
@@ -43,7 +44,7 @@
       <section class="hero">
         <div class="hero-copy">
           <p class="eyebrow">Protocol compiler for adversarial networks</p>
-          <h1>Production-grade polymorphic relay transport compiler in development.</h1>
+          <h1>Adaptive polymorphic relay transport compiler in development.</h1>
           <p class="hero-text">
             Kurdistan generates profile-specific relay transport implementations with generated state machines,
             framing, scheduling, padding, probing behavior, multi-stream semantics, source-code backends,
@@ -74,6 +75,7 @@
             <div><span>wire evaluation</span><b>dataset-ready</b></div>
             <div><span>host detection</span><b>modeled</b></div>
             <div><span>relay fleet</span><b>lifecycle-modeled</b></div>
+            <div><span>transport bundle</span><b>compiled</b></div>
             <div><span>hardening</span><b>gate-driven</b></div>
           </div>
         </div>
@@ -117,6 +119,19 @@
             research, and controlled experiments around internet censorship.
           </p>
         </div>
+      </section>
+
+      <section class="section status" id="direction">
+        <div>
+          <h2>Adaptive runtime direction</h2>
+          <p>
+            Kurdistan is moving from single generated profiles toward adaptive transport sets: candidate paths,
+            synthetic condition evidence, relay lifecycle risk, generated transport bundles, fallback hints, and
+            future deterministic path racing. The model remains based on safe local metadata and audit fixtures,
+            not real path probing or public-network measurement.
+          </p>
+        </div>
+        <a class="button primary" href="KIP-0034-generated-transport-bundle-compiler.md">Read KIP-0034</a>
       </section>
 
       <section class="section" id="capabilities">
@@ -190,6 +205,10 @@
             <p>Synthetic relay states, profile assignment, churn schedules, migration events, burn-risk scoring, collapse controls, and fixture drift gates.</p>
           </article>
           <article class="card">
+            <h3>Transport bundles</h3>
+            <p>Deterministic bundle modes, candidate roles, profile and wire-policy references, synthetic relay binding, fallback hints, and collapse controls.</p>
+          </article>
+          <article class="card">
             <h3>Hardening gates</h3>
             <p>Invariant registry, API misuse tests, panic-safety wrappers, resource bounds, trace hygiene, generated parity, and readiness checks.</p>
           </article>
@@ -222,10 +241,10 @@
           <p>The next workstream moves Kurdistan from deterministic ingress prototypes toward adaptive runtime modeling.</p>
         </div>
         <div class="timeline">
-          <div class="next"><strong>M27</strong><span>Adaptive path model and candidate taxonomy</span></div>
-          <div><strong>M28</strong><span>Generated transport bundle compiler</span></div>
-          <div><strong>M29</strong><span>Path racing and short-lived scoring harness</span></div>
-          <div><strong>M30</strong><span>Continuous health monitoring and failover model</span></div>
+          <div><strong>M27</strong><span>Adaptive path model and candidate taxonomy</span></div>
+          <div class="next"><strong>M28</strong><span>Generated transport bundle compiler</span></div>
+          <div><strong>M29</strong><span>Planned: path racing and short-lived scoring harness</span></div>
+          <div><strong>M30</strong><span>Planned: continuous health monitoring and failover model</span></div>
           <div><strong>M31</strong><span>Carrier-family design reviews</span></div>
           <div><strong>M32</strong><span>Safe measurement-client design and privacy review</span></div>
           <div><strong>M33</strong><span>Local proxy egress and relay bridge model</span></div>
@@ -282,7 +301,19 @@
           <a href="KIP-0031-deterministic-local-proxy-ingress-prototype.md">KIP-0031: Deterministic local proxy ingress prototype</a>
           <a href="KIP-0032-proxy-ingress-adversarial-parity-hardening.md">KIP-0032: Proxy ingress adversarial hardening</a>
           <a href="KIP-0033-adaptive-path-model-candidate-taxonomy.md">KIP-0033: Adaptive path model and candidate taxonomy</a>
+          <a href="KIP-0034-generated-transport-bundle-compiler.md">KIP-0034: Generated transport bundle compiler</a>
           <a href="PRE_ADAPTER_READINESS.md">Pre-adapter readiness matrix</a>
+        </div>
+      </section>
+
+      <section class="section dark-band" id="boundaries">
+        <div class="section-heading">
+          <h2>Boundaries and safety</h2>
+          <p>
+            Current work is deterministic, offline, synthetic, and payload-free. The repository does not implement
+            real path probing, concrete proxy/VPN adapters, deployment, DNS/resolver tests, TLS mimicry, CDN
+            behavior, endpoint handling, or public-network measurement.
+          </p>
         </div>
       </section>
 
@@ -307,23 +338,6 @@
         </div>
       </section>
 
-      <section class="section status" id="direction">
-        <div>
-          <h2>Adaptive runtime direction</h2>
-          <p>
-            The current implementation centers on generated profiles, source-code backends, multi-stream
-            semantics, proxy-semantics modeling, carrier abstraction, security prerequisites, runtime session
-            architecture, implementation hardening, adapter interface contracts, a deterministic local adapter
-            prototype, a deterministic byte transport harness, byte-path fixture freeze, protocol-feature corpus,
-            wire-shape baselines, the wire-shape generator prototype, wire evaluation datasets, host-based detection
-            resistance, relay fleet lifecycle modeling, concrete local proxy ingress design review, deterministic
-            local proxy ingress prototyping, proxy ingress adversarial hardening, adaptive path modeling, and
-            adversarial audits. The next roadmap phase is generated transport bundle compilation, followed by path
-            racing and short-lived scoring.
-          </p>
-        </div>
-        <a class="button primary" href="https://github.com/saroo98/kurdistan-protocol-compiler">View on GitHub</a>
-      </section>
     </main>
 
     <footer>
