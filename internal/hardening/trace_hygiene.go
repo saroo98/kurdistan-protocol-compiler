@@ -17,7 +17,10 @@ import (
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
+	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relayfleet"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
@@ -407,6 +410,50 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 			if err := relayfleet.ScanForLeak(tc); err == nil {
 				return fmt.Errorf("unsafe relayfleet metadata accepted: %v", tc)
 			}
+		}
+		return nil
+	}))
+	results = append(results, check("proxyingress_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := proxyingress.GoldenFixtureSet()
+		if err != nil {
+			return err
+		}
+		if err := proxyingress.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		review, _, _, err := proxyingressreview.GenerateGoldenReview()
+		if err != nil {
+			return err
+		}
+		if review.PayloadLogged || review.SecretLogged || review.GoNoGoDecision != proxyingressreview.DecisionGo {
+			return fmt.Errorf("proxyingress review hygiene failed")
+		}
+		for _, tc := range []map[string]string{{"endpoint": "x"}, {"domain": "x"}, {"url": "x"}, {"secret": "x"}} {
+			if err := proxyingress.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe proxyingress metadata accepted")
+			}
+		}
+		return nil
+	}))
+	results = append(results, check("localproxyingress_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := localproxyingress.GenerateFixtureSet(ctx, localproxyingress.QuickScenarios())
+		if err != nil {
+			return err
+		}
+		if err := localproxyingress.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		for _, summary := range set.Summaries {
+			if summary.PayloadLogged || summary.SecretLogged {
+				return fmt.Errorf("localproxyingress summary hygiene failed")
+			}
+			events := localproxyingress.TraceEvents(summary)
+			if report := ScanEvents(events); !report.Passed {
+				return fmt.Errorf("localproxyingress trace rejected: %v", report.Findings)
+			}
+		}
+		if ScanJSON([]byte(`{"endpoint":"x"}`)).Passed {
+			return fmt.Errorf("unsafe localproxyingress field accepted")
 		}
 		return nil
 	}))
