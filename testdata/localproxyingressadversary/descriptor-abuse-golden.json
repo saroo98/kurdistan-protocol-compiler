@@ -1,0 +1,165 @@
+{
+  "version": "localproxyingressadv-v1",
+  "case_count": 22,
+  "cases": [
+    {
+      "name": "ipv4_literal",
+      "input_class": "ipv4_literal",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "ipv6_literal",
+      "input_class": "ipv6_literal",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "domain_name",
+      "input_class": "domain_name",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "subdomain_name",
+      "input_class": "subdomain_name",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "url_http",
+      "input_class": "url_http",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "url_https",
+      "input_class": "url_https",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "url_with_port",
+      "input_class": "url_with_port",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "email_like",
+      "input_class": "email_like",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "sni_key",
+      "input_class": "sni_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "host_header_key",
+      "input_class": "host_header_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "dns_query_key",
+      "input_class": "dns_query_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "resolver_key",
+      "input_class": "resolver_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "cloud_provider_key",
+      "input_class": "cloud_provider_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "region_key",
+      "input_class": "region_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "instance_id_key",
+      "input_class": "instance_id_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "credential_key",
+      "input_class": "credential_key",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "base64_like_payload",
+      "input_class": "base64_like_payload",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "hex_blob_like_payload",
+      "input_class": "hex_blob_like_payload",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "oversized_descriptor",
+      "input_class": "oversized_descriptor",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "unicode_confusable_descriptor",
+      "input_class": "unicode_confusable_descriptor",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "control_character_descriptor",
+      "input_class": "control_character_descriptor",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    },
+    {
+      "name": "path_like_descriptor",
+      "input_class": "path_like_descriptor",
+      "expected_reject": true,
+      "reject_bucket": "unsafe_descriptor",
+      "panic_allowed": false
+    }
+  ],
+  "rejected": 22,
+  "report_hash": "e6297073198ffe97773ce250e35ad21601389dfe5d623bae5bd1850377ee73dc",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

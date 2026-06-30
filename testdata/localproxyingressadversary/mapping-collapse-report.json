@@ -1,0 +1,15 @@
+{
+  "scenario_count": 12,
+  "request_count": 17,
+  "unique_target_bindings": 3,
+  "unique_stream_mappings": 1,
+  "unique_lifecycle_patterns": 12,
+  "unique_error_buckets": 2,
+  "unique_reset_buckets": 2,
+  "unique_backpressure_classes": 2,
+  "diversity_score": 1,
+  "report_hash": "8ca97cdbd945d935a2c161cf701ab2808a3b737857152063c69075c69b70c5d1",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

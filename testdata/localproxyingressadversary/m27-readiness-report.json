@@ -1,0 +1,17 @@
+{
+  "version": "localproxyingressadv-v1",
+  "review_id": "localproxyingress_m27_readiness_v1",
+  "categories_checked": 10,
+  "descriptor_abuse_passed": true,
+  "lifecycle_hardening_passed": true,
+  "pressure_hardening_passed": true,
+  "reset_error_passed": true,
+  "collapse_resistance_passed": true,
+  "parity_passed": true,
+  "trace_hygiene_passed": true,
+  "go_no_go_decision": "go_for_local_proxy_egress_model",
+  "recommended_next_milestone": "M27: local proxy egress and relay bridge model",
+  "report_hash": "7c65e1a5cc2e9723f2f7868ad00b96e6e513c16d62d3ce29edefcd356a63de67",
+  "payload_logged": false,
+  "secret_logged": false
+}
