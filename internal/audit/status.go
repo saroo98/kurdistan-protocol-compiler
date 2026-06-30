@@ -122,6 +122,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "carrier_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "security_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "runtime_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "hostdetect_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -141,6 +142,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `bytepath_fixture_generated_backend_parity`: `%s`\n", summary.BytePathFixtureParity)
 			fmt.Fprintf(&b, "- `wirefeatures_generated_backend_parity`: `%s`\n", summary.WireFeaturesGeneratedParity)
 			fmt.Fprintf(&b, "- `wiregen_generated_backend_parity`: `%s`\n", summary.WireGenGeneratedParity)
+			fmt.Fprintf(&b, "- `hostdetect_generated_backend_parity`: `%s`\n", summary.HostDetectGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}

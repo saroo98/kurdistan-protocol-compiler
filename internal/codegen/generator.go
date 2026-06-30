@@ -1081,6 +1081,38 @@ func GeneratedWireEvalJSONL(ctx context.Context) ([]byte, error) {
 		return nil, err
 	}
 
+	hostDetectSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/hostdetect"
+)
+
+const HostDetectSchemaVersion = "hostdetect-v1"
+const HostDetectGeneratedProfileID = %[1]s
+const HostDetectAssignmentMode = hostdetect.AssignControlCollapsed
+const HostDetectWindow = hostdetect.WindowMedium
+const HostDetectHostCount = 6
+
+var HostDetectForbiddenMarkers = []string{"raw_payload", "raw_bytes", "encoded_bytes", "decoded_bytes", "destination_address", "secret"}
+
+func GeneratedHostDetectSummary(ctx context.Context) (hostdetect.HostDetectSummary, error) {
+	dataset, err := GeneratedWireEvalDataset(ctx)
+	if err != nil {
+		return hostdetect.HostDetectSummary{}, err
+	}
+	return hostdetect.Run(dataset, hostdetect.BuildOptions{
+		AssignmentMode: HostDetectAssignmentMode,
+		Window: HostDetectWindow,
+		HostCount: HostDetectHostCount,
+	})
+}
+`, quote(p.ID))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2515,6 +2547,97 @@ func TestGeneratedWireEvalParity(t *testing.T) {
 		return nil, err
 	}
 
+	hostDetectTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/hostdetect"
+)
+
+func TestGeneratedHostDetectSummary(t *testing.T) {
+	if HostDetectSchemaVersion != "hostdetect-v1" || HostDetectGeneratedProfileID != ProfileID {
+		t.Fatalf("generated hostdetect constants drifted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	summary, err := GeneratedHostDetectSummary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hostdetect.ValidateSummary(summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.ObservationSet.ObservationCount == 0 || summary.PayloadLogged || summary.SecretLogged {
+		t.Fatalf("generated hostdetect summary unsafe or empty: %%+v", summary.ObservationSet)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	hostDetectParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"kurdistan/internal/hostdetect"
+)
+
+func TestGeneratedHostDetectParity(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	summary, err := GeneratedHostDetectSummary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := hostdetect.CompareObservationSets(summary.ObservationSet, summary.ObservationSet)
+	if report.Conclusion != "passed" || report.Changed != 0 || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated hostdetect self parity failed: %%+v", report)
+	}
+	if summary.Detection.ControlHostsFlagged == 0 || !summary.Resistance.ControlCollapseDetected {
+		t.Fatalf("generated hostdetect controls not detected: %%+v", summary)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	hostDetectHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/hostdetect"
+)
+
+func TestGeneratedHostDetectHygiene(t *testing.T) {
+	if err := hostdetect.ScanForLeak(map[string]string{"synthetic_host_id": "host_1", "safe_bucket": "small"}); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "x"},
+		{"encoded_bytes": "x"},
+		{"destination_address": "127.0.0.1"},
+		{"secret": "x"},
+	}
+	for _, tc := range unsafeCases {
+		if err := hostdetect.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe hostdetect field accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -2844,6 +2967,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/wirefeatures_generated.go", Content: wireFeaturesSource, Go: true},
 		{RelPath: "protocol/wiregen_generated.go", Content: wireGenSource, Go: true},
 		{RelPath: "protocol/wireeval_generated.go", Content: wireEvalSource, Go: true},
+		{RelPath: "protocol/hostdetect_generated.go", Content: hostDetectSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -2876,6 +3000,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/wireeval_test.go", Content: wireEvalTestSource, Go: true},
 		{RelPath: "protocol/wireeval_export_test.go", Content: wireEvalExportTestSource, Go: true},
 		{RelPath: "protocol/wireeval_parity_test.go", Content: wireEvalParityTestSource, Go: true},
+		{RelPath: "protocol/hostdetect_test.go", Content: hostDetectTestSource, Go: true},
+		{RelPath: "protocol/hostdetect_parity_test.go", Content: hostDetectParityTestSource, Go: true},
+		{RelPath: "protocol/hostdetect_hygiene_test.go", Content: hostDetectHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},

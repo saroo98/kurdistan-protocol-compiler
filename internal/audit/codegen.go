@@ -98,6 +98,7 @@ type CodegenAuditSummary struct {
 	BytePathFixtureParity        string                         `json:"bytepath_fixture_generated_backend_parity"`
 	WireFeaturesGeneratedParity  string                         `json:"wirefeatures_generated_backend_parity"`
 	WireGenGeneratedParity       string                         `json:"wiregen_generated_backend_parity"`
+	HostDetectGeneratedParity    string                         `json:"hostdetect_generated_backend_parity"`
 	SourceScanner                string                         `json:"source_scanner"`
 	InterpretedVsGenerated       InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                   codegen.SourceScanReport       `json:"source_scan"`
@@ -185,6 +186,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	bytePathFixtureGate := GeneratedBytePathFixtureParityGate(corpus, testFailures)
 	wireFeaturesGate := WireFeaturesGeneratedBackendParityGate()
 	wireGenGate := WireGenGeneratedBackendParityGate()
+	hostDetectGate := HostDetectGeneratedBackendParityGate()
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -212,6 +214,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		bytePathFixtureGate,
 		wireFeaturesGate,
 		wireGenGate,
+		hostDetectGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -797,6 +800,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		BytePathFixtureParity:        status("bytepath_fixture_generated_backend_parity"),
 		WireFeaturesGeneratedParity:  status("wirefeatures_generated_backend_parity"),
 		WireGenGeneratedParity:       status("wiregen_generated_backend_parity"),
+		HostDetectGeneratedParity:    status("hostdetect_generated_backend_parity"),
 		SourceScanner:                status("generated_source_scanner"),
 		InterpretedVsGenerated:       divergenceSummary(corpus),
 		SourceScan:                   corpus.SourceScan,
