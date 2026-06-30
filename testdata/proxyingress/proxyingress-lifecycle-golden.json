@@ -1,0 +1,110 @@
+[
+  {
+    "event_id": "ingress_lifecycle_000",
+    "request_id": "req_connect_alpha",
+    "old_state": "created",
+    "new_state": "validated",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_001",
+    "request_id": "req_connect_alpha",
+    "old_state": "validated",
+    "new_state": "mapped",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_002",
+    "request_id": "req_connect_alpha",
+    "old_state": "mapped",
+    "new_state": "accepted",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_003",
+    "request_id": "req_connect_alpha",
+    "old_state": "accepted",
+    "new_state": "closed",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_004",
+    "request_id": "req_assoc_beta",
+    "old_state": "created",
+    "new_state": "validated",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_005",
+    "request_id": "req_assoc_beta",
+    "old_state": "validated",
+    "new_state": "mapped",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_006",
+    "request_id": "req_assoc_beta",
+    "old_state": "mapped",
+    "new_state": "accepted",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_007",
+    "request_id": "req_assoc_beta",
+    "old_state": "accepted",
+    "new_state": "closed",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_008",
+    "request_id": "req_opaque_gamma",
+    "old_state": "created",
+    "new_state": "validated",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_009",
+    "request_id": "req_opaque_gamma",
+    "old_state": "validated",
+    "new_state": "mapped",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_010",
+    "request_id": "req_opaque_gamma",
+    "old_state": "mapped",
+    "new_state": "accepted",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "event_id": "ingress_lifecycle_011",
+    "request_id": "req_opaque_gamma",
+    "old_state": "accepted",
+    "new_state": "closed",
+    "reason_bucket": "happy_path",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

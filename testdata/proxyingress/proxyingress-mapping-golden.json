@@ -1,0 +1,53 @@
+[
+  {
+    "request_id": "req_connect_alpha",
+    "stream_class": "interactive",
+    "open_intent": "open_stream",
+    "target_descriptor_intent": "target_descriptor:synthetic_name",
+    "data_intent": "target_data:bucket_4k",
+    "close_intent": "target_close",
+    "reset_intent": "target_reset",
+    "error_intent": "target_error",
+    "backpressure_intent": "pressure_runtime",
+    "requires_secure_context": true,
+    "requires_replay_window": true,
+    "requires_trace_hygiene": true,
+    "mapping_hash": "812c429787a4b2768fa24bb4443321f1e8fe6ce119f1b09643ff30e412445da8",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "request_id": "req_assoc_beta",
+    "stream_class": "bulk",
+    "open_intent": "open_stream",
+    "target_descriptor_intent": "target_descriptor:synthetic_service",
+    "data_intent": "target_data:bucket_64k",
+    "close_intent": "target_close",
+    "reset_intent": "target_reset",
+    "error_intent": "target_error",
+    "backpressure_intent": "pressure_adapter",
+    "requires_secure_context": true,
+    "requires_replay_window": true,
+    "requires_trace_hygiene": true,
+    "mapping_hash": "104164870401e897f2cae927113380ca48a899e8d3fdc990732fb01d6d5c36c9",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "request_id": "req_opaque_gamma",
+    "stream_class": "control",
+    "open_intent": "open_stream",
+    "target_descriptor_intent": "target_descriptor:opaque_descriptor",
+    "data_intent": "target_data:bucket_16k",
+    "close_intent": "target_close",
+    "reset_intent": "target_reset",
+    "error_intent": "target_error",
+    "backpressure_intent": "pressure_carrier",
+    "requires_secure_context": true,
+    "requires_replay_window": true,
+    "requires_trace_hygiene": true,
+    "mapping_hash": "ab9410c936325894f598e97c1d584baecb73706c7a2f5fa4b4c78b651b28eb2d",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

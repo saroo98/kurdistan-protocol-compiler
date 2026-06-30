@@ -1,0 +1,48 @@
+{
+  "version": "proxyingress-v1",
+  "contract_id": "proxyingress_contract_v1",
+  "supported_kinds": [
+    "synthetic_connect",
+    "synthetic_associate",
+    "synthetic_bind"
+  ],
+  "supported_target_kinds": [
+    "synthetic_name",
+    "synthetic_service",
+    "opaque_descriptor"
+  ],
+  "limits": {
+    "max_concurrent_requests": 16,
+    "max_request_bytes_bucket": "bucket_64k",
+    "max_target_descriptor_bytes": 256,
+    "max_metadata_fields": 8,
+    "max_pending_streams": 16,
+    "max_failure_records": 64
+  },
+  "required_capabilities": [
+    "stream_open",
+    "stream_data",
+    "stream_close",
+    "stream_reset",
+    "backpressure",
+    "target_descriptor",
+    "target_error",
+    "target_reset",
+    "target_close",
+    "secure_context_required",
+    "replay_rejection_required",
+    "trace_hygiene_required",
+    "bounded_queue_required"
+  ],
+  "forbidden_behaviors": [
+    "network_address_rejected",
+    "lookup_rejected",
+    "listener_rejected",
+    "raw_content_rejected",
+    "sensitive_material_rejected",
+    "provider_metadata_rejected"
+  ],
+  "contract_hash": "7e7e4604b987f0bd8548ad29d3595e7ce5cb0bf0514b7805ba27ae92e66f0b8f",
+  "payload_logged": false,
+  "secret_logged": false
+}
