@@ -1,0 +1,20 @@
+{
+  "version": "hostdetect-v1",
+  "host_count": 9,
+  "generated_host_count": 6,
+  "observation_count": 72,
+  "avg_observations_per_host": 8,
+  "avg_unique_feature_hashes": 7.555555555555555,
+  "avg_unique_first_n_shapes": 3.888888888888889,
+  "avg_consistency_score": 0.5607407407407408,
+  "avg_rotation_score": 0.43925925925925924,
+  "high_risk_generated_hosts": 0,
+  "control_collapse_detected": true,
+  "padding_only_detected": true,
+  "recommended_next_actions": [
+    "continue_host_rotation_metric_tracking"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
