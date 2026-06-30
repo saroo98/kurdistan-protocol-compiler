@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/proxyingressreview"
@@ -1280,6 +1281,61 @@ func GeneratedLocalProxyIngressAdversarialReadiness(ctx context.Context) (localp
 	return set.Readiness, nil
 }
 `, quote(localproxyingressadversary.Version), quote(p.ID), quote(localproxyingressadversary.CorpusID), quoteSlice(localproxyingressadversary.RequiredScenarioIDs()), quoteSlice(localProxyIngressAdvDescriptorClasses), quoteSlice(localproxyingressadversary.LifecycleAbuseScenarios()), quoteSlice(localproxyingressadversary.PressureScenarios()), quoteSlice(localproxyingressadversary.ResetErrorScenarios()))
+	if err != nil {
+		return nil, err
+	}
+
+	adaptivePathSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/adaptivepath"
+)
+
+const AdaptivePathSchemaVersion = %[1]s
+const AdaptivePathGeneratedProfileID = %[2]s
+const AdaptivePathGeneratedProfileSeed int64 = %[3]d
+
+var AdaptivePathCandidateFamilies = %[4]s
+var AdaptivePathConditionClasses = %[5]s
+var AdaptivePathObservationKinds = %[6]s
+var AdaptivePathFreshnessClasses = %[7]s
+var AdaptivePathTTLClasses = %[8]s
+var AdaptivePathUncertaintyBuckets = %[9]s
+var AdaptivePathViabilityStates = %[10]s
+var AdaptivePathHighRiskFamilies = %[11]s
+var AdaptivePathGatedFamilies = %[12]s
+var AdaptivePathForbiddenFields = %[13]s
+
+func GeneratedAdaptivePathFixtureSet(ctx context.Context) (adaptivepath.AdaptivePathFixtureSet, error) {
+	return adaptivepath.GenerateFixtureSet(ctx)
+}
+
+func GeneratedAdaptivePathDecisionSet(ctx context.Context) (adaptivepath.CandidateDecisionSet, error) {
+	set, err := adaptivepath.GenerateFixtureSet(ctx)
+	if err != nil {
+		return adaptivepath.CandidateDecisionSet{}, err
+	}
+	return set.DecisionInputs, nil
+}
+
+func GeneratedAdaptivePathParity(ctx context.Context) (adaptivepath.AdaptivePathParityReport, error) {
+	set, err := adaptivepath.GenerateFixtureSet(ctx)
+	if err != nil {
+		return adaptivepath.AdaptivePathParityReport{}, err
+	}
+	return set.Parity, nil
+}
+
+func GeneratedAdaptivePathMisuse(ctx context.Context) (adaptivepath.AdaptivePathMisuseReport, error) {
+	set, err := adaptivepath.GenerateFixtureSet(ctx)
+	if err != nil {
+		return adaptivepath.AdaptivePathMisuseReport{}, err
+	}
+	return set.MisuseReport, nil
+}
+`, quote(string(adaptivepath.Version)), quote(p.ID), p.Seed, quoteSlice(adaptivePathCandidateFamilies()), quoteSlice(adaptivePathConditionClasses()), quoteSlice(adaptivePathObservationKinds()), quoteSlice(adaptivePathFreshnessClasses()), quoteSlice(adaptivePathTTLClasses()), quoteSlice(adaptivePathUncertaintyBuckets()), quoteSlice(adaptivePathViabilityStates()), quoteSlice(adaptivePathHighRiskFamilies()), quoteSlice(adaptivePathGatedFamilies()), quoteSlice(adaptivepath.ForbiddenMarkers()))
 	if err != nil {
 		return nil, err
 	}
@@ -3180,6 +3236,108 @@ func TestGeneratedLocalProxyIngressAdversarialHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	adaptivePathTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/adaptivepath"
+)
+
+func TestGeneratedAdaptivePathFixtureSet(t *testing.T) {
+	if AdaptivePathSchemaVersion != string(adaptivepath.Version) || AdaptivePathGeneratedProfileID != ProfileID {
+		t.Fatalf("generated adaptive path constants drifted")
+	}
+	set, err := GeneratedAdaptivePathFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := adaptivepath.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(AdaptivePathCandidateFamilies) != len(set.Families) || len(AdaptivePathConditionClasses) != len(set.Conditions) {
+		t.Fatalf("generated adaptive path taxonomy markers drifted")
+	}
+	if set.PayloadLogged || set.SecretLogged {
+		t.Fatalf("generated adaptive path fixture leaked sensitive flags")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	adaptivePathParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/adaptivepath"
+)
+
+func TestGeneratedAdaptivePathParity(t *testing.T) {
+	report, err := GeneratedAdaptivePathParity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Conclusion != "passed" || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated adaptive path parity failed: %%+v", report)
+	}
+	set, err := GeneratedAdaptivePathFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adaptivepath.CompareFixtureSets(set, set).Conclusion != "passed" {
+		t.Fatalf("generated adaptive path fixture self-compare failed")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	adaptivePathHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/adaptivepath"
+)
+
+func TestGeneratedAdaptivePathHygiene(t *testing.T) {
+	set, err := GeneratedAdaptivePathFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := adaptivepath.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range AdaptivePathForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty adaptive path forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"payload": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := adaptivepath.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe adaptive path metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3514,6 +3672,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/proxyingress_generated.go", Content: proxyIngressSource, Go: true},
 		{RelPath: "protocol/localproxyingress_generated.go", Content: localProxyIngressSource, Go: true},
 		{RelPath: "protocol/localproxyingressadv_generated.go", Content: localProxyIngressAdvSource, Go: true},
+		{RelPath: "protocol/adaptivepath_generated.go", Content: adaptivePathSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3561,6 +3720,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyingressadv_test.go", Content: localProxyIngressAdvTestSource, Go: true},
 		{RelPath: "protocol/localproxyingressadv_parity_test.go", Content: localProxyIngressAdvParityTestSource, Go: true},
 		{RelPath: "protocol/localproxyingressadv_hygiene_test.go", Content: localProxyIngressAdvHygieneTestSource, Go: true},
+		{RelPath: "protocol/adaptivepath_test.go", Content: adaptivePathTestSource, Go: true},
+		{RelPath: "protocol/adaptivepath_parity_test.go", Content: adaptivePathParityTestSource, Go: true},
+		{RelPath: "protocol/adaptivepath_hygiene_test.go", Content: adaptivePathHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -3928,6 +4090,84 @@ func localProxyIngressAdversarialDescriptorClasses(cases []localproxyingressadve
 		classes = append(classes, tc.InputClass)
 	}
 	return classes
+}
+
+func adaptivePathCandidateFamilies() []string {
+	out := []string{}
+	for _, desc := range adaptivepath.FamilyDescriptors() {
+		out = append(out, string(desc.Family))
+	}
+	return out
+}
+
+func adaptivePathConditionClasses() []string {
+	out := []string{}
+	for _, condition := range adaptivepath.DefaultConditions() {
+		out = append(out, condition.ConditionClass)
+	}
+	return out
+}
+
+func adaptivePathObservationKinds() []string {
+	return []string{
+		string(adaptivepath.ObservationHandshakeOK),
+		string(adaptivepath.ObservationHandshakeFailed),
+		string(adaptivepath.ObservationFirstUsefulByteOK),
+		string(adaptivepath.ObservationStallAfterHandshake),
+		string(adaptivepath.ObservationStallAfterData),
+		string(adaptivepath.ObservationResetLikeFailure),
+		string(adaptivepath.ObservationBlackholeLikeFailure),
+		string(adaptivepath.ObservationPoisoningLikeSignal),
+		string(adaptivepath.ObservationTruncationLikeSignal),
+		string(adaptivepath.ObservationRelayBurnRisk),
+		string(adaptivepath.ObservationShortSuccess),
+		string(adaptivepath.ObservationShortFailure),
+	}
+}
+
+func adaptivePathFreshnessClasses() []string {
+	return []string{adaptivepath.FreshSeconds, adaptivepath.FreshShort, adaptivepath.StaleShort, adaptivepath.StaleMedium, adaptivepath.Expired, adaptivepath.FreshUnknown}
+}
+
+func adaptivePathTTLClasses() []string {
+	return []string{adaptivepath.TTLSeconds, adaptivepath.TTLOneMinute, adaptivepath.TTLFiveMinutes, adaptivepath.TTLShortSession, adaptivepath.TTLExpired}
+}
+
+func adaptivePathUncertaintyBuckets() []string {
+	return []string{adaptivepath.LowUncertainty, adaptivepath.MediumUncertainty, adaptivepath.HighUncertainty, adaptivepath.UnknownUncertainty}
+}
+
+func adaptivePathViabilityStates() []string {
+	return []string{
+		string(adaptivepath.CandidateUnknown),
+		string(adaptivepath.CandidateLikelyUsable),
+		string(adaptivepath.CandidateDegraded),
+		string(adaptivepath.CandidateUnstable),
+		string(adaptivepath.CandidateBlocked),
+		string(adaptivepath.CandidateBurned),
+		string(adaptivepath.CandidateQuarantined),
+		string(adaptivepath.CandidateRejected),
+	}
+}
+
+func adaptivePathHighRiskFamilies() []string {
+	out := []string{}
+	for _, desc := range adaptivepath.FamilyDescriptors() {
+		if desc.HighRisk {
+			out = append(out, string(desc.Family))
+		}
+	}
+	return out
+}
+
+func adaptivePathGatedFamilies() []string {
+	out := []string{}
+	for _, desc := range adaptivepath.FamilyDescriptors() {
+		if desc.Gated {
+			out = append(out, string(desc.Family))
+		}
+	}
+	return out
 }
 
 func findRepoRoot() (string, error) {
