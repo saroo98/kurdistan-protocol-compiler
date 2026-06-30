@@ -191,6 +191,19 @@ const (
 	ModeLocalProxyIngressAdvPayloadLeak             = "localproxyingressadv_payload_leak"
 	ModeLocalProxyIngressAdvSecretLeak              = "localproxyingressadv_secret_leak"
 	ModeLocalProxyIngressAdvGeneratedBackendDrift   = "localproxyingressadv_generated_backend_drift"
+	ModeAdaptivePathAllCandidatesSameFamily         = "adaptivepath_all_candidates_same_family"
+	ModeAdaptivePathStaleSuccessIsFresh             = "adaptivepath_stale_success_is_fresh"
+	ModeAdaptivePathIgnoresRecentFailure            = "adaptivepath_ignores_recent_failure"
+	ModeAdaptivePathIgnoresRelayBurn                = "adaptivepath_ignores_relay_burn"
+	ModeAdaptivePathIgnoresDNSPoisoning             = "adaptivepath_ignores_dns_poisoning"
+	ModeAdaptivePathIgnoresTCPBlackhole             = "adaptivepath_ignores_tcp_blackhole"
+	ModeAdaptivePathIgnoresUDPBlock                 = "adaptivepath_ignores_udp_block"
+	ModeAdaptivePathHighRiskDefaultEligible         = "adaptivepath_high_risk_default_eligible"
+	ModeAdaptivePathUnknownMarkedUsable             = "adaptivepath_unknown_marked_usable"
+	ModeAdaptivePathEndpointLeak                    = "adaptivepath_endpoint_leak"
+	ModeAdaptivePathPayloadLeak                     = "adaptivepath_payload_leak"
+	ModeAdaptivePathSecretLeak                      = "adaptivepath_secret_leak"
+	ModeAdaptivePathGeneratedBackendDrift           = "adaptivepath_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -368,6 +381,19 @@ func Modes() []string {
 		ModeLocalProxyIngressAdvPayloadLeak,
 		ModeLocalProxyIngressAdvSecretLeak,
 		ModeLocalProxyIngressAdvGeneratedBackendDrift,
+		ModeAdaptivePathAllCandidatesSameFamily,
+		ModeAdaptivePathStaleSuccessIsFresh,
+		ModeAdaptivePathIgnoresRecentFailure,
+		ModeAdaptivePathIgnoresRelayBurn,
+		ModeAdaptivePathIgnoresDNSPoisoning,
+		ModeAdaptivePathIgnoresTCPBlackhole,
+		ModeAdaptivePathIgnoresUDPBlock,
+		ModeAdaptivePathHighRiskDefaultEligible,
+		ModeAdaptivePathUnknownMarkedUsable,
+		ModeAdaptivePathEndpointLeak,
+		ModeAdaptivePathPayloadLeak,
+		ModeAdaptivePathSecretLeak,
+		ModeAdaptivePathGeneratedBackendDrift,
 	}
 }
 
