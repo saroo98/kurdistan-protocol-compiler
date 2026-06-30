@@ -1,0 +1,143 @@
+[
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_balanced_adaptive_12345",
+    "mode": "balanced_adaptive",
+    "bundle_seed": 12345,
+    "candidate_count": 6,
+    "required_families": [
+      "https_like_tcp",
+      "dns_survival",
+      "experimental_udp_quic",
+      "relay_rotation"
+    ],
+    "optional_families": [
+      "baseline_control"
+    ],
+    "max_candidates_per_family": 2,
+    "min_unique_profile_seeds": 3,
+    "min_unique_wire_policy_hashes": 3,
+    "allow_high_risk_candidates": false,
+    "allow_experimental_candidates": true,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "bdc718672bd862c324d513a508423ed2cdee716b8734361daffe499bb397dc86",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_conservative_tcp_12345",
+    "mode": "conservative_tcp",
+    "bundle_seed": 12345,
+    "candidate_count": 5,
+    "required_families": [
+      "https_like_tcp",
+      "relay_rotation"
+    ],
+    "optional_families": [
+      "baseline_control"
+    ],
+    "max_candidates_per_family": 2,
+    "min_unique_profile_seeds": 3,
+    "min_unique_wire_policy_hashes": 3,
+    "allow_high_risk_candidates": false,
+    "allow_experimental_candidates": false,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "8293ce4f2c8707c76ecc2d6a43f3d47edc818094bc25fcb33ea9f575a760a6d5",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_survival_dns_12345",
+    "mode": "survival_dns",
+    "bundle_seed": 12345,
+    "candidate_count": 5,
+    "required_families": [
+      "dns_survival",
+      "https_like_tcp",
+      "relay_rotation"
+    ],
+    "max_candidates_per_family": 2,
+    "min_unique_profile_seeds": 3,
+    "min_unique_wire_policy_hashes": 3,
+    "allow_high_risk_candidates": false,
+    "allow_experimental_candidates": false,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "010abc33d83e7c7293102ba75fc1f629a31083d2a31460abc5bbee291ba7ef08",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_experimental_mix_12345",
+    "mode": "experimental_mix",
+    "bundle_seed": 12345,
+    "candidate_count": 5,
+    "required_families": [
+      "experimental_udp_quic",
+      "https_like_tcp",
+      "relay_rotation"
+    ],
+    "max_candidates_per_family": 2,
+    "min_unique_profile_seeds": 3,
+    "min_unique_wire_policy_hashes": 3,
+    "allow_high_risk_candidates": false,
+    "allow_experimental_candidates": true,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "be3a3323f2c95f057e714b2743f12ecd9d8f3ee908adb039907c9bc173c1ac39",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_high_risk_review_12345",
+    "mode": "high_risk_review",
+    "bundle_seed": 12345,
+    "candidate_count": 4,
+    "required_families": [
+      "domestic_media_risk",
+      "https_like_tcp"
+    ],
+    "max_candidates_per_family": 2,
+    "min_unique_profile_seeds": 3,
+    "min_unique_wire_policy_hashes": 3,
+    "allow_high_risk_candidates": true,
+    "allow_experimental_candidates": false,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "617844d17d12cad0f0de3322f1999472e44c800b67fecbb5ed0ce5a10ee6eeca",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "version": "transportbundle-v1",
+    "policy_id": "bundle_policy_control_collapsed_12345",
+    "mode": "control_collapsed",
+    "bundle_seed": 12345,
+    "candidate_count": 5,
+    "required_families": [
+      "collapsed_control"
+    ],
+    "max_candidates_per_family": 99,
+    "min_unique_profile_seeds": 1,
+    "min_unique_wire_policy_hashes": 1,
+    "allow_high_risk_candidates": false,
+    "allow_experimental_candidates": false,
+    "require_relay_risk_metadata": true,
+    "require_freshness_metadata": true,
+    "require_fallback_hints": true,
+    "policy_hash": "92ce1f5f156cfafbfd5f5e25ba8b5c98a4f244bc5dec484bdee34f6a47435b89",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

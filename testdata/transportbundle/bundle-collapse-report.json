@@ -1,0 +1,14 @@
+{
+  "bundle_id": "bundle_balanced_adaptive_12345",
+  "candidate_count": 6,
+  "unique_families": 5,
+  "unique_profile_seeds": 6,
+  "unique_wire_policy_hashes": 6,
+  "primary_eligible_candidates": 2,
+  "high_risk_candidates": 0,
+  "experimental_candidates": 1,
+  "diversity_score": 0.9444444444444444,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
