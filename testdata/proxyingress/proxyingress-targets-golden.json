@@ -1,0 +1,38 @@
+[
+  {
+    "target_kind": "synthetic_name",
+    "descriptor_id": "target_alpha",
+    "service_class": "service_echo",
+    "port_class": "port_class_small",
+    "name_class": "name_alpha",
+    "address_class": "loopback_class",
+    "metadata_class": "meta_basic",
+    "opaque_hash": "dcfc1628abce20aaaecd86637f300236bf939a779f1141353b540aa424881b39",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "target_kind": "synthetic_service",
+    "descriptor_id": "service_echo",
+    "service_class": "service_echo",
+    "port_class": "port_class_medium",
+    "name_class": "name_beta",
+    "address_class": "private_lab_class",
+    "metadata_class": "meta_control",
+    "opaque_hash": "fe7d7babcdc8edc7e68c30f0e548686b0bbd2039e3277a7c7eef5799c9975ac0",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "target_kind": "opaque_descriptor",
+    "descriptor_id": "opaque_target_001",
+    "service_class": "service_opaque",
+    "port_class": "port_class_control",
+    "name_class": "name_gamma",
+    "address_class": "opaque_descriptor",
+    "metadata_class": "meta_opaque",
+    "opaque_hash": "2255802aab22fbee1a44f61fab04e3a7cd4f475043d0663196ee2e72696c1cd4",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]
