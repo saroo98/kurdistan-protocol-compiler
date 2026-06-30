@@ -17,7 +17,11 @@ import (
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
@@ -84,6 +88,12 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "relayfleet" {
 		os.Exit(runRelayFleet(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "proxyingress" {
+		os.Exit(runProxyIngress(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "localproxyingress" {
+		os.Exit(runLocalProxyIngress(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -1781,6 +1791,336 @@ func writeRelayFleetCompanions(out string, summary relayfleet.RelayFleetSummary,
 		if !force {
 			if _, err := os.Stat(path); err == nil {
 				return relayfleet.ErrRefuseOverwrite
+			}
+		}
+		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runProxyIngress(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runProxyIngressGenerate(args[1:])
+		case "verify":
+			return runProxyIngressVerify(args[1:])
+		case "compare":
+			return runProxyIngressCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck proxyingress", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick proxy ingress audit")
+	full := flags.Bool("full", false, "run full proxy ingress audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	report, err := audit.RunProxyIngressAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(*out, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runProxyIngressGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyingress generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "proxyingress", "proxyingress-contract-golden.json"), "proxy ingress contract fixture path")
+	force := flags.Bool("force", false, "overwrite existing fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := proxyingress.GoldenFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := proxyingress.WriteContract(*out, set.Contract, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeProxyIngressCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote proxyingress fixtures: %s (%d requests)\n", *out, len(set.Requests))
+	return 0
+}
+
+func runProxyIngressVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyingress verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "proxyingress", "proxyingress-contract-golden.json"), "proxy ingress contract fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	report, err := proxyingress.VerifyContract(context.Background(), *baseline)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runProxyIngressCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyingress compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old proxyingress contract path")
+	newPath := flags.String("new", "", "new proxyingress contract path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldContract, err := proxyingress.LoadContract(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newContract, err := proxyingress.LoadContract(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := proxyingress.CompareContractsOnly(oldContract, newContract)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeProxyIngressCompanions(out string, set proxyingress.ProxyIngressFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	review, misuse, parity, err := proxyingressreview.GenerateGoldenReview()
+	if err != nil {
+		return err
+	}
+	writes := []struct {
+		name string
+		raw  []byte
+	}{
+		{"proxyingress-requests-golden.json", mustJSON(set.Requests)},
+		{"proxyingress-targets-golden.json", mustJSON(set.Targets)},
+		{"proxyingress-mapping-golden.json", mustJSON(set.Mappings)},
+		{"proxyingress-lifecycle-golden.json", mustJSON(set.Lifecycle)},
+		{"proxyingress-design-review.json", mustJSON(review)},
+		{"failure-mode-matrix.json", mustJSON(review.FailureModes)},
+		{"proxyingress-controls.json", mustJSON(map[string]any{"misuse": misuse, "parity": parity})},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return proxyingress.ErrRefuseOverwrite
+			}
+		}
+		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalProxyIngress(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalProxyIngressGenerate(args[1:])
+		case "verify":
+			return runLocalProxyIngressVerify(args[1:])
+		case "compare":
+			return runLocalProxyIngressCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localproxyingress", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local proxy ingress audit")
+	full := flags.Bool("full", false, "run full local proxy ingress audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	report, err := audit.RunLocalProxyIngressAudit(context.Background(), audit.DefaultConfig(mode))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(*out, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyIngressGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingress generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localproxyingress", "localproxyingress-summary-golden.json"), "local proxy ingress fixture path")
+	force := flags.Bool("force", false, "overwrite fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localproxyingress.GenerateFixtureSet(context.Background(), localproxyingress.FullScenarios())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localproxyingress.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalProxyIngressCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localproxyingress fixtures: %s (%d scenarios)\n", *out, len(set.Summaries))
+	return 0
+}
+
+func runLocalProxyIngressVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingress verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localproxyingress", "localproxyingress-summary-golden.json"), "local proxy ingress fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localproxyingress.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyingress.GenerateFixtureSet(context.Background(), oldSet.Scenarios)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyingress.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyIngressCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyingress compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local proxy ingress fixture path")
+	newPath := flags.String("new", "", "new local proxy ingress fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localproxyingress.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyingress.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyingress.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalProxyIngressCompanions(out string, set localproxyingress.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	adversaryRuns := []localproxyingressadversary.ScenarioRun{}
+	for _, scenario := range localproxyingressadversary.FullScenarios() {
+		adversaryRuns = append(adversaryRuns, localproxyingressadversary.RunScenario(context.Background(), scenario))
+	}
+	writes := []struct {
+		name string
+		raw  []byte
+	}{
+		{"localproxyingress-scenarios-golden.json", mustJSON(set.Scenarios)},
+		{"localproxyingress-backpressure.json", mustJSON(set.Backpressure)},
+		{"localproxyingress-error-reset.json", mustJSON(set.ErrorReset)},
+		{"localproxyingress-collapse-report.json", mustJSON(localproxyingressadversary.RunAll(adversaryRuns))},
+		{"localproxyingress-controls.json", mustJSON(adversaryRuns)},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return localproxyingress.ErrRefuseOverwrite
 			}
 		}
 		if err := os.WriteFile(path, write.raw, 0o600); err != nil {
