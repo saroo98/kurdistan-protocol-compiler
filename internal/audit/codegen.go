@@ -99,6 +99,7 @@ type CodegenAuditSummary struct {
 	WireFeaturesGeneratedParity  string                         `json:"wirefeatures_generated_backend_parity"`
 	WireGenGeneratedParity       string                         `json:"wiregen_generated_backend_parity"`
 	HostDetectGeneratedParity    string                         `json:"hostdetect_generated_backend_parity"`
+	RelayFleetGeneratedParity    string                         `json:"relayfleet_generated_backend_parity"`
 	SourceScanner                string                         `json:"source_scanner"`
 	InterpretedVsGenerated       InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                   codegen.SourceScanReport       `json:"source_scan"`
@@ -187,6 +188,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	wireFeaturesGate := WireFeaturesGeneratedBackendParityGate()
 	wireGenGate := WireGenGeneratedBackendParityGate()
 	hostDetectGate := HostDetectGeneratedBackendParityGate()
+	relayFleetGate := RelayFleetGeneratedBackendParityGate()
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -215,6 +217,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		wireFeaturesGate,
 		wireGenGate,
 		hostDetectGate,
+		relayFleetGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -801,6 +804,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		WireFeaturesGeneratedParity:  status("wirefeatures_generated_backend_parity"),
 		WireGenGeneratedParity:       status("wiregen_generated_backend_parity"),
 		HostDetectGeneratedParity:    status("hostdetect_generated_backend_parity"),
+		RelayFleetGeneratedParity:    status("relayfleet_generated_backend_parity"),
 		SourceScanner:                status("generated_source_scanner"),
 		InterpretedVsGenerated:       divergenceSummary(corpus),
 		SourceScan:                   corpus.SourceScan,
