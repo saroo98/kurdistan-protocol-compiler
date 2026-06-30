@@ -12,6 +12,7 @@ import (
 	"kurdistan/internal/compiler"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/framing"
+	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/protocorpus"
@@ -266,6 +267,19 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		splits := wireeval.BuildSplitManifest(dataset.Records, wireeval.DefaultSplitMode())
 		if !splits.Passed || splits.SplitCounts["train"] == 0 || splits.SplitCounts["test"] == 0 || splits.SplitCounts["ood"] == 0 {
 			return fmt.Errorf("wireeval split manifest failed")
+		}
+		return nil
+	}))
+	results = append(results, check("hostdetect_observation_controls_validate", CategoryInvariants, func() error {
+		summary, err := hostdetect.GenerateGoldenSummary(context.Background())
+		if err != nil {
+			return err
+		}
+		if err := hostdetect.ValidateSummary(summary); err != nil {
+			return err
+		}
+		if summary.Detection.ControlHostsFlagged == 0 || !summary.Resistance.ControlCollapseDetected || !summary.Resistance.PaddingOnlyDetected {
+			return fmt.Errorf("hostdetect controls not detected")
 		}
 		return nil
 	}))
