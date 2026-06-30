@@ -160,4 +160,4 @@ This milestone does not train classifiers, consume PCAPs, capture live traffic, 
 
 ## Next Milestone
 
-Milestone 22 should evaluate host-based detection risk: repeated synthetic observations against the same destination identity can reveal consistency that is not visible in single-flow records.
+Milestone 22 is documented in [KIP-0028](KIP-0028-host-based-detection-resistance.md). It evaluates host-based detection risk: repeated synthetic observations against the same destination identity can reveal consistency that is not visible in single-flow records.
