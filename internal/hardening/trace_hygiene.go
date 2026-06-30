@@ -18,6 +18,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/relayfleet"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/wireeval"
@@ -52,8 +53,22 @@ var forbiddenTraceKeys = []string{
 	"packet_dump",
 	"capture_bytes",
 	"destination_address",
+	"endpoint",
+	"real_host",
 	"proxy_ip",
 	"server_ip",
+	"domain",
+	"sni",
+	"host_header",
+	"url",
+	"ip_address",
+	"cloud_provider",
+	"aws",
+	"gcp",
+	"azure",
+	"region",
+	"instance_id",
+	"credential",
 	"plaintext",
 	"ciphertext",
 	"secret",
@@ -366,6 +381,31 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		for _, tc := range unsafeCases {
 			if err := hostdetect.ScanForLeak(tc); err == nil {
 				return fmt.Errorf("unsafe hostdetect metadata accepted: %v", tc)
+			}
+		}
+		return nil
+	}))
+	results = append(results, check("relayfleet_trace_hygiene", CategoryTraceHygiene, func() error {
+		summary, err := relayfleet.GenerateGoldenSummary(ctx)
+		if err != nil {
+			return err
+		}
+		if err := relayfleet.ScanForLeak(summary); err != nil {
+			return fmt.Errorf("relayfleet summary rejected: %w", err)
+		}
+		if report := ScanValue(summary); !report.Passed {
+			return fmt.Errorf("relayfleet summary failed generic hygiene: %v", report.Findings)
+		}
+		unsafeCases := []map[string]string{
+			{"endpoint": "x"},
+			{"cloud_provider": "x"},
+			{"real_host": "x"},
+			{"raw_payload": "x"},
+			{"secret": "x"},
+		}
+		for _, tc := range unsafeCases {
+			if err := relayfleet.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe relayfleet metadata accepted: %v", tc)
 			}
 		}
 		return nil

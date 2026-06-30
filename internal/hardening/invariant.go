@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxysem"
+	"kurdistan/internal/relayfleet"
 	kstream "kurdistan/internal/stream"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
@@ -280,6 +281,22 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if summary.Detection.ControlHostsFlagged == 0 || !summary.Resistance.ControlCollapseDetected || !summary.Resistance.PaddingOnlyDetected {
 			return fmt.Errorf("hostdetect controls not detected")
+		}
+		return nil
+	}))
+	results = append(results, check("relayfleet_lifecycle_and_risk_validate", CategoryInvariants, func() error {
+		summary, err := relayfleet.GenerateGoldenSummary(context.Background())
+		if err != nil {
+			return err
+		}
+		if err := relayfleet.ValidateSummary(summary); err != nil {
+			return err
+		}
+		if len(summary.ChurnEvents) == 0 || len(summary.MigrationEvents) == 0 {
+			return fmt.Errorf("relayfleet churn or migration events missing")
+		}
+		if summary.BurnRisk.HighRiskRelays+summary.BurnRisk.CriticalRiskRelays == 0 {
+			return fmt.Errorf("relayfleet high-risk controls missing")
 		}
 		return nil
 	}))

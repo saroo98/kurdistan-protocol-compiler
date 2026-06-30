@@ -126,6 +126,17 @@ type Event struct {
 	ByteCorruptionRejectionCount int    `json:"byte_corruption_rejection_count,omitempty"`
 	ByteMalformedRejectionCount  int    `json:"byte_malformed_rejection_count,omitempty"`
 	ByteCloseResetEventBucket    string `json:"byte_close_reset_event_bucket,omitempty"`
+	RelayFleetID                 string `json:"relay_fleet_id,omitempty"`
+	RelayIDBucket                string `json:"relay_id_bucket,omitempty"`
+	RelayLifecycleState          string `json:"relay_lifecycle_state,omitempty"`
+	RelayLifecycleEvent          string `json:"relay_lifecycle_event,omitempty"`
+	RelayClassBucket             string `json:"relay_class_bucket,omitempty"`
+	RelayChurnReasonBucket       string `json:"relay_churn_reason_bucket,omitempty"`
+	RelayMigrationResultBucket   string `json:"relay_migration_result_bucket,omitempty"`
+	RelayBurnRiskBucket          string `json:"relay_burn_risk_bucket,omitempty"`
+	RelayProfileAssignmentBucket string `json:"relay_profile_assignment_bucket,omitempty"`
+	RelayPolicyBucket            string `json:"relay_policy_bucket,omitempty"`
+	RelayCollapseResult          string `json:"relay_collapse_result,omitempty"`
 	Note                         string `json:"note,omitempty"`
 }
 
