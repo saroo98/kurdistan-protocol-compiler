@@ -26,6 +26,7 @@ import (
 	"kurdistan/internal/relayfleet"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregencompare"
@@ -504,6 +505,33 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		} {
 			if err := adaptivepath.ScanForLeak(tc); err == nil {
 				return fmt.Errorf("unsafe adaptivepath metadata accepted")
+			}
+		}
+		return nil
+	}))
+	results = append(results, check("transportbundle_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := transportbundle.GenerateFixtureSet(ctx)
+		if err != nil {
+			return err
+		}
+		if err := transportbundle.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		if err := transportbundle.ScanForLeak(set); err != nil {
+			return err
+		}
+		if report := ScanValue(set); !report.Passed {
+			return fmt.Errorf("transportbundle fixture failed generic hygiene: %v", report.Findings)
+		}
+		for _, tc := range []map[string]string{
+			{"endpoint": "x"},
+			{"dns_query": "x"},
+			{"resolver_ip": "x"},
+			{"payload": "x"},
+			{"secret": "x"},
+		} {
+			if err := transportbundle.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe transportbundle metadata accepted")
 			}
 		}
 		return nil
