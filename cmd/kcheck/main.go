@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
@@ -157,6 +158,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "carrierreadiness" {
 		os.Exit(runCarrierReadiness(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "httpscarrierreview" {
+		os.Exit(runHTTPSCarrierReview(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -5001,6 +5005,179 @@ func writeCarrierReadinessCompanions(out string, set carrierreadiness.FixtureSet
 	}
 	for _, write := range writes {
 		if err := carrierreadiness.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runHTTPSCarrierReview(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runHTTPSCarrierReviewGenerate(args[1:])
+		case "verify":
+			return runHTTPSCarrierReviewVerify(args[1:])
+		case "compare":
+			return runHTTPSCarrierReviewCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck httpscarrierreview", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick HTTPS carrier design-lock audit")
+	full := flags.Bool("full", false, "run full HTTPS carrier design-lock audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunHTTPSCarrierReviewAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSCarrierReviewGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrierreview generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "httpscarrierreview", "httpscarrierreview-report-golden.json"), "HTTPS carrier design-lock fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := httpscarrierreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := httpscarrierreview.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeHTTPSCarrierReviewCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote httpscarrierreview fixtures: %s (%d request shapes, %d response shapes)\n", *out, len(set.RequestShapes), len(set.ResponseShapes))
+	return 0
+}
+
+func runHTTPSCarrierReviewVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrierreview verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "httpscarrierreview", "httpscarrierreview-report-golden.json"), "HTTPS carrier design-lock fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := httpscarrierreview.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpscarrierreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpscarrierreview.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSCarrierReviewCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrierreview compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old HTTPS carrier design-lock fixture")
+	newPath := flags.String("new", "", "new HTTPS carrier design-lock fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := httpscarrierreview.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpscarrierreview.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpscarrierreview.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := httpscarrierreview.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeHTTPSCarrierReviewCompanions(out string, set httpscarrierreview.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"https-carrier-lab-contract.json", set.Contract},
+		{"scope-report.json", set.Scope},
+		{"shape-taxonomy-report.json", set.ShapeTaxonomy},
+		{"request-shapes-golden.json", set.RequestShapes},
+		{"response-shapes-golden.json", set.ResponseShapes},
+		{"stream-mapping-report.json", set.StreamMapping},
+		{"backpressure-contract-report.json", set.Backpressure},
+		{"reset-error-contract-report.json", set.ResetError},
+		{"integration-contract-report.json", set.Integration},
+		{"m42-implementation-contract.json", set.M42Contract},
+		{"blocker-matrix.json", set.Blockers},
+		{"risk-report.json", set.Risks},
+		{"readiness-checklist.json", set.Checklist},
+		{"httpscarrierreview-misuse-report.json", set.Misuse},
+		{"httpscarrierreview-controls.json", set.Controls},
+	}
+	for _, write := range writes {
+		if err := httpscarrierreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

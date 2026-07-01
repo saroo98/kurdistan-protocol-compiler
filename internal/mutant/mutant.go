@@ -369,6 +369,34 @@ const (
 	ModeCarrierReadinessUnsafePublicClaim     = "carrierreadiness_unsafe_public_claim"
 	ModeCarrierReadinessIgnoresBlocker        = "carrierreadiness_ignores_blocker"
 	ModeCarrierReadinessGeneratedBackendDrift = "carrierreadiness_generated_backend_drift"
+
+	ModeHTTPSCarrierReviewGoDespiteBlocker             = "httpscarrierreview_go_despite_blocker"
+	ModeHTTPSCarrierReviewAllowsRealTLS                = "httpscarrierreview_allows_real_tls"
+	ModeHTTPSCarrierReviewAllowsSNIRouting             = "httpscarrierreview_allows_sni_routing"
+	ModeHTTPSCarrierReviewAllowsHostHeaderRouting      = "httpscarrierreview_allows_host_header_routing"
+	ModeHTTPSCarrierReviewAllowsDomainDependency       = "httpscarrierreview_allows_domain_dependency"
+	ModeHTTPSCarrierReviewAllowsCDNProvider            = "httpscarrierreview_allows_cdn_provider"
+	ModeHTTPSCarrierReviewAllowsPublicNetwork          = "httpscarrierreview_allows_public_network"
+	ModeHTTPSCarrierReviewAllowsArbitraryEgress        = "httpscarrierreview_allows_arbitrary_egress"
+	ModeHTTPSCarrierReviewAllowsPayloadForwarding      = "httpscarrierreview_allows_payload_forwarding"
+	ModeHTTPSCarrierReviewAllowsPayloadLogging         = "httpscarrierreview_allows_payload_logging"
+	ModeHTTPSCarrierReviewAllowsPacketCapture          = "httpscarrierreview_allows_packet_capture"
+	ModeHTTPSCarrierReviewAllowsMeasurementUpload      = "httpscarrierreview_allows_measurement_upload"
+	ModeHTTPSCarrierReviewMissingShapeCollapseControls = "httpscarrierreview_missing_shape_collapse_controls"
+	ModeHTTPSCarrierReviewMissingProfileSensitivity    = "httpscarrierreview_missing_profile_sensitivity"
+	ModeHTTPSCarrierReviewMissingBackpressureMapping   = "httpscarrierreview_missing_backpressure_mapping"
+	ModeHTTPSCarrierReviewMissingResetIsolation        = "httpscarrierreview_missing_reset_isolation"
+	ModeHTTPSCarrierReviewCarrierReadinessBypass       = "httpscarrierreview_carrierreadiness_bypass"
+	ModeHTTPSCarrierReviewCarrierReviewBypass          = "httpscarrierreview_carrierreview_bypass"
+	ModeHTTPSCarrierReviewMeasurementReviewBypass      = "httpscarrierreview_measurementreview_bypass"
+	ModeHTTPSCarrierReviewLabEgressBypass              = "httpscarrierreview_labegress_bypass"
+	ModeHTTPSCarrierReviewPublicClaimRealHTTPS         = "httpscarrierreview_public_claim_real_https"
+	ModeHTTPSCarrierReviewPublicClaimFieldReady        = "httpscarrierreview_public_claim_field_ready"
+	ModeHTTPSCarrierReviewPublicClaimWorkingVPN        = "httpscarrierreview_public_claim_working_vpn"
+	ModeHTTPSCarrierReviewPublicClaimUndetectable      = "httpscarrierreview_public_claim_undetectable"
+	ModeHTTPSCarrierReviewPayloadLeak                  = "httpscarrierreview_payload_leak"
+	ModeHTTPSCarrierReviewSecretLeak                   = "httpscarrierreview_secret_leak"
+	ModeHTTPSCarrierReviewGeneratedBackendDrift        = "httpscarrierreview_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -721,6 +749,33 @@ func Modes() []string {
 		ModeCarrierReadinessUnsafePublicClaim,
 		ModeCarrierReadinessIgnoresBlocker,
 		ModeCarrierReadinessGeneratedBackendDrift,
+		ModeHTTPSCarrierReviewGoDespiteBlocker,
+		ModeHTTPSCarrierReviewAllowsRealTLS,
+		ModeHTTPSCarrierReviewAllowsSNIRouting,
+		ModeHTTPSCarrierReviewAllowsHostHeaderRouting,
+		ModeHTTPSCarrierReviewAllowsDomainDependency,
+		ModeHTTPSCarrierReviewAllowsCDNProvider,
+		ModeHTTPSCarrierReviewAllowsPublicNetwork,
+		ModeHTTPSCarrierReviewAllowsArbitraryEgress,
+		ModeHTTPSCarrierReviewAllowsPayloadForwarding,
+		ModeHTTPSCarrierReviewAllowsPayloadLogging,
+		ModeHTTPSCarrierReviewAllowsPacketCapture,
+		ModeHTTPSCarrierReviewAllowsMeasurementUpload,
+		ModeHTTPSCarrierReviewMissingShapeCollapseControls,
+		ModeHTTPSCarrierReviewMissingProfileSensitivity,
+		ModeHTTPSCarrierReviewMissingBackpressureMapping,
+		ModeHTTPSCarrierReviewMissingResetIsolation,
+		ModeHTTPSCarrierReviewCarrierReadinessBypass,
+		ModeHTTPSCarrierReviewCarrierReviewBypass,
+		ModeHTTPSCarrierReviewMeasurementReviewBypass,
+		ModeHTTPSCarrierReviewLabEgressBypass,
+		ModeHTTPSCarrierReviewPublicClaimRealHTTPS,
+		ModeHTTPSCarrierReviewPublicClaimFieldReady,
+		ModeHTTPSCarrierReviewPublicClaimWorkingVPN,
+		ModeHTTPSCarrierReviewPublicClaimUndetectable,
+		ModeHTTPSCarrierReviewPayloadLeak,
+		ModeHTTPSCarrierReviewSecretLeak,
+		ModeHTTPSCarrierReviewGeneratedBackendDrift,
 	}
 }
 
