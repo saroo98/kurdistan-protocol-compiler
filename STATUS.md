@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-06-30T22:41:25Z`
+- Generated at: `2026-06-30T23:43:52Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -216,11 +216,21 @@
 | `transportbundle_trace_hygiene` | PASS | `required` | transport bundle fixtures contain safe metadata only |
 | `transportbundle_mutant_detection` | PASS | `required` | 15 mutants represented |
 | `transportbundle_fixture_drift` | PASS | `required` | passed |
-| `hardening_invariant_registry` | PASS | `required` | 18 invariants checks run; 0 failures |
+| `pathrace_scenario_validation` | PASS | `required` | 14 scenarios checked |
+| `pathrace_parallel_scheduler` | PASS | `required` | 14 race runs scheduled |
+| `pathrace_candidate_verification` | PASS | `required` | 10 verified candidate outcomes |
+| `pathrace_short_lived_scoring` | PASS | `required` | 75 score buckets checked |
+| `pathrace_ranking_tiebreak` | PASS | `required` | 6 ranked candidates |
+| `pathrace_misuse_detection` | PASS | `required` | 6 control findings |
+| `pathrace_generated_backend_parity` | PASS | `required` | 14 scenarios compared |
+| `pathrace_trace_hygiene` | PASS | `required` | pathrace fixtures contain safe metadata only |
+| `pathrace_mutant_detection` | PASS | `required` | 16 mutants represented |
+| `pathrace_fixture_drift` | PASS | `required` | passed |
+| `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
 | `hardening_resource_limits` | PASS | `required` | 9 resource_limits checks run; 0 failures |
-| `hardening_trace_hygiene` | PASS | `required` | 19 trace/security hygiene checks run; 0 failures |
+| `hardening_trace_hygiene` | PASS | `required` | 20 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
 | `hardening_pre_adapter_readiness` | PASS | `required` | 24 pre_adapter_readiness checks run; 0 failures |
@@ -229,9 +239,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `87 ms`
+- Profile generation: `86 ms`
 - Trace generation: `20 ms`
-- Total audit runtime: `1476 ms`
+- Total audit runtime: `1893 ms`
 
 ## Corpus Diversity Summary
 
@@ -256,8 +266,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31928058498876116`
-- `same_profile_distance`: `0.007462686567164179`
+- `different_profile_average_distance`: `0.3183881047668976`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
@@ -457,6 +467,20 @@
 - `transportbundle_mutant_detection`: `passed`
 - `transportbundle_fixture_drift`: `passed`
 
+## Path Racing and Short-Lived Scoring
+
+- Gate result: `true`
+- `pathrace_scenario_validation`: `passed`
+- `pathrace_parallel_scheduler`: `passed`
+- `pathrace_candidate_verification`: `passed`
+- `pathrace_short_lived_scoring`: `passed`
+- `pathrace_ranking_tiebreak`: `passed`
+- `pathrace_misuse_detection`: `passed`
+- `pathrace_generated_backend_parity`: `passed`
+- `pathrace_trace_hygiene`: `passed`
+- `pathrace_mutant_detection`: `passed`
+- `pathrace_fixture_drift`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -469,6 +493,7 @@
 - Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.
 - Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.
 - Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.
+- Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -477,4 +502,4 @@
 
 ## Next Milestone
 
-Milestone 29 should focus on path-racing and revalidation within the deterministic local model.
+Milestone 30 should focus on continuous health monitoring and failover over already-selected synthetic paths.
