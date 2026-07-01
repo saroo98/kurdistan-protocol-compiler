@@ -18,6 +18,7 @@ import (
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
@@ -1687,6 +1688,40 @@ func GeneratedConcreteLocalAdapterParity(ctx context.Context) (concretelocaladap
 	return set.Parity, nil
 }
 `, quote(concretelocaladapter.Version), quote(p.ID), p.Seed, quote(concretelocaladapter.BindClassLoopbackOnly), quote(p.AdapterPolicy.RuntimeMappingPolicy), 16, 64*1024, quote(concretelocaladapter.RecommendedNextMilestone), quoteSlice(concreteLocalAdapterScenarios()))
+	if err != nil {
+		return nil, err
+	}
+
+	localProtocolAdapterSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/localprotocoladapter"
+)
+
+const LocalProtocolAdapterSchemaVersion = %[1]s
+const LocalProtocolAdapterGeneratedProfileID = %[2]s
+const LocalProtocolAdapterGeneratedProfileSeed int64 = %[3]d
+const LocalProtocolAdapterRuntimeMappingPolicy = %[4]s
+const LocalProtocolAdapterMaxRequestBytes = %[5]d
+const LocalProtocolAdapterMaxEvents = %[6]d
+const LocalProtocolAdapterRecommendedNextMilestone = %[7]s
+
+var LocalProtocolAdapterFamilies = %[8]s
+var LocalProtocolAdapterScenarios = %[9]s
+var LocalProtocolAdapterParserStates = %[10]s
+
+func GeneratedLocalProtocolAdapterFixtureSet() (localprotocoladapter.LocalProtocolFixtureSet, error) {
+	return localprotocoladapter.GenerateFixtureSet()
+}
+
+func GeneratedLocalProtocolAdapterParity() (localprotocoladapter.LocalProtocolParityReport, error) {
+	set, err := localprotocoladapter.GenerateFixtureSet()
+	if err != nil {
+		return localprotocoladapter.LocalProtocolParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(localprotocoladapter.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.RelayIntentEncoding+"/"+p.WireShape.PolicyID), localprotocoladapter.DefaultConfig().MaxRequestLineBytes, localprotocoladapter.DefaultConfig().MaxParserTransitions, quote(localprotocoladapter.RecommendedNextMilestone), quoteSlice(localProtocolAdapterFamilies()), quoteSlice(localProtocolAdapterScenarios()), quoteSlice(localProtocolAdapterParserStates()))
 	if err != nil {
 		return nil, err
 	}
@@ -4563,6 +4598,85 @@ func TestGeneratedConcreteLocalAdapterHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	localProtocolAdapterTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localprotocoladapter"
+)
+
+func TestGeneratedLocalProtocolAdapter(t *testing.T) {
+	if LocalProtocolAdapterSchemaVersion != localprotocoladapter.Version || LocalProtocolAdapterGeneratedProfileID != ProfileID {
+		t.Fatalf("generated local protocol adapter constants drifted")
+	}
+	set, err := GeneratedLocalProtocolAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(LocalProtocolAdapterScenarios) == 0 || len(LocalProtocolAdapterFamilies) == 0 {
+		t.Fatalf("generated local protocol adapter fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProtocolAdapterParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedLocalProtocolAdapterParity(t *testing.T) {
+	parity, err := GeneratedLocalProtocolAdapterParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated local protocol adapter parity failed: %%+v", parity)
+	}
+	if LocalProtocolAdapterRuntimeMappingPolicy == "" || LocalProtocolAdapterRecommendedNextMilestone == "" {
+		t.Fatalf("local protocol adapter generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProtocolAdapterHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localprotocoladapter"
+)
+
+func TestGeneratedLocalProtocolAdapterHygiene(t *testing.T) {
+	set, err := GeneratedLocalProtocolAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localprotocoladapter.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "synthetic"},
+		{"raw_target": "synthetic"},
+		{"secret": "synthetic"},
+		{"resolved_address": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := localprotocoladapter.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe local protocol adapter metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -4908,6 +5022,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localpipeline_generated.go", Content: localPipelineSource, Go: true},
 		{RelPath: "protocol/productionreadiness_generated.go", Content: productionReadinessSource, Go: true},
 		{RelPath: "protocol/concretelocaladapter_generated.go", Content: concreteLocalAdapterSource, Go: true},
+		{RelPath: "protocol/localprotocoladapter_generated.go", Content: localProtocolAdapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4988,6 +5103,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/concretelocaladapter_test.go", Content: concreteLocalAdapterTestSource, Go: true},
 		{RelPath: "protocol/concretelocaladapter_parity_test.go", Content: concreteLocalAdapterParityTestSource, Go: true},
 		{RelPath: "protocol/concretelocaladapter_hygiene_test.go", Content: concreteLocalAdapterHygieneTestSource, Go: true},
+		{RelPath: "protocol/localprotocoladapter_test.go", Content: localProtocolAdapterTestSource, Go: true},
+		{RelPath: "protocol/localprotocoladapter_parity_test.go", Content: localProtocolAdapterParityTestSource, Go: true},
+		{RelPath: "protocol/localprotocoladapter_hygiene_test.go", Content: localProtocolAdapterHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5625,6 +5743,35 @@ func concreteLocalAdapterScenarios() []string {
 		concretelocaladapter.ScenarioTargetResetMapping,
 		concretelocaladapter.ScenarioLoopbackBindPolicy,
 		concretelocaladapter.ScenarioMalformedLocalEvent,
+	}
+}
+
+func localProtocolAdapterFamilies() []string {
+	return []string{
+		localprotocoladapter.ProtocolFamilyConnectLikeMetadata,
+		localprotocoladapter.ProtocolFamilySocks5LikeMetadata,
+	}
+}
+
+func localProtocolAdapterScenarios() []string {
+	return []string{
+		localprotocoladapter.ScenarioConnectSynthetic,
+		localprotocoladapter.ScenarioSocks5Synthetic,
+		localprotocoladapter.ScenarioSocks5AuthRejected,
+		localprotocoladapter.ScenarioConnectSmuggling,
+		localprotocoladapter.ScenarioPipelineMapping,
+		localprotocoladapter.ScenarioConcreteAdapterMapping,
+	}
+}
+
+func localProtocolAdapterParserStates() []string {
+	return []string{
+		localprotocoladapter.ParserStateCreated,
+		localprotocoladapter.ParserStateHeaderParsed,
+		localprotocoladapter.ParserStateTargetRedacted,
+		localprotocoladapter.ParserStateMapped,
+		localprotocoladapter.ParserStateClosed,
+		localprotocoladapter.ParserStateRejected,
 	}
 }
 
