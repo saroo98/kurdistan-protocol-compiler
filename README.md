@@ -106,6 +106,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Proxy ingress adversarial parity and hardening with malformed event sequences, descriptor-abuse rejection, lifecycle and pressure stress, reset/error isolation, mapping collapse controls, generated/interpreted parity, and M27 readiness reporting.
 - Adaptive path modeling with candidate families, synthetic condition observations, freshness and uncertainty buckets, viability evaluation, decision-input summaries, misuse detection, and generated/interpreted parity.
 - Generated transport bundle compiler with deterministic bundle modes, candidate roles, profile/wire-policy references, synthetic relay binding, fallback hints, collapse controls, fixtures, and generated-backend parity.
+- Path racing and short-lived scoring harness with deterministic synthetic race scenarios, parallel scheduler modeling, candidate verification, freshness decay, ranking/tie-break controls, misuse detection, fixtures, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -177,6 +178,9 @@ internal/adaptivepath
 internal/transportbundle
   generated transport bundle policies, seed plans, candidate manifests, adaptive-path mapping, synthetic relay binding, fallback hints, collapse controls, and fixture drift gates
 
+internal/pathrace
+  synthetic path racing, candidate verification, short-lived scoring, deterministic ranking, misuse controls, and pathrace fixtures
+
 internal/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
@@ -219,6 +223,7 @@ go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
 go run ./cmd/kcheck transportbundle --quick
+go run ./cmd/kcheck pathrace --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -299,6 +304,7 @@ Kurdistan treats diversity as something to measure.
 - proxy ingress contract validation, target descriptor safety, capability mapping, runtime mapping, lifecycle integrity, failure-mode matrix coverage, design review, misuse detection, trace hygiene, fixture drift, and generated-backend parity
 - local proxy ingress contract compliance, target validation, lifecycle execution, runtime mapping, backpressure, error/reset isolation, queue bounds, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
 - adaptive path candidate taxonomy, synthetic condition model, freshness and uncertainty evaluation, viability reports, decision inputs, misuse detection, trace hygiene, fixture drift, public roadmap cleanup, and generated-backend parity
+- path racing scenario validation, parallel scheduling, candidate verification, short-lived scoring, ranking tie-breaks, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -332,6 +338,7 @@ go run ./cmd/kcheck localproxyingress --quick
 go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
 go run ./cmd/kcheck transportbundle --quick
+go run ./cmd/kcheck pathrace --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -569,6 +576,24 @@ go run ./cmd/kcheck transportbundle compare --old testdata/transportbundle/bundl
 go run ./cmd/kdc bundle --seed 12345 --mode balanced_adaptive --out profiles/examples/bundle-12345.json
 go run ./cmd/kdc validate-bundle --bundle profiles/examples/bundle-12345.json
 go run ./cmd/kdc summarize-bundle --bundle profiles/examples/bundle-12345.json
+```
+
+## Path Racing And Short-Lived Scoring
+
+Milestone 29 races generated bundle candidates over deterministic synthetic observations. `internal/pathrace` models parallel candidate starts, verification of usable synthetic states, short-lived scoring, stale-evidence decay, ranking/tie-break behavior, misuse controls, and generated/interpreted parity.
+
+The pathrace harness can produce a synthetic winner for a local scenario. It does not probe paths, dial relays, resolve DNS, contact endpoints, or select a production active path.
+
+Committed fixtures live under `testdata/pathrace/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck pathrace --quick
+go run ./cmd/kcheck pathrace --full --out testdata/audit/pathrace.json
+go run ./cmd/kcheck pathrace generate --out testdata/pathrace/pathrace-report-golden.json --force
+go run ./cmd/kcheck pathrace verify
+go run ./cmd/kcheck pathrace compare --old testdata/pathrace/pathrace-report-golden.json --new testdata/pathrace/pathrace-report-golden.json
 ```
 
 ## Multi-Stream Semantics
