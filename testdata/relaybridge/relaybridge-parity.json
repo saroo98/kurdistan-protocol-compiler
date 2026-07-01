@@ -1,0 +1,9 @@
+{
+  "version": "relaybridge-v1",
+  "compared_scenarios": 15,
+  "matching_sessions": 12,
+  "matching_streams": 12,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
