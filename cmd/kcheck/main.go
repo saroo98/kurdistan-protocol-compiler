@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
@@ -105,6 +106,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "transportbundle" {
 		os.Exit(runTransportBundle(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "pathrace" {
+		os.Exit(runPathRace(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -2642,6 +2646,177 @@ func writeTransportBundleCompanions(out string, set transportbundle.TransportBun
 	for _, write := range writes {
 		path := filepath.Join(dir, write.name)
 		if err := transportbundle.WriteJSON(path, write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runPathRace(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runPathRaceGenerate(args[1:])
+		case "verify":
+			return runPathRaceVerify(args[1:])
+		case "compare":
+			return runPathRaceCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck pathrace", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick pathrace audit")
+	full := flags.Bool("full", false, "run full pathrace audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunPathRaceAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runPathRaceGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathrace generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "pathrace", "pathrace-report-golden.json"), "pathrace fixture path")
+	force := flags.Bool("force", false, "overwrite fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := pathrace.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := pathrace.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writePathRaceCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote pathrace fixtures: %s (%d scenarios, %d outcomes)\n", *out, len(set.Scenarios), len(set.Outcomes))
+	return 0
+}
+
+func runPathRaceVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathrace verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "pathrace", "pathrace-report-golden.json"), "pathrace fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := pathrace.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := pathrace.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := pathrace.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runPathRaceCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathrace compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old pathrace fixture path")
+	newPath := flags.String("new", "", "new pathrace fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := pathrace.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := pathrace.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := pathrace.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writePathRaceCompanions(out string, set pathrace.PathRaceFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"race-scenarios-golden.json", set.Scenarios},
+		{"race-events-golden.json", set.Events},
+		{"race-outcomes-golden.json", set.Outcomes},
+		{"scoring-policy-golden.json", set.ScoringPolicy},
+		{"candidate-scores-golden.json", set.Scores},
+		{"ranking-report-golden.json", set.RankingReport},
+		{"pathrace-misuse-report.json", set.MisuseReport},
+		{"pathrace-controls.json", set.Controls},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if err := pathrace.WriteJSON(path, write.value, force); err != nil {
 			return err
 		}
 	}
