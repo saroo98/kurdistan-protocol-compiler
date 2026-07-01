@@ -1,0 +1,27 @@
+[
+  {
+    "from": "local protocol adapter",
+    "to": "loopback relay transport",
+    "status": "ready_for_review"
+  },
+  {
+    "from": "loopback relay transport",
+    "to": "lab egress connector",
+    "status": "ready_for_review"
+  },
+  {
+    "from": "lab egress connector",
+    "to": "carrier prototype design review",
+    "status": "ready_for_review"
+  },
+  {
+    "from": "carrier abstraction",
+    "to": "carrier prototype design review",
+    "status": "ready_for_review"
+  },
+  {
+    "from": "security prerequisites",
+    "to": "carrier prototype design review",
+    "status": "ready_for_review"
+  }
+]

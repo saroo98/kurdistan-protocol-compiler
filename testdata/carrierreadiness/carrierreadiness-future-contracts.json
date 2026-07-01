@@ -1,0 +1,20 @@
+[
+  {
+    "milestone": "M41",
+    "name": "carrier prototype design review",
+    "scope": "contract and threat model",
+    "status": "needs_work"
+  },
+  {
+    "milestone": "M42",
+    "name": "carrier prototype harness",
+    "scope": "deterministic local carrier prototype only",
+    "status": "needs_work"
+  },
+  {
+    "milestone": "M43",
+    "name": "carrier adversarial hardening",
+    "scope": "collapse/misuse gates for carrier prototype",
+    "status": "needs_work"
+  }
+]

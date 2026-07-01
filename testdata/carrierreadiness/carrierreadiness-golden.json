@@ -1,0 +1,261 @@
+{
+  "version": "carrierreadiness-v1",
+  "review": {
+    "version": "carrierreadiness-v1",
+    "fixture_id": "carrier_prototype_readiness_v1",
+    "generated_at": "2026-01-01T00:00:00Z",
+    "generated_at_unix": 1767225600,
+    "backend_version": "0.40.0-lab",
+    "recommended_next_milestone": "M41: carrier prototype design review",
+    "inventory": [
+      {
+        "name": "local protocol adapter",
+        "layer": "adapter",
+        "status": "ready_for_review",
+        "evidence": "M37 parser fixtures and gates",
+        "remaining_risk": "metadata-only parser"
+      },
+      {
+        "name": "loopback relay transport",
+        "layer": "relay",
+        "status": "ready_for_review",
+        "evidence": "M38 loopback relay fixtures and gates",
+        "remaining_risk": "loopback-only harness"
+      },
+      {
+        "name": "lab egress connector",
+        "layer": "egress",
+        "status": "ready_for_review",
+        "evidence": "M39 allowlist connector fixtures and gates",
+        "remaining_risk": "synthetic targets only"
+      },
+      {
+        "name": "byte transport harness",
+        "layer": "byte_path",
+        "status": "ready_for_review",
+        "evidence": "M17-M18 fixtures and parity",
+        "remaining_risk": "local deterministic bytes only"
+      },
+      {
+        "name": "carrier abstraction",
+        "layer": "carrier",
+        "status": "ready_for_review",
+        "evidence": "M11 carrier models and audits",
+        "remaining_risk": "abstract models only"
+      },
+      {
+        "name": "security prerequisites",
+        "layer": "security",
+        "status": "ready_for_review",
+        "evidence": "M12 transcript/replay/downgrade gates",
+        "remaining_risk": "not final production key exchange"
+      }
+    ],
+    "dependencies": [
+      {
+        "from": "local protocol adapter",
+        "to": "loopback relay transport",
+        "status": "ready_for_review"
+      },
+      {
+        "from": "loopback relay transport",
+        "to": "lab egress connector",
+        "status": "ready_for_review"
+      },
+      {
+        "from": "lab egress connector",
+        "to": "carrier prototype design review",
+        "status": "ready_for_review"
+      },
+      {
+        "from": "carrier abstraction",
+        "to": "carrier prototype design review",
+        "status": "ready_for_review"
+      },
+      {
+        "from": "security prerequisites",
+        "to": "carrier prototype design review",
+        "status": "ready_for_review"
+      }
+    ],
+    "boundaries": [
+      {
+        "name": "no external targets",
+        "status": "ready_for_review",
+        "policy": "local-only connector inputs",
+        "enforced": true,
+        "evidence": "M39 allowlist gate"
+      },
+      {
+        "name": "no deployment behavior",
+        "status": "ready_for_review",
+        "policy": "fixtures and audits only",
+        "enforced": true,
+        "evidence": "M40 blocker register"
+      },
+      {
+        "name": "no payload logging",
+        "status": "ready_for_review",
+        "policy": "trace hygiene scanner",
+        "enforced": true,
+        "evidence": "all fixture scanners"
+      },
+      {
+        "name": "no production key exchange",
+        "status": "ready_for_review",
+        "policy": "security prerequisite model only",
+        "enforced": true,
+        "evidence": "M12/M40 boundary"
+      },
+      {
+        "name": "no live carrier implementation",
+        "status": "ready_for_review",
+        "policy": "prototype review gate blocks carrier code",
+        "enforced": true,
+        "evidence": "M40 decision matrix"
+      }
+    ],
+    "future_contracts": [
+      {
+        "milestone": "M41",
+        "name": "carrier prototype design review",
+        "scope": "contract and threat model",
+        "status": "needs_work"
+      },
+      {
+        "milestone": "M42",
+        "name": "carrier prototype harness",
+        "scope": "deterministic local carrier prototype only",
+        "status": "needs_work"
+      },
+      {
+        "milestone": "M43",
+        "name": "carrier adversarial hardening",
+        "scope": "collapse/misuse gates for carrier prototype",
+        "status": "needs_work"
+      }
+    ],
+    "blockers": [
+      {
+        "name": "public carrier implementation",
+        "severity": "critical",
+        "required": true,
+        "status": "blocked"
+      },
+      {
+        "name": "production deployment",
+        "severity": "critical",
+        "required": true,
+        "status": "blocked"
+      },
+      {
+        "name": "external target dialing",
+        "severity": "critical",
+        "required": true,
+        "status": "blocked"
+      },
+      {
+        "name": "payload-bearing traces",
+        "severity": "critical",
+        "required": true,
+        "status": "blocked"
+      },
+      {
+        "name": "production key exchange",
+        "severity": "high",
+        "required": true,
+        "status": "blocked"
+      }
+    ],
+    "risks": [
+      {
+        "name": "carrier fingerprint collapse",
+        "level": "high",
+        "mitigation": "require bundle/wire/fixture parity gates before prototype",
+        "status": "needs_work"
+      },
+      {
+        "name": "operational misuse",
+        "level": "high",
+        "mitigation": "keep prototype local and audit-only",
+        "status": "needs_work"
+      },
+      {
+        "name": "trace leakage",
+        "level": "high",
+        "mitigation": "fixture and generated hygiene gates",
+        "status": "ready_for_review"
+      },
+      {
+        "name": "generated drift",
+        "level": "medium",
+        "mitigation": "generated/interpreted parity gates",
+        "status": "ready_for_review"
+      }
+    ],
+    "checklist": [
+      {
+        "name": "inventory complete",
+        "checked": true,
+        "evidence": "six prerequisite layers listed"
+      },
+      {
+        "name": "dependency graph complete",
+        "checked": true,
+        "evidence": "five prerequisite edges listed"
+      },
+      {
+        "name": "boundaries enforced",
+        "checked": true,
+        "evidence": "five blocking boundaries listed"
+      },
+      {
+        "name": "future contracts scoped",
+        "checked": true,
+        "evidence": "M41-M43 contracts listed"
+      },
+      {
+        "name": "public claim safety checked",
+        "checked": true,
+        "evidence": "unsafe public claims absent"
+      },
+      {
+        "name": "generated parity checked",
+        "checked": true,
+        "evidence": "codegen marker and parity gate"
+      }
+    ],
+    "decision": "ready_for_next_design_review",
+    "review_hash": "sha256:8a54e62563eccc5750c709ac1ad812332efa4a5edf70c28129d218c68e5cfc44",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "unsafe_controls": [
+      "public_carrier_implementation",
+      "external_target_dial",
+      "deployment_script",
+      "payload_trace",
+      "production_key_exchange",
+      "live_probe",
+      "generated_backend_drift"
+    ],
+    "unsafe_detected": 7,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "inventory_compared": 6,
+    "contracts_compared": 3,
+    "semantic_matches": 9,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:7faf380571ad44c9315f86f2ac2359a9b75d7af1d7b98355153119d719e05471",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "no external targets",
+    "status": "ready_for_review",
+    "policy": "local-only connector inputs",
+    "enforced": true,
+    "evidence": "M39 allowlist gate"
+  },
+  {
+    "name": "no deployment behavior",
+    "status": "ready_for_review",
+    "policy": "fixtures and audits only",
+    "enforced": true,
+    "evidence": "M40 blocker register"
+  },
+  {
+    "name": "no payload logging",
+    "status": "ready_for_review",
+    "policy": "trace hygiene scanner",
+    "enforced": true,
+    "evidence": "all fixture scanners"
+  },
+  {
+    "name": "no production key exchange",
+    "status": "ready_for_review",
+    "policy": "security prerequisite model only",
+    "enforced": true,
+    "evidence": "M12/M40 boundary"
+  },
+  {
+    "name": "no live carrier implementation",
+    "status": "ready_for_review",
+    "policy": "prototype review gate blocks carrier code",
+    "enforced": true,
+    "evidence": "M40 decision matrix"
+  }
+]
