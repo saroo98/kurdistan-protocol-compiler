@@ -1,0 +1,144 @@
+[
+  {
+    "name": "socket_large_backpressure",
+    "source_model": "large_object_source",
+    "sink_model": "backpressure_sink",
+    "target_class": "large_object",
+    "flow_count": 2,
+    "chunk_count": 12,
+    "byte_budget": 65536,
+    "expected_events": [
+      "backpressure",
+      "window_update",
+      "close"
+    ],
+    "requires_loopback": true
+  },
+  {
+    "name": "socket_loopback_bind_policy",
+    "source_model": "bind_policy_probe",
+    "sink_model": "metadata_sink",
+    "target_class": "control",
+    "flow_count": 1,
+    "chunk_count": 1,
+    "byte_budget": 64,
+    "expected_events": [
+      "loopback_only",
+      "external_rejected"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_malformed_local_event",
+    "source_model": "malformed_event_source",
+    "sink_model": "rejecting_sink",
+    "target_class": "control",
+    "flow_count": 1,
+    "chunk_count": 1,
+    "byte_budget": 64,
+    "expected_events": [
+      "malformed_rejected"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_many_small_flows",
+    "source_model": "many_small_sources",
+    "sink_model": "fair_count_sink",
+    "target_class": "fixed_response",
+    "flow_count": 4,
+    "chunk_count": 8,
+    "byte_budget": 1024,
+    "expected_events": [
+      "multi_open",
+      "fairness",
+      "close"
+    ],
+    "requires_loopback": true
+  },
+  {
+    "name": "socket_no_external_bind_control",
+    "source_model": "external_bind_probe",
+    "sink_model": "rejecting_sink",
+    "target_class": "control",
+    "flow_count": 1,
+    "chunk_count": 1,
+    "byte_budget": 64,
+    "expected_events": [
+      "external_rejected"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_payload_leak_control",
+    "source_model": "hygiene_source",
+    "sink_model": "hygiene_sink",
+    "target_class": "control",
+    "flow_count": 1,
+    "chunk_count": 1,
+    "byte_budget": 64,
+    "expected_events": [
+      "payload_hygiene",
+      "secret_hygiene"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_reset_isolation",
+    "source_model": "resetting_source",
+    "sink_model": "reset_aware_sink",
+    "target_class": "echo",
+    "flow_count": 3,
+    "chunk_count": 6,
+    "byte_budget": 2048,
+    "expected_events": [
+      "reset",
+      "isolation",
+      "continue"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_single_flow_echo",
+    "source_model": "small_burst_source",
+    "sink_model": "ordered_count_sink",
+    "target_class": "echo",
+    "flow_count": 1,
+    "chunk_count": 2,
+    "byte_budget": 256,
+    "expected_events": [
+      "open",
+      "echo",
+      "close"
+    ],
+    "requires_loopback": true
+  },
+  {
+    "name": "socket_target_error_mapping",
+    "source_model": "error_source",
+    "sink_model": "safe_error_sink",
+    "target_class": "error_response",
+    "flow_count": 2,
+    "chunk_count": 3,
+    "byte_budget": 512,
+    "expected_events": [
+      "target_error",
+      "safe_flow_error"
+    ],
+    "requires_loopback": false
+  },
+  {
+    "name": "socket_target_reset_mapping",
+    "source_model": "target_reset_source",
+    "sink_model": "reset_sink",
+    "target_class": "reset_midstream",
+    "flow_count": 2,
+    "chunk_count": 4,
+    "byte_budget": 768,
+    "expected_events": [
+      "target_reset",
+      "flow_reset"
+    ],
+    "requires_loopback": false
+  }
+]

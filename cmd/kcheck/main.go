@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
+	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/localpipeline"
@@ -137,6 +138,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "productionreadiness" {
 		os.Exit(runProductionReadiness(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "concretelocaladapter" {
+		os.Exit(runConcreteLocalAdapter(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -4154,6 +4158,173 @@ func writeProductionReadinessCompanions(out string, review productionreadiness.P
 	}
 	for _, write := range writes {
 		if err := productionreadiness.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runConcreteLocalAdapter(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runConcreteLocalAdapterGenerate(args[1:])
+		case "verify":
+			return runConcreteLocalAdapterVerify(args[1:])
+		case "compare":
+			return runConcreteLocalAdapterCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck concretelocaladapter", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick concrete local adapter audit")
+	full := flags.Bool("full", false, "run full concrete local adapter audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunConcreteLocalAdapterAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runConcreteLocalAdapterGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck concretelocaladapter generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "concretelocaladapter", "concretelocaladapter-golden.json"), "concrete local adapter fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := concretelocaladapter.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := concretelocaladapter.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeConcreteLocalAdapterCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote concretelocaladapter fixtures: %s (%d scenarios)\n", *out, len(set.Scenarios))
+	return 0
+}
+
+func runConcreteLocalAdapterVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck concretelocaladapter verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "concretelocaladapter", "concretelocaladapter-golden.json"), "concrete local adapter fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := concretelocaladapter.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := concretelocaladapter.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := concretelocaladapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runConcreteLocalAdapterCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck concretelocaladapter compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old concrete local adapter fixture path")
+	newPath := flags.String("new", "", "new concrete local adapter fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := concretelocaladapter.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := concretelocaladapter.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := concretelocaladapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeConcreteLocalAdapterCompanions(out string, set concretelocaladapter.SocketFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"concretelocaladapter-scenarios.json", set.Scenarios},
+		{"concretelocaladapter-summaries.json", set.Summaries},
+		{"concretelocaladapter-misuse.json", set.Misuse},
+		{"concretelocaladapter-parity.json", set.Parity},
+		{"concretelocaladapter-collapse.json", set.Collapse},
+	}
+	for _, write := range writes {
+		if err := concretelocaladapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

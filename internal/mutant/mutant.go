@@ -329,6 +329,14 @@ const (
 	ModeProductionReadinessMissingM36Contract       = "productionreadiness_missing_m36_contract"
 	ModeProductionReadinessIgnoresBlockers          = "productionreadiness_ignores_blockers"
 	ModeProductionReadinessGeneratedBackendDrift    = "productionreadiness_generated_backend_drift"
+	ModeConcreteLocalAdapterAllowsExternalBind      = "concretelocaladapter_allows_external_bind"
+	ModeConcreteLocalAdapterAcceptsWildcardBind     = "concretelocaladapter_accepts_wildcard_bind"
+	ModeConcreteLocalAdapterIgnoresBackpressure     = "concretelocaladapter_ignores_backpressure"
+	ModeConcreteLocalAdapterPayloadTraceLeak        = "concretelocaladapter_payload_trace_leak"
+	ModeConcreteLocalAdapterSecretTraceLeak         = "concretelocaladapter_secret_trace_leak"
+	ModeConcreteLocalAdapterWrongRuntimeMapping     = "concretelocaladapter_wrong_runtime_mapping"
+	ModeConcreteLocalAdapterAcceptsMalformedEvent   = "concretelocaladapter_accepts_malformed_event"
+	ModeConcreteLocalAdapterGeneratedBackendDrift   = "concretelocaladapter_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -644,6 +652,14 @@ func Modes() []string {
 		ModeProductionReadinessMissingM36Contract,
 		ModeProductionReadinessIgnoresBlockers,
 		ModeProductionReadinessGeneratedBackendDrift,
+		ModeConcreteLocalAdapterAllowsExternalBind,
+		ModeConcreteLocalAdapterAcceptsWildcardBind,
+		ModeConcreteLocalAdapterIgnoresBackpressure,
+		ModeConcreteLocalAdapterPayloadTraceLeak,
+		ModeConcreteLocalAdapterSecretTraceLeak,
+		ModeConcreteLocalAdapterWrongRuntimeMapping,
+		ModeConcreteLocalAdapterAcceptsMalformedEvent,
+		ModeConcreteLocalAdapterGeneratedBackendDrift,
 	}
 }
 
