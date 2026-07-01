@@ -20,7 +20,9 @@ import (
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
+	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/transportbundle"
 )
 
@@ -1523,6 +1525,68 @@ func GeneratedMeasurementReview() (measurementreview.MeasurementReview, error) {
 	return measurementreview.GenerateReview()
 }
 `, quote(measurementreview.Version), quote(p.ID), p.Seed, quoteSlice(measurementReviewObservationFields()), quoteSlice(measurementreview.AllowedRedactionClasses()), quoteSlice(measurementreview.AllowedConsentModes()), quoteSlice(measurementreview.AllowedRetentionClasses()), quoteSlice(measurementreview.ForbiddenMarkers()), quote(measurementreview.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	proxyEgressSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/proxyegress"
+)
+
+const ProxyEgressSchemaVersion = %[1]s
+const ProxyEgressGeneratedProfileID = %[2]s
+const ProxyEgressGeneratedProfileSeed int64 = %[3]d
+const ProxyEgressMappingPolicy = %[4]s
+
+var ProxyEgressTargetClasses = %[5]s
+var ProxyEgressLifecycleStates = %[6]s
+var ProxyEgressRecommendedNextMilestone = %[7]s
+
+func GeneratedProxyEgressFixture() (proxyegress.EgressFixtureSet, error) {
+	return proxyegress.GenerateFixtureSet()
+}
+
+func GeneratedProxyEgressParity() (proxyegress.EgressParityReport, error) {
+	set, err := proxyegress.GenerateFixtureSet()
+	if err != nil {
+		return proxyegress.EgressParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(proxyegress.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.TargetDescriptorEncoding+"/"+p.CarrierPolicy.CarrierFamily), quoteSlice(proxyEgressTargetClasses()), quoteSlice(proxyEgressLifecycleStates()), quote(proxyegress.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	relayBridgeSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/relaybridge"
+)
+
+const RelayBridgeSchemaVersion = %[1]s
+const RelayBridgeGeneratedProfileID = %[2]s
+const RelayBridgeGeneratedProfileSeed int64 = %[3]d
+const RelayBridgeMappingPolicy = %[4]s
+
+var RelayBridgeStates = %[5]s
+var RelayBridgeScenarioClasses = %[6]s
+var RelayBridgeRecommendedNextMilestone = %[7]s
+
+func GeneratedRelayBridgeFixture() (relaybridge.RelayBridgeFixtureSet, error) {
+	return relaybridge.GenerateFixtureSet()
+}
+
+func GeneratedRelayBridgeParity() (relaybridge.RelayBridgeParityReport, error) {
+	set, err := relaybridge.GenerateFixtureSet()
+	if err != nil {
+		return relaybridge.RelayBridgeParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(relaybridge.Version), quote(p.ID), p.Seed, quote(p.Stream.PriorityPolicy+"/"+p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.BackpressurePolicy), quoteSlice(relayBridgeStates()), quoteSlice(relayBridgeScenarioClasses()), quote(relaybridge.RecommendedNextMilestone))
 	if err != nil {
 		return nil, err
 	}
@@ -3997,6 +4061,167 @@ func TestGeneratedMeasurementReviewHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	proxyEgressTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyegress"
+)
+
+func TestGeneratedProxyEgress(t *testing.T) {
+	if ProxyEgressSchemaVersion != proxyegress.Version || ProxyEgressGeneratedProfileID != ProfileID {
+		t.Fatalf("generated proxyegress constants drifted")
+	}
+	set, err := GeneratedProxyEgressFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(set.Targets) == 0 || len(ProxyEgressTargetClasses) == 0 {
+		t.Fatalf("generated proxyegress fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyEgressParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedProxyEgressParity(t *testing.T) {
+	parity, err := GeneratedProxyEgressParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated proxyegress parity failed: %%+v", parity)
+	}
+	if ProxyEgressRecommendedNextMilestone == "" || ProxyEgressMappingPolicy == "" {
+		t.Fatalf("proxyegress generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyEgressHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/proxyegress"
+)
+
+func TestGeneratedProxyEgressHygiene(t *testing.T) {
+	set, err := GeneratedProxyEgressFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := proxyegress.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"resolver": "synthetic"},
+		{"url": "synthetic"},
+		{"raw_payload": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := proxyegress.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe proxyegress metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayBridgeTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relaybridge"
+)
+
+func TestGeneratedRelayBridge(t *testing.T) {
+	if RelayBridgeSchemaVersion != relaybridge.Version || RelayBridgeGeneratedProfileID != ProfileID {
+		t.Fatalf("generated relaybridge constants drifted")
+	}
+	set, err := GeneratedRelayBridgeFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(set.Streams) == 0 || len(RelayBridgeStates) == 0 {
+		t.Fatalf("generated relaybridge fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayBridgeParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedRelayBridgeParity(t *testing.T) {
+	parity, err := GeneratedRelayBridgeParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated relaybridge parity failed: %%+v", parity)
+	}
+	if RelayBridgeRecommendedNextMilestone == "" || RelayBridgeMappingPolicy == "" {
+		t.Fatalf("relaybridge generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayBridgeHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relaybridge"
+)
+
+func TestGeneratedRelayBridgeHygiene(t *testing.T) {
+	set, err := GeneratedRelayBridgeFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relaybridge.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"raw_payload": "synthetic"},
+		{"secret": "synthetic"},
+		{"real_relay": "synthetic"},
+		{"dial_real": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := relaybridge.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe relaybridge metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -4337,6 +4562,8 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/pathhealth_generated.go", Content: pathHealthSource, Go: true},
 		{RelPath: "protocol/carrierreview_generated.go", Content: carrierReviewSource, Go: true},
 		{RelPath: "protocol/measurementreview_generated.go", Content: measurementReviewSource, Go: true},
+		{RelPath: "protocol/proxyegress_generated.go", Content: proxyEgressSource, Go: true},
+		{RelPath: "protocol/relaybridge_generated.go", Content: relayBridgeSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4402,6 +4629,12 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/measurementreview_test.go", Content: measurementReviewTestSource, Go: true},
 		{RelPath: "protocol/measurementreview_parity_test.go", Content: measurementReviewParityTestSource, Go: true},
 		{RelPath: "protocol/measurementreview_hygiene_test.go", Content: measurementReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/proxyegress_test.go", Content: proxyEgressTestSource, Go: true},
+		{RelPath: "protocol/proxyegress_parity_test.go", Content: proxyEgressParityTestSource, Go: true},
+		{RelPath: "protocol/proxyegress_hygiene_test.go", Content: proxyEgressHygieneTestSource, Go: true},
+		{RelPath: "protocol/relaybridge_test.go", Content: relayBridgeTestSource, Go: true},
+		{RelPath: "protocol/relaybridge_parity_test.go", Content: relayBridgeParityTestSource, Go: true},
+		{RelPath: "protocol/relaybridge_hygiene_test.go", Content: relayBridgeHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -4930,6 +5163,59 @@ func measurementReviewObservationFields() []string {
 		out = append(out, field.Name)
 	}
 	return out
+}
+
+func proxyEgressTargetClasses() []string {
+	return []string{
+		string(proxyegress.EgressTargetEchoSynthetic),
+		string(proxyegress.EgressTargetFixedResponse),
+		string(proxyegress.EgressTargetChunkedResponse),
+		string(proxyegress.EgressTargetSlowResponse),
+		string(proxyegress.EgressTargetLargeObject),
+		string(proxyegress.EgressTargetResetMidstream),
+		string(proxyegress.EgressTargetErrorResponse),
+		string(proxyegress.EgressTargetDripResponse),
+		string(proxyegress.EgressTargetBlackholeSynthetic),
+		string(proxyegress.EgressTargetControlCollapsed),
+	}
+}
+
+func proxyEgressLifecycleStates() []string {
+	return []string{
+		string(proxyegress.EgressStateCreated),
+		string(proxyegress.EgressStateMapped),
+		string(proxyegress.EgressStateTargetBound),
+		string(proxyegress.EgressStateStreaming),
+		string(proxyegress.EgressStateBackpressured),
+		string(proxyegress.EgressStateCompleted),
+		string(proxyegress.EgressStateReset),
+		string(proxyegress.EgressStateFailed),
+		string(proxyegress.EgressStateQuarantined),
+	}
+}
+
+func relayBridgeStates() []string {
+	return []string{
+		string(relaybridge.BridgeStateCreated),
+		string(relaybridge.BridgeStateBound),
+		string(relaybridge.BridgeStateOpen),
+		string(relaybridge.BridgeStateDraining),
+		string(relaybridge.BridgeStateBackpressured),
+		string(relaybridge.BridgeStateFailed),
+		string(relaybridge.BridgeStateReset),
+		string(relaybridge.BridgeStateClosed),
+	}
+}
+
+func relayBridgeScenarioClasses() []string {
+	return []string{
+		"single_stream",
+		"multi_stream",
+		"slow_large_backpressure",
+		"reset_error_isolation",
+		"path_failure_failover",
+		"gated_control",
+	}
 }
 
 func findRepoRoot() (string, error) {
