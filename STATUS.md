@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T20:58:41Z`
+- Generated at: `2026-07-01T22:32:41Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -355,6 +355,22 @@
 | `carrierreadiness_generated_backend_parity` | PASS | `required` | 6 inventory items compared |
 | `carrierreadiness_mutant_detection` | PASS | `required` | 7/7 carrier readiness mutant modes detected |
 | `carrierreadiness_fixture_drift` | PASS | `required` | passed |
+| `httpscarrierreview_scope_contract` | PASS | `required` | 12 blocked behaviors checked |
+| `httpscarrierreview_shape_taxonomy` | PASS | `required` | 8 shape descriptors checked |
+| `httpscarrierreview_stream_mapping` | PASS | `required` | stream open close reset and error mappings locked |
+| `httpscarrierreview_backpressure_contract` | PASS | `required` | 3 carrier pressure signals |
+| `httpscarrierreview_reset_error_contract` | PASS | `required` | 3 safe error buckets |
+| `httpscarrierreview_integration_contract` | PASS | `required` | 6 integration contracts checked |
+| `httpscarrierreview_m42_contract` | PASS | `required` | 11 M42 criteria locked |
+| `httpscarrierreview_blocker_matrix` | PASS | `required` | 12 blockers enforced |
+| `httpscarrierreview_risk_model` | PASS | `required` | 5 risks checked |
+| `httpscarrierreview_checklist` | PASS | `required` | 10 checklist items checked |
+| `httpscarrierreview_misuse_detection` | PASS | `required` | 10 unsafe controls detected |
+| `httpscarrierreview_generated_backend_parity` | PASS | `required` | 5 generated markers checked |
+| `httpscarrierreview_trace_hygiene` | PASS | `required` | fixture trace hygiene scanned |
+| `httpscarrierreview_public_claim_safety` | PASS | `required` | public claim safety markers checked |
+| `httpscarrierreview_mutant_detection` | PASS | `required` | 27/27 HTTPS carrier review mutant modes detected |
+| `httpscarrierreview_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -368,9 +384,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `94 ms`
+- Profile generation: `85 ms`
 - Trace generation: `20 ms`
-- Total audit runtime: `2251 ms`
+- Total audit runtime: `2202 ms`
 
 ## Corpus Diversity Summary
 
@@ -395,7 +411,7 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.319922387336599`
+- `different_profile_average_distance`: `0.31816371549844846`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 

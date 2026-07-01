@@ -108,7 +108,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Generated transport bundle compiler with deterministic bundle modes, candidate roles, profile/wire-policy references, synthetic relay binding, fallback hints, collapse controls, fixtures, and generated-backend parity.
 - Path racing and short-lived scoring harness with deterministic synthetic race scenarios, parallel scheduler modeling, candidate verification, freshness decay, ranking/tie-break controls, misuse detection, fixtures, and generated-backend parity.
 - Continuous path health monitoring and failover modeling with deterministic health scenarios, score decay, relay burn quarantine, confidence expiry, fixture drift gates, and generated-backend parity.
-- Carrier-family design review gates for synthetic carrier readiness, risk gating, misuse detection, trace-hygiene preconditions, and fixture drift.
+- Carrier-family design review gates for synthetic carrier readiness, risk gating, misuse detection, trace-hygiene preconditions, fixture drift, and HTTPS-like carrier lab contract locking.
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
@@ -785,6 +785,19 @@ Kurdistan now separates semantic relay messages from abstract carrier envelopes.
 
 Carrier families include `stream_carrier`, `message_carrier`, `datagram_like_carrier`, `chunked_carrier`, `batch_carrier`, `interactive_carrier`, `long_poll_style_carrier`, and `lossy_reordered_carrier`. The model records safe metadata for envelope counts, chunking, batching, flush behavior, retry/reorder events, and carrier-induced backpressure.
 
+## HTTPS-Like Carrier Design Lock
+
+Milestone 41 narrows the M40 carrier readiness evidence into a contract for the first HTTPS-like lab carrier prototype. It locks request/response shape classes, stream mapping, backpressure mapping, reset/error isolation, misuse controls, fixture schema, trace hygiene, generated parity requirements, and M42 acceptance criteria.
+
+This is a review artifact, not a carrier implementation. It blocks real TLS behavior, real HTTPS client behavior, SNI routing, Host header routing, CDN/provider integration, public-network egress, arbitrary target proxying, payload logging, packet capture, and measurement upload.
+
+Run:
+
+```bash
+go run ./cmd/kcheck httpscarrierreview --quick
+go run ./cmd/kcheck httpscarrierreview verify
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -820,7 +833,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: carrier prototype design review.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype.
 
 ## Research Positioning
 
