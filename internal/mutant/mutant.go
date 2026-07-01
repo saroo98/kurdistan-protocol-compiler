@@ -345,6 +345,14 @@ const (
 	ModeLocalProtocolAdapterAcceptsUDPAssociate     = "localprotocoladapter_accepts_udp_associate"
 	ModeLocalProtocolAdapterHeaderSmuggling         = "localprotocoladapter_header_smuggling"
 	ModeLocalProtocolAdapterGeneratedBackendDrift   = "localprotocoladapter_generated_backend_drift"
+
+	ModeLoopbackRelayAllowsExternalBind    = "loopbackrelay_allows_external_bind"
+	ModeLoopbackRelayAllowsExternalDial    = "loopbackrelay_allows_external_dial"
+	ModeLoopbackRelayAllowsDNSResolution   = "loopbackrelay_allows_dns_resolution"
+	ModeLoopbackRelayLogsPayload           = "loopbackrelay_logs_payload"
+	ModeLoopbackRelayIgnoresBackpressure   = "loopbackrelay_ignores_backpressure"
+	ModeLoopbackRelayAcceptsMalformedFrame = "loopbackrelay_accepts_malformed_frame"
+	ModeLoopbackRelayGeneratedBackendDrift = "loopbackrelay_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -676,6 +684,13 @@ func Modes() []string {
 		ModeLocalProtocolAdapterAcceptsUDPAssociate,
 		ModeLocalProtocolAdapterHeaderSmuggling,
 		ModeLocalProtocolAdapterGeneratedBackendDrift,
+		ModeLoopbackRelayAllowsExternalBind,
+		ModeLoopbackRelayAllowsExternalDial,
+		ModeLoopbackRelayAllowsDNSResolution,
+		ModeLoopbackRelayLogsPayload,
+		ModeLoopbackRelayIgnoresBackpressure,
+		ModeLoopbackRelayAcceptsMalformedFrame,
+		ModeLoopbackRelayGeneratedBackendDrift,
 	}
 }
 
