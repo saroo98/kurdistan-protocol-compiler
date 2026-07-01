@@ -15,6 +15,7 @@ import (
 	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
+	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
@@ -132,6 +133,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localPipelineDrift := localPipelineComparison(filepath.Join(fixtureRoot, "testdata", "localpipeline", "localpipeline-golden.json"), localPipelineSet)
 	productionReadinessReview, productionReadinessErr := productionreadiness.GenerateReview()
 	productionReadinessDrift := productionReadinessComparison(filepath.Join(fixtureRoot, "testdata", "productionreadiness", "productionreadiness-golden.json"), productionReadinessReview)
+	concreteLocalAdapterSet, concreteLocalAdapterErr := concretelocaladapter.GenerateFixtureSet(ctx)
+	concreteLocalAdapterDrift := concreteLocalAdapterComparison(filepath.Join(fixtureRoot, "testdata", "concretelocaladapter", "concretelocaladapter-golden.json"), concreteLocalAdapterSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -331,6 +334,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, ProductionReadinessGates(productionReadinessReview, productionReadinessDrift)...)
 	} else {
 		gates = append(gates, gate("productionreadiness_inventory", false, "required", productionReadinessErr.Error(), nil, []string{productionReadinessErr.Error()}))
+	}
+	if concreteLocalAdapterErr == nil {
+		gates = append(gates, ConcreteLocalAdapterGates(concreteLocalAdapterSet, concreteLocalAdapterDrift)...)
+	} else {
+		gates = append(gates, gate("concretelocaladapter_bind_policy", false, "required", concreteLocalAdapterErr.Error(), nil, []string{concreteLocalAdapterErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
