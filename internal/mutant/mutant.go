@@ -235,6 +235,52 @@ const (
 	ModePathRacePayloadLeak                         = "pathrace_payload_leak"
 	ModePathRaceSecretLeak                          = "pathrace_secret_leak"
 	ModePathRaceGeneratedBackendDrift               = "pathrace_generated_backend_drift"
+	ModePathHealthNoHealthMonitoring                = "pathhealth_no_health_monitoring"
+	ModePathHealthOverEagerFailover                 = "pathhealth_over_eager_failover"
+	ModePathHealthUnderEagerFailover                = "pathhealth_under_eager_failover"
+	ModePathHealthIgnoresStallAfterHandshake        = "pathhealth_ignores_stall_after_handshake"
+	ModePathHealthIgnoresStallAfterData             = "pathhealth_ignores_stall_after_data"
+	ModePathHealthIgnoresResetBurst                 = "pathhealth_ignores_reset_burst"
+	ModePathHealthIgnoresBlackhole                  = "pathhealth_ignores_blackhole"
+	ModePathHealthIgnoresRelayBurn                  = "pathhealth_ignores_relay_burn"
+	ModePathHealthFailoverToBurnedRelay             = "pathhealth_failover_to_burned_relay"
+	ModePathHealthHighRiskDefaultFailover           = "pathhealth_high_risk_default_failover"
+	ModePathHealthExperimentalDefaultFailover       = "pathhealth_experimental_default_failover"
+	ModePathHealthNoScoreDecay                      = "pathhealth_no_score_decay"
+	ModePathHealthNoConfidenceExpiry                = "pathhealth_no_confidence_expiry"
+	ModePathHealthPayloadLeak                       = "pathhealth_payload_leak"
+	ModePathHealthSecretLeak                        = "pathhealth_secret_leak"
+	ModePathHealthGeneratedBackendDrift             = "pathhealth_generated_backend_drift"
+	ModeCarrierReviewClaimsGuaranteedBypass         = "carrierreview_claims_guaranteed_bypass"
+	ModeCarrierReviewClaimsUndetectable             = "carrierreview_claims_undetectable"
+	ModeCarrierReviewFieldReadyCarrier              = "carrierreview_field_ready_carrier"
+	ModeCarrierReviewRealTLSClaim                   = "carrierreview_real_tls_claim"
+	ModeCarrierReviewResolverQueryClaim             = "carrierreview_resolver_query_claim"
+	ModeCarrierReviewQUICCompatibilityClaim         = "carrierreview_quic_compatibility_claim"
+	ModeCarrierReviewDomesticDefault                = "carrierreview_domestic_default"
+	ModeCarrierReviewHighRiskUngated                = "carrierreview_high_risk_ungated"
+	ModeCarrierReviewExperimentalUngated            = "carrierreview_experimental_ungated"
+	ModeCarrierReviewRelayEndpointLeak              = "carrierreview_relay_endpoint_leak"
+	ModeCarrierReviewMissingTracePrecondition       = "carrierreview_missing_trace_precondition"
+	ModeCarrierReviewGoDespiteBlocker               = "carrierreview_go_despite_blocker"
+	ModeCarrierReviewPayloadLeak                    = "carrierreview_payload_leak"
+	ModeCarrierReviewSecretLeak                     = "carrierreview_secret_leak"
+	ModeCarrierReviewGeneratedBackendDrift          = "carrierreview_generated_backend_drift"
+	ModeMeasurementReviewAllowsRawPayload           = "measurementreview_allows_raw_payload"
+	ModeMeasurementReviewAllowsEndpointData         = "measurementreview_allows_endpoint_data"
+	ModeMeasurementReviewAllowsDNSQuery             = "measurementreview_allows_dns_query"
+	ModeMeasurementReviewAllowsResolverIP           = "measurementreview_allows_resolver_ip"
+	ModeMeasurementReviewAllowsLocation             = "measurementreview_allows_location"
+	ModeMeasurementReviewAllowsPhoneSIMDevice       = "measurementreview_allows_phone_sim_device"
+	ModeMeasurementReviewUploadsWithoutOptIn        = "measurementreview_uploads_without_opt_in"
+	ModeMeasurementReviewBackgroundMeasurement      = "measurementreview_background_measurement"
+	ModeMeasurementReviewUnboundedRetention         = "measurementreview_unbounded_retention"
+	ModeMeasurementReviewHashesEndpoint             = "measurementreview_hashes_endpoint"
+	ModeMeasurementReviewExportWithoutRedaction     = "measurementreview_export_without_redaction"
+	ModeMeasurementReviewDomesticNotManual          = "measurementreview_domestic_not_manual"
+	ModeMeasurementReviewPayloadLeak                = "measurementreview_payload_leak"
+	ModeMeasurementReviewSecretLeak                 = "measurementreview_secret_leak"
+	ModeMeasurementReviewGeneratedBackendDrift      = "measurementreview_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -456,6 +502,52 @@ func Modes() []string {
 		ModePathRacePayloadLeak,
 		ModePathRaceSecretLeak,
 		ModePathRaceGeneratedBackendDrift,
+		ModePathHealthNoHealthMonitoring,
+		ModePathHealthOverEagerFailover,
+		ModePathHealthUnderEagerFailover,
+		ModePathHealthIgnoresStallAfterHandshake,
+		ModePathHealthIgnoresStallAfterData,
+		ModePathHealthIgnoresResetBurst,
+		ModePathHealthIgnoresBlackhole,
+		ModePathHealthIgnoresRelayBurn,
+		ModePathHealthFailoverToBurnedRelay,
+		ModePathHealthHighRiskDefaultFailover,
+		ModePathHealthExperimentalDefaultFailover,
+		ModePathHealthNoScoreDecay,
+		ModePathHealthNoConfidenceExpiry,
+		ModePathHealthPayloadLeak,
+		ModePathHealthSecretLeak,
+		ModePathHealthGeneratedBackendDrift,
+		ModeCarrierReviewClaimsGuaranteedBypass,
+		ModeCarrierReviewClaimsUndetectable,
+		ModeCarrierReviewFieldReadyCarrier,
+		ModeCarrierReviewRealTLSClaim,
+		ModeCarrierReviewResolverQueryClaim,
+		ModeCarrierReviewQUICCompatibilityClaim,
+		ModeCarrierReviewDomesticDefault,
+		ModeCarrierReviewHighRiskUngated,
+		ModeCarrierReviewExperimentalUngated,
+		ModeCarrierReviewRelayEndpointLeak,
+		ModeCarrierReviewMissingTracePrecondition,
+		ModeCarrierReviewGoDespiteBlocker,
+		ModeCarrierReviewPayloadLeak,
+		ModeCarrierReviewSecretLeak,
+		ModeCarrierReviewGeneratedBackendDrift,
+		ModeMeasurementReviewAllowsRawPayload,
+		ModeMeasurementReviewAllowsEndpointData,
+		ModeMeasurementReviewAllowsDNSQuery,
+		ModeMeasurementReviewAllowsResolverIP,
+		ModeMeasurementReviewAllowsLocation,
+		ModeMeasurementReviewAllowsPhoneSIMDevice,
+		ModeMeasurementReviewUploadsWithoutOptIn,
+		ModeMeasurementReviewBackgroundMeasurement,
+		ModeMeasurementReviewUnboundedRetention,
+		ModeMeasurementReviewHashesEndpoint,
+		ModeMeasurementReviewExportWithoutRedaction,
+		ModeMeasurementReviewDomesticNotManual,
+		ModeMeasurementReviewPayloadLeak,
+		ModeMeasurementReviewSecretLeak,
+		ModeMeasurementReviewGeneratedBackendDrift,
 	}
 }
 
