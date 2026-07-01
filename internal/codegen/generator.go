@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
+	"kurdistan/internal/productionreadiness"
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relaybridge"
@@ -1619,6 +1620,37 @@ func GeneratedLocalPipelineParity() (localpipeline.PipelineParityReport, error) 
 	return set.Parity, nil
 }
 `, quote(localpipeline.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.ResponseModeEncoding+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.WireShape.PolicyID), quoteSlice(localPipelineScenarioKinds()), quoteSlice(localPipelineStates()), quote(localpipeline.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	productionReadinessSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/productionreadiness"
+)
+
+const ProductionReadinessSchemaVersion = %[1]s
+const ProductionReadinessGeneratedProfileID = %[2]s
+const ProductionReadinessGeneratedProfileSeed int64 = %[3]d
+const ProductionReadinessBoundaryPolicy = %[4]s
+
+var ProductionReadinessContracts = %[5]s
+var ProductionReadinessBoundaries = %[6]s
+var ProductionReadinessRecommendedNextMilestone = %[7]s
+
+func GeneratedProductionReadinessReview() (productionreadiness.ProductionReadinessReview, error) {
+	return productionreadiness.GenerateReview()
+}
+
+func GeneratedProductionReadinessParity() (productionreadiness.ReadinessParityReport, error) {
+	review, err := productionreadiness.GenerateReview()
+	if err != nil {
+		return productionreadiness.ReadinessParityReport{}, err
+	}
+	return review.Parity, nil
+}
+`, quote(productionreadiness.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.Security.CapabilityNegotiationPolicy+"/"+p.WireShape.PolicyID), quoteSlice(productionReadinessContracts()), quoteSlice(productionReadinessBoundaries()), quote(productionreadiness.RecommendedNextMilestone))
 	if err != nil {
 		return nil, err
 	}
@@ -4333,6 +4365,85 @@ func TestGeneratedLocalPipelineHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	productionReadinessTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/productionreadiness"
+)
+
+func TestGeneratedProductionReadiness(t *testing.T) {
+	if ProductionReadinessSchemaVersion != productionreadiness.Version || ProductionReadinessGeneratedProfileID != ProfileID {
+		t.Fatalf("generated productionreadiness constants drifted")
+	}
+	review, err := GeneratedProductionReadinessReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Conclusion != "passed" || len(review.Items) == 0 || len(ProductionReadinessContracts) == 0 {
+		t.Fatalf("generated productionreadiness review failed: %%+v", review)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	productionReadinessParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedProductionReadinessParity(t *testing.T) {
+	parity, err := GeneratedProductionReadinessParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated productionreadiness parity failed: %%+v", parity)
+	}
+	if ProductionReadinessBoundaryPolicy == "" || ProductionReadinessRecommendedNextMilestone == "" {
+		t.Fatalf("productionreadiness generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	productionReadinessHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/productionreadiness"
+)
+
+func TestGeneratedProductionReadinessHygiene(t *testing.T) {
+	review, err := GeneratedProductionReadinessReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := productionreadiness.ScanForLeak(review); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"raw_payload": "synthetic"},
+		{"secret": "synthetic"},
+		{"deployment_token": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := productionreadiness.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe productionreadiness metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -4676,6 +4787,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/proxyegress_generated.go", Content: proxyEgressSource, Go: true},
 		{RelPath: "protocol/relaybridge_generated.go", Content: relayBridgeSource, Go: true},
 		{RelPath: "protocol/localpipeline_generated.go", Content: localPipelineSource, Go: true},
+		{RelPath: "protocol/productionreadiness_generated.go", Content: productionReadinessSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4750,6 +4862,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localpipeline_test.go", Content: localPipelineTestSource, Go: true},
 		{RelPath: "protocol/localpipeline_parity_test.go", Content: localPipelineParityTestSource, Go: true},
 		{RelPath: "protocol/localpipeline_hygiene_test.go", Content: localPipelineHygieneTestSource, Go: true},
+		{RelPath: "protocol/productionreadiness_test.go", Content: productionReadinessTestSource, Go: true},
+		{RelPath: "protocol/productionreadiness_parity_test.go", Content: productionReadinessParityTestSource, Go: true},
+		{RelPath: "protocol/productionreadiness_hygiene_test.go", Content: productionReadinessHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5360,6 +5475,20 @@ func localPipelineStates() []string {
 		string(localpipeline.StateReset),
 		string(localpipeline.StateFailed),
 		string(localpipeline.StateRejected),
+	}
+}
+
+func productionReadinessContracts() []string {
+	return []string{"M36", "M37", "M38", "M39"}
+}
+
+func productionReadinessBoundaries() []string {
+	return []string{
+		productionreadiness.BoundaryStrictLocalOnly,
+		productionreadiness.BoundaryNoRealNetworkIO,
+		productionreadiness.BoundaryNoDeployment,
+		productionreadiness.BoundaryNoPayloadLogging,
+		productionreadiness.BoundaryNoProductionKeyXchg,
 	}
 }
 
