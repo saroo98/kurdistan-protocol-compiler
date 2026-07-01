@@ -26,6 +26,7 @@ import (
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
@@ -138,6 +139,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	concreteLocalAdapterDrift := concreteLocalAdapterComparison(filepath.Join(fixtureRoot, "testdata", "concretelocaladapter", "concretelocaladapter-golden.json"), concreteLocalAdapterSet)
 	localProtocolAdapterSet, localProtocolAdapterErr := localprotocoladapter.GenerateFixtureSet()
 	localProtocolAdapterDrift := localProtocolAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localprotocoladapter", "localprotocoladapter-report-golden.json"), localProtocolAdapterSet)
+	loopbackRelaySet, loopbackRelayErr := loopbackrelay.GenerateFixtureSet()
+	loopbackRelayDrift := loopbackRelayComparison(filepath.Join(fixtureRoot, "testdata", "loopbackrelay", "loopbackrelay-report-golden.json"), loopbackRelaySet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -347,6 +350,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalProtocolAdapterGates(localProtocolAdapterSet, localProtocolAdapterDrift)...)
 	} else {
 		gates = append(gates, gate("localprotocoladapter_config_validation", false, "required", localProtocolAdapterErr.Error(), nil, []string{localProtocolAdapterErr.Error()}))
+	}
+	if loopbackRelayErr == nil {
+		gates = append(gates, LoopbackRelayGates(loopbackRelaySet, loopbackRelayDrift)...)
+	} else {
+		gates = append(gates, gate("loopbackrelay_bind_policy", false, "required", loopbackRelayErr.Error(), nil, []string{loopbackRelayErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
