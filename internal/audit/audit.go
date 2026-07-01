@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/labtrace"
@@ -147,6 +148,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	labEgressDrift := labEgressComparison(filepath.Join(fixtureRoot, "testdata", "labegress", "labegress-report-golden.json"), labEgressSet)
 	carrierReadinessSet, carrierReadinessErr := carrierreadiness.GenerateFixtureSet()
 	carrierReadinessDrift := carrierReadinessComparison(filepath.Join(fixtureRoot, "testdata", "carrierreadiness", "carrierreadiness-golden.json"), carrierReadinessSet)
+	httpsCarrierReviewSet, httpsCarrierReviewErr := httpscarrierreview.GenerateFixtureSet()
+	httpsCarrierReviewDrift := httpsCarrierReviewComparison(filepath.Join(fixtureRoot, "testdata", "httpscarrierreview", "httpscarrierreview-report-golden.json"), httpsCarrierReviewSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -371,6 +374,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, CarrierReadinessGates(carrierReadinessSet, carrierReadinessDrift)...)
 	} else {
 		gates = append(gates, gate("carrierreadiness_inventory", false, "required", carrierReadinessErr.Error(), nil, []string{carrierReadinessErr.Error()}))
+	}
+	if httpsCarrierReviewErr == nil {
+		gates = append(gates, HTTPSCarrierReviewGates(httpsCarrierReviewSet, httpsCarrierReviewDrift)...)
+	} else {
+		gates = append(gates, gate("httpscarrierreview_scope_contract", false, "required", httpsCarrierReviewErr.Error(), nil, []string{httpsCarrierReviewErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
