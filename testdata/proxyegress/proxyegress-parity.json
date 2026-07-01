@@ -1,0 +1,9 @@
+{
+  "version": "proxyegress-v1",
+  "compared_scenarios": 16,
+  "matching_lifecycle": 16,
+  "matching_mappings": 13,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

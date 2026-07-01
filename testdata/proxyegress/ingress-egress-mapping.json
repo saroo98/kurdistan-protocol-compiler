@@ -1,0 +1,14 @@
+{
+  "version": "proxyegress-v1",
+  "ingress_requests_checked": 14,
+  "egress_requests_created": 13,
+  "streams_mapped": 13,
+  "descriptor_abuse_rejected": 1,
+  "backpressure_preserved": true,
+  "reset_mapping_preserved": true,
+  "error_mapping_preserved": true,
+  "isolation_preserved": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
