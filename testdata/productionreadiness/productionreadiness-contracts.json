@@ -1,0 +1,66 @@
+[
+  {
+    "milestone": "M36",
+    "name": "concrete local socket adapter",
+    "allowed_scope": "loopback-only local socket harness",
+    "required_gates": [
+      "productionreadiness",
+      "localpipeline",
+      "hardening",
+      "codegen"
+    ],
+    "forbidden_scopes": [
+      "external targets",
+      "public network relay",
+      "deployment"
+    ],
+    "status": "needs-design"
+  },
+  {
+    "milestone": "M37",
+    "name": "socket adapter adversarial hardening",
+    "allowed_scope": "deterministic loopback misuse and pressure tests",
+    "required_gates": [
+      "M36 gates",
+      "trace hygiene",
+      "mutant detection"
+    ],
+    "forbidden_scopes": [
+      "field probing",
+      "external DNS",
+      "HTTP/TLS mimicry"
+    ],
+    "status": "needs-design"
+  },
+  {
+    "milestone": "M38",
+    "name": "adapter readiness consolidation",
+    "allowed_scope": "review matrix and fixture freeze",
+    "required_gates": [
+      "M36",
+      "M37",
+      "fixture drift"
+    ],
+    "forbidden_scopes": [
+      "production claims",
+      "mobile client"
+    ],
+    "status": "needs-design"
+  },
+  {
+    "milestone": "M39",
+    "name": "client architecture review",
+    "allowed_scope": "architecture-only review of future client constraints",
+    "required_gates": [
+      "privacy review",
+      "trace hygiene",
+      "local-only test plan"
+    ],
+    "forbidden_scopes": [
+      "app store release",
+      "user-risk guidance",
+      "field readiness claims"
+    ],
+    "status": "needs-design"
+  }
+]

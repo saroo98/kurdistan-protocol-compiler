@@ -1,0 +1,247 @@
+[
+  {
+    "name": "adapter interface",
+    "layer": "adapter",
+    "status": "ready-for-review",
+    "evidence": [
+      "flow lifecycle",
+      "config validation",
+      "capability compatibility"
+    ],
+    "remaining_risk": "interface only",
+    "next_action": "only add concrete adapters after readiness gates"
+  },
+  {
+    "name": "byte transport harness",
+    "layer": "bytepath",
+    "status": "ready-for-review",
+    "evidence": [
+      "bounded byte pipe",
+      "fragmentation",
+      "sequence checks",
+      "corruption rejection"
+    ],
+    "remaining_risk": "local deterministic bytes only",
+    "next_action": "keep malformed byte corpus current"
+  },
+  {
+    "name": "byte-path fixtures",
+    "layer": "bytepath",
+    "status": "ready-for-review",
+    "evidence": [
+      "golden summaries",
+      "malformed corpus",
+      "parity checks"
+    ],
+    "remaining_risk": "safe metadata only",
+    "next_action": "regenerate only when drift is reviewed"
+  },
+  {
+    "name": "carrier abstraction",
+    "layer": "carrier",
+    "status": "ready-for-review",
+    "evidence": [
+      "carrier envelope validation",
+      "queue limits",
+      "reorder/retry recovery"
+    ],
+    "remaining_risk": "abstract carriers are not deployable carriers",
+    "next_action": "review each carrier family separately"
+  },
+  {
+    "name": "compiler",
+    "layer": "compiler",
+    "status": "ready-for-review",
+    "evidence": [
+      "profile generation",
+      "seed stability",
+      "corpus diversity gates"
+    ],
+    "remaining_risk": "future policy expansion can regress diversity",
+    "next_action": "keep corpus and mutation gates mandatory"
+  },
+  {
+    "name": "documentation and status",
+    "layer": "docs",
+    "status": "ready-for-review",
+    "evidence": [
+      "README",
+      "KIP docs",
+      "STATUS",
+      "docs site"
+    ],
+    "remaining_risk": "docs can drift",
+    "next_action": "update docs with every command and gate"
+  },
+  {
+    "name": "end-to-end local proxy pipeline",
+    "layer": "pipeline",
+    "status": "ready-for-review",
+    "evidence": [
+      "localpipeline",
+      "boundary integration",
+      "descriptor rejection",
+      "collapse controls"
+    ],
+    "remaining_risk": "synthetic local pipeline only",
+    "next_action": "use as readiness evidence for M35"
+  },
+  {
+    "name": "framing",
+    "layer": "runtime",
+    "status": "ready-for-review",
+    "evidence": [
+      "round trip",
+      "malformed rejection",
+      "cross-profile checks"
+    ],
+    "remaining_risk": "future grammar expansion needs new malformed cases",
+    "next_action": "extend framing fuzz coverage"
+  },
+  {
+    "name": "generated backend parity",
+    "layer": "codegen",
+    "status": "ready-for-review",
+    "evidence": [
+      "kgen source scanner",
+      "generated tests",
+      "codegen quick audit"
+    ],
+    "remaining_risk": "shared helpers still exist",
+    "next_action": "keep scanner expanding"
+  },
+  {
+    "name": "host and relay risk models",
+    "layer": "risk",
+    "status": "ready-for-review",
+    "evidence": [
+      "hostdetect",
+      "relayfleet",
+      "burn-risk controls"
+    ],
+    "remaining_risk": "synthetic hosts and relays only",
+    "next_action": "no infrastructure automation"
+  },
+  {
+    "name": "local adapter prototype",
+    "layer": "adapter",
+    "status": "ready-for-review",
+    "evidence": [
+      "memory ingress",
+      "memory egress",
+      "source/sink models"
+    ],
+    "remaining_risk": "memory-only prototype",
+    "next_action": "use byte transport and local pipeline as prerequisites"
+  },
+  {
+    "name": "profile validation",
+    "layer": "compiler",
+    "status": "ready-for-review",
+    "evidence": [
+      "schema validation",
+      "bounded limits",
+      "unsupported policy rejection"
+    ],
+    "remaining_risk": "new policy fields need validators",
+    "next_action": "require tests for each policy"
+  },
+  {
+    "name": "proxy egress and relay bridge",
+    "layer": "proxy",
+    "status": "ready-for-review",
+    "evidence": [
+      "proxyegress",
+      "relaybridge",
+      "generated parity"
+    ],
+    "remaining_risk": "synthetic egress and bridge only",
+    "next_action": "keep egress descriptors safe"
+  },
+  {
+    "name": "proxy ingress prototype",
+    "layer": "proxy",
+    "status": "ready-for-review",
+    "evidence": [
+      "localproxyingress",
+      "adversarial hardening",
+      "fixture drift"
+    ],
+    "remaining_risk": "no socket listener",
+    "next_action": "bridge through M33/M34 before concrete adapter"
+  },
+  {
+    "name": "proxy semantics",
+    "layer": "proxy",
+    "status": "ready-for-review",
+    "evidence": [
+      "synthetic target registry",
+      "descriptor rejection",
+      "target isolation"
+    ],
+    "remaining_risk": "synthetic targets are not real destinations",
+    "next_action": "keep target classes synthetic until reviewed"
+  },
+  {
+    "name": "runtime session lifecycle",
+    "layer": "runtime",
+    "status": "ready-for-review",
+    "evidence": [
+      "roles",
+      "session state",
+      "capability negotiation",
+      "in-memory link"
+    ],
+    "remaining_risk": "no real socket session manager",
+    "next_action": "keep runtime adversary gates mandatory"
+  },
+  {
+    "name": "security context",
+    "layer": "security",
+    "status": "ready-for-review",
+    "evidence": [
+      "transcript binding",
+      "nonce/replay",
+      "downgrade rejection"
+    ],
+    "remaining_risk": "no production key exchange",
+    "next_action": "design key exchange separately"
+  },
+  {
+    "name": "stream semantics",
+    "layer": "runtime",
+    "status": "ready-for-review",
+    "evidence": [
+      "max stream gates",
+      "flow control",
+      "backpressure",
+      "reset isolation"
+    ],
+    "remaining_risk": "future concrete adapters add pressure",
+    "next_action": "keep stream adversary gates mandatory"
+  },
+  {
+    "name": "trace hygiene",
+    "layer": "safety",
+    "status": "ready-for-review",
+    "evidence": [
+      "payload-free summaries",
+      "forbidden field scans",
+      "STATUS audit"
+    ],
+    "remaining_risk": "new fields can drift",
+    "next_action": "update scanner allowlists with tests"
+  },
+  {
+    "name": "wire-shape baselines",
+    "layer": "wire",
+    "status": "ready-for-review",
+    "evidence": [
+      "wire features",
+      "wiregen",
+      "wireeval datasets"
+    ],
+    "remaining_risk": "classifier harness is offline synthetic",
+    "next_action": "treat live captures as separate review"
+  }
+]
