@@ -1,0 +1,7 @@
+{
+  "fields_checked": 18,
+  "bucketed_fields": 18,
+  "rejected_unsafe_fields": 0,
+  "recommended_next_milestone": "M33: local proxy egress and relay bridge model",
+  "conclusion": "passed"
+}

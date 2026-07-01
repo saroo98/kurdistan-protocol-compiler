@@ -1,0 +1,226 @@
+{
+  "version": "measurementreview-v1",
+  "review_id": "safe_measurement_client_design_review_v1",
+  "fields": [
+    {
+      "name": "path_availability_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "handshake_outcome_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "first_useful_byte_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "stall_pattern_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "reset_like_failure_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "blackhole_like_failure_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "dns_poisoning_like_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "dns_truncation_like_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "dns_rate_limit_like_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "relay_burn_like_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "carrier_family_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "bundle_candidate_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "score_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "health_state_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "failover_outcome_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "coarse_platform_class",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "coarse_network_class",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    },
+    {
+      "name": "coarse_time_bucket",
+      "class": "safe_bucket",
+      "redaction_class": "bucket",
+      "retention_class": "session_only",
+      "allowed_in_fixture": true
+    }
+  ],
+  "policy": {
+    "consent_mode": "local_only",
+    "retention_class": "session_only",
+    "local_diagnostics_only": true,
+    "background_collection": false,
+    "manual_export_requires_review": true,
+    "allowed_observation_classes": [
+      "path_availability_bucket",
+      "handshake_outcome_bucket",
+      "first_useful_byte_bucket",
+      "stall_pattern_bucket",
+      "reset_like_failure_bucket",
+      "blackhole_like_failure_bucket",
+      "dns_poisoning_like_bucket",
+      "dns_truncation_like_bucket",
+      "dns_rate_limit_like_bucket",
+      "relay_burn_like_bucket",
+      "carrier_family_bucket",
+      "bundle_candidate_bucket",
+      "score_bucket",
+      "health_state_bucket",
+      "failover_outcome_bucket",
+      "coarse_platform_class",
+      "coarse_network_class",
+      "coarse_time_bucket"
+    ],
+    "rejected_observation_classes": [
+      "raw_payload",
+      "raw_packet",
+      "exact_destination",
+      "dns_query",
+      "resolver_ip",
+      "precise_location",
+      "subscriber_or_device_identifier",
+      "secret_material"
+    ]
+  },
+  "diagnostics": {
+    "version": "measurementreview-v1",
+    "report_id": "measurement_local_diagnostics_v1",
+    "observation_count": 18,
+    "field_count": 18,
+    "bucket_counts": {
+      "bucket": 18
+    },
+    "consent_mode": "local_only",
+    "retention_class": "session_only",
+    "local_only": true,
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:3f9c88b2374bdf6ab52fb942e97dff78e124ac751fff6c4daf5f64928dc5ce88",
+    "conclusion": "passed"
+  },
+  "matrix": {
+    "layers": {
+      "adaptivepath": "candidate families, freshness, and uncertainty buckets",
+      "carrierreview": "carrier-family risk review preconditions",
+      "documentation": "public boundary and privacy review notes",
+      "generated_backend_parity": "generated/interpreted review parity",
+      "hardening": "trace hygiene and resource-limit checks",
+      "hostdetect": "host-level risk buckets",
+      "pathhealth": "health state and failover outcomes",
+      "pathrace": "short-lived scoring outcomes",
+      "relayfleet": "synthetic relay lifecycle risk buckets",
+      "trace_hygiene": "bucketed local diagnostic metadata",
+      "transportbundle": "bundle candidate classes without concrete endpoints",
+      "wireeval": "offline dataset evaluation summaries"
+    }
+  },
+  "misuse": {
+    "fields_checked": 18,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "compared_fields": 18,
+    "redaction_matches": 18,
+    "retention_matches": 18,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "readiness": {
+    "fields_checked": 18,
+    "bucketed_fields": 18,
+    "rejected_unsafe_fields": 0,
+    "recommended_next_milestone": "M33: local proxy egress and relay bridge model",
+    "conclusion": "passed"
+  },
+  "payload_logged": false,
+  "secret_logged": false,
+  "review_hash": "sha256:e2e4c1a114a07b8aaa5449b7496404fc338eaba458506298b490568216285ef0",
+  "conclusion": "passed"
+}

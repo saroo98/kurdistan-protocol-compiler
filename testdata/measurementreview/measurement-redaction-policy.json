@@ -1,0 +1,37 @@
+{
+  "consent_mode": "local_only",
+  "retention_class": "session_only",
+  "local_diagnostics_only": true,
+  "background_collection": false,
+  "manual_export_requires_review": true,
+  "allowed_observation_classes": [
+    "path_availability_bucket",
+    "handshake_outcome_bucket",
+    "first_useful_byte_bucket",
+    "stall_pattern_bucket",
+    "reset_like_failure_bucket",
+    "blackhole_like_failure_bucket",
+    "dns_poisoning_like_bucket",
+    "dns_truncation_like_bucket",
+    "dns_rate_limit_like_bucket",
+    "relay_burn_like_bucket",
+    "carrier_family_bucket",
+    "bundle_candidate_bucket",
+    "score_bucket",
+    "health_state_bucket",
+    "failover_outcome_bucket",
+    "coarse_platform_class",
+    "coarse_network_class",
+    "coarse_time_bucket"
+  ],
+  "rejected_observation_classes": [
+    "raw_payload",
+    "raw_packet",
+    "exact_destination",
+    "dns_query",
+    "resolver_ip",
+    "precise_location",
+    "subscriber_or_device_identifier",
+    "secret_material"
+  ]
+}
