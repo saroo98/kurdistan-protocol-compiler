@@ -111,6 +111,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Carrier-family design review gates for synthetic carrier readiness, risk gating, misuse detection, trace-hygiene preconditions, and fixture drift.
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
+- End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -179,6 +180,9 @@ internal/localproxyingress + internal/localproxyingressadversary
 internal/proxyegress + internal/relaybridge
   trace-safe local proxy egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, misuse controls, and generated parity checks
 
+internal/localpipeline
+  deterministic end-to-end local proxy pipeline fixtures, boundary integration checks, descriptor rejection, collapse controls, misuse detection, and generated parity checks
+
 internal/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
@@ -236,6 +240,7 @@ go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
+go run ./cmd/kcheck localpipeline --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -322,6 +327,7 @@ Kurdistan treats diversity as something to measure.
 - measurement-review observation schema, redaction policy, consent/retention checks, local diagnostics, privacy readiness, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 - proxy egress contract validation, synthetic target model checks, ingress-to-egress mapping, adaptive binding, lifecycle execution, backpressure, reset/error isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 - relay bridge session validation, stream mapping, adaptive runtime binding, backpressure, reset/error isolation, stream isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
+- local proxy pipeline correctness, boundary integration, bridge composition, byte transport metadata, backpressure, reset/error isolation, descriptor rejection, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -681,7 +687,20 @@ go run ./cmd/kcheck relaybridge --quick
 go run ./cmd/kcheck relaybridge --full --out testdata/audit/relaybridge.json
 go run ./cmd/kcheck relaybridge generate --out testdata/relaybridge/relaybridge-report-golden.json --force
 go run ./cmd/kcheck relaybridge verify
+
+go run ./cmd/kcheck localpipeline --quick
+go run ./cmd/kcheck localpipeline --full --out testdata/audit/localpipeline.json
+go run ./cmd/kcheck localpipeline generate --out testdata/localpipeline/localpipeline-golden.json --force
+go run ./cmd/kcheck localpipeline verify
 ```
+
+## End-To-End Local Proxy Pipeline
+
+Milestone 34 adds a deterministic local pipeline model that composes local proxy ingress evidence, proxy egress descriptors, relay bridge sessions, byte transport metadata, runtime stream mapping, and adaptive-path prerequisites into one trace-safe fixture set.
+
+`internal/localpipeline` defines synthetic scenarios for single-flow echo, many small requests, large backpressure, slow chunked response, reset isolation, target error isolation, bridge backpressure, path failover, descriptor rejection, mixed synthetic targets, collapse controls, and leak controls. The audit checks boundary integration, backpressure, reset/error isolation, descriptor rejection, collapse resistance, fixture drift, trace hygiene, and generated/interpreted parity.
+
+The model records only counts, buckets, state paths, hashes, and hygiene flags. It does not implement a socket listener, outbound dialer, real relay, DNS resolver, packet capture, deployment behavior, or concrete proxy/VPN adapter.
 
 ## Multi-Stream Semantics
 
