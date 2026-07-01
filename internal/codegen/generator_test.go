@@ -46,6 +46,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/relayfleet_generated.go",
 		"protocol/adaptivepath_generated.go",
 		"protocol/transportbundle_generated.go",
+		"protocol/pathrace_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -78,6 +79,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/transportbundle_test.go",
 		"protocol/transportbundle_parity_test.go",
 		"protocol/transportbundle_hygiene_test.go",
+		"protocol/pathrace_test.go",
+		"protocol/pathrace_parity_test.go",
+		"protocol/pathrace_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -139,6 +143,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const RelayFleetSchemaVersion") ||
 		!strings.Contains(protocolSource, "const AdaptivePathSchemaVersion") ||
 		!strings.Contains(protocolSource, "const TransportBundleSchemaVersion") ||
+		!strings.Contains(protocolSource, "const PathRaceSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -206,6 +211,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
 	relayFleetB := mustRead(t, filepath.Join(outB, "protocol", "relayfleet_generated.go"))
+	pathRaceA := mustRead(t, filepath.Join(outA, "protocol", "pathrace_generated.go"))
+	pathRaceB := mustRead(t, filepath.Join(outB, "protocol", "pathrace_generated.go"))
 	if stateA == stateB {
 		t.Fatalf("state generation did not differ across profiles")
 	}
@@ -238,6 +245,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if relayFleetA == relayFleetB {
 		t.Fatalf("relayfleet generation did not differ across profiles")
+	}
+	if pathRaceA == pathRaceB {
+		t.Fatalf("pathrace generation did not differ across profiles")
 	}
 }
 

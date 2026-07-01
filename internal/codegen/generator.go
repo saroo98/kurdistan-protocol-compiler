@@ -16,6 +16,7 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/pathrace"
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/transportbundle"
 )
@@ -1386,6 +1387,49 @@ func GeneratedTransportBundleCollapse(ctx context.Context) (transportbundle.Bund
 	return set.CollapseReport, nil
 }
 `, quote(string(transportbundle.Version)), quote(p.ID), p.Seed, quoteSlice(transportBundleModeStrings()), quoteSlice(transportBundleCandidateRoles()), quoteSlice(transportbundle.ForbiddenMarkers()), quote(transportbundle.DefaultPolicy(12345, transportbundle.BundleModeBalancedAdaptive).PolicyHash))
+	if err != nil {
+		return nil, err
+	}
+
+	pathRaceSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/pathrace"
+)
+
+const PathRaceSchemaVersion = %[1]s
+const PathRaceGeneratedProfileID = %[2]s
+const PathRaceGeneratedProfileSeed int64 = %[3]d
+
+var PathRaceModes = %[4]s
+var PathRaceEventKinds = %[5]s
+var PathRaceStates = %[6]s
+var PathRaceForbiddenFields = %[7]s
+var PathRaceDefaultSchedulerPolicyHash = %[8]s
+var PathRaceDefaultScoringPolicyHash = %[9]s
+
+func GeneratedPathRaceFixtureSet(ctx context.Context) (pathrace.PathRaceFixtureSet, error) {
+	return pathrace.GenerateFixtureSet(ctx)
+}
+
+func GeneratedPathRaceParity(ctx context.Context) (pathrace.PathRaceParityReport, error) {
+	set, err := pathrace.GenerateFixtureSet(ctx)
+	if err != nil {
+		return pathrace.PathRaceParityReport{}, err
+	}
+	return set.Parity, nil
+}
+
+func GeneratedPathRaceMisuse(ctx context.Context) (pathrace.PathRaceMisuseReport, error) {
+	set, err := pathrace.GenerateFixtureSet(ctx)
+	if err != nil {
+		return pathrace.PathRaceMisuseReport{}, err
+	}
+	return set.Controls, nil
+}
+`, quote(string(pathrace.Version)), quote(p.ID), p.Seed, quoteSlice(pathRaceModeStrings()), quoteSlice(pathRaceEventKindStrings()), quoteSlice(pathRaceStateStrings()), quoteSlice(pathrace.ForbiddenMarkers()), quote(pathrace.DefaultSchedulerPolicy(pathrace.RaceModeVerifiedUsable).PolicyHash), quote(pathrace.DefaultScoringPolicy().PolicyHash))
 	if err != nil {
 		return nil, err
 	}
@@ -3490,6 +3534,106 @@ func TestGeneratedTransportBundleHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	pathRaceTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/pathrace"
+)
+
+func TestGeneratedPathRaceFixtureSet(t *testing.T) {
+	if PathRaceSchemaVersion != string(pathrace.Version) || PathRaceGeneratedProfileID != ProfileID {
+		t.Fatalf("generated pathrace constants drifted")
+	}
+	set, err := GeneratedPathRaceFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pathrace.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(PathRaceModes) == 0 || len(PathRaceEventKinds) == 0 || len(PathRaceStates) == 0 {
+		t.Fatalf("generated pathrace taxonomy markers missing")
+	}
+	if set.PayloadLogged || set.SecretLogged {
+		t.Fatalf("generated pathrace fixture leaked sensitive flags")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	pathRaceParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+)
+
+func TestGeneratedPathRaceParity(t *testing.T) {
+	report, err := GeneratedPathRaceParity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Conclusion != "passed" || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated pathrace parity failed: %%+v", report)
+	}
+	misuse, err := GeneratedPathRaceMisuse(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if misuse.Conclusion != "failed" || len(misuse.MisuseFindings) == 0 {
+		t.Fatalf("generated pathrace misuse controls were not detected: %%+v", misuse)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	pathRaceHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/pathrace"
+)
+
+func TestGeneratedPathRaceHygiene(t *testing.T) {
+	set, err := GeneratedPathRaceFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pathrace.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range PathRaceForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty pathrace forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"payload": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := pathrace.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe pathrace metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3826,6 +3970,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyingressadv_generated.go", Content: localProxyIngressAdvSource, Go: true},
 		{RelPath: "protocol/adaptivepath_generated.go", Content: adaptivePathSource, Go: true},
 		{RelPath: "protocol/transportbundle_generated.go", Content: transportBundleSource, Go: true},
+		{RelPath: "protocol/pathrace_generated.go", Content: pathRaceSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -3879,6 +4024,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/transportbundle_test.go", Content: transportBundleTestSource, Go: true},
 		{RelPath: "protocol/transportbundle_parity_test.go", Content: transportBundleParityTestSource, Go: true},
 		{RelPath: "protocol/transportbundle_hygiene_test.go", Content: transportBundleHygieneTestSource, Go: true},
+		{RelPath: "protocol/pathrace_test.go", Content: pathRaceTestSource, Go: true},
+		{RelPath: "protocol/pathrace_parity_test.go", Content: pathRaceParityTestSource, Go: true},
+		{RelPath: "protocol/pathrace_hygiene_test.go", Content: pathRaceHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -4343,6 +4491,43 @@ func transportBundleCandidateRoles() []string {
 		string(transportbundle.CandidateRoleHighRiskGated),
 		string(transportbundle.CandidateRoleControl),
 		string(transportbundle.CandidateRoleRejected),
+	}
+}
+
+func pathRaceModeStrings() []string {
+	return []string{
+		string(pathrace.RaceModeFirstUsable),
+		string(pathrace.RaceModeVerifiedUsable),
+		string(pathrace.RaceModeConservative),
+		string(pathrace.RaceModeSurvivalFallback),
+		string(pathrace.RaceModeExperimentalGated),
+		string(pathrace.RaceModeControlCollapsed),
+	}
+}
+
+func pathRaceEventKindStrings() []string {
+	return []string{
+		string(pathrace.RaceEventCandidateStarted),
+		string(pathrace.RaceEventHandshakeObserved),
+		string(pathrace.RaceEventFirstUsefulByte),
+		string(pathrace.RaceEventCandidateStalled),
+		string(pathrace.RaceEventCandidateFailed),
+		string(pathrace.RaceEventCandidateVerified),
+		string(pathrace.RaceEventCandidateRejected),
+		string(pathrace.RaceEventRaceCompleted),
+	}
+}
+
+func pathRaceStateStrings() []string {
+	return []string{
+		string(pathrace.RaceStatePending),
+		string(pathrace.RaceStateStarted),
+		string(pathrace.RaceStateVerifying),
+		string(pathrace.RaceStateVerified),
+		string(pathrace.RaceStateStalled),
+		string(pathrace.RaceStateFailed),
+		string(pathrace.RaceStateRejected),
+		string(pathrace.RaceStateGated),
 	}
 }
 
