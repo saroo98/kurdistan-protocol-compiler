@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/labegress"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/localpipeline"
@@ -141,6 +142,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localProtocolAdapterDrift := localProtocolAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localprotocoladapter", "localprotocoladapter-report-golden.json"), localProtocolAdapterSet)
 	loopbackRelaySet, loopbackRelayErr := loopbackrelay.GenerateFixtureSet()
 	loopbackRelayDrift := loopbackRelayComparison(filepath.Join(fixtureRoot, "testdata", "loopbackrelay", "loopbackrelay-report-golden.json"), loopbackRelaySet)
+	labEgressSet, labEgressErr := labegress.GenerateFixtureSet()
+	labEgressDrift := labEgressComparison(filepath.Join(fixtureRoot, "testdata", "labegress", "labegress-report-golden.json"), labEgressSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -355,6 +358,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LoopbackRelayGates(loopbackRelaySet, loopbackRelayDrift)...)
 	} else {
 		gates = append(gates, gate("loopbackrelay_bind_policy", false, "required", loopbackRelayErr.Error(), nil, []string{loopbackRelayErr.Error()}))
+	}
+	if labEgressErr == nil {
+		gates = append(gates, LabEgressGates(labEgressSet, labEgressDrift)...)
+	} else {
+		gates = append(gates, gate("labegress_allowlist_validation", false, "required", labEgressErr.Error(), nil, []string{labEgressErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
