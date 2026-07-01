@@ -1,0 +1,20 @@
+{
+  "scenario_count": 3,
+  "candidate_count": 15,
+  "winners_declared": 3,
+  "misuse_findings": [
+    "all_scores_identical",
+    "always_picks_first_candidate",
+    "burned_relay_candidate_wins",
+    "freshness_ttl_ignored",
+    "high_risk_candidate_wins_by_default",
+    "stale_success_beats_fresh_success"
+  ],
+  "stale_wins_detected": 1,
+  "high_risk_wins_detected": 2,
+  "experimental_wins_detected": 0,
+  "burned_wins_detected": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "failed"
+}
