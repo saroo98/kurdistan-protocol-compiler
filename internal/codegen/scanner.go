@@ -78,6 +78,8 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/pathhealth_generated.go",
 		"protocol/carrierreview_generated.go",
 		"protocol/measurementreview_generated.go",
+		"protocol/proxyegress_generated.go",
+		"protocol/relaybridge_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -194,7 +196,9 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const PathRaceSchemaVersion") &&
 		strings.Contains(joined, "const PathHealthSchemaVersion") &&
 		strings.Contains(joined, "const CarrierReviewSchemaVersion") &&
-		strings.Contains(joined, "const MeasurementReviewSchemaVersion")
+		strings.Contains(joined, "const MeasurementReviewSchemaVersion") &&
+		strings.Contains(joined, "const ProxyEgressSchemaVersion") &&
+		strings.Contains(joined, "const RelayBridgeSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)

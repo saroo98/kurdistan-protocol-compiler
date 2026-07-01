@@ -109,6 +109,8 @@ type CodegenAuditSummary struct {
 	PathHealthGeneratedParity        string                         `json:"pathhealth_generated_backend_parity"`
 	CarrierReviewGeneratedParity     string                         `json:"carrierreview_generated_backend_parity"`
 	MeasurementReviewGeneratedParity string                         `json:"measurementreview_generated_backend_parity"`
+	ProxyEgressGeneratedParity       string                         `json:"proxyegress_generated_backend_parity"`
+	RelayBridgeGeneratedParity       string                         `json:"relaybridge_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -207,6 +209,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	pathHealthGate := GeneratedPathHealthParityGate(corpus, testFailures)
 	carrierReviewGate := GeneratedCarrierReviewParityGate(corpus, testFailures)
 	measurementReviewGate := GeneratedMeasurementReviewParityGate(corpus, testFailures)
+	proxyEgressGate := GeneratedProxyEgressParityGate(corpus, testFailures)
+	relayBridgeGate := GeneratedRelayBridgeParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -245,6 +249,8 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		pathHealthGate,
 		carrierReviewGate,
 		measurementReviewGate,
+		proxyEgressGate,
+		relayBridgeGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -997,6 +1003,53 @@ func GeneratedMeasurementReviewParityGate(corpus GeneratedBackendTraceCorpus, te
 	}, failures)
 }
 
+func GeneratedProxyEgressParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "proxyegress", "proxy egress", "ProxyEgressSchemaVersion")
+}
+
+func GeneratedRelayBridgeParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "relaybridge", "relay bridge", "RelayBridgeSchemaVersion")
+}
+
+func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module "+label+" tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated "+label+" specialization constants missing")
+	}
+	uniqueFiles := 0
+	generatedRel := "protocol/" + slug + "_generated.go"
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == generatedRel {
+			uniqueFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && uniqueFiles < 2 {
+		failures = append(failures, "generated "+label+" specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{slug + "_generated.go", slug + "_test.go", slug + "_parity_test.go", slug + "_hygiene_test.go", schemaMarker} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated "+slug+" marker "+marker)
+				}
+			}
+		}
+	}
+	return gate(slug+"_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include %s tests and constants", corpus.GeneratedModules, label), map[string]any{
+		"generated_modules":            corpus.GeneratedModules,
+		"generated_test_failures":      len(testFailures),
+		slug + "_unique_files":         uniqueFiles,
+		"generated_source_specialized": corpus.SourceScan.ProfileSpecificConstantsPresent,
+		slug + "_generated_artifacts":  []string{slug + "_generated.go", slug + "_test.go", slug + "_parity_test.go", slug + "_hygiene_test.go"},
+	}, failures)
+}
+
 func GeneratedByteTransportParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1155,6 +1208,8 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		PathHealthGeneratedParity:        status("pathhealth_generated_backend_parity"),
 		CarrierReviewGeneratedParity:     status("carrierreview_generated_backend_parity"),
 		MeasurementReviewGeneratedParity: status("measurementreview_generated_backend_parity"),
+		ProxyEgressGeneratedParity:       status("proxyegress_generated_backend_parity"),
+		RelayBridgeGeneratedParity:       status("relaybridge_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
