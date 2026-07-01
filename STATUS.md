@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T12:42:32Z`
+- Generated at: `2026-07-01T12:56:59Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -277,6 +277,16 @@
 | `relaybridge_trace_hygiene` | PASS | `required` | relay bridge summaries contain safe metadata only |
 | `relaybridge_mutant_detection` | PASS | `required` | 13/13 relaybridge mutant modes detected |
 | `relaybridge_fixture_drift` | PASS | `required` | passed |
+| `localpipeline_correctness` | PASS | `required` | 12 runs checked |
+| `localpipeline_boundary_integration` | PASS | `required` | 12 scenarios bound |
+| `localpipeline_backpressure` | PASS | `required` | 23 pressure events |
+| `localpipeline_error_reset_isolation` | PASS | `required` | 8 errors, 2 resets |
+| `localpipeline_descriptor_rejection` | PASS | `required` | 2 descriptor rejections |
+| `localpipeline_trace_hygiene` | PASS | `required` | local pipeline summaries contain safe metadata only |
+| `localpipeline_collapse_resistance` | PASS | `required` | diversity 0.83 |
+| `localpipeline_generated_backend_parity` | PASS | `required` | 12 scenarios compared |
+| `localpipeline_mutant_detection` | PASS | `required` | 11/11 localpipeline mutant modes detected |
+| `localpipeline_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -290,9 +300,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `88 ms`
-- Trace generation: `27 ms`
-- Total audit runtime: `2182 ms`
+- Profile generation: `96 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2202 ms`
 
 ## Corpus Diversity Summary
 
@@ -315,9 +325,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3199253603649493`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3196198410994695`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
