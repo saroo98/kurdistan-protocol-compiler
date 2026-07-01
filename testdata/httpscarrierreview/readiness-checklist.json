@@ -1,0 +1,52 @@
+[
+  {
+    "name": "scope contract locked",
+    "checked": true,
+    "evidence": "allowed and blocked behaviors enumerated"
+  },
+  {
+    "name": "request shape taxonomy locked",
+    "checked": true,
+    "evidence": "four request shape classes"
+  },
+  {
+    "name": "response shape taxonomy locked",
+    "checked": true,
+    "evidence": "four response shape classes"
+  },
+  {
+    "name": "stream mapping locked",
+    "checked": true,
+    "evidence": "open close reset and error mappings"
+  },
+  {
+    "name": "backpressure contract locked",
+    "checked": true,
+    "evidence": "queue stream and session pressure"
+  },
+  {
+    "name": "reset error isolation locked",
+    "checked": true,
+    "evidence": "per-stream isolation required"
+  },
+  {
+    "name": "integration contracts locked",
+    "checked": true,
+    "evidence": "six local/offline layers"
+  },
+  {
+    "name": "M42 acceptance criteria locked",
+    "checked": true,
+    "evidence": "implementation gate list"
+  },
+  {
+    "name": "unsafe public claims blocked",
+    "checked": true,
+    "evidence": "claim-safety scanner"
+  },
+  {
+    "name": "generated parity contract locked",
+    "checked": true,
+    "evidence": "generated markers and tests"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "open_mapping": "stream_open_maps_to_request_shape_marker",
+  "close_mapping": "stream_close_maps_to_response_final_marker",
+  "reset_mapping": "stream_reset_maps_to_reset_bucket_marker",
+  "error_mapping": "target_error_maps_to_safe_error_bucket",
+  "isolation_required": true,
+  "profile_sensitive": true
+}
