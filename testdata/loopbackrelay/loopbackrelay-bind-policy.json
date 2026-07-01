@@ -1,0 +1,13 @@
+{
+  "loopback_addresses_accepted": 3,
+  "unsafe_addresses_rejected": 4,
+  "rejected_classes": [
+    "wildcard_bind",
+    "external_bind",
+    "external_dial",
+    "dns_resolution"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
