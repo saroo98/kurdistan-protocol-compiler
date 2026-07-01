@@ -1,0 +1,7 @@
+{
+  "version": "localpipeline-v1",
+  "scenario_count": 12,
+  "unique_run_hashes": 10,
+  "diversity_score": 0.8333333333333334,
+  "conclusion": "passed"
+}

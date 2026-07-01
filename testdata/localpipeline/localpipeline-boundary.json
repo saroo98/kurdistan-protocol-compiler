@@ -1,0 +1,14 @@
+{
+  "version": "localpipeline-v1",
+  "scenarios_checked": 12,
+  "ingress_bound": true,
+  "egress_bound": true,
+  "bridge_bound": true,
+  "runtime_bound": true,
+  "carrier_bound": true,
+  "byte_transport_bound": true,
+  "adaptive_bound": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
