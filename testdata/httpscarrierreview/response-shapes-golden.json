@@ -1,0 +1,45 @@
+[
+  {
+    "name": "response_marker_compact",
+    "shape_class": "compact_marker",
+    "allowed_markers": [
+      "rs_a",
+      "rs_b"
+    ],
+    "max_marker_bytes": 48,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "response_marker_chunked",
+    "shape_class": "chunked_marker",
+    "allowed_markers": [
+      "rs_chunk",
+      "rs_final"
+    ],
+    "max_marker_bytes": 96,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "response_marker_error_bucket",
+    "shape_class": "error_bucket_marker",
+    "allowed_markers": [
+      "rs_error",
+      "rs_retry"
+    ],
+    "max_marker_bytes": 80,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "response_marker_state_derived",
+    "shape_class": "state_derived_marker",
+    "allowed_markers": [
+      "rs_state"
+    ],
+    "max_marker_bytes": 80,
+    "profile_sensitive": true,
+    "payload_free": true
+  }
+]

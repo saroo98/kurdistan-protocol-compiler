@@ -1,0 +1,11 @@
+{
+  "queue_limit_required": true,
+  "stream_window_required": true,
+  "session_window_required": true,
+  "carrier_signals": [
+    "queue_pressure_bucket",
+    "stream_window_bucket",
+    "session_window_bucket"
+  ],
+  "failure_mode": "bounded_safe_reject"
+}

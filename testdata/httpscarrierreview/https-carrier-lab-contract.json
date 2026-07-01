@@ -1,0 +1,415 @@
+{
+  "version": "httpscarrierreview-v1",
+  "fixture_id": "https_like_carrier_lab_design_lock_v1",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "generated_at_unix": 1767225600,
+  "backend_version": "0.41.0-lab",
+  "recommended_next_milestone": "M42: HTTPS-like carrier lab prototype",
+  "allowed_behavior": [
+    "bounded_request_shape_markers",
+    "bounded_response_shape_markers",
+    "loopback_lab_envelopes",
+    "profile_sensitive_shape_selection",
+    "metadata_only_stream_mapping",
+    "payload_free_trace_summaries"
+  ],
+  "blocked_behavior": [
+    {
+      "name": "real_tls_behavior",
+      "blocked": true,
+      "reason": "M41 is shape-contract only",
+      "evidence": "blocked before M42 implementation"
+    },
+    {
+      "name": "real_https_client_behavior",
+      "blocked": true,
+      "reason": "no network client behavior in design lock",
+      "evidence": "blocked by scope gate"
+    },
+    {
+      "name": "real_sni_routing",
+      "blocked": true,
+      "reason": "routing metadata must not depend on names",
+      "evidence": "blocked by misuse controls"
+    },
+    {
+      "name": "real_host_header_routing",
+      "blocked": true,
+      "reason": "routing metadata must not depend on headers",
+      "evidence": "blocked by misuse controls"
+    },
+    {
+      "name": "real_domain_dependency",
+      "blocked": true,
+      "reason": "no public naming dependency",
+      "evidence": "blocked by fixture scanner"
+    },
+    {
+      "name": "real_cdn_provider_integration",
+      "blocked": true,
+      "reason": "no provider integration",
+      "evidence": "blocked by scope gate"
+    },
+    {
+      "name": "public_network_egress",
+      "blocked": true,
+      "reason": "local deterministic harness only",
+      "evidence": "blocked by integration contract"
+    },
+    {
+      "name": "arbitrary_target_proxying",
+      "blocked": true,
+      "reason": "synthetic target model only",
+      "evidence": "blocked by proxy contract"
+    },
+    {
+      "name": "payload_forwarding",
+      "blocked": true,
+      "reason": "no carrier payload forwarding contract",
+      "evidence": "blocked by trace hygiene"
+    },
+    {
+      "name": "payload_logging",
+      "blocked": true,
+      "reason": "safe counts and buckets only",
+      "evidence": "blocked by hygiene scanner"
+    },
+    {
+      "name": "packet_capture",
+      "blocked": true,
+      "reason": "fixtures store summaries only",
+      "evidence": "blocked by fixture schema"
+    },
+    {
+      "name": "measurement_upload",
+      "blocked": true,
+      "reason": "measurement review remains offline",
+      "evidence": "blocked by measurement contract"
+    }
+  ],
+  "request_shapes": [
+    {
+      "name": "request_marker_compact",
+      "shape_class": "compact_marker",
+      "allowed_markers": [
+        "rq_a",
+        "rq_b"
+      ],
+      "max_marker_bytes": 48,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "request_marker_split",
+      "shape_class": "split_marker",
+      "allowed_markers": [
+        "rq_head",
+        "rq_tail"
+      ],
+      "max_marker_bytes": 64,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "request_marker_bucketed",
+      "shape_class": "bucketed_marker",
+      "allowed_markers": [
+        "rq_small",
+        "rq_medium",
+        "rq_large"
+      ],
+      "max_marker_bytes": 96,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "request_marker_state_derived",
+      "shape_class": "state_derived_marker",
+      "allowed_markers": [
+        "rq_state"
+      ],
+      "max_marker_bytes": 80,
+      "profile_sensitive": true,
+      "payload_free": true
+    }
+  ],
+  "response_shapes": [
+    {
+      "name": "response_marker_compact",
+      "shape_class": "compact_marker",
+      "allowed_markers": [
+        "rs_a",
+        "rs_b"
+      ],
+      "max_marker_bytes": 48,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "response_marker_chunked",
+      "shape_class": "chunked_marker",
+      "allowed_markers": [
+        "rs_chunk",
+        "rs_final"
+      ],
+      "max_marker_bytes": 96,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "response_marker_error_bucket",
+      "shape_class": "error_bucket_marker",
+      "allowed_markers": [
+        "rs_error",
+        "rs_retry"
+      ],
+      "max_marker_bytes": 80,
+      "profile_sensitive": true,
+      "payload_free": true
+    },
+    {
+      "name": "response_marker_state_derived",
+      "shape_class": "state_derived_marker",
+      "allowed_markers": [
+        "rs_state"
+      ],
+      "max_marker_bytes": 80,
+      "profile_sensitive": true,
+      "payload_free": true
+    }
+  ],
+  "stream_mapping": {
+    "open_mapping": "stream_open_maps_to_request_shape_marker",
+    "close_mapping": "stream_close_maps_to_response_final_marker",
+    "reset_mapping": "stream_reset_maps_to_reset_bucket_marker",
+    "error_mapping": "target_error_maps_to_safe_error_bucket",
+    "isolation_required": true,
+    "profile_sensitive": true
+  },
+  "backpressure": {
+    "queue_limit_required": true,
+    "stream_window_required": true,
+    "session_window_required": true,
+    "carrier_signals": [
+      "queue_pressure_bucket",
+      "stream_window_bucket",
+      "session_window_bucket"
+    ],
+    "failure_mode": "bounded_safe_reject"
+  },
+  "reset_error": {
+    "reset_isolation_required": true,
+    "error_isolation_required": true,
+    "allowed_error_buckets": [
+      "target_error_bucket",
+      "carrier_limit_bucket",
+      "malformed_shape_bucket"
+    ],
+    "unsafe_fallback_blocked": true
+  },
+  "fixture_schema": {
+    "schema_version": "httpscarrierreview-v1",
+    "required_files": [
+      "https-carrier-lab-contract.json",
+      "scope-report.json",
+      "shape-taxonomy-report.json",
+      "request-shapes-golden.json",
+      "response-shapes-golden.json",
+      "stream-mapping-report.json",
+      "backpressure-contract-report.json",
+      "reset-error-contract-report.json",
+      "integration-contract-report.json",
+      "m42-implementation-contract.json",
+      "blocker-matrix.json",
+      "risk-report.json",
+      "readiness-checklist.json",
+      "httpscarrierreview-report-golden.json",
+      "httpscarrierreview-misuse-report.json",
+      "httpscarrierreview-controls.json"
+    ],
+    "safe_fields": [
+      "shape_class",
+      "marker_count",
+      "stream_bucket",
+      "backpressure_bucket",
+      "reset_bucket",
+      "error_bucket"
+    ],
+    "forbidden_data": [
+      "raw content",
+      "raw encoded data",
+      "credentials",
+      "address literals",
+      "packet dumps"
+    ]
+  },
+  "trace_hygiene": {
+    "allowed_fields": [
+      "carrier_shape_bucket",
+      "stream_bucket",
+      "backpressure_bucket",
+      "reset_bucket",
+      "error_bucket",
+      "profile_shape_hash"
+    ],
+    "forbidden_fields": [
+      "raw content fields",
+      "raw encoded content fields",
+      "secret material fields",
+      "cryptographic proof fields",
+      "address literal fields"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "misuse_controls": [
+    {
+      "name": "real_tls_behavior",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked before M42 implementation"
+    },
+    {
+      "name": "real_https_client_behavior",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by scope gate"
+    },
+    {
+      "name": "real_sni_routing",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by misuse controls"
+    },
+    {
+      "name": "real_host_header_routing",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by misuse controls"
+    },
+    {
+      "name": "real_domain_dependency",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by fixture scanner"
+    },
+    {
+      "name": "real_cdn_provider_integration",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by scope gate"
+    },
+    {
+      "name": "public_network_egress",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by integration contract"
+    },
+    {
+      "name": "arbitrary_target_proxying",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by proxy contract"
+    },
+    {
+      "name": "payload_forwarding",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by trace hygiene"
+    },
+    {
+      "name": "payload_logging",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by hygiene scanner"
+    },
+    {
+      "name": "packet_capture",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by fixture schema"
+    },
+    {
+      "name": "measurement_upload",
+      "blocked": true,
+      "severity": "critical",
+      "evidence": "blocked by measurement contract"
+    },
+    {
+      "name": "shape_collapse",
+      "blocked": true,
+      "severity": "high",
+      "evidence": "request/response taxonomy requires profile-sensitive markers"
+    },
+    {
+      "name": "generated_backend_drift",
+      "blocked": true,
+      "severity": "high",
+      "evidence": "generated parity tests required"
+    }
+  ],
+  "generated_parity_required": true,
+  "m42_acceptance_criteria": [
+    {
+      "name": "implements bounded request-shape markers",
+      "required": true,
+      "evidence": "shape taxonomy contract"
+    },
+    {
+      "name": "implements bounded response-shape markers",
+      "required": true,
+      "evidence": "shape taxonomy contract"
+    },
+    {
+      "name": "maps stream open close reset and error safely",
+      "required": true,
+      "evidence": "stream mapping contract"
+    },
+    {
+      "name": "propagates carrier backpressure",
+      "required": true,
+      "evidence": "backpressure contract"
+    },
+    {
+      "name": "integrates relaybridge loopbackrelay labegress localpipeline and pathhealth",
+      "required": true,
+      "evidence": "integration contract"
+    },
+    {
+      "name": "enforces measurement review blocker",
+      "required": true,
+      "evidence": "measurementreview integration"
+    },
+    {
+      "name": "rejects real TLS and real HTTPS client behavior",
+      "required": true,
+      "evidence": "scope contract"
+    },
+    {
+      "name": "rejects public network and provider integration",
+      "required": true,
+      "evidence": "scope contract"
+    },
+    {
+      "name": "keeps traces payload-free and secret-free",
+      "required": true,
+      "evidence": "trace hygiene contract"
+    },
+    {
+      "name": "passes generated interpreted parity",
+      "required": true,
+      "evidence": "generated backend parity contract"
+    },
+    {
+      "name": "includes fixture verify and compare commands",
+      "required": true,
+      "evidence": "fixture schema contract"
+    }
+  ],
+  "contract_hash": "sha256:ed58b2f355db2471c53b7a17df0046e11f106a143bcf71c8fe8ce2b68a6ea9c4",
+  "payload_logged": false,
+  "secret_logged": false,
+  "decision": "ready_for_m42_lab_prototype",
+  "conclusion": "passed"
+}

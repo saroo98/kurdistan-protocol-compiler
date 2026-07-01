@@ -1,0 +1,57 @@
+[
+  {
+    "name": "implements bounded request-shape markers",
+    "required": true,
+    "evidence": "shape taxonomy contract"
+  },
+  {
+    "name": "implements bounded response-shape markers",
+    "required": true,
+    "evidence": "shape taxonomy contract"
+  },
+  {
+    "name": "maps stream open close reset and error safely",
+    "required": true,
+    "evidence": "stream mapping contract"
+  },
+  {
+    "name": "propagates carrier backpressure",
+    "required": true,
+    "evidence": "backpressure contract"
+  },
+  {
+    "name": "integrates relaybridge loopbackrelay labegress localpipeline and pathhealth",
+    "required": true,
+    "evidence": "integration contract"
+  },
+  {
+    "name": "enforces measurement review blocker",
+    "required": true,
+    "evidence": "measurementreview integration"
+  },
+  {
+    "name": "rejects real TLS and real HTTPS client behavior",
+    "required": true,
+    "evidence": "scope contract"
+  },
+  {
+    "name": "rejects public network and provider integration",
+    "required": true,
+    "evidence": "scope contract"
+  },
+  {
+    "name": "keeps traces payload-free and secret-free",
+    "required": true,
+    "evidence": "trace hygiene contract"
+  },
+  {
+    "name": "passes generated interpreted parity",
+    "required": true,
+    "evidence": "generated backend parity contract"
+  },
+  {
+    "name": "includes fixture verify and compare commands",
+    "required": true,
+    "evidence": "fixture schema contract"
+  }
+]

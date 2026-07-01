@@ -1,0 +1,86 @@
+[
+  {
+    "name": "real_tls_behavior",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked before M42 implementation"
+  },
+  {
+    "name": "real_https_client_behavior",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by scope gate"
+  },
+  {
+    "name": "real_sni_routing",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by misuse controls"
+  },
+  {
+    "name": "real_host_header_routing",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by misuse controls"
+  },
+  {
+    "name": "real_domain_dependency",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by fixture scanner"
+  },
+  {
+    "name": "real_cdn_provider_integration",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by scope gate"
+  },
+  {
+    "name": "public_network_egress",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by integration contract"
+  },
+  {
+    "name": "arbitrary_target_proxying",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by proxy contract"
+  },
+  {
+    "name": "payload_forwarding",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by trace hygiene"
+  },
+  {
+    "name": "payload_logging",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by hygiene scanner"
+  },
+  {
+    "name": "packet_capture",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by fixture schema"
+  },
+  {
+    "name": "measurement_upload",
+    "blocked": true,
+    "severity": "critical",
+    "evidence": "blocked by measurement contract"
+  },
+  {
+    "name": "shape_collapse",
+    "blocked": true,
+    "severity": "high",
+    "evidence": "request/response taxonomy requires profile-sensitive markers"
+  },
+  {
+    "name": "generated_backend_drift",
+    "blocked": true,
+    "severity": "high",
+    "evidence": "generated parity tests required"
+  }
+]
