@@ -219,6 +219,22 @@ const (
 	ModeTransportBundleSecretLeak                   = "transportbundle_secret_leak"
 	ModeTransportBundleGeneratedBackendDrift        = "transportbundle_generated_backend_drift"
 	ModeTransportBundleControlNotDetected           = "transportbundle_control_not_detected"
+	ModePathRaceAlwaysFirstCandidate                = "pathrace_always_first_candidate"
+	ModePathRaceSerialOnly                          = "pathrace_serial_only"
+	ModePathRaceStaleSuccessWins                    = "pathrace_stale_success_wins"
+	ModePathRaceIgnoresRecentFailure                = "pathrace_ignores_recent_failure"
+	ModePathRaceIgnoresStall                        = "pathrace_ignores_stall"
+	ModePathRaceIgnoresRelayBurn                    = "pathrace_ignores_relay_burn"
+	ModePathRaceHighRiskWins                        = "pathrace_high_risk_wins"
+	ModePathRaceExperimentalWins                    = "pathrace_experimental_wins"
+	ModePathRaceBurnedRelayWins                     = "pathrace_burned_relay_wins"
+	ModePathRaceBlockedCandidateVerified            = "pathrace_blocked_candidate_verified"
+	ModePathRaceAllScoresIdentical                  = "pathrace_all_scores_identical"
+	ModePathRaceUnstableTieBreak                    = "pathrace_unstable_tiebreak"
+	ModePathRaceEndpointLeak                        = "pathrace_endpoint_leak"
+	ModePathRacePayloadLeak                         = "pathrace_payload_leak"
+	ModePathRaceSecretLeak                          = "pathrace_secret_leak"
+	ModePathRaceGeneratedBackendDrift               = "pathrace_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -424,6 +440,22 @@ func Modes() []string {
 		ModeTransportBundleSecretLeak,
 		ModeTransportBundleGeneratedBackendDrift,
 		ModeTransportBundleControlNotDetected,
+		ModePathRaceAlwaysFirstCandidate,
+		ModePathRaceSerialOnly,
+		ModePathRaceStaleSuccessWins,
+		ModePathRaceIgnoresRecentFailure,
+		ModePathRaceIgnoresStall,
+		ModePathRaceIgnoresRelayBurn,
+		ModePathRaceHighRiskWins,
+		ModePathRaceExperimentalWins,
+		ModePathRaceBurnedRelayWins,
+		ModePathRaceBlockedCandidateVerified,
+		ModePathRaceAllScoresIdentical,
+		ModePathRaceUnstableTieBreak,
+		ModePathRaceEndpointLeak,
+		ModePathRacePayloadLeak,
+		ModePathRaceSecretLeak,
+		ModePathRaceGeneratedBackendDrift,
 	}
 }
 
