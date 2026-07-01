@@ -1,0 +1,15 @@
+{
+  "unsafe_controls": [
+    "public_carrier_implementation",
+    "external_target_dial",
+    "deployment_script",
+    "payload_trace",
+    "production_key_exchange",
+    "live_probe",
+    "generated_backend_drift"
+  ],
+  "unsafe_detected": 7,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

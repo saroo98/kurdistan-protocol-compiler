@@ -1,0 +1,44 @@
+[
+  {
+    "name": "local protocol adapter",
+    "layer": "adapter",
+    "status": "ready_for_review",
+    "evidence": "M37 parser fixtures and gates",
+    "remaining_risk": "metadata-only parser"
+  },
+  {
+    "name": "loopback relay transport",
+    "layer": "relay",
+    "status": "ready_for_review",
+    "evidence": "M38 loopback relay fixtures and gates",
+    "remaining_risk": "loopback-only harness"
+  },
+  {
+    "name": "lab egress connector",
+    "layer": "egress",
+    "status": "ready_for_review",
+    "evidence": "M39 allowlist connector fixtures and gates",
+    "remaining_risk": "synthetic targets only"
+  },
+  {
+    "name": "byte transport harness",
+    "layer": "byte_path",
+    "status": "ready_for_review",
+    "evidence": "M17-M18 fixtures and parity",
+    "remaining_risk": "local deterministic bytes only"
+  },
+  {
+    "name": "carrier abstraction",
+    "layer": "carrier",
+    "status": "ready_for_review",
+    "evidence": "M11 carrier models and audits",
+    "remaining_risk": "abstract models only"
+  },
+  {
+    "name": "security prerequisites",
+    "layer": "security",
+    "status": "ready_for_review",
+    "evidence": "M12 transcript/replay/downgrade gates",
+    "remaining_risk": "not final production key exchange"
+  }
+]
