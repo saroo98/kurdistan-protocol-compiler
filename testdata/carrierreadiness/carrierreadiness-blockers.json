@@ -1,0 +1,32 @@
+[
+  {
+    "name": "public carrier implementation",
+    "severity": "critical",
+    "required": true,
+    "status": "blocked"
+  },
+  {
+    "name": "production deployment",
+    "severity": "critical",
+    "required": true,
+    "status": "blocked"
+  },
+  {
+    "name": "external target dialing",
+    "severity": "critical",
+    "required": true,
+    "status": "blocked"
+  },
+  {
+    "name": "payload-bearing traces",
+    "severity": "critical",
+    "required": true,
+    "status": "blocked"
+  },
+  {
+    "name": "production key exchange",
+    "severity": "high",
+    "required": true,
+    "status": "blocked"
+  }
+]

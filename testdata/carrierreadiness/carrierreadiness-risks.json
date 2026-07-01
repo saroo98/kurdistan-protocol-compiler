@@ -1,0 +1,26 @@
+[
+  {
+    "name": "carrier fingerprint collapse",
+    "level": "high",
+    "mitigation": "require bundle/wire/fixture parity gates before prototype",
+    "status": "needs_work"
+  },
+  {
+    "name": "operational misuse",
+    "level": "high",
+    "mitigation": "keep prototype local and audit-only",
+    "status": "needs_work"
+  },
+  {
+    "name": "trace leakage",
+    "level": "high",
+    "mitigation": "fixture and generated hygiene gates",
+    "status": "ready_for_review"
+  },
+  {
+    "name": "generated drift",
+    "level": "medium",
+    "mitigation": "generated/interpreted parity gates",
+    "status": "ready_for_review"
+  }
+]
