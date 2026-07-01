@@ -1,0 +1,17 @@
+{
+  "version": "proxyegress-v1",
+  "scenario_id": "egress_reset_error_isolation",
+  "streams_checked": 16,
+  "reset_events": 1,
+  "error_events": 8,
+  "isolated_resets": 1,
+  "cross_stream_leaks": 0,
+  "safe_error_classes": [
+    "target_error_bucket",
+    "bridge_failure_bucket",
+    "descriptor_rejected_bucket"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
