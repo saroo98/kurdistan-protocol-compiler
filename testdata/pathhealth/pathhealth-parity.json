@@ -1,0 +1,11 @@
+{
+  "compared_scenarios": 17,
+  "compared_active_paths": 17,
+  "health_state_matches": 17,
+  "degradation_matches": 17,
+  "failover_matches": 17,
+  "outcome_bucket_matches": 17,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
