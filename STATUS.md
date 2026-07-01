@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T11:18:49Z`
+- Generated at: `2026-07-01T12:42:32Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -254,6 +254,29 @@
 | `measurementreview_trace_hygiene` | PASS | `required` | measurement review fixtures contain safe metadata only |
 | `measurementreview_mutant_detection` | PASS | `required` | 15/15 measurementreview mutant modes detected |
 | `measurementreview_fixture_drift` | PASS | `required` | passed |
+| `proxyegress_contract_validation` | PASS | `required` | 13 requests checked |
+| `proxyegress_target_model` | PASS | `required` | 8 target classes |
+| `proxyegress_ingress_mapping` | PASS | `required` | 13 streams mapped |
+| `proxyegress_adaptive_binding` | PASS | `required` | 16 bindings checked |
+| `proxyegress_lifecycle_execution` | PASS | `required` | 16 lifecycle reports |
+| `proxyegress_backpressure` | PASS | `required` | 6 pressure events |
+| `proxyegress_reset_error_isolation` | PASS | `required` | 1 resets, 8 errors |
+| `proxyegress_misuse_detection` | PASS | `required` | 1 objects scanned |
+| `proxyegress_generated_backend_parity` | PASS | `required` | 16 scenarios compared |
+| `proxyegress_trace_hygiene` | PASS | `required` | proxy egress summaries contain safe metadata only |
+| `proxyegress_mutant_detection` | PASS | `required` | 16/16 proxyegress mutant modes detected |
+| `proxyegress_fixture_drift` | PASS | `required` | passed |
+| `relaybridge_session_validation` | PASS | `required` | 12 sessions checked |
+| `relaybridge_stream_mapping` | PASS | `required` | 12 streams mapped |
+| `relaybridge_adaptive_runtime_binding` | PASS | `required` | 15 bindings checked |
+| `relaybridge_backpressure` | PASS | `required` | 6 backpressure events |
+| `relaybridge_reset_error_isolation` | PASS | `required` | 1 resets, 8 errors |
+| `relaybridge_stream_isolation` | PASS | `required` | 12 streams isolated |
+| `relaybridge_misuse_detection` | PASS | `required` | 1 objects scanned |
+| `relaybridge_generated_backend_parity` | PASS | `required` | 15 scenarios compared |
+| `relaybridge_trace_hygiene` | PASS | `required` | relay bridge summaries contain safe metadata only |
+| `relaybridge_mutant_detection` | PASS | `required` | 13/13 relaybridge mutant modes detected |
+| `relaybridge_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -267,9 +290,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `119 ms`
-- Trace generation: `28 ms`
-- Total audit runtime: `2947 ms`
+- Profile generation: `88 ms`
+- Trace generation: `27 ms`
+- Total audit runtime: `2182 ms`
 
 ## Corpus Diversity Summary
 
@@ -294,7 +317,7 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31953565621272545`
+- `different_profile_average_distance`: `0.3199253603649493`
 - `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 

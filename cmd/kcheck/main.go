@@ -25,8 +25,10 @@ import (
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/wireeval"
@@ -121,6 +123,12 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "measurementreview" {
 		os.Exit(runMeasurementReview(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "proxyegress" {
+		os.Exit(runProxyEgress(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "relaybridge" {
+		os.Exit(runRelayBridge(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -3334,6 +3342,346 @@ func writeMeasurementReviewCompanions(out string, review measurementreview.Measu
 	}
 	for _, write := range writes {
 		if err := measurementreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runProxyEgress(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runProxyEgressGenerate(args[1:])
+		case "verify":
+			return runProxyEgressVerify(args[1:])
+		case "compare":
+			return runProxyEgressCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck proxyegress", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick proxy egress audit")
+	full := flags.Bool("full", false, "run full proxy egress audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunProxyEgressAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runProxyEgressGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyegress generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "proxyegress", "egress-lifecycle-golden.json"), "proxy egress fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := proxyegress.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := proxyegress.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeProxyEgressCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote proxyegress fixtures: %s (%d scenarios)\n", *out, len(set.Scenarios))
+	return 0
+}
+
+func runProxyEgressVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyegress verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "proxyegress", "egress-lifecycle-golden.json"), "proxy egress fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := proxyegress.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := proxyegress.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := proxyegress.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runProxyEgressCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck proxyegress compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old proxy egress fixture path")
+	newPath := flags.String("new", "", "new proxy egress fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := proxyegress.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := proxyegress.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := proxyegress.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeProxyEgressCompanions(out string, set proxyegress.EgressFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"egress-requests-golden.json", set.Requests},
+		{"egress-targets-golden.json", set.Targets},
+		{"egress-mapping-golden.json", set.Mappings},
+		{"egress-backpressure-golden.json", set.Backpressure},
+		{"egress-reset-error-golden.json", set.ResetError},
+		{"egress-adaptive-binding.json", set.Adaptive},
+		{"ingress-egress-mapping.json", set.IngressMapping},
+		{"proxyegress-misuse-report.json", set.Misuse},
+		{"proxyegress-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := proxyegress.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runRelayBridge(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runRelayBridgeGenerate(args[1:])
+		case "verify":
+			return runRelayBridgeVerify(args[1:])
+		case "compare":
+			return runRelayBridgeCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck relaybridge", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick relay bridge audit")
+	full := flags.Bool("full", false, "run full relay bridge audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunRelayBridgeAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runRelayBridgeGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck relaybridge generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "relaybridge", "relaybridge-report-golden.json"), "relay bridge fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := relaybridge.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := relaybridge.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeRelayBridgeCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote relaybridge fixtures: %s (%d scenarios)\n", *out, len(set.Scenarios))
+	return 0
+}
+
+func runRelayBridgeVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck relaybridge verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "relaybridge", "relaybridge-report-golden.json"), "relay bridge fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := relaybridge.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relaybridge.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relaybridge.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runRelayBridgeCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck relaybridge compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old relay bridge fixture path")
+	newPath := flags.String("new", "", "new relay bridge fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := relaybridge.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relaybridge.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relaybridge.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeRelayBridgeCompanions(out string, set relaybridge.RelayBridgeFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"relaybridge-scenarios-golden.json", set.Scenarios},
+		{"relaybridge-sessions-golden.json", set.Sessions},
+		{"relaybridge-streams-golden.json", set.Streams},
+		{"relaybridge-reports-golden.json", set.Reports},
+		{"relaybridge-adaptive-binding.json", set.Adaptive},
+		{"relaybridge-misuse-report.json", set.Misuse},
+		{"relaybridge-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := relaybridge.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
