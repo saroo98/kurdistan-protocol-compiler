@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingressadversary"
@@ -1757,6 +1758,40 @@ func GeneratedLoopbackRelayParity() (loopbackrelay.LoopbackParityReport, error) 
 	return set.Parity, nil
 }
 `, quote(loopbackrelay.Version), quote(p.ID), p.Seed, quote(loopbackrelay.BindPolicyLoopbackOnly), quote(loopbackrelay.DialPolicyLoopbackOnly), loopbackrelay.DefaultConfig().MaxSessions, loopbackrelay.DefaultConfig().MaxFrameBytes, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(loopbackrelay.RecommendedNextMilestone), quoteSlice(loopbackRelayScenarios()))
+	if err != nil {
+		return nil, err
+	}
+
+	labEgressSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/labegress"
+)
+
+const LabEgressSchemaVersion = %[1]s
+const LabEgressGeneratedProfileID = %[2]s
+const LabEgressGeneratedProfileSeed int64 = %[3]d
+const LabEgressConnectorPolicy = %[4]s
+const LabEgressMaxConnections = %[5]d
+const LabEgressMaxResponseBytes = %[6]d
+const LabEgressRuntimePolicy = %[7]s
+const LabEgressRecommendedNextMilestone = %[8]s
+
+var LabEgressScenarios = %[9]s
+var LabEgressTargetClasses = %[10]s
+
+func GeneratedLabEgressFixtureSet() (labegress.LabEgressFixtureSet, error) {
+	return labegress.GenerateFixtureSet()
+}
+
+func GeneratedLabEgressParity() (labegress.LabEgressParityReport, error) {
+	set, err := labegress.GenerateFixtureSet()
+	if err != nil {
+		return labegress.LabEgressParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(labegress.Version), quote(p.ID), p.Seed, quote(labegress.ConnectorPolicyLoopbackAllowlist), labegress.DefaultConfig().MaxConnections, labegress.DefaultConfig().MaxResponseBytes, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.TargetDescriptorEncoding+"/"+p.CarrierPolicy.CarrierFamily), quote(labegress.RecommendedNextMilestone), quoteSlice(labEgressScenarios()), quoteSlice(labEgressTargetClasses()))
 	if err != nil {
 		return nil, err
 	}
@@ -4790,6 +4825,85 @@ func TestGeneratedLoopbackRelayHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	labEgressTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/labegress"
+)
+
+func TestGeneratedLabEgress(t *testing.T) {
+	if LabEgressSchemaVersion != labegress.Version || LabEgressGeneratedProfileID != ProfileID {
+		t.Fatalf("generated lab egress constants drifted")
+	}
+	set, err := GeneratedLabEgressFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(LabEgressScenarios) == 0 || LabEgressConnectorPolicy != labegress.ConnectorPolicyLoopbackAllowlist {
+		t.Fatalf("generated lab egress fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	labEgressParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedLabEgressParity(t *testing.T) {
+	parity, err := GeneratedLabEgressParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated lab egress parity failed: %%+v", parity)
+	}
+	if LabEgressRuntimePolicy == "" || LabEgressRecommendedNextMilestone == "" {
+		t.Fatalf("lab egress generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	labEgressHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/labegress"
+)
+
+func TestGeneratedLabEgressHygiene(t *testing.T) {
+	set, err := GeneratedLabEgressFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := labegress.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "synthetic"},
+		{"public_ip": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"raw_secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := labegress.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe lab egress metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5137,6 +5251,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/concretelocaladapter_generated.go", Content: concreteLocalAdapterSource, Go: true},
 		{RelPath: "protocol/localprotocoladapter_generated.go", Content: localProtocolAdapterSource, Go: true},
 		{RelPath: "protocol/loopbackrelay_generated.go", Content: loopbackRelaySource, Go: true},
+		{RelPath: "protocol/labegress_generated.go", Content: labEgressSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5223,6 +5338,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/loopbackrelay_test.go", Content: loopbackRelayTestSource, Go: true},
 		{RelPath: "protocol/loopbackrelay_parity_test.go", Content: loopbackRelayParityTestSource, Go: true},
 		{RelPath: "protocol/loopbackrelay_hygiene_test.go", Content: loopbackRelayHygieneTestSource, Go: true},
+		{RelPath: "protocol/labegress_test.go", Content: labEgressTestSource, Go: true},
+		{RelPath: "protocol/labegress_parity_test.go", Content: labEgressParityTestSource, Go: true},
+		{RelPath: "protocol/labegress_hygiene_test.go", Content: labEgressHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5902,6 +6020,30 @@ func loopbackRelayScenarios() []string {
 		loopbackrelay.ScenarioQueuePressure,
 		loopbackrelay.ScenarioGeneratedParity,
 		loopbackrelay.ScenarioTraceHygiene,
+	}
+}
+
+func labEgressScenarios() []string {
+	return []string{
+		labegress.ScenarioAllowlistValidation,
+		labegress.ScenarioFixtureExchange,
+		labegress.ScenarioSlowBackpressure,
+		labegress.ScenarioResetIsolation,
+		labegress.ScenarioErrorIsolation,
+		labegress.ScenarioHalfClose,
+		labegress.ScenarioQueuePressure,
+		labegress.ScenarioGeneratedParity,
+	}
+}
+
+func labEgressTargetClasses() []string {
+	return []string{
+		labegress.TargetClassEchoSynthetic,
+		labegress.TargetClassFixedSynthetic,
+		labegress.TargetClassSlowSynthetic,
+		labegress.TargetClassResetSynthetic,
+		labegress.TargetClassErrorSynthetic,
+		labegress.TargetClassLargeSynthetic,
 	}
 }
 
