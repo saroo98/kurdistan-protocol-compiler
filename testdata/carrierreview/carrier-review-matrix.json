@@ -1,0 +1,16 @@
+{
+  "layers": {
+    "adaptivepath": "candidate taxonomy and volatile condition input",
+    "generated_backend_parity": "generated/interpreted marker and test parity",
+    "hardening": "panic/resource/trace hygiene checks",
+    "hostdetect": "host-level collapse and consistency checks",
+    "localproxyingress": "deterministic local ingress prototype summaries",
+    "pathhealth": "active health, quarantine, and failover hooks",
+    "pathrace": "short-lived candidate scoring",
+    "proxyingress": "local ingress contract preconditions",
+    "relayfleet": "synthetic relay burn and lifecycle metadata",
+    "security": "transcript binding and replay checks",
+    "trace_hygiene": "payload-free metadata-only reports",
+    "transportbundle": "bundle membership and fallback hints"
+  }
+}

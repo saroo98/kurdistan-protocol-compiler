@@ -1,0 +1,8 @@
+{
+  "compared_families": 5,
+  "readiness_matches": 5,
+  "risk_matches": 5,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

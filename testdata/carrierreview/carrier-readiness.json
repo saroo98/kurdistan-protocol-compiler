@@ -1,0 +1,8 @@
+{
+  "family_count": 5,
+  "ready_synthetic_families": 2,
+  "gated_families": 2,
+  "manual_review_families": 1,
+  "recommended_next_milestone": "M32 safe measurement-client design and privacy review",
+  "conclusion": "passed"
+}

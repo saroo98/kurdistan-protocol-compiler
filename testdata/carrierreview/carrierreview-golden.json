@@ -1,0 +1,208 @@
+{
+  "version": "carrierreview-v1",
+  "review_id": "carrier_family_design_review_v1",
+  "descriptors": [
+    {
+      "family": "https_like_tcp",
+      "review_class": "baseline_tcp_shape",
+      "risk_class": "medium",
+      "readiness": "ready_for_synthetic_prototype",
+      "allowed_prototype_scope": "synthetic_metadata_model",
+      "manual_review_required": false,
+      "default_eligible": true,
+      "synthetic_only": true,
+      "required_preconditions": [
+        "trace_hygiene",
+        "security_context",
+        "generated_parity",
+        "pathhealth_hooks"
+      ],
+      "forbidden_claims": [
+        "tls_mimicry",
+        "http_compatibility",
+        "sni_behavior",
+        "host_header_behavior",
+        "guaranteed_bypass"
+      ],
+      "forbidden_implementation": [
+        "real_tls",
+        "real_http",
+        "sockets",
+        "external_targets"
+      ],
+      "notes": [
+        "TCP-like shape review only; no TLS or HTTP carrier is implemented."
+      ],
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "family": "dns_survival",
+      "review_class": "survival_fallback",
+      "risk_class": "high",
+      "readiness": "gated_survival_design_only",
+      "allowed_prototype_scope": "design_only_or_synthetic_metadata_model",
+      "manual_review_required": true,
+      "default_eligible": false,
+      "synthetic_only": true,
+      "required_preconditions": [
+        "manual_review",
+        "trace_hygiene",
+        "privacy_review",
+        "pathhealth_hooks"
+      ],
+      "forbidden_claims": [
+        "dns_tunneling_ready",
+        "resolver_compatibility",
+        "reliable_bypass",
+        "real_dns_query"
+      ],
+      "forbidden_implementation": [
+        "resolver_testing",
+        "dns_queries",
+        "external_targets"
+      ],
+      "notes": [
+        "DNS-survival remains a gated design review; no resolver or query behavior is implemented."
+      ],
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "family": "experimental_udp_quic",
+      "review_class": "experimental",
+      "risk_class": "high",
+      "readiness": "experimental_gated_design_only",
+      "allowed_prototype_scope": "synthetic_metadata_model",
+      "manual_review_required": true,
+      "default_eligible": false,
+      "synthetic_only": true,
+      "required_preconditions": [
+        "experimental_gate",
+        "trace_hygiene",
+        "privacy_review",
+        "loss_reorder_review"
+      ],
+      "forbidden_claims": [
+        "quic_compatibility",
+        "udp_reachability",
+        "default_transport"
+      ],
+      "forbidden_implementation": [
+        "real_udp",
+        "real_quic",
+        "external_targets"
+      ],
+      "notes": [
+        "UDP/QUIC-like behavior is an experimental metadata model, not a QUIC implementation."
+      ],
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "family": "domestic_media_risk",
+      "review_class": "high_risk_sensitive",
+      "risk_class": "critical",
+      "readiness": "manual_review_only",
+      "allowed_prototype_scope": "manual_review_only",
+      "manual_review_required": true,
+      "default_eligible": false,
+      "synthetic_only": true,
+      "required_preconditions": [
+        "explicit_manual_review",
+        "privacy_review",
+        "risk_acceptance",
+        "trace_hygiene"
+      ],
+      "forbidden_claims": [
+        "default_transport",
+        "safe_for_high_risk_users",
+        "real_platform_support"
+      ],
+      "forbidden_implementation": [
+        "service_names",
+        "provider_names",
+        "account_metadata",
+        "app_identifiers"
+      ],
+      "notes": [
+        "Domestic/media-shaped risk is tracked only as a high-risk review class."
+      ],
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "family": "relay_bridge_rotation",
+      "review_class": "relay_lifecycle",
+      "risk_class": "medium",
+      "readiness": "ready_for_synthetic_prototype",
+      "allowed_prototype_scope": "synthetic_relay_lifecycle_model",
+      "manual_review_required": false,
+      "default_eligible": true,
+      "synthetic_only": true,
+      "required_preconditions": [
+        "relayfleet_hooks",
+        "hostdetect_hooks",
+        "pathhealth_hooks",
+        "trace_hygiene"
+      ],
+      "forbidden_claims": [
+        "real_bridge_discovery",
+        "endpoint_rotation_ready",
+        "relay_deployment_ready"
+      ],
+      "forbidden_implementation": [
+        "real_bridge_endpoints",
+        "relay_provisioning",
+        "external_targets"
+      ],
+      "notes": [
+        "Relay rotation review ties synthetic burn/quarantine metadata to fleet and pathhealth gates."
+      ],
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "matrix": {
+    "layers": {
+      "adaptivepath": "candidate taxonomy and volatile condition input",
+      "generated_backend_parity": "generated/interpreted marker and test parity",
+      "hardening": "panic/resource/trace hygiene checks",
+      "hostdetect": "host-level collapse and consistency checks",
+      "localproxyingress": "deterministic local ingress prototype summaries",
+      "pathhealth": "active health, quarantine, and failover hooks",
+      "pathrace": "short-lived candidate scoring",
+      "proxyingress": "local ingress contract preconditions",
+      "relayfleet": "synthetic relay burn and lifecycle metadata",
+      "security": "transcript binding and replay checks",
+      "trace_hygiene": "payload-free metadata-only reports",
+      "transportbundle": "bundle membership and fallback hints"
+    }
+  },
+  "misuse": {
+    "descriptors_checked": 5,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "compared_families": 5,
+    "readiness_matches": 5,
+    "risk_matches": 5,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "readiness": {
+    "family_count": 5,
+    "ready_synthetic_families": 2,
+    "gated_families": 2,
+    "manual_review_families": 1,
+    "recommended_next_milestone": "M32 safe measurement-client design and privacy review",
+    "conclusion": "passed"
+  },
+  "payload_logged": false,
+  "secret_logged": false,
+  "review_hash": "sha256:04fc4755cc2c6e80a325c87bdecbafd275916e62d089e1b0cf8b8628abf873b2",
+  "conclusion": "passed"
+}
