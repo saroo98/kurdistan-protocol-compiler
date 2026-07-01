@@ -1,0 +1,7 @@
+{
+  "version": "localpipeline-v1",
+  "objects_scanned": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

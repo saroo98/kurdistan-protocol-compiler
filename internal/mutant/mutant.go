@@ -310,6 +310,17 @@ const (
 	ModeRelayBridgeFailedHealthAllowed              = "relaybridge_failed_health_allowed"
 	ModeRelayBridgeAllStreamsSameShape              = "relaybridge_all_streams_same_shape"
 	ModeRelayBridgeGeneratedBackendDrift            = "relaybridge_generated_backend_drift"
+	ModeLocalPipelineIngressMappingBroken           = "localpipeline_ingress_mapping_broken"
+	ModeLocalPipelineEgressMappingBroken            = "localpipeline_egress_mapping_broken"
+	ModeLocalPipelineBridgeIntegrationBroken        = "localpipeline_bridge_integration_broken"
+	ModeLocalPipelineIgnoresBackpressure            = "localpipeline_ignores_backpressure"
+	ModeLocalPipelineSwallowsReset                  = "localpipeline_swallows_reset"
+	ModeLocalPipelineSwallowsTargetError            = "localpipeline_swallows_target_error"
+	ModeLocalPipelineAcceptsUnsafeDescriptor        = "localpipeline_accepts_unsafe_descriptor"
+	ModeLocalPipelinePayloadTraceLeak               = "localpipeline_payload_trace_leak"
+	ModeLocalPipelineSecretTraceLeak                = "localpipeline_secret_trace_leak"
+	ModeLocalPipelinePaddingOnlyDiversity           = "localpipeline_padding_only_diversity"
+	ModeLocalPipelineGeneratedBackendDrift          = "localpipeline_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -606,6 +617,17 @@ func Modes() []string {
 		ModeRelayBridgeFailedHealthAllowed,
 		ModeRelayBridgeAllStreamsSameShape,
 		ModeRelayBridgeGeneratedBackendDrift,
+		ModeLocalPipelineIngressMappingBroken,
+		ModeLocalPipelineEgressMappingBroken,
+		ModeLocalPipelineBridgeIntegrationBroken,
+		ModeLocalPipelineIgnoresBackpressure,
+		ModeLocalPipelineSwallowsReset,
+		ModeLocalPipelineSwallowsTargetError,
+		ModeLocalPipelineAcceptsUnsafeDescriptor,
+		ModeLocalPipelinePayloadTraceLeak,
+		ModeLocalPipelineSecretTraceLeak,
+		ModeLocalPipelinePaddingOnlyDiversity,
+		ModeLocalPipelineGeneratedBackendDrift,
 	}
 }
 
