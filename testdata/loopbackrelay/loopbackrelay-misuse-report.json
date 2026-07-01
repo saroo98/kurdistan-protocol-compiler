@@ -1,0 +1,16 @@
+{
+  "unsafe_controls": [
+    "wildcard_bind",
+    "external_bind",
+    "external_dial",
+    "dns_resolution",
+    "payload_logging",
+    "unbounded_queue",
+    "raw_address_trace",
+    "generated_backend_drift"
+  ],
+  "unsafe_detected": 8,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
