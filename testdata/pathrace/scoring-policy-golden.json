@@ -1,0 +1,12 @@
+{
+  "policy_id": "pathrace_short_lived_scoring_v1",
+  "success_ttl_class": "seconds",
+  "failure_ttl_class": "seconds",
+  "stale_success_penalty": "sharp",
+  "failure_streak_penalty": "sharp",
+  "stall_penalty": "medium",
+  "relay_burn_penalty": "critical",
+  "high_risk_penalty": "critical",
+  "experimental_penalty": "review_gated",
+  "policy_hash": "sha256:38a6d63b2d228985b8d281328654d9473f42ea27653313ba958db57720bf8b57"
+}
