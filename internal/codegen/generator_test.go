@@ -58,6 +58,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/localprotocoladapter_generated.go",
 		"protocol/loopbackrelay_generated.go",
 		"protocol/labegress_generated.go",
+		"protocol/carrierreadiness_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -126,6 +127,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/labegress_test.go",
 		"protocol/labegress_parity_test.go",
 		"protocol/labegress_hygiene_test.go",
+		"protocol/carrierreadiness_test.go",
+		"protocol/carrierreadiness_parity_test.go",
+		"protocol/carrierreadiness_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -260,6 +264,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	loopbackRelayB := mustRead(t, filepath.Join(outB, "protocol", "loopbackrelay_generated.go"))
 	labEgressA := mustRead(t, filepath.Join(outA, "protocol", "labegress_generated.go"))
 	labEgressB := mustRead(t, filepath.Join(outB, "protocol", "labegress_generated.go"))
+	carrierReadinessA := mustRead(t, filepath.Join(outA, "protocol", "carrierreadiness_generated.go"))
+	carrierReadinessB := mustRead(t, filepath.Join(outB, "protocol", "carrierreadiness_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -301,6 +307,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if labEgressA == labEgressB {
 		t.Fatalf("lab egress generation did not differ across profiles")
+	}
+	if carrierReadinessA == carrierReadinessB {
+		t.Fatalf("carrier readiness generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

@@ -117,6 +117,7 @@ type CodegenAuditSummary struct {
 	LocalProtocolAdapterParity       string                         `json:"localprotocoladapter_generated_backend_parity"`
 	LoopbackRelayParity              string                         `json:"loopbackrelay_generated_backend_parity"`
 	LabEgressParity                  string                         `json:"labegress_generated_backend_parity"`
+	CarrierReadinessParity           string                         `json:"carrierreadiness_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -223,6 +224,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localProtocolAdapterGate := GeneratedLocalProtocolAdapterParityGate(corpus, testFailures)
 	loopbackRelayGate := GeneratedLoopbackRelayParityGate(corpus, testFailures)
 	labEgressGate := GeneratedLabEgressParityGate(corpus, testFailures)
+	carrierReadinessGate := GeneratedCarrierReadinessParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -269,6 +271,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localProtocolAdapterGate,
 		loopbackRelayGate,
 		labEgressGate,
+		carrierReadinessGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1053,6 +1056,10 @@ func GeneratedLabEgressParityGate(corpus GeneratedBackendTraceCorpus, testFailur
 	return generatedMilestoneSourceGate(corpus, testFailures, "labegress", "lab egress", "LabEgressSchemaVersion")
 }
 
+func GeneratedCarrierReadinessParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "carrierreadiness", "carrier readiness", "CarrierReadinessSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1258,6 +1265,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalProtocolAdapterParity:       status("localprotocoladapter_generated_backend_parity"),
 		LoopbackRelayParity:              status("loopbackrelay_generated_backend_parity"),
 		LabEgressParity:                  status("labegress_generated_backend_parity"),
+		CarrierReadinessParity:           status("carrierreadiness_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

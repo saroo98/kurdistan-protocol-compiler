@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/ir"
@@ -1792,6 +1793,38 @@ func GeneratedLabEgressParity() (labegress.LabEgressParityReport, error) {
 	return set.Parity, nil
 }
 `, quote(labegress.Version), quote(p.ID), p.Seed, quote(labegress.ConnectorPolicyLoopbackAllowlist), labegress.DefaultConfig().MaxConnections, labegress.DefaultConfig().MaxResponseBytes, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.TargetDescriptorEncoding+"/"+p.CarrierPolicy.CarrierFamily), quote(labegress.RecommendedNextMilestone), quoteSlice(labEgressScenarios()), quoteSlice(labEgressTargetClasses()))
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReadinessSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/carrierreadiness"
+)
+
+const CarrierReadinessSchemaVersion = %[1]s
+const CarrierReadinessGeneratedProfileID = %[2]s
+const CarrierReadinessGeneratedProfileSeed int64 = %[3]d
+const CarrierReadinessDecision = %[4]s
+const CarrierReadinessRuntimePolicy = %[5]s
+const CarrierReadinessRecommendedNextMilestone = %[6]s
+
+var CarrierReadinessFutureMilestones = %[7]s
+var CarrierReadinessBoundaryNames = %[8]s
+
+func GeneratedCarrierReadinessFixtureSet() (carrierreadiness.FixtureSet, error) {
+	return carrierreadiness.GenerateFixtureSet()
+}
+
+func GeneratedCarrierReadinessParity() (carrierreadiness.ParityReport, error) {
+	set, err := carrierreadiness.GenerateFixtureSet()
+	if err != nil {
+		return carrierreadiness.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(carrierreadiness.Version), quote(p.ID), p.Seed, quote(carrierreadiness.DecisionReady), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(carrierreadiness.RecommendedNextMilestone), quoteSlice(carrierReadinessFutureMilestones()), quoteSlice(carrierReadinessBoundaryNames()))
 	if err != nil {
 		return nil, err
 	}
@@ -4904,6 +4937,84 @@ func TestGeneratedLabEgressHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	carrierReadinessTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carrierreadiness"
+)
+
+func TestGeneratedCarrierReadiness(t *testing.T) {
+	if CarrierReadinessSchemaVersion != carrierreadiness.Version || CarrierReadinessGeneratedProfileID != ProfileID {
+		t.Fatalf("generated carrier readiness constants drifted")
+	}
+	set, err := GeneratedCarrierReadinessFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || CarrierReadinessDecision != carrierreadiness.DecisionReady || len(CarrierReadinessFutureMilestones) != 3 {
+		t.Fatalf("generated carrier readiness fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReadinessParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedCarrierReadinessParity(t *testing.T) {
+	parity, err := GeneratedCarrierReadinessParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated carrier readiness parity failed: %%+v", parity)
+	}
+	if CarrierReadinessRuntimePolicy == "" || CarrierReadinessRecommendedNextMilestone == "" {
+		t.Fatalf("carrier readiness generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReadinessHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carrierreadiness"
+)
+
+func TestGeneratedCarrierReadinessHygiene(t *testing.T) {
+	set, err := GeneratedCarrierReadinessFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := carrierreadiness.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "synthetic"},
+		{"raw_secret": "synthetic"},
+		{"claim": "guaranteed bypass"},
+	}
+	for _, tc := range unsafeCases {
+		if err := carrierreadiness.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe carrier readiness metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5252,6 +5363,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localprotocoladapter_generated.go", Content: localProtocolAdapterSource, Go: true},
 		{RelPath: "protocol/loopbackrelay_generated.go", Content: loopbackRelaySource, Go: true},
 		{RelPath: "protocol/labegress_generated.go", Content: labEgressSource, Go: true},
+		{RelPath: "protocol/carrierreadiness_generated.go", Content: carrierReadinessSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5341,6 +5453,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/labegress_test.go", Content: labEgressTestSource, Go: true},
 		{RelPath: "protocol/labegress_parity_test.go", Content: labEgressParityTestSource, Go: true},
 		{RelPath: "protocol/labegress_hygiene_test.go", Content: labEgressHygieneTestSource, Go: true},
+		{RelPath: "protocol/carrierreadiness_test.go", Content: carrierReadinessTestSource, Go: true},
+		{RelPath: "protocol/carrierreadiness_parity_test.go", Content: carrierReadinessParityTestSource, Go: true},
+		{RelPath: "protocol/carrierreadiness_hygiene_test.go", Content: carrierReadinessHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -6044,6 +6159,20 @@ func labEgressTargetClasses() []string {
 		labegress.TargetClassResetSynthetic,
 		labegress.TargetClassErrorSynthetic,
 		labegress.TargetClassLargeSynthetic,
+	}
+}
+
+func carrierReadinessFutureMilestones() []string {
+	return []string{"M41", "M42", "M43"}
+}
+
+func carrierReadinessBoundaryNames() []string {
+	return []string{
+		"no external targets",
+		"no deployment behavior",
+		"no payload logging",
+		"no production key exchange",
+		"no live carrier implementation",
 	}
 }
 
