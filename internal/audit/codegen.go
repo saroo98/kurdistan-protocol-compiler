@@ -114,6 +114,7 @@ type CodegenAuditSummary struct {
 	LocalPipelineGeneratedParity     string                         `json:"localpipeline_generated_backend_parity"`
 	ProductionReadinessParity        string                         `json:"productionreadiness_generated_backend_parity"`
 	ConcreteLocalAdapterParity       string                         `json:"concretelocaladapter_generated_backend_parity"`
+	LocalProtocolAdapterParity       string                         `json:"localprotocoladapter_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -217,6 +218,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localPipelineGate := GeneratedLocalPipelineParityGate(corpus, testFailures)
 	productionReadinessGate := GeneratedProductionReadinessParityGate(corpus, testFailures)
 	concreteLocalAdapterGate := GeneratedConcreteLocalAdapterParityGate(corpus, testFailures)
+	localProtocolAdapterGate := GeneratedLocalProtocolAdapterParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -260,6 +262,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localPipelineGate,
 		productionReadinessGate,
 		concreteLocalAdapterGate,
+		localProtocolAdapterGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1032,6 +1035,10 @@ func GeneratedConcreteLocalAdapterParityGate(corpus GeneratedBackendTraceCorpus,
 	return generatedMilestoneSourceGate(corpus, testFailures, "concretelocaladapter", "concrete local adapter", "ConcreteLocalAdapterSchemaVersion")
 }
 
+func GeneratedLocalProtocolAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "localprotocoladapter", "local protocol adapter", "LocalProtocolAdapterSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1234,6 +1241,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalPipelineGeneratedParity:     status("localpipeline_generated_backend_parity"),
 		ProductionReadinessParity:        status("productionreadiness_generated_backend_parity"),
 		ConcreteLocalAdapterParity:       status("concretelocaladapter_generated_backend_parity"),
+		LocalProtocolAdapterParity:       status("localprotocoladapter_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
