@@ -281,6 +281,35 @@ const (
 	ModeMeasurementReviewPayloadLeak                = "measurementreview_payload_leak"
 	ModeMeasurementReviewSecretLeak                 = "measurementreview_secret_leak"
 	ModeMeasurementReviewGeneratedBackendDrift      = "measurementreview_generated_backend_drift"
+	ModeProxyEgressContainsEndpoint                 = "proxyegress_contains_endpoint"
+	ModeProxyEgressContainsDNSQuery                 = "proxyegress_contains_dns_query"
+	ModeProxyEgressContainsResolver                 = "proxyegress_contains_resolver"
+	ModeProxyEgressContainsURL                      = "proxyegress_contains_url"
+	ModeProxyEgressContainsPayload                  = "proxyegress_contains_payload"
+	ModeProxyEgressContainsSecret                   = "proxyegress_contains_secret"
+	ModeProxyEgressTargetNotSynthetic               = "proxyegress_target_not_synthetic"
+	ModeProxyEgressDescriptorAbuseAccepted          = "proxyegress_descriptor_abuse_accepted"
+	ModeProxyEgressHighRiskDefault                  = "proxyegress_high_risk_default"
+	ModeProxyEgressExperimentalDefault              = "proxyegress_experimental_default"
+	ModeProxyEgressFailedHealthAllowed              = "proxyegress_failed_health_allowed"
+	ModeProxyEgressBackpressureIgnored              = "proxyegress_backpressure_ignored"
+	ModeProxyEgressResetSwallowed                   = "proxyegress_reset_swallowed"
+	ModeProxyEgressErrorLeaksTarget                 = "proxyegress_error_leaks_target"
+	ModeProxyEgressAllTargetsSameShape              = "proxyegress_all_targets_same_shape"
+	ModeProxyEgressGeneratedBackendDrift            = "proxyegress_generated_backend_drift"
+	ModeRelayBridgeContainsEndpoint                 = "relaybridge_contains_endpoint"
+	ModeRelayBridgeContainsPayload                  = "relaybridge_contains_payload"
+	ModeRelayBridgeContainsSecret                   = "relaybridge_contains_secret"
+	ModeRelayBridgeDialsRealRelay                   = "relaybridge_dials_real_relay"
+	ModeRelayBridgeStreamIsolationBroken            = "relaybridge_stream_isolation_broken"
+	ModeRelayBridgeBackpressureIgnored              = "relaybridge_backpressure_ignored"
+	ModeRelayBridgeResetSwallowed                   = "relaybridge_reset_swallowed"
+	ModeRelayBridgeErrorLeaksTarget                 = "relaybridge_error_leaks_target"
+	ModeRelayBridgeHighRiskDefault                  = "relaybridge_high_risk_default"
+	ModeRelayBridgeExperimentalDefault              = "relaybridge_experimental_default"
+	ModeRelayBridgeFailedHealthAllowed              = "relaybridge_failed_health_allowed"
+	ModeRelayBridgeAllStreamsSameShape              = "relaybridge_all_streams_same_shape"
+	ModeRelayBridgeGeneratedBackendDrift            = "relaybridge_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -548,6 +577,35 @@ func Modes() []string {
 		ModeMeasurementReviewPayloadLeak,
 		ModeMeasurementReviewSecretLeak,
 		ModeMeasurementReviewGeneratedBackendDrift,
+		ModeProxyEgressContainsEndpoint,
+		ModeProxyEgressContainsDNSQuery,
+		ModeProxyEgressContainsResolver,
+		ModeProxyEgressContainsURL,
+		ModeProxyEgressContainsPayload,
+		ModeProxyEgressContainsSecret,
+		ModeProxyEgressTargetNotSynthetic,
+		ModeProxyEgressDescriptorAbuseAccepted,
+		ModeProxyEgressHighRiskDefault,
+		ModeProxyEgressExperimentalDefault,
+		ModeProxyEgressFailedHealthAllowed,
+		ModeProxyEgressBackpressureIgnored,
+		ModeProxyEgressResetSwallowed,
+		ModeProxyEgressErrorLeaksTarget,
+		ModeProxyEgressAllTargetsSameShape,
+		ModeProxyEgressGeneratedBackendDrift,
+		ModeRelayBridgeContainsEndpoint,
+		ModeRelayBridgeContainsPayload,
+		ModeRelayBridgeContainsSecret,
+		ModeRelayBridgeDialsRealRelay,
+		ModeRelayBridgeStreamIsolationBroken,
+		ModeRelayBridgeBackpressureIgnored,
+		ModeRelayBridgeResetSwallowed,
+		ModeRelayBridgeErrorLeaksTarget,
+		ModeRelayBridgeHighRiskDefault,
+		ModeRelayBridgeExperimentalDefault,
+		ModeRelayBridgeFailedHealthAllowed,
+		ModeRelayBridgeAllStreamsSameShape,
+		ModeRelayBridgeGeneratedBackendDrift,
 	}
 }
 

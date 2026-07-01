@@ -28,8 +28,10 @@ import (
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
@@ -120,6 +122,10 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	carrierReviewDrift := carrierReviewComparison(filepath.Join(fixtureRoot, "testdata", "carrierreview", "carrierreview-golden.json"), carrierReview)
 	measurementReview, measurementReviewErr := measurementreview.GenerateReview()
 	measurementReviewDrift := measurementReviewComparison(filepath.Join(fixtureRoot, "testdata", "measurementreview", "measurementreview-golden.json"), measurementReview)
+	proxyEgressSet, proxyEgressErr := proxyegress.GenerateFixtureSet()
+	proxyEgressDrift := proxyEgressComparison(filepath.Join(fixtureRoot, "testdata", "proxyegress", "egress-lifecycle-golden.json"), proxyEgressSet)
+	relayBridgeSet, relayBridgeErr := relaybridge.GenerateFixtureSet()
+	relayBridgeDrift := relayBridgeComparison(filepath.Join(fixtureRoot, "testdata", "relaybridge", "relaybridge-report-golden.json"), relayBridgeSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -299,6 +305,16 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, MeasurementReviewGates(measurementReview, measurementReviewDrift)...)
 	} else {
 		gates = append(gates, gate("measurementreview_observation_schema", false, "required", measurementReviewErr.Error(), nil, []string{measurementReviewErr.Error()}))
+	}
+	if proxyEgressErr == nil {
+		gates = append(gates, ProxyEgressGates(proxyEgressSet, proxyEgressDrift)...)
+	} else {
+		gates = append(gates, gate("proxyegress_contract_validation", false, "required", proxyEgressErr.Error(), nil, []string{proxyEgressErr.Error()}))
+	}
+	if relayBridgeErr == nil {
+		gates = append(gates, RelayBridgeGates(relayBridgeSet, relayBridgeDrift)...)
+	} else {
+		gates = append(gates, gate("relaybridge_session_validation", false, "required", relayBridgeErr.Error(), nil, []string{relayBridgeErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
