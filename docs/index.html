@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.32.0-lab</strong>
+            <strong>0.33.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -108,6 +108,8 @@
             <div class="stack-row"><span class="status-dot on"></span><span>health failover</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>carrier review</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>measurement review</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>proxy egress</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>relay bridge</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -227,6 +229,8 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Proxy ingress design</h3><p>Request contracts, target descriptor checks, lifecycle constraints, and failure-mode matrices.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local proxy ingress prototype</h3><p>Deterministic request events, target binding, runtime mapping, bounded queues, and isolation checks.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Ingress adversarial hardening</h3><p>Descriptor abuse, invalid lifecycle sequences, pressure stress, reset/error isolation, and parity.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Proxy egress model</h3><p>Trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, and lifecycle gates.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Relay bridge model</h3><p>Bridge session/stream fixtures, adaptive binding, backpressure, reset/error isolation, and parity gates.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Adaptive path model</h3><p>Candidate taxonomy, condition observations, freshness buckets, uncertainty, and viability reports.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Transport bundle compiler</h3><p>Bundle modes, candidate roles, seed plans, synthetic relay binding, and fallback hints.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Hardening gates</h3><p>Invariant registry, API misuse, panic safety, resource bounds, trace hygiene, and readiness checks.</p></article>
@@ -310,7 +314,7 @@
             <h3>Local proxy pipeline</h3>
             <p><b>M33:</b> local proxy egress and relay bridge model</p>
             <p><b>M34:</b> end-to-end local proxy pipeline</p>
-            <span class="status-chip planned">planned</span>
+            <span class="status-chip implemented">M33 implemented</span>
           </article>
           <article class="phase-card">
             <span class="phase-kicker">Phase 5</span>
@@ -392,6 +396,7 @@
             <h3>Carrier and measurement review</h3>
             <a href="KIP-0037-carrier-family-design-reviews.md">KIP-0037: Carrier-family design reviews</a>
             <a href="KIP-0038-safe-measurement-client-design.md">KIP-0038: Safe measurement-client design</a>
+            <a href="KIP-0039-local-proxy-egress-relay-bridge-model.md">KIP-0039: Local proxy egress and relay bridge</a>
           </article>
           <article class="docs-group">
             <h3>Readiness</h3>
