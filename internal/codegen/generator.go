@@ -15,6 +15,7 @@ import (
 
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localproxyingressadversary"
@@ -1651,6 +1652,41 @@ func GeneratedProductionReadinessParity() (productionreadiness.ReadinessParityRe
 	return review.Parity, nil
 }
 `, quote(productionreadiness.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.Security.CapabilityNegotiationPolicy+"/"+p.WireShape.PolicyID), quoteSlice(productionReadinessContracts()), quoteSlice(productionReadinessBoundaries()), quote(productionreadiness.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	concreteLocalAdapterSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/concretelocaladapter"
+)
+
+const ConcreteLocalAdapterSchemaVersion = %[1]s
+const ConcreteLocalAdapterGeneratedProfileID = %[2]s
+const ConcreteLocalAdapterGeneratedProfileSeed int64 = %[3]d
+const ConcreteLocalAdapterBindClass = %[4]s
+const ConcreteLocalAdapterRuntimeMappingPolicy = %[5]s
+const ConcreteLocalAdapterMaxConnections = %[6]d
+const ConcreteLocalAdapterMaxBufferedBytes = %[7]d
+const ConcreteLocalAdapterRecommendedNextMilestone = %[8]s
+
+var ConcreteLocalAdapterScenarios = %[9]s
+
+func GeneratedConcreteLocalAdapterFixtureSet(ctx context.Context) (concretelocaladapter.SocketFixtureSet, error) {
+	return concretelocaladapter.GenerateFixtureSet(ctx)
+}
+
+func GeneratedConcreteLocalAdapterParity(ctx context.Context) (concretelocaladapter.SocketParityReport, error) {
+	set, err := concretelocaladapter.GenerateFixtureSet(ctx)
+	if err != nil {
+		return concretelocaladapter.SocketParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(concretelocaladapter.Version), quote(p.ID), p.Seed, quote(concretelocaladapter.BindClassLoopbackOnly), quote(p.AdapterPolicy.RuntimeMappingPolicy), 16, 64*1024, quote(concretelocaladapter.RecommendedNextMilestone), quoteSlice(concreteLocalAdapterScenarios()))
 	if err != nil {
 		return nil, err
 	}
@@ -4444,6 +4480,89 @@ func TestGeneratedProductionReadinessHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	concreteLocalAdapterTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/concretelocaladapter"
+)
+
+func TestGeneratedConcreteLocalAdapter(t *testing.T) {
+	if ConcreteLocalAdapterSchemaVersion != concretelocaladapter.Version || ConcreteLocalAdapterGeneratedProfileID != ProfileID {
+		t.Fatalf("generated concrete local adapter constants drifted")
+	}
+	set, err := GeneratedConcreteLocalAdapterFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(ConcreteLocalAdapterScenarios) == 0 || ConcreteLocalAdapterBindClass == "" {
+		t.Fatalf("generated concrete local adapter fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	concreteLocalAdapterParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+)
+
+func TestGeneratedConcreteLocalAdapterParity(t *testing.T) {
+	parity, err := GeneratedConcreteLocalAdapterParity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated concrete local adapter parity failed: %%+v", parity)
+	}
+	if ConcreteLocalAdapterRuntimeMappingPolicy == "" || ConcreteLocalAdapterRecommendedNextMilestone == "" {
+		t.Fatalf("concrete local adapter generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	concreteLocalAdapterHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/concretelocaladapter"
+)
+
+func TestGeneratedConcreteLocalAdapterHygiene(t *testing.T) {
+	set, err := GeneratedConcreteLocalAdapterFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := concretelocaladapter.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "unsafe"},
+		{"encoded_bytes": "unsafe"},
+		{"client_write_key": "unsafe"},
+	}
+	for _, tc := range unsafeCases {
+		if err := concretelocaladapter.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe concrete local adapter metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -4788,6 +4907,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relaybridge_generated.go", Content: relayBridgeSource, Go: true},
 		{RelPath: "protocol/localpipeline_generated.go", Content: localPipelineSource, Go: true},
 		{RelPath: "protocol/productionreadiness_generated.go", Content: productionReadinessSource, Go: true},
+		{RelPath: "protocol/concretelocaladapter_generated.go", Content: concreteLocalAdapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4865,6 +4985,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/productionreadiness_test.go", Content: productionReadinessTestSource, Go: true},
 		{RelPath: "protocol/productionreadiness_parity_test.go", Content: productionReadinessParityTestSource, Go: true},
 		{RelPath: "protocol/productionreadiness_hygiene_test.go", Content: productionReadinessHygieneTestSource, Go: true},
+		{RelPath: "protocol/concretelocaladapter_test.go", Content: concreteLocalAdapterTestSource, Go: true},
+		{RelPath: "protocol/concretelocaladapter_parity_test.go", Content: concreteLocalAdapterParityTestSource, Go: true},
+		{RelPath: "protocol/concretelocaladapter_hygiene_test.go", Content: concreteLocalAdapterHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5489,6 +5612,19 @@ func productionReadinessBoundaries() []string {
 		productionreadiness.BoundaryNoDeployment,
 		productionreadiness.BoundaryNoPayloadLogging,
 		productionreadiness.BoundaryNoProductionKeyXchg,
+	}
+}
+
+func concreteLocalAdapterScenarios() []string {
+	return []string{
+		concretelocaladapter.ScenarioSingleFlowEcho,
+		concretelocaladapter.ScenarioManySmallFlows,
+		concretelocaladapter.ScenarioLargeBackpressure,
+		concretelocaladapter.ScenarioResetIsolation,
+		concretelocaladapter.ScenarioTargetErrorMapping,
+		concretelocaladapter.ScenarioTargetResetMapping,
+		concretelocaladapter.ScenarioLoopbackBindPolicy,
+		concretelocaladapter.ScenarioMalformedLocalEvent,
 	}
 }
 
