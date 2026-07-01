@@ -125,6 +125,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "hostdetect_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "adaptivepath_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "transportbundle_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "pathrace_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -148,6 +149,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `relayfleet_generated_backend_parity`: `%s`\n", summary.RelayFleetGeneratedParity)
 			fmt.Fprintf(&b, "- `adaptivepath_generated_backend_parity`: `%s`\n", summary.AdaptivePathGeneratedParity)
 			fmt.Fprintf(&b, "- `transportbundle_generated_backend_parity`: `%s`\n", summary.TransportBundleGeneratedParity)
+			fmt.Fprintf(&b, "- `pathrace_generated_backend_parity`: `%s`\n", summary.PathRaceGeneratedParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -543,6 +545,42 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck transportbundle --quick` for bundle candidate and fallback checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Path Racing and Short-Lived Scoring")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "pathrace_scenario_validation"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "pathrace_scenario_validation")
+		renderNamedGateResult(&b, report.Gates, "pathrace_parallel_scheduler")
+		renderNamedGateResult(&b, report.Gates, "pathrace_candidate_verification")
+		renderNamedGateResult(&b, report.Gates, "pathrace_short_lived_scoring")
+		renderNamedGateResult(&b, report.Gates, "pathrace_ranking_tiebreak")
+		renderNamedGateResult(&b, report.Gates, "pathrace_misuse_detection")
+		renderNamedGateResult(&b, report.Gates, "pathrace_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "pathrace_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "pathrace_mutant_detection")
+		renderNamedGateResult(&b, report.Gates, "pathrace_fixture_drift")
+		if strings.HasPrefix(report.Mode, "pathrace-") {
+			summary := toJSONMap(report.TraceScanSummary)
+			renderSummaryMap(&b, summary, []string{
+				"version",
+				"scenario_count",
+				"candidate_count",
+				"started_candidates",
+				"verified_candidates",
+				"failed_candidates",
+				"stalled_candidates",
+				"rejected_candidates",
+				"gated_candidates",
+				"winners_declared",
+				"generated_parity",
+				"conclusion",
+			})
+		}
+	} else {
+		fmt.Fprintln(&b, "- Pathrace gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck pathrace --quick` for synthetic racing and scoring checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -555,6 +593,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Wire-shape generation is deterministic and fixture-driven; classifier/dataset evaluation is separate future work.")
 	fmt.Fprintln(&b, "- Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.")
 	fmt.Fprintln(&b, "- Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.")
+	fmt.Fprintln(&b, "- Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -563,7 +602,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 29 should focus on path-racing and revalidation within the deterministic local model.")
+	fmt.Fprintln(&b, "Milestone 30 should focus on continuous health monitoring and failover over already-selected synthetic paths.")
 	return b.String()
 }
 
