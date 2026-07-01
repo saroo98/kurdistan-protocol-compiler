@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.29.0-lab</strong>
+            <strong>0.32.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -105,7 +105,9 @@
             <div class="stack-row"><span class="status-dot on"></span><span>adaptive path</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>transport bundles</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>path racing</span><b>implemented</b></div>
-            <div class="stack-row"><span class="status-dot next"></span><span>health failover</span><b>planned</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>health failover</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>carrier review</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>measurement review</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -187,15 +189,15 @@
           </article>
           <span class="flow-edge" aria-hidden="true"></span>
           <article class="flow-node">
-            <span class="status-chip planned">planned</span>
+            <span class="status-chip implemented">implemented</span>
             <h3>health monitoring</h3>
-            <p>Future local evidence windows for path health, stale data, and uncertainty.</p>
+            <p>Deterministic local evidence windows for path health, stale data, relay burn, and uncertainty.</p>
           </article>
           <span class="flow-edge" aria-hidden="true"></span>
           <article class="flow-node">
-            <span class="status-chip planned">planned</span>
+            <span class="status-chip implemented">implemented</span>
             <h3>failover decision</h3>
-            <p>Future bounded decision model for changing path conditions.</p>
+            <p>Bounded synthetic decision model for changing path conditions and failover controls.</p>
           </article>
         </div>
       </section>
@@ -230,9 +232,9 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Hardening gates</h3><p>Invariant registry, API misuse, panic safety, resource bounds, trace hygiene, and readiness checks.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Safety and trace hygiene</h3><p>Payload-free summaries, forbidden-field scanning, generated parity, and fixture drift controls.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Path racing and scoring</h3><p>Synthetic racing, short-lived evidence, freshness decay, verification, ranking, and misuse controls.</p></article>
-          <article class="capability-card"><span class="status-chip planned">planned</span><h3>Health monitoring and failover</h3><p>Future deterministic monitoring and failover models for changing path conditions.</p></article>
-          <article class="capability-card"><span class="status-chip review">review</span><h3>Carrier-family design reviews</h3><p>Future review of carrier-family assumptions before concrete carrier implementations.</p></article>
-          <article class="capability-card"><span class="status-chip review">review</span><h3>Measurement-client privacy review</h3><p>Future privacy review before any measurement-client architecture moves beyond design.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Health monitoring and failover</h3><p>Deterministic monitoring, failover decisions, relay burn quarantine, confidence expiry, and controls.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Carrier-family design reviews</h3><p>Risk-gated carrier-family descriptors, readiness matrices, misuse checks, and trace preconditions.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Measurement-client privacy review</h3><p>Bucketed observation taxonomy, redaction policy, consent/retention checks, and local diagnostics.</p></article>
           <article class="capability-card"><span class="status-chip review">review</span><h3>Android client architecture</h3><p>Future client architecture review after readiness and safety checks mature.</p></article>
         </div>
       </section>
@@ -294,15 +296,14 @@
             <p><b>M28:</b> generated transport bundle compiler</p>
             <p><b>M29:</b> path racing and short-lived scoring harness</p>
             <p><b>M30:</b> continuous health monitoring and failover model</p>
-            <span class="status-chip implemented">M28-M29 implemented</span>
-            <span class="status-chip planned">M30 planned</span>
+            <span class="status-chip implemented">M28-M30 implemented</span>
           </article>
           <article class="phase-card">
             <span class="phase-kicker">Phase 3</span>
             <h3>Carrier and measurement review</h3>
             <p><b>M31:</b> carrier-family design reviews</p>
             <p><b>M32:</b> safe measurement-client design and privacy review</p>
-            <span class="status-chip review">review</span>
+            <span class="status-chip implemented">implemented review gates</span>
           </article>
           <article class="phase-card">
             <span class="phase-kicker">Phase 4</span>
@@ -385,6 +386,12 @@
             <a href="KIP-0033-adaptive-path-model-candidate-taxonomy.md">KIP-0033: Adaptive path model and candidate taxonomy</a>
             <a href="KIP-0034-generated-transport-bundle-compiler.md">KIP-0034: Generated transport bundle compiler</a>
             <a href="KIP-0035-path-racing-short-lived-scoring.md">KIP-0035: Path racing and short-lived scoring</a>
+            <a href="KIP-0036-continuous-health-monitoring-failover.md">KIP-0036: Continuous health monitoring and failover</a>
+          </article>
+          <article class="docs-group highlight">
+            <h3>Carrier and measurement review</h3>
+            <a href="KIP-0037-carrier-family-design-reviews.md">KIP-0037: Carrier-family design reviews</a>
+            <a href="KIP-0038-safe-measurement-client-design.md">KIP-0038: Safe measurement-client design</a>
           </article>
           <article class="docs-group">
             <h3>Readiness</h3>
