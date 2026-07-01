@@ -15,6 +15,7 @@ import (
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localadapter"
+	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxysem"
 	"kurdistan/internal/relayfleet"
@@ -311,6 +312,22 @@ func RunInvariantRegistry(profiles []*ir.Profile) []CheckResult {
 		}
 		if set.CollapseReport.Conclusion != "passed" || set.ControlCollapseReport.Conclusion != "failed" {
 			return fmt.Errorf("transport bundle collapse controls failed")
+		}
+		return nil
+	}))
+	results = append(results, check("pathrace_fixture_and_controls_validate", CategoryInvariants, func() error {
+		set, err := pathrace.GenerateFixtureSet(context.Background())
+		if err != nil {
+			return err
+		}
+		if err := pathrace.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		if set.Controls.Conclusion != "failed" || len(set.Controls.MisuseFindings) == 0 {
+			return fmt.Errorf("pathrace controls not detected")
+		}
+		if set.Parity.Conclusion != "passed" {
+			return fmt.Errorf("pathrace parity failed")
 		}
 		return nil
 	}))

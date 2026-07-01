@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
@@ -532,6 +533,34 @@ func RunTraceHygieneChecks(ctx context.Context, profiles []*ir.Profile) []CheckR
 		} {
 			if err := transportbundle.ScanForLeak(tc); err == nil {
 				return fmt.Errorf("unsafe transportbundle metadata accepted")
+			}
+		}
+		return nil
+	}))
+	results = append(results, check("pathrace_trace_hygiene", CategoryTraceHygiene, func() error {
+		set, err := pathrace.GenerateFixtureSet(ctx)
+		if err != nil {
+			return err
+		}
+		if err := pathrace.ValidateFixtureSet(set); err != nil {
+			return err
+		}
+		if err := pathrace.ScanForLeak(set); err != nil {
+			return err
+		}
+		if report := ScanValue(set); !report.Passed {
+			return fmt.Errorf("pathrace fixture failed generic hygiene: %v", report.Findings)
+		}
+		for _, tc := range []map[string]string{
+			{"endpoint": "x"},
+			{"dns_query": "x"},
+			{"resolver_ip": "x"},
+			{"cloud_provider": "x"},
+			{"payload": "x"},
+			{"secret": "x"},
+		} {
+			if err := pathrace.ScanForLeak(tc); err == nil {
+				return fmt.Errorf("unsafe pathrace metadata accepted")
 			}
 		}
 		return nil
