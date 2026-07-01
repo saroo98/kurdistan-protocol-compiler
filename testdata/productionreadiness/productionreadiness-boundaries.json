@@ -1,0 +1,98 @@
+[
+  {
+    "name": "real_io_boundary",
+    "policy": "no_real_network_io",
+    "allowed": false,
+    "forbidden": [
+      "external targets",
+      "resolver access",
+      "packet capture",
+      "live probing"
+    ],
+    "evidence": [
+      "review gate",
+      "trace hygiene",
+      "fixture drift"
+    ],
+    "conclusion": "passed",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "name": "deployment_boundary",
+    "policy": "no_deployment",
+    "allowed": false,
+    "forbidden": [
+      "service deployment",
+      "relay orchestration",
+      "cloud provisioning"
+    ],
+    "evidence": [
+      "review gate",
+      "trace hygiene",
+      "fixture drift"
+    ],
+    "conclusion": "passed",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "name": "trace_boundary",
+    "policy": "no_payload_logging",
+    "allowed": false,
+    "forbidden": [
+      "raw payload",
+      "raw bytes",
+      "endpoint data",
+      "keys",
+      "nonces",
+      "auth tags"
+    ],
+    "evidence": [
+      "review gate",
+      "trace hygiene",
+      "fixture drift"
+    ],
+    "conclusion": "passed",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "name": "security_boundary",
+    "policy": "no_production_key_exchange",
+    "allowed": false,
+    "forbidden": [
+      "production key exchange",
+      "long-term secret distribution"
+    ],
+    "evidence": [
+      "review gate",
+      "trace hygiene",
+      "fixture drift"
+    ],
+    "conclusion": "passed",
+    "payload_logged": false,
+    "secret_logged": false
+  },
+  {
+    "name": "adapter_boundary",
+    "policy": "strict_local_only",
+    "allowed": false,
+    "forbidden": [
+      "SOCKS",
+      "TUN",
+      "VPN",
+      "HTTP carrier",
+      "TLS mimicry",
+      "CDN behavior"
+    ],
+    "evidence": [
+      "review gate",
+      "trace hygiene",
+      "fixture drift"
+    ],
+    "conclusion": "passed",
+    "payload_logged": false,
+    "secret_logged": false
+  }
+]

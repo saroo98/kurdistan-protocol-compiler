@@ -1,0 +1,77 @@
+[
+  {
+    "from": "adapter interface",
+    "to": "local adapter prototype",
+    "relation": "implements"
+  },
+  {
+    "from": "byte-path fixtures",
+    "to": "wire-shape baselines",
+    "relation": "freezes"
+  },
+  {
+    "from": "carrier abstraction",
+    "to": "byte transport harness",
+    "relation": "maps_to"
+  },
+  {
+    "from": "compiler",
+    "to": "profile validation",
+    "relation": "defines"
+  },
+  {
+    "from": "end-to-end local proxy pipeline",
+    "to": "M36",
+    "relation": "prerequisite_for"
+  },
+  {
+    "from": "framing",
+    "to": "byte transport harness",
+    "relation": "encodes"
+  },
+  {
+    "from": "local adapter prototype",
+    "to": "end-to-end local proxy pipeline",
+    "relation": "drives"
+  },
+  {
+    "from": "profile validation",
+    "to": "framing",
+    "relation": "guards"
+  },
+  {
+    "from": "proxy egress and relay bridge",
+    "to": "end-to-end local proxy pipeline",
+    "relation": "composes"
+  },
+  {
+    "from": "proxy ingress prototype",
+    "to": "proxy egress and relay bridge",
+    "relation": "feeds"
+  },
+  {
+    "from": "proxy semantics",
+    "to": "proxy ingress prototype",
+    "relation": "binds"
+  },
+  {
+    "from": "runtime session lifecycle",
+    "to": "adapter interface",
+    "relation": "exposes"
+  },
+  {
+    "from": "security context",
+    "to": "runtime session lifecycle",
+    "relation": "protects"
+  },
+  {
+    "from": "stream semantics",
+    "to": "proxy semantics",
+    "relation": "carries"
+  },
+  {
+    "from": "trace hygiene",
+    "to": "generated backend parity",
+    "relation": "checks"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "prod_key_exchange_design",
+    "severity": "high",
+    "category": "security",
+    "summary": "production key exchange is not designed",
+    "required": true,
+    "resolved": false
+  },
+  {
+    "id": "external_carrier_review",
+    "severity": "high",
+    "category": "carrier",
+    "summary": "concrete carrier families require separate review",
+    "required": true,
+    "resolved": false
+  },
+  {
+    "id": "field_measurement_review",
+    "severity": "high",
+    "category": "privacy",
+    "summary": "field measurement client is not designed",
+    "required": true,
+    "resolved": false
+  },
+  {
+    "id": "mobile_client_review",
+    "severity": "medium",
+    "category": "client",
+    "summary": "Android client architecture is not reviewed",
+    "required": false,
+    "resolved": false
+  },
+  {
+    "id": "deployment_review",
+    "severity": "high",
+    "category": "operations",
+    "summary": "deployment and relay operations are out of scope",
+    "required": true,
+    "resolved": false
+  }
+]
