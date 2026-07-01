@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/measurementreview"
@@ -126,6 +127,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	proxyEgressDrift := proxyEgressComparison(filepath.Join(fixtureRoot, "testdata", "proxyegress", "egress-lifecycle-golden.json"), proxyEgressSet)
 	relayBridgeSet, relayBridgeErr := relaybridge.GenerateFixtureSet()
 	relayBridgeDrift := relayBridgeComparison(filepath.Join(fixtureRoot, "testdata", "relaybridge", "relaybridge-report-golden.json"), relayBridgeSet)
+	localPipelineSet, localPipelineErr := localpipeline.GenerateFixtureSet()
+	localPipelineDrift := localPipelineComparison(filepath.Join(fixtureRoot, "testdata", "localpipeline", "localpipeline-golden.json"), localPipelineSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -315,6 +318,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, RelayBridgeGates(relayBridgeSet, relayBridgeDrift)...)
 	} else {
 		gates = append(gates, gate("relaybridge_session_validation", false, "required", relayBridgeErr.Error(), nil, []string{relayBridgeErr.Error()}))
+	}
+	if localPipelineErr == nil {
+		gates = append(gates, LocalPipelineGates(localPipelineSet, localPipelineDrift)...)
+	} else {
+		gates = append(gates, gate("localpipeline_correctness", false, "required", localPipelineErr.Error(), nil, []string{localPipelineErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
