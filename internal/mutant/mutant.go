@@ -337,6 +337,14 @@ const (
 	ModeConcreteLocalAdapterWrongRuntimeMapping     = "concretelocaladapter_wrong_runtime_mapping"
 	ModeConcreteLocalAdapterAcceptsMalformedEvent   = "concretelocaladapter_accepts_malformed_event"
 	ModeConcreteLocalAdapterGeneratedBackendDrift   = "concretelocaladapter_generated_backend_drift"
+	ModeLocalProtocolAdapterAllowsOutboundDial      = "localprotocoladapter_allows_outbound_dial"
+	ModeLocalProtocolAdapterAllowsDNSResolution     = "localprotocoladapter_allows_dns_resolution"
+	ModeLocalProtocolAdapterAllowsPayloadForwarding = "localprotocoladapter_allows_payload_forwarding"
+	ModeLocalProtocolAdapterPersistsTarget          = "localprotocoladapter_persists_target"
+	ModeLocalProtocolAdapterAcceptsCredentials      = "localprotocoladapter_accepts_credentials"
+	ModeLocalProtocolAdapterAcceptsUDPAssociate     = "localprotocoladapter_accepts_udp_associate"
+	ModeLocalProtocolAdapterHeaderSmuggling         = "localprotocoladapter_header_smuggling"
+	ModeLocalProtocolAdapterGeneratedBackendDrift   = "localprotocoladapter_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -660,6 +668,14 @@ func Modes() []string {
 		ModeConcreteLocalAdapterWrongRuntimeMapping,
 		ModeConcreteLocalAdapterAcceptsMalformedEvent,
 		ModeConcreteLocalAdapterGeneratedBackendDrift,
+		ModeLocalProtocolAdapterAllowsOutboundDial,
+		ModeLocalProtocolAdapterAllowsDNSResolution,
+		ModeLocalProtocolAdapterAllowsPayloadForwarding,
+		ModeLocalProtocolAdapterPersistsTarget,
+		ModeLocalProtocolAdapterAcceptsCredentials,
+		ModeLocalProtocolAdapterAcceptsUDPAssociate,
+		ModeLocalProtocolAdapterHeaderSmuggling,
+		ModeLocalProtocolAdapterGeneratedBackendDrift,
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/measurementreview"
@@ -141,6 +142,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "concretelocaladapter" {
 		os.Exit(runConcreteLocalAdapter(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "localprotocoladapter" {
+		os.Exit(runLocalProtocolAdapter(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -4325,6 +4329,176 @@ func writeConcreteLocalAdapterCompanions(out string, set concretelocaladapter.So
 	}
 	for _, write := range writes {
 		if err := concretelocaladapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalProtocolAdapter(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalProtocolAdapterGenerate(args[1:])
+		case "verify":
+			return runLocalProtocolAdapterVerify(args[1:])
+		case "compare":
+			return runLocalProtocolAdapterCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localprotocoladapter", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local protocol adapter audit")
+	full := flags.Bool("full", false, "run full local protocol adapter audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunLocalProtocolAdapterAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProtocolAdapterGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localprotocoladapter generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localprotocoladapter", "localprotocoladapter-report-golden.json"), "local protocol adapter fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localprotocoladapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localprotocoladapter.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalProtocolAdapterCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localprotocoladapter fixtures: %s (%d requests)\n", *out, len(set.Requests))
+	return 0
+}
+
+func runLocalProtocolAdapterVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localprotocoladapter verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localprotocoladapter", "localprotocoladapter-report-golden.json"), "local protocol adapter fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localprotocoladapter.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localprotocoladapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localprotocoladapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProtocolAdapterCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localprotocoladapter compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local protocol adapter fixture path")
+	newPath := flags.String("new", "", "new local protocol adapter fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localprotocoladapter.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localprotocoladapter.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localprotocoladapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalProtocolAdapterCompanions(out string, set localprotocoladapter.LocalProtocolFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"localprotocoladapter-requests.json", set.Requests},
+		{"localprotocoladapter-config-report.json", set.ConfigReport},
+		{"localprotocoladapter-connect-report.json", set.ConnectReport},
+		{"localprotocoladapter-socks5-report.json", set.Socks5Report},
+		{"localprotocoladapter-redaction-report.json", set.RedactionReport},
+		{"localprotocoladapter-state-report.json", set.StateReport},
+		{"localprotocoladapter-misuse-report.json", set.Misuse},
+		{"localprotocoladapter-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := localprotocoladapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
