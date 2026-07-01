@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T13:10:30Z`
+- Generated at: `2026-07-01T13:31:35Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -296,6 +296,17 @@
 | `productionreadiness_generated_backend_parity` | PASS | `required` | 20 items and 4 contracts compared |
 | `productionreadiness_mutant_detection` | PASS | `required` | 8/8 productionreadiness mutant modes detected |
 | `productionreadiness_fixture_drift` | PASS | `required` | passed |
+| `concretelocaladapter_bind_policy` | PASS | `required` | 6 unsafe bind controls checked |
+| `concretelocaladapter_loopback_listener` | PASS | `required` | 3 loopback connections accepted |
+| `concretelocaladapter_flow_lifecycle` | PASS | `required` | 18 opened flows; 18 terminal flows |
+| `concretelocaladapter_runtime_mapping` | PASS | `required` | 18 runtime stream mappings checked |
+| `concretelocaladapter_backpressure` | PASS | `required` | 4 backpressure events observed |
+| `concretelocaladapter_error_reset_isolation` | PASS | `required` | 1 errors and 4 resets mapped safely |
+| `concretelocaladapter_trace_hygiene` | PASS | `required` | socket summaries contain safe metadata only |
+| `concretelocaladapter_no_external_io` | PASS | `required` | external and wildcard binds are rejected |
+| `concretelocaladapter_generated_backend_parity` | PASS | `required` | 10 summaries compared |
+| `concretelocaladapter_mutant_detection` | PASS | `required` | 8/8 concrete local adapter mutant modes detected |
+| `concretelocaladapter_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -309,9 +320,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `87 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `2127 ms`
+- Profile generation: `89 ms`
+- Trace generation: `21 ms`
+- Total audit runtime: `2238 ms`
 
 ## Corpus Diversity Summary
 
@@ -334,10 +345,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3185482070138951`
-- `same_profile_distance`: `0.007462686567164179`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3191736682245879`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison

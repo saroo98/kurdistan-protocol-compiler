@@ -113,6 +113,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
 - Production integration readiness review with review inventory, dependency graph, future milestone contracts, closed real-I/O boundaries, blocker register, fixture drift, and generated-backend parity.
+- Concrete local socket adapter harness with strict loopback-only bind validation, deterministic ephemeral listener probes, runtime stream mapping summaries, backpressure controls, fixture drift, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -187,6 +188,9 @@ internal/localpipeline
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
+internal/concretelocaladapter
+  strict loopback-only socket bind validation, deterministic local listener probes, safe socket summaries, fixture drift checks, misuse controls, and generated parity
+
 internal/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
@@ -246,6 +250,7 @@ go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
 go run ./cmd/kcheck localpipeline --quick
 go run ./cmd/kcheck productionreadiness --quick
+go run ./cmd/kcheck concretelocaladapter --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -373,6 +378,9 @@ go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
+go run ./cmd/kcheck localpipeline --quick
+go run ./cmd/kcheck productionreadiness --quick
+go run ./cmd/kcheck concretelocaladapter --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -721,6 +729,21 @@ go run ./cmd/kcheck productionreadiness generate --out testdata/productionreadin
 go run ./cmd/kcheck productionreadiness verify
 ```
 
+## Concrete Local Socket Adapter
+
+Milestone 36 adds the first concrete local socket adapter harness, constrained to loopback-only behavior. `internal/concretelocaladapter` validates bind configuration, rejects wildcard and external hosts, runs deterministic local listener probes on ephemeral loopback ports, records safe flow/runtime mapping summaries, and freezes fixture drift checks.
+
+The harness exercises socket single-flow echo, many small flows, large backpressure, reset isolation, target error/reset mapping, loopback bind policy, malformed local events, external bind controls, and leak controls. It does not implement SOCKS, TUN, VPN, HTTP, TLS, WebSocket, CDN, deployment, external targets, or public-network behavior.
+
+Run:
+
+```bash
+go run ./cmd/kcheck concretelocaladapter --quick
+go run ./cmd/kcheck concretelocaladapter --full --out testdata/audit/concretelocaladapter.json
+go run ./cmd/kcheck concretelocaladapter generate --out testdata/concretelocaladapter/concretelocaladapter-golden.json --force
+go run ./cmd/kcheck concretelocaladapter verify
+```
+
 ## Multi-Stream Semantics
 
 Kurdistan models multiple logical streams inside one session.
@@ -797,7 +820,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local socket adversarial hardening.
 
 ## Research Positioning
 
