@@ -56,6 +56,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/productionreadiness_generated.go",
 		"protocol/concretelocaladapter_generated.go",
 		"protocol/localprotocoladapter_generated.go",
+		"protocol/loopbackrelay_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -118,6 +119,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/localprotocoladapter_test.go",
 		"protocol/localprotocoladapter_parity_test.go",
 		"protocol/localprotocoladapter_hygiene_test.go",
+		"protocol/loopbackrelay_test.go",
+		"protocol/loopbackrelay_parity_test.go",
+		"protocol/loopbackrelay_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -248,6 +252,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	localAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localadapter_generated.go"))
 	localProtocolAdapterA := mustRead(t, filepath.Join(outA, "protocol", "localprotocoladapter_generated.go"))
 	localProtocolAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localprotocoladapter_generated.go"))
+	loopbackRelayA := mustRead(t, filepath.Join(outA, "protocol", "loopbackrelay_generated.go"))
+	loopbackRelayB := mustRead(t, filepath.Join(outB, "protocol", "loopbackrelay_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -283,6 +289,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if localProtocolAdapterA == localProtocolAdapterB {
 		t.Fatalf("local protocol adapter generation did not differ across profiles")
+	}
+	if loopbackRelayA == loopbackRelayB {
+		t.Fatalf("loopback relay generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
@@ -1722,6 +1723,40 @@ func GeneratedLocalProtocolAdapterParity() (localprotocoladapter.LocalProtocolPa
 	return set.Parity, nil
 }
 `, quote(localprotocoladapter.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.RelayIntentEncoding+"/"+p.WireShape.PolicyID), localprotocoladapter.DefaultConfig().MaxRequestLineBytes, localprotocoladapter.DefaultConfig().MaxParserTransitions, quote(localprotocoladapter.RecommendedNextMilestone), quoteSlice(localProtocolAdapterFamilies()), quoteSlice(localProtocolAdapterScenarios()), quoteSlice(localProtocolAdapterParserStates()))
+	if err != nil {
+		return nil, err
+	}
+
+	loopbackRelaySource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/loopbackrelay"
+)
+
+const LoopbackRelaySchemaVersion = %[1]s
+const LoopbackRelayGeneratedProfileID = %[2]s
+const LoopbackRelayGeneratedProfileSeed int64 = %[3]d
+const LoopbackRelayBindPolicy = %[4]s
+const LoopbackRelayDialPolicy = %[5]s
+const LoopbackRelayMaxSessions = %[6]d
+const LoopbackRelayMaxFrameBytes = %[7]d
+const LoopbackRelayRuntimePolicy = %[8]s
+const LoopbackRelayRecommendedNextMilestone = %[9]s
+
+var LoopbackRelayScenarios = %[10]s
+
+func GeneratedLoopbackRelayFixtureSet() (loopbackrelay.LoopbackRelayFixtureSet, error) {
+	return loopbackrelay.GenerateFixtureSet()
+}
+
+func GeneratedLoopbackRelayParity() (loopbackrelay.LoopbackParityReport, error) {
+	set, err := loopbackrelay.GenerateFixtureSet()
+	if err != nil {
+		return loopbackrelay.LoopbackParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(loopbackrelay.Version), quote(p.ID), p.Seed, quote(loopbackrelay.BindPolicyLoopbackOnly), quote(loopbackrelay.DialPolicyLoopbackOnly), loopbackrelay.DefaultConfig().MaxSessions, loopbackrelay.DefaultConfig().MaxFrameBytes, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(loopbackrelay.RecommendedNextMilestone), quoteSlice(loopbackRelayScenarios()))
 	if err != nil {
 		return nil, err
 	}
@@ -4677,6 +4712,84 @@ func TestGeneratedLocalProtocolAdapterHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	loopbackRelayTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/loopbackrelay"
+)
+
+func TestGeneratedLoopbackRelay(t *testing.T) {
+	if LoopbackRelaySchemaVersion != loopbackrelay.Version || LoopbackRelayGeneratedProfileID != ProfileID {
+		t.Fatalf("generated loopback relay constants drifted")
+	}
+	set, err := GeneratedLoopbackRelayFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(LoopbackRelayScenarios) == 0 || LoopbackRelayBindPolicy != loopbackrelay.BindPolicyLoopbackOnly {
+		t.Fatalf("generated loopback relay fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	loopbackRelayParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedLoopbackRelayParity(t *testing.T) {
+	parity, err := GeneratedLoopbackRelayParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated loopback relay parity failed: %%+v", parity)
+	}
+	if LoopbackRelayRuntimePolicy == "" || LoopbackRelayRecommendedNextMilestone == "" {
+		t.Fatalf("loopback relay generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	loopbackRelayHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/loopbackrelay"
+)
+
+func TestGeneratedLoopbackRelayHygiene(t *testing.T) {
+	set, err := GeneratedLoopbackRelayFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := loopbackrelay.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "synthetic"},
+		{"public_ip": "synthetic"},
+		{"raw_secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := loopbackrelay.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe loopback relay metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5023,6 +5136,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/productionreadiness_generated.go", Content: productionReadinessSource, Go: true},
 		{RelPath: "protocol/concretelocaladapter_generated.go", Content: concreteLocalAdapterSource, Go: true},
 		{RelPath: "protocol/localprotocoladapter_generated.go", Content: localProtocolAdapterSource, Go: true},
+		{RelPath: "protocol/loopbackrelay_generated.go", Content: loopbackRelaySource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5106,6 +5220,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localprotocoladapter_test.go", Content: localProtocolAdapterTestSource, Go: true},
 		{RelPath: "protocol/localprotocoladapter_parity_test.go", Content: localProtocolAdapterParityTestSource, Go: true},
 		{RelPath: "protocol/localprotocoladapter_hygiene_test.go", Content: localProtocolAdapterHygieneTestSource, Go: true},
+		{RelPath: "protocol/loopbackrelay_test.go", Content: loopbackRelayTestSource, Go: true},
+		{RelPath: "protocol/loopbackrelay_parity_test.go", Content: loopbackRelayParityTestSource, Go: true},
+		{RelPath: "protocol/loopbackrelay_hygiene_test.go", Content: loopbackRelayHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5772,6 +5889,19 @@ func localProtocolAdapterParserStates() []string {
 		localprotocoladapter.ParserStateMapped,
 		localprotocoladapter.ParserStateClosed,
 		localprotocoladapter.ParserStateRejected,
+	}
+}
+
+func loopbackRelayScenarios() []string {
+	return []string{
+		loopbackrelay.ScenarioHandshake,
+		loopbackrelay.ScenarioFrameExchange,
+		loopbackrelay.ScenarioStreamBackpressure,
+		loopbackrelay.ScenarioResetIsolation,
+		loopbackrelay.ScenarioMalformedFrame,
+		loopbackrelay.ScenarioQueuePressure,
+		loopbackrelay.ScenarioGeneratedParity,
+		loopbackrelay.ScenarioTraceHygiene,
 	}
 }
 
