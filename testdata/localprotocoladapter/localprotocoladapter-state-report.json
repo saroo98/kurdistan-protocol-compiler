@@ -1,0 +1,21 @@
+{
+  "version": "localprotocoladapter-v1",
+  "transitions": [
+    "created\u003eawaiting_input",
+    "awaiting_input\u003eheader_parsed",
+    "header_parsed\u003emethod_selected",
+    "method_selected\u003erequest_parsed",
+    "request_parsed\u003etarget_redacted",
+    "target_redacted\u003emapped",
+    "mapped\u003eclosed",
+    "awaiting_input\u003erejected",
+    "rejected\u003eclosed"
+  ],
+  "rejected": 1,
+  "failed": 0,
+  "closed": 2,
+  "report_hash": "sha256:6dfd5471221f99b4893d173c4d51c1a4b34f2539180ac7af88442a9b3a5545ba",
+  "conclusion": "passed",
+  "payload_logged": false,
+  "secret_logged": false
+}
