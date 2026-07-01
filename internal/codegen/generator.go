@@ -16,6 +16,7 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
@@ -1587,6 +1588,37 @@ func GeneratedRelayBridgeParity() (relaybridge.RelayBridgeParityReport, error) {
 	return set.Parity, nil
 }
 `, quote(relaybridge.Version), quote(p.ID), p.Seed, quote(p.Stream.PriorityPolicy+"/"+p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.BackpressurePolicy), quoteSlice(relayBridgeStates()), quoteSlice(relayBridgeScenarioClasses()), quote(relaybridge.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	localPipelineSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/localpipeline"
+)
+
+const LocalPipelineSchemaVersion = %[1]s
+const LocalPipelineGeneratedProfileID = %[2]s
+const LocalPipelineGeneratedProfileSeed int64 = %[3]d
+const LocalPipelineBoundaryPolicy = %[4]s
+
+var LocalPipelineScenarioKinds = %[5]s
+var LocalPipelineStates = %[6]s
+var LocalPipelineRecommendedNextMilestone = %[7]s
+
+func GeneratedLocalPipelineFixture() (localpipeline.PipelineFixtureSet, error) {
+	return localpipeline.GenerateFixtureSet()
+}
+
+func GeneratedLocalPipelineParity() (localpipeline.PipelineParityReport, error) {
+	set, err := localpipeline.GenerateFixtureSet()
+	if err != nil {
+		return localpipeline.PipelineParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(localpipeline.Version), quote(p.ID), p.Seed, quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.ProxySemantics.ResponseModeEncoding+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.WireShape.PolicyID), quoteSlice(localPipelineScenarioKinds()), quoteSlice(localPipelineStates()), quote(localpipeline.RecommendedNextMilestone))
 	if err != nil {
 		return nil, err
 	}
@@ -4222,6 +4254,85 @@ func TestGeneratedRelayBridgeHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	localPipelineTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localpipeline"
+)
+
+func TestGeneratedLocalPipeline(t *testing.T) {
+	if LocalPipelineSchemaVersion != localpipeline.Version || LocalPipelineGeneratedProfileID != ProfileID {
+		t.Fatalf("generated localpipeline constants drifted")
+	}
+	set, err := GeneratedLocalPipelineFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || len(set.Runs) == 0 || len(LocalPipelineScenarioKinds) == 0 {
+		t.Fatalf("generated localpipeline fixture failed: %%+v", set)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localPipelineParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedLocalPipelineParity(t *testing.T) {
+	parity, err := GeneratedLocalPipelineParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated localpipeline parity failed: %%+v", parity)
+	}
+	if LocalPipelineBoundaryPolicy == "" || LocalPipelineRecommendedNextMilestone == "" {
+		t.Fatalf("localpipeline generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localPipelineHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localpipeline"
+)
+
+func TestGeneratedLocalPipelineHygiene(t *testing.T) {
+	set, err := GeneratedLocalPipelineFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localpipeline.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"raw_payload": "synthetic"},
+		{"secret": "synthetic"},
+		{"dns_query": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := localpipeline.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe localpipeline metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -4564,6 +4675,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/measurementreview_generated.go", Content: measurementReviewSource, Go: true},
 		{RelPath: "protocol/proxyegress_generated.go", Content: proxyEgressSource, Go: true},
 		{RelPath: "protocol/relaybridge_generated.go", Content: relayBridgeSource, Go: true},
+		{RelPath: "protocol/localpipeline_generated.go", Content: localPipelineSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4635,6 +4747,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relaybridge_test.go", Content: relayBridgeTestSource, Go: true},
 		{RelPath: "protocol/relaybridge_parity_test.go", Content: relayBridgeParityTestSource, Go: true},
 		{RelPath: "protocol/relaybridge_hygiene_test.go", Content: relayBridgeHygieneTestSource, Go: true},
+		{RelPath: "protocol/localpipeline_test.go", Content: localPipelineTestSource, Go: true},
+		{RelPath: "protocol/localpipeline_parity_test.go", Content: localPipelineParityTestSource, Go: true},
+		{RelPath: "protocol/localpipeline_hygiene_test.go", Content: localPipelineHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -5215,6 +5330,36 @@ func relayBridgeScenarioClasses() []string {
 		"reset_error_isolation",
 		"path_failure_failover",
 		"gated_control",
+	}
+}
+
+func localPipelineScenarioKinds() []string {
+	return []string{
+		string(localpipeline.ScenarioSingleFlowEcho),
+		string(localpipeline.ScenarioManySmallRequests),
+		string(localpipeline.ScenarioLargeBackpressure),
+		string(localpipeline.ScenarioSlowChunkedResponse),
+		string(localpipeline.ScenarioResetIsolation),
+		string(localpipeline.ScenarioTargetErrorIsolation),
+		string(localpipeline.ScenarioBridgeBackpressure),
+		string(localpipeline.ScenarioPathFailover),
+		string(localpipeline.ScenarioDescriptorRejection),
+		string(localpipeline.ScenarioMixedSyntheticTargets),
+	}
+}
+
+func localPipelineStates() []string {
+	return []string{
+		string(localpipeline.StateCreated),
+		string(localpipeline.StateIngressBound),
+		string(localpipeline.StateEgressBound),
+		string(localpipeline.StateBridgeOpen),
+		string(localpipeline.StateRunning),
+		string(localpipeline.StateDraining),
+		string(localpipeline.StateCompleted),
+		string(localpipeline.StateReset),
+		string(localpipeline.StateFailed),
+		string(localpipeline.StateRejected),
 	}
 }
 
