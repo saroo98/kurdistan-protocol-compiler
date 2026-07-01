@@ -1,0 +1,18 @@
+{
+  "unsafe_controls": [
+    "real_tls_behavior",
+    "real_https_client_behavior",
+    "sni_routing",
+    "host_header_routing",
+    "cdn_provider_integration",
+    "public_network_egress",
+    "arbitrary_target_proxying",
+    "payload_logging",
+    "packet_capture",
+    "measurement_upload"
+  ],
+  "unsafe_detected": 10,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

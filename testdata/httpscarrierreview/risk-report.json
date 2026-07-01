@@ -1,0 +1,32 @@
+[
+  {
+    "name": "shape collapse",
+    "level": "high",
+    "mitigation": "profile-sensitive request/response shape taxonomy",
+    "status": "review"
+  },
+  {
+    "name": "unsafe fallback",
+    "level": "critical",
+    "mitigation": "block public-network and provider behavior before implementation",
+    "status": "blocked"
+  },
+  {
+    "name": "trace leakage",
+    "level": "high",
+    "mitigation": "fixture scanner and generated hygiene tests",
+    "status": "locked"
+  },
+  {
+    "name": "generated drift",
+    "level": "high",
+    "mitigation": "M42 generated/interpreted parity criteria",
+    "status": "review"
+  },
+  {
+    "name": "misuse of review as implementation",
+    "level": "medium",
+    "mitigation": "M41 package contains contracts only",
+    "status": "locked"
+  }
+]

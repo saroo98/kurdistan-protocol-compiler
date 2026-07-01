@@ -1,0 +1,46 @@
+[
+  {
+    "name": "request_marker_compact",
+    "shape_class": "compact_marker",
+    "allowed_markers": [
+      "rq_a",
+      "rq_b"
+    ],
+    "max_marker_bytes": 48,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "request_marker_split",
+    "shape_class": "split_marker",
+    "allowed_markers": [
+      "rq_head",
+      "rq_tail"
+    ],
+    "max_marker_bytes": 64,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "request_marker_bucketed",
+    "shape_class": "bucketed_marker",
+    "allowed_markers": [
+      "rq_small",
+      "rq_medium",
+      "rq_large"
+    ],
+    "max_marker_bytes": 96,
+    "profile_sensitive": true,
+    "payload_free": true
+  },
+  {
+    "name": "request_marker_state_derived",
+    "shape_class": "state_derived_marker",
+    "allowed_markers": [
+      "rq_state"
+    ],
+    "max_marker_bytes": 80,
+    "profile_sensitive": true,
+    "payload_free": true
+  }
+]

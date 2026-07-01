@@ -1,0 +1,74 @@
+[
+  {
+    "name": "real_tls_behavior",
+    "blocked": true,
+    "reason": "M41 is shape-contract only",
+    "evidence": "blocked before M42 implementation"
+  },
+  {
+    "name": "real_https_client_behavior",
+    "blocked": true,
+    "reason": "no network client behavior in design lock",
+    "evidence": "blocked by scope gate"
+  },
+  {
+    "name": "real_sni_routing",
+    "blocked": true,
+    "reason": "routing metadata must not depend on names",
+    "evidence": "blocked by misuse controls"
+  },
+  {
+    "name": "real_host_header_routing",
+    "blocked": true,
+    "reason": "routing metadata must not depend on headers",
+    "evidence": "blocked by misuse controls"
+  },
+  {
+    "name": "real_domain_dependency",
+    "blocked": true,
+    "reason": "no public naming dependency",
+    "evidence": "blocked by fixture scanner"
+  },
+  {
+    "name": "real_cdn_provider_integration",
+    "blocked": true,
+    "reason": "no provider integration",
+    "evidence": "blocked by scope gate"
+  },
+  {
+    "name": "public_network_egress",
+    "blocked": true,
+    "reason": "local deterministic harness only",
+    "evidence": "blocked by integration contract"
+  },
+  {
+    "name": "arbitrary_target_proxying",
+    "blocked": true,
+    "reason": "synthetic target model only",
+    "evidence": "blocked by proxy contract"
+  },
+  {
+    "name": "payload_forwarding",
+    "blocked": true,
+    "reason": "no carrier payload forwarding contract",
+    "evidence": "blocked by trace hygiene"
+  },
+  {
+    "name": "payload_logging",
+    "blocked": true,
+    "reason": "safe counts and buckets only",
+    "evidence": "blocked by hygiene scanner"
+  },
+  {
+    "name": "packet_capture",
+    "blocked": true,
+    "reason": "fixtures store summaries only",
+    "evidence": "blocked by fixture schema"
+  },
+  {
+    "name": "measurement_upload",
+    "blocked": true,
+    "reason": "measurement review remains offline",
+    "evidence": "blocked by measurement contract"
+  }
+]

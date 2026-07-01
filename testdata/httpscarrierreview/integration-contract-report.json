@@ -1,0 +1,62 @@
+[
+  {
+    "layer": "relaybridge",
+    "required": true,
+    "checks": [
+      "stream-open mapping",
+      "stream-close mapping",
+      "reset isolation"
+    ],
+    "conclusion": "locked"
+  },
+  {
+    "layer": "loopbackrelay",
+    "required": true,
+    "checks": [
+      "loopback-only bind",
+      "no public egress",
+      "safe summaries"
+    ],
+    "conclusion": "locked"
+  },
+  {
+    "layer": "labegress",
+    "required": true,
+    "checks": [
+      "synthetic allowlist only",
+      "target error buckets",
+      "target reset buckets"
+    ],
+    "conclusion": "locked"
+  },
+  {
+    "layer": "localpipeline",
+    "required": true,
+    "checks": [
+      "local source/sink only",
+      "byte-path fixture parity",
+      "bounded queues"
+    ],
+    "conclusion": "locked"
+  },
+  {
+    "layer": "pathhealth",
+    "required": true,
+    "checks": [
+      "offline health buckets",
+      "no active probe",
+      "no upload"
+    ],
+    "conclusion": "locked"
+  },
+  {
+    "layer": "measurementreview",
+    "required": true,
+    "checks": [
+      "privacy gate",
+      "no public measurement",
+      "no exact endpoint data"
+    ],
+    "conclusion": "locked"
+  }
+]

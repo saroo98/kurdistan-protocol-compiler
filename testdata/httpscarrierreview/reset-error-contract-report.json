@@ -1,0 +1,10 @@
+{
+  "reset_isolation_required": true,
+  "error_isolation_required": true,
+  "allowed_error_buckets": [
+    "target_error_bucket",
+    "carrier_limit_bucket",
+    "malformed_shape_bucket"
+  ],
+  "unsafe_fallback_blocked": true
+}
