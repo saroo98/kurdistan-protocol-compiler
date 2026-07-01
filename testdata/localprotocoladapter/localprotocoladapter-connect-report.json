@@ -1,0 +1,16 @@
+{
+  "version": "localprotocoladapter-v1",
+  "parser_runs": 5,
+  "requests_parsed": 1,
+  "requests_rejected": 4,
+  "unsupported_methods": 1,
+  "oversized_rejected": 1,
+  "malformed_rejected": 0,
+  "absolute_url_rejected": 1,
+  "header_smuggling_rejected": 1,
+  "target_redacted": 1,
+  "ports_bucketed": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

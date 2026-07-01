@@ -1,0 +1,16 @@
+{
+  "version": "localprotocoladapter-v1",
+  "configs_checked": 8,
+  "valid_configs": 1,
+  "rejected_configs": 7,
+  "outbound_dial_rejected": 1,
+  "dns_resolution_rejected": 1,
+  "payload_forwarding_rejected": 1,
+  "target_persistence_rejected": 1,
+  "credential_support_rejected": 1,
+  "payload_logging_rejected": 1,
+  "resource_limit_rejected": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

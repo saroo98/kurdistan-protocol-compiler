@@ -1,0 +1,9 @@
+{
+  "objects_checked": 15,
+  "unsafe_detected": 8,
+  "leak_controls_detected": 4,
+  "pipeline_bypass_detected": 0,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
