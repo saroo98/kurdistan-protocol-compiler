@@ -1,0 +1,13 @@
+{
+  "version": "localprotocoladapter-v1",
+  "targets_checked": 5,
+  "targets_redacted": 5,
+  "targets_rejected": 0,
+  "ports_bucketed": 5,
+  "exact_target_leaks": 0,
+  "exact_port_leaks": 0,
+  "unsafe_target_findings": 0,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
