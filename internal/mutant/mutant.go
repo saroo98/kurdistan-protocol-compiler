@@ -321,6 +321,14 @@ const (
 	ModeLocalPipelineSecretTraceLeak                = "localpipeline_secret_trace_leak"
 	ModeLocalPipelinePaddingOnlyDiversity           = "localpipeline_padding_only_diversity"
 	ModeLocalPipelineGeneratedBackendDrift          = "localpipeline_generated_backend_drift"
+	ModeProductionReadinessMissingBoundary          = "productionreadiness_missing_boundary"
+	ModeProductionReadinessAllowsRealIO             = "productionreadiness_allows_real_io"
+	ModeProductionReadinessAllowsDeployment         = "productionreadiness_allows_deployment"
+	ModeProductionReadinessPayloadTraceLeak         = "productionreadiness_payload_trace_leak"
+	ModeProductionReadinessSecretTraceLeak          = "productionreadiness_secret_trace_leak"
+	ModeProductionReadinessMissingM36Contract       = "productionreadiness_missing_m36_contract"
+	ModeProductionReadinessIgnoresBlockers          = "productionreadiness_ignores_blockers"
+	ModeProductionReadinessGeneratedBackendDrift    = "productionreadiness_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -628,6 +636,14 @@ func Modes() []string {
 		ModeLocalPipelineSecretTraceLeak,
 		ModeLocalPipelinePaddingOnlyDiversity,
 		ModeLocalPipelineGeneratedBackendDrift,
+		ModeProductionReadinessMissingBoundary,
+		ModeProductionReadinessAllowsRealIO,
+		ModeProductionReadinessAllowsDeployment,
+		ModeProductionReadinessPayloadTraceLeak,
+		ModeProductionReadinessSecretTraceLeak,
+		ModeProductionReadinessMissingM36Contract,
+		ModeProductionReadinessIgnoresBlockers,
+		ModeProductionReadinessGeneratedBackendDrift,
 	}
 }
 
