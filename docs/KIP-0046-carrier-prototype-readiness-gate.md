@@ -76,4 +76,4 @@ This readiness gate is a review artifact and deterministic fixture set. It does 
 
 ## Next Milestone
 
-The recommended next milestone is M41: carrier prototype design review.
+The recommended next milestone is M41: HTTPS-like carrier lab design lock. See [KIP-0047](KIP-0047-https-like-carrier-lab-design-lock.md).
