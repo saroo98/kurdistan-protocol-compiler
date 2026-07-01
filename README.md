@@ -112,6 +112,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
+- Production integration readiness review with review inventory, dependency graph, future milestone contracts, closed real-I/O boundaries, blocker register, fixture drift, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -183,6 +184,9 @@ internal/proxyegress + internal/relaybridge
 internal/localpipeline
   deterministic end-to-end local proxy pipeline fixtures, boundary integration checks, descriptor rejection, collapse controls, misuse detection, and generated parity checks
 
+internal/productionreadiness
+  structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
+
 internal/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
@@ -241,6 +245,7 @@ go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
 go run ./cmd/kcheck localpipeline --quick
+go run ./cmd/kcheck productionreadiness --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -328,6 +333,7 @@ Kurdistan treats diversity as something to measure.
 - proxy egress contract validation, synthetic target model checks, ingress-to-egress mapping, adaptive binding, lifecycle execution, backpressure, reset/error isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 - relay bridge session validation, stream mapping, adaptive runtime binding, backpressure, reset/error isolation, stream isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 - local proxy pipeline correctness, boundary integration, bridge composition, byte transport metadata, backpressure, reset/error isolation, descriptor rejection, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
+- production readiness inventory, dependency graph, real-I/O boundary review, future contracts, blocker register, fixture drift, trace hygiene, mutant detection, and generated-backend parity
 
 Useful commands:
 
@@ -702,6 +708,19 @@ Milestone 34 adds a deterministic local pipeline model that composes local proxy
 
 The model records only counts, buckets, state paths, hashes, and hygiene flags. It does not implement a socket listener, outbound dialer, real relay, DNS resolver, packet capture, deployment behavior, or concrete proxy/VPN adapter.
 
+## Production Integration Readiness Review
+
+Milestone 35 adds a structured readiness review before any concrete socket adapter work. `internal/productionreadiness` records readiness inventory items, dependency edges, closed boundary reviews, future milestone contracts, blocker-register entries, misuse controls, generated/interpreted parity, trace hygiene, and fixture drift.
+
+Run:
+
+```bash
+go run ./cmd/kcheck productionreadiness --quick
+go run ./cmd/kcheck productionreadiness --full --out testdata/audit/productionreadiness.json
+go run ./cmd/kcheck productionreadiness generate --out testdata/productionreadiness/productionreadiness-golden.json --force
+go run ./cmd/kcheck productionreadiness verify
+```
+
 ## Multi-Stream Semantics
 
 Kurdistan models multiple logical streams inside one session.
@@ -778,7 +797,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: Android client architecture review.
+   M35: production integration readiness review. M36: concrete local socket adapter.
 
 ## Research Positioning
 

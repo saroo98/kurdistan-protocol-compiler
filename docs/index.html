@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.34.0-lab</strong>
+            <strong>0.35.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -111,6 +111,7 @@
             <div class="stack-row"><span class="status-dot on"></span><span>proxy egress</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>relay bridge</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>local pipeline</span><b>implemented</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>readiness review</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -233,6 +234,7 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Proxy egress model</h3><p>Trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, and lifecycle gates.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Relay bridge model</h3><p>Bridge session/stream fixtures, adaptive binding, backpressure, reset/error isolation, and parity gates.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local proxy pipeline</h3><p>End-to-end synthetic ingress, egress, relay bridge, byte transport, adaptive binding, fixture drift, and parity checks.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Production readiness review</h3><p>Readiness inventory, dependency graph, closed-boundary reviews, future contracts, blockers, fixtures, and parity checks.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Adaptive path model</h3><p>Candidate taxonomy, condition observations, freshness buckets, uncertainty, and viability reports.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Transport bundle compiler</h3><p>Bundle modes, candidate roles, seed plans, synthetic relay binding, and fallback hints.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Hardening gates</h3><p>Invariant registry, API misuse, panic safety, resource bounds, trace hygiene, and readiness checks.</p></article>
@@ -322,8 +324,8 @@
             <span class="phase-kicker">Phase 5</span>
             <h3>Readiness and client architecture</h3>
             <p><b>M35:</b> production integration readiness review</p>
-            <p><b>M36:</b> Android client architecture review</p>
-            <span class="status-chip review">review</span>
+            <p><b>M36:</b> concrete local socket adapter</p>
+            <span class="status-chip implemented">M35 implemented</span>
           </article>
         </div>
       </section>
@@ -408,6 +410,7 @@
             <a href="KIP-0015-multi-stream-adversarial-testing.md">KIP-0015: Multi-stream adversarial testing</a>
             <a href="KIP-0016-lab-proxy-semantics.md">KIP-0016: Lab proxy semantics</a>
             <a href="KIP-0017-carrier-abstraction-modeling.md">KIP-0017: Carrier abstraction modeling</a>
+            <a href="KIP-0041-production-integration-readiness-review.md">KIP-0041: Production integration readiness review</a>
           </article>
         </div>
       </section>
