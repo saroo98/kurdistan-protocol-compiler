@@ -1,0 +1,317 @@
+[
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_single_stream_echo",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 1,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:f04d2ef92fa5bf0a099ac0fbca8a8693801e8df7ce7e23714e593234102a1ba1",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_multi_stream_chunked",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 2,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:cf2745e65a5a2e2e42228ec998205857588ff205cfed3dcfb7c5e16b134ccaa7",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_slow_target_backpressure",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 1,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 2,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:d16f6393d0c6943789b35f84708b3012b752db42559eb0f4f1047e10409a25d2",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_large_response_window_pressure",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 1,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 3,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:dbe20ca88f5b457dccffe9dd7a9f005b276a88a17bd86fa109df2a93218674ae",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_reset_one_stream",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 1,
+    "failed_requests": 0,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:8a3759e6610d052e60c15788e926a7f30d90a0a65d433ad7f2d9e54369d790f2",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_error_one_stream",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:4c892af7b4f21a86f4fb56d983d6b39b4773add321ec5a511e181e7526ad5204",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_bridge_session_failure",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:6b1d79206cd3a307fc0f47c9e84fda3085429f609dcf3234dc7bcfe34d237e51",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_active_path_failed_before_mapping",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 1,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:892f2434530f51d16fbed58ec7bb73a4ff27aed68a45466cbca89b578ff30e2b",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_active_path_failover_midstream",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 1,
+    "reset_requests": 0,
+    "failed_requests": 0,
+    "backpressure_events": 1,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:b6d38165c21c49db907af057fbc7a32b93229f92204f68f427b40e1f67e9dcbf",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_candidate_high_risk_blocked",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:71b176bc1a4b95cc837baa46cd0fe0bdc50d5f83fb8c8a4245b5f9ae7fd657c0",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_candidate_experimental_blocked",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:07b3294d7806cee98f63a276fddadcd35b52cdf731d9f2b0080b98b27dad9383",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_all_alternates_failed",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:c603a6b486108901416c5dce42f1a1a394e225714fbf08bb0de6548ab71d2003",
+    "conclusion": "passed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_control_fifo_only_scheduler",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:7a7315f71065b5625ad522e68e1c2c2bf94cbd1e2565a9ae42d28396a080496e",
+    "conclusion": "failed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_control_no_stream_isolation",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:9e238b3ccd5a615a94e79236dc5b0222bdf09bf945a61032f98fff31974eb504",
+    "conclusion": "failed"
+  },
+  {
+    "version": "relaybridge-v1",
+    "bridge_id": "bridge_control_all_targets_same_shape",
+    "session_count": 1,
+    "stream_count": 1,
+    "mapped_requests": 1,
+    "completed_requests": 0,
+    "reset_requests": 0,
+    "failed_requests": 1,
+    "backpressure_events": 0,
+    "isolation_violations": 0,
+    "safe_error_classes": [
+      "target_error_bucket",
+      "bridge_failure_bucket",
+      "candidate_blocked_bucket"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "report_hash": "sha256:f25fcd96708e4aacd85529129936422e6e94c067bd7b46a9bd34bce3abc764f1",
+    "conclusion": "failed"
+  }
+]
