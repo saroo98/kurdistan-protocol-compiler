@@ -10,9 +10,9 @@ multiple generated profile references, wire-shape policy references,
 carrier-family candidates, synthetic relay metadata, eligibility roles, and
 fallback hints into one auditable artifact.
 
-The bundle compiler is the layer between adaptive path taxonomy and future
+The bundle compiler is the layer between adaptive path taxonomy and deterministic
 path-racing work. It does not select a live winner. It produces candidate plans
-for later local scoring, revalidation, and failover modeling.
+for local scoring, revalidation, and later failover modeling.
 
 ## Why Bundles Are Needed
 
@@ -140,14 +140,15 @@ using the same deterministic metadata model.
 
 ## Limitations
 
-The bundle compiler is not path racing, active probing, a health monitor, a
+The bundle compiler is not active probing, a health monitor, a
 measurement client, or a real network selector. It does not open sockets,
 perform DNS lookups, test TCP/UDP/QUIC/HTTPS paths, dial relays, manage real
 hosts, or deploy infrastructure. It freezes safe candidate metadata for local
-audit and future deterministic scoring work.
+audit and deterministic scoring work.
 
 ## Next Milestone
 
-Milestone 29 should focus on path racing and short-lived revalidation over
-transport bundle candidates, still using synthetic observations and deterministic
-local fixtures.
+Milestone 29 adds path racing and short-lived revalidation/scoring over
+transport bundle candidates, still using synthetic observations and
+deterministic local fixtures. Milestone 30 should focus on continuous health
+monitoring and failover over already-selected synthetic paths.
