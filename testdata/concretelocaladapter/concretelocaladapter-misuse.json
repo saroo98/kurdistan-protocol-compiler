@@ -1,0 +1,9 @@
+{
+  "objects_checked": 6,
+  "external_rejected": 1,
+  "wildcard_rejected": 1,
+  "malformed_rejected": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

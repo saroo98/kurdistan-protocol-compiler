@@ -1,0 +1,11 @@
+{
+  "scenario": "concrete_local_socket_matrix",
+  "profile_count": 3,
+  "adapter_kinds": [
+    "loopback_ingress",
+    "loopback_egress",
+    "runtime_boundary"
+  ],
+  "diversity_score": 0.84,
+  "conclusion": "passed"
+}
