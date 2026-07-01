@@ -11,7 +11,7 @@ import (
 	"kurdistan/internal/ir"
 )
 
-const Version = "0.35.0-lab"
+const Version = "0.36.0-lab"
 
 const (
 	CategoryInvariants          = "invariants"
@@ -182,6 +182,7 @@ func packagesChecked() []string {
 		"internal/relayfleet",
 		"internal/localpipeline",
 		"internal/productionreadiness",
+		"internal/concretelocaladapter",
 		"internal/transportbundle",
 		"internal/pathrace",
 		"internal/pathhealth",
