@@ -1,0 +1,16 @@
+{
+  "version": "measurementreview-v1",
+  "report_id": "measurement_local_diagnostics_v1",
+  "observation_count": 18,
+  "field_count": 18,
+  "bucket_counts": {
+    "bucket": 18
+  },
+  "consent_mode": "local_only",
+  "retention_class": "session_only",
+  "local_only": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "report_hash": "sha256:3f9c88b2374bdf6ab52fb942e97dff78e124ac751fff6c4daf5f64928dc5ce88",
+  "conclusion": "passed"
+}

@@ -1,0 +1,8 @@
+{
+  "compared_fields": 18,
+  "redaction_matches": 18,
+  "retention_matches": 18,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,128 @@
+[
+  {
+    "name": "path_availability_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "handshake_outcome_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "first_useful_byte_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "stall_pattern_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "reset_like_failure_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "blackhole_like_failure_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "dns_poisoning_like_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "dns_truncation_like_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "dns_rate_limit_like_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "relay_burn_like_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "carrier_family_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "bundle_candidate_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "score_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "health_state_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "failover_outcome_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "coarse_platform_class",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "coarse_network_class",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  },
+  {
+    "name": "coarse_time_bucket",
+    "class": "safe_bucket",
+    "redaction_class": "bucket",
+    "retention_class": "session_only",
+    "allowed_in_fixture": true
+  }
+]
