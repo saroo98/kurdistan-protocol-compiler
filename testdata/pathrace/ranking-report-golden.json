@@ -1,0 +1,21 @@
+{
+  "candidate_count": 6,
+  "ranked_candidates": [
+    "bundle_candidate_balanced_adaptive_01_https_like_tcp_45101",
+    "bundle_candidate_balanced_adaptive_02_dns_survival_45118",
+    "bundle_candidate_balanced_adaptive_04_relay_rotation_45152",
+    "bundle_candidate_balanced_adaptive_05_baseline_control_45169",
+    "bundle_candidate_balanced_adaptive_06_https_like_tcp_45186",
+    "bundle_candidate_balanced_adaptive_03_experimental_udp_quic_45135"
+  ],
+  "verified_usable": 1,
+  "rejected_candidates": 0,
+  "gated_candidates": 1,
+  "tie_breaks_applied": 3,
+  "winner_candidate_id": "bundle_candidate_balanced_adaptive_01_https_like_tcp_45101",
+  "winner_family": "https_like_tcp",
+  "winner_synthetic_only": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
