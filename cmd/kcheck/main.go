@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyingress"
@@ -149,6 +150,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "loopbackrelay" {
 		os.Exit(runLoopbackRelay(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "labegress" {
+		os.Exit(runLabEgress(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -4665,6 +4669,168 @@ func writeLoopbackRelayCompanions(out string, set loopbackrelay.LoopbackRelayFix
 	}
 	for _, write := range writes {
 		if err := loopbackrelay.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLabEgress(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLabEgressGenerate(args[1:])
+		case "verify":
+			return runLabEgressVerify(args[1:])
+		case "compare":
+			return runLabEgressCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck labegress", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick lab egress audit")
+	full := flags.Bool("full", false, "run full lab egress audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunLabEgressAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLabEgressGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck labegress generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "labegress", "labegress-report-golden.json"), "lab egress fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := labegress.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := labegress.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLabEgressCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote labegress fixtures: %s (%d exchanges)\n", *out, len(set.Report.Exchanges))
+	return 0
+}
+
+func runLabEgressVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck labegress verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "labegress", "labegress-report-golden.json"), "lab egress fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := labegress.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := labegress.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := labegress.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLabEgressCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck labegress compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old lab egress fixture")
+	newPath := flags.String("new", "", "new lab egress fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := labegress.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := labegress.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := labegress.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := labegress.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLabEgressCompanions(out string, set labegress.LabEgressFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"labegress-exchanges.json", set.Report.Exchanges},
+		{"labegress-allowlist.json", set.Allowlist},
+		{"labegress-misuse-report.json", set.Misuse},
+		{"labegress-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := labegress.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

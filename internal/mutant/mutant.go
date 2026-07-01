@@ -353,6 +353,14 @@ const (
 	ModeLoopbackRelayIgnoresBackpressure   = "loopbackrelay_ignores_backpressure"
 	ModeLoopbackRelayAcceptsMalformedFrame = "loopbackrelay_accepts_malformed_frame"
 	ModeLoopbackRelayGeneratedBackendDrift = "loopbackrelay_generated_backend_drift"
+
+	ModeLabEgressAllowsExternalTarget  = "labegress_allows_external_target"
+	ModeLabEgressAllowsDNSResolution   = "labegress_allows_dns_resolution"
+	ModeLabEgressLogsPayload           = "labegress_logs_payload"
+	ModeLabEgressIgnoresBackpressure   = "labegress_ignores_backpressure"
+	ModeLabEgressWrongResetMapping     = "labegress_wrong_reset_mapping"
+	ModeLabEgressUnboundedResponse     = "labegress_unbounded_response"
+	ModeLabEgressGeneratedBackendDrift = "labegress_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -691,6 +699,13 @@ func Modes() []string {
 		ModeLoopbackRelayIgnoresBackpressure,
 		ModeLoopbackRelayAcceptsMalformedFrame,
 		ModeLoopbackRelayGeneratedBackendDrift,
+		ModeLabEgressAllowsExternalTarget,
+		ModeLabEgressAllowsDNSResolution,
+		ModeLabEgressLogsPayload,
+		ModeLabEgressIgnoresBackpressure,
+		ModeLabEgressWrongResetMapping,
+		ModeLabEgressUnboundedResponse,
+		ModeLabEgressGeneratedBackendDrift,
 	}
 }
 
