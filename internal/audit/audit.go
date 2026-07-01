@@ -13,6 +13,7 @@ import (
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/concretelocaladapter"
@@ -144,6 +145,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	loopbackRelayDrift := loopbackRelayComparison(filepath.Join(fixtureRoot, "testdata", "loopbackrelay", "loopbackrelay-report-golden.json"), loopbackRelaySet)
 	labEgressSet, labEgressErr := labegress.GenerateFixtureSet()
 	labEgressDrift := labEgressComparison(filepath.Join(fixtureRoot, "testdata", "labegress", "labegress-report-golden.json"), labEgressSet)
+	carrierReadinessSet, carrierReadinessErr := carrierreadiness.GenerateFixtureSet()
+	carrierReadinessDrift := carrierReadinessComparison(filepath.Join(fixtureRoot, "testdata", "carrierreadiness", "carrierreadiness-golden.json"), carrierReadinessSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -363,6 +366,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LabEgressGates(labEgressSet, labEgressDrift)...)
 	} else {
 		gates = append(gates, gate("labegress_allowlist_validation", false, "required", labEgressErr.Error(), nil, []string{labEgressErr.Error()}))
+	}
+	if carrierReadinessErr == nil {
+		gates = append(gates, CarrierReadinessGates(carrierReadinessSet, carrierReadinessDrift)...)
+	} else {
+		gates = append(gates, gate("carrierreadiness_inventory", false, "required", carrierReadinessErr.Error(), nil, []string{carrierReadinessErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

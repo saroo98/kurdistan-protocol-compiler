@@ -14,6 +14,7 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/audit"
+	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
@@ -153,6 +154,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "labegress" {
 		os.Exit(runLabEgress(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "carrierreadiness" {
+		os.Exit(runCarrierReadiness(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -4831,6 +4835,172 @@ func writeLabEgressCompanions(out string, set labegress.LabEgressFixtureSet, for
 	}
 	for _, write := range writes {
 		if err := labegress.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runCarrierReadiness(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runCarrierReadinessGenerate(args[1:])
+		case "verify":
+			return runCarrierReadinessVerify(args[1:])
+		case "compare":
+			return runCarrierReadinessCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck carrierreadiness", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick carrier readiness audit")
+	full := flags.Bool("full", false, "run full carrier readiness audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunCarrierReadinessAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runCarrierReadinessGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreadiness generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "carrierreadiness", "carrierreadiness-golden.json"), "carrier readiness fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := carrierreadiness.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := carrierreadiness.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeCarrierReadinessCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote carrierreadiness fixtures: %s (%d inventory items)\n", *out, len(set.Review.Inventory))
+	return 0
+}
+
+func runCarrierReadinessVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreadiness verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "carrierreadiness", "carrierreadiness-golden.json"), "carrier readiness fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := carrierreadiness.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := carrierreadiness.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := carrierreadiness.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runCarrierReadinessCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreadiness compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old carrier readiness fixture")
+	newPath := flags.String("new", "", "new carrier readiness fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := carrierreadiness.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := carrierreadiness.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := carrierreadiness.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := carrierreadiness.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeCarrierReadinessCompanions(out string, set carrierreadiness.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"carrierreadiness-inventory.json", set.Review.Inventory},
+		{"carrierreadiness-dependencies.json", set.Review.Dependencies},
+		{"carrierreadiness-boundaries.json", set.Review.Boundaries},
+		{"carrierreadiness-future-contracts.json", set.Review.FutureContracts},
+		{"carrierreadiness-blockers.json", set.Review.Blockers},
+		{"carrierreadiness-risks.json", set.Review.Risks},
+		{"carrierreadiness-misuse-report.json", set.Misuse},
+		{"carrierreadiness-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := carrierreadiness.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

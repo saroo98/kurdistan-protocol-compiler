@@ -361,6 +361,14 @@ const (
 	ModeLabEgressWrongResetMapping     = "labegress_wrong_reset_mapping"
 	ModeLabEgressUnboundedResponse     = "labegress_unbounded_response"
 	ModeLabEgressGeneratedBackendDrift = "labegress_generated_backend_drift"
+
+	ModeCarrierReadinessMissingInventory      = "carrierreadiness_missing_inventory"
+	ModeCarrierReadinessMissingFutureContract = "carrierreadiness_missing_future_contract"
+	ModeCarrierReadinessAllowsExternalCarrier = "carrierreadiness_allows_external_carrier"
+	ModeCarrierReadinessAllowsDeployment      = "carrierreadiness_allows_deployment"
+	ModeCarrierReadinessUnsafePublicClaim     = "carrierreadiness_unsafe_public_claim"
+	ModeCarrierReadinessIgnoresBlocker        = "carrierreadiness_ignores_blocker"
+	ModeCarrierReadinessGeneratedBackendDrift = "carrierreadiness_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -706,6 +714,13 @@ func Modes() []string {
 		ModeLabEgressWrongResetMapping,
 		ModeLabEgressUnboundedResponse,
 		ModeLabEgressGeneratedBackendDrift,
+		ModeCarrierReadinessMissingInventory,
+		ModeCarrierReadinessMissingFutureContract,
+		ModeCarrierReadinessAllowsExternalCarrier,
+		ModeCarrierReadinessAllowsDeployment,
+		ModeCarrierReadinessUnsafePublicClaim,
+		ModeCarrierReadinessIgnoresBlocker,
+		ModeCarrierReadinessGeneratedBackendDrift,
 	}
 }
 
