@@ -1,0 +1,14 @@
+{
+  "version": "proxyegress-v1",
+  "scenario_id": "egress_backpressure_preservation",
+  "streams_checked": 16,
+  "pressure_events": 6,
+  "pause_events": 6,
+  "resume_events": 6,
+  "window_bucket": "bounded_window_bucket",
+  "pressure_bucket": "synthetic_pressure_bucket",
+  "isolation_preserved": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

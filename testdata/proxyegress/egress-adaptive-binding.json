@@ -1,0 +1,16 @@
+{
+  "version": "proxyegress-v1",
+  "bindings_checked": 16,
+  "bundle_bound": true,
+  "race_bound": true,
+  "health_bound": true,
+  "carrier_review_bound": true,
+  "measurement_review_bound": true,
+  "high_risk_blocked": 1,
+  "experimental_blocked": 1,
+  "failed_health_blocked": 1,
+  "safe_bindings": 16,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
