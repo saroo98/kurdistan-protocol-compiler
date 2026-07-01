@@ -14,8 +14,11 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/transportbundle"
@@ -1430,6 +1433,96 @@ func GeneratedPathRaceMisuse(ctx context.Context) (pathrace.PathRaceMisuseReport
 	return set.Controls, nil
 }
 `, quote(string(pathrace.Version)), quote(p.ID), p.Seed, quoteSlice(pathRaceModeStrings()), quoteSlice(pathRaceEventKindStrings()), quoteSlice(pathRaceStateStrings()), quoteSlice(pathrace.ForbiddenMarkers()), quote(pathrace.DefaultSchedulerPolicy(pathrace.RaceModeVerifiedUsable).PolicyHash), quote(pathrace.DefaultScoringPolicy().PolicyHash))
+	if err != nil {
+		return nil, err
+	}
+
+	pathHealthSource, err := renderGo(`package protocol
+
+import (
+	"context"
+
+	"kurdistan/internal/pathhealth"
+)
+
+const PathHealthSchemaVersion = %[1]s
+const PathHealthGeneratedProfileID = %[2]s
+const PathHealthGeneratedProfileSeed int64 = %[3]d
+
+var PathHealthStates = %[4]s
+var PathHealthEventKinds = %[5]s
+var PathHealthFailoverOutcomes = %[6]s
+var PathHealthForbiddenFields = %[7]s
+var PathHealthDefaultPolicyHash = %[8]s
+
+func GeneratedPathHealthFixtureSet(ctx context.Context) (pathhealth.PathHealthFixtureSet, error) {
+	return pathhealth.GenerateFixtureSet(ctx)
+}
+
+func GeneratedPathHealthParity(ctx context.Context) (pathhealth.PathHealthParityReport, error) {
+	set, err := pathhealth.GenerateFixtureSet(ctx)
+	if err != nil {
+		return pathhealth.PathHealthParityReport{}, err
+	}
+	return set.Parity, nil
+}
+
+func GeneratedPathHealthMisuse(ctx context.Context) (pathhealth.PathHealthMisuseReport, error) {
+	set, err := pathhealth.GenerateFixtureSet(ctx)
+	if err != nil {
+		return pathhealth.PathHealthMisuseReport{}, err
+	}
+	return set.Controls, nil
+}
+`, quote(string(pathhealth.Version)), quote(p.ID), p.Seed, quoteSlice(pathhealth.HealthStates()), quoteSlice(pathhealth.HealthEventKinds()), quoteSlice(pathhealth.FailoverOutcomes()), quoteSlice(pathhealth.ForbiddenMarkers()), quote(pathhealth.DefaultPolicy().PolicyHash))
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReviewSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/carrierreview"
+)
+
+const CarrierReviewSchemaVersion = %[1]s
+const CarrierReviewGeneratedProfileID = %[2]s
+const CarrierReviewGeneratedProfileSeed int64 = %[3]d
+
+var CarrierReviewFamilies = %[4]s
+var CarrierReviewReadinessClasses = %[5]s
+var CarrierReviewForbiddenFields = %[6]s
+var CarrierReviewRecommendedNextMilestone = %[7]s
+
+func GeneratedCarrierReview() (carrierreview.CarrierFamilyReview, error) {
+	return carrierreview.GenerateReview()
+}
+`, quote(carrierreview.Version), quote(p.ID), p.Seed, quoteSlice(carrierReviewFamilies()), quoteSlice(carrierReviewReadinessClasses()), quoteSlice(carrierreview.ForbiddenMarkers()), quote(carrierreview.RecommendedNextMilestone))
+	if err != nil {
+		return nil, err
+	}
+
+	measurementReviewSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/measurementreview"
+)
+
+const MeasurementReviewSchemaVersion = %[1]s
+const MeasurementReviewGeneratedProfileID = %[2]s
+const MeasurementReviewGeneratedProfileSeed int64 = %[3]d
+
+var MeasurementReviewObservationFields = %[4]s
+var MeasurementReviewRedactionClasses = %[5]s
+var MeasurementReviewConsentModes = %[6]s
+var MeasurementReviewRetentionClasses = %[7]s
+var MeasurementReviewForbiddenFields = %[8]s
+var MeasurementReviewRecommendedNextMilestone = %[9]s
+
+func GeneratedMeasurementReview() (measurementreview.MeasurementReview, error) {
+	return measurementreview.GenerateReview()
+}
+`, quote(measurementreview.Version), quote(p.ID), p.Seed, quoteSlice(measurementReviewObservationFields()), quoteSlice(measurementreview.AllowedRedactionClasses()), quoteSlice(measurementreview.AllowedConsentModes()), quoteSlice(measurementreview.AllowedRetentionClasses()), quoteSlice(measurementreview.ForbiddenMarkers()), quote(measurementreview.RecommendedNextMilestone))
 	if err != nil {
 		return nil, err
 	}
@@ -3634,6 +3727,276 @@ func TestGeneratedPathRaceHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	pathHealthTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/pathhealth"
+)
+
+func TestGeneratedPathHealthFixtureSet(t *testing.T) {
+	if PathHealthSchemaVersion != string(pathhealth.Version) || PathHealthGeneratedProfileID != ProfileID {
+		t.Fatalf("generated pathhealth constants drifted")
+	}
+	set, err := GeneratedPathHealthFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(set.Scenarios) == 0 || set.Parity.Conclusion != "passed" {
+		t.Fatalf("generated pathhealth fixture failed: %%+v", set.Parity)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	pathHealthParityTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+)
+
+func TestGeneratedPathHealthParity(t *testing.T) {
+	report, err := GeneratedPathHealthParity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Conclusion != "passed" || report.PayloadLogged || report.SecretLogged {
+		t.Fatalf("generated pathhealth parity failed: %%+v", report)
+	}
+	misuse, err := GeneratedPathHealthMisuse(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if misuse.Conclusion != "failed" || len(misuse.MisuseFindings) == 0 {
+		t.Fatalf("generated pathhealth misuse controls were not detected: %%+v", misuse)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	pathHealthHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"context"
+	"testing"
+
+	"kurdistan/internal/pathhealth"
+)
+
+func TestGeneratedPathHealthHygiene(t *testing.T) {
+	set, err := GeneratedPathHealthFixtureSet(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pathhealth.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range PathHealthForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty pathhealth forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"payload": "synthetic"},
+		{"secret": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := pathhealth.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe pathhealth metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReviewTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carrierreview"
+)
+
+func TestGeneratedCarrierReview(t *testing.T) {
+	if CarrierReviewSchemaVersion != carrierreview.Version || CarrierReviewGeneratedProfileID != ProfileID {
+		t.Fatalf("generated carrierreview constants drifted")
+	}
+	review, err := GeneratedCarrierReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(review.Descriptors) == 0 || review.Readiness.Conclusion != "passed" {
+		t.Fatalf("generated carrier review failed: %%+v", review.Readiness)
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReviewParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedCarrierReviewParity(t *testing.T) {
+	review, err := GeneratedCarrierReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Parity.Conclusion != "passed" || review.PayloadLogged || review.SecretLogged {
+		t.Fatalf("generated carrierreview parity failed: %%+v", review.Parity)
+	}
+	if review.Readiness.RecommendedNextMilestone != CarrierReviewRecommendedNextMilestone {
+		t.Fatalf("carrierreview next milestone drifted")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierReviewHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carrierreview"
+)
+
+func TestGeneratedCarrierReviewHygiene(t *testing.T) {
+	review, err := GeneratedCarrierReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := carrierreview.ScanForLeak(review); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range CarrierReviewForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty carrierreview forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"endpoint": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"payload": "synthetic"},
+		{"secret": "synthetic"},
+		{"claim": "guaranteed bypass"},
+	}
+	for _, tc := range unsafeCases {
+		if err := carrierreview.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe carrierreview metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	measurementReviewTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/measurementreview"
+)
+
+func TestGeneratedMeasurementReview(t *testing.T) {
+	if MeasurementReviewSchemaVersion != measurementreview.Version || MeasurementReviewGeneratedProfileID != ProfileID {
+		t.Fatalf("generated measurementreview constants drifted")
+	}
+	review, err := GeneratedMeasurementReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(review.Fields) == 0 || review.Readiness.Conclusion != "passed" {
+		t.Fatalf("generated measurement review failed: %%+v", review.Readiness)
+	}
+	if len(MeasurementReviewObservationFields) == 0 || len(MeasurementReviewRedactionClasses) == 0 {
+		t.Fatalf("generated measurement review taxonomy markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	measurementReviewParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedMeasurementReviewParity(t *testing.T) {
+	review, err := GeneratedMeasurementReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Parity.Conclusion != "passed" || review.PayloadLogged || review.SecretLogged {
+		t.Fatalf("generated measurementreview parity failed: %%+v", review.Parity)
+	}
+	if review.Readiness.RecommendedNextMilestone != MeasurementReviewRecommendedNextMilestone {
+		t.Fatalf("measurementreview next milestone drifted")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	measurementReviewHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/measurementreview"
+)
+
+func TestGeneratedMeasurementReviewHygiene(t *testing.T) {
+	review, err := GeneratedMeasurementReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := measurementreview.ScanForLeak(review); err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range MeasurementReviewForbiddenFields {
+		if marker == "" {
+			t.Fatalf("empty measurementreview forbidden marker")
+		}
+	}
+	unsafeCases := []map[string]string{
+		{"raw_payload": "synthetic"},
+		{"raw_packet": "synthetic"},
+		{"dns_query": "synthetic"},
+		{"resolver_ip": "synthetic"},
+		{"client_ip": "synthetic"},
+		{"precise_location": "synthetic"},
+		{"claim": "undetectable"},
+	}
+	for _, tc := range unsafeCases {
+		if err := measurementreview.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe measurementreview metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -3971,6 +4334,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/adaptivepath_generated.go", Content: adaptivePathSource, Go: true},
 		{RelPath: "protocol/transportbundle_generated.go", Content: transportBundleSource, Go: true},
 		{RelPath: "protocol/pathrace_generated.go", Content: pathRaceSource, Go: true},
+		{RelPath: "protocol/pathhealth_generated.go", Content: pathHealthSource, Go: true},
+		{RelPath: "protocol/carrierreview_generated.go", Content: carrierReviewSource, Go: true},
+		{RelPath: "protocol/measurementreview_generated.go", Content: measurementReviewSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -4027,6 +4393,15 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/pathrace_test.go", Content: pathRaceTestSource, Go: true},
 		{RelPath: "protocol/pathrace_parity_test.go", Content: pathRaceParityTestSource, Go: true},
 		{RelPath: "protocol/pathrace_hygiene_test.go", Content: pathRaceHygieneTestSource, Go: true},
+		{RelPath: "protocol/pathhealth_test.go", Content: pathHealthTestSource, Go: true},
+		{RelPath: "protocol/pathhealth_parity_test.go", Content: pathHealthParityTestSource, Go: true},
+		{RelPath: "protocol/pathhealth_hygiene_test.go", Content: pathHealthHygieneTestSource, Go: true},
+		{RelPath: "protocol/carrierreview_test.go", Content: carrierReviewTestSource, Go: true},
+		{RelPath: "protocol/carrierreview_parity_test.go", Content: carrierReviewParityTestSource, Go: true},
+		{RelPath: "protocol/carrierreview_hygiene_test.go", Content: carrierReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/measurementreview_test.go", Content: measurementReviewTestSource, Go: true},
+		{RelPath: "protocol/measurementreview_parity_test.go", Content: measurementReviewParityTestSource, Go: true},
+		{RelPath: "protocol/measurementreview_hygiene_test.go", Content: measurementReviewHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -4529,6 +4904,32 @@ func pathRaceStateStrings() []string {
 		string(pathrace.RaceStateRejected),
 		string(pathrace.RaceStateGated),
 	}
+}
+
+func carrierReviewFamilies() []string {
+	out := []string{}
+	for _, desc := range carrierreview.DefaultDescriptors() {
+		out = append(out, desc.Family)
+	}
+	return out
+}
+
+func carrierReviewReadinessClasses() []string {
+	return []string{
+		carrierreview.ReadinessReadySynthetic,
+		carrierreview.ReadinessGatedSurvival,
+		carrierreview.ReadinessExperimentalGated,
+		carrierreview.ReadinessManualReviewOnly,
+		carrierreview.ReadinessBlockedByRisk,
+	}
+}
+
+func measurementReviewObservationFields() []string {
+	out := []string{}
+	for _, field := range measurementreview.DefaultObservationFields() {
+		out = append(out, field.Name)
+	}
+	return out
 }
 
 func findRepoRoot() (string, error) {

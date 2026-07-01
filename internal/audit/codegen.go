@@ -106,6 +106,9 @@ type CodegenAuditSummary struct {
 	AdaptivePathGeneratedParity      string                         `json:"adaptivepath_generated_backend_parity"`
 	TransportBundleGeneratedParity   string                         `json:"transportbundle_generated_backend_parity"`
 	PathRaceGeneratedParity          string                         `json:"pathrace_generated_backend_parity"`
+	PathHealthGeneratedParity        string                         `json:"pathhealth_generated_backend_parity"`
+	CarrierReviewGeneratedParity     string                         `json:"carrierreview_generated_backend_parity"`
+	MeasurementReviewGeneratedParity string                         `json:"measurementreview_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -201,6 +204,9 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	adaptivePathGate := GeneratedAdaptivePathParityGate(corpus, testFailures)
 	transportBundleGate := GeneratedTransportBundleParityGate(corpus, testFailures)
 	pathRaceGate := GeneratedPathRaceParityGate(corpus, testFailures)
+	pathHealthGate := GeneratedPathHealthParityGate(corpus, testFailures)
+	carrierReviewGate := GeneratedCarrierReviewParityGate(corpus, testFailures)
+	measurementReviewGate := GeneratedMeasurementReviewParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -236,6 +242,9 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		adaptivePathGate,
 		transportBundleGate,
 		pathRaceGate,
+		pathHealthGate,
+		carrierReviewGate,
+		measurementReviewGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -874,6 +883,120 @@ func GeneratedPathRaceParityGate(corpus GeneratedBackendTraceCorpus, testFailure
 	}, failures)
 }
 
+func GeneratedPathHealthParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module pathhealth tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated pathhealth specialization constants missing")
+	}
+	pathHealthFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/pathhealth_generated.go" {
+			pathHealthFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && pathHealthFiles < 2 {
+		failures = append(failures, "generated pathhealth specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{"pathhealth_generated.go", "pathhealth_test.go", "pathhealth_parity_test.go", "pathhealth_hygiene_test.go", "PathHealthSchemaVersion"} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated pathhealth marker "+marker)
+				}
+			}
+		}
+	}
+	return gate("pathhealth_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include pathhealth tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":              corpus.GeneratedModules,
+		"generated_test_failures":        len(testFailures),
+		"pathhealth_unique_files":        pathHealthFiles,
+		"generated_source_specialized":   corpus.SourceScan.ProfileSpecificConstantsPresent,
+		"pathhealth_generated_artifacts": []string{"pathhealth_generated.go", "pathhealth_test.go", "pathhealth_parity_test.go", "pathhealth_hygiene_test.go"},
+	}, failures)
+}
+
+func GeneratedCarrierReviewParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module carrierreview tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated carrierreview specialization constants missing")
+	}
+	carrierReviewFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/carrierreview_generated.go" {
+			carrierReviewFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && carrierReviewFiles < 2 {
+		failures = append(failures, "generated carrierreview specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{"carrierreview_generated.go", "carrierreview_test.go", "carrierreview_parity_test.go", "carrierreview_hygiene_test.go", "CarrierReviewSchemaVersion"} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated carrierreview marker "+marker)
+				}
+			}
+		}
+	}
+	return gate("carrierreview_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include carrierreview tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":                 corpus.GeneratedModules,
+		"generated_test_failures":           len(testFailures),
+		"carrierreview_unique_files":        carrierReviewFiles,
+		"generated_source_specialized":      corpus.SourceScan.ProfileSpecificConstantsPresent,
+		"carrierreview_generated_artifacts": []string{"carrierreview_generated.go", "carrierreview_test.go", "carrierreview_parity_test.go", "carrierreview_hygiene_test.go"},
+	}, failures)
+}
+
+func GeneratedMeasurementReviewParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	failures := []string{}
+	if len(testFailures) > 0 {
+		failures = append(failures, "generated module measurementreview tests failed")
+	}
+	if !corpus.SourceScan.ProfileSpecificConstantsPresent {
+		failures = append(failures, "generated measurementreview specialization constants missing")
+	}
+	measurementReviewFiles := 0
+	for rel := range corpus.SourceScan.SpecializedFileUniqueFingerprints {
+		if rel == "protocol/measurementreview_generated.go" {
+			measurementReviewFiles = corpus.SourceScan.SpecializedFileUniqueFingerprints[rel]
+		}
+	}
+	if corpus.GeneratedModules > 1 && measurementReviewFiles < 2 {
+		failures = append(failures, "generated measurementreview specialized files did not differ")
+	}
+	root, err := repoRoot()
+	if err == nil {
+		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		if readErr == nil {
+			text := string(raw)
+			for _, marker := range []string{"measurementreview_generated.go", "measurementreview_test.go", "measurementreview_parity_test.go", "measurementreview_hygiene_test.go", "MeasurementReviewSchemaVersion"} {
+				if !strings.Contains(text, marker) {
+					failures = append(failures, "missing generated measurementreview marker "+marker)
+				}
+			}
+		}
+	}
+	return gate("measurementreview_generated_backend_parity", len(failures) == 0, "required", fmt.Sprintf("%d generated modules include measurementreview tests and constants", corpus.GeneratedModules), map[string]any{
+		"generated_modules":                     corpus.GeneratedModules,
+		"generated_test_failures":               len(testFailures),
+		"measurementreview_unique_files":        measurementReviewFiles,
+		"generated_source_specialized":          corpus.SourceScan.ProfileSpecificConstantsPresent,
+		"measurementreview_generated_artifacts": []string{"measurementreview_generated.go", "measurementreview_test.go", "measurementreview_parity_test.go", "measurementreview_hygiene_test.go"},
+	}, failures)
+}
+
 func GeneratedByteTransportParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1029,6 +1152,9 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		AdaptivePathGeneratedParity:      status("adaptivepath_generated_backend_parity"),
 		TransportBundleGeneratedParity:   status("transportbundle_generated_backend_parity"),
 		PathRaceGeneratedParity:          status("pathrace_generated_backend_parity"),
+		PathHealthGeneratedParity:        status("pathhealth_generated_backend_parity"),
+		CarrierReviewGeneratedParity:     status("carrierreview_generated_backend_parity"),
+		MeasurementReviewGeneratedParity: status("measurementreview_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

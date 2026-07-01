@@ -47,6 +47,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/adaptivepath_generated.go",
 		"protocol/transportbundle_generated.go",
 		"protocol/pathrace_generated.go",
+		"protocol/pathhealth_generated.go",
+		"protocol/carrierreview_generated.go",
+		"protocol/measurementreview_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -82,6 +85,15 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/pathrace_test.go",
 		"protocol/pathrace_parity_test.go",
 		"protocol/pathrace_hygiene_test.go",
+		"protocol/pathhealth_test.go",
+		"protocol/pathhealth_parity_test.go",
+		"protocol/pathhealth_hygiene_test.go",
+		"protocol/carrierreview_test.go",
+		"protocol/carrierreview_parity_test.go",
+		"protocol/carrierreview_hygiene_test.go",
+		"protocol/measurementreview_test.go",
+		"protocol/measurementreview_parity_test.go",
+		"protocol/measurementreview_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -144,6 +156,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const AdaptivePathSchemaVersion") ||
 		!strings.Contains(protocolSource, "const TransportBundleSchemaVersion") ||
 		!strings.Contains(protocolSource, "const PathRaceSchemaVersion") ||
+		!strings.Contains(protocolSource, "const PathHealthSchemaVersion") ||
+		!strings.Contains(protocolSource, "const CarrierReviewSchemaVersion") ||
+		!strings.Contains(protocolSource, "const MeasurementReviewSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
