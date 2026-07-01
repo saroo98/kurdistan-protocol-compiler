@@ -107,6 +107,9 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Adaptive path modeling with candidate families, synthetic condition observations, freshness and uncertainty buckets, viability evaluation, decision-input summaries, misuse detection, and generated/interpreted parity.
 - Generated transport bundle compiler with deterministic bundle modes, candidate roles, profile/wire-policy references, synthetic relay binding, fallback hints, collapse controls, fixtures, and generated-backend parity.
 - Path racing and short-lived scoring harness with deterministic synthetic race scenarios, parallel scheduler modeling, candidate verification, freshness decay, ranking/tie-break controls, misuse detection, fixtures, and generated-backend parity.
+- Continuous path health monitoring and failover modeling with deterministic health scenarios, score decay, relay burn quarantine, confidence expiry, fixture drift gates, and generated-backend parity.
+- Carrier-family design review gates for synthetic carrier readiness, risk gating, misuse detection, trace-hygiene preconditions, and fixture drift.
+- Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -224,6 +227,9 @@ go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
 go run ./cmd/kcheck transportbundle --quick
 go run ./cmd/kcheck pathrace --quick
+go run ./cmd/kcheck pathhealth --quick
+go run ./cmd/kcheck carrierreview --quick
+go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -305,6 +311,9 @@ Kurdistan treats diversity as something to measure.
 - local proxy ingress contract compliance, target validation, lifecycle execution, runtime mapping, backpressure, error/reset isolation, queue bounds, collapse resistance, fixture drift, trace hygiene, and generated-backend parity
 - adaptive path candidate taxonomy, synthetic condition model, freshness and uncertainty evaluation, viability reports, decision inputs, misuse detection, trace hygiene, fixture drift, public roadmap cleanup, and generated-backend parity
 - path racing scenario validation, parallel scheduling, candidate verification, short-lived scoring, ranking tie-breaks, misuse controls, fixture drift, trace hygiene, and generated-backend parity
+- path health monitoring, degradation detection, score decay, failover decisions, relay burn quarantine, controls, fixture drift, trace hygiene, and generated-backend parity
+- carrier-family design review descriptors, readiness matrices, risk gating, misuse detection, fixture drift, trace hygiene, and generated-backend parity
+- measurement-review observation schema, redaction policy, consent/retention checks, local diagnostics, privacy readiness, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -339,6 +348,9 @@ go run ./cmd/kcheck localproxyingressadv --quick
 go run ./cmd/kcheck adaptivepath --quick
 go run ./cmd/kcheck transportbundle --quick
 go run ./cmd/kcheck pathrace --quick
+go run ./cmd/kcheck pathhealth --quick
+go run ./cmd/kcheck carrierreview --quick
+go run ./cmd/kcheck measurementreview --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -594,6 +606,51 @@ go run ./cmd/kcheck pathrace --full --out testdata/audit/pathrace.json
 go run ./cmd/kcheck pathrace generate --out testdata/pathrace/pathrace-report-golden.json --force
 go run ./cmd/kcheck pathrace verify
 go run ./cmd/kcheck pathrace compare --old testdata/pathrace/pathrace-report-golden.json --new testdata/pathrace/pathrace-report-golden.json
+```
+
+## Continuous Path Health And Failover
+
+Milestone 30 monitors the selected adaptive path over deterministic synthetic event streams. `internal/pathhealth` models active-path state, progress windows, stalls, reset bursts, blackhole-like failures, relay burn quarantine, score decay, confidence expiry, flapping, reconnect loops, failover decisions, controls, and generated/interpreted parity.
+
+The pathhealth harness does not run network probes, dial relays, resolve names, or operate a production failover system. Fixtures live under `testdata/pathhealth/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck pathhealth --quick
+go run ./cmd/kcheck pathhealth --full --out testdata/audit/pathhealth.json
+go run ./cmd/kcheck pathhealth generate --out testdata/pathhealth/pathhealth-report-golden.json --force
+go run ./cmd/kcheck pathhealth verify
+```
+
+## Carrier-Family Design Review
+
+Milestone 31 adds design-review gates before any concrete carrier-family work. `internal/carrierreview` records synthetic readiness, risk gating, default eligibility, manual-review requirements, trace-hygiene preconditions, misuse controls, and generated/interpreted parity for carrier-family ideas.
+
+This is a review layer only. It does not implement concrete HTTP, TLS, DNS, UDP, QUIC, CDN, bridge, deployment, or external-network behavior. Fixtures live under `testdata/carrierreview/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck carrierreview --quick
+go run ./cmd/kcheck carrierreview --full --out testdata/audit/carrierreview.json
+go run ./cmd/kcheck carrierreview generate --out testdata/carrierreview/carrierreview-golden.json --force
+go run ./cmd/kcheck carrierreview verify
+```
+
+## Safe Measurement-Client Design Review
+
+Milestone 32 adds privacy and readiness checks for a future local measurement-client design. `internal/measurementreview` defines bucketed observation classes, redaction classes, consent modes, retention classes, local diagnostic summaries, misuse controls, fixture drift checks, and generated/interpreted parity.
+
+This is not a measurement client or telemetry system. It does not collect field data, upload telemetry, run background measurement, contact resolvers, probe destinations, or record packet, payload, account, location, device, or secret material. Fixtures live under `testdata/measurementreview/`.
+
+Run:
+
+```bash
+go run ./cmd/kcheck measurementreview --quick
+go run ./cmd/kcheck measurementreview --full --out testdata/audit/measurementreview.json
+go run ./cmd/kcheck measurementreview generate --out testdata/measurementreview/measurementreview-golden.json --force
+go run ./cmd/kcheck measurementreview verify
 ```
 
 ## Multi-Stream Semantics

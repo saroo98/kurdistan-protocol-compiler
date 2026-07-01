@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T00:10:39Z`
+- Generated at: `2026-07-01T11:18:49Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -226,6 +226,34 @@
 | `pathrace_trace_hygiene` | PASS | `required` | pathrace fixtures contain safe metadata only |
 | `pathrace_mutant_detection` | PASS | `required` | 16 mutants represented |
 | `pathrace_fixture_drift` | PASS | `required` | passed |
+| `pathhealth_active_monitor` | PASS | `required` | 17 active-path scenarios checked |
+| `pathhealth_degradation_detection` | PASS | `required` | 13 severe/critical and 2 degraded reports |
+| `pathhealth_score_decay` | PASS | `required` | 5 low and 9 zero score outcomes |
+| `pathhealth_failover_decision` | PASS | `required` | 7 completed and 3 blocked failover outcomes |
+| `pathhealth_relay_burn_quarantine` | PASS | `required` | 1 quarantine decisions |
+| `pathhealth_control_detection` | PASS | `required` | 6 control findings |
+| `pathhealth_generated_backend_parity` | PASS | `required` | 17 scenarios compared |
+| `pathhealth_trace_hygiene` | PASS | `required` | pathhealth fixtures contain safe metadata only |
+| `pathhealth_mutant_detection` | PASS | `required` | 16/16 pathhealth mutant modes detected |
+| `pathhealth_fixture_drift` | PASS | `required` | passed |
+| `carrierreview_family_descriptors` | PASS | `required` | 5 carrier families reviewed |
+| `carrierreview_readiness_matrix` | PASS | `required` | 12 matrix layers checked |
+| `carrierreview_risk_gating` | PASS | `required` | 3 manual and 2 gated families |
+| `carrierreview_misuse_detection` | PASS | `required` | 5 descriptors scanned |
+| `carrierreview_generated_backend_parity` | PASS | `required` | 5 families compared |
+| `carrierreview_trace_hygiene` | PASS | `required` | carrier review fixtures contain safe metadata only |
+| `carrierreview_mutant_detection` | PASS | `required` | 15/15 carrierreview mutant modes detected |
+| `carrierreview_fixture_drift` | PASS | `required` | passed |
+| `measurementreview_observation_schema` | PASS | `required` | 18 observation fields checked |
+| `measurementreview_redaction_policy` | PASS | `required` | 18 bucketed fields |
+| `measurementreview_consent_retention` | PASS | `required` | local_only/session_only |
+| `measurementreview_local_diagnostics` | PASS | `required` | 18 diagnostic fields |
+| `measurementreview_privacy_readiness` | PASS | `required` | M33: local proxy egress and relay bridge model |
+| `measurementreview_misuse_detection` | PASS | `required` | 18 fields scanned |
+| `measurementreview_generated_backend_parity` | PASS | `required` | 18 fields compared |
+| `measurementreview_trace_hygiene` | PASS | `required` | measurement review fixtures contain safe metadata only |
+| `measurementreview_mutant_detection` | PASS | `required` | 15/15 measurementreview mutant modes detected |
+| `measurementreview_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -239,9 +267,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `88 ms`
-- Trace generation: `21 ms`
-- Total audit runtime: `1930 ms`
+- Profile generation: `119 ms`
+- Trace generation: `28 ms`
+- Total audit runtime: `2947 ms`
 
 ## Corpus Diversity Summary
 
@@ -264,10 +292,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3202870658775257`
-- `same_profile_distance`: `0`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.31953565621272545`
+- `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
