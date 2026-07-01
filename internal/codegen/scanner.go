@@ -87,6 +87,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/loopbackrelay_generated.go",
 		"protocol/labegress_generated.go",
 		"protocol/carrierreadiness_generated.go",
+		"protocol/httpscarrierreview_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
