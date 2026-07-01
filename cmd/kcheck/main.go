@@ -25,6 +25,7 @@ import (
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
+	"kurdistan/internal/productionreadiness"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingress"
@@ -133,6 +134,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "localpipeline" {
 		os.Exit(runLocalPipeline(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "productionreadiness" {
+		os.Exit(runProductionReadiness(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -3985,4 +3989,173 @@ func defaultFixturePath(name string) string {
 
 func defaultProtocolCorpusPath(name string) string {
 	return filepath.Join("testdata", "protocorpus", name)
+}
+
+func runProductionReadiness(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runProductionReadinessGenerate(args[1:])
+		case "verify":
+			return runProductionReadinessVerify(args[1:])
+		case "compare":
+			return runProductionReadinessCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck productionreadiness", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick production readiness audit")
+	full := flags.Bool("full", false, "run full production readiness audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunProductionReadinessAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runProductionReadinessGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck productionreadiness generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "productionreadiness", "productionreadiness-golden.json"), "production readiness fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	review, err := productionreadiness.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := productionreadiness.WriteJSON(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeProductionReadinessCompanions(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote productionreadiness fixtures: %s (%d items)\n", *out, len(review.Items))
+	return 0
+}
+
+func runProductionReadinessVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck productionreadiness verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "productionreadiness", "productionreadiness-golden.json"), "production readiness fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldReview, err := productionreadiness.LoadReview(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := productionreadiness.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := productionreadiness.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runProductionReadinessCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck productionreadiness compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old production readiness fixture path")
+	newPath := flags.String("new", "", "new production readiness fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldReview, err := productionreadiness.LoadReview(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := productionreadiness.LoadReview(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := productionreadiness.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeProductionReadinessCompanions(out string, review productionreadiness.ProductionReadinessReview, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"productionreadiness-inventory.json", review.Items},
+		{"productionreadiness-dependencies.json", review.Dependencies},
+		{"productionreadiness-boundaries.json", review.Boundaries},
+		{"productionreadiness-contracts.json", review.Contracts},
+		{"productionreadiness-blockers.json", review.Blockers},
+		{"productionreadiness-controls.json", review.Misuse},
+		{"productionreadiness-parity.json", review.Parity},
+	}
+	for _, write := range writes {
+		if err := productionreadiness.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
 }

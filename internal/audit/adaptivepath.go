@@ -302,7 +302,7 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 		"M27: adaptive path model and candidate taxonomy",
 		"M28: generated transport bundle compiler",
 		"M33: local proxy egress and relay bridge model",
-		"M36: Android client architecture review",
+		"M36: concrete local socket adapter",
 	} {
 		if !strings.Contains(readme, required) && !strings.Contains(index, required) {
 			failures = append(failures, "roadmap missing "+required)

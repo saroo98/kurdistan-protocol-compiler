@@ -27,6 +27,7 @@ import (
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
+	"kurdistan/internal/productionreadiness"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/proxyegress"
@@ -129,6 +130,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	relayBridgeDrift := relayBridgeComparison(filepath.Join(fixtureRoot, "testdata", "relaybridge", "relaybridge-report-golden.json"), relayBridgeSet)
 	localPipelineSet, localPipelineErr := localpipeline.GenerateFixtureSet()
 	localPipelineDrift := localPipelineComparison(filepath.Join(fixtureRoot, "testdata", "localpipeline", "localpipeline-golden.json"), localPipelineSet)
+	productionReadinessReview, productionReadinessErr := productionreadiness.GenerateReview()
+	productionReadinessDrift := productionReadinessComparison(filepath.Join(fixtureRoot, "testdata", "productionreadiness", "productionreadiness-golden.json"), productionReadinessReview)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -323,6 +326,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalPipelineGates(localPipelineSet, localPipelineDrift)...)
 	} else {
 		gates = append(gates, gate("localpipeline_correctness", false, "required", localPipelineErr.Error(), nil, []string{localPipelineErr.Error()}))
+	}
+	if productionReadinessErr == nil {
+		gates = append(gates, ProductionReadinessGates(productionReadinessReview, productionReadinessDrift)...)
+	} else {
+		gates = append(gates, gate("productionreadiness_inventory", false, "required", productionReadinessErr.Error(), nil, []string{productionReadinessErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
