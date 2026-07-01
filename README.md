@@ -110,6 +110,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Continuous path health monitoring and failover modeling with deterministic health scenarios, score decay, relay burn quarantine, confidence expiry, fixture drift gates, and generated-backend parity.
 - Carrier-family design review gates for synthetic carrier readiness, risk gating, misuse detection, trace-hygiene preconditions, and fixture drift.
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
+- Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - Generated-backend parity checks for interpreted vs generated behavior.
 
 ## Current Boundary
@@ -175,6 +176,9 @@ internal/proxyingress + internal/proxyingressreview
 internal/localproxyingress + internal/localproxyingressadversary
   deterministic local proxy ingress prototype, adversarial request corpus, descriptor-abuse hardening, lifecycle/pressure stress, reset/error isolation, mapping collapse controls, parity checks, and fixtures
 
+internal/proxyegress + internal/relaybridge
+  trace-safe local proxy egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, misuse controls, and generated parity checks
+
 internal/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
@@ -230,6 +234,8 @@ go run ./cmd/kcheck pathrace --quick
 go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck measurementreview --quick
+go run ./cmd/kcheck proxyegress --quick
+go run ./cmd/kcheck relaybridge --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -314,6 +320,8 @@ Kurdistan treats diversity as something to measure.
 - path health monitoring, degradation detection, score decay, failover decisions, relay burn quarantine, controls, fixture drift, trace hygiene, and generated-backend parity
 - carrier-family design review descriptors, readiness matrices, risk gating, misuse detection, fixture drift, trace hygiene, and generated-backend parity
 - measurement-review observation schema, redaction policy, consent/retention checks, local diagnostics, privacy readiness, misuse controls, fixture drift, trace hygiene, and generated-backend parity
+- proxy egress contract validation, synthetic target model checks, ingress-to-egress mapping, adaptive binding, lifecycle execution, backpressure, reset/error isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
+- relay bridge session validation, stream mapping, adaptive runtime binding, backpressure, reset/error isolation, stream isolation, misuse controls, fixture drift, trace hygiene, and generated-backend parity
 
 Useful commands:
 
@@ -351,6 +359,8 @@ go run ./cmd/kcheck pathrace --quick
 go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck measurementreview --quick
+go run ./cmd/kcheck proxyegress --quick
+go run ./cmd/kcheck relaybridge --quick
 ```
 
 `STATUS.md` is generated from the latest audit and is intended as a compact project status snapshot.
@@ -651,6 +661,26 @@ go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck measurementreview --full --out testdata/audit/measurementreview.json
 go run ./cmd/kcheck measurementreview generate --out testdata/measurementreview/measurementreview-golden.json --force
 go run ./cmd/kcheck measurementreview verify
+```
+
+## Local Proxy Egress And Relay Bridge Model
+
+Milestone 33 adds a trace-safe model for the local proxy egress side and the relay bridge that connects ingress requests to synthetic egress targets. `internal/proxyegress` defines bounded egress descriptors, synthetic target classes, ingress-to-egress mapping, lifecycle reports, adaptive prerequisite binding, backpressure, reset/error isolation, misuse controls, fixture drift checks, and generated/interpreted parity.
+
+`internal/relaybridge` models bridge sessions and streams using safe synthetic identifiers, stream isolation, adaptive runtime binding, bridge backpressure, reset/error propagation, and fixture drift gates. It does not dial real relays, record destinations, or add deployment behavior.
+
+Run:
+
+```bash
+go run ./cmd/kcheck proxyegress --quick
+go run ./cmd/kcheck proxyegress --full --out testdata/audit/proxyegress.json
+go run ./cmd/kcheck proxyegress generate --out testdata/proxyegress/egress-lifecycle-golden.json --force
+go run ./cmd/kcheck proxyegress verify
+
+go run ./cmd/kcheck relaybridge --quick
+go run ./cmd/kcheck relaybridge --full --out testdata/audit/relaybridge.json
+go run ./cmd/kcheck relaybridge generate --out testdata/relaybridge/relaybridge-report-golden.json --force
+go run ./cmd/kcheck relaybridge verify
 ```
 
 ## Multi-Stream Semantics
