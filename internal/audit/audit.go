@@ -13,6 +13,7 @@ import (
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
@@ -22,6 +23,8 @@ import (
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyadversary"
@@ -111,6 +114,12 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	transportBundleComparison := transportBundleFixtureComparison(filepath.Join(fixtureRoot, "testdata", "transportbundle", "bundle-manifest-golden.json"), transportBundleSet)
 	pathRaceSet, pathRaceErr := pathrace.GenerateFixtureSet(ctx)
 	pathRaceComparison := pathRaceFixtureComparison(filepath.Join(fixtureRoot, "testdata", "pathrace", "pathrace-report-golden.json"), pathRaceSet)
+	pathHealthSet, pathHealthErr := pathhealth.GenerateFixtureSet(ctx)
+	pathHealthComparison := pathHealthFixtureComparison(filepath.Join(fixtureRoot, "testdata", "pathhealth", "pathhealth-report-golden.json"), pathHealthSet)
+	carrierReview, carrierReviewErr := carrierreview.GenerateReview()
+	carrierReviewDrift := carrierReviewComparison(filepath.Join(fixtureRoot, "testdata", "carrierreview", "carrierreview-golden.json"), carrierReview)
+	measurementReview, measurementReviewErr := measurementreview.GenerateReview()
+	measurementReviewDrift := measurementReviewComparison(filepath.Join(fixtureRoot, "testdata", "measurementreview", "measurementreview-golden.json"), measurementReview)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -275,6 +284,21 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, PathRaceGates(pathRaceSet, pathRaceComparison)...)
 	} else {
 		gates = append(gates, gate("pathrace_scenario_validation", false, "required", pathRaceErr.Error(), nil, []string{pathRaceErr.Error()}))
+	}
+	if pathHealthErr == nil {
+		gates = append(gates, PathHealthGates(pathHealthSet, pathHealthComparison)...)
+	} else {
+		gates = append(gates, gate("pathhealth_active_monitor", false, "required", pathHealthErr.Error(), nil, []string{pathHealthErr.Error()}))
+	}
+	if carrierReviewErr == nil {
+		gates = append(gates, CarrierReviewGates(carrierReview, carrierReviewDrift)...)
+	} else {
+		gates = append(gates, gate("carrierreview_family_descriptors", false, "required", carrierReviewErr.Error(), nil, []string{carrierReviewErr.Error()}))
+	}
+	if measurementReviewErr == nil {
+		gates = append(gates, MeasurementReviewGates(measurementReview, measurementReviewDrift)...)
+	} else {
+		gates = append(gates, gate("measurementreview_observation_schema", false, "required", measurementReviewErr.Error(), nil, []string{measurementReviewErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

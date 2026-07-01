@@ -14,12 +14,15 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/audit"
+	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/protocorpus"
 	"kurdistan/internal/proxyingress"
@@ -109,6 +112,15 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "pathrace" {
 		os.Exit(runPathRace(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "pathhealth" {
+		os.Exit(runPathHealth(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "carrierreview" {
+		os.Exit(runCarrierReview(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "measurementreview" {
+		os.Exit(runMeasurementReview(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -2817,6 +2829,511 @@ func writePathRaceCompanions(out string, set pathrace.PathRaceFixtureSet, force 
 	for _, write := range writes {
 		path := filepath.Join(dir, write.name)
 		if err := pathrace.WriteJSON(path, write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runPathHealth(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runPathHealthGenerate(args[1:])
+		case "verify":
+			return runPathHealthVerify(args[1:])
+		case "compare":
+			return runPathHealthCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck pathhealth", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick pathhealth audit")
+	full := flags.Bool("full", false, "run full pathhealth audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunPathHealthAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runPathHealthGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathhealth generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "pathhealth", "pathhealth-report-golden.json"), "pathhealth fixture path")
+	force := flags.Bool("force", false, "overwrite fixtures")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := pathhealth.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := pathhealth.WriteJSON(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writePathHealthCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote pathhealth fixtures: %s (%d scenarios, %d events)\n", *out, len(set.Scenarios), len(set.Events))
+	return 0
+}
+
+func runPathHealthVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathhealth verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "pathhealth", "pathhealth-report-golden.json"), "pathhealth fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := pathhealth.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := pathhealth.GenerateFixtureSet(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := pathhealth.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runPathHealthCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck pathhealth compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old pathhealth fixture path")
+	newPath := flags.String("new", "", "new pathhealth fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := pathhealth.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := pathhealth.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := pathhealth.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writePathHealthCompanions(out string, set pathhealth.PathHealthFixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"pathhealth-scenarios-golden.json", set.Scenarios},
+		{"pathhealth-events-golden.json", set.Events},
+		{"pathhealth-transitions-golden.json", set.Transitions},
+		{"pathhealth-degradation-golden.json", set.Degradation},
+		{"pathhealth-decisions-golden.json", set.Decisions},
+		{"pathhealth-controls.json", set.Controls},
+		{"pathhealth-parity.json", set.Parity},
+	}
+	for _, write := range writes {
+		path := filepath.Join(dir, write.name)
+		if err := pathhealth.WriteJSON(path, write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runCarrierReview(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runCarrierReviewGenerate(args[1:])
+		case "verify":
+			return runCarrierReviewVerify(args[1:])
+		case "compare":
+			return runCarrierReviewCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck carrierreview", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick carrier review audit")
+	full := flags.Bool("full", false, "run full carrier review audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunCarrierReviewAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runCarrierReviewGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreview generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "carrierreview", "carrierreview-golden.json"), "carrier review fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	review, err := carrierreview.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := carrierreview.WriteJSON(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeCarrierReviewCompanions(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote carrierreview fixtures: %s (%d families)\n", *out, len(review.Descriptors))
+	return 0
+}
+
+func runCarrierReviewVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreview verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "carrierreview", "carrierreview-golden.json"), "carrier review fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldReview, err := carrierreview.LoadReview(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := carrierreview.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := carrierreview.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runCarrierReviewCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck carrierreview compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old carrier review fixture path")
+	newPath := flags.String("new", "", "new carrier review fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldReview, err := carrierreview.LoadReview(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := carrierreview.LoadReview(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := carrierreview.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeCarrierReviewCompanions(out string, review carrierreview.CarrierFamilyReview, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"carrier-families.json", review.Descriptors},
+		{"carrier-readiness.json", review.Readiness},
+		{"carrier-review-matrix.json", review.Matrix},
+		{"carrierreview-controls.json", review.Misuse},
+		{"carrierreview-parity.json", review.Parity},
+	}
+	for _, write := range writes {
+		if err := carrierreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runMeasurementReview(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runMeasurementReviewGenerate(args[1:])
+		case "verify":
+			return runMeasurementReviewVerify(args[1:])
+		case "compare":
+			return runMeasurementReviewCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck measurementreview", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick measurement review audit")
+	full := flags.Bool("full", false, "run full measurement review audit")
+	out := flags.String("out", "", "optional audit JSON output path")
+	status := flags.String("status", "", "optional STATUS.md output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunMeasurementReviewAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runMeasurementReviewGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck measurementreview generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "measurementreview", "measurementreview-golden.json"), "measurement review fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	review, err := measurementreview.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := measurementreview.WriteJSON(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeMeasurementReviewCompanions(*out, review, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote measurementreview fixtures: %s (%d fields)\n", *out, len(review.Fields))
+	return 0
+}
+
+func runMeasurementReviewVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck measurementreview verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "measurementreview", "measurementreview-golden.json"), "measurement review fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldReview, err := measurementreview.LoadReview(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := measurementreview.GenerateReview()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := measurementreview.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runMeasurementReviewCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck measurementreview compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old measurement review fixture path")
+	newPath := flags.String("new", "", "new measurement review fixture path")
+	out := flags.String("out", "", "optional compare JSON output path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldReview, err := measurementreview.LoadReview(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newReview, err := measurementreview.LoadReview(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := measurementreview.CompareReviews(oldReview, newReview)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	if *out != "" {
+		if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil && filepath.Dir(*out) != "." {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(*out, append(raw, '\n'), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeMeasurementReviewCompanions(out string, review measurementreview.MeasurementReview, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"measurement-observation-schema.json", review.Fields},
+		{"measurement-redaction-policy.json", review.Policy},
+		{"measurement-local-diagnostics.json", review.Diagnostics},
+		{"measurement-readiness.json", review.Readiness},
+		{"measurementreview-controls.json", review.Misuse},
+		{"measurementreview-parity.json", review.Parity},
+	}
+	for _, write := range writes {
+		if err := measurementreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
