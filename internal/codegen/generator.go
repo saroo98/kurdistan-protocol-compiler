@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
@@ -1825,6 +1826,41 @@ func GeneratedCarrierReadinessParity() (carrierreadiness.ParityReport, error) {
 	return set.Parity, nil
 }
 `, quote(carrierreadiness.Version), quote(p.ID), p.Seed, quote(carrierreadiness.DecisionReady), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(carrierreadiness.RecommendedNextMilestone), quoteSlice(carrierReadinessFutureMilestones()), quoteSlice(carrierReadinessBoundaryNames()))
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierReviewSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/httpscarrierreview"
+)
+
+const HTTPSCarrierReviewSchemaVersion = %[1]s
+const HTTPSCarrierReviewGeneratedProfileID = %[2]s
+const HTTPSCarrierReviewGeneratedProfileSeed int64 = %[3]d
+const HTTPSCarrierReviewBackendVersion = %[4]s
+const HTTPSCarrierReviewDecision = %[5]s
+const HTTPSCarrierReviewRuntimePolicy = %[6]s
+const HTTPSCarrierReviewRecommendedNextMilestone = %[7]s
+const HTTPSCarrierReviewRequestShapeCount = %[8]d
+const HTTPSCarrierReviewResponseShapeCount = %[9]d
+
+var HTTPSCarrierReviewBlockedBehaviors = %[10]s
+var HTTPSCarrierReviewM42Criteria = %[11]s
+
+func GeneratedHTTPSCarrierReviewFixtureSet() (httpscarrierreview.FixtureSet, error) {
+	return httpscarrierreview.GenerateFixtureSet()
+}
+
+func GeneratedHTTPSCarrierReviewParity() (httpscarrierreview.ParityReport, error) {
+	set, err := httpscarrierreview.GenerateFixtureSet()
+	if err != nil {
+		return httpscarrierreview.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(httpscarrierreview.Version), quote(p.ID), p.Seed, quote(httpscarrierreview.BackendVersion), quote(httpscarrierreview.DecisionReady), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpscarrierreview.RecommendedNextMilestone), len(httpsCarrierReviewRequestShapeNames()), len(httpsCarrierReviewResponseShapeNames()), quoteSlice(httpsCarrierReviewBlockedBehaviorNames()), quoteSlice(httpsCarrierReviewM42Criteria()))
 	if err != nil {
 		return nil, err
 	}
@@ -5015,6 +5051,89 @@ func TestGeneratedCarrierReadinessHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	httpsCarrierReviewTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpscarrierreview"
+)
+
+func TestGeneratedHTTPSCarrierReview(t *testing.T) {
+	if HTTPSCarrierReviewSchemaVersion != httpscarrierreview.Version || HTTPSCarrierReviewGeneratedProfileID != ProfileID {
+		t.Fatalf("generated HTTPS carrier review constants drifted")
+	}
+	set, err := GeneratedHTTPSCarrierReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || HTTPSCarrierReviewDecision != httpscarrierreview.DecisionReady || len(HTTPSCarrierReviewBlockedBehaviors) < 10 {
+		t.Fatalf("generated HTTPS carrier review fixture failed: %%+v", set)
+	}
+	if HTTPSCarrierReviewRequestShapeCount < 4 || HTTPSCarrierReviewResponseShapeCount < 4 {
+		t.Fatalf("generated HTTPS carrier shape counts incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierReviewParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedHTTPSCarrierReviewParity(t *testing.T) {
+	parity, err := GeneratedHTTPSCarrierReviewParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged {
+		t.Fatalf("generated HTTPS carrier review parity failed: %%+v", parity)
+	}
+	if HTTPSCarrierReviewRuntimePolicy == "" || HTTPSCarrierReviewRecommendedNextMilestone == "" || len(HTTPSCarrierReviewM42Criteria) < 10 {
+		t.Fatalf("HTTPS carrier review generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierReviewHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpscarrierreview"
+)
+
+func TestGeneratedHTTPSCarrierReviewHygiene(t *testing.T) {
+	set, err := GeneratedHTTPSCarrierReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := httpscarrierreview.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_secret": "synthetic"},
+		map[string]string{"claim": "guaranteed bypass"},
+		map[string]bool{"contains_sni": true},
+		map[string]bool{"contains_host_header": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := httpscarrierreview.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe HTTPS carrier review metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5364,6 +5483,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/loopbackrelay_generated.go", Content: loopbackRelaySource, Go: true},
 		{RelPath: "protocol/labegress_generated.go", Content: labEgressSource, Go: true},
 		{RelPath: "protocol/carrierreadiness_generated.go", Content: carrierReadinessSource, Go: true},
+		{RelPath: "protocol/httpscarrierreview_generated.go", Content: httpsCarrierReviewSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5456,6 +5576,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/carrierreadiness_test.go", Content: carrierReadinessTestSource, Go: true},
 		{RelPath: "protocol/carrierreadiness_parity_test.go", Content: carrierReadinessParityTestSource, Go: true},
 		{RelPath: "protocol/carrierreadiness_hygiene_test.go", Content: carrierReadinessHygieneTestSource, Go: true},
+		{RelPath: "protocol/httpscarrierreview_test.go", Content: httpsCarrierReviewTestSource, Go: true},
+		{RelPath: "protocol/httpscarrierreview_parity_test.go", Content: httpsCarrierReviewParityTestSource, Go: true},
+		{RelPath: "protocol/httpscarrierreview_hygiene_test.go", Content: httpsCarrierReviewHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -6173,6 +6296,44 @@ func carrierReadinessBoundaryNames() []string {
 		"no payload logging",
 		"no production key exchange",
 		"no live carrier implementation",
+	}
+}
+
+func httpsCarrierReviewRequestShapeNames() []string {
+	return []string{"request_marker_compact", "request_marker_split", "request_marker_bucketed", "request_marker_state_derived"}
+}
+
+func httpsCarrierReviewResponseShapeNames() []string {
+	return []string{"response_marker_compact", "response_marker_chunked", "response_marker_error_bucket", "response_marker_state_derived"}
+}
+
+func httpsCarrierReviewBlockedBehaviorNames() []string {
+	return []string{
+		"real_tls_behavior",
+		"real_https_client_behavior",
+		"real_sni_routing",
+		"real_host_header_routing",
+		"real_domain_dependency",
+		"real_cdn_provider_integration",
+		"public_network_egress",
+		"arbitrary_target_proxying",
+		"payload_logging",
+		"packet_capture",
+	}
+}
+
+func httpsCarrierReviewM42Criteria() []string {
+	return []string{
+		"bounded_request_shape_markers",
+		"bounded_response_shape_markers",
+		"stream_mapping",
+		"backpressure_mapping",
+		"local_integration",
+		"measurement_review_enforcement",
+		"real_tls_blocked",
+		"public_network_blocked",
+		"trace_hygiene",
+		"generated_parity",
 	}
 }
 
