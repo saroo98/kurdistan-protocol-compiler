@@ -1,0 +1,16 @@
+{
+  "unsafe_controls": [
+    "external_target",
+    "dns_resolution",
+    "raw_address_trace",
+    "payload_logging",
+    "unbounded_response",
+    "ignored_backpressure",
+    "wrong_reset_mapping",
+    "generated_backend_drift"
+  ],
+  "unsafe_detected": 8,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

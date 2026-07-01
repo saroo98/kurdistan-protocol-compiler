@@ -1,0 +1,13 @@
+{
+  "loopback_targets_accepted": 3,
+  "unsafe_targets_rejected": 4,
+  "rejected_classes": [
+    "external_target",
+    "dns_resolution",
+    "raw_address_trace",
+    "arbitrary_payload_capture"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
