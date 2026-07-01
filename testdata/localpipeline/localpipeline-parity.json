@@ -1,0 +1,8 @@
+{
+  "version": "localpipeline-v1",
+  "compared_scenarios": 12,
+  "matching_summaries": 12,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
