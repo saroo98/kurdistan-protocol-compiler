@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T13:47:59Z`
+- Generated at: `2026-07-01T20:58:41Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -307,6 +307,54 @@
 | `concretelocaladapter_generated_backend_parity` | PASS | `required` | 10 summaries compared |
 | `concretelocaladapter_mutant_detection` | PASS | `required` | 8/8 concrete local adapter mutant modes detected |
 | `concretelocaladapter_fixture_drift` | PASS | `required` | passed |
+| `localprotocoladapter_config_validation` | PASS | `required` | 8 configs checked |
+| `localprotocoladapter_connect_like_parser` | PASS | `required` | 5 CONNECT-like parser runs |
+| `localprotocoladapter_socks5_like_parser` | PASS | `required` | 4 SOCKS5-like parser runs |
+| `localprotocoladapter_target_redaction` | PASS | `required` | 5 targets redacted |
+| `localprotocoladapter_state_machine` | PASS | `required` | 9 parser transitions checked |
+| `localprotocoladapter_concrete_adapter_integration` | PASS | `required` | 5 local connection descriptors checked |
+| `localprotocoladapter_localpipeline_mapping` | PASS | `required` | 3 localpipeline mappings |
+| `localprotocoladapter_resource_limits` | PASS | `required` | 2 resource limit controls |
+| `localprotocoladapter_error_redaction` | PASS | `required` | parser errors are stable classes |
+| `localprotocoladapter_misuse_detection` | PASS | `required` | 8 unsafe controls detected |
+| `localprotocoladapter_generated_backend_parity` | PASS | `required` | 5 requests compared |
+| `localprotocoladapter_trace_hygiene` | PASS | `required` | local protocol fixtures contain safe metadata only |
+| `localprotocoladapter_mutant_detection` | PASS | `required` | 8/8 localprotocoladapter mutant modes detected |
+| `localprotocoladapter_fixture_drift` | PASS | `required` | passed |
+| `loopbackrelay_bind_policy` | PASS | `required` | 4 unsafe controls rejected |
+| `loopbackrelay_session_lifecycle` | PASS | `required` | 8 sessions closed |
+| `loopbackrelay_handshake` | PASS | `required` | 8 handshakes completed |
+| `loopbackrelay_frame_round_trip` | PASS | `required` | 44 frames round-tripped |
+| `loopbackrelay_backpressure` | PASS | `required` | 2 backpressure events |
+| `loopbackrelay_reset_isolation` | PASS | `required` | 1 resets observed |
+| `loopbackrelay_malformed_input` | PASS | `required` | 1 malformed inputs rejected |
+| `loopbackrelay_resource_limits` | PASS | `required` | bounded sessions, frames, queues, and events |
+| `loopbackrelay_trace_hygiene` | PASS | `required` | loopback relay summaries contain safe metadata only |
+| `loopbackrelay_generated_backend_parity` | PASS | `required` | 8 sessions compared |
+| `loopbackrelay_mutant_detection` | PASS | `required` | 7/7 loopback relay mutant modes detected |
+| `loopbackrelay_fixture_drift` | PASS | `required` | passed |
+| `labegress_allowlist_validation` | PASS | `required` | 4 unsafe targets rejected |
+| `labegress_connector_lifecycle` | PASS | `required` | 8 connections closed |
+| `labegress_fixture_exchange` | PASS | `required` | 15/20 chunks written/read |
+| `labegress_target_backpressure` | PASS | `required` | 2 backpressure events |
+| `labegress_error_reset_isolation` | PASS | `required` | 1 errors, 1 resets |
+| `labegress_half_close` | PASS | `required` | half-close metadata checked |
+| `labegress_queue_limits` | PASS | `required` | 1 queue pressure events |
+| `labegress_trace_hygiene` | PASS | `required` | lab egress summaries contain safe metadata only |
+| `labegress_generated_backend_parity` | PASS | `required` | 8 exchanges compared |
+| `labegress_mutant_detection` | PASS | `required` | 7/7 lab egress mutant modes detected |
+| `labegress_fixture_drift` | PASS | `required` | passed |
+| `carrierreadiness_inventory` | PASS | `required` | 6 inventory items checked |
+| `carrierreadiness_dependency_graph` | PASS | `required` | 5 dependency edges checked |
+| `carrierreadiness_boundary_policy` | PASS | `required` | 5 boundaries enforced |
+| `carrierreadiness_future_contracts` | PASS | `required` | 3 future contracts scoped |
+| `carrierreadiness_blocker_register` | PASS | `required` | 5 blockers tracked |
+| `carrierreadiness_risk_matrix` | PASS | `required` | 4 risk items checked |
+| `carrierreadiness_checklist` | PASS | `required` | 6 checklist items checked |
+| `carrierreadiness_public_claim_safety` | PASS | `required` | public claim safety markers checked |
+| `carrierreadiness_generated_backend_parity` | PASS | `required` | 6 inventory items compared |
+| `carrierreadiness_mutant_detection` | PASS | `required` | 7/7 carrier readiness mutant modes detected |
+| `carrierreadiness_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -320,9 +368,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `97 ms`
-- Trace generation: `22 ms`
-- Total audit runtime: `2331 ms`
+- Profile generation: `94 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2251 ms`
 
 ## Corpus Diversity Summary
 
@@ -347,7 +395,7 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3199689492185658`
+- `different_profile_average_distance`: `0.319922387336599`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
