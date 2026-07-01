@@ -1,0 +1,20 @@
+{
+  "scenario_count": 4,
+  "active_paths_checked": 4,
+  "failovers_triggered": 2,
+  "failovers_completed": 4,
+  "misuse_findings": [
+    "failover_always_triggers",
+    "failover_never_triggers",
+    "failover_to_burned_relay",
+    "health_never_degrades",
+    "single_minor_event_always_fails",
+    "stall_not_detected"
+  ],
+  "high_risk_failovers_detected": 0,
+  "experimental_failovers_detected": 0,
+  "burned_relay_failovers_detected": 1,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "failed"
+}
