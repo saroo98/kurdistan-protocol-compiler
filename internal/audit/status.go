@@ -127,6 +127,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "transportbundle_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "pathrace_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "androidreview_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "androidruntime_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -152,6 +153,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `transportbundle_generated_backend_parity`: `%s`\n", summary.TransportBundleGeneratedParity)
 			fmt.Fprintf(&b, "- `pathrace_generated_backend_parity`: `%s`\n", summary.PathRaceGeneratedParity)
 			fmt.Fprintf(&b, "- `androidreview_generated_backend_parity`: `%s`\n", summary.AndroidReviewParity)
+			fmt.Fprintf(&b, "- `androidruntime_generated_backend_parity`: `%s`\n", summary.AndroidRuntimeParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
