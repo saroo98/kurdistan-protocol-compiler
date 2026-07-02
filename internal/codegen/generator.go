@@ -18,6 +18,7 @@ import (
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/httpscarrierreview"
+	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/ir"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
@@ -1861,6 +1862,46 @@ func GeneratedHTTPSCarrierReviewParity() (httpscarrierreview.ParityReport, error
 	return set.Parity, nil
 }
 `, quote(httpscarrierreview.Version), quote(p.ID), p.Seed, quote(httpscarrierreview.BackendVersion), quote(httpscarrierreview.DecisionReady), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpscarrierreview.RecommendedNextMilestone), len(httpsCarrierReviewRequestShapeNames()), len(httpsCarrierReviewResponseShapeNames()), quoteSlice(httpsCarrierReviewBlockedBehaviorNames()), quoteSlice(httpsCarrierReviewM42Criteria()))
+	if err != nil {
+		return nil, err
+	}
+
+	httpsLikeCarrierSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/httpslikecarrier"
+)
+
+const HTTPSLikeCarrierSchemaVersion = %[1]s
+const HTTPSLikeCarrierGeneratedProfileID = %[2]s
+const HTTPSLikeCarrierGeneratedProfileSeed int64 = %[3]d
+const HTTPSLikeCarrierBackendVersion = %[4]s
+const HTTPSLikeCarrierFamily = %[5]s
+const HTTPSLikeCarrierRuntimePolicy = %[6]s
+const HTTPSLikeCarrierRecommendedNextMilestone = %[7]s
+const HTTPSLikeCarrierMaxMarkerBytes = %[8]d
+const HTTPSLikeCarrierRequestShapeCount = %[9]d
+const HTTPSLikeCarrierResponseShapeCount = %[10]d
+
+var HTTPSLikeCarrierBlockedScopes = %[11]s
+var HTTPSLikeCarrierRequestShapeClasses = %[12]s
+var HTTPSLikeCarrierResponseShapeClasses = %[13]s
+var HTTPSLikeCarrierSessionStates = %[14]s
+var HTTPSLikeCarrierStreamStates = %[15]s
+var HTTPSLikeCarrierMisuseControls = %[16]s
+
+func GeneratedHTTPSLikeCarrierFixtureSet() (httpslikecarrier.FixtureSet, error) {
+	return httpslikecarrier.GenerateFixtureSet()
+}
+
+func GeneratedHTTPSLikeCarrierParity() (httpslikecarrier.ParityReport, error) {
+	set, err := httpslikecarrier.GenerateFixtureSet()
+	if err != nil {
+		return httpslikecarrier.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(httpslikecarrier.Version), quote(p.ID), p.Seed, quote(httpslikecarrier.BackendVersion), quote(httpslikecarrier.CarrierFamily), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpslikecarrier.RecommendedNextMilestone), httpslikecarrier.DefaultConfig().MaxMarkerBytes, len(httpsLikeCarrierRequestShapeClasses()), len(httpsLikeCarrierResponseShapeClasses()), quoteSlice(httpsLikeCarrierBlockedScopes()), quoteSlice(httpsLikeCarrierRequestShapeClasses()), quoteSlice(httpsLikeCarrierResponseShapeClasses()), quoteSlice(httpsLikeCarrierSessionStates()), quoteSlice(httpsLikeCarrierStreamStates()), quoteSlice(httpsLikeCarrierMisuseControls()))
 	if err != nil {
 		return nil, err
 	}
@@ -5134,6 +5175,90 @@ func TestGeneratedHTTPSCarrierReviewHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	httpsLikeCarrierTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpslikecarrier"
+)
+
+func TestGeneratedHTTPSLikeCarrier(t *testing.T) {
+	if HTTPSLikeCarrierSchemaVersion != httpslikecarrier.Version || HTTPSLikeCarrierGeneratedProfileID != ProfileID {
+		t.Fatalf("generated HTTPS-like carrier constants drifted")
+	}
+	set, err := GeneratedHTTPSLikeCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || set.BackendVersion != httpslikecarrier.BackendVersion {
+		t.Fatalf("generated HTTPS-like carrier fixture failed: %%+v", set)
+	}
+	if HTTPSLikeCarrierMaxMarkerBytes <= 0 || HTTPSLikeCarrierRequestShapeCount < 4 || HTTPSLikeCarrierResponseShapeCount < 4 {
+		t.Fatalf("generated HTTPS-like carrier shape constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsLikeCarrierParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedHTTPSLikeCarrierParity(t *testing.T) {
+	parity, err := GeneratedHTTPSLikeCarrierParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated HTTPS-like carrier parity failed: %%+v", parity)
+	}
+	if HTTPSLikeCarrierRuntimePolicy == "" || HTTPSLikeCarrierRecommendedNextMilestone == "" || len(HTTPSLikeCarrierMisuseControls) < 20 {
+		t.Fatalf("HTTPS-like carrier generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsLikeCarrierHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpslikecarrier"
+)
+
+func TestGeneratedHTTPSLikeCarrierHygiene(t *testing.T) {
+	set, err := GeneratedHTTPSLikeCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := httpslikecarrier.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_secret": "synthetic"},
+		map[string]string{"claim": "real HTTPS carrier support"},
+		map[string]bool{"contains_sni": true},
+		map[string]bool{"contains_host_header": true},
+		map[string]bool{"allow_public_network": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := httpslikecarrier.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe HTTPS-like carrier metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5484,6 +5609,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/labegress_generated.go", Content: labEgressSource, Go: true},
 		{RelPath: "protocol/carrierreadiness_generated.go", Content: carrierReadinessSource, Go: true},
 		{RelPath: "protocol/httpscarrierreview_generated.go", Content: httpsCarrierReviewSource, Go: true},
+		{RelPath: "protocol/httpslikecarrier_generated.go", Content: httpsLikeCarrierSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5579,6 +5705,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpscarrierreview_test.go", Content: httpsCarrierReviewTestSource, Go: true},
 		{RelPath: "protocol/httpscarrierreview_parity_test.go", Content: httpsCarrierReviewParityTestSource, Go: true},
 		{RelPath: "protocol/httpscarrierreview_hygiene_test.go", Content: httpsCarrierReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/httpslikecarrier_test.go", Content: httpsLikeCarrierTestSource, Go: true},
+		{RelPath: "protocol/httpslikecarrier_parity_test.go", Content: httpsLikeCarrierParityTestSource, Go: true},
+		{RelPath: "protocol/httpslikecarrier_hygiene_test.go", Content: httpsLikeCarrierHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -6334,6 +6463,95 @@ func httpsCarrierReviewM42Criteria() []string {
 		"public_network_blocked",
 		"trace_hygiene",
 		"generated_parity",
+	}
+}
+
+func httpsLikeCarrierBlockedScopes() []string {
+	return []string{
+		"real_tls",
+		"real_https_client",
+		"sni_routing",
+		"host_header_routing",
+		"domain_dependency",
+		"cdn_provider_integration",
+		"public_network_egress",
+		"arbitrary_destination_proxying",
+		"payload_logging",
+		"packet_capture",
+		"measurement_upload",
+	}
+}
+
+func httpsLikeCarrierRequestShapeClasses() []string {
+	return []string{
+		"short_request_marker",
+		"chunked_request_marker",
+		"large_object_request_marker",
+		"reset_error_request_marker",
+	}
+}
+
+func httpsLikeCarrierResponseShapeClasses() []string {
+	return []string{
+		"fixed_response_marker",
+		"chunked_response_marker",
+		"delayed_large_response_marker",
+		"reset_error_response_marker",
+	}
+}
+
+func httpsLikeCarrierSessionStates() []string {
+	return []string{
+		httpslikecarrier.SessionConfigured,
+		httpslikecarrier.SessionSelected,
+		httpslikecarrier.SessionOpening,
+		httpslikecarrier.SessionActive,
+		httpslikecarrier.SessionBackpressured,
+		httpslikecarrier.SessionDraining,
+		httpslikecarrier.SessionReset,
+		httpslikecarrier.SessionClosed,
+		httpslikecarrier.SessionFailed,
+		httpslikecarrier.SessionRejected,
+	}
+}
+
+func httpsLikeCarrierStreamStates() []string {
+	return []string{
+		httpslikecarrier.StreamOpening,
+		httpslikecarrier.StreamActive,
+		httpslikecarrier.StreamBackpressure,
+		httpslikecarrier.StreamDraining,
+		httpslikecarrier.StreamReset,
+		httpslikecarrier.StreamClosed,
+		httpslikecarrier.StreamError,
+	}
+}
+
+func httpsLikeCarrierMisuseControls() []string {
+	return []string{
+		"httpslikecarrier_real_tls_allowed",
+		"httpslikecarrier_sni_allowed",
+		"httpslikecarrier_host_header_allowed",
+		"httpslikecarrier_domain_dependency_allowed",
+		"httpslikecarrier_cdn_provider_allowed",
+		"httpslikecarrier_public_network_allowed",
+		"httpslikecarrier_arbitrary_egress_allowed",
+		"httpslikecarrier_payload_forwarding_allowed",
+		"httpslikecarrier_payload_logging_allowed",
+		"httpslikecarrier_packet_capture_allowed",
+		"httpslikecarrier_measurement_upload_allowed",
+		"httpslikecarrier_fixed_shape",
+		"httpslikecarrier_padding_only_variation",
+		"httpslikecarrier_profile_insensitive",
+		"httpslikecarrier_backpressure_ignored",
+		"httpslikecarrier_reset_swallowed",
+		"httpslikecarrier_cross_stream_leak",
+		"httpslikecarrier_pathhealth_bypass",
+		"httpslikecarrier_measurementreview_bypass",
+		"httpslikecarrier_carrierreview_bypass",
+		"httpslikecarrier_generated_backend_drift",
+		"httpslikecarrier_payload_leak",
+		"httpslikecarrier_secret_leak",
 	}
 }
 
