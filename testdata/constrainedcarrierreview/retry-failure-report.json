@@ -1,0 +1,26 @@
+{
+  "retry_buckets": [
+    "retry_none",
+    "retry_once",
+    "retry_bounded"
+  ],
+  "timeout_buckets": [
+    "timeout_none",
+    "timeout_short",
+    "timeout_repeated"
+  ],
+  "reset_buckets": [
+    "reset_none",
+    "reset_stream",
+    "reset_session_safe"
+  ],
+  "poison_failure_buckets": [
+    "poison_none",
+    "poison_suspected",
+    "poison_confirmed"
+  ],
+  "max_retry_controls": 3,
+  "pathhealth_propagation": true,
+  "measurement_review_diagnostics": true,
+  "conclusion": "passed"
+}

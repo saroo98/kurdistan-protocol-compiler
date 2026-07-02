@@ -1,0 +1,28 @@
+{
+  "design_lock_id": "m44_constrained_carrier_contract",
+  "lab_only": true,
+  "local_resolver_harness_only": true,
+  "no_public_resolver_default": true,
+  "no_real_query_default": true,
+  "no_exact_query_logging": true,
+  "no_resolver_address_logging": true,
+  "no_domain_dependence": true,
+  "no_payload_logging": true,
+  "blocked_behaviors": [
+    "public_resolver_use",
+    "real_query_default",
+    "resolver_dialing",
+    "tunneling_runtime",
+    "exact_query_logging",
+    "resolver_address_logging",
+    "wildcard_resolver_configuration",
+    "domain_dependence",
+    "public_network_egress",
+    "arbitrary_proxying",
+    "payload_forwarding",
+    "packet_capture",
+    "payload_logging",
+    "measurement_upload"
+  ],
+  "conclusion": "passed"
+}

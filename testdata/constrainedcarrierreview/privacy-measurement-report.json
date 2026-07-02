@@ -1,0 +1,17 @@
+{
+  "measurement_review_composed": true,
+  "local_only_diagnostics": true,
+  "upload_allowed": false,
+  "exact_query_stored": false,
+  "resolver_address_stored": false,
+  "account_device_location_data": false,
+  "safe_fields": [
+    "query_shape_bucket",
+    "response_shape_bucket",
+    "retry_bucket",
+    "failure_bucket",
+    "truncation_bucket",
+    "local_diagnostic_flag"
+  ],
+  "conclusion": "passed"
+}

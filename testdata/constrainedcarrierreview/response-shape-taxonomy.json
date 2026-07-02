@@ -1,0 +1,119 @@
+[
+  {
+    "id": "response_shape_01",
+    "direction": "response",
+    "shape_class": "small_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:bb14061692ef546ce66a7864fe1cce96ff24a2961911f236e777d14ce795367d"
+  },
+  {
+    "id": "response_shape_02",
+    "direction": "response",
+    "shape_class": "truncated_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:ceb8ebd1fa1edf46f87049b881845284b4ad48b880f54efd36f315480f346d6e"
+  },
+  {
+    "id": "response_shape_03",
+    "direction": "response",
+    "shape_class": "delayed_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:1326ae1e0e0205b2d6ead5cb3ba16ebe902f406bc6c69d6ae651c52ecbcdf906"
+  },
+  {
+    "id": "response_shape_04",
+    "direction": "response",
+    "shape_class": "failure_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:6ed6430ffa86ed8e941728f8d19dbd5ae60c69b9bb8759bc13e0a3e3b356c53c"
+  },
+  {
+    "id": "response_shape_05",
+    "direction": "response",
+    "shape_class": "retry_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:fcf704feec88aa87b5ce77d25c303b5bc27f7581e6c8cb08923e7fe8e63b48df"
+  },
+  {
+    "id": "response_shape_06",
+    "direction": "response",
+    "shape_class": "poisoning_failure_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:c8024485baf771e8e8d263485299abdc9aa5ebe5c347381574153371f7d0a320"
+  },
+  {
+    "id": "response_shape_07",
+    "direction": "response",
+    "shape_class": "reset_response_marker",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:939ea40627f7b2c6b796b22d9bd1c846bd34b2cb83ef3683e7948d4c69ae2978"
+  },
+  {
+    "id": "response_shape_08",
+    "direction": "response",
+    "shape_class": "control_payload_leak",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": true,
+    "stable_hash": "sha256:556f652cc6946dce69dba9b5aabb8b874bb8206c354038ec316c82c2275c4df0"
+  },
+  {
+    "id": "response_shape_09",
+    "direction": "response",
+    "shape_class": "control_resolver_leak",
+    "marker_class": "symbolic_response_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": true,
+    "stable_hash": "sha256:a4da66ad0f6138e75d2468850decdc4cb5f200b8d01b39a3032b0ea604b3cdb5"
+  }
+]

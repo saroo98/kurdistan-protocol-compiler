@@ -1,0 +1,52 @@
+[
+  {
+    "name": "scope_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "resolver_harness_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "query_taxonomy_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "response_taxonomy_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "size_truncation_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "retry_failure_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "privacy_measurement_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "m45_contract_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "misuse_controls_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  },
+  {
+    "name": "generated_parity_locked",
+    "checked": true,
+    "evidence": "deterministic_fixture"
+  }
+]

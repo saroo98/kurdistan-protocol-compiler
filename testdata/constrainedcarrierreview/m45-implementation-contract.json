@@ -1,0 +1,69 @@
+{
+  "command_name": "constrainedcarrier",
+  "fixture_family": "testdata/constrainedcarrier",
+  "required_integrations": [
+    "relaybridge",
+    "localpipeline",
+    "pathhealth",
+    "measurementreview",
+    "generated_backend"
+  ],
+  "required_controls": [
+    "local_resolver_harness",
+    "query_shape_buckets",
+    "response_shape_buckets",
+    "truncation_buckets",
+    "retry_failure_buckets",
+    "privacy_measurement_buckets"
+  ],
+  "required_mutants": [
+    "constrainedcarrierreview_allows_public_resolver",
+    "constrainedcarrierreview_allows_real_dns_query_default",
+    "constrainedcarrierreview_logs_exact_query",
+    "constrainedcarrierreview_logs_resolver_ip",
+    "constrainedcarrierreview_allows_domain_dependency",
+    "constrainedcarrierreview_allows_wildcard_resolver",
+    "constrainedcarrierreview_allows_public_network",
+    "constrainedcarrierreview_allows_arbitrary_egress",
+    "constrainedcarrierreview_allows_payload_logging",
+    "constrainedcarrierreview_allows_packet_capture",
+    "constrainedcarrierreview_allows_measurement_upload",
+    "constrainedcarrierreview_missing_resolver_harness",
+    "constrainedcarrierreview_missing_query_shape_taxonomy",
+    "constrainedcarrierreview_missing_response_shape_taxonomy",
+    "constrainedcarrierreview_missing_truncation_contract",
+    "constrainedcarrierreview_missing_retry_failure_contract",
+    "constrainedcarrierreview_missing_profile_sensitivity",
+    "constrainedcarrierreview_measurementreview_bypass",
+    "constrainedcarrierreview_public_docs_claim_real_dns",
+    "constrainedcarrierreview_public_docs_claim_field_ready",
+    "constrainedcarrierreview_payload_leak",
+    "constrainedcarrierreview_secret_leak",
+    "constrainedcarrierreview_generated_backend_drift"
+  ],
+  "blocked_behaviors": [
+    "public_resolver_use",
+    "real_query_default",
+    "resolver_dialing",
+    "tunneling_runtime",
+    "exact_query_logging",
+    "resolver_address_logging",
+    "wildcard_resolver_configuration",
+    "domain_dependence",
+    "public_network_egress",
+    "arbitrary_proxying",
+    "payload_forwarding",
+    "packet_capture",
+    "payload_logging",
+    "measurement_upload"
+  ],
+  "acceptance_requirements": [
+    "quick_full_verify_compare",
+    "generated_parity",
+    "trace_hygiene",
+    "fixture_drift",
+    "mutation_detection"
+  ],
+  "decision": "ready_for_m45_lab_prototype",
+  "conclusion": "passed"
+}

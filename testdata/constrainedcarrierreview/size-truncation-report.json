@@ -1,0 +1,27 @@
+{
+  "size_buckets": [
+    "tiny_bucket",
+    "small_bucket",
+    "constrained_bucket",
+    "oversize_reject_bucket"
+  ],
+  "constrained_capacity_classes": [
+    "low_capacity",
+    "medium_capacity",
+    "fragmented_capacity"
+  ],
+  "truncation_buckets": [
+    "no_truncation",
+    "soft_truncation",
+    "hard_truncation"
+  ],
+  "retry_after_truncation_classes": [
+    "no_retry",
+    "bounded_retry",
+    "retry_then_fail"
+  ],
+  "oversize_rejection_controls": 2,
+  "raw_byte_counts_stored": false,
+  "raw_query_response_bytes_stored": false,
+  "conclusion": "passed"
+}

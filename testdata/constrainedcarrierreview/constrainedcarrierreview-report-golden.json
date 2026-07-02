@@ -1,0 +1,896 @@
+{
+  "version": "constrainedcarrierreview-v1",
+  "fixture_id": "constrained_carrier_review_v1",
+  "backend_version": "0.44.0-lab",
+  "report": {
+    "version": "constrainedcarrierreview-v1",
+    "fixture_id": "constrained_carrier_review_v1",
+    "generated_at": "2026-01-01T00:44:00Z",
+    "generated_at_unix": 1767228240,
+    "backend_version": "0.44.0-lab",
+    "scope": {
+      "design_lock_id": "m44_constrained_carrier_contract",
+      "lab_only": true,
+      "local_resolver_harness_only": true,
+      "no_public_resolver_default": true,
+      "no_real_query_default": true,
+      "no_exact_query_logging": true,
+      "no_resolver_address_logging": true,
+      "no_domain_dependence": true,
+      "no_payload_logging": true,
+      "blocked_behaviors": [
+        "public_resolver_use",
+        "real_query_default",
+        "resolver_dialing",
+        "tunneling_runtime",
+        "exact_query_logging",
+        "resolver_address_logging",
+        "wildcard_resolver_configuration",
+        "domain_dependence",
+        "public_network_egress",
+        "arbitrary_proxying",
+        "payload_forwarding",
+        "packet_capture",
+        "payload_logging",
+        "measurement_upload"
+      ],
+      "conclusion": "passed"
+    },
+    "resolver_harness": {
+      "harness_id": "local_deterministic_resolver_harness_contract",
+      "local_only": true,
+      "deterministic_fixture_scope": true,
+      "loopback_only": true,
+      "public_resolver_behavior": false,
+      "resolver_address_persisted": false,
+      "exact_query_persisted": false,
+      "wildcard_resolver_allowed": false,
+      "resolver_class_buckets": [
+        "loopback_harness",
+        "fixture_resolver",
+        "failure_fixture",
+        "poison_fixture"
+      ],
+      "conclusion": "passed"
+    },
+    "query_shapes": [
+      {
+        "id": "query_shape_01",
+        "direction": "query",
+        "shape_class": "small_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:dd449190608ed71e4e56d69fefcbd97b4757709fb4c6307f1a1088cd5b0fb95f"
+      },
+      {
+        "id": "query_shape_02",
+        "direction": "query",
+        "shape_class": "chunked_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:28b12808b752defe45cec93e686eb31fdb666df6ad2ebd1cda65a000640cf64f"
+      },
+      {
+        "id": "query_shape_03",
+        "direction": "query",
+        "shape_class": "repeated_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:c89f81a39b74cd67ca0531e64078369e74362a7b002cafa05739613f784bf4a0"
+      },
+      {
+        "id": "query_shape_04",
+        "direction": "query",
+        "shape_class": "delayed_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:dbb9702c42e3ac24f5bd7251929d4ad03a4763b1a6c07959fb09afbc513a3304"
+      },
+      {
+        "id": "query_shape_05",
+        "direction": "query",
+        "shape_class": "truncated_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:7aff37b0ab9eeafcf532c2056a7c469d688b31a7c770211ef389b3a9338a92fe"
+      },
+      {
+        "id": "query_shape_06",
+        "direction": "query",
+        "shape_class": "retry_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:58cfc763fc44dfd0837a2176cb030fdc831a0aa18cebc9f48f518a6b29cc9fdc"
+      },
+      {
+        "id": "query_shape_07",
+        "direction": "query",
+        "shape_class": "failure_query_marker",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:9b93e79112caf036a0b2718e568f0d96a179d90e7b83e76fc71cb0f3ccb43b05"
+      },
+      {
+        "id": "query_shape_08",
+        "direction": "query",
+        "shape_class": "control_exact_query_leak",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": true,
+        "stable_hash": "sha256:9f8ab4e5fb371c3ffc226ee9471a7150fdddd830bf9acd21428a5c7ff6752424"
+      },
+      {
+        "id": "query_shape_09",
+        "direction": "query",
+        "shape_class": "control_domain_leak",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": true,
+        "stable_hash": "sha256:336ad20ce60836a40a621597fa1b9dc22a015ffc5ba565eec8922ba8296a7b1d"
+      },
+      {
+        "id": "query_shape_10",
+        "direction": "query",
+        "shape_class": "control_resolver_leak",
+        "marker_class": "symbolic_query_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": true,
+        "stable_hash": "sha256:a99820cbc4b1c5760a1d8f8ba59a8726dd3bcdba2a3a04c58d43717a4fa2888d"
+      }
+    ],
+    "response_shapes": [
+      {
+        "id": "response_shape_01",
+        "direction": "response",
+        "shape_class": "small_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:bb14061692ef546ce66a7864fe1cce96ff24a2961911f236e777d14ce795367d"
+      },
+      {
+        "id": "response_shape_02",
+        "direction": "response",
+        "shape_class": "truncated_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:ceb8ebd1fa1edf46f87049b881845284b4ad48b880f54efd36f315480f346d6e"
+      },
+      {
+        "id": "response_shape_03",
+        "direction": "response",
+        "shape_class": "delayed_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:1326ae1e0e0205b2d6ead5cb3ba16ebe902f406bc6c69d6ae651c52ecbcdf906"
+      },
+      {
+        "id": "response_shape_04",
+        "direction": "response",
+        "shape_class": "failure_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:6ed6430ffa86ed8e941728f8d19dbd5ae60c69b9bb8759bc13e0a3e3b356c53c"
+      },
+      {
+        "id": "response_shape_05",
+        "direction": "response",
+        "shape_class": "retry_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:fcf704feec88aa87b5ce77d25c303b5bc27f7581e6c8cb08923e7fe8e63b48df"
+      },
+      {
+        "id": "response_shape_06",
+        "direction": "response",
+        "shape_class": "poisoning_failure_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:c8024485baf771e8e8d263485299abdc9aa5ebe5c347381574153371f7d0a320"
+      },
+      {
+        "id": "response_shape_07",
+        "direction": "response",
+        "shape_class": "reset_response_marker",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": false,
+        "stable_hash": "sha256:939ea40627f7b2c6b796b22d9bd1c846bd34b2cb83ef3683e7948d4c69ae2978"
+      },
+      {
+        "id": "response_shape_08",
+        "direction": "response",
+        "shape_class": "control_payload_leak",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": true,
+        "stable_hash": "sha256:556f652cc6946dce69dba9b5aabb8b874bb8206c354038ec316c82c2275c4df0"
+      },
+      {
+        "id": "response_shape_09",
+        "direction": "response",
+        "shape_class": "control_resolver_leak",
+        "marker_class": "symbolic_response_bucket",
+        "safe_buckets": [
+          "size_bucket",
+          "timing_bucket",
+          "failure_bucket"
+        ],
+        "control": true,
+        "stable_hash": "sha256:a4da66ad0f6138e75d2468850decdc4cb5f200b8d01b39a3032b0ea604b3cdb5"
+      }
+    ],
+    "size_truncation": {
+      "size_buckets": [
+        "tiny_bucket",
+        "small_bucket",
+        "constrained_bucket",
+        "oversize_reject_bucket"
+      ],
+      "constrained_capacity_classes": [
+        "low_capacity",
+        "medium_capacity",
+        "fragmented_capacity"
+      ],
+      "truncation_buckets": [
+        "no_truncation",
+        "soft_truncation",
+        "hard_truncation"
+      ],
+      "retry_after_truncation_classes": [
+        "no_retry",
+        "bounded_retry",
+        "retry_then_fail"
+      ],
+      "oversize_rejection_controls": 2,
+      "raw_byte_counts_stored": false,
+      "raw_query_response_bytes_stored": false,
+      "conclusion": "passed"
+    },
+    "retry_failure": {
+      "retry_buckets": [
+        "retry_none",
+        "retry_once",
+        "retry_bounded"
+      ],
+      "timeout_buckets": [
+        "timeout_none",
+        "timeout_short",
+        "timeout_repeated"
+      ],
+      "reset_buckets": [
+        "reset_none",
+        "reset_stream",
+        "reset_session_safe"
+      ],
+      "poison_failure_buckets": [
+        "poison_none",
+        "poison_suspected",
+        "poison_confirmed"
+      ],
+      "max_retry_controls": 3,
+      "pathhealth_propagation": true,
+      "measurement_review_diagnostics": true,
+      "conclusion": "passed"
+    },
+    "stream_mapping": {
+      "stream_class_mappings": [
+        "interactive_to_small_query",
+        "bulk_to_chunked_query",
+        "control_to_failure_query",
+        "reset_to_reset_marker"
+      ],
+      "response_shape_mappings": [
+        "small_to_small_response",
+        "truncated_to_retry_response",
+        "failure_to_failure_response",
+        "reset_to_reset_response"
+      ],
+      "multi_stream_isolation_required": true,
+      "reset_isolation_required": true,
+      "backpressure_mapping_required": true,
+      "profile_sensitive_selection": true,
+      "collapse_controls": [
+        "fixed_constrained_shape",
+        "padding_only_constrained_shape",
+        "profile_insensitive_query_shape"
+      ],
+      "conclusion": "passed"
+    },
+    "privacy_measurement": {
+      "measurement_review_composed": true,
+      "local_only_diagnostics": true,
+      "upload_allowed": false,
+      "exact_query_stored": false,
+      "resolver_address_stored": false,
+      "account_device_location_data": false,
+      "safe_fields": [
+        "query_shape_bucket",
+        "response_shape_bucket",
+        "retry_bucket",
+        "failure_bucket",
+        "truncation_bucket",
+        "local_diagnostic_flag"
+      ],
+      "conclusion": "passed"
+    },
+    "m45_contract": {
+      "command_name": "constrainedcarrier",
+      "fixture_family": "testdata/constrainedcarrier",
+      "required_integrations": [
+        "relaybridge",
+        "localpipeline",
+        "pathhealth",
+        "measurementreview",
+        "generated_backend"
+      ],
+      "required_controls": [
+        "local_resolver_harness",
+        "query_shape_buckets",
+        "response_shape_buckets",
+        "truncation_buckets",
+        "retry_failure_buckets",
+        "privacy_measurement_buckets"
+      ],
+      "required_mutants": [
+        "constrainedcarrierreview_allows_public_resolver",
+        "constrainedcarrierreview_allows_real_dns_query_default",
+        "constrainedcarrierreview_logs_exact_query",
+        "constrainedcarrierreview_logs_resolver_ip",
+        "constrainedcarrierreview_allows_domain_dependency",
+        "constrainedcarrierreview_allows_wildcard_resolver",
+        "constrainedcarrierreview_allows_public_network",
+        "constrainedcarrierreview_allows_arbitrary_egress",
+        "constrainedcarrierreview_allows_payload_logging",
+        "constrainedcarrierreview_allows_packet_capture",
+        "constrainedcarrierreview_allows_measurement_upload",
+        "constrainedcarrierreview_missing_resolver_harness",
+        "constrainedcarrierreview_missing_query_shape_taxonomy",
+        "constrainedcarrierreview_missing_response_shape_taxonomy",
+        "constrainedcarrierreview_missing_truncation_contract",
+        "constrainedcarrierreview_missing_retry_failure_contract",
+        "constrainedcarrierreview_missing_profile_sensitivity",
+        "constrainedcarrierreview_measurementreview_bypass",
+        "constrainedcarrierreview_public_docs_claim_real_dns",
+        "constrainedcarrierreview_public_docs_claim_field_ready",
+        "constrainedcarrierreview_payload_leak",
+        "constrainedcarrierreview_secret_leak",
+        "constrainedcarrierreview_generated_backend_drift"
+      ],
+      "blocked_behaviors": [
+        "public_resolver_use",
+        "real_query_default",
+        "resolver_dialing",
+        "tunneling_runtime",
+        "exact_query_logging",
+        "resolver_address_logging",
+        "wildcard_resolver_configuration",
+        "domain_dependence",
+        "public_network_egress",
+        "arbitrary_proxying",
+        "payload_forwarding",
+        "packet_capture",
+        "payload_logging",
+        "measurement_upload"
+      ],
+      "acceptance_requirements": [
+        "quick_full_verify_compare",
+        "generated_parity",
+        "trace_hygiene",
+        "fixture_drift",
+        "mutation_detection"
+      ],
+      "decision": "ready_for_m45_lab_prototype",
+      "conclusion": "passed"
+    },
+    "blockers": [
+      {
+        "name": "missing_scope",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "missing_resolver_harness",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "missing_shape_taxonomy",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "missing_truncation_contract",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "missing_retry_failure_contract",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "measurementreview_bypass",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "generated_parity_missing",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      },
+      {
+        "name": "trace_hygiene_missing",
+        "resolved": true,
+        "severity": "required",
+        "next_action": "covered_by_m44_gate"
+      }
+    ],
+    "risks": [
+      {
+        "name": "public_resolver_accident",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      },
+      {
+        "name": "exact_query_logging",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      },
+      {
+        "name": "resolver_address_logging",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      },
+      {
+        "name": "retry_storm",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      },
+      {
+        "name": "pathhealth_bypass",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      },
+      {
+        "name": "public_claim_overstatement",
+        "severity": "high",
+        "mitigation": "deterministic_design_lock_gate",
+        "accepted": false
+      }
+    ],
+    "checklist": [
+      {
+        "name": "scope_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "resolver_harness_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "query_taxonomy_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "response_taxonomy_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "size_truncation_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "retry_failure_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "privacy_measurement_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "m45_contract_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "misuse_controls_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      },
+      {
+        "name": "generated_parity_locked",
+        "checked": true,
+        "evidence": "deterministic_fixture"
+      }
+    ],
+    "misuse": {
+      "findings": [
+        {
+          "name": "constrainedcarrierreview_allows_public_resolver",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_real_dns_query_default",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_logs_exact_query",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_logs_resolver_ip",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_domain_dependency",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_wildcard_resolver",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_public_network",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_arbitrary_egress",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_payload_logging",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_packet_capture",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_allows_measurement_upload",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_resolver_harness",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_query_shape_taxonomy",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_response_shape_taxonomy",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_truncation_contract",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_retry_failure_contract",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_missing_profile_sensitivity",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_measurementreview_bypass",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_public_docs_claim_real_dns",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_public_docs_claim_field_ready",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_payload_leak",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_secret_leak",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        },
+        {
+          "name": "constrainedcarrierreview_generated_backend_drift",
+          "detected": true,
+          "severity": "required",
+          "evidence": "deterministic design-lock control flagged"
+        }
+      ],
+      "detected_count": 23,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "parity": {
+      "profile_count": 3,
+      "generated_markers": [
+        "constrainedcarrierreview_generated.go",
+        "constrainedcarrierreview_test.go",
+        "constrainedcarrierreview_parity_test.go",
+        "constrainedcarrierreview_hygiene_test.go",
+        "ConstrainedCarrierReviewSchemaVersion",
+        "ConstrainedCarrierReviewGeneratedProfileID"
+      ],
+      "contract_matches": 10,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "completed": true,
+    "payload_logged": false,
+    "secret_logged": false,
+    "recommended_next_milestone": "M45: DNS-survival / constrained-carrier lab prototype",
+    "report_hash": "sha256:9a5c3daa2f631df8e723fe4337351eea50634bcad168e8f602df0aeddcd2b39c",
+    "conclusion": "passed"
+  },
+  "fixtures": [
+    {
+      "name": "scope-report",
+      "kind": "scope",
+      "expected": "passed",
+      "summary_hash": "sha256:119451e6eff2e72887a14254af967856e1e107f903e1e2cd0131b6e3bdde9c91",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "resolver-harness-contract",
+      "kind": "resolver_harness",
+      "expected": "passed",
+      "summary_hash": "sha256:d545799a45ee31e4b3b87fc2f8ceb1b45aecab42fe67b07b72b14fc0878a1740",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "query-shape-taxonomy",
+      "kind": "query_shapes",
+      "expected": "passed",
+      "summary_hash": "sha256:b148ec0eead55a81107a6a11aed3fe6dedf160eafe0935f950ff48328e626150",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "response-shape-taxonomy",
+      "kind": "response_shapes",
+      "expected": "passed",
+      "summary_hash": "sha256:32f41d6e14e8bfb130ba7dc9d64438c30ed5945009722b1c384a128d337bfede",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "size-truncation-contract",
+      "kind": "size_truncation",
+      "expected": "passed",
+      "summary_hash": "sha256:22105340211e3a9cdd5320706eb03c710788e5126b232a8a463ba43423e0e85e",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "retry-failure-contract",
+      "kind": "retry_failure",
+      "expected": "passed",
+      "summary_hash": "sha256:7e21cd2e157e99abecb8d39e6ecea5e61f96d3998877c05370f9c9a9e0a3c966",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "stream-mapping-contract",
+      "kind": "stream_mapping",
+      "expected": "passed",
+      "summary_hash": "sha256:d432a2df8eeb8e8df12f6f19acfc815f5a4b2581330826c5ce488e0dbd584e10",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "privacy-measurement-contract",
+      "kind": "privacy_measurement",
+      "expected": "passed",
+      "summary_hash": "sha256:bd036528d3c00724cd511373cf2a3cea8710b3b9d6525e0137f969a8375d047c",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "m45-implementation-contract",
+      "kind": "m45_contract",
+      "expected": "passed",
+      "summary_hash": "sha256:640f3889418eb9b3a40a9f47aa725ad5bd14dbb27f6143060b52e6034c4b3061",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "blocker-matrix",
+      "kind": "blockers",
+      "expected": "passed",
+      "summary_hash": "sha256:7e49ef08cdb94636e00ac13b559d3c74942675b8cd9ef62d3a9ef543fb1fb611",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "risk-report",
+      "kind": "risks",
+      "expected": "passed",
+      "summary_hash": "sha256:4ca9dd0ed334f4e7ab611bbe71e9bebc7935dfc02e29288cbf310dd4db584476",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "readiness-checklist",
+      "kind": "checklist",
+      "expected": "passed",
+      "summary_hash": "sha256:a5774ff30f5cd997d7514f9b493c4f057a6880757ced6abc032c0b57b56f9d05",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "misuse-report",
+      "kind": "misuse",
+      "expected": "passed",
+      "summary_hash": "sha256:1c4c2345556ae5072eac0c9f3748c165c7125bf26d68f76adb5a5084f479ff99",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "generated-parity-summary",
+      "kind": "generated_parity",
+      "expected": "passed",
+      "summary_hash": "sha256:0d7a6dfa1615852e118347f519c49af9ea1f883f236fe3d806190a74212dafa1",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "fixture_hash": "sha256:729e8d941f1512b672c15874423317926b2b0f95105b1d2bfa353af9d23118c7",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "missing_scope",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "missing_resolver_harness",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "missing_shape_taxonomy",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "missing_truncation_contract",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "missing_retry_failure_contract",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "measurementreview_bypass",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "generated_parity_missing",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  },
+  {
+    "name": "trace_hygiene_missing",
+    "resolved": true,
+    "severity": "required",
+    "next_action": "covered_by_m44_gate"
+  }
+]

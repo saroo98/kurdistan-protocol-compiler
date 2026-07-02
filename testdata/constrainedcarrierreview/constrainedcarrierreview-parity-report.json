@@ -1,0 +1,15 @@
+{
+  "profile_count": 3,
+  "generated_markers": [
+    "constrainedcarrierreview_generated.go",
+    "constrainedcarrierreview_test.go",
+    "constrainedcarrierreview_parity_test.go",
+    "constrainedcarrierreview_hygiene_test.go",
+    "ConstrainedCarrierReviewSchemaVersion",
+    "ConstrainedCarrierReviewGeneratedProfileID"
+  ],
+  "contract_matches": 10,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,8 @@
+[
+  "local_resolver_harness",
+  "query_shape_buckets",
+  "response_shape_buckets",
+  "truncation_buckets",
+  "retry_failure_buckets",
+  "privacy_measurement_buckets"
+]
