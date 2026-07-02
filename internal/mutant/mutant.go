@@ -397,6 +397,30 @@ const (
 	ModeHTTPSCarrierReviewPayloadLeak                  = "httpscarrierreview_payload_leak"
 	ModeHTTPSCarrierReviewSecretLeak                   = "httpscarrierreview_secret_leak"
 	ModeHTTPSCarrierReviewGeneratedBackendDrift        = "httpscarrierreview_generated_backend_drift"
+
+	ModeHTTPSLikeCarrierAllowsRealTLS           = "httpslikecarrier_real_tls_allowed"
+	ModeHTTPSLikeCarrierAllowsSNIRouting        = "httpslikecarrier_sni_allowed"
+	ModeHTTPSLikeCarrierAllowsHostHeaderRouting = "httpslikecarrier_host_header_allowed"
+	ModeHTTPSLikeCarrierAllowsDomainDependency  = "httpslikecarrier_domain_dependency_allowed"
+	ModeHTTPSLikeCarrierAllowsCDNProvider       = "httpslikecarrier_cdn_provider_allowed"
+	ModeHTTPSLikeCarrierAllowsPublicNetwork     = "httpslikecarrier_public_network_allowed"
+	ModeHTTPSLikeCarrierAllowsArbitraryEgress   = "httpslikecarrier_arbitrary_egress_allowed"
+	ModeHTTPSLikeCarrierAllowsPayloadForwarding = "httpslikecarrier_payload_forwarding_allowed"
+	ModeHTTPSLikeCarrierAllowsPayloadLogging    = "httpslikecarrier_payload_logging_allowed"
+	ModeHTTPSLikeCarrierAllowsPacketCapture     = "httpslikecarrier_packet_capture_allowed"
+	ModeHTTPSLikeCarrierAllowsMeasurementUpload = "httpslikecarrier_measurement_upload_allowed"
+	ModeHTTPSLikeCarrierFixedShape              = "httpslikecarrier_fixed_shape"
+	ModeHTTPSLikeCarrierPaddingOnlyVariation    = "httpslikecarrier_padding_only_variation"
+	ModeHTTPSLikeCarrierProfileInsensitive      = "httpslikecarrier_profile_insensitive"
+	ModeHTTPSLikeCarrierIgnoresBackpressure     = "httpslikecarrier_backpressure_ignored"
+	ModeHTTPSLikeCarrierSwallowsReset           = "httpslikecarrier_reset_swallowed"
+	ModeHTTPSLikeCarrierCrossStreamLeak         = "httpslikecarrier_cross_stream_leak"
+	ModeHTTPSLikeCarrierPathHealthBypass        = "httpslikecarrier_pathhealth_bypass"
+	ModeHTTPSLikeCarrierMeasurementReviewBypass = "httpslikecarrier_measurementreview_bypass"
+	ModeHTTPSLikeCarrierCarrierReviewBypass     = "httpslikecarrier_carrierreview_bypass"
+	ModeHTTPSLikeCarrierGeneratedBackendDrift   = "httpslikecarrier_generated_backend_drift"
+	ModeHTTPSLikeCarrierPayloadLeak             = "httpslikecarrier_payload_leak"
+	ModeHTTPSLikeCarrierSecretLeak              = "httpslikecarrier_secret_leak"
 )
 
 func Modes() []string {
@@ -776,6 +800,29 @@ func Modes() []string {
 		ModeHTTPSCarrierReviewPayloadLeak,
 		ModeHTTPSCarrierReviewSecretLeak,
 		ModeHTTPSCarrierReviewGeneratedBackendDrift,
+		ModeHTTPSLikeCarrierAllowsRealTLS,
+		ModeHTTPSLikeCarrierAllowsSNIRouting,
+		ModeHTTPSLikeCarrierAllowsHostHeaderRouting,
+		ModeHTTPSLikeCarrierAllowsDomainDependency,
+		ModeHTTPSLikeCarrierAllowsCDNProvider,
+		ModeHTTPSLikeCarrierAllowsPublicNetwork,
+		ModeHTTPSLikeCarrierAllowsArbitraryEgress,
+		ModeHTTPSLikeCarrierAllowsPayloadForwarding,
+		ModeHTTPSLikeCarrierAllowsPayloadLogging,
+		ModeHTTPSLikeCarrierAllowsPacketCapture,
+		ModeHTTPSLikeCarrierAllowsMeasurementUpload,
+		ModeHTTPSLikeCarrierFixedShape,
+		ModeHTTPSLikeCarrierPaddingOnlyVariation,
+		ModeHTTPSLikeCarrierProfileInsensitive,
+		ModeHTTPSLikeCarrierIgnoresBackpressure,
+		ModeHTTPSLikeCarrierSwallowsReset,
+		ModeHTTPSLikeCarrierCrossStreamLeak,
+		ModeHTTPSLikeCarrierPathHealthBypass,
+		ModeHTTPSLikeCarrierMeasurementReviewBypass,
+		ModeHTTPSLikeCarrierCarrierReviewBypass,
+		ModeHTTPSLikeCarrierGeneratedBackendDrift,
+		ModeHTTPSLikeCarrierPayloadLeak,
+		ModeHTTPSLikeCarrierSecretLeak,
 	}
 }
 
