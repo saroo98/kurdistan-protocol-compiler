@@ -40,6 +40,7 @@ import (
 	"kurdistan/internal/productionreadiness"
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relayauthplan"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayprocess"
 	"kurdistan/internal/transportbundle"
@@ -2333,6 +2334,43 @@ func GeneratedKeyExchangePlanParity() (keyexchangeplan.ParityReport, error) {
 		return nil, err
 	}
 
+	relayAuthPlanSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/relayauthplan"
+)
+
+const RelayAuthPlanSchemaVersion = %[1]s
+const RelayAuthPlanGeneratedProfileID = %[2]s
+const RelayAuthPlanGeneratedProfileSeed int64 = %[3]d
+const RelayAuthPlanBackendVersion = %[4]s
+const RelayAuthPlanCompatibilityPolicy = %[5]s
+const RelayAuthPlanRotationPolicy = %[6]s
+const RelayAuthPlanFailurePolicy = %[7]s
+const RelayAuthPlanRecommendedNextMilestone = %[8]s
+const RelayAuthPlanInventoryCount = %[9]d
+const RelayAuthPlanMisuseCount = %[10]d
+
+var RelayAuthPlanControls = %[11]s
+var RelayAuthPlanBoundComponents = %[12]s
+var RelayAuthPlanGeneratedPolicyHints = %[13]s
+
+func GeneratedRelayAuthPlanFixtureSet() (relayauthplan.FixtureSet, error) {
+	return relayauthplan.GenerateFixtureSet()
+}
+
+func GeneratedRelayAuthPlanParity() (relayauthplan.ParityReport, error) {
+	set, err := relayauthplan.GenerateFixtureSet()
+	if err != nil {
+		return relayauthplan.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(relayauthplan.Version), quote(p.ID), p.Seed, quote(relayauthplan.BackendVersion), quote(p.Security.CapabilityNegotiationPolicy+"/"+p.Security.DowngradePolicy+"/"+p.CarrierPolicy.CarrierFamily), quote("bounded_epoch_rotation_with_required_overlap_window"), quote("fail_closed_with_safe_bucketed_diagnostics"), quote(relayauthplan.RecommendedNextMilestone), 15, len(relayauthplan.RequiredMisuseNames()), quoteSlice(relayauthplan.RequiredMisuseNames()), quoteSlice(relayauthplan.DefaultIdentityBindingPolicyReport().BoundComponents), quoteSlice([]string{p.Security.CapabilityNegotiationPolicy, p.Security.DowngradePolicy, p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.ReplayPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2889,6 +2927,89 @@ func TestGeneratedKeyExchangePlanHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := keyexchangeplan.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe key exchange metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayAuthPlanTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relayauthplan"
+)
+
+func TestGeneratedRelayAuthPlan(t *testing.T) {
+	if RelayAuthPlanSchemaVersion != relayauthplan.Version || RelayAuthPlanGeneratedProfileID != ProfileID {
+		t.Fatalf("generated relay auth constants drifted")
+	}
+	set, err := GeneratedRelayAuthPlanFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relayauthplan.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if RelayAuthPlanInventoryCount < 15 || len(RelayAuthPlanControls) < len(relayauthplan.RequiredMisuseNames()) || len(RelayAuthPlanBoundComponents) < 6 {
+		t.Fatalf("generated relay auth constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayAuthPlanParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedRelayAuthPlanParity(t *testing.T) {
+	parity, err := GeneratedRelayAuthPlanParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated relay auth parity failed: %%+v", parity)
+	}
+	if RelayAuthPlanCompatibilityPolicy == "" || RelayAuthPlanRotationPolicy == "" || RelayAuthPlanFailurePolicy == "" || RelayAuthPlanRecommendedNextMilestone == "" {
+		t.Fatalf("relay auth generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayAuthPlanHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relayauthplan"
+)
+
+func TestGeneratedRelayAuthPlanHygiene(t *testing.T) {
+	set, err := GeneratedRelayAuthPlanFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relayauthplan.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"secret_value": "synthetic"},
+		map[string]string{"key_material_value": "synthetic"},
+		map[string]string{"account_identifier": "synthetic"},
+		map[string]string{"cloud_provider_metadata": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := relayauthplan.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe relay auth metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7088,6 +7209,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/keyexchangeplan_test.go", Content: keyExchangePlanTestSource, Go: true},
 		{RelPath: "protocol/keyexchangeplan_parity_test.go", Content: keyExchangePlanParityTestSource, Go: true},
 		{RelPath: "protocol/keyexchangeplan_hygiene_test.go", Content: keyExchangePlanHygieneTestSource, Go: true},
+		{RelPath: "protocol/relayauthplan_generated.go", Content: relayAuthPlanSource, Go: true},
+		{RelPath: "protocol/relayauthplan_test.go", Content: relayAuthPlanTestSource, Go: true},
+		{RelPath: "protocol/relayauthplan_parity_test.go", Content: relayAuthPlanParityTestSource, Go: true},
+		{RelPath: "protocol/relayauthplan_hygiene_test.go", Content: relayAuthPlanHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
