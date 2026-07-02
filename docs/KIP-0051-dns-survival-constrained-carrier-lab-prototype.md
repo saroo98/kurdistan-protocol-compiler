@@ -65,7 +65,7 @@ The misuse scanner covers public resolver allowance, default resolver-style quer
 
 ## Generated Backend Parity
 
-`kgen` emits constrained-carrier constants, fixture accessors, parity tests, and hygiene tests. Generated modules specialize query shapes, response shapes, capacity buckets, retry/failure buckets, blocked scopes, misuse controls, and backend version `0.45.0-lab`.
+`kgen` emits constrained-carrier constants, fixture accessors, parity tests, and hygiene tests. Generated modules specialize query shapes, response shapes, capacity buckets, retry/failure buckets, blocked scopes, misuse controls, and backend version `0.45.0-lab`. M46 adds the next composition layer that selects across reviewed lab carrier families without adding public carrier behavior.
 
 ## Commands
 
@@ -83,4 +83,4 @@ The prototype is symbolic and deterministic. It does not validate performance, a
 
 ## Next Milestone
 
-M46 should integrate reviewed carrier families into controlled multi-carrier runtime selection while preserving carrier review, measurement review, path health, generated parity, and trace hygiene constraints.
+M46 integrates reviewed carrier families into controlled multi-carrier runtime selection while preserving carrier review, measurement review, path health, generated parity, and trace hygiene constraints. M47 should add carrier collapse and mutation audit coverage for the multi-carrier selector.

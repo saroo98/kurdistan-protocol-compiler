@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T01:51:41Z`
+- Generated at: `2026-07-02T02:35:02Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -437,6 +437,22 @@
 | `constrainedcarrier_trace_hygiene` | PASS | `required` | fixtures and summaries scanned for unsafe material |
 | `constrainedcarrier_mutant_detection` | PASS | `required` | 26/26 constrained carrier mutant modes detected |
 | `constrainedcarrier_fixture_drift` | PASS | `required` | passed |
+| `multicarrierselect_inventory` | PASS | `required` | 5 carrier families |
+| `multicarrierselect_candidate_bundle` | PASS | `required` | 9 candidates; 6 blocked |
+| `multicarrierselect_policy` | PASS | `required` | 10 decision classes |
+| `multicarrierselect_profile_sensitivity` | PASS | `required` | diversity=0.89 hashes=9 |
+| `multicarrierselect_pathrace_integration` | PASS | `required` | 3 raced candidates |
+| `multicarrierselect_pathhealth_integration` | PASS | `required` | 9 health reports |
+| `multicarrierselect_failover_fallback` | PASS | `required` | primary=carrier_candidate_https_primary backup=carrier_candidate_dns_survival_backup |
+| `multicarrierselect_measurementreview_composition` | PASS | `required` | measurementreview constraints enforced |
+| `multicarrierselect_carrierreview_composition` | PASS | `required` | carrierreview constraints enforced |
+| `multicarrierselect_runtime_composition` | PASS | `required` | pathrace pathhealth transportbundle relaybridge labegress localpipeline runtime security mappings checked |
+| `multicarrierselect_misuse_detection` | PASS | `required` | 15 misuse controls detected |
+| `multicarrierselect_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `multicarrierselect_trace_hygiene` | PASS | `required` | selection fixtures scanned for unsafe material |
+| `multicarrierselect_public_claim_safety` | PASS | `required` | 4 public docs scanned |
+| `multicarrierselect_mutant_detection` | PASS | `required` | 15/15 multi-carrier selection mutant modes detected |
+| `multicarrierselect_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -450,9 +466,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `92 ms`
-- Trace generation: `22 ms`
-- Total audit runtime: `2235 ms`
+- Profile generation: `89 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2198 ms`
 
 ## Corpus Diversity Summary
 
@@ -477,8 +493,8 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3166703697535589`
-- `same_profile_distance`: `0.007462686567164179`
+- `different_profile_average_distance`: `0.3190646229639785`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison

@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.45.0-lab</strong>
+            <strong>0.46.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -115,6 +115,7 @@
             <div class="stack-row"><span class="status-dot on"></span><span>HTTPS-like carrier</span><b>lab prototype</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>carrier adversary</span><b>hardened</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>constrained carrier</span><b>lab prototype</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>multi-carrier selection</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -246,6 +247,7 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Path racing and scoring</h3><p>Synthetic racing, short-lived evidence, freshness decay, verification, ranking, and misuse controls.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Health monitoring and failover</h3><p>Deterministic monitoring, failover decisions, relay burn quarantine, confidence expiry, and controls.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Carrier-family design reviews</h3><p>Risk-gated carrier-family descriptors, HTTPS-like and constrained lab carrier checks, misuse checks, and trace preconditions.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Multi-carrier runtime selection</h3><p>Reviewed carrier inventory, profile-sensitive selection, pathrace/pathhealth composition, unsafe fallback blocking, and parity gates.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Measurement-client privacy review</h3><p>Bucketed observation taxonomy, redaction policy, consent/retention checks, and local diagnostics.</p></article>
           <article class="capability-card"><span class="status-chip review">review</span><h3>Android client architecture</h3><p>Future client architecture review after readiness and safety checks mature.</p></article>
         </div>
@@ -274,6 +276,7 @@
               <span>transport bundles</span>
               <span>path racing</span>
               <span>health/failover</span>
+              <span>multi-carrier selection</span>
             </div>
           </article>
           <article class="lane">
@@ -339,7 +342,8 @@
             <p><b>M44:</b> constrained-carrier design lock</p>
             <p><b>M45:</b> constrained-carrier lab prototype</p>
             <p><b>M46:</b> multi-carrier runtime selection</p>
-            <span class="status-chip implemented">M35-M44 implemented</span>
+            <p><b>M47:</b> carrier collapse and mutation audit</p>
+            <span class="status-chip implemented">M35-M46 implemented</span>
           </article>
         </div>
       </section>
@@ -435,6 +439,7 @@
             <a href="KIP-0049-https-like-carrier-adversarial-hardening.md">KIP-0049: HTTPS-like carrier adversarial hardening</a>
             <a href="KIP-0050-dns-survival-constrained-carrier-design-lock.md">KIP-0050: DNS-survival constrained-carrier design lock</a>
             <a href="KIP-0051-dns-survival-constrained-carrier-lab-prototype.md">KIP-0051: DNS-survival constrained-carrier lab prototype</a>
+            <a href="KIP-0052-multi-carrier-runtime-selection.md">KIP-0052: Multi-carrier runtime selection</a>
           </article>
         </div>
       </section>
