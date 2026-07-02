@@ -194,6 +194,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/androidreview_test.go",
 		"protocol/androidreview_parity_test.go",
 		"protocol/androidreview_hygiene_test.go",
+		"protocol/androidruntime_generated.go",
+		"protocol/androidruntime_test.go",
+		"protocol/androidruntime_parity_test.go",
+		"protocol/androidruntime_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -370,6 +374,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	operationalHardeningB := mustRead(t, filepath.Join(outB, "protocol", "operationalhardening_generated.go"))
 	androidReviewA := mustRead(t, filepath.Join(outA, "protocol", "androidreview_generated.go"))
 	androidReviewB := mustRead(t, filepath.Join(outB, "protocol", "androidreview_generated.go"))
+	androidRuntimeA := mustRead(t, filepath.Join(outA, "protocol", "androidruntime_generated.go"))
+	androidRuntimeB := mustRead(t, filepath.Join(outB, "protocol", "androidruntime_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -462,6 +468,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if androidReviewA == androidReviewB {
 		t.Fatalf("Android review generation did not differ across profiles")
+	}
+	if androidRuntimeA == androidRuntimeB {
+		t.Fatalf("Android runtime generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

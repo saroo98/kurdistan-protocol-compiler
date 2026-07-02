@@ -15,6 +15,7 @@ import (
 
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/androidreview"
+	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
@@ -2452,6 +2453,46 @@ func GeneratedAndroidReviewParity() (androidreview.ParityReport, error) {
 		return nil, err
 	}
 
+	androidRuntimeSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/androidruntime"
+)
+
+const AndroidRuntimeSchemaVersion = %[1]s
+const AndroidRuntimeGeneratedProfileID = %[2]s
+const AndroidRuntimeGeneratedProfileSeed int64 = %[3]d
+const AndroidRuntimeBackendVersion = %[4]s
+const AndroidRuntimeDecision = %[5]s
+const AndroidRuntimeInitializationPolicy = %[6]s
+const AndroidRuntimeLifecyclePolicy = %[7]s
+const AndroidRuntimeDiagnosticsPolicy = %[8]s
+const AndroidRuntimeConcurrencyPolicy = %[9]s
+const AndroidRuntimeCompatibilityPolicy = %[10]s
+const AndroidRuntimeNextMilestone = %[11]s
+const AndroidRuntimeLifecycleEventCount = %[12]d
+const AndroidRuntimeMisuseCount = %[13]d
+
+var AndroidRuntimeLifecycleEvents = %[14]s
+var AndroidRuntimeControls = %[15]s
+var AndroidRuntimeGeneratedPolicyHints = %[16]s
+
+func GeneratedAndroidRuntimeFixtureSet() (androidruntime.FixtureSet, error) {
+	return androidruntime.GenerateFixtureSet()
+}
+
+func GeneratedAndroidRuntimeParity() (androidruntime.ParityReport, error) {
+	set, err := androidruntime.GenerateFixtureSet()
+	if err != nil {
+		return androidruntime.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(androidruntime.Version), quote(p.ID), p.Seed, quote(androidruntime.BackendVersion), quote(androidruntime.DecisionReady), quote(androidruntime.DefaultInitializationReport().Policy), quote(androidruntime.DefaultLifecycleReport().Policy+"/"+p.AdapterPolicy.RuntimeMappingPolicy), quote(androidruntime.DefaultDiagnosticsReport().Policy), quote(androidruntime.DefaultConcurrencyReport().Policy+"/"+p.CarrierPolicy.BackpressurePolicy), quote(p.Security.ProfileCompatibilityPolicy+"/"+p.Security.CapabilityNegotiationPolicy+"/"+p.Security.ReplayPolicy), quote(androidruntime.RecommendedNextMilestone), len(androidruntime.DefaultLifecycleReport().Events), len(androidruntime.RequiredMisuseNames()), quoteSlice(androidruntime.DefaultLifecycleReport().Events), quoteSlice(androidruntime.RequiredMisuseNames()), quoteSlice([]string{p.AdapterPolicy.RuntimeMappingPolicy, p.CarrierPolicy.CarrierFamily, p.CarrierPolicy.BackpressurePolicy, p.Security.ReplayPolicy, p.Security.ProfileCompatibilityPolicy, p.Security.CapabilityNegotiationPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -3174,6 +3215,91 @@ func TestGeneratedAndroidReviewHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := androidreview.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe Android review metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidRuntimeTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidruntime"
+)
+
+func TestGeneratedAndroidRuntime(t *testing.T) {
+	if AndroidRuntimeSchemaVersion != androidruntime.Version || AndroidRuntimeGeneratedProfileID != ProfileID {
+		t.Fatalf("generated Android runtime constants drifted")
+	}
+	set, err := GeneratedAndroidRuntimeFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidruntime.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if AndroidRuntimeLifecycleEventCount < 10 || AndroidRuntimeMisuseCount < len(androidruntime.RequiredMisuseNames()) || len(AndroidRuntimeLifecycleEvents) < 10 {
+		t.Fatalf("generated Android runtime constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidRuntimeParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedAndroidRuntimeParity(t *testing.T) {
+	parity, err := GeneratedAndroidRuntimeParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated Android runtime parity failed: %%+v", parity)
+	}
+	if AndroidRuntimeInitializationPolicy == "" || AndroidRuntimeLifecyclePolicy == "" || AndroidRuntimeDiagnosticsPolicy == "" || AndroidRuntimeNextMilestone == "" {
+		t.Fatalf("Android runtime generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidRuntimeHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidruntime"
+)
+
+func TestGeneratedAndroidRuntimeHygiene(t *testing.T) {
+	set, err := GeneratedAndroidRuntimeFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidruntime.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_packet": "synthetic"},
+		map[string]string{"visited_domain": "synthetic"},
+		map[string]string{"host_header": "synthetic"},
+		map[string]string{"dns_query": "synthetic"},
+		map[string]string{"phone_identifier": "synthetic"},
+		map[string]string{"telemetry_upload_endpoint": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := androidruntime.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe Android runtime metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7468,6 +7594,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/androidreview_test.go", Content: androidReviewTestSource, Go: true},
 		{RelPath: "protocol/androidreview_parity_test.go", Content: androidReviewParityTestSource, Go: true},
 		{RelPath: "protocol/androidreview_hygiene_test.go", Content: androidReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/androidruntime_generated.go", Content: androidRuntimeSource, Go: true},
+		{RelPath: "protocol/androidruntime_test.go", Content: androidRuntimeTestSource, Go: true},
+		{RelPath: "protocol/androidruntime_parity_test.go", Content: androidRuntimeParityTestSource, Go: true},
+		{RelPath: "protocol/androidruntime_hygiene_test.go", Content: androidRuntimeHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
