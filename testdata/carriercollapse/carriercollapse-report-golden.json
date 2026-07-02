@@ -1,0 +1,525 @@
+{
+  "version": "carriercollapse-v1",
+  "fixture_id": "carrier_collapse_mutation_audit_v1",
+  "backend_version": "0.47.0-lab",
+  "report": {
+    "version": "carriercollapse-v1",
+    "fixture_id": "carrier_collapse_mutation_audit_v1",
+    "generated_at": "2026-02-16T00:00:00Z",
+    "generated_at_unix": 1771200000,
+    "backend_version": "0.47.0-lab",
+    "carrier_families": [
+      "https_like_lab",
+      "dns_survival_lab",
+      "constrained_request_response_lab"
+    ],
+    "implemented_versions": {
+      "constrainedcarrier": "0.45.0-lab",
+      "httpscarrieradversary": "0.43.0-lab",
+      "httpslikecarrier": "0.42.0-lab",
+      "multicarrierselect": "0.46.0-lab"
+    },
+    "dimensions": [
+      "carrier_family_diversity",
+      "shape_class_diversity",
+      "profile_sensitivity",
+      "transport_bundle_sensitivity",
+      "pathrace_sensitivity",
+      "pathhealth_sensitivity",
+      "measurementreview_enforcement",
+      "carrierreview_enforcement",
+      "labegress_enforcement",
+      "runtime_security_metadata_consistency",
+      "stream_isolation",
+      "backpressure_visibility",
+      "reset_propagation",
+      "fixture_drift",
+      "generated_interpreted_parity",
+      "trace_hygiene",
+      "public_claim_safety"
+    ],
+    "diversity": {
+      "carrier_families": [
+        "https_like_lab",
+        "dns_survival_lab",
+        "constrained_request_response_lab"
+      ],
+      "shape_classes": [
+        "constrained:chunked_query_marker-delayed_response_marker",
+        "constrained:delayed_query_marker-reset_response_marker",
+        "constrained:repeated_query_marker-retry_response_marker",
+        "constrained:small_query_marker-small_response_marker",
+        "https:request-chunked_request_marker",
+        "https:request-large_object_request_marker",
+        "https:request-reset_error_request_marker",
+        "https:request-short_request_marker",
+        "https:response-chunked_response_marker",
+        "https:response-delayed_large_response_marker",
+        "https:response-fixed_response_marker",
+        "https:response-reset_error_response_marker"
+      ],
+      "profile_sensitive": true,
+      "bundle_sensitive": true,
+      "profile_hash_count": 9,
+      "shape_hash_count": 12,
+      "diversity_score": 0.88,
+      "collapse_classes_tested": [
+        "single_carrier_collapse",
+        "single_shape_collapse",
+        "padding_only_variation",
+        "profile_insensitive_output",
+        "bundle_insensitive_output",
+        "pathhealth_ignored",
+        "pathrace_ignored",
+        "measurementreview_bypassed",
+        "carrierreview_bypassed",
+        "unsafe_fallback_enabled",
+        "high_risk_default_enabled",
+        "fixed_error_behavior",
+        "reset_swallowed",
+        "backpressure_hidden",
+        "stream_isolation_broken",
+        "generated_backend_drift"
+      ],
+      "conclusion": "passed"
+    },
+    "selection_collapse": {
+      "carrier_families": [
+        "https_like_lab",
+        "dns_survival_lab",
+        "constrained_request_response_lab"
+      ],
+      "shape_classes": [
+        "https_request_response_shape",
+        "constrained_request_response_shape",
+        "dns_survival_shape"
+      ],
+      "profile_sensitive": true,
+      "bundle_sensitive": true,
+      "profile_hash_count": 9,
+      "shape_hash_count": 3,
+      "diversity_score": 0.89,
+      "collapse_classes_tested": [
+        "single_carrier_collapse",
+        "profile_insensitive_output",
+        "padding_only_variation"
+      ],
+      "conclusion": "passed"
+    },
+    "fallback_safety": {
+      "unsafe_fallback_rejected": true,
+      "high_risk_default_rejected": true,
+      "public_network_rejected": true,
+      "blocked_classes": [
+        "unsafe_fallback_enabled",
+        "high_risk_default_enabled",
+        "public_network_selection"
+      ],
+      "conclusion": "passed"
+    },
+    "pathhealth": {
+      "name": "pathhealth",
+      "checked": true,
+      "enforced": true,
+      "bypasses_rejected": 1,
+      "controls": [
+        "pathhealth_bypass",
+        "pathhealth_composition_required"
+      ],
+      "conclusion": "passed"
+    },
+    "pathrace": {
+      "name": "pathrace",
+      "checked": true,
+      "enforced": true,
+      "bypasses_rejected": 1,
+      "controls": [
+        "pathrace_bypass",
+        "pathrace_composition_required"
+      ],
+      "conclusion": "passed"
+    },
+    "measurementreview": {
+      "name": "measurementreview",
+      "checked": true,
+      "enforced": true,
+      "bypasses_rejected": 1,
+      "controls": [
+        "measurementreview_bypass",
+        "measurementreview_composition_required"
+      ],
+      "conclusion": "passed"
+    },
+    "carrierreview": {
+      "name": "carrierreview",
+      "checked": true,
+      "enforced": true,
+      "bypasses_rejected": 1,
+      "controls": [
+        "carrierreview_bypass",
+        "carrierreview_composition_required"
+      ],
+      "conclusion": "passed"
+    },
+    "labegress": {
+      "name": "labegress",
+      "checked": true,
+      "enforced": true,
+      "bypasses_rejected": 1,
+      "controls": [
+        "labegress_bypass",
+        "labegress_composition_required"
+      ],
+      "conclusion": "passed"
+    },
+    "runtime_safety": {
+      "runtime_security_metadata_consistent": true,
+      "stream_isolation_preserved": true,
+      "backpressure_visible": true,
+      "reset_propagated": true,
+      "fixed_error_behavior_detected": true,
+      "controls": [
+        "stream_isolation_broken",
+        "backpressure_hidden",
+        "reset_swallowed",
+        "fixed_error_behavior"
+      ],
+      "conclusion": "passed"
+    },
+    "parity": {
+      "compared_families": 3,
+      "semantic_matches": 3,
+      "generated_markers": [
+        "CarrierCollapseSchemaVersion",
+        "CarrierCollapseGeneratedProfileID",
+        "CarrierCollapseControlCount",
+        "CarrierCollapseBackendVersion"
+      ],
+      "allowed_differences": [
+        "profile_specific_shape_hash",
+        "carrier_family_rank"
+      ],
+      "unexpected_differences": null,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "trace_hygiene": {
+      "fixtures_scanned": 19,
+      "reports_scanned": 13,
+      "docs_scanned": 5,
+      "forbidden_marker_buckets": [
+        "raw network marker",
+        "payload marker",
+        "secret marker",
+        "target marker",
+        "resolver marker"
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "mutations": {
+      "findings": [
+        {
+          "name": "carriercollapse_single_carrier_default",
+          "class": "single_carrier_collapse",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_single_shape_default",
+          "class": "single_shape_collapse",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_padding_only_variation",
+          "class": "padding_only_variation",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_profile_insensitive",
+          "class": "profile_insensitive_output",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_bundle_insensitive",
+          "class": "bundle_insensitive_output",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_pathrace_bypass",
+          "class": "pathrace_ignored",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_pathhealth_bypass",
+          "class": "pathhealth_ignored",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_measurementreview_bypass",
+          "class": "measurementreview_bypassed",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_carrierreview_bypass",
+          "class": "carrierreview_bypassed",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_labegress_bypass",
+          "class": "carrier_collapse_control",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_unsafe_fallback",
+          "class": "unsafe_fallback_enabled",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_high_risk_default",
+          "class": "high_risk_default_enabled",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_payload_leak",
+          "class": "trace_hygiene_violation",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_secret_leak",
+          "class": "trace_hygiene_violation",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_generated_backend_drift",
+          "class": "generated_backend_drift",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        },
+        {
+          "name": "carriercollapse_trace_hygiene_bypass",
+          "class": "trace_hygiene_violation",
+          "family": "cross_carrier",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked_by_carriercollapse_gate",
+          "payload_logged": false,
+          "secret_logged": false
+        }
+      ],
+      "detected_count": 16,
+      "expected_count": 16,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "public_claims": {
+      "docs_checked": 5,
+      "claim_safety_passed": true,
+      "conclusion": "passed"
+    },
+    "payload_logged": false,
+    "secret_logged": false,
+    "recommended_next_milestone": "M48: payload-bearing local proxy adapter design review",
+    "report_hash": "sha256:07e3f9162e9a280374c4dd4691833e9c3cd48b849c29f210e27cb04bbceb98fe",
+    "conclusion": "passed"
+  },
+  "fixtures": [
+    {
+      "name": "carrier-diversity-audit",
+      "kind": "diversity",
+      "scenario": "carrier_family_diversity",
+      "expected": "passed",
+      "summary_hash": "sha256:a7d77c6d741f3df8a8d843b26e0d1653e159c7789fc480eec13ff12bdc94fc2f",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "shape-diversity-audit",
+      "kind": "diversity",
+      "scenario": "shape_class_diversity",
+      "expected": "passed",
+      "summary_hash": "sha256:f6c71542699117ceb033d3607330bdac8e6c9d74542fbba4b024ac38d7f8b919",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "profile-sensitivity-audit",
+      "kind": "sensitivity",
+      "scenario": "profile_sensitivity",
+      "expected": "passed",
+      "summary_hash": "sha256:c47f5a7104c82e6bc33e6cdb07cc7d3780183b36a4d1d981b5039edb58eda557",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "bundle-sensitivity-audit",
+      "kind": "sensitivity",
+      "scenario": "transport_bundle_sensitivity",
+      "expected": "passed",
+      "summary_hash": "sha256:b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "selection-collapse-audit",
+      "kind": "collapse",
+      "scenario": "selection_collapse",
+      "expected": "passed",
+      "summary_hash": "sha256:c47f5a7104c82e6bc33e6cdb07cc7d3780183b36a4d1d981b5039edb58eda557",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "fallback-safety-audit",
+      "kind": "fallback",
+      "scenario": "fallback_safety",
+      "expected": "passed",
+      "summary_hash": "sha256:7920fe8e2990d67b21f3c2e66bedeb45878df80bb497f53158ef9190529409fe",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "pathhealth-pathrace-enforcement-audit",
+      "kind": "enforcement",
+      "scenario": "pathhealth_pathrace",
+      "expected": "passed",
+      "summary_hash": "sha256:8b3cf81d0693069f1d62f5a21ae507304f0e1354ea543821dc05c6e0c41827dc",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "measurement-carrier-review-audit",
+      "kind": "enforcement",
+      "scenario": "review_gates",
+      "expected": "passed",
+      "summary_hash": "sha256:86ab953e481ea1092d5b251e332ddb6a4a8e8843a0cc2b066ffa669e88002dbd",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "stream-backpressure-reset-audit",
+      "kind": "runtime",
+      "scenario": "stream_backpressure_reset",
+      "expected": "passed",
+      "summary_hash": "sha256:32d405017440f145a5da4670e691a7f01c7242dbaab7eb32ad63c06a1dd82a42",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "generated-parity-audit",
+      "kind": "parity",
+      "scenario": "generated_interpreted_parity",
+      "expected": "passed",
+      "summary_hash": "sha256:6d85209f0d059bd18a646a363cda9470256009f76f54834fb1fa2ea6b5a458e4",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "trace-hygiene-audit",
+      "kind": "hygiene",
+      "scenario": "trace_hygiene",
+      "expected": "passed",
+      "summary_hash": "sha256:08b595ef05d19f8b727c5df945caeb9195e7d9af275a44bc07a818e0b89e5348",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "mutation-coverage-audit",
+      "kind": "mutation",
+      "scenario": "mutation_coverage",
+      "expected": "passed",
+      "summary_hash": "sha256:e021ae2f6ff7f14c14ec86985372d4bbefaf7a87b155d0d8eabd9af21ec70e4b",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "public-claim-safety-audit",
+      "kind": "claim_safety",
+      "scenario": "public_claim_safety",
+      "expected": "passed",
+      "summary_hash": "sha256:7623df837a217494593f170fc49b59a000a729b585a597349dfc6db2186d9f30",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "fixture_hash": "sha256:1b5bdc4a9c7defdcb015bd689416fe9b33fbb31499fc10b0aa7c00780315fd35",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

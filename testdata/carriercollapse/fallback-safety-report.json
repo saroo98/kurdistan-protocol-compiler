@@ -1,0 +1,11 @@
+{
+  "unsafe_fallback_rejected": true,
+  "high_risk_default_rejected": true,
+  "public_network_rejected": true,
+  "blocked_classes": [
+    "unsafe_fallback_enabled",
+    "high_risk_default_enabled",
+    "public_network_selection"
+  ],
+  "conclusion": "passed"
+}

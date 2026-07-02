@@ -1,0 +1,15 @@
+{
+  "fixtures_scanned": 19,
+  "reports_scanned": 13,
+  "docs_scanned": 5,
+  "forbidden_marker_buckets": [
+    "raw network marker",
+    "payload marker",
+    "secret marker",
+    "target marker",
+    "resolver marker"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
