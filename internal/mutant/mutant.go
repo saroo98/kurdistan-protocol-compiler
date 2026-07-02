@@ -610,6 +610,20 @@ const (
 	ModeRelayProcessPayloadLeak             = "relayprocess_payload_leak"
 	ModeRelayProcessSecretLeak              = "relayprocess_secret_leak"
 	ModeRelayProcessGeneratedBackendDrift   = "relayprocess_generated_backend_drift"
+
+	ModeKeyExchangePlanCustomCryptoAllowed      = "keyexchangeplan_custom_crypto_allowed"
+	ModeKeyExchangePlanSecretLogged             = "keyexchangeplan_secret_logged"
+	ModeKeyExchangePlanNonceLogged              = "keyexchangeplan_nonce_logged"
+	ModeKeyExchangePlanAuthTagLogged            = "keyexchangeplan_auth_tag_logged"
+	ModeKeyExchangePlanPrivateKeyFixture        = "keyexchangeplan_private_key_fixture"
+	ModeKeyExchangePlanReplayAllowed            = "keyexchangeplan_replay_allowed"
+	ModeKeyExchangePlanDowngradeAllowed         = "keyexchangeplan_downgrade_allowed"
+	ModeKeyExchangePlanMissingTranscriptBinding = "keyexchangeplan_missing_transcript_binding"
+	ModeKeyExchangePlanMissingIdentityBinding   = "keyexchangeplan_missing_identity_binding"
+	ModeKeyExchangePlanMissingKeySeparation     = "keyexchangeplan_missing_key_separation"
+	ModeKeyExchangePlanIndependentReviewBypass  = "keyexchangeplan_independent_review_bypass"
+	ModeKeyExchangePlanProductionClaim          = "keyexchangeplan_production_claim"
+	ModeKeyExchangePlanGeneratedBackendDrift    = "keyexchangeplan_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1194,6 +1208,19 @@ func Modes() []string {
 		ModeRelayProcessPayloadLeak,
 		ModeRelayProcessSecretLeak,
 		ModeRelayProcessGeneratedBackendDrift,
+		ModeKeyExchangePlanCustomCryptoAllowed,
+		ModeKeyExchangePlanSecretLogged,
+		ModeKeyExchangePlanNonceLogged,
+		ModeKeyExchangePlanAuthTagLogged,
+		ModeKeyExchangePlanPrivateKeyFixture,
+		ModeKeyExchangePlanReplayAllowed,
+		ModeKeyExchangePlanDowngradeAllowed,
+		ModeKeyExchangePlanMissingTranscriptBinding,
+		ModeKeyExchangePlanMissingIdentityBinding,
+		ModeKeyExchangePlanMissingKeySeparation,
+		ModeKeyExchangePlanIndependentReviewBypass,
+		ModeKeyExchangePlanProductionClaim,
+		ModeKeyExchangePlanGeneratedBackendDrift,
 	}
 }
 
