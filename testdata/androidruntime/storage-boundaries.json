@@ -1,0 +1,12 @@
+{
+  "policy": "android_private_storage_with_ephemeral_runtime_state",
+  "profile_storage": "validated_profile_bundle_private_app_storage",
+  "diagnostic_storage": "user_exported_redacted_bundle_only",
+  "cache_storage": "bounded_cache_no_private_content",
+  "generated_artifact_storage": "profile_specific_generated_runtime_markers_only",
+  "temporary_state_storage": "ephemeral_session_state_cleared_on_shutdown",
+  "raw_packet_stored": false,
+  "secret_stored": false,
+  "private_endpoint_stored": false,
+  "conclusion": "passed"
+}

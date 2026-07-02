@@ -1,0 +1,37 @@
+{
+  "policy": "bounded_redacted_local_runtime_diagnostics",
+  "allowed_fields": [
+    "runtime_state_bucket",
+    "profile_validation_result",
+    "carrier_compatibility_bucket",
+    "relay_auth_bucket",
+    "pathhealth_bucket",
+    "lifecycle_event_count",
+    "failure_class",
+    "recovery_action",
+    "shutdown_status",
+    "redaction_status"
+  ],
+  "failure_classes": [
+    "profile_invalid",
+    "profile_expired",
+    "permission_lost",
+    "carrier_incompatible",
+    "runtime_startup_failed",
+    "stale_session_rejected",
+    "shutdown_timeout_bucket"
+  ],
+  "recovery_actions": [
+    "reimport_profile",
+    "retry_connect",
+    "safe_disconnect",
+    "clear_ephemeral_state",
+    "export_redacted_diagnostics"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "raw_packet_logged": false,
+  "destination_metadata_logged": false,
+  "auto_upload_allowed": false,
+  "conclusion": "passed"
+}

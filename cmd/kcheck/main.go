@@ -14,6 +14,7 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/androidreview"
+	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/audit"
 	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
@@ -218,6 +219,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "operationalhardening" {
 		os.Exit(runOperationalHardening(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "androidruntime" {
+		os.Exit(runAndroidRuntime(os.Args[2:]))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "androidreview" {
 		os.Exit(runAndroidReview(os.Args[2:]))
@@ -7786,6 +7790,176 @@ func writeAndroidReviewCompanions(out string, set androidreview.FixtureSet, forc
 	}
 	for _, write := range writes {
 		if err := androidreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runAndroidRuntime(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runAndroidRuntimeGenerate(args[1:])
+		case "verify":
+			return runAndroidRuntimeVerify(args[1:])
+		case "compare":
+			return runAndroidRuntimeCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck androidruntime", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick Android local runtime audit")
+	full := flags.Bool("full", false, "run full Android local runtime audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunAndroidRuntimeAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidRuntimeGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidruntime generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "androidruntime", "androidruntime-report-golden.json"), "Android runtime fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := androidruntime.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := androidruntime.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeAndroidRuntimeCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote androidruntime fixtures: %s (%d lifecycle events, %d controls)\n", *out, len(set.Lifecycle.Events), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runAndroidRuntimeVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidruntime verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "androidruntime", "androidruntime-report-golden.json"), "Android runtime fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := androidruntime.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidruntime.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidruntime.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidRuntimeCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidruntime compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old Android runtime fixture")
+	newPath := flags.String("new", "", "new Android runtime fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := androidruntime.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidruntime.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidruntime.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := androidruntime.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeAndroidRuntimeCompanions(out string, set androidruntime.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"initialization.json", set.Initialization},
+		{"lifecycle.json", set.Lifecycle},
+		{"storage-boundaries.json", set.Storage},
+		{"diagnostics.json", set.Diagnostics},
+		{"concurrency.json", set.Concurrency},
+		{"compatibility.json", set.Compatibility},
+		{"shutdown.json", set.Shutdown},
+		{"checklist-report.json", set.Checklist},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"androidruntime-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := androidruntime.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

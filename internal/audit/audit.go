@@ -11,6 +11,7 @@ import (
 	"kurdistan/internal/adapteradversary"
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/androidreview"
+	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
@@ -195,6 +196,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	operationalHardeningDrift := operationalHardeningComparison(filepath.Join(fixtureRoot, "testdata", "operationalhardening", "operationalhardening-report-golden.json"), operationalHardeningSet)
 	androidReviewSet, androidReviewErr := androidreview.GenerateFixtureSet()
 	androidReviewDrift := androidReviewComparison(filepath.Join(fixtureRoot, "testdata", "androidreview", "androidreview-report-golden.json"), androidReviewSet)
+	androidRuntimeSet, androidRuntimeErr := androidruntime.GenerateFixtureSet()
+	androidRuntimeDrift := androidRuntimeComparison(filepath.Join(fixtureRoot, "testdata", "androidruntime", "androidruntime-report-golden.json"), androidRuntimeSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -499,6 +502,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, AndroidReviewGates(androidReviewSet, androidReviewDrift)...)
 	} else {
 		gates = append(gates, gate("androidreview_report", false, "required", androidReviewErr.Error(), nil, []string{androidReviewErr.Error()}))
+	}
+	if androidRuntimeErr == nil {
+		gates = append(gates, AndroidRuntimeGates(androidRuntimeSet, androidRuntimeDrift)...)
+	} else {
+		gates = append(gates, gate("androidruntime_report", false, "required", androidRuntimeErr.Error(), nil, []string{androidRuntimeErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

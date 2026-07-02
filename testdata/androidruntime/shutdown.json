@@ -1,0 +1,17 @@
+{
+  "policy": "safe_idempotent_android_local_runtime_shutdown",
+  "actions": [
+    "reject_new_connect_intent",
+    "close_local_session",
+    "drain_lifecycle_queue",
+    "flush_redacted_diagnostics",
+    "clear_ephemeral_state",
+    "mark_shutdown_terminal"
+  ],
+  "close_idempotent": true,
+  "queues_drained": true,
+  "diagnostics_flushed": true,
+  "leaked_workers": 0,
+  "post_shutdown_allowed": false,
+  "conclusion": "passed"
+}
