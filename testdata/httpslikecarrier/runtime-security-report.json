@@ -1,0 +1,8 @@
+{
+  "runtime_bound": true,
+  "secure_envelope_metadata": true,
+  "production_keying_changed": false,
+  "cryptographic_secret_logged": false,
+  "generated_transport_compatible": true,
+  "conclusion": "passed"
+}

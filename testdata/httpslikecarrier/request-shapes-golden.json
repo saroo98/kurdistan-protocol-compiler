@@ -1,0 +1,62 @@
+[
+  {
+    "id": "rq_short_marker",
+    "direction": "request",
+    "shape_class": "short_request_marker",
+    "marker_class": "rq_short",
+    "scenario_classes": [
+      "short",
+      "small_object"
+    ],
+    "max_marker_bytes": 32,
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:d2d57b317403e6c3e6a05f16019360b5ba40102575bcd9411b795f81ccf5accc"
+  },
+  {
+    "id": "rq_chunked_marker",
+    "direction": "request",
+    "shape_class": "chunked_request_marker",
+    "marker_class": "rq_chunked",
+    "scenario_classes": [
+      "chunked",
+      "long_poll_style"
+    ],
+    "max_marker_bytes": 64,
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:e287cc182b2deccf3e1cbbc83523808e9ad44cac85a81c6f5b7727da16828f9b"
+  },
+  {
+    "id": "rq_large_marker",
+    "direction": "request",
+    "shape_class": "large_object_request_marker",
+    "marker_class": "rq_large",
+    "scenario_classes": [
+      "large_object",
+      "slow"
+    ],
+    "max_marker_bytes": 96,
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:d3c31e3033feb836ad55a1c2c07eed2fa5e901243099830f72a15b8238cd300b"
+  },
+  {
+    "id": "rq_reset_error_marker",
+    "direction": "request",
+    "shape_class": "reset_error_request_marker",
+    "marker_class": "rq_reset_error",
+    "scenario_classes": [
+      "reset",
+      "error"
+    ],
+    "max_marker_bytes": 80,
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:f1ea70a43756e9003fd5eb9d54747b0eeec48f72c535e338ca6560a79ad938ef"
+  }
+]

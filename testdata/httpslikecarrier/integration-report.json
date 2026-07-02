@@ -1,0 +1,56 @@
+[
+  {
+    "layer": "loopbackrelay",
+    "composed": true,
+    "evidence": "loopbackrelay_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "labegress",
+    "composed": true,
+    "evidence": "labegress_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "relaybridge",
+    "composed": true,
+    "evidence": "relaybridge_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "proxyegress",
+    "composed": true,
+    "evidence": "proxyegress_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "localpipeline",
+    "composed": true,
+    "evidence": "localpipeline_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "pathrace",
+    "composed": true,
+    "evidence": "pathrace_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "pathhealth",
+    "composed": true,
+    "evidence": "pathhealth_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "carrierreview",
+    "composed": true,
+    "evidence": "carrierreview_summary_mapping",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "measurementreview",
+    "composed": true,
+    "evidence": "measurementreview_summary_mapping",
+    "conclusion": "passed"
+  }
+]

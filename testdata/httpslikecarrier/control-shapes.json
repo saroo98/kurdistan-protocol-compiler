@@ -1,0 +1,62 @@
+[
+  {
+    "id": "control_fixed_shape",
+    "direction": "control",
+    "shape_class": "fixed_shape_collapse",
+    "marker_class": "control_fixed",
+    "scenario_classes": [
+      "fixed_shape"
+    ],
+    "max_marker_bytes": 24,
+    "profile_sensitive": false,
+    "payload_free": true,
+    "control": true,
+    "hash": "sha256:df2a369be9fd85a00364519833845f880843fda5ecd684902befbaf56a4fa29f"
+  },
+  {
+    "id": "control_padding_only",
+    "direction": "control",
+    "shape_class": "padding_only_variation",
+    "marker_class": "control_padding",
+    "scenario_classes": [
+      "padding_only"
+    ],
+    "max_marker_bytes": 24,
+    "profile_sensitive": false,
+    "payload_free": true,
+    "control": true,
+    "hash": "sha256:877d3a5c9b40866c0496290935b2f8e603d78280dde939858509fc2685791d44"
+  },
+  {
+    "id": "control_profile_insensitive",
+    "direction": "control",
+    "shape_class": "profile_insensitive_selection",
+    "marker_class": "control_profile",
+    "scenario_classes": [
+      "profile_insensitive"
+    ],
+    "max_marker_bytes": 24,
+    "profile_sensitive": false,
+    "payload_free": true,
+    "control": true,
+    "hash": "sha256:a5f7fc9f9885380933a1b5d998a96e139d8ad8ff4195bdca55edca0ee7559464"
+  },
+  {
+    "id": "control_leakage",
+    "direction": "control",
+    "shape_class": "unsafe_metadata_leak",
+    "marker_class": "control_leak",
+    "scenario_classes": [
+      "payload_leak",
+      "sni_leak",
+      "host_header_leak",
+      "domain_url_leak",
+      "public_network_drift"
+    ],
+    "max_marker_bytes": 24,
+    "profile_sensitive": false,
+    "payload_free": false,
+    "control": true,
+    "hash": "sha256:c356b53bd68b39c627835100080d09541e52685bc9ccce2456d88885131b72d3"
+  }
+]

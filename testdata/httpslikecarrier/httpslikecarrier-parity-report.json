@@ -1,0 +1,17 @@
+{
+  "profile_count": 3,
+  "scenario_count": 9,
+  "semantic_matches": 9,
+  "shape_matches": 18,
+  "generated_markers": [
+    "httpslikecarrier_generated.go",
+    "httpslikecarrier_test.go",
+    "httpslikecarrier_parity_test.go",
+    "httpslikecarrier_hygiene_test.go",
+    "HTTPSLikeCarrierSchemaVersion",
+    "HTTPSLikeCarrierGeneratedProfileID"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "session_id": "session_selected_active",
+    "profile_class": "profile_alpha",
+    "states": [
+      "configured",
+      "selected",
+      "opening",
+      "active",
+      "draining",
+      "closed"
+    ],
+    "streams_opened": 2,
+    "streams_closed": 2,
+    "streams_reset": 0,
+    "backpressure_events": 0,
+    "rejected": false,
+    "failed": false,
+    "hash": "sha256:4a5c32c8ed68849604b5d1e761ef97a67ecdae652549c90c219ab8d879988242"
+  },
+  {
+    "session_id": "session_backpressured",
+    "profile_class": "profile_beta",
+    "states": [
+      "configured",
+      "selected",
+      "opening",
+      "active",
+      "backpressured",
+      "draining",
+      "closed"
+    ],
+    "streams_opened": 3,
+    "streams_closed": 3,
+    "streams_reset": 0,
+    "backpressure_events": 2,
+    "rejected": false,
+    "failed": false,
+    "hash": "sha256:89b1bdf6d24dea98f010b7e10d4c957a47ed992d5d0ba7dee239a9058eff0928"
+  },
+  {
+    "session_id": "session_reset",
+    "profile_class": "profile_gamma",
+    "states": [
+      "configured",
+      "selected",
+      "opening",
+      "active",
+      "reset"
+    ],
+    "streams_opened": 2,
+    "streams_closed": 1,
+    "streams_reset": 1,
+    "backpressure_events": 0,
+    "rejected": false,
+    "failed": false,
+    "hash": "sha256:f33d76bfff5816226bea2ea888c7685b42522fd0651635d9de49a4c721c7b211"
+  },
+  {
+    "session_id": "session_rejected",
+    "profile_class": "control",
+    "states": [
+      "configured",
+      "rejected"
+    ],
+    "streams_opened": 0,
+    "streams_closed": 0,
+    "streams_reset": 0,
+    "backpressure_events": 0,
+    "rejected": true,
+    "failed": false,
+    "hash": "sha256:6c22a804bbf9bc142e393a4116669481f4ec864b1b5e373b1532b6f3ff1664f0"
+  }
+]

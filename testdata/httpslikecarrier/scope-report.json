@@ -1,0 +1,22 @@
+[
+  "real_tls",
+  "tls_handshake_behavior",
+  "real_https_client",
+  "real_http_request_forwarding",
+  "sni_routing",
+  "host_header_routing",
+  "url_routing",
+  "domain_dependency",
+  "cdn_provider_integration",
+  "domain_fronting",
+  "public_network_egress",
+  "arbitrary_destination_proxying",
+  "payload_forwarding_to_real_targets",
+  "dns_resolution",
+  "packet_capture",
+  "payload_logging",
+  "measurement_upload",
+  "android_behavior",
+  "production_relay_deployment",
+  "country_specific_mode"
+]

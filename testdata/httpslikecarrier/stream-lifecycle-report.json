@@ -1,0 +1,67 @@
+[
+  {
+    "stream_id": 1,
+    "states": [
+      "stream_opening",
+      "stream_active",
+      "stream_reset"
+    ],
+    "request_shape": "short_request_marker",
+    "response_shape": "delayed_large_response_marker",
+    "closed": false,
+    "reset": true,
+    "target_error": false,
+    "isolated": true,
+    "hash": "sha256:7ab06c546a1fbf3cb78742ddf6c74a002fdbf3b79d207286a31e2cc130013ff7"
+  },
+  {
+    "stream_id": 2,
+    "states": [
+      "stream_opening",
+      "stream_active",
+      "stream_draining",
+      "stream_closed",
+      "stream_error"
+    ],
+    "request_shape": "short_request_marker",
+    "response_shape": "chunked_response_marker",
+    "closed": true,
+    "reset": false,
+    "target_error": true,
+    "isolated": true,
+    "hash": "sha256:a5305735d93375d0d7cf1df2699d83cfde3202276f68dbdaf3210fd9d0ac62ae"
+  },
+  {
+    "stream_id": 3,
+    "states": [
+      "stream_opening",
+      "stream_active",
+      "stream_draining",
+      "stream_closed"
+    ],
+    "request_shape": "chunked_request_marker",
+    "response_shape": "reset_error_response_marker",
+    "closed": true,
+    "reset": false,
+    "target_error": false,
+    "isolated": true,
+    "hash": "sha256:340bcfe56eca9da3520ef49fba830344b383300d94d6dab1f2d6aaf708481776"
+  },
+  {
+    "stream_id": 4,
+    "states": [
+      "stream_opening",
+      "stream_active",
+      "stream_backpressure",
+      "stream_draining",
+      "stream_closed"
+    ],
+    "request_shape": "reset_error_request_marker",
+    "response_shape": "reset_error_response_marker",
+    "closed": true,
+    "reset": false,
+    "target_error": false,
+    "isolated": true,
+    "hash": "sha256:c730839cff43e7da2565aab16089504522f210b970870760fd08f252367e82f1"
+  }
+]
