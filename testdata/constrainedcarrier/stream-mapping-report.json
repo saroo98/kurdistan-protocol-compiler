@@ -1,0 +1,62 @@
+[
+  {
+    "stream_id": 1,
+    "states": [
+      "stream_open",
+      "stream_active",
+      "stream_closed"
+    ],
+    "query_shape": "small_query_marker",
+    "response_shape": "small_response_marker",
+    "closed": true,
+    "reset": false,
+    "failure_bucket": "",
+    "isolated": true,
+    "hash": "sha256:be4045df0224c8154c2794a704eef89c5cecd377b5d91799912fd4090a6ae668"
+  },
+  {
+    "stream_id": 2,
+    "states": [
+      "stream_open",
+      "stream_active",
+      "stream_closed"
+    ],
+    "query_shape": "chunked_query_marker",
+    "response_shape": "delayed_response_marker",
+    "closed": true,
+    "reset": false,
+    "failure_bucket": "",
+    "isolated": true,
+    "hash": "sha256:b8fb0e5582db4feedd3ff9f32391fbb31f5958bea8042c9c93aee75a751bb27c"
+  },
+  {
+    "stream_id": 3,
+    "states": [
+      "stream_open",
+      "stream_active",
+      "stream_closed"
+    ],
+    "query_shape": "repeated_query_marker",
+    "response_shape": "retry_response_marker",
+    "closed": true,
+    "reset": false,
+    "failure_bucket": "",
+    "isolated": true,
+    "hash": "sha256:a4544f67c2394cc35f4c8a53010bcd84be51391059b8ff1add293b2e2a20c69b"
+  },
+  {
+    "stream_id": 4,
+    "states": [
+      "stream_open",
+      "stream_active",
+      "stream_reset"
+    ],
+    "query_shape": "delayed_query_marker",
+    "response_shape": "reset_response_marker",
+    "closed": false,
+    "reset": true,
+    "failure_bucket": "failure_reset_bucket",
+    "isolated": true,
+    "hash": "sha256:3a4d3ca407481f75a95bb2d57ab64089266a88c307081761e04d5268cfc7999b"
+  }
+]

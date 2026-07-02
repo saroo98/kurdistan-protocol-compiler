@@ -1,0 +1,26 @@
+{
+  "capacity_buckets": [
+    "capacity_tiny_bucket",
+    "capacity_small_bucket",
+    "capacity_split_bucket",
+    "capacity_retry_bucket"
+  ],
+  "marker_size_buckets": [
+    "marker_tiny_bucket",
+    "marker_split_bucket",
+    "marker_retry_bucket"
+  ],
+  "truncation_buckets": [
+    "truncation_none_bucket",
+    "truncation_soft_bucket",
+    "truncation_hard_bucket"
+  ],
+  "truncation_to_retry_mappings": [
+    "soft_to_retry_once",
+    "hard_to_bounded_retry"
+  ],
+  "oversized_markers_rejected": 2,
+  "raw_byte_counts_stored": false,
+  "raw_query_response_bytes_stored": false,
+  "conclusion": "passed"
+}

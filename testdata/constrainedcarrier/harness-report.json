@@ -1,0 +1,19 @@
+{
+  "harness_id": "local_deterministic_resolver_harness",
+  "local_only": true,
+  "deterministic_fixture_scope": true,
+  "loopback_only": true,
+  "public_resolver_behavior": false,
+  "real_dns_query_default": false,
+  "resolver_ip_persisted": false,
+  "exact_query_persisted": false,
+  "domain_dependent": false,
+  "resolver_class_buckets": [
+    "loopback_resolver_bucket",
+    "fixture_resolver_bucket",
+    "in_memory_resolver_bucket"
+  ],
+  "clean_shutdown": true,
+  "resource_limits_enforced": true,
+  "conclusion": "passed"
+}

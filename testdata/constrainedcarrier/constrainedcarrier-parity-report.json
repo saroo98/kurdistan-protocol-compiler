@@ -1,0 +1,17 @@
+{
+  "profile_count": 3,
+  "scenario_count": 11,
+  "semantic_matches": 11,
+  "shape_matches": 11,
+  "generated_markers": [
+    "ConstrainedCarrierSchemaVersion",
+    "ConstrainedCarrierGeneratedProfileID",
+    "ConstrainedCarrierBackendVersion",
+    "ConstrainedCarrierQueryShapeClasses",
+    "ConstrainedCarrierResponseShapeClasses",
+    "ConstrainedCarrierMisuseControls"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

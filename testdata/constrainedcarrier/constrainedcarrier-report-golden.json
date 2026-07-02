@@ -1,0 +1,1288 @@
+{
+  "version": "constrainedcarrier-v1",
+  "fixture_id": "constrained_carrier_lab_prototype_v1",
+  "backend_version": "0.45.0-lab",
+  "carrier_family": "constrained_local_lab_carrier",
+  "report": {
+    "version": "constrainedcarrier-v1",
+    "fixture_id": "constrained_carrier_lab_prototype_v1",
+    "generated_at": "2026-07-02T00:45:00Z",
+    "generated_at_unix": 1782953100,
+    "backend_version": "0.45.0-lab",
+    "carrier_family": "constrained_local_lab_carrier",
+    "config": {
+      "config_id": "constrainedcarrier-default",
+      "carrier_family": "constrained_local_lab_carrier",
+      "max_sessions": 3,
+      "max_streams": 8,
+      "max_query_markers": 48,
+      "max_response_markers": 48,
+      "max_retries": 3,
+      "max_retained_events": 96,
+      "max_queue_depth": 16,
+      "trace_enabled": true,
+      "allow_public_resolver": false,
+      "allow_real_dns_query_default": false,
+      "allow_resolver_ip_persistence": false,
+      "allow_exact_query_persistence": false,
+      "allow_domain_dependency": false,
+      "allow_wildcard_resolver": false,
+      "allow_public_network": false,
+      "allow_arbitrary_egress": false,
+      "allow_payload_forwarding": false,
+      "allow_payload_logging": false,
+      "allow_packet_capture": false,
+      "allow_measurement_upload": false,
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    "harness": {
+      "harness_id": "local_deterministic_resolver_harness",
+      "local_only": true,
+      "deterministic_fixture_scope": true,
+      "loopback_only": true,
+      "public_resolver_behavior": false,
+      "real_dns_query_default": false,
+      "resolver_ip_persisted": false,
+      "exact_query_persisted": false,
+      "domain_dependent": false,
+      "resolver_class_buckets": [
+        "loopback_resolver_bucket",
+        "fixture_resolver_bucket",
+        "in_memory_resolver_bucket"
+      ],
+      "clean_shutdown": true,
+      "resource_limits_enforced": true,
+      "conclusion": "passed"
+    },
+    "query_shapes": [
+      {
+        "id": "query_01",
+        "direction": "query",
+        "shape_class": "small_query_marker",
+        "marker_class": "small_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_tiny_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:d89dcae8ffb87cca9562d0d7c07fcdd4aa5fdf3b83080ab595038ae11480bd0a"
+      },
+      {
+        "id": "query_02",
+        "direction": "query",
+        "shape_class": "chunked_query_marker",
+        "marker_class": "chunked_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_small_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_small_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:988dc55a5ab16ccd00c13217c30b09c95bac736c542e7a371812678408abaa68"
+      },
+      {
+        "id": "query_03",
+        "direction": "query",
+        "shape_class": "repeated_query_marker",
+        "marker_class": "repeated_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_split_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_split_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:bf87143859bb1c458077d35b64d43c4b093e65070ff83e765e086a364ff7c236"
+      },
+      {
+        "id": "query_04",
+        "direction": "query",
+        "shape_class": "delayed_query_marker",
+        "marker_class": "delayed_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_retry_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_retry_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:07f71683015484560257a2ab78cd30b051ac417533ffc73992677a76cd41fc87"
+      },
+      {
+        "id": "query_05",
+        "direction": "query",
+        "shape_class": "truncated_query_marker",
+        "marker_class": "truncated_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_tiny_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:7af1f45cede40376df467e71df3d918e81f58c0f36df5f3f37d6f19cfda3fa56"
+      },
+      {
+        "id": "query_06",
+        "direction": "query",
+        "shape_class": "retry_query_marker",
+        "marker_class": "retry_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_small_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_small_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:aa20c695d28a621ac2f192da5c14da898abba1aace96a7a20ee3f18c7fba4eb3"
+      },
+      {
+        "id": "query_07",
+        "direction": "query",
+        "shape_class": "failure_query_marker",
+        "marker_class": "failure_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_split_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_split_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:778ce6b427ea1336b61aa15a4db852c76f3cccad50a1f2a56e7e91bfa7cceca9"
+      },
+      {
+        "id": "query_08",
+        "direction": "query",
+        "shape_class": "reset_query_marker",
+        "marker_class": "reset_query_marker_safe_bucket",
+        "capacity_bucket": "capacity_retry_bucket",
+        "scenario_classes": [
+          "query_carrier_shape",
+          "capacity_retry_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:2d2ba83e626fc537b03f7100297420dbd0d593b9ee4346f0042a31557332035a"
+      }
+    ],
+    "response_shapes": [
+      {
+        "id": "response_01",
+        "direction": "response",
+        "shape_class": "small_response_marker",
+        "marker_class": "small_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_tiny_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:5e5ea1d531c50f8f7059fc2963356d3e221280f4e30cf20a1cd27125e637d963"
+      },
+      {
+        "id": "response_02",
+        "direction": "response",
+        "shape_class": "truncated_response_marker",
+        "marker_class": "truncated_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_small_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_small_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:04672d1e95608a428d881bac424c85d2c7cf36f2cd23dc489000a5cec3e7d955"
+      },
+      {
+        "id": "response_03",
+        "direction": "response",
+        "shape_class": "delayed_response_marker",
+        "marker_class": "delayed_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_split_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_split_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:3c89a91a9032f6ca90ab7f739234f775d6a1dccd51fc5dc46359a123fdbb5e8a"
+      },
+      {
+        "id": "response_04",
+        "direction": "response",
+        "shape_class": "failure_response_marker",
+        "marker_class": "failure_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_retry_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_retry_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:3835c6521d3fa2a226046c9553950604b4356416c5636867b06f42031de21127"
+      },
+      {
+        "id": "response_05",
+        "direction": "response",
+        "shape_class": "retry_response_marker",
+        "marker_class": "retry_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_tiny_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:ec9a6a590b5d8c8d50e02e2e01a9626f783f5c1098ed88acdb51aa3246123f35"
+      },
+      {
+        "id": "response_06",
+        "direction": "response",
+        "shape_class": "poison_failure_response_marker",
+        "marker_class": "poison_failure_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_small_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_small_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:3d754b97e2e003c54d53a20dfc0cae8c54a388643720480de4ad070d02cfa288"
+      },
+      {
+        "id": "response_07",
+        "direction": "response",
+        "shape_class": "reset_response_marker",
+        "marker_class": "reset_response_marker_safe_bucket",
+        "capacity_bucket": "capacity_split_bucket",
+        "scenario_classes": [
+          "response_carrier_shape",
+          "capacity_split_bucket"
+        ],
+        "profile_sensitive": true,
+        "payload_free": true,
+        "control": false,
+        "hash": "sha256:5afa36377ec66dfb298b70a2007a1701e3496112f2fccfcbe2ea33e2a411ac07"
+      }
+    ],
+    "control_shapes": [
+      {
+        "id": "control_exact_query_leak",
+        "direction": "control",
+        "shape_class": "control_exact_query_leak",
+        "marker_class": "control_exact_query_leak_safe_bucket",
+        "capacity_bucket": "control_leak_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_leak_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:97fc6c69d521c517f1c64edc1ef3e8a7c6a7ccdd8d8120dc3a0c5ad0a5396c62"
+      },
+      {
+        "id": "control_domain_leak",
+        "direction": "control",
+        "shape_class": "control_domain_leak",
+        "marker_class": "control_domain_leak_safe_bucket",
+        "capacity_bucket": "control_leak_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_leak_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:331e1f790852407b21c6c564bffc31d50ff6287228dc1e01fbcd88a596c4995a"
+      },
+      {
+        "id": "control_resolver_leak",
+        "direction": "control",
+        "shape_class": "control_resolver_leak",
+        "marker_class": "control_resolver_leak_safe_bucket",
+        "capacity_bucket": "control_leak_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_leak_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:bf84e413080aaa374fc4a19f478658069794b67f08e89960d178d80685cddf24"
+      },
+      {
+        "id": "control_payload_leak",
+        "direction": "control",
+        "shape_class": "control_payload_leak",
+        "marker_class": "control_payload_leak_safe_bucket",
+        "capacity_bucket": "control_leak_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_leak_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:52b81aa7c81c9f38bdfecccec229956ab706493f431469aa62a7d3d6884b9876"
+      },
+      {
+        "id": "control_public_resolver",
+        "direction": "control",
+        "shape_class": "control_public_resolver",
+        "marker_class": "control_public_resolver_safe_bucket",
+        "capacity_bucket": "control_resolver_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_resolver_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:b67ee2ef7c05e341edd7aecf4df51a9a20d1b61c4025b3d640f160a67b6335e4"
+      },
+      {
+        "id": "control_measurementreview_bypass",
+        "direction": "control",
+        "shape_class": "control_measurementreview_bypass",
+        "marker_class": "control_measurementreview_bypass_safe_bucket",
+        "capacity_bucket": "control_review_bucket",
+        "scenario_classes": [
+          "control_carrier_shape",
+          "control_review_bucket"
+        ],
+        "profile_sensitive": false,
+        "payload_free": true,
+        "control": true,
+        "hash": "sha256:3ae8e290f87e45b46c5096243df8477cd7192e3a297e1e763e064dfb48fb011f"
+      }
+    ],
+    "events": [
+      {
+        "scenario": "constrained_harness_success",
+        "stream_id": 1,
+        "sequence": 1,
+        "query_shape": "small_query_marker",
+        "response_shape": "small_response_marker",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_none_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:56d38c8cacd13ce69126cf71984aed472aa4e7210055ed5686b3714e997e4b56"
+      },
+      {
+        "scenario": "constrained_query_shape_selection",
+        "stream_id": 2,
+        "sequence": 2,
+        "query_shape": "chunked_query_marker",
+        "response_shape": "delayed_response_marker",
+        "capacity_bucket": "capacity_small_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_once_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:b4503ec52d82dadd268be7838a52c94709cb30c4c740fbbe21941f2b9d54811c"
+      },
+      {
+        "scenario": "constrained_response_shape_selection",
+        "stream_id": 3,
+        "sequence": 3,
+        "query_shape": "repeated_query_marker",
+        "response_shape": "retry_response_marker",
+        "capacity_bucket": "capacity_split_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_bounded_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:f7c71c56139bbe6b4c71be8c19973022e6a2785891d129d7b6b0762cb5e1d937"
+      },
+      {
+        "scenario": "constrained_truncation",
+        "stream_id": 4,
+        "sequence": 4,
+        "query_shape": "delayed_query_marker",
+        "response_shape": "reset_response_marker",
+        "capacity_bucket": "capacity_retry_bucket",
+        "truncated": true,
+        "retry_bucket": "retry_none_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": true,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:97fe3afc34824800262423422e7233d817461e4a9beab68a54c7ce8ea73ecc7c"
+      },
+      {
+        "scenario": "constrained_retry",
+        "stream_id": 1,
+        "sequence": 5,
+        "query_shape": "truncated_query_marker",
+        "response_shape": "truncated_response_marker",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_once_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": true,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:834f11e9682e19ea9632bfc9edaa63aab88dbd3979eb7e2cb46878f1e70cf5c9"
+      },
+      {
+        "scenario": "constrained_timeout_failure",
+        "stream_id": 2,
+        "sequence": 6,
+        "query_shape": "retry_query_marker",
+        "response_shape": "failure_response_marker",
+        "capacity_bucket": "capacity_small_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_bounded_bucket",
+        "failure_bucket": "failure_reset_bucket",
+        "pathhealth_bucket": "degraded_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:ce5a088888682a30846888ad5afcfb9a2c532ac84109b54a625255d45c09e560"
+      },
+      {
+        "scenario": "constrained_poison_failure",
+        "stream_id": 3,
+        "sequence": 7,
+        "query_shape": "failure_query_marker",
+        "response_shape": "poison_failure_response_marker",
+        "capacity_bucket": "capacity_split_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_none_bucket",
+        "failure_bucket": "failure_timeout_bucket",
+        "pathhealth_bucket": "degraded_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:69617887c321ea9aa05ef40d7c9eed7765f1ed8c7b2a8534fae6dcc041a75e00"
+      },
+      {
+        "scenario": "constrained_multi_stream",
+        "stream_id": 4,
+        "sequence": 8,
+        "query_shape": "reset_query_marker",
+        "response_shape": "small_response_marker",
+        "capacity_bucket": "capacity_retry_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_once_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:c64a120f5eb99863b3d41c3efee1faac11bda002e4df18de7a90da87c5ba84b8"
+      },
+      {
+        "scenario": "constrained_backpressure",
+        "stream_id": 1,
+        "sequence": 9,
+        "query_shape": "small_query_marker",
+        "response_shape": "delayed_response_marker",
+        "capacity_bucket": "capacity_tiny_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_bounded_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": true,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:6c4d2bf424a6491e57bc2d5992005e53e07453d2a9721661401e4552387d81c3"
+      },
+      {
+        "scenario": "constrained_reset_error",
+        "stream_id": 2,
+        "sequence": 10,
+        "query_shape": "chunked_query_marker",
+        "response_shape": "retry_response_marker",
+        "capacity_bucket": "capacity_small_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_none_bucket",
+        "failure_bucket": "failure_reset_bucket",
+        "pathhealth_bucket": "reset_bucket",
+        "backpressure": false,
+        "reset": true,
+        "closed": false,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:fd998d0954fc0ecba376fb040a5322eab02a0fa1e467b05c70c1296ab6cd48de"
+      },
+      {
+        "scenario": "constrained_profile_sensitive_selection",
+        "stream_id": 3,
+        "sequence": 11,
+        "query_shape": "repeated_query_marker",
+        "response_shape": "reset_response_marker",
+        "capacity_bucket": "capacity_split_bucket",
+        "truncated": false,
+        "retry_bucket": "retry_once_bucket",
+        "failure_bucket": "none",
+        "pathhealth_bucket": "healthy_bucket",
+        "backpressure": false,
+        "reset": false,
+        "closed": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "event_hash": "sha256:02227b5176b0b59384ed93a153dddf2b3f58878c190ff09979af0b5c3a4abc5c"
+      }
+    ],
+    "sessions": [
+      {
+        "session_id": "constrained_session_profile_a",
+        "profile_class": "profile_bucket_a",
+        "states": [
+          "configured",
+          "selected",
+          "active",
+          "closed"
+        ],
+        "streams_opened": 4,
+        "streams_closed": 4,
+        "streams_reset": 0,
+        "backpressure_events": 0,
+        "failed": false,
+        "hash": "sha256:2a2981b3da48e88c28f9ea8df792511cbeb7342757a13abe40e07b9ca17e8919"
+      },
+      {
+        "session_id": "constrained_session_profile_b",
+        "profile_class": "profile_bucket_b",
+        "states": [
+          "configured",
+          "selected",
+          "backpressured",
+          "draining",
+          "closed"
+        ],
+        "streams_opened": 4,
+        "streams_closed": 3,
+        "streams_reset": 1,
+        "backpressure_events": 3,
+        "failed": false,
+        "hash": "sha256:31058391ab025e35bc94a4f34e9c82cd360867d04cbe3262bbd1e995c323830d"
+      },
+      {
+        "session_id": "constrained_session_failure",
+        "profile_class": "profile_bucket_c",
+        "states": [
+          "configured",
+          "active",
+          "degraded",
+          "closed"
+        ],
+        "streams_opened": 2,
+        "streams_closed": 2,
+        "streams_reset": 0,
+        "backpressure_events": 1,
+        "failed": false,
+        "hash": "sha256:45ec6a48d75b8bbc365b0ec25cd308752d65694601a26d505767c5a17cbc304b"
+      }
+    ],
+    "streams": [
+      {
+        "stream_id": 1,
+        "states": [
+          "stream_open",
+          "stream_active",
+          "stream_closed"
+        ],
+        "query_shape": "small_query_marker",
+        "response_shape": "small_response_marker",
+        "closed": true,
+        "reset": false,
+        "failure_bucket": "",
+        "isolated": true,
+        "hash": "sha256:be4045df0224c8154c2794a704eef89c5cecd377b5d91799912fd4090a6ae668"
+      },
+      {
+        "stream_id": 2,
+        "states": [
+          "stream_open",
+          "stream_active",
+          "stream_closed"
+        ],
+        "query_shape": "chunked_query_marker",
+        "response_shape": "delayed_response_marker",
+        "closed": true,
+        "reset": false,
+        "failure_bucket": "",
+        "isolated": true,
+        "hash": "sha256:b8fb0e5582db4feedd3ff9f32391fbb31f5958bea8042c9c93aee75a751bb27c"
+      },
+      {
+        "stream_id": 3,
+        "states": [
+          "stream_open",
+          "stream_active",
+          "stream_closed"
+        ],
+        "query_shape": "repeated_query_marker",
+        "response_shape": "retry_response_marker",
+        "closed": true,
+        "reset": false,
+        "failure_bucket": "",
+        "isolated": true,
+        "hash": "sha256:a4544f67c2394cc35f4c8a53010bcd84be51391059b8ff1add293b2e2a20c69b"
+      },
+      {
+        "stream_id": 4,
+        "states": [
+          "stream_open",
+          "stream_active",
+          "stream_reset"
+        ],
+        "query_shape": "delayed_query_marker",
+        "response_shape": "reset_response_marker",
+        "closed": false,
+        "reset": true,
+        "failure_bucket": "failure_reset_bucket",
+        "isolated": true,
+        "hash": "sha256:3a4d3ca407481f75a95bb2d57ab64089266a88c307081761e04d5268cfc7999b"
+      }
+    ],
+    "capacity_truncation": {
+      "capacity_buckets": [
+        "capacity_tiny_bucket",
+        "capacity_small_bucket",
+        "capacity_split_bucket",
+        "capacity_retry_bucket"
+      ],
+      "marker_size_buckets": [
+        "marker_tiny_bucket",
+        "marker_split_bucket",
+        "marker_retry_bucket"
+      ],
+      "truncation_buckets": [
+        "truncation_none_bucket",
+        "truncation_soft_bucket",
+        "truncation_hard_bucket"
+      ],
+      "truncation_to_retry_mappings": [
+        "soft_to_retry_once",
+        "hard_to_bounded_retry"
+      ],
+      "oversized_markers_rejected": 2,
+      "raw_byte_counts_stored": false,
+      "raw_query_response_bytes_stored": false,
+      "conclusion": "passed"
+    },
+    "retry_failure": {
+      "retry_buckets": [
+        "retry_none_bucket",
+        "retry_once_bucket",
+        "retry_bounded_bucket"
+      ],
+      "timeout_buckets": [
+        "timeout_none_bucket",
+        "timeout_short_bucket",
+        "timeout_degraded_bucket"
+      ],
+      "failure_buckets": [
+        "failure_timeout_bucket",
+        "failure_poison_bucket",
+        "failure_reset_bucket"
+      ],
+      "poison_failure_buckets": [
+        "poison_absent_bucket",
+        "poison_suspected_bucket",
+        "poison_confirmed_bucket"
+      ],
+      "reset_buckets": [
+        "reset_none_bucket",
+        "reset_local_bucket",
+        "reset_remote_bucket"
+      ],
+      "max_retry_enforced": true,
+      "retry_storm_controls": 3,
+      "pathhealth_feedback": true,
+      "localpipeline_failure_summary": true,
+      "measurement_review_diagnostics": true,
+      "conclusion": "passed"
+    },
+    "profile_sensitivity": {
+      "profile_count": 100,
+      "query_shape_fingerprints": [
+        "sha256:3444aa316cbdc237d66143cfce91b79c9b14af085c63549f60e4e6ec54a00513",
+        "sha256:545f25c8bea89de9e69449736be6e8778f0766490961cab18e10323bed76f91a",
+        "sha256:554f905ccc2ef1fe605332fd21d73c4c7f2a324b97e4666a7d00b7d92dddaf49",
+        "sha256:75b0b0ead395cab3192c7169880145f7756f8bc6d9c4fc5b9faff6a816ecfe9f",
+        "sha256:8cf0bdd7fe0245c1cca74356a90cd5dd9ecd70d537f47a7ef6fcf98ae81c445a",
+        "sha256:8fb2f3a80b9c307d04cf8bd8a3bd233ccb782d8b3fefa2270ffc846f26015d5c",
+        "sha256:a3cd139914dcf221e08cd4952fa1896662b99caeceab2c292a7be357fa7be299",
+        "sha256:a552270ed11ca468ed7598ceff73a30014614f3443db5a6f24027514d359da6f",
+        "sha256:b6b6e3934517af3ec25600059d1017d4da75e22beb32ddfa5ccc9856761a5c3c",
+        "sha256:d37d70b79a77307263afd7a44863ced3006473aed8282c3f05a618e5c330d45f",
+        "sha256:e0af953e4b8447d8639e87413f2ee286d8ac689c9d33b2395474b6a8719e67e4",
+        "sha256:ea28a0c15720f848384b888dbe10c64106033887382cf274cf5a84bd46443a06"
+      ],
+      "response_shape_fingerprints": [
+        "response_fp_a",
+        "response_fp_b",
+        "response_fp_c",
+        "response_fp_d",
+        "response_fp_e",
+        "response_fp_f"
+      ],
+      "diversity_score": 0.88,
+      "fixed_shape_controls": 2,
+      "padding_only_controls": 2,
+      "generated_profile_controls": 2,
+      "conclusion": "passed"
+    },
+    "backpressure": {
+      "capacity_pressure_buckets": [
+        "capacity_pressure_none",
+        "capacity_pressure_soft",
+        "capacity_pressure_hard"
+      ],
+      "truncation_pressure_buckets": [
+        "truncation_pressure_none",
+        "truncation_pressure_retry"
+      ],
+      "retry_pressure_buckets": [
+        "retry_pressure_none",
+        "retry_pressure_bounded"
+      ],
+      "localpipeline_summary": true,
+      "bounded_queues": true,
+      "ignored_pressure_controls": 2,
+      "backpressure_events": 4,
+      "conclusion": "passed"
+    },
+    "reset_error": {
+      "reset_buckets": [
+        "reset_none_bucket",
+        "reset_stream_bucket",
+        "reset_session_safe_bucket"
+      ],
+      "timeout_buckets": [
+        "timeout_short_bucket",
+        "timeout_degraded_bucket"
+      ],
+      "poison_failure_buckets": [
+        "poison_suspected_bucket",
+        "poison_confirmed_bucket"
+      ],
+      "safe_error_classes": [
+        "error_timeout_class",
+        "error_poison_class",
+        "error_reset_class"
+      ],
+      "cross_stream_reset_controls": 2,
+      "stale_retry_controls": 2,
+      "resets_observed": 1,
+      "errors_observed": 2,
+      "conclusion": "passed"
+    },
+    "integrations": [
+      {
+        "layer": "loopbackrelay",
+        "composed": true,
+        "evidence": "loopbackrelay_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "labegress",
+        "composed": true,
+        "evidence": "labegress_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "relaybridge",
+        "composed": true,
+        "evidence": "relaybridge_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "proxyegress",
+        "composed": true,
+        "evidence": "proxyegress_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "localpipeline",
+        "composed": true,
+        "evidence": "localpipeline_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "pathrace",
+        "composed": true,
+        "evidence": "pathrace_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "pathhealth",
+        "composed": true,
+        "evidence": "pathhealth_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "carrierreview",
+        "composed": true,
+        "evidence": "carrierreview_safe_metadata_mapping",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "measurementreview",
+        "composed": true,
+        "evidence": "measurementreview_safe_metadata_mapping",
+        "conclusion": "passed"
+      }
+    ],
+    "diagnostics": {
+      "local_only_diagnostics": true,
+      "aggregate_only": true,
+      "upload_allowed": false,
+      "exact_query_stored": false,
+      "resolver_ip_stored": false,
+      "exact_port_stored": false,
+      "account_device_location_data": false,
+      "safe_fields": [
+        "scenario_bucket",
+        "query_shape_bucket",
+        "response_shape_bucket",
+        "truncation_bucket",
+        "retry_bucket",
+        "failure_bucket",
+        "pathhealth_bucket",
+        "backpressure_count_bucket"
+      ],
+      "conclusion": "passed"
+    },
+    "resource_limits": {
+      "max_sessions": 3,
+      "max_streams": 8,
+      "max_query_markers": 48,
+      "max_response_markers": 48,
+      "max_retries": 3,
+      "max_retained_events": 96,
+      "max_queue_depth": 16,
+      "deterministic_shutdown": true,
+      "panic_safety_checked": true,
+      "oversized_marker_rejected": true
+    },
+    "scopes_blocked": [
+      "public_resolver_use",
+      "real_dns_query_default",
+      "public_resolver_dialing",
+      "dns_tunneling",
+      "exact_query_logging",
+      "resolver_ip_logging",
+      "wildcard_resolver_configuration",
+      "domain_dependence",
+      "public_network_egress",
+      "arbitrary_target_proxying",
+      "payload_forwarding_to_real_targets",
+      "packet_capture",
+      "payload_logging",
+      "measurement_upload",
+      "android_behavior",
+      "production_deployment"
+    ],
+    "shape_diversity_fingerprints": [
+      "sha256:3444aa316cbdc237d66143cfce91b79c9b14af085c63549f60e4e6ec54a00513",
+      "sha256:545f25c8bea89de9e69449736be6e8778f0766490961cab18e10323bed76f91a",
+      "sha256:554f905ccc2ef1fe605332fd21d73c4c7f2a324b97e4666a7d00b7d92dddaf49",
+      "sha256:75b0b0ead395cab3192c7169880145f7756f8bc6d9c4fc5b9faff6a816ecfe9f",
+      "sha256:8cf0bdd7fe0245c1cca74356a90cd5dd9ecd70d537f47a7ef6fcf98ae81c445a",
+      "sha256:8fb2f3a80b9c307d04cf8bd8a3bd233ccb782d8b3fefa2270ffc846f26015d5c",
+      "sha256:a3cd139914dcf221e08cd4952fa1896662b99caeceab2c292a7be357fa7be299",
+      "sha256:a552270ed11ca468ed7598ceff73a30014614f3443db5a6f24027514d359da6f",
+      "sha256:b6b6e3934517af3ec25600059d1017d4da75e22beb32ddfa5ccc9856761a5c3c",
+      "sha256:d37d70b79a77307263afd7a44863ced3006473aed8282c3f05a618e5c330d45f",
+      "sha256:e0af953e4b8447d8639e87413f2ee286d8ac689c9d33b2395474b6a8719e67e4",
+      "sha256:ea28a0c15720f848384b888dbe10c64106033887382cf274cf5a84bd46443a06"
+    ],
+    "query_events": 11,
+    "response_events": 11,
+    "streams_opened": 4,
+    "streams_closed": 3,
+    "stream_resets": 1,
+    "backpressure_events": 4,
+    "target_errors": 2,
+    "pathhealth_enforced": true,
+    "measurement_review_enforced": true,
+    "carrier_review_enforced": true,
+    "localpipeline_enforced": true,
+    "public_resolver_blocked": true,
+    "real_dns_query_blocked": true,
+    "misuse": {
+      "findings": [
+        {
+          "name": "constrainedcarrier_public_resolver_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_real_dns_query_default",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_exact_query_logged",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_resolver_ip_logged",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_domain_dependency_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_wildcard_resolver_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_public_network_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_arbitrary_egress_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_payload_forwarding_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_payload_logging_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_packet_capture_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_measurement_upload_allowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_fixed_query_shape",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_padding_only_variation",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_profile_insensitive",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_retry_storm",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_truncation_misclassified",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_poison_failure_misclassified",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_backpressure_ignored",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_reset_swallowed",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_cross_stream_leak",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_pathhealth_bypass",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_measurementreview_bypass",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_generated_backend_drift",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_payload_leak",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        },
+        {
+          "name": "constrainedcarrier_secret_leak",
+          "detected": true,
+          "severity": "required",
+          "evidence": "blocked by constrained carrier prototype gate"
+        }
+      ],
+      "detected_count": 26,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "parity": {
+      "profile_count": 3,
+      "scenario_count": 11,
+      "semantic_matches": 11,
+      "shape_matches": 11,
+      "generated_markers": [
+        "ConstrainedCarrierSchemaVersion",
+        "ConstrainedCarrierGeneratedProfileID",
+        "ConstrainedCarrierBackendVersion",
+        "ConstrainedCarrierQueryShapeClasses",
+        "ConstrainedCarrierResponseShapeClasses",
+        "ConstrainedCarrierMisuseControls"
+      ],
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "payload_logged": false,
+    "secret_logged": false,
+    "recommended_next_milestone": "M46: multi-carrier runtime selection",
+    "report_hash": "sha256:2916edc37521d41c44d76219413ef7c4f2aa8c3eef2ade91cadb8862b0908b21",
+    "conclusion": "passed"
+  },
+  "scenarios": [
+    {
+      "name": "local_harness_success",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:aa0ea9e355f8dd6fdcc8d0f8a4509b540c90ad20a9ece326da796b13c4ca5cb3",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "query_shape_success",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:08b406c583b92034432ba951e64ab17a27e87efeac6ae177d797d8046cdb4b53",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "response_shape_success",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:62e59e0fcdf96e9c6f08f889122c9ec62951875061ef19643686f1731625b8ab",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "truncation_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:42cab0b2f71fcaee6841149519cdc8221f8944b05adc394ec3057a1ce6545580",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "retry_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:5397811bc86237d17b1d2197867aca4daad748c1121881fabfa1ae4a93fd6d9e",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "timeout_failure_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:d6641dc954a618353f00f4a52bbaf32ac8834a5002bc006c59ff3d41c5374108",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "poisoning_failure_class_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:6f4c7ce5e23e36e45ceb3ff43fe06614b1e03cecce1cf46d8e209981b18a2a72",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "multi_stream_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:7485ed6327d18eae89e7c9fbc4b786086ecfcfbb0b6d37803875a533215cd740",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "backpressure_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:9169c2e12263abc3f30e6eef33126da1b543c0b27233be23feb91ecf124b5282",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "reset_error_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:55de53a0f4bb4bbdaa21f4d1d03d0597a3b1d2128ec9f9a5416589044f37e30e",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "profile_sensitive_selection_case",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:f3224ca353e231985bc99f244a05d90cf6309951e440731b39434873d253dd6d",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "fixed_shape_collapse_control",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:07a8c3721c7ddb90de52fc5419af6ce0277fd1eb27c8181b2d1c26cf9fb29661",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "exact_query_leak_control",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:7cdc75990bd02406babb5a152101f8cb5e879051cc987cccec80e849ce6777fc",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "resolver_leak_control",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:c55080d1feb2d90b809339516dee8f665ab8a4708e68b91350003d431d411eb5",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "public_resolver_control",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:f36f93ceb97495c634c997c96c111295f66698e58544f8231e5eb322c0670d7a",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "measurementreview_bypass_control",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:7b09ff98ef03112983632a05dc69b570a1a505f6185a784de8d08e4f0cb1ebfe",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "generated_parity_summary",
+      "kind": "constrainedcarrier",
+      "expected": "passed",
+      "summary_hash": "sha256:c9d7e31078543dd773bee94ed3f6a5e072ed7ab78b33ace6c8e6e34b313d7cec",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "fixture_hash": "sha256:bda0ea1403c92341cf3d276725c45d2e3e2faf8e7630a836ee5bcbec09903765",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

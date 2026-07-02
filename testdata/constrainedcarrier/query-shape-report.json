@@ -1,0 +1,122 @@
+[
+  {
+    "id": "query_01",
+    "direction": "query",
+    "shape_class": "small_query_marker",
+    "marker_class": "small_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_tiny_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_tiny_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:d89dcae8ffb87cca9562d0d7c07fcdd4aa5fdf3b83080ab595038ae11480bd0a"
+  },
+  {
+    "id": "query_02",
+    "direction": "query",
+    "shape_class": "chunked_query_marker",
+    "marker_class": "chunked_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_small_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_small_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:988dc55a5ab16ccd00c13217c30b09c95bac736c542e7a371812678408abaa68"
+  },
+  {
+    "id": "query_03",
+    "direction": "query",
+    "shape_class": "repeated_query_marker",
+    "marker_class": "repeated_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_split_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_split_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:bf87143859bb1c458077d35b64d43c4b093e65070ff83e765e086a364ff7c236"
+  },
+  {
+    "id": "query_04",
+    "direction": "query",
+    "shape_class": "delayed_query_marker",
+    "marker_class": "delayed_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_retry_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_retry_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:07f71683015484560257a2ab78cd30b051ac417533ffc73992677a76cd41fc87"
+  },
+  {
+    "id": "query_05",
+    "direction": "query",
+    "shape_class": "truncated_query_marker",
+    "marker_class": "truncated_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_tiny_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_tiny_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:7af1f45cede40376df467e71df3d918e81f58c0f36df5f3f37d6f19cfda3fa56"
+  },
+  {
+    "id": "query_06",
+    "direction": "query",
+    "shape_class": "retry_query_marker",
+    "marker_class": "retry_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_small_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_small_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:aa20c695d28a621ac2f192da5c14da898abba1aace96a7a20ee3f18c7fba4eb3"
+  },
+  {
+    "id": "query_07",
+    "direction": "query",
+    "shape_class": "failure_query_marker",
+    "marker_class": "failure_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_split_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_split_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:778ce6b427ea1336b61aa15a4db852c76f3cccad50a1f2a56e7e91bfa7cceca9"
+  },
+  {
+    "id": "query_08",
+    "direction": "query",
+    "shape_class": "reset_query_marker",
+    "marker_class": "reset_query_marker_safe_bucket",
+    "capacity_bucket": "capacity_retry_bucket",
+    "scenario_classes": [
+      "query_carrier_shape",
+      "capacity_retry_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:2d2ba83e626fc537b03f7100297420dbd0d593b9ee4346f0042a31557332035a"
+  }
+]

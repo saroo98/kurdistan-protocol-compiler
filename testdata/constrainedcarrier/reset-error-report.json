@@ -1,0 +1,25 @@
+{
+  "reset_buckets": [
+    "reset_none_bucket",
+    "reset_stream_bucket",
+    "reset_session_safe_bucket"
+  ],
+  "timeout_buckets": [
+    "timeout_short_bucket",
+    "timeout_degraded_bucket"
+  ],
+  "poison_failure_buckets": [
+    "poison_suspected_bucket",
+    "poison_confirmed_bucket"
+  ],
+  "safe_error_classes": [
+    "error_timeout_class",
+    "error_poison_class",
+    "error_reset_class"
+  ],
+  "cross_stream_reset_controls": 2,
+  "stale_retry_controls": 2,
+  "resets_observed": 1,
+  "errors_observed": 2,
+  "conclusion": "passed"
+}
