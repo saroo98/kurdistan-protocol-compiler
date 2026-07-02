@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/constrainedcarrier"
 	"kurdistan/internal/constrainedcarrierreview"
 	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
@@ -1983,6 +1984,49 @@ func GeneratedConstrainedCarrierReviewParity() (constrainedcarrierreview.ParityR
 	return set.Report.Parity, nil
 }
 `, quote(constrainedcarrierreview.Version), quote(p.ID), p.Seed, quote(constrainedcarrierreview.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(constrainedcarrierreview.RecommendedNextMilestone), len(constrainedCarrierReviewQueryShapeClasses()), len(constrainedCarrierReviewResponseShapeClasses()), len(constrainedCarrierReviewResolverBuckets()), len(constrainedCarrierReviewM45Requirements()), quoteSlice(constrainedCarrierReviewBlockedBehaviors()), quoteSlice(constrainedCarrierReviewResolverBuckets()), quoteSlice(constrainedCarrierReviewQueryShapeClasses()), quoteSlice(constrainedCarrierReviewResponseShapeClasses()), quoteSlice(constrainedCarrierReviewM45Requirements()), quoteSlice(constrainedcarrierreview.RequiredMisuseNames()))
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/constrainedcarrier"
+)
+
+const ConstrainedCarrierSchemaVersion = %[1]s
+const ConstrainedCarrierGeneratedProfileID = %[2]s
+const ConstrainedCarrierGeneratedProfileSeed int64 = %[3]d
+const ConstrainedCarrierBackendVersion = %[4]s
+const ConstrainedCarrierRuntimePolicy = %[5]s
+const ConstrainedCarrierFamily = %[6]s
+const ConstrainedCarrierRecommendedNextMilestone = %[7]s
+const ConstrainedCarrierQueryShapeCount = %[8]d
+const ConstrainedCarrierResponseShapeCount = %[9]d
+const ConstrainedCarrierCapacityBucketCount = %[10]d
+const ConstrainedCarrierRetryBucketCount = %[11]d
+const ConstrainedCarrierFailureBucketCount = %[12]d
+
+var ConstrainedCarrierQueryShapeClasses = %[13]s
+var ConstrainedCarrierResponseShapeClasses = %[14]s
+var ConstrainedCarrierCapacityBuckets = %[15]s
+var ConstrainedCarrierRetryBuckets = %[16]s
+var ConstrainedCarrierFailureBuckets = %[17]s
+var ConstrainedCarrierBlockedScopes = %[18]s
+var ConstrainedCarrierMisuseControls = %[19]s
+
+func GeneratedConstrainedCarrierFixtureSet() (constrainedcarrier.FixtureSet, error) {
+	return constrainedcarrier.GenerateFixtureSet()
+}
+
+func GeneratedConstrainedCarrierParity() (constrainedcarrier.ParityReport, error) {
+	set, err := constrainedcarrier.GenerateFixtureSet()
+	if err != nil {
+		return constrainedcarrier.ParityReport{}, err
+	}
+	return set.Report.Parity, nil
+}
+`, quote(constrainedcarrier.Version), quote(p.ID), p.Seed, quote(constrainedcarrier.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(constrainedcarrier.CarrierFamily), quote(constrainedcarrier.RecommendedNextMilestone), len(constrainedcarrier.QueryShapeClasses()), len(constrainedcarrier.ResponseShapeClasses()), len(constrainedcarrier.CapacityBuckets()), len(constrainedcarrier.RetryBuckets()), len(constrainedcarrier.FailureBuckets()), quoteSlice(constrainedcarrier.QueryShapeClasses()), quoteSlice(constrainedcarrier.ResponseShapeClasses()), quoteSlice(constrainedcarrier.CapacityBuckets()), quoteSlice(constrainedcarrier.RetryBuckets()), quoteSlice(constrainedcarrier.FailureBuckets()), quoteSlice(constrainedcarrier.BlockedScopes()), quoteSlice(constrainedcarrier.RequiredMisuseNames()))
 	if err != nil {
 		return nil, err
 	}
@@ -5506,6 +5550,89 @@ func TestGeneratedConstrainedCarrierReviewHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	constrainedCarrierTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/constrainedcarrier"
+)
+
+func TestGeneratedConstrainedCarrier(t *testing.T) {
+	if ConstrainedCarrierSchemaVersion != constrainedcarrier.Version || ConstrainedCarrierGeneratedProfileID != ProfileID {
+		t.Fatalf("generated constrained carrier constants drifted")
+	}
+	set, err := GeneratedConstrainedCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || set.BackendVersion != constrainedcarrier.BackendVersion {
+		t.Fatalf("generated constrained carrier fixture failed: %%+v", set)
+	}
+	if ConstrainedCarrierQueryShapeCount < 8 || ConstrainedCarrierResponseShapeCount < 7 || ConstrainedCarrierCapacityBucketCount < 3 {
+		t.Fatalf("generated constrained carrier taxonomy constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedConstrainedCarrierParity(t *testing.T) {
+	parity, err := GeneratedConstrainedCarrierParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated constrained carrier parity failed: %%+v", parity)
+	}
+	if ConstrainedCarrierRuntimePolicy == "" || ConstrainedCarrierRecommendedNextMilestone == "" || len(ConstrainedCarrierMisuseControls) < 20 {
+		t.Fatalf("constrained carrier generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/constrainedcarrier"
+)
+
+func TestGeneratedConstrainedCarrierHygiene(t *testing.T) {
+	set, err := GeneratedConstrainedCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := constrainedcarrier.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_secret": "synthetic"},
+		map[string]string{"resolver_address_value": "synthetic"},
+		map[string]string{"exact_query_value": "synthetic"},
+		map[string]bool{"allow_public_resolver": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := constrainedcarrier.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe constrained carrier metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5859,6 +5986,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpslikecarrier_generated.go", Content: httpsLikeCarrierSource, Go: true},
 		{RelPath: "protocol/httpscarrieradversary_generated.go", Content: httpsCarrierAdversarySource, Go: true},
 		{RelPath: "protocol/constrainedcarrierreview_generated.go", Content: constrainedCarrierReviewSource, Go: true},
+		{RelPath: "protocol/constrainedcarrier_generated.go", Content: constrainedCarrierSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5963,6 +6091,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/constrainedcarrierreview_test.go", Content: constrainedCarrierReviewTestSource, Go: true},
 		{RelPath: "protocol/constrainedcarrierreview_parity_test.go", Content: constrainedCarrierReviewParityTestSource, Go: true},
 		{RelPath: "protocol/constrainedcarrierreview_hygiene_test.go", Content: constrainedCarrierReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrier_test.go", Content: constrainedCarrierTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrier_parity_test.go", Content: constrainedCarrierParityTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrier_hygiene_test.go", Content: constrainedCarrierHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
