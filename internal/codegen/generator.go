@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/androidreview"
 	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
@@ -2412,6 +2413,45 @@ func GeneratedOperationalHardeningParity() (operationalhardening.ParityReport, e
 		return nil, err
 	}
 
+	androidReviewSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/androidreview"
+)
+
+const AndroidReviewSchemaVersion = %[1]s
+const AndroidReviewGeneratedProfileID = %[2]s
+const AndroidReviewGeneratedProfileSeed int64 = %[3]d
+const AndroidReviewBackendVersion = %[4]s
+const AndroidReviewDecision = %[5]s
+const AndroidReviewRuntimePolicy = %[6]s
+const AndroidReviewPermissionPolicy = %[7]s
+const AndroidReviewDiagnosticsPolicy = %[8]s
+const AndroidReviewKillSwitchPolicy = %[9]s
+const AndroidReviewNextMilestone = %[10]s
+const AndroidReviewUIStateCount = %[11]d
+const AndroidReviewMisuseCount = %[12]d
+
+var AndroidReviewUIStates = %[13]s
+var AndroidReviewControls = %[14]s
+var AndroidReviewGeneratedPolicyHints = %[15]s
+
+func GeneratedAndroidReviewFixtureSet() (androidreview.FixtureSet, error) {
+	return androidreview.GenerateFixtureSet()
+}
+
+func GeneratedAndroidReviewParity() (androidreview.ParityReport, error) {
+	set, err := androidreview.GenerateFixtureSet()
+	if err != nil {
+		return androidreview.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(androidreview.Version), quote(p.ID), p.Seed, quote(androidreview.BackendVersion), quote(androidreview.DecisionReady), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.ReplayPolicy), quote("platform_permission_first_foreground_service_bounded"), quote("local_user_export_only_redacted_diagnostic_bundle"), quote("fail_closed_on_profile_permission_runtime_or_carrier_invalid"), quote(androidreview.RecommendedNextMilestone), len(androidreview.DefaultUIStateReport().States), len(androidreview.RequiredMisuseNames()), quoteSlice(androidreview.DefaultUIStateReport().States), quoteSlice(androidreview.RequiredMisuseNames()), quoteSlice([]string{p.AdapterPolicy.RuntimeMappingPolicy, p.CarrierPolicy.CarrierFamily, p.Security.ReplayPolicy, p.Security.ProfileCompatibilityPolicy, p.Security.CapabilityNegotiationPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -3051,6 +3091,89 @@ func TestGeneratedOperationalHardeningHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := operationalhardening.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe operational hardening metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidReviewTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidreview"
+)
+
+func TestGeneratedAndroidReview(t *testing.T) {
+	if AndroidReviewSchemaVersion != androidreview.Version || AndroidReviewGeneratedProfileID != ProfileID {
+		t.Fatalf("generated Android review constants drifted")
+	}
+	set, err := GeneratedAndroidReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidreview.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if AndroidReviewUIStateCount < 14 || AndroidReviewMisuseCount < len(androidreview.RequiredMisuseNames()) || len(AndroidReviewUIStates) < 14 {
+		t.Fatalf("generated Android review constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidReviewParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedAndroidReviewParity(t *testing.T) {
+	parity, err := GeneratedAndroidReviewParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated Android review parity failed: %%+v", parity)
+	}
+	if AndroidReviewRuntimePolicy == "" || AndroidReviewPermissionPolicy == "" || AndroidReviewDiagnosticsPolicy == "" || AndroidReviewNextMilestone == "" {
+		t.Fatalf("Android review generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidReviewHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidreview"
+)
+
+func TestGeneratedAndroidReviewHygiene(t *testing.T) {
+	set, err := GeneratedAndroidReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidreview.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"visited_domain": "synthetic"},
+		map[string]string{"dns_query": "synthetic"},
+		map[string]string{"phone_identifier": "synthetic"},
+		map[string]string{"telemetry_upload_endpoint": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := androidreview.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe Android review metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7341,6 +7464,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/operationalhardening_test.go", Content: operationalHardeningTestSource, Go: true},
 		{RelPath: "protocol/operationalhardening_parity_test.go", Content: operationalHardeningParityTestSource, Go: true},
 		{RelPath: "protocol/operationalhardening_hygiene_test.go", Content: operationalHardeningHygieneTestSource, Go: true},
+		{RelPath: "protocol/androidreview_generated.go", Content: androidReviewSource, Go: true},
+		{RelPath: "protocol/androidreview_test.go", Content: androidReviewTestSource, Go: true},
+		{RelPath: "protocol/androidreview_parity_test.go", Content: androidReviewParityTestSource, Go: true},
+		{RelPath: "protocol/androidreview_hygiene_test.go", Content: androidReviewHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
