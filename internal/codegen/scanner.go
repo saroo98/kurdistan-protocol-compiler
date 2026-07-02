@@ -97,6 +97,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/localproxyadapterreview_generated.go",
 		"protocol/localproxyadapter_generated.go",
 		"protocol/vpnsemantics_generated.go",
+		"protocol/localvpnadapter_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",

@@ -30,6 +30,7 @@ import (
 	"kurdistan/internal/localproxyadapter"
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/localvpnadapter"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/multicarrierselect"
@@ -2221,6 +2222,41 @@ func GeneratedPacketSemanticsParity() (vpnsemantics.ParityReport, error) {
 		return nil, err
 	}
 
+	localVPNAdapterSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/localvpnadapter"
+)
+
+const PacketAdapterSchemaVersion = %[1]s
+const PacketAdapterGeneratedProfileID = %[2]s
+const PacketAdapterGeneratedProfileSeed int64 = %[3]d
+const PacketAdapterBackendVersion = %[4]s
+const PacketAdapterRuntimePolicy = %[5]s
+const PacketAdapterRecommendedNextMilestone = %[6]s
+const PacketAdapterControlCount = %[7]d
+const PacketAdapterPayloadPolicy = %[8]s
+
+var PacketAdapterFlowClasses = %[9]s
+var PacketAdapterControls = %[10]s
+var PacketAdapterProfileHints = %[11]s
+
+func GeneratedPacketAdapterFixtureSet() (localvpnadapter.FixtureSet, error) {
+	return localvpnadapter.GenerateFixtureSet()
+}
+
+func GeneratedPacketAdapterParity() (localvpnadapter.ParityReport, error) {
+	set, err := localvpnadapter.GenerateFixtureSet()
+	if err != nil {
+		return localvpnadapter.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(localvpnadapter.Version), quote(p.ID), p.Seed, quote(localvpnadapter.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(localvpnadapter.RecommendedNextMilestone), len(localvpnadapter.RequiredMisuseNames()), quote("class_buckets_only"), quoteSlice([]string{"tcp_like_flow", "udp_like_flow", "dns_boundary_flow", "fragmented_flow", "retry_backpressure_flow", "reset_flow", "kill_switch_flow"}), quoteSlice(localvpnadapter.RequiredMisuseNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2530,6 +2566,88 @@ func TestGeneratedPacketSemanticsHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := vpnsemantics.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe packet semantics metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localVPNAdapterTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localvpnadapter"
+)
+
+func TestGeneratedPacketAdapter(t *testing.T) {
+	if PacketAdapterSchemaVersion != localvpnadapter.Version || PacketAdapterGeneratedProfileID != ProfileID {
+		t.Fatalf("generated packet adapter constants drifted")
+	}
+	set, err := GeneratedPacketAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localvpnadapter.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(PacketAdapterFlowClasses) < 7 || len(PacketAdapterControls) < len(localvpnadapter.RequiredMisuseNames()) {
+		t.Fatalf("generated packet adapter constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localVPNAdapterParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedPacketAdapterParity(t *testing.T) {
+	parity, err := GeneratedPacketAdapterParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated packet adapter parity failed: %%+v", parity)
+	}
+	if PacketAdapterRuntimePolicy == "" || PacketAdapterRecommendedNextMilestone == "" || PacketAdapterControlCount < 10 {
+		t.Fatalf("packet adapter generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localVPNAdapterHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localvpnadapter"
+)
+
+func TestGeneratedPacketAdapterHygiene(t *testing.T) {
+	set, err := GeneratedPacketAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localvpnadapter.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_packet_bytes": "synthetic"},
+		map[string]string{"exact_endpoint_value": "synthetic"},
+		map[string]bool{"allow_route_mutation": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := localvpnadapter.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe packet adapter metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -6595,6 +6713,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyadapterreview_generated.go", Content: localProxyAdapterReviewSource, Go: true},
 		{RelPath: "protocol/localproxyadapter_generated.go", Content: localProxyAdapterSource, Go: true},
 		{RelPath: "protocol/vpnsemantics_generated.go", Content: vpnSemanticsSource, Go: true},
+		{RelPath: "protocol/localvpnadapter_generated.go", Content: localVPNAdapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6717,6 +6836,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/vpnsemantics_test.go", Content: vpnSemanticsTestSource, Go: true},
 		{RelPath: "protocol/vpnsemantics_parity_test.go", Content: vpnSemanticsParityTestSource, Go: true},
 		{RelPath: "protocol/vpnsemantics_hygiene_test.go", Content: vpnSemanticsHygieneTestSource, Go: true},
+		{RelPath: "protocol/localvpnadapter_test.go", Content: localVPNAdapterTestSource, Go: true},
+		{RelPath: "protocol/localvpnadapter_parity_test.go", Content: localVPNAdapterParityTestSource, Go: true},
+		{RelPath: "protocol/localvpnadapter_hygiene_test.go", Content: localVPNAdapterHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
