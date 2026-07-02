@@ -94,4 +94,4 @@ M50 does not create a real packet adapter. It does not prove field readiness, de
 
 ## Next Milestone
 
-M51 should implement the controlled local desktop packet-style prototype against this contract while preserving packet-flow redaction, trace hygiene, boundary checks, generated parity, and audit gates.
+M51 implements the controlled local desktop packet-style prototype against this contract while preserving packet-flow redaction, trace hygiene, boundary checks, generated parity, and audit gates.

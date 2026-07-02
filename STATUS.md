@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T09:38:39Z`
+- Generated at: `2026-07-02T10:46:07Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -513,6 +513,20 @@
 | `vpnsemantics_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
 | `vpnsemantics_trace_hygiene` | PASS | `required` | 10 fixtures scanned |
 | `vpnsemantics_fixture_drift` | PASS | `required` | passed |
+| `localvpnadapter_lifecycle` | PASS | `required` | 1 session opened and 1 closed |
+| `localvpnadapter_flow_descriptor_taxonomy` | PASS | `required` | 11 descriptors |
+| `localvpnadapter_flow_stream_mapping` | PASS | `required` | 7 runtime streams mapped |
+| `localvpnadapter_mtu_fragmentation` | PASS | `required` | 7 MTU decisions |
+| `localvpnadapter_retry_reset_backpressure` | PASS | `required` | 7 retry decisions; 4 pressure events; 1 resets |
+| `localvpnadapter_killswitch_policy` | PASS | `required` | 7 decisions |
+| `localvpnadapter_dns_boundary` | PASS | `required` | 7 checks |
+| `localvpnadapter_integration` | PASS | `required` | 10 integration gates |
+| `localvpnadapter_resource_limits` | PASS | `required` | 4 rejected controls |
+| `localvpnadapter_panic_safety` | PASS | `required` | 6 panic-safety targets |
+| `localvpnadapter_misuse_detection` | PASS | `required` | 17/17 misuse controls detected |
+| `localvpnadapter_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `localvpnadapter_trace_hygiene` | PASS | `required` | 22 fixtures scanned |
+| `localvpnadapter_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -526,9 +540,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `87 ms`
-- Trace generation: `18 ms`
-- Total audit runtime: `2155 ms`
+- Profile generation: `127 ms`
+- Trace generation: `30 ms`
+- Total audit runtime: `3186 ms`
 
 ## Corpus Diversity Summary
 
@@ -551,10 +565,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31871119477298226`
-- `same_profile_distance`: `0`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3190629967772176`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
