@@ -1,0 +1,32 @@
+{
+  "mapping_rules": [
+    "one_packet_flow_to_one_runtime_stream",
+    "flow_identity_hash_bucket_only",
+    "localproxyadapter_precondition",
+    "carrier_selection_after_policy_review"
+  ],
+  "stream_classes": [
+    "interactive_packet_stream",
+    "bulk_packet_stream",
+    "datagram_like_packet_stream",
+    "control_packet_stream"
+  ],
+  "result_mappings": [
+    "stream_closed_to_flow_closed_bucket",
+    "stream_reset_to_flow_reset_bucket",
+    "stream_pressure_to_flow_backpressure_bucket",
+    "stream_error_to_safe_flow_error_bucket"
+  ],
+  "backpressure_buckets": [
+    "adapter_pressure",
+    "runtime_stream_pressure",
+    "carrier_pressure",
+    "kill_switch_pressure"
+  ],
+  "reset_buckets": [
+    "local_reset",
+    "stream_reset",
+    "policy_reset",
+    "carrier_reset"
+  ]
+}

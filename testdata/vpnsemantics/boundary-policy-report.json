@@ -1,0 +1,22 @@
+{
+  "dns_boundary_classes": [
+    "dns_metadata_blocked_by_default",
+    "dns_boundary_review_required",
+    "dns_class_bucket_only"
+  ],
+  "routing_boundary_classes": [
+    "no_os_route_changes",
+    "no_default_route_install",
+    "local_harness_only"
+  ],
+  "kill_switch_policies": [
+    "fail_closed_summary_only",
+    "no_os_firewall_changes",
+    "blocked_until_m51_review"
+  ],
+  "local_diagnostics_policy": "aggregate_buckets_only",
+  "privacy_review": "measurementreview_required",
+  "real_dns_interception": false,
+  "os_route_modification": false,
+  "android_vpnservice": false
+}

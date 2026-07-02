@@ -1,0 +1,35 @@
+{
+  "packet_flow_classes": [
+    "tcp_like_flow",
+    "udp_like_flow",
+    "dns_boundary_flow",
+    "reset_flow",
+    "backpressure_flow",
+    "control_misuse_flow"
+  ],
+  "flow_identity_classes": [
+    "flow_hash_bucket",
+    "session_bucket",
+    "direction_bucket",
+    "protocol_class_bucket"
+  ],
+  "app_identity_policies": [
+    "app_identity_not_collected",
+    "app_class_optional_future_review",
+    "per_app_logging_blocked"
+  ],
+  "diagnostics_classes": [
+    "aggregate_flow_count",
+    "mtu_bucket_count",
+    "reset_bucket_count",
+    "backpressure_bucket_count"
+  ],
+  "privacy_classes": [
+    "payload_free",
+    "endpoint_bucket_only",
+    "session_local_only",
+    "measurementreview_composed"
+  ],
+  "exact_endpoint_logging": false,
+  "app_identity_logging": false
+}

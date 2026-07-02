@@ -1,0 +1,20 @@
+{
+  "detected_controls": [
+    "vpnsemantics_allows_packet_capture",
+    "vpnsemantics_allows_payload_logging",
+    "vpnsemantics_allows_os_route_modification",
+    "vpnsemantics_allows_android_vpnservice",
+    "vpnsemantics_allows_real_dns_interception",
+    "vpnsemantics_logs_app_identity",
+    "vpnsemantics_logs_exact_endpoint",
+    "vpnsemantics_bypasses_localproxyadapter",
+    "vpnsemantics_bypasses_measurementreview",
+    "vpnsemantics_public_claim_working_vpn",
+    "vpnsemantics_payload_leak",
+    "vpnsemantics_secret_leak",
+    "vpnsemantics_generated_backend_drift"
+  ],
+  "detected_count": 13,
+  "expected_count": 13,
+  "conclusion": "passed"
+}

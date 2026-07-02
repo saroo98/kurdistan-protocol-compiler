@@ -1,0 +1,311 @@
+{
+  "version": "vpnsemantics-v1",
+  "fixture_id": "local_tun_vpn_semantics_model_v1",
+  "generated_at": "2026-02-17T00:00:00Z",
+  "backend_version": "0.50.0-lab",
+  "recommended_next_milestone": "M51: local desktop TUN/VPN prototype",
+  "scope": {
+    "allowed_behaviors": [
+      "class_only_packet_flow_semantics",
+      "flow_to_runtime_stream_model",
+      "stream_to_flow_summary_model",
+      "local_diagnostics_buckets",
+      "M51_local_desktop_contract"
+    ],
+    "blocked_behaviors": [
+      "real_tun_device_creation",
+      "real_packet_capture",
+      "os_route_modification",
+      "android_vpnservice",
+      "app_traffic_interception",
+      "real_dns_interception",
+      "public_network_behavior",
+      "payload_logging",
+      "packet_dumps",
+      "per_app_identity_logging",
+      "precise_endpoint_logging"
+    ],
+    "decision": "ready_for_m51_local_desktop_tun_vpn_prototype"
+  },
+  "taxonomy": {
+    "packet_flow_classes": [
+      "tcp_like_flow",
+      "udp_like_flow",
+      "dns_boundary_flow",
+      "reset_flow",
+      "backpressure_flow",
+      "control_misuse_flow"
+    ],
+    "flow_identity_classes": [
+      "flow_hash_bucket",
+      "session_bucket",
+      "direction_bucket",
+      "protocol_class_bucket"
+    ],
+    "app_identity_policies": [
+      "app_identity_not_collected",
+      "app_class_optional_future_review",
+      "per_app_logging_blocked"
+    ],
+    "diagnostics_classes": [
+      "aggregate_flow_count",
+      "mtu_bucket_count",
+      "reset_bucket_count",
+      "backpressure_bucket_count"
+    ],
+    "privacy_classes": [
+      "payload_free",
+      "endpoint_bucket_only",
+      "session_local_only",
+      "measurementreview_composed"
+    ],
+    "exact_endpoint_logging": false,
+    "app_identity_logging": false
+  },
+  "mapping": {
+    "mapping_rules": [
+      "one_packet_flow_to_one_runtime_stream",
+      "flow_identity_hash_bucket_only",
+      "localproxyadapter_precondition",
+      "carrier_selection_after_policy_review"
+    ],
+    "stream_classes": [
+      "interactive_packet_stream",
+      "bulk_packet_stream",
+      "datagram_like_packet_stream",
+      "control_packet_stream"
+    ],
+    "result_mappings": [
+      "stream_closed_to_flow_closed_bucket",
+      "stream_reset_to_flow_reset_bucket",
+      "stream_pressure_to_flow_backpressure_bucket",
+      "stream_error_to_safe_flow_error_bucket"
+    ],
+    "backpressure_buckets": [
+      "adapter_pressure",
+      "runtime_stream_pressure",
+      "carrier_pressure",
+      "kill_switch_pressure"
+    ],
+    "reset_buckets": [
+      "local_reset",
+      "stream_reset",
+      "policy_reset",
+      "carrier_reset"
+    ]
+  },
+  "mtu": {
+    "mtu_buckets": [
+      "small_mtu_bucket",
+      "standard_mtu_bucket",
+      "large_mtu_bucket"
+    ],
+    "fragmentation_buckets": [
+      "no_fragment",
+      "bounded_fragment",
+      "mtu_bucket_fragment"
+    ],
+    "reassembly_buckets": [
+      "ordered_reassembly",
+      "bounded_missing_fragment",
+      "reset_clears_reassembly"
+    ],
+    "retry_buckets": [
+      "no_retry",
+      "bounded_retry",
+      "policy_blocked_retry"
+    ],
+    "max_packet_class": "bounded_synthetic_packet_class",
+    "packet_dumps_allowed": false
+  },
+  "boundaries": {
+    "dns_boundary_classes": [
+      "dns_metadata_blocked_by_default",
+      "dns_boundary_review_required",
+      "dns_class_bucket_only"
+    ],
+    "routing_boundary_classes": [
+      "no_os_route_changes",
+      "no_default_route_install",
+      "local_harness_only"
+    ],
+    "kill_switch_policies": [
+      "fail_closed_summary_only",
+      "no_os_firewall_changes",
+      "blocked_until_m51_review"
+    ],
+    "local_diagnostics_policy": "aggregate_buckets_only",
+    "privacy_review": "measurementreview_required",
+    "real_dns_interception": false,
+    "os_route_modification": false,
+    "android_vpnservice": false
+  },
+  "m51_contract": {
+    "command_name": "vpnsemantics",
+    "decision": "ready_for_m51_local_desktop_tun_vpn_prototype",
+    "may_implement": [
+      "deterministic_local_desktop_packet_flow_harness",
+      "packet_flow_to_stream_mapping",
+      "mtu_bucket_fragmentation_model",
+      "stream_result_to_flow_summary_mapping",
+      "local_diagnostics_buckets"
+    ],
+    "must_not_implement": [
+      "real_tun_device_creation",
+      "real_packet_capture",
+      "os_route_modification",
+      "android_vpnservice",
+      "public_network_behavior",
+      "real_dns_interception",
+      "payload_logging",
+      "packet_dumps",
+      "per_app_identity_logging",
+      "precise_endpoint_logging"
+    ],
+    "required_fixtures": [
+      "packet_flow_taxonomy",
+      "flow_to_stream_mapping",
+      "mtu_fragmentation",
+      "retry_reset_backpressure",
+      "dns_boundary",
+      "kill_switch_policy",
+      "privacy_review"
+    ],
+    "required_gates": [
+      "vpnsemantics",
+      "localproxyadapter",
+      "measurementreview",
+      "hardening",
+      "codegen"
+    ],
+    "acceptance_requirements": [
+      "no_real_packet_capture",
+      "no_os_route_changes",
+      "no_android_vpnservice",
+      "no_real_dns_interception",
+      "payload_free_summaries",
+      "endpoint_bucket_only",
+      "generated_interpreted_parity"
+    ]
+  },
+  "misuse": {
+    "detected_controls": [
+      "vpnsemantics_allows_packet_capture",
+      "vpnsemantics_allows_payload_logging",
+      "vpnsemantics_allows_os_route_modification",
+      "vpnsemantics_allows_android_vpnservice",
+      "vpnsemantics_allows_real_dns_interception",
+      "vpnsemantics_logs_app_identity",
+      "vpnsemantics_logs_exact_endpoint",
+      "vpnsemantics_bypasses_localproxyadapter",
+      "vpnsemantics_bypasses_measurementreview",
+      "vpnsemantics_public_claim_working_vpn",
+      "vpnsemantics_payload_leak",
+      "vpnsemantics_secret_leak",
+      "vpnsemantics_generated_backend_drift"
+    ],
+    "detected_count": 13,
+    "expected_count": 13,
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "PacketSemanticsSchemaVersion",
+      "PacketSemanticsGeneratedProfileID",
+      "PacketSemanticsBackendVersion",
+      "PacketSemanticsFlowClasses",
+      "PacketSemanticsM51Decision",
+      "GeneratedPacketSemanticsFixtureSet"
+    ],
+    "interpreted_hash": "sha256:cffb2f4a85d2a93ac01ef69043540bdd7f7edc176bae717691a67bceddbf4aef",
+    "generated_hash": "sha256:cffb2f4a85d2a93ac01ef69043540bdd7f7edc176bae717691a67bceddbf4aef",
+    "unexpected_drift": null,
+    "conclusion": "passed"
+  },
+  "fixtures": [
+    {
+      "name": "packet_flow_taxonomy",
+      "category": "taxonomy",
+      "safe_class": "flow_class_buckets",
+      "expected": "classes_present",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "flow_to_stream_mapping",
+      "category": "mapping",
+      "safe_class": "flow_hash_to_stream",
+      "expected": "mapped_without_endpoint",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "stream_to_flow_result",
+      "category": "mapping",
+      "safe_class": "stream_result_bucket",
+      "expected": "result_bucketed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "mtu_fragmentation",
+      "category": "mtu",
+      "safe_class": "mtu_bucket",
+      "expected": "bounded",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "retry_reset_backpressure",
+      "category": "flow_control",
+      "safe_class": "retry_reset_pressure_buckets",
+      "expected": "bounded",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "dns_boundary",
+      "category": "boundary",
+      "safe_class": "dns_class_bucket",
+      "expected": "real_dns_blocked",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "routing_boundary",
+      "category": "boundary",
+      "safe_class": "routing_class_bucket",
+      "expected": "os_routes_blocked",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "kill_switch_policy",
+      "category": "boundary",
+      "safe_class": "fail_closed_summary",
+      "expected": "modeled_only",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "privacy_review",
+      "category": "privacy",
+      "safe_class": "measurementreview_composed",
+      "expected": "passed",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "m51_contract",
+      "category": "contract",
+      "safe_class": "go_for_local_desktop_prototype",
+      "expected": "ready",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "fixture_hash": "sha256:511e30ea006957062265dbd8a1777031045d53e35337332e321f5eefdfe6f737",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
