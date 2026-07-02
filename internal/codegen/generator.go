@@ -40,6 +40,7 @@ import (
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/vpnsemantics"
 )
 
 type Options struct {
@@ -2184,6 +2185,42 @@ func GeneratedLocalProxyAdapterParity() (localproxyadapter.ParityReport, error) 
 		return nil, err
 	}
 
+	vpnSemanticsSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/vpnsemantics"
+)
+
+const PacketSemanticsSchemaVersion = %[1]s
+const PacketSemanticsGeneratedProfileID = %[2]s
+const PacketSemanticsGeneratedProfileSeed int64 = %[3]d
+const PacketSemanticsBackendVersion = %[4]s
+const PacketSemanticsRuntimePolicy = %[5]s
+const PacketSemanticsRecommendedNextMilestone = %[6]s
+const PacketSemanticsControlCount = %[7]d
+const PacketSemanticsM51Decision = %[8]s
+const PacketSemanticsPayloadPolicy = %[9]s
+
+var PacketSemanticsFlowClasses = %[10]s
+var PacketSemanticsControls = %[11]s
+var PacketSemanticsProfileHints = %[12]s
+
+func GeneratedPacketSemanticsFixtureSet() (vpnsemantics.FixtureSet, error) {
+	return vpnsemantics.GenerateFixtureSet()
+}
+
+func GeneratedPacketSemanticsParity() (vpnsemantics.ParityReport, error) {
+	set, err := vpnsemantics.GenerateFixtureSet()
+	if err != nil {
+		return vpnsemantics.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(vpnsemantics.Version), quote(p.ID), p.Seed, quote(vpnsemantics.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote("M51: local desktop packet adapter prototype"), len(vpnsemantics.RequiredMisuseNames()), quote(vpnsemantics.DecisionReady), quote("class_buckets_only"), quoteSlice([]string{"tcp_like_flow", "udp_like_flow", "dns_boundary_flow", "reset_flow", "backpressure_flow", "control_misuse_flow"}), quoteSlice(vpnsemantics.RequiredMisuseNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2411,6 +2448,88 @@ func TestGeneratedLocalProxyAdapterHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := localproxyadapter.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe local proxy adapter metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	vpnSemanticsTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/vpnsemantics"
+)
+
+func TestGeneratedPacketSemantics(t *testing.T) {
+	if PacketSemanticsSchemaVersion != vpnsemantics.Version || PacketSemanticsGeneratedProfileID != ProfileID {
+		t.Fatalf("generated packet semantics constants drifted")
+	}
+	set, err := GeneratedPacketSemanticsFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vpnsemantics.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(PacketSemanticsFlowClasses) < 6 || len(PacketSemanticsControls) < len(vpnsemantics.RequiredMisuseNames()) {
+		t.Fatalf("generated packet semantics constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	vpnSemanticsParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedPacketSemanticsParity(t *testing.T) {
+	parity, err := GeneratedPacketSemanticsParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated packet semantics parity failed: %%+v", parity)
+	}
+	if PacketSemanticsRuntimePolicy == "" || PacketSemanticsRecommendedNextMilestone == "" || PacketSemanticsControlCount < 10 || PacketSemanticsM51Decision == "" {
+		t.Fatalf("packet semantics generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	vpnSemanticsHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/vpnsemantics"
+)
+
+func TestGeneratedPacketSemanticsHygiene(t *testing.T) {
+	set, err := GeneratedPacketSemanticsFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vpnsemantics.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_packet_bytes": "synthetic"},
+		map[string]string{"exact_endpoint_value": "synthetic"},
+		map[string]bool{"android_vpnservice": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := vpnsemantics.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe packet semantics metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -6475,6 +6594,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/carriercollapse_generated.go", Content: carrierCollapseSource, Go: true},
 		{RelPath: "protocol/localproxyadapterreview_generated.go", Content: localProxyAdapterReviewSource, Go: true},
 		{RelPath: "protocol/localproxyadapter_generated.go", Content: localProxyAdapterSource, Go: true},
+		{RelPath: "protocol/vpnsemantics_generated.go", Content: vpnSemanticsSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6594,6 +6714,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyadapter_test.go", Content: localProxyAdapterTestSource, Go: true},
 		{RelPath: "protocol/localproxyadapter_parity_test.go", Content: localProxyAdapterParityTestSource, Go: true},
 		{RelPath: "protocol/localproxyadapter_hygiene_test.go", Content: localProxyAdapterHygieneTestSource, Go: true},
+		{RelPath: "protocol/vpnsemantics_test.go", Content: vpnSemanticsTestSource, Go: true},
+		{RelPath: "protocol/vpnsemantics_parity_test.go", Content: vpnSemanticsParityTestSource, Go: true},
+		{RelPath: "protocol/vpnsemantics_hygiene_test.go", Content: vpnSemanticsHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
