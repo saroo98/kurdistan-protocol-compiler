@@ -80,4 +80,4 @@ M51 proves that packet-style flow descriptors can enter the stream/runtime/carri
 
 ## Next Milestone
 
-M52 should define the long-running relay process architecture: configuration, lifecycle, health, logging boundaries, shutdown, compatibility, profile loading, relay policy, observability without payload logging, crash behavior, and rotation interfaces.
+M52 defines the long-running relay process architecture: configuration, lifecycle, logging boundaries, shutdown, compatibility, profile loading, relay policy, observability without payload logging, crash behavior, and safe process-review interfaces.

@@ -204,6 +204,9 @@ internal/vpnsemantics
 internal/localvpnadapter
   controlled local desktop packet-style adapter prototype, packet-flow descriptors, flow-to-stream summaries, MTU/retry/reset/backpressure handling, kill-switch and DNS boundary summaries, resource checks, misuse controls, fixture drift checks, and generated parity
 
+internal/relayprocess
+  long-running client/relay process architecture contracts, config/profile bundle policy, lifecycle, shutdown/recovery, logging/observability, compatibility, resource, misuse, fixture drift, and generated parity gates
+
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
@@ -975,6 +978,22 @@ go run ./cmd/kcheck localvpnadapter verify
 go run ./cmd/kcheck localvpnadapter compare --old testdata/localvpnadapter/localvpnadapter-report-golden.json --new testdata/localvpnadapter/localvpnadapter-report-golden.json
 ```
 
+## Relay Process Architecture
+
+Milestone 52 defines the long-running client and relay process architecture needed before Kurdistan can move beyond single-shot lab harnesses. It is a review and contract milestone: it defines client, relay, and supervisor process roles; config and profile-bundle loading policy; service, session, carrier, listener, and egress lifecycle; logging and observability policy; shutdown and crash recovery; compatibility, upgrade, rollback, resource, and abuse-control placeholder policy.
+
+The `internal/relayprocess` package does not provision relays, deploy services, add account systems, upload observability, change production key exchange, add Android behavior, or enable field-test tooling. Its fixtures contain only roles, state classes, policy classes, counts, hashes, and hygiene flags.
+
+Run:
+
+```bash
+go run ./cmd/kcheck relayprocess --quick
+go run ./cmd/kcheck relayprocess --full --out testdata/audit/relayprocess.json
+go run ./cmd/kcheck relayprocess generate --out testdata/relayprocess/relayprocess-report-golden.json --force
+go run ./cmd/kcheck relayprocess verify
+go run ./cmd/kcheck relayprocess compare --old testdata/relayprocess/relayprocess-report-golden.json --new testdata/relayprocess/relayprocess-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -1010,7 +1029,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture. M53: production key exchange review.
 
 ## Research Positioning
 

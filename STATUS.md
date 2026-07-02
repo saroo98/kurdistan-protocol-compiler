@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T10:46:07Z`
+- Generated at: `2026-07-02T11:28:33Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -527,6 +527,21 @@
 | `localvpnadapter_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
 | `localvpnadapter_trace_hygiene` | PASS | `required` | 22 fixtures scanned |
 | `localvpnadapter_fixture_drift` | PASS | `required` | passed |
+| `relayprocess_role_inventory` | PASS | `required` | 3 process roles |
+| `relayprocess_config_contract` | PASS | `required` | explicit_lab_config_only |
+| `relayprocess_profile_bundle_contract` | PASS | `required` | signed_manifest_placeholder_no_key_exchange_change |
+| `relayprocess_lifecycle_contract` | PASS | `required` | 5 lifecycle contracts |
+| `relayprocess_logging_observability` | PASS | `required` | structured_safe_metadata_only |
+| `relayprocess_shutdown_recovery` | PASS | `required` | bounded_graceful_shutdown |
+| `relayprocess_compatibility_policy` | PASS | `required` | versioned_capability_floor |
+| `relayprocess_resource_policy` | PASS | `required` | bounded_process_resources |
+| `relayprocess_abuse_control_placeholder` | PASS | `required` | placeholder_only_rate_bucket_and_reset_bucket_no_user_accounts |
+| `relayprocess_m53_preconditions` | PASS | `required` | 5 preconditions |
+| `relayprocess_misuse_detection` | PASS | `required` | 15/15 misuse controls detected |
+| `relayprocess_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `relayprocess_trace_hygiene` | PASS | `required` | 13 fixtures scanned |
+| `relayprocess_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `relayprocess_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -540,9 +555,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `127 ms`
-- Trace generation: `30 ms`
-- Total audit runtime: `3186 ms`
+- Profile generation: `95 ms`
+- Trace generation: `21 ms`
+- Total audit runtime: `2272 ms`
 
 ## Corpus Diversity Summary
 
@@ -565,9 +580,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3190629967772176`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.31835167640956646`
 - `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
