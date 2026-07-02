@@ -146,6 +146,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/constrainedcarrierreview_test.go",
 		"protocol/constrainedcarrierreview_parity_test.go",
 		"protocol/constrainedcarrierreview_hygiene_test.go",
+		"protocol/constrainedcarrier_generated.go",
+		"protocol/constrainedcarrier_test.go",
+		"protocol/constrainedcarrier_parity_test.go",
+		"protocol/constrainedcarrier_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -292,6 +296,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	httpsCarrierAdversaryB := mustRead(t, filepath.Join(outB, "protocol", "httpscarrieradversary_generated.go"))
 	constrainedCarrierReviewA := mustRead(t, filepath.Join(outA, "protocol", "constrainedcarrierreview_generated.go"))
 	constrainedCarrierReviewB := mustRead(t, filepath.Join(outB, "protocol", "constrainedcarrierreview_generated.go"))
+	constrainedCarrierA := mustRead(t, filepath.Join(outA, "protocol", "constrainedcarrier_generated.go"))
+	constrainedCarrierB := mustRead(t, filepath.Join(outB, "protocol", "constrainedcarrier_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -348,6 +354,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if constrainedCarrierReviewA == constrainedCarrierReviewB {
 		t.Fatalf("constrained carrier review generation did not differ across profiles")
+	}
+	if constrainedCarrierA == constrainedCarrierB {
+		t.Fatalf("constrained carrier generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")
