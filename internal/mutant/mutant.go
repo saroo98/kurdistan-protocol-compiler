@@ -624,6 +624,19 @@ const (
 	ModeKeyExchangePlanIndependentReviewBypass  = "keyexchangeplan_independent_review_bypass"
 	ModeKeyExchangePlanProductionClaim          = "keyexchangeplan_production_claim"
 	ModeKeyExchangePlanGeneratedBackendDrift    = "keyexchangeplan_generated_backend_drift"
+
+	ModeRelayAuthPlanUnauthenticatedRelayAllowed = "relayauthplan_unauthenticated_relay_allowed"
+	ModeRelayAuthPlanSilentDowngradeAllowed      = "relayauthplan_silent_downgrade_allowed"
+	ModeRelayAuthPlanUnknownVersionFailOpen      = "relayauthplan_unknown_version_fail_open"
+	ModeRelayAuthPlanStaleProfileFailOpen        = "relayauthplan_stale_profile_fail_open"
+	ModeRelayAuthPlanRotationWithoutWindow       = "relayauthplan_rotation_without_window"
+	ModeRelayAuthPlanRevocationMissing           = "relayauthplan_revocation_missing"
+	ModeRelayAuthPlanSecretLogged                = "relayauthplan_secret_logged"
+	ModeRelayAuthPlanKeyMaterialLogged           = "relayauthplan_key_material_logged"
+	ModeRelayAuthPlanAccountTrackingAdded        = "relayauthplan_account_tracking_added"
+	ModeRelayAuthPlanPublicDiscoveryAdded        = "relayauthplan_public_discovery_added"
+	ModeRelayAuthPlanCloudProviderDependency     = "relayauthplan_cloud_provider_dependency"
+	ModeRelayAuthPlanGeneratedBackendDrift       = "relayauthplan_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1221,6 +1234,18 @@ func Modes() []string {
 		ModeKeyExchangePlanIndependentReviewBypass,
 		ModeKeyExchangePlanProductionClaim,
 		ModeKeyExchangePlanGeneratedBackendDrift,
+		ModeRelayAuthPlanUnauthenticatedRelayAllowed,
+		ModeRelayAuthPlanSilentDowngradeAllowed,
+		ModeRelayAuthPlanUnknownVersionFailOpen,
+		ModeRelayAuthPlanStaleProfileFailOpen,
+		ModeRelayAuthPlanRotationWithoutWindow,
+		ModeRelayAuthPlanRevocationMissing,
+		ModeRelayAuthPlanSecretLogged,
+		ModeRelayAuthPlanKeyMaterialLogged,
+		ModeRelayAuthPlanAccountTrackingAdded,
+		ModeRelayAuthPlanPublicDiscoveryAdded,
+		ModeRelayAuthPlanCloudProviderDependency,
+		ModeRelayAuthPlanGeneratedBackendDrift,
 	}
 }
 

@@ -49,6 +49,7 @@ import (
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relayauthplan"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/relayprocess"
@@ -186,6 +187,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	relayProcessDrift := relayProcessComparison(filepath.Join(fixtureRoot, "testdata", "relayprocess", "relayprocess-report-golden.json"), relayProcessSet)
 	keyExchangePlanSet, keyExchangePlanErr := keyexchangeplan.GenerateFixtureSet()
 	keyExchangePlanDrift := keyExchangePlanComparison(filepath.Join(fixtureRoot, "testdata", "keyexchangeplan", "keyexchangeplan-report-golden.json"), keyExchangePlanSet)
+	relayAuthPlanSet, relayAuthPlanErr := relayauthplan.GenerateFixtureSet()
+	relayAuthPlanDrift := relayAuthPlanComparison(filepath.Join(fixtureRoot, "testdata", "relayauthplan", "relayauthplan-report-golden.json"), relayAuthPlanSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -475,6 +478,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, KeyExchangePlanGates(keyExchangePlanSet, keyExchangePlanDrift)...)
 	} else {
 		gates = append(gates, gate("keyexchangeplan_design_inventory", false, "required", keyExchangePlanErr.Error(), nil, []string{keyExchangePlanErr.Error()}))
+	}
+	if relayAuthPlanErr == nil {
+		gates = append(gates, RelayAuthPlanGates(relayAuthPlanSet, relayAuthPlanDrift)...)
+	} else {
+		gates = append(gates, gate("relayauthplan_inventory", false, "required", relayAuthPlanErr.Error(), nil, []string{relayAuthPlanErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

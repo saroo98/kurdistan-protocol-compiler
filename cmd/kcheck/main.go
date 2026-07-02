@@ -46,6 +46,7 @@ import (
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/relayauthplan"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/relayprocess"
@@ -209,6 +210,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "keyexchangeplan" {
 		os.Exit(runKeyExchangePlan(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "relayauthplan" {
+		os.Exit(runRelayAuthPlan(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -7262,6 +7266,177 @@ func writeKeyExchangePlanCompanions(out string, set keyexchangeplan.FixtureSet, 
 	}
 	for _, write := range writes {
 		if err := keyexchangeplan.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runRelayAuthPlan(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runRelayAuthPlanGenerate(args[1:])
+		case "verify":
+			return runRelayAuthPlanVerify(args[1:])
+		case "compare":
+			return runRelayAuthPlanCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck relayauthplan", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick relay auth plan audit")
+	full := flags.Bool("full", false, "run full relay auth plan audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunRelayAuthPlanAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runRelayAuthPlanGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayauthplan generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "relayauthplan", "relayauthplan-report-golden.json"), "relay auth plan fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := relayauthplan.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := relayauthplan.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeRelayAuthPlanCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote relayauthplan fixtures: %s (%d auth items, %d controls)\n", *out, len(set.AuthInventory), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runRelayAuthPlanVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayauthplan verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "relayauthplan", "relayauthplan-report-golden.json"), "relay auth plan fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := relayauthplan.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relayauthplan.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relayauthplan.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runRelayAuthPlanCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayauthplan compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old relay auth plan fixture")
+	newPath := flags.String("new", "", "new relay auth plan fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := relayauthplan.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relayauthplan.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relayauthplan.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := relayauthplan.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeRelayAuthPlanCompanions(out string, set relayauthplan.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"relay-auth-inventory.json", set.AuthInventory},
+		{"identity-binding-policy.json", set.IdentityBinding},
+		{"compatibility-matrix.json", set.CompatibilityMatrix},
+		{"rotation-policy.json", set.RotationPolicy},
+		{"expiry-revocation-policy.json", set.ExpiryRevocation},
+		{"safe-failure-policy.json", set.SafeFailure},
+		{"downgrade-rejection-report.json", set.DowngradeRejection},
+		{"unknown-stale-profile-report.json", set.UnknownStaleProfile},
+		{"m55-operational-hardening-prerequisites.json", set.OperationalPrereqs},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"relayauthplan-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := relayauthplan.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
