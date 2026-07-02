@@ -162,6 +162,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/localproxyadapterreview_test.go",
 		"protocol/localproxyadapterreview_parity_test.go",
 		"protocol/localproxyadapterreview_hygiene_test.go",
+		"protocol/localproxyadapter_generated.go",
+		"protocol/localproxyadapter_test.go",
+		"protocol/localproxyadapter_parity_test.go",
+		"protocol/localproxyadapter_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -318,6 +322,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	carrierCollapseB := mustRead(t, filepath.Join(outB, "protocol", "carriercollapse_generated.go"))
 	localProxyAdapterReviewA := mustRead(t, filepath.Join(outA, "protocol", "localproxyadapterreview_generated.go"))
 	localProxyAdapterReviewB := mustRead(t, filepath.Join(outB, "protocol", "localproxyadapterreview_generated.go"))
+	localProxyAdapterA := mustRead(t, filepath.Join(outA, "protocol", "localproxyadapter_generated.go"))
+	localProxyAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localproxyadapter_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -386,6 +392,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if localProxyAdapterReviewA == localProxyAdapterReviewB {
 		t.Fatalf("local proxy adapter review generation did not differ across profiles")
+	}
+	if localProxyAdapterA == localProxyAdapterB {
+		t.Fatalf("local proxy adapter generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")
