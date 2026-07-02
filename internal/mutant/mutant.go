@@ -528,6 +528,22 @@ const (
 	ModeCarrierCollapseSecretLeak                       = "carriercollapse_secret_leak"
 	ModeCarrierCollapseGeneratedBackendDrift            = "carriercollapse_generated_backend_drift"
 	ModeCarrierCollapseTraceHygieneBypass               = "carriercollapse_trace_hygiene_bypass"
+	ModeLocalProxyAdapterReviewAllowsPayloadLogging     = "localproxyadapterreview_allows_payload_logging"
+	ModeLocalProxyAdapterReviewAllowsPacketCapture      = "localproxyadapterreview_allows_packet_capture"
+	ModeLocalProxyAdapterReviewAllowsDNSByDefault       = "localproxyadapterreview_allows_dns_by_default"
+	ModeLocalProxyAdapterReviewAllowsPublicDeployment   = "localproxyadapterreview_allows_public_deployment"
+	ModeLocalProxyAdapterReviewAllowsExactTargetPersist = "localproxyadapterreview_allows_exact_target_persistence"
+	ModeLocalProxyAdapterReviewAllowsCredentialStorage  = "localproxyadapterreview_allows_credential_storage"
+	ModeLocalProxyAdapterReviewAllowsOSBrowserConfig    = "localproxyadapterreview_allows_os_browser_config"
+	ModeLocalProxyAdapterReviewAllowsVPNPacketCapture   = "localproxyadapterreview_allows_vpn_packet_capture"
+	ModeLocalProxyAdapterReviewBypassLocalProtocol      = "localproxyadapterreview_bypasses_localprotocoladapter"
+	ModeLocalProxyAdapterReviewBypassMultiCarrier       = "localproxyadapterreview_bypasses_multicarrierselect"
+	ModeLocalProxyAdapterReviewBypassMeasurement        = "localproxyadapterreview_bypasses_measurementreview"
+	ModeLocalProxyAdapterReviewPublicClaimProxy         = "localproxyadapterreview_public_claim_working_proxy"
+	ModeLocalProxyAdapterReviewPublicClaimVPN           = "localproxyadapterreview_public_claim_working_vpn"
+	ModeLocalProxyAdapterReviewPayloadLeak              = "localproxyadapterreview_payload_leak"
+	ModeLocalProxyAdapterReviewSecretLeak               = "localproxyadapterreview_secret_leak"
+	ModeLocalProxyAdapterReviewGeneratedBackendDrift    = "localproxyadapterreview_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1034,6 +1050,22 @@ func Modes() []string {
 		ModeCarrierCollapseSecretLeak,
 		ModeCarrierCollapseGeneratedBackendDrift,
 		ModeCarrierCollapseTraceHygieneBypass,
+		ModeLocalProxyAdapterReviewAllowsPayloadLogging,
+		ModeLocalProxyAdapterReviewAllowsPacketCapture,
+		ModeLocalProxyAdapterReviewAllowsDNSByDefault,
+		ModeLocalProxyAdapterReviewAllowsPublicDeployment,
+		ModeLocalProxyAdapterReviewAllowsExactTargetPersist,
+		ModeLocalProxyAdapterReviewAllowsCredentialStorage,
+		ModeLocalProxyAdapterReviewAllowsOSBrowserConfig,
+		ModeLocalProxyAdapterReviewAllowsVPNPacketCapture,
+		ModeLocalProxyAdapterReviewBypassLocalProtocol,
+		ModeLocalProxyAdapterReviewBypassMultiCarrier,
+		ModeLocalProxyAdapterReviewBypassMeasurement,
+		ModeLocalProxyAdapterReviewPublicClaimProxy,
+		ModeLocalProxyAdapterReviewPublicClaimVPN,
+		ModeLocalProxyAdapterReviewPayloadLeak,
+		ModeLocalProxyAdapterReviewSecretLeak,
+		ModeLocalProxyAdapterReviewGeneratedBackendDrift,
 	}
 }
 

@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T03:14:19Z`
+- Generated at: `2026-07-02T04:03:07Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -472,6 +472,20 @@
 | `carriercollapse_public_claim_safety` | PASS | `required` | 5 docs checked |
 | `carriercollapse_mutant_detection` | PASS | `required` | 16/16 carrier collapse mutant modes detected |
 | `carriercollapse_fixture_drift` | PASS | `required` | passed |
+| `localproxyadapterreview_scope_contract` | PASS | `required` | 11 blocked behaviors |
+| `localproxyadapterreview_protocol_acceptance` | PASS | `required` | 2 accepted local protocol classes |
+| `localproxyadapterreview_payload_contract` | PASS | `required` | byte_counts_buckets_and_flags_only |
+| `localproxyadapterreview_stream_mapping` | PASS | `required` | 4 stream classes |
+| `localproxyadapterreview_backpressure_reset` | PASS | `required` | 4 pressure signals; 4 reset signals |
+| `localproxyadapterreview_target_redaction` | PASS | `required` | 7 forbidden fields |
+| `localproxyadapterreview_carrier_selector_integration` | PASS | `required` | 7 required gates |
+| `localproxyadapterreview_resource_limits` | PASS | `required` | 5 panic-safety targets |
+| `localproxyadapterreview_misuse_detection` | PASS | `required` | 16/16 misuse controls detected |
+| `localproxyadapterreview_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `localproxyadapterreview_m49_contract` | PASS | `required` | 7 acceptance requirements |
+| `localproxyadapterreview_generated_backend_parity` | PASS | `required` | 5 generated markers checked |
+| `localproxyadapterreview_trace_hygiene` | PASS | `required` | 10 fixtures scanned |
+| `localproxyadapterreview_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -485,9 +499,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `87 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `2215 ms`
+- Profile generation: `119 ms`
+- Trace generation: `30 ms`
+- Total audit runtime: `3113 ms`
 
 ## Corpus Diversity Summary
 
@@ -512,8 +526,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3198526734991525`
-- `same_profile_distance`: `0`
+- `different_profile_average_distance`: `0.3187497711832676`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison

@@ -30,6 +30,7 @@ import (
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/loopbackrelay"
@@ -185,6 +186,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "carriercollapse" {
 		os.Exit(runCarrierCollapse(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "localproxyadapterreview" {
+		os.Exit(runLocalProxyAdapterReview(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -6229,6 +6233,176 @@ func writeCarrierCollapseCompanions(out string, set carriercollapse.FixtureSet, 
 	}
 	for _, write := range writes {
 		if err := carriercollapse.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalProxyAdapterReview(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalProxyAdapterReviewGenerate(args[1:])
+		case "verify":
+			return runLocalProxyAdapterReviewVerify(args[1:])
+		case "compare":
+			return runLocalProxyAdapterReviewCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localproxyadapterreview", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local proxy adapter review audit")
+	full := flags.Bool("full", false, "run full local proxy adapter review audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunLocalProxyAdapterReviewAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyAdapterReviewGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapterreview generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localproxyadapterreview", "localproxyadapterreview-report-golden.json"), "local proxy adapter review fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localproxyadapterreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localproxyadapterreview.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalProxyAdapterReviewCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localproxyadapterreview fixtures: %s (%d fixtures, %d controls)\n", *out, len(set.Fixtures), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runLocalProxyAdapterReviewVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapterreview verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localproxyadapterreview", "localproxyadapterreview-report-golden.json"), "local proxy adapter review fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localproxyadapterreview.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyadapterreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyadapterreview.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyAdapterReviewCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapterreview compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local proxy adapter review fixture")
+	newPath := flags.String("new", "", "new local proxy adapter review fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localproxyadapterreview.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyadapterreview.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyadapterreview.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := localproxyadapterreview.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalProxyAdapterReviewCompanions(out string, set localproxyadapterreview.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"adapter-scope-report.json", set.Scope},
+		{"protocol-acceptance-report.json", set.Protocols},
+		{"payload-handling-contract.json", set.Payload},
+		{"stream-mapping-contract.json", set.StreamMapping},
+		{"backpressure-reset-contract.json", set.BackpressureReset},
+		{"target-redaction-report.json", set.TargetRedaction},
+		{"carrier-selector-integration-report.json", set.Integration},
+		{"resource-limit-contract.json", set.ResourceLimits},
+		{"misuse-report.json", set.Misuse},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"m49-implementation-contract.json", set.M49Contract},
+		{"localproxyadapterreview-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := localproxyadapterreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
