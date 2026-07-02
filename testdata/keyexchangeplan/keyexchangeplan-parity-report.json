@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "KeyExchangePlanSchemaVersion",
+    "KeyExchangePlanBackendVersion",
+    "KeyExchangePlanDesignCount",
+    "KeyExchangePlanMisuseCount",
+    "KeyExchangePlanTranscriptPolicy",
+    "KeyExchangePlanNextMilestone"
+  ],
+  "interpreted_hash": "sha256:b9add65a2ad1cc0dfd61389254eceb535e62881b6594f2b73c49e4f9df171e2e",
+  "generated_hash": "sha256:b9add65a2ad1cc0dfd61389254eceb535e62881b6594f2b73c49e4f9df171e2e",
+  "conclusion": "passed"
+}

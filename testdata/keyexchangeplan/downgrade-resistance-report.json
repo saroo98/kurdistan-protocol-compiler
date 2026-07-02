@@ -1,0 +1,12 @@
+{
+  "version_negotiation_boundary": "minimum_supported_version_and_profile_compatibility_floor_bound_to_transcript",
+  "algorithm_agility_boundary": "named_suite_registry_only_no_custom_primitive_design",
+  "rejects_silent_downgrade": true,
+  "required_checks": [
+    "version_floor_bound",
+    "algorithm_suite_bound",
+    "capability_hash_bound",
+    "downgrade_attempt_rejected"
+  ],
+  "conclusion": "passed"
+}

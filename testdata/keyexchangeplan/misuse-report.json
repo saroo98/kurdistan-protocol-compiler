@@ -1,0 +1,20 @@
+{
+  "detected_controls": [
+    "keyexchangeplan_custom_crypto_allowed",
+    "keyexchangeplan_secret_logged",
+    "keyexchangeplan_nonce_logged",
+    "keyexchangeplan_auth_tag_logged",
+    "keyexchangeplan_private_key_fixture",
+    "keyexchangeplan_replay_allowed",
+    "keyexchangeplan_downgrade_allowed",
+    "keyexchangeplan_missing_transcript_binding",
+    "keyexchangeplan_missing_identity_binding",
+    "keyexchangeplan_missing_key_separation",
+    "keyexchangeplan_independent_review_bypass",
+    "keyexchangeplan_production_claim",
+    "keyexchangeplan_generated_backend_drift"
+  ],
+  "detected_count": 13,
+  "expected_count": 13,
+  "conclusion": "passed"
+}

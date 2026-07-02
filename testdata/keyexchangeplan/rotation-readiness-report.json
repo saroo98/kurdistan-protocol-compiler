@@ -1,0 +1,15 @@
+{
+  "policy": "rotation_interfaces_defined_for_m54_no_key_material_in_fixtures",
+  "relay_key_policy": "static_or_rotating_identity_bucket_with_epoch_and_overlap_contract",
+  "resumption_policy": "disabled_until_reviewed_resumption_contract",
+  "forward_secrecy_goal": "fresh_client_ephemeral_per_session_and_relay_rotation_support",
+  "post_compromise_recovery_goal": "post_compromise_recovery_requires_epoch_rotation_and_session_rekey_boundary",
+  "required_interfaces": [
+    "relay_identity_epoch",
+    "rotation_overlap_window",
+    "compatibility_floor",
+    "safe_failure_reason",
+    "review_artifact_linkage"
+  ],
+  "conclusion": "passed"
+}

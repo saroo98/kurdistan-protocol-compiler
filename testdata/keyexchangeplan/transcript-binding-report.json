@@ -1,0 +1,16 @@
+{
+  "binding_id": "keyexchangeplan-transcript-binding-v1",
+  "bound_components": [
+    "profile_id_hash",
+    "relay_identity_bucket",
+    "client_ephemeral_class",
+    "relay_rotation_epoch_bucket",
+    "version_floor",
+    "algorithm_suite_bucket",
+    "generated_transport_compatibility_hash"
+  ],
+  "rejects_confusion": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

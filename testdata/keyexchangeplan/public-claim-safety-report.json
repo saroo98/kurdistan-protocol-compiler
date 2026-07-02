@@ -1,0 +1,12 @@
+{
+  "docs_checked": 5,
+  "forbidden_claims": [
+    "reviewed production cryptography",
+    "production-ready key exchange",
+    "guaranteed bypass",
+    "undetectable",
+    "field-ready",
+    "independent crypto review complete"
+  ],
+  "conclusion": "passed"
+}

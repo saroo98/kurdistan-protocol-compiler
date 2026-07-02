@@ -1,0 +1,19 @@
+{
+  "nonce_policy": "directional_monotonic_nonce_space_with_context_label",
+  "replay_policy": "bounded_replay_window_reject_duplicate_old_and_future_jump",
+  "nonce_logged": false,
+  "replay_accepted": false,
+  "required_checks": [
+    "nonce_context_unique",
+    "duplicate_replay_rejected",
+    "old_sequence_rejected",
+    "future_jump_rejected",
+    "close_reset_terminal"
+  ],
+  "safety_invariants": [
+    "nonce_never_logged",
+    "replay_never_accepted",
+    "nonce_context_bound_to_transcript"
+  ],
+  "conclusion": "passed"
+}

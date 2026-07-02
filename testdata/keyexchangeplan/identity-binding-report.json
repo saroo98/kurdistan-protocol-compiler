@@ -1,0 +1,13 @@
+{
+  "policy": "profile_and_relay_identity_bound_before_session_open",
+  "profile_binding": "profile_hash_plus_generated_transport_policy_hash",
+  "relay_identity_binding": "reviewed_relay_identity_bucket_with_rotation_epoch",
+  "unauthenticated_relay_identity": false,
+  "required_checks": [
+    "profile_hash_match",
+    "relay_identity_required",
+    "version_floor_match",
+    "capability_set_match"
+  ],
+  "conclusion": "passed"
+}
