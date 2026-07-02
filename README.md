@@ -811,6 +811,17 @@ go run ./cmd/kcheck httpslikecarrier --quick
 go run ./cmd/kcheck httpslikecarrier verify
 ```
 
+## HTTPS-Like Carrier Adversarial Hardening
+
+Milestone 43 adds adversarial gates for the M42 carrier prototype. The `internal/httpscarrieradversary` package checks fixed-shape collapse, request/response sequence collapse, padding-only variation, profile-insensitive output, unsafe fallback, trace hygiene, symbolic replay/control markers, stream isolation, backpressure/reset/error regressions, integration bypass, public claim safety, and generated-backend drift.
+
+Run:
+
+```bash
+go run ./cmd/kcheck httpscarrieradversary --quick
+go run ./cmd/kcheck httpscarrieradversary verify
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -846,7 +857,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: constrained-carrier design lock. M45: constrained-carrier lab prototype.
 
 ## Research Positioning
 

@@ -124,4 +124,6 @@ Generated constants specialize the schema version, profile ID, seed, runtime pol
 
 This milestone is a lab carrier prototype. It proves a bounded carrier family can be represented, audited, and generated without crossing the M41 boundary. It does not prove deployability, censorship resistance, undetectability, field readiness, Android readiness, or production HTTPS behavior.
 
-M43 is next because this prototype needs adversarial hardening against fixed shape behavior, profile-insensitive output, unsafe fallback, leakage, generated drift, and integration bypass.
+M43 adds adversarial hardening against fixed shape behavior, profile-insensitive output, unsafe fallback, leakage, generated drift, and integration bypass. See [KIP-0049](KIP-0049-https-like-carrier-adversarial-hardening.md).
+
+M44 is next because the constrained-carrier family needs a separate design lock before any DNS-survival-style prototype is implemented.

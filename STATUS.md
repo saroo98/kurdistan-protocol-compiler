@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T23:41:19Z`
+- Generated at: `2026-07-02T00:21:32Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -387,6 +387,20 @@
 | `httpslikecarrier_trace_hygiene` | PASS | `required` | fixtures and summaries scanned for unsafe material |
 | `httpslikecarrier_mutant_detection` | PASS | `required` | 23/23 HTTPS-like carrier mutant modes detected |
 | `httpslikecarrier_fixture_drift` | PASS | `required` | passed |
+| `httpscarrieradversary_collapse_detection` | PASS | `required` | diversity=0.83 dominant=0.34 pairs=8 |
+| `httpscarrieradversary_profile_sensitivity` | PASS | `required` | 18 fingerprints; 3 generated markers |
+| `httpscarrieradversary_padding_only_rejection` | PASS | `required` | 8 structural classes |
+| `httpscarrieradversary_unsafe_fallback_detection` | PASS | `required` | 8 fallback categories blocked |
+| `httpscarrieradversary_trace_hygiene` | PASS | `required` | 24 fixtures and 3 generated outputs scanned |
+| `httpscarrieradversary_replay_controls` | PASS | `required` | 5 control marker classes |
+| `httpscarrieradversary_stream_isolation` | PASS | `required` | 4 multi-stream fixtures |
+| `httpscarrieradversary_backpressure` | PASS | `required` | 4 bounded pressure summaries |
+| `httpscarrieradversary_reset_error` | PASS | `required` | 3 safe error classes |
+| `httpscarrieradversary_integration_bypass` | PASS | `required` | 10 bypass controls rejected |
+| `httpscarrieradversary_public_claim_safety` | PASS | `required` | 4 public docs scanned |
+| `httpscarrieradversary_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `httpscarrieradversary_mutant_detection` | PASS | `required` | 24/24 HTTPS carrier adversary mutant modes detected |
+| `httpscarrieradversary_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -400,9 +414,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `139 ms`
-- Trace generation: `31 ms`
-- Total audit runtime: `3296 ms`
+- Profile generation: `82 ms`
+- Trace generation: `19 ms`
+- Total audit runtime: `2129 ms`
 
 ## Corpus Diversity Summary
 
@@ -425,10 +439,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3198134487111871`
-- `same_profile_distance`: `0.007462686567164179`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.319619443472706`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
