@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T18:44:26Z`
+- Generated at: `2026-07-02T18:49:12Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -596,9 +596,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `86 ms`
-- Trace generation: `23 ms`
-- Total audit runtime: `2231 ms`
+- Profile generation: `79 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2196 ms`
 
 ## Corpus Diversity Summary
 
@@ -623,7 +623,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3201265835070168`
+- `different_profile_average_distance`: `0.3161155276518774`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
