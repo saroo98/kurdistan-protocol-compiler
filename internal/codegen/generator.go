@@ -40,6 +40,7 @@ import (
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relaybridge"
+	"kurdistan/internal/relayprocess"
 	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/vpnsemantics"
 )
@@ -2257,6 +2258,43 @@ func GeneratedPacketAdapterParity() (localvpnadapter.ParityReport, error) {
 		return nil, err
 	}
 
+	relayProcessSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/relayprocess"
+)
+
+const RelayProcessSchemaVersion = %[1]s
+const RelayProcessGeneratedProfileID = %[2]s
+const RelayProcessGeneratedProfileSeed int64 = %[3]d
+const RelayProcessBackendVersion = %[4]s
+const RelayProcessRuntimePolicy = %[5]s
+const RelayProcessRecommendedNextMilestone = %[6]s
+const RelayProcessRoleCount = %[7]d
+const RelayProcessLifecycleCount = %[8]d
+const RelayProcessMisuseCount = %[9]d
+const RelayProcessLoggingPolicy = %[10]s
+
+var RelayProcessControls = %[11]s
+var RelayProcessRoles = %[12]s
+var RelayProcessProfileHints = %[13]s
+
+func GeneratedRelayProcessFixtureSet() (relayprocess.FixtureSet, error) {
+	return relayprocess.GenerateFixtureSet()
+}
+
+func GeneratedRelayProcessParity() (relayprocess.ParityReport, error) {
+	set, err := relayprocess.GenerateFixtureSet()
+	if err != nil {
+		return relayprocess.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(relayprocess.Version), quote(p.ID), p.Seed, quote(relayprocess.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(relayprocess.RecommendedNextMilestone), 3, 5, len(relayprocess.RequiredMisuseNames()), quote("structured_safe_metadata_only"), quoteSlice(relayprocess.RequiredMisuseNames()), quoteSlice([]string{"client_process", "relay_process", "supervisor_process"}), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2648,6 +2686,88 @@ func TestGeneratedPacketAdapterHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := localvpnadapter.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe packet adapter metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayProcessTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relayprocess"
+)
+
+func TestGeneratedRelayProcess(t *testing.T) {
+	if RelayProcessSchemaVersion != relayprocess.Version || RelayProcessGeneratedProfileID != ProfileID {
+		t.Fatalf("generated relay process constants drifted")
+	}
+	set, err := GeneratedRelayProcessFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relayprocess.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if RelayProcessRoleCount < 3 || RelayProcessLifecycleCount < 5 || len(RelayProcessControls) < len(relayprocess.RequiredMisuseNames()) {
+		t.Fatalf("generated relay process constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayProcessParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedRelayProcessParity(t *testing.T) {
+	parity, err := GeneratedRelayProcessParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated relay process parity failed: %%+v", parity)
+	}
+	if RelayProcessRuntimePolicy == "" || RelayProcessRecommendedNextMilestone == "" || RelayProcessMisuseCount < 10 || RelayProcessLoggingPolicy == "" {
+		t.Fatalf("relay process generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	relayProcessHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/relayprocess"
+)
+
+func TestGeneratedRelayProcessHygiene(t *testing.T) {
+	set, err := GeneratedRelayProcessFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relayprocess.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"packet_capture": "synthetic"},
+		map[string]string{"secret_value": "synthetic"},
+		map[string]bool{"public_observability_upload": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := relayprocess.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe relay process metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -6714,6 +6834,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyadapter_generated.go", Content: localProxyAdapterSource, Go: true},
 		{RelPath: "protocol/vpnsemantics_generated.go", Content: vpnSemanticsSource, Go: true},
 		{RelPath: "protocol/localvpnadapter_generated.go", Content: localVPNAdapterSource, Go: true},
+		{RelPath: "protocol/relayprocess_generated.go", Content: relayProcessSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6839,6 +6960,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localvpnadapter_test.go", Content: localVPNAdapterTestSource, Go: true},
 		{RelPath: "protocol/localvpnadapter_parity_test.go", Content: localVPNAdapterParityTestSource, Go: true},
 		{RelPath: "protocol/localvpnadapter_hygiene_test.go", Content: localVPNAdapterHygieneTestSource, Go: true},
+		{RelPath: "protocol/relayprocess_test.go", Content: relayProcessTestSource, Go: true},
+		{RelPath: "protocol/relayprocess_parity_test.go", Content: relayProcessParityTestSource, Go: true},
+		{RelPath: "protocol/relayprocess_hygiene_test.go", Content: relayProcessHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},

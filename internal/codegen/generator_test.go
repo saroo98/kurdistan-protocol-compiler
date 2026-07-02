@@ -174,6 +174,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/localvpnadapter_test.go",
 		"protocol/localvpnadapter_parity_test.go",
 		"protocol/localvpnadapter_hygiene_test.go",
+		"protocol/relayprocess_generated.go",
+		"protocol/relayprocess_test.go",
+		"protocol/relayprocess_parity_test.go",
+		"protocol/relayprocess_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -243,6 +247,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const ConstrainedCarrierReviewSchemaVersion") ||
 		!strings.Contains(protocolSource, "const ConstrainedCarrierSchemaVersion") ||
 		!strings.Contains(protocolSource, "const MultiCarrierSelectSchemaVersion") ||
+		!strings.Contains(protocolSource, "const RelayProcessSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -336,6 +341,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	vpnSemanticsB := mustRead(t, filepath.Join(outB, "protocol", "vpnsemantics_generated.go"))
 	localVPNAdapterA := mustRead(t, filepath.Join(outA, "protocol", "localvpnadapter_generated.go"))
 	localVPNAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localvpnadapter_generated.go"))
+	relayProcessA := mustRead(t, filepath.Join(outA, "protocol", "relayprocess_generated.go"))
+	relayProcessB := mustRead(t, filepath.Join(outB, "protocol", "relayprocess_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -413,6 +420,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if localVPNAdapterA == localVPNAdapterB {
 		t.Fatalf("local packet adapter generation did not differ across profiles")
+	}
+	if relayProcessA == relayProcessB {
+		t.Fatalf("relay process generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")
