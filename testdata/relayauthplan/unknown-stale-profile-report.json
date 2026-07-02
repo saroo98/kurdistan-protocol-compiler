@@ -1,0 +1,14 @@
+{
+  "policy": "unknown_and_stale_profiles_fail_closed_with_safe_diagnostics",
+  "unknown_version_policy": "unknown_version_rejected_by_default_pending_matrix_entry",
+  "stale_profile_policy": "stale_profile_rejected_by_default_pending_rotation_window",
+  "safe_diagnostics": [
+    "unknown_version_bucket",
+    "stale_profile_bucket",
+    "rotation_hint_bucket",
+    "compatibility_floor_bucket"
+  ],
+  "unknown_version_accepted": false,
+  "stale_profile_accepted": false,
+  "conclusion": "passed"
+}

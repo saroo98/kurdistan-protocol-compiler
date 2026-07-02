@@ -1,0 +1,26 @@
+{
+  "policy": "relay_profile_transport_carrier_compatibility_checked_before_session_open",
+  "relay_compatibility": [
+    "relay_version_floor",
+    "relay_epoch_bucket",
+    "auth_policy_class"
+  ],
+  "transport_compatibility": [
+    "generated_backend_version",
+    "profile_wire_policy_hash",
+    "runtime_capability_floor"
+  ],
+  "carrier_compatibility": [
+    "carrier_family_class",
+    "carrier_review_gate_status",
+    "measurement_review_gate_status"
+  ],
+  "profile_bundle_versioning": [
+    "profile_bundle_version",
+    "profile_expiry_bucket",
+    "revocation_epoch_bucket"
+  ],
+  "unknown_version_fail_open": false,
+  "generated_drift_allowed": false,
+  "conclusion": "passed"
+}

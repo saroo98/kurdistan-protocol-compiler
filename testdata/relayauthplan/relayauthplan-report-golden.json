@@ -1,0 +1,424 @@
+{
+  "version": "relayauthplan-v1",
+  "fixture_id": "relay_auth_rotation_compatibility_v1",
+  "generated_at": "2026-02-19T00:00:00Z",
+  "backend_version": "0.54.0-lab",
+  "recommended_next_milestone": "M55: relay operational hardening",
+  "relay_auth_inventory": [
+    {
+      "name": "carrier_compatibility_matrix",
+      "policy": "carrier_family_and_review_gate_bound_to_relay_auth_decision",
+      "required_inputs": [
+        "carrier_family",
+        "review_gate_status"
+      ],
+      "required_outputs": [
+        "carrier_compatibility_result"
+      ],
+      "blocked_classes": [
+        "carrier_review_bypass"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "client_profile_identity_policy",
+      "policy": "client_profile_hash_bound_to_profile_bundle_version",
+      "required_inputs": [
+        "profile_id",
+        "profile_hash",
+        "profile_bundle_version"
+      ],
+      "required_outputs": [
+        "profile_identity_result"
+      ],
+      "blocked_classes": [
+        "profile_confusion"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "diagnostics_policy",
+      "policy": "safe_bucketed_reasons_no_accounts_no_keys_no_payloads",
+      "required_inputs": [
+        "failure_bucket",
+        "compatibility_bucket"
+      ],
+      "required_outputs": [
+        "diagnostic_summary"
+      ],
+      "blocked_classes": [
+        "secret_logging",
+        "key_material_logging",
+        "account_tracking"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "downgrade_rejection_policy",
+      "policy": "version_floor_and_capability_hash_bound_to_auth_result",
+      "required_inputs": [
+        "version_floor",
+        "capability_hash"
+      ],
+      "required_outputs": [
+        "downgrade_result"
+      ],
+      "blocked_classes": [
+        "silent_downgrade"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "profile_bundle_version_policy",
+      "policy": "version_floor_and_bundle_epoch_bound_to_compatibility_matrix",
+      "required_inputs": [
+        "bundle_version",
+        "compatibility_floor"
+      ],
+      "required_outputs": [
+        "version_policy_result"
+      ],
+      "blocked_classes": [
+        "unknown_version_fail_open"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "profile_expiry_policy",
+      "policy": "expired_profiles_fail_closed_with_safe_reason_bucket",
+      "required_inputs": [
+        "profile_expiry_bucket",
+        "current_epoch_bucket"
+      ],
+      "required_outputs": [
+        "expiry_result"
+      ],
+      "blocked_classes": [
+        "stale_profile_fail_open"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_auth_policy",
+      "policy": "authenticated_relay_identity_required_no_public_discovery",
+      "required_inputs": [
+        "relay_identity_bucket",
+        "auth_policy_class"
+      ],
+      "required_outputs": [
+        "relay_auth_result"
+      ],
+      "blocked_classes": [
+        "public_discovery",
+        "account_tracking"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_compatibility_matrix",
+      "policy": "relay_profile_transport_carrier_versions_checked_before_open",
+      "required_inputs": [
+        "relay_version",
+        "profile_version",
+        "transport_version",
+        "carrier_family"
+      ],
+      "required_outputs": [
+        "compatibility_result"
+      ],
+      "blocked_classes": [
+        "generated_backend_drift"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_identity_policy",
+      "policy": "relay_identity_bucket_required_before_session_open",
+      "required_inputs": [
+        "relay_identity_bucket",
+        "relay_epoch_bucket"
+      ],
+      "required_outputs": [
+        "relay_identity_result"
+      ],
+      "blocked_classes": [
+        "unauthenticated_relay_acceptance"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "revocation_policy",
+      "policy": "revocation_list_bucket_required_and_checked_before_session_open",
+      "required_inputs": [
+        "revocation_epoch_bucket",
+        "relay_identity_bucket"
+      ],
+      "required_outputs": [
+        "revocation_result"
+      ],
+      "blocked_classes": [
+        "revocation_missing"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "rotation_window_policy",
+      "policy": "overlap_window_required_for_epoch_rotation",
+      "required_inputs": [
+        "current_epoch",
+        "next_epoch",
+        "overlap_window_bucket"
+      ],
+      "required_outputs": [
+        "rotation_window_result"
+      ],
+      "blocked_classes": [
+        "rotation_without_window"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "safe_failure_policy",
+      "policy": "closed_failure_buckets_with_no_retry_to_public_discovery",
+      "required_inputs": [
+        "failure_bucket",
+        "diagnostic_bucket"
+      ],
+      "required_outputs": [
+        "safe_failure_result"
+      ],
+      "blocked_classes": [
+        "unsafe_fail_open",
+        "public_relay_discovery"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "stale_profile_policy",
+      "policy": "stale_profiles_rejected_by_default_with_rotation_hint_bucket",
+      "required_inputs": [
+        "profile_epoch",
+        "relay_epoch"
+      ],
+      "required_outputs": [
+        "stale_profile_result"
+      ],
+      "blocked_classes": [
+        "stale_profile_acceptance"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "transport_compatibility_matrix",
+      "policy": "generated_transport_policy_hash_bound_to_compatibility_floor",
+      "required_inputs": [
+        "transport_policy_hash",
+        "backend_version"
+      ],
+      "required_outputs": [
+        "transport_compatibility_result"
+      ],
+      "blocked_classes": [
+        "transport_confusion"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "unknown_version_policy",
+      "policy": "unknown_versions_rejected_by_default_pending_explicit_matrix_entry",
+      "required_inputs": [
+        "presented_version",
+        "matrix_entry"
+      ],
+      "required_outputs": [
+        "unknown_version_result"
+      ],
+      "blocked_classes": [
+        "unknown_version_acceptance"
+      ],
+      "conclusion": "passed"
+    }
+  ],
+  "identity_binding_policy": {
+    "policy": "relay_and_profile_identity_required_before_session_open",
+    "relay_identity_required": true,
+    "client_profile_identity_required": true,
+    "bound_components": [
+      "relay_identity_bucket",
+      "relay_rotation_epoch_bucket",
+      "profile_id_hash",
+      "profile_bundle_version",
+      "compatibility_floor",
+      "capability_hash"
+    ],
+    "unauthenticated_relay_allowed": false,
+    "conclusion": "passed"
+  },
+  "compatibility_matrix": {
+    "policy": "relay_profile_transport_carrier_compatibility_checked_before_session_open",
+    "relay_compatibility": [
+      "relay_version_floor",
+      "relay_epoch_bucket",
+      "auth_policy_class"
+    ],
+    "transport_compatibility": [
+      "generated_backend_version",
+      "profile_wire_policy_hash",
+      "runtime_capability_floor"
+    ],
+    "carrier_compatibility": [
+      "carrier_family_class",
+      "carrier_review_gate_status",
+      "measurement_review_gate_status"
+    ],
+    "profile_bundle_versioning": [
+      "profile_bundle_version",
+      "profile_expiry_bucket",
+      "revocation_epoch_bucket"
+    ],
+    "unknown_version_fail_open": false,
+    "generated_drift_allowed": false,
+    "conclusion": "passed"
+  },
+  "rotation_policy": {
+    "policy": "bounded_epoch_rotation_with_required_overlap_window",
+    "rotation_window_policy": "current_and_next_epoch_overlap_bucket_required",
+    "split_brain_rotation_policy": "split_brain_epochs_fail_closed_with_rotation_hint_bucket",
+    "required_checks": [
+      "epoch_overlap_present",
+      "current_epoch_accepted",
+      "next_epoch_accepted_inside_window",
+      "old_epoch_rejected_after_window",
+      "split_brain_rejected"
+    ],
+    "rotation_without_window": false,
+    "conclusion": "passed"
+  },
+  "expiry_revocation_policy": {
+    "policy": "expiry_and_revocation_checked_before_session_open",
+    "profile_expiry_policy": "expired_or_stale_profile_fails_closed_by_default",
+    "revocation_policy": "revocation_epoch_bucket_required_for_relay_identity",
+    "stale_profile_fail_open": false,
+    "revocation_missing": false,
+    "required_checks": [
+      "profile_expiry_checked",
+      "stale_profile_rejected",
+      "revocation_bucket_checked",
+      "revoked_relay_rejected"
+    ],
+    "conclusion": "passed"
+  },
+  "safe_failure_policy": {
+    "policy": "fail_closed_with_safe_bucketed_diagnostics",
+    "failure_buckets": [
+      "unauthenticated_relay",
+      "unknown_version",
+      "stale_profile",
+      "revoked_relay",
+      "rotation_split_brain",
+      "compatibility_mismatch"
+    ],
+    "fail_open_allowed": false,
+    "public_discovery_added": false,
+    "production_provisioning_added": false,
+    "conclusion": "passed"
+  },
+  "downgrade_rejection": {
+    "policy": "silent_downgrade_rejected_before_relay_session_open",
+    "rejects_silent_downgrade": true,
+    "required_bindings": [
+      "version_floor",
+      "profile_bundle_version",
+      "capability_hash",
+      "relay_auth_policy",
+      "generated_backend_version"
+    ],
+    "unknown_version_policy": "reject_unknown_version_by_default",
+    "compatibility_floor": "minimum_supported_version_and_capability_floor",
+    "conclusion": "passed"
+  },
+  "unknown_stale_profile": {
+    "policy": "unknown_and_stale_profiles_fail_closed_with_safe_diagnostics",
+    "unknown_version_policy": "unknown_version_rejected_by_default_pending_matrix_entry",
+    "stale_profile_policy": "stale_profile_rejected_by_default_pending_rotation_window",
+    "safe_diagnostics": [
+      "unknown_version_bucket",
+      "stale_profile_bucket",
+      "rotation_hint_bucket",
+      "compatibility_floor_bucket"
+    ],
+    "unknown_version_accepted": false,
+    "stale_profile_accepted": false,
+    "conclusion": "passed"
+  },
+  "m55_operational_hardening_prerequisites": {
+    "package_id": "m55-relay-operational-hardening-preconditions",
+    "required_artifacts": [
+      "relay_auth_identity_contract",
+      "compatibility_matrix",
+      "rotation_window_policy",
+      "expiry_revocation_policy",
+      "safe_failure_matrix",
+      "diagnostics_redaction_policy",
+      "generated_backend_parity_markers"
+    ],
+    "m55_ready": true,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "relayauthplan_unauthenticated_relay_allowed",
+      "relayauthplan_silent_downgrade_allowed",
+      "relayauthplan_unknown_version_fail_open",
+      "relayauthplan_stale_profile_fail_open",
+      "relayauthplan_rotation_without_window",
+      "relayauthplan_revocation_missing",
+      "relayauthplan_secret_logged",
+      "relayauthplan_key_material_logged",
+      "relayauthplan_account_tracking_added",
+      "relayauthplan_public_discovery_added",
+      "relayauthplan_cloud_provider_dependency",
+      "relayauthplan_generated_backend_drift"
+    ],
+    "detected_count": 12,
+    "expected_count": 12,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "reports_scanned": 12,
+    "payload_logged": false,
+    "secret_logged": false,
+    "key_material_logged": false,
+    "account_tracking_added": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "production relay provisioning",
+      "public relay discovery",
+      "field-ready relay operations",
+      "guaranteed bypass",
+      "undetectable",
+      "account tracking enabled"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "RelayAuthPlanSchemaVersion",
+      "RelayAuthPlanBackendVersion",
+      "RelayAuthPlanInventoryCount",
+      "RelayAuthPlanMisuseCount",
+      "RelayAuthPlanCompatibilityPolicy",
+      "RelayAuthPlanNextMilestone"
+    ],
+    "interpreted_hash": "sha256:aa4ecef621a1b22b3a7fc30ba1477da9019f978d1f269ce92cb590ebd58e0f82",
+    "generated_hash": "sha256:aa4ecef621a1b22b3a7fc30ba1477da9019f978d1f269ce92cb590ebd58e0f82",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:18a6eea3e1bdf5387ec1fba754c9920eeb21606cb212732be2ecbbad646c76b2",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

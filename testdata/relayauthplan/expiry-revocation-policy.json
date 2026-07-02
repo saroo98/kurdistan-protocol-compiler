@@ -1,0 +1,14 @@
+{
+  "policy": "expiry_and_revocation_checked_before_session_open",
+  "profile_expiry_policy": "expired_or_stale_profile_fails_closed_by_default",
+  "revocation_policy": "revocation_epoch_bucket_required_for_relay_identity",
+  "stale_profile_fail_open": false,
+  "revocation_missing": false,
+  "required_checks": [
+    "profile_expiry_checked",
+    "stale_profile_rejected",
+    "revocation_bucket_checked",
+    "revoked_relay_rejected"
+  ],
+  "conclusion": "passed"
+}

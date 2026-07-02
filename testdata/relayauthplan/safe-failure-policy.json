@@ -1,0 +1,15 @@
+{
+  "policy": "fail_closed_with_safe_bucketed_diagnostics",
+  "failure_buckets": [
+    "unauthenticated_relay",
+    "unknown_version",
+    "stale_profile",
+    "revoked_relay",
+    "rotation_split_brain",
+    "compatibility_mismatch"
+  ],
+  "fail_open_allowed": false,
+  "public_discovery_added": false,
+  "production_provisioning_added": false,
+  "conclusion": "passed"
+}

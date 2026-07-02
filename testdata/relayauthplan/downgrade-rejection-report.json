@@ -1,0 +1,14 @@
+{
+  "policy": "silent_downgrade_rejected_before_relay_session_open",
+  "rejects_silent_downgrade": true,
+  "required_bindings": [
+    "version_floor",
+    "profile_bundle_version",
+    "capability_hash",
+    "relay_auth_policy",
+    "generated_backend_version"
+  ],
+  "unknown_version_policy": "reject_unknown_version_by_default",
+  "compatibility_floor": "minimum_supported_version_and_capability_floor",
+  "conclusion": "passed"
+}
