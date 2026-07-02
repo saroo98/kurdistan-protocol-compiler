@@ -1,0 +1,146 @@
+{
+  "findings": [
+    {
+      "name": "httpslikecarrier_real_tls_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_sni_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_host_header_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_domain_dependency_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_cdn_provider_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_public_network_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_arbitrary_egress_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_payload_forwarding_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_payload_logging_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_packet_capture_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_measurement_upload_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_fixed_shape",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_padding_only_variation",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_profile_insensitive",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_backpressure_ignored",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_reset_swallowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_cross_stream_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_pathhealth_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_measurementreview_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_carrierreview_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_generated_backend_drift",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_payload_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    },
+    {
+      "name": "httpslikecarrier_secret_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic control flagged"
+    }
+  ],
+  "detected_count": 23,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
