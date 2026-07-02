@@ -128,6 +128,7 @@ type CodegenAuditSummary struct {
 	LocalProxyAdapterReviewParity    string                         `json:"localproxyadapterreview_generated_backend_parity"`
 	LocalProxyAdapterParity          string                         `json:"localproxyadapter_generated_backend_parity"`
 	VPNSemanticsParity               string                         `json:"vpnsemantics_generated_backend_parity"`
+	LocalVPNAdapterParity            string                         `json:"localvpnadapter_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -245,6 +246,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localProxyAdapterReviewGate := GeneratedLocalProxyAdapterReviewParityGate(corpus, testFailures)
 	localProxyAdapterGate := GeneratedLocalProxyAdapterParityGate(corpus, testFailures)
 	vpnSemanticsGate := GeneratedVPNSemanticsParityGate(corpus, testFailures)
+	localVPNAdapterGate := GeneratedLocalVPNAdapterParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -302,6 +304,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localProxyAdapterReviewGate,
 		localProxyAdapterGate,
 		vpnSemanticsGate,
+		localVPNAdapterGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1130,6 +1133,10 @@ func GeneratedVPNSemanticsParityGate(corpus GeneratedBackendTraceCorpus, testFai
 	return generatedMilestoneSourceGate(corpus, testFailures, "vpnsemantics", "VPN semantics", "PacketSemanticsSchemaVersion")
 }
 
+func GeneratedLocalVPNAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "localvpnadapter", "local packet adapter", "PacketAdapterSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1346,6 +1353,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalProxyAdapterReviewParity:    status("localproxyadapterreview_generated_backend_parity"),
 		LocalProxyAdapterParity:          status("localproxyadapter_generated_backend_parity"),
 		VPNSemanticsParity:               status("vpnsemantics_generated_backend_parity"),
+		LocalVPNAdapterParity:            status("localvpnadapter_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
