@@ -20,7 +20,7 @@ The `internal/relayprocess` package freezes deterministic contracts for:
 - compatibility, upgrade, and rollback policy
 - bounded resource policy
 - abuse-control placeholder policy
-- M53 production key exchange review preconditions
+- M53 production key exchange design preconditions
 
 ## Blocked Behavior
 
@@ -78,9 +78,9 @@ go run ./cmd/kcheck relayprocess compare --old testdata/relayprocess/relayproces
 
 Generated modules include relay process constants and tests through `protocol/relayprocess_generated.go`, `protocol/relayprocess_test.go`, `protocol/relayprocess_parity_test.go`, and `protocol/relayprocess_hygiene_test.go`. The generated markers bind the process architecture to the selected profile, carrier, adapter, and security policy classes without adding process deployment behavior.
 
-## M53 Preconditions
+## M53 Design Handoff
 
-M53 should review production key exchange. M52 leaves production keying changes blocked until that review defines the key exchange contract, downgrade behavior, operator secret handling, compatibility rules, and generated-backend parity requirements.
+M53 now defines the production key exchange design contract. M52 leaves production keying changes blocked until later milestones implement relay authentication, rotation behavior, compatibility execution, and generated-backend parity under that contract.
 
 ## Limitations
 

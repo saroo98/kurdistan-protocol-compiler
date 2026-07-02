@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T11:28:33Z`
+- Generated at: `2026-07-02T12:11:19Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -542,6 +542,20 @@
 | `relayprocess_trace_hygiene` | PASS | `required` | 13 fixtures scanned |
 | `relayprocess_public_claim_safety` | PASS | `required` | 5 docs checked |
 | `relayprocess_fixture_drift` | PASS | `required` | passed |
+| `keyexchangeplan_design_inventory` | PASS | `required` | 10 design items |
+| `keyexchangeplan_transcript_binding` | PASS | `required` | 7 bound components |
+| `keyexchangeplan_identity_binding` | PASS | `required` | profile_and_relay_identity_bound_before_session_open |
+| `keyexchangeplan_nonce_replay` | PASS | `required` | bounded_replay_window_reject_duplicate_old_and_future_jump |
+| `keyexchangeplan_downgrade_resistance` | PASS | `required` | named_suite_registry_only_no_custom_primitive_design |
+| `keyexchangeplan_key_separation` | PASS | `required` | context_labeled_key_schedule_contract_no_custom_primitives |
+| `keyexchangeplan_rotation_readiness` | PASS | `required` | rotation_interfaces_defined_for_m54_no_key_material_in_fixtures |
+| `keyexchangeplan_generated_transport_compatibility` | PASS | `required` | generated_transport_compatibility_hash_bound_to_handshake |
+| `keyexchangeplan_external_crypto_review_readiness` | PASS | `required` | m62-independent-cryptography-review-package-precondition |
+| `keyexchangeplan_misuse_detection` | PASS | `required` | 13/13 misuse controls detected |
+| `keyexchangeplan_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `keyexchangeplan_trace_hygiene` | PASS | `required` | 12 reports scanned |
+| `keyexchangeplan_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `keyexchangeplan_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -555,9 +569,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `95 ms`
-- Trace generation: `21 ms`
-- Total audit runtime: `2272 ms`
+- Profile generation: `86 ms`
+- Trace generation: `19 ms`
+- Total audit runtime: `2223 ms`
 
 ## Corpus Diversity Summary
 
@@ -582,8 +596,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31835167640956646`
-- `same_profile_distance`: `0.007462686567164179`
+- `different_profile_average_distance`: `0.319769408913208`
+- `same_profile_distance`: `0.014925373134328358`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
