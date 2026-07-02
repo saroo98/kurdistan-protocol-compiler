@@ -87,8 +87,8 @@ protocol/relayauthplan_hygiene_test.go
 
 ## Limitations
 
-M54 is a design and review layer. It does not implement production relay authentication, relay provisioning, public relay discovery, user accounts, cloud integration, Android behavior, or field-test tooling. Operational relay hardening remains a later milestone.
+M54 is a design and review layer. It does not implement production relay authentication, relay provisioning, public relay discovery, user accounts, cloud integration, Android behavior, or field-test tooling. M55 now covers the operational hardening contract around these relay-auth boundaries.
 
 ## Next Milestone
 
-M55 should harden relay operational semantics around the M54 contract: lifecycle controls, auditability, rotation enforcement, compatibility failure handling, and safe operational boundaries.
+M55 operational hardening builds on this contract. After M55, M56 should perform the Android architecture review without bypassing relay-auth, compatibility, rotation, or operational-hardening gates.

@@ -602,7 +602,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 30 should focus on continuous health monitoring and failover over already-selected synthetic paths.")
+	fmt.Fprintln(&b, "Milestone 56 should focus on Android architecture review against the hardened relay/runtime operational boundary.")
 	return b.String()
 }
 

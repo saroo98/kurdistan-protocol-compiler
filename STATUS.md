@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T16:48:08Z`
+- Generated at: `2026-07-02T18:44:26Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -570,6 +570,19 @@
 | `relayauthplan_trace_hygiene` | PASS | `required` | 12 reports scanned |
 | `relayauthplan_public_claim_safety` | PASS | `required` | 5 docs checked |
 | `relayauthplan_fixture_drift` | PASS | `required` | passed |
+| `operationalhardening_report` | PASS | `required` | decision=ready_for_android_architecture_review blockers=0 risks=5 checklist_failed=0 |
+| `operationalhardening_resource_limits` | PASS | `required` | 8 bounds |
+| `operationalhardening_config_validation` | PASS | `required` | strict_operational_config_validation_with_safe_error_classes |
+| `operationalhardening_lifecycle` | PASS | `required` | deterministic_bounded_shutdown_restart |
+| `operationalhardening_safe_logging` | PASS | `required` | state_failure_version_resource_redacted_only |
+| `operationalhardening_rollback_boundaries` | PASS | `required` | rollback_boundaries_fail_closed_on_ambiguity |
+| `operationalhardening_health_summary` | PASS | `required` | redacted_android_ready_operational_health_summary |
+| `operationalhardening_compatibility_integration` | PASS | `required` | operational_hardening_preserves_prior_safety_gates |
+| `operationalhardening_misuse_detection` | PASS | `required` | 12/12 misuse controls detected |
+| `operationalhardening_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `operationalhardening_trace_hygiene` | PASS | `required` | 10 reports scanned |
+| `operationalhardening_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `operationalhardening_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -583,9 +596,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `89 ms`
-- Trace generation: `22 ms`
-- Total audit runtime: `2458 ms`
+- Profile generation: `86 ms`
+- Trace generation: `23 ms`
+- Total audit runtime: `2231 ms`
 
 ## Corpus Diversity Summary
 
@@ -610,7 +623,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.315759438259699`
+- `different_profile_average_distance`: `0.3201265835070168`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -846,4 +859,4 @@
 
 ## Next Milestone
 
-Milestone 30 should focus on continuous health monitoring and failover over already-selected synthetic paths.
+Milestone 56 should focus on Android architecture review against the hardened relay/runtime operational boundary.

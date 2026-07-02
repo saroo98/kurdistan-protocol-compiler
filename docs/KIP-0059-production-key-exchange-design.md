@@ -96,4 +96,4 @@ M53 is not an independent cryptography review, not a production cryptography imp
 
 ## M54 Handoff
 
-M54 uses this contract to define relay authentication, rotation, and compatibility behavior without weakening downgrade resistance, replay rejection, generated transport compatibility, or trace hygiene. M55 should harden the resulting relay operational semantics while keeping public relay provisioning, account tracking, payload logging, packet capture, and field-test behavior out of scope.
+M54 uses this contract to define relay authentication, rotation, and compatibility behavior without weakening downgrade resistance, replay rejection, generated transport compatibility, or trace hygiene. M55 hardens the resulting relay operational semantics while keeping public relay provisioning, account tracking, payload logging, packet capture, and field-test behavior out of scope.
