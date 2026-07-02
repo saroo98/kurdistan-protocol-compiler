@@ -131,6 +131,7 @@ type CodegenAuditSummary struct {
 	LocalVPNAdapterParity            string                         `json:"localvpnadapter_generated_backend_parity"`
 	RelayProcessParity               string                         `json:"relayprocess_generated_backend_parity"`
 	KeyExchangePlanParity            string                         `json:"keyexchangeplan_generated_backend_parity"`
+	RelayAuthPlanParity              string                         `json:"relayauthplan_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -251,6 +252,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	localVPNAdapterGate := GeneratedLocalVPNAdapterParityGate(corpus, testFailures)
 	relayProcessGate := GeneratedRelayProcessParityGate(corpus, testFailures)
 	keyExchangePlanGate := GeneratedKeyExchangePlanParityGate(corpus, testFailures)
+	relayAuthPlanGate := GeneratedRelayAuthPlanParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -311,6 +313,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		localVPNAdapterGate,
 		relayProcessGate,
 		keyExchangePlanGate,
+		relayAuthPlanGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1151,6 +1154,10 @@ func GeneratedKeyExchangePlanParityGate(corpus GeneratedBackendTraceCorpus, test
 	return generatedMilestoneSourceGate(corpus, testFailures, "keyexchangeplan", "production key exchange design", "KeyExchangePlanSchemaVersion")
 }
 
+func GeneratedRelayAuthPlanParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "relayauthplan", "relay auth rotation compatibility", "RelayAuthPlanSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1370,6 +1377,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		LocalVPNAdapterParity:            status("localvpnadapter_generated_backend_parity"),
 		RelayProcessParity:               status("relayprocess_generated_backend_parity"),
 		KeyExchangePlanParity:            status("keyexchangeplan_generated_backend_parity"),
+		RelayAuthPlanParity:              status("relayauthplan_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
