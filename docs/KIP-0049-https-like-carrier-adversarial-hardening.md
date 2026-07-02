@@ -129,4 +129,4 @@ M43 proves deterministic adversarial coverage for the M42 lab carrier prototype.
 
 ## Next Milestone
 
-M44 is the DNS-survival / constrained-carrier design lock. It should define the next constrained carrier family contract before any implementation work begins.
+M44 is the DNS-survival / constrained-carrier design lock. M45 should implement the constrained-carrier lab prototype against that contract before any real carrier, resolver, public-network, or deployment behavior is considered.

@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T00:21:32Z`
+- Generated at: `2026-07-02T01:09:18Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -401,6 +401,24 @@
 | `httpscarrieradversary_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
 | `httpscarrieradversary_mutant_detection` | PASS | `required` | 24/24 HTTPS carrier adversary mutant modes detected |
 | `httpscarrieradversary_fixture_drift` | PASS | `required` | passed |
+| `constrainedcarrierreview_scope_contract` | PASS | `required` | 14 blocked behaviors |
+| `constrainedcarrierreview_resolver_harness_contract` | PASS | `required` | 4 resolver buckets |
+| `constrainedcarrierreview_query_shape_taxonomy` | PASS | `required` | 10 query shapes; 3 controls |
+| `constrainedcarrierreview_response_shape_taxonomy` | PASS | `required` | 9 response shapes; 2 controls |
+| `constrainedcarrierreview_size_truncation_contract` | PASS | `required` | 3 truncation buckets |
+| `constrainedcarrierreview_retry_failure_contract` | PASS | `required` | 3 retry buckets |
+| `constrainedcarrierreview_stream_mapping` | PASS | `required` | 4 stream mappings |
+| `constrainedcarrierreview_privacy_measurement` | PASS | `required` | 6 safe fields |
+| `constrainedcarrierreview_m45_contract` | PASS | `required` | 5 acceptance requirements |
+| `constrainedcarrierreview_blocker_matrix` | PASS | `required` | 8 blockers resolved |
+| `constrainedcarrierreview_risk_model` | PASS | `required` | 6 risks gated |
+| `constrainedcarrierreview_checklist` | PASS | `required` | 10 checklist items |
+| `constrainedcarrierreview_misuse_detection` | PASS | `required` | 23 misuse controls |
+| `constrainedcarrierreview_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `constrainedcarrierreview_trace_hygiene` | PASS | `required` | fixture trace hygiene scanned |
+| `constrainedcarrierreview_public_claim_safety` | PASS | `required` | public claim safety markers checked |
+| `constrainedcarrierreview_mutant_detection` | PASS | `required` | 23/23 constrained carrier review mutant modes detected |
+| `constrainedcarrierreview_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -414,9 +432,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `82 ms`
-- Trace generation: `19 ms`
-- Total audit runtime: `2129 ms`
+- Profile generation: `107 ms`
+- Trace generation: `25 ms`
+- Total audit runtime: `2265 ms`
 
 ## Corpus Diversity Summary
 
@@ -441,8 +459,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.319619443472706`
-- `same_profile_distance`: `0`
+- `different_profile_average_distance`: `0.3194986177155879`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
