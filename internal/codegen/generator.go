@@ -35,6 +35,7 @@ import (
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/operationalhardening"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/productionreadiness"
@@ -2371,6 +2372,46 @@ func GeneratedRelayAuthPlanParity() (relayauthplan.ParityReport, error) {
 		return nil, err
 	}
 
+	operationalHardeningSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/operationalhardening"
+)
+
+const OperationalHardeningSchemaVersion = %[1]s
+const OperationalHardeningGeneratedProfileID = %[2]s
+const OperationalHardeningGeneratedProfileSeed int64 = %[3]d
+const OperationalHardeningBackendVersion = %[4]s
+const OperationalHardeningResourcePolicy = %[5]s
+const OperationalHardeningConfigPolicy = %[6]s
+const OperationalHardeningLifecyclePolicy = %[7]s
+const OperationalHardeningDiagnosticsPolicy = %[8]s
+const OperationalHardeningRollbackPolicy = %[9]s
+const OperationalHardeningHealthPolicy = %[10]s
+const OperationalHardeningNextMilestone = %[11]s
+const OperationalHardeningResourceBoundCount = %[12]d
+const OperationalHardeningMisuseCount = %[13]d
+
+var OperationalHardeningSafeErrorClasses = %[14]s
+var OperationalHardeningControls = %[15]s
+var OperationalHardeningGeneratedPolicyHints = %[16]s
+
+func GeneratedOperationalHardeningFixtureSet() (operationalhardening.FixtureSet, error) {
+	return operationalhardening.GenerateFixtureSet()
+}
+
+func GeneratedOperationalHardeningParity() (operationalhardening.ParityReport, error) {
+	set, err := operationalhardening.GenerateFixtureSet()
+	if err != nil {
+		return operationalhardening.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(operationalhardening.Version), quote(p.ID), p.Seed, quote(operationalhardening.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.ReplayPolicy), quote(p.Security.ConfigValidationPolicy+"/"+p.Security.ProfileCompatibilityPolicy), quote(p.Stream.ClosePolicy+"/"+p.Stream.ResetPolicy+"/"+p.AdapterPolicy.RuntimeMappingPolicy), quote("structured_redacted_operational_status"), quote("fail_closed_profile_rotation_required"), quote("bucketed_redacted_operational_health"), quote(operationalhardening.RecommendedNextMilestone), len(operationalhardening.DefaultResourceLimitReport().Bounds), len(operationalhardening.RequiredMisuseNames()), quoteSlice(operationalhardening.DefaultConfigValidationReport().SafeErrorClasses), quoteSlice(operationalhardening.RequiredMisuseNames()), quoteSlice([]string{p.AdapterPolicy.RuntimeMappingPolicy, p.CarrierPolicy.CarrierFamily, p.Security.ReplayPolicy, p.Security.DowngradePolicy, p.Security.ProfileCompatibilityPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2927,6 +2968,89 @@ func TestGeneratedKeyExchangePlanHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := keyexchangeplan.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe key exchange metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	operationalHardeningTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/operationalhardening"
+)
+
+func TestGeneratedOperationalHardening(t *testing.T) {
+	if OperationalHardeningSchemaVersion != operationalhardening.Version || OperationalHardeningGeneratedProfileID != ProfileID {
+		t.Fatalf("generated operational hardening constants drifted")
+	}
+	set, err := GeneratedOperationalHardeningFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := operationalhardening.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if OperationalHardeningResourceBoundCount < 8 || OperationalHardeningMisuseCount < len(operationalhardening.RequiredMisuseNames()) || len(OperationalHardeningSafeErrorClasses) < 7 {
+		t.Fatalf("generated operational hardening constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	operationalHardeningParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedOperationalHardeningParity(t *testing.T) {
+	parity, err := GeneratedOperationalHardeningParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated operational hardening parity failed: %%+v", parity)
+	}
+	if OperationalHardeningResourcePolicy == "" || OperationalHardeningConfigPolicy == "" || OperationalHardeningLifecyclePolicy == "" || OperationalHardeningNextMilestone == "" {
+		t.Fatalf("operational hardening generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	operationalHardeningHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/operationalhardening"
+)
+
+func TestGeneratedOperationalHardeningHygiene(t *testing.T) {
+	set, err := GeneratedOperationalHardeningFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := operationalhardening.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"secret_value": "synthetic"},
+		map[string]string{"key_material": "synthetic"},
+		map[string]string{"telemetry_upload_endpoint": "synthetic"},
+		map[string]string{"destination_url": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := operationalhardening.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe operational hardening metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7213,6 +7337,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relayauthplan_test.go", Content: relayAuthPlanTestSource, Go: true},
 		{RelPath: "protocol/relayauthplan_parity_test.go", Content: relayAuthPlanParityTestSource, Go: true},
 		{RelPath: "protocol/relayauthplan_hygiene_test.go", Content: relayAuthPlanHygieneTestSource, Go: true},
+		{RelPath: "protocol/operationalhardening_generated.go", Content: operationalHardeningSource, Go: true},
+		{RelPath: "protocol/operationalhardening_test.go", Content: operationalHardeningTestSource, Go: true},
+		{RelPath: "protocol/operationalhardening_parity_test.go", Content: operationalHardeningParityTestSource, Go: true},
+		{RelPath: "protocol/operationalhardening_hygiene_test.go", Content: operationalHardeningHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},

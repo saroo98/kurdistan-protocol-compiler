@@ -101,6 +101,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/relayprocess_generated.go",
 		"protocol/keyexchangeplan_generated.go",
 		"protocol/relayauthplan_generated.go",
+		"protocol/operationalhardening_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -235,6 +236,8 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const KeyExchangePlanSchemaVersion")
 	module.ProfileSpecificConstantsPresent = module.ProfileSpecificConstantsPresent &&
 		strings.Contains(joined, "const RelayAuthPlanSchemaVersion")
+	module.ProfileSpecificConstantsPresent = module.ProfileSpecificConstantsPresent &&
+		strings.Contains(joined, "const OperationalHardeningSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)

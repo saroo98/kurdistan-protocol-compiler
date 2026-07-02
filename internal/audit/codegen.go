@@ -132,6 +132,7 @@ type CodegenAuditSummary struct {
 	RelayProcessParity               string                         `json:"relayprocess_generated_backend_parity"`
 	KeyExchangePlanParity            string                         `json:"keyexchangeplan_generated_backend_parity"`
 	RelayAuthPlanParity              string                         `json:"relayauthplan_generated_backend_parity"`
+	OperationalHardeningParity       string                         `json:"operationalhardening_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -253,6 +254,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	relayProcessGate := GeneratedRelayProcessParityGate(corpus, testFailures)
 	keyExchangePlanGate := GeneratedKeyExchangePlanParityGate(corpus, testFailures)
 	relayAuthPlanGate := GeneratedRelayAuthPlanParityGate(corpus, testFailures)
+	operationalHardeningGate := GeneratedOperationalHardeningParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -314,6 +316,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		relayProcessGate,
 		keyExchangePlanGate,
 		relayAuthPlanGate,
+		operationalHardeningGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1158,6 +1161,10 @@ func GeneratedRelayAuthPlanParityGate(corpus GeneratedBackendTraceCorpus, testFa
 	return generatedMilestoneSourceGate(corpus, testFailures, "relayauthplan", "relay auth rotation compatibility", "RelayAuthPlanSchemaVersion")
 }
 
+func GeneratedOperationalHardeningParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "operationalhardening", "relay/runtime operational hardening", "OperationalHardeningSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1378,6 +1385,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		RelayProcessParity:               status("relayprocess_generated_backend_parity"),
 		KeyExchangePlanParity:            status("keyexchangeplan_generated_backend_parity"),
 		RelayAuthPlanParity:              status("relayauthplan_generated_backend_parity"),
+		OperationalHardeningParity:       status("operationalhardening_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
