@@ -544,6 +544,24 @@ const (
 	ModeLocalProxyAdapterReviewPayloadLeak              = "localproxyadapterreview_payload_leak"
 	ModeLocalProxyAdapterReviewSecretLeak               = "localproxyadapterreview_secret_leak"
 	ModeLocalProxyAdapterReviewGeneratedBackendDrift    = "localproxyadapterreview_generated_backend_drift"
+
+	ModeLocalProxyAdapterPayloadLoggingAllowed    = "localproxyadapter_payload_logging_allowed"
+	ModeLocalProxyAdapterPacketCaptureAllowed     = "localproxyadapter_packet_capture_allowed"
+	ModeLocalProxyAdapterExactTargetPersisted     = "localproxyadapter_exact_target_persisted"
+	ModeLocalProxyAdapterExactPortPersisted       = "localproxyadapter_exact_port_persisted"
+	ModeLocalProxyAdapterDNSResolutionAllowed     = "localproxyadapter_dns_resolution_allowed"
+	ModeLocalProxyAdapterPublicNetworkDefault     = "localproxyadapter_public_network_default"
+	ModeLocalProxyAdapterCredentialStorageAllowed = "localproxyadapter_credential_storage_allowed"
+	ModeLocalProxyAdapterUnboundedStream          = "localproxyadapter_unbounded_stream"
+	ModeLocalProxyAdapterBackpressureIgnored      = "localproxyadapter_backpressure_ignored"
+	ModeLocalProxyAdapterResetSwallowed           = "localproxyadapter_reset_swallowed"
+	ModeLocalProxyAdapterStreamIsolationBroken    = "localproxyadapter_stream_isolation_broken"
+	ModeLocalProxyAdapterLocalProtocolBypass      = "localproxyadapter_localprotocoladapter_bypass"
+	ModeLocalProxyAdapterMultiCarrierBypass       = "localproxyadapter_multicarrierselect_bypass"
+	ModeLocalProxyAdapterMeasurementReviewBypass  = "localproxyadapter_measurementreview_bypass"
+	ModeLocalProxyAdapterGeneratedBackendDrift    = "localproxyadapter_generated_backend_drift"
+	ModeLocalProxyAdapterPayloadLeak              = "localproxyadapter_payload_leak"
+	ModeLocalProxyAdapterSecretLeak               = "localproxyadapter_secret_leak"
 )
 
 func Modes() []string {
@@ -1066,6 +1084,23 @@ func Modes() []string {
 		ModeLocalProxyAdapterReviewPayloadLeak,
 		ModeLocalProxyAdapterReviewSecretLeak,
 		ModeLocalProxyAdapterReviewGeneratedBackendDrift,
+		ModeLocalProxyAdapterPayloadLoggingAllowed,
+		ModeLocalProxyAdapterPacketCaptureAllowed,
+		ModeLocalProxyAdapterExactTargetPersisted,
+		ModeLocalProxyAdapterExactPortPersisted,
+		ModeLocalProxyAdapterDNSResolutionAllowed,
+		ModeLocalProxyAdapterPublicNetworkDefault,
+		ModeLocalProxyAdapterCredentialStorageAllowed,
+		ModeLocalProxyAdapterUnboundedStream,
+		ModeLocalProxyAdapterBackpressureIgnored,
+		ModeLocalProxyAdapterResetSwallowed,
+		ModeLocalProxyAdapterStreamIsolationBroken,
+		ModeLocalProxyAdapterLocalProtocolBypass,
+		ModeLocalProxyAdapterMultiCarrierBypass,
+		ModeLocalProxyAdapterMeasurementReviewBypass,
+		ModeLocalProxyAdapterGeneratedBackendDrift,
+		ModeLocalProxyAdapterPayloadLeak,
+		ModeLocalProxyAdapterSecretLeak,
 	}
 }
 

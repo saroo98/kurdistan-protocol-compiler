@@ -30,6 +30,7 @@ import (
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/localproxyadapter"
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
@@ -189,6 +190,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "localproxyadapterreview" {
 		os.Exit(runLocalProxyAdapterReview(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "localproxyadapter" {
+		os.Exit(runLocalProxyAdapter(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -6403,6 +6407,172 @@ func writeLocalProxyAdapterReviewCompanions(out string, set localproxyadapterrev
 	}
 	for _, write := range writes {
 		if err := localproxyadapterreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalProxyAdapter(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalProxyAdapterGenerate(args[1:])
+		case "verify":
+			return runLocalProxyAdapterVerify(args[1:])
+		case "compare":
+			return runLocalProxyAdapterCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localproxyadapter", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local proxy adapter audit")
+	full := flags.Bool("full", false, "run full local proxy adapter audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunLocalProxyAdapterAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyAdapterGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapter generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localproxyadapter", "localproxyadapter-report-golden.json"), "local proxy adapter fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localproxyadapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localproxyadapter.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalProxyAdapterCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localproxyadapter fixtures: %s (%d runs, %d controls)\n", *out, len(set.Runs), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runLocalProxyAdapterVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapter verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localproxyadapter", "localproxyadapter-report-golden.json"), "local proxy adapter fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localproxyadapter.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyadapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyadapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalProxyAdapterCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localproxyadapter compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local proxy adapter fixture")
+	newPath := flags.String("new", "", "new local proxy adapter fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localproxyadapter.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localproxyadapter.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localproxyadapter.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := localproxyadapter.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalProxyAdapterCompanions(out string, set localproxyadapter.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"config.json", set.Config},
+		{"accepted-requests.json", set.Requests},
+		{"stream-runs.json", set.Runs},
+		{"prototype-summary.json", set.Summary},
+		{"integration-report.json", set.Integration},
+		{"resource-limit-report.json", set.ResourceLimits},
+		{"misuse-report.json", set.Misuse},
+		{"localproxyadapter-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := localproxyadapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
