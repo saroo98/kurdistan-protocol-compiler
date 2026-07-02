@@ -56,6 +56,7 @@ func PreAdapterReadinessMatrix() []ReadinessItem {
 		item("concurrency/race prep", "nonce/replay concurrent checks and race-test advice"),
 		item("documentation", "KIP-0020 and PRE_ADAPTER_READINESS evidence"),
 		item("Android architecture review", "M56 user flows, permission model, UI states, diagnostics/privacy, kill-switch, runtime composition, M57/M58 contracts, and generated parity"),
+		item("Android local runtime port", "M57 Android-shaped profile loading, lifecycle, storage boundaries, diagnostics, concurrency assumptions, shutdown, misuse controls, and generated parity"),
 	}
 }
 
