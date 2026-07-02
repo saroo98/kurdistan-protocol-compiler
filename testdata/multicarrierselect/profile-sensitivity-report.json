@@ -1,0 +1,21 @@
+{
+  "profile_count": 8,
+  "unique_selection_hashes": 9,
+  "selection_fingerprints": [
+    "sha256:1ddaffe420232b095072673677598b5f39989debfe55ba66fc19fb1a2cac5932",
+    "sha256:8177666497cb0b88e3b060e3445fd2ec7e7084d8ebd112380f078eb241534b54",
+    "sha256:8227d42496df75a55205f6f5583ea8a99f432cb8356010a08ff6ef9b007083b8",
+    "sha256:9b96068eaad08b3507038447afe09dbda200ab6c4be3c42fade82b4a7e3fd8f8",
+    "sha256:b2a42ecf487863808687a2ee3a93ec64792c8bb0281f2afcbc0f126a7fe43c14",
+    "sha256:c2ac94301d9a364dccb56fd196f605e8245546321e6bbf8a18990773f81e3f13",
+    "sha256:c592fb7353a55e84602afb565bdc3ddfb25f667adb259a68378f89e2aeedb63b",
+    "sha256:cb15191b4ade4d874c6bdf0747dee544c36051992bb67daab929a9b51e66540f",
+    "sha256:f1f859b485afd00e405c35edae95407da2e3723beb820d7b684ee63b52c97c25"
+  ],
+  "profile_diversity_class": "multi_family_profile_sensitive",
+  "fixed_carrier_controls": 1,
+  "padding_only_controls": 1,
+  "profile_insensitive_checks": 1,
+  "diversity_score": 0.89,
+  "conclusion": "passed"
+}

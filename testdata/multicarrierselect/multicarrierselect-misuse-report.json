@@ -1,0 +1,98 @@
+{
+  "findings": [
+    {
+      "name": "multicarrierselect_fixed_carrier_default",
+      "detected": true,
+      "risk_bucket": "medium",
+      "safe_error": "blocked_multicarrierselect_fixed_carrier_default"
+    },
+    {
+      "name": "multicarrierselect_profile_insensitive_selection",
+      "detected": true,
+      "risk_bucket": "medium",
+      "safe_error": "blocked_multicarrierselect_profile_insensitive_selection"
+    },
+    {
+      "name": "multicarrierselect_padding_only_selection_variation",
+      "detected": true,
+      "risk_bucket": "medium",
+      "safe_error": "blocked_multicarrierselect_padding_only_selection_variation"
+    },
+    {
+      "name": "multicarrierselect_high_risk_default_allowed",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_high_risk_default_allowed"
+    },
+    {
+      "name": "multicarrierselect_unsafe_fallback_allowed",
+      "detected": true,
+      "risk_bucket": "critical",
+      "safe_error": "blocked_multicarrierselect_unsafe_fallback_allowed"
+    },
+    {
+      "name": "multicarrierselect_measurementreview_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_measurementreview_bypass"
+    },
+    {
+      "name": "multicarrierselect_carrierreview_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_carrierreview_bypass"
+    },
+    {
+      "name": "multicarrierselect_pathhealth_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_pathhealth_bypass"
+    },
+    {
+      "name": "multicarrierselect_pathrace_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_pathrace_bypass"
+    },
+    {
+      "name": "multicarrierselect_transportbundle_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_transportbundle_bypass"
+    },
+    {
+      "name": "multicarrierselect_labegress_bypass",
+      "detected": true,
+      "risk_bucket": "high",
+      "safe_error": "blocked_multicarrierselect_labegress_bypass"
+    },
+    {
+      "name": "multicarrierselect_public_network_allowed",
+      "detected": true,
+      "risk_bucket": "critical",
+      "safe_error": "blocked_multicarrierselect_public_network_allowed"
+    },
+    {
+      "name": "multicarrierselect_payload_logging_allowed",
+      "detected": true,
+      "risk_bucket": "medium",
+      "safe_error": "blocked_multicarrierselect_payload_logging_allowed"
+    },
+    {
+      "name": "multicarrierselect_secret_leak",
+      "detected": true,
+      "risk_bucket": "critical",
+      "safe_error": "blocked_multicarrierselect_secret_leak"
+    },
+    {
+      "name": "multicarrierselect_generated_backend_drift",
+      "detected": true,
+      "risk_bucket": "medium",
+      "safe_error": "blocked_multicarrierselect_generated_backend_drift"
+    }
+  ],
+  "detected_count": 15,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

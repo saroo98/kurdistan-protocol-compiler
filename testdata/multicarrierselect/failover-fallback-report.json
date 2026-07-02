@@ -1,0 +1,20 @@
+{
+  "failover_classes": [
+    "primary_active",
+    "backup_ready",
+    "standby",
+    "none"
+  ],
+  "fallback_classes": [
+    "safe_backup_available",
+    "failover_candidate",
+    "bounded_retry_only",
+    "none",
+    "blocked_unsafe"
+  ],
+  "primary_selected": "carrier_candidate_https_primary",
+  "backup_selected": "carrier_candidate_dns_survival_backup",
+  "unsafe_fallback_blocked": 1,
+  "high_risk_blocked": 1,
+  "conclusion": "passed"
+}

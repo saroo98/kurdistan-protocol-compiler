@@ -1,0 +1,13 @@
+{
+  "docs_checked": 4,
+  "unsafe_claims_found": 0,
+  "blocked_claims": [
+    "bypass_guarantee_claim",
+    "undetectability_claim",
+    "field_readiness_claim",
+    "production_vpn_claim",
+    "real_dns_probe_claim",
+    "real_https_claim"
+  ],
+  "conclusion": "passed"
+}

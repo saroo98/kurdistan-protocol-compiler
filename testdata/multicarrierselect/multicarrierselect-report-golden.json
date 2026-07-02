@@ -1,0 +1,621 @@
+{
+  "version": "multicarrierselect-v1",
+  "fixture_id": "multi_carrier_runtime_selection_v1",
+  "backend_version": "0.46.0-lab",
+  "generated_at": "2026-07-02T00:46:00Z",
+  "report": {
+    "version": "multicarrierselect-v1",
+    "backend_version": "0.46.0-lab",
+    "fixture_id": "multi_carrier_runtime_selection_v1",
+    "generated_at": "2026-07-02T00:46:00Z",
+    "carrier_families": [
+      {
+        "family": "https_like_lab",
+        "implemented": true,
+        "reviewed": true,
+        "risk_bucket": "reviewed_lab_medium",
+        "capability_class": "bounded_request_response",
+        "blocked_behaviors": [
+          "cdn_provider",
+          "host_header",
+          "public_network",
+          "real_tls",
+          "sni"
+        ],
+        "trace_safe": true,
+        "hash": "sha256:9513fe2b981ac8efc92fe291e5616e53a17618cfb9a0d5ca9bbf7391ba711016"
+      },
+      {
+        "family": "dns_survival_lab",
+        "implemented": true,
+        "reviewed": true,
+        "risk_bucket": "reviewed_lab_constrained",
+        "capability_class": "bounded_query_response",
+        "blocked_behaviors": [
+          "domain_dependency",
+          "exact_query",
+          "public_resolver",
+          "real_dns_query",
+          "resolver_ip"
+        ],
+        "trace_safe": true,
+        "hash": "sha256:67eebcd11f53143aa9d5478da2ad607ae2bb135c6a05cd922409f57d0589fd32"
+      },
+      {
+        "family": "constrained_request_response_lab",
+        "implemented": true,
+        "reviewed": true,
+        "risk_bucket": "reviewed_lab_constrained",
+        "capability_class": "low_capacity_request_response",
+        "blocked_behaviors": [
+          "measurement_upload",
+          "packet_capture",
+          "payload_logging"
+        ],
+        "trace_safe": true,
+        "hash": "sha256:6a7e0cf4354f067a1dc1611484f67004a20615a0788a816cecc16620d668852b"
+      },
+      {
+        "family": "rejected_unsafe",
+        "implemented": false,
+        "reviewed": false,
+        "risk_bucket": "rejected",
+        "capability_class": "blocked_fallback",
+        "blocked_behaviors": [
+          "arbitrary_egress",
+          "public_network"
+        ],
+        "trace_safe": true,
+        "hash": "sha256:3160f610cbddbb6db018b400743123c74d381952e8e704bdbcd1949da7651fec"
+      },
+      {
+        "family": "control_unsafe",
+        "implemented": false,
+        "reviewed": false,
+        "risk_bucket": "control",
+        "capability_class": "mutation_control",
+        "blocked_behaviors": [
+          "review_bypass",
+          "unsafe_fallback"
+        ],
+        "trace_safe": true,
+        "hash": "sha256:94c7453058fcbc19c754ffce5aa93432ab42a385f86e9a3ad2904efd14cb5671"
+      }
+    ],
+    "candidates": [
+      {
+        "id": "carrier_candidate_https_primary",
+        "family": "https_like_lab",
+        "profile_class": "profile_even",
+        "eligibility_class": "eligible_primary",
+        "decision_class": "selected_primary",
+        "race_class": "raced_and_selected",
+        "health_class": "healthy_fresh",
+        "failover_class": "primary_active",
+        "fallback_class": "safe_backup_available",
+        "risk_bucket": "reviewed_lab_medium",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": true,
+        "blocked": false,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:b2a42ecf487863808687a2ee3a93ec64792c8bb0281f2afcbc0f126a7fe43c14"
+      },
+      {
+        "id": "carrier_candidate_dns_survival_backup",
+        "family": "dns_survival_lab",
+        "profile_class": "profile_odd",
+        "eligibility_class": "eligible_backup",
+        "decision_class": "selected_backup",
+        "race_class": "raced_and_selected",
+        "health_class": "healthy_constrained",
+        "failover_class": "backup_ready",
+        "fallback_class": "failover_candidate",
+        "risk_bucket": "reviewed_lab_constrained",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": false,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:9b96068eaad08b3507038447afe09dbda200ab6c4be3c42fade82b4a7e3fd8f8"
+      },
+      {
+        "id": "carrier_candidate_constrained_request_response",
+        "family": "constrained_request_response_lab",
+        "profile_class": "profile_survival",
+        "eligibility_class": "eligible_constrained",
+        "decision_class": "raced_and_rejected",
+        "race_class": "raced_and_rejected",
+        "health_class": "degraded_but_usable",
+        "failover_class": "standby",
+        "fallback_class": "bounded_retry_only",
+        "risk_bucket": "reviewed_lab_constrained",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": false,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:c2ac94301d9a364dccb56fd196f605e8245546321e6bbf8a18990773f81e3f13"
+      },
+      {
+        "id": "carrier_candidate_measurement_blocked",
+        "family": "https_like_lab",
+        "profile_class": "profile_review_blocked",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_by_measurementreview",
+        "race_class": "not_raced",
+        "health_class": "unknown",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "blocked_review",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:8177666497cb0b88e3b060e3445fd2ec7e7084d8ebd112380f078eb241534b54"
+      },
+      {
+        "id": "carrier_candidate_carrierreview_blocked",
+        "family": "dns_survival_lab",
+        "profile_class": "profile_review_blocked",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_by_carrierreview",
+        "race_class": "not_raced",
+        "health_class": "unknown",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "blocked_review",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:8227d42496df75a55205f6f5583ea8a99f432cb8356010a08ff6ef9b007083b8"
+      },
+      {
+        "id": "carrier_candidate_pathhealth_blocked",
+        "family": "constrained_request_response_lab",
+        "profile_class": "profile_unhealthy",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_by_pathhealth",
+        "race_class": "not_raced",
+        "health_class": "unhealthy",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "blocked_health",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:c592fb7353a55e84602afb565bdc3ddfb25f667adb259a68378f89e2aeedb63b"
+      },
+      {
+        "id": "carrier_candidate_profile_policy_blocked",
+        "family": "https_like_lab",
+        "profile_class": "profile_policy_denied",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_by_profile_policy",
+        "race_class": "not_raced",
+        "health_class": "unknown",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "blocked_profile",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:cb15191b4ade4d874c6bdf0747dee544c36051992bb67daab929a9b51e66540f"
+      },
+      {
+        "id": "carrier_candidate_high_risk_blocked",
+        "family": "rejected_unsafe",
+        "profile_class": "profile_high_risk",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_as_high_risk",
+        "race_class": "not_raced",
+        "health_class": "unknown",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "high_risk",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": true,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:f1f859b485afd00e405c35edae95407da2e3723beb820d7b684ee63b52c97c25"
+      },
+      {
+        "id": "carrier_candidate_unsafe_fallback_blocked",
+        "family": "control_unsafe",
+        "profile_class": "profile_control",
+        "eligibility_class": "blocked",
+        "decision_class": "blocked_as_unsafe_fallback",
+        "race_class": "not_raced",
+        "health_class": "unknown",
+        "failover_class": "none",
+        "fallback_class": "none",
+        "risk_bucket": "unsafe_control",
+        "measurementreview_class": "measurementreview_enforced",
+        "carrierreview_class": "carrierreview_enforced",
+        "pathhealth_class": "pathhealth_enforced",
+        "transportbundle_class": "transportbundle_enforced",
+        "generated_compatible": false,
+        "selected": false,
+        "blocked": true,
+        "profile_sensitive": true,
+        "payload_logged": false,
+        "secret_logged": false,
+        "hash": "sha256:1ddaffe420232b095072673677598b5f39989debfe55ba66fc19fb1a2cac5932"
+      }
+    ],
+    "inventory": {
+      "constrained_request_response_lab": 2,
+      "control_unsafe": 1,
+      "dns_survival_lab": 2,
+      "https_like_lab": 3,
+      "rejected_unsafe": 1
+    },
+    "selection_policy": {
+      "policy_id": "multi_carrier_policy_profile_pathhealth_reviewed_lab",
+      "policy_classes": [
+        "profile_sensitive",
+        "review_gated",
+        "health_scored",
+        "race_aware",
+        "fail_closed"
+      ],
+      "decision_classes": [
+        "selected_primary",
+        "selected_backup",
+        "raced_and_selected",
+        "raced_and_rejected",
+        "blocked_by_measurementreview",
+        "blocked_by_carrierreview",
+        "blocked_by_pathhealth",
+        "blocked_by_profile_policy",
+        "blocked_as_high_risk",
+        "blocked_as_unsafe_fallback"
+      ],
+      "profile_sensitive": true,
+      "high_risk_default_rejected": true,
+      "unsafe_fallback_rejected": true,
+      "measurementreview_enforced": true,
+      "carrierreview_enforced": true,
+      "pathhealth_enforced": true,
+      "pathrace_enforced": true,
+      "transportbundle_enforced": true,
+      "labegress_enforced": true,
+      "conclusion": "passed"
+    },
+    "race": {
+      "race_classes": [
+        "raced_and_selected",
+        "raced_and_rejected",
+        "not_raced"
+      ],
+      "raced_candidates": 3,
+      "selected_candidates": 2,
+      "rejected_candidates": 1,
+      "stale_rejected": 1,
+      "deterministic": true,
+      "conclusion": "passed"
+    },
+    "health": {
+      "health_classes": [
+        "healthy_fresh",
+        "healthy_constrained",
+        "degraded_but_usable",
+        "unhealthy",
+        "unknown"
+      ],
+      "reports_checked": 9,
+      "blocked_by_pathhealth": 1,
+      "failover_candidates": 2,
+      "fail_closed_on_no_carrier": true,
+      "conclusion": "passed"
+    },
+    "failover": {
+      "failover_classes": [
+        "primary_active",
+        "backup_ready",
+        "standby",
+        "none"
+      ],
+      "fallback_classes": [
+        "safe_backup_available",
+        "failover_candidate",
+        "bounded_retry_only",
+        "none",
+        "blocked_unsafe"
+      ],
+      "primary_selected": "carrier_candidate_https_primary",
+      "backup_selected": "carrier_candidate_dns_survival_backup",
+      "unsafe_fallback_blocked": 1,
+      "high_risk_blocked": 1,
+      "conclusion": "passed"
+    },
+    "profile_sensitivity": {
+      "profile_count": 8,
+      "unique_selection_hashes": 9,
+      "selection_fingerprints": [
+        "sha256:1ddaffe420232b095072673677598b5f39989debfe55ba66fc19fb1a2cac5932",
+        "sha256:8177666497cb0b88e3b060e3445fd2ec7e7084d8ebd112380f078eb241534b54",
+        "sha256:8227d42496df75a55205f6f5583ea8a99f432cb8356010a08ff6ef9b007083b8",
+        "sha256:9b96068eaad08b3507038447afe09dbda200ab6c4be3c42fade82b4a7e3fd8f8",
+        "sha256:b2a42ecf487863808687a2ee3a93ec64792c8bb0281f2afcbc0f126a7fe43c14",
+        "sha256:c2ac94301d9a364dccb56fd196f605e8245546321e6bbf8a18990773f81e3f13",
+        "sha256:c592fb7353a55e84602afb565bdc3ddfb25f667adb259a68378f89e2aeedb63b",
+        "sha256:cb15191b4ade4d874c6bdf0747dee544c36051992bb67daab929a9b51e66540f",
+        "sha256:f1f859b485afd00e405c35edae95407da2e3723beb820d7b684ee63b52c97c25"
+      ],
+      "profile_diversity_class": "multi_family_profile_sensitive",
+      "fixed_carrier_controls": 1,
+      "padding_only_controls": 1,
+      "profile_insensitive_checks": 1,
+      "diversity_score": 0.89,
+      "conclusion": "passed"
+    },
+    "compositions": [
+      {
+        "layer": "pathrace",
+        "composed": true,
+        "enforced": true,
+        "evidence": "pathrace_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "pathhealth",
+        "composed": true,
+        "enforced": true,
+        "evidence": "pathhealth_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "transportbundle",
+        "composed": true,
+        "enforced": true,
+        "evidence": "transportbundle_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "measurementreview",
+        "composed": true,
+        "enforced": true,
+        "evidence": "measurementreview_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "carrierreview",
+        "composed": true,
+        "enforced": true,
+        "evidence": "carrierreview_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "relaybridge",
+        "composed": true,
+        "enforced": true,
+        "evidence": "relaybridge_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "labegress",
+        "composed": true,
+        "enforced": true,
+        "evidence": "labegress_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "localpipeline",
+        "composed": true,
+        "enforced": true,
+        "evidence": "localpipeline_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "runtime",
+        "composed": true,
+        "enforced": true,
+        "evidence": "runtime_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "security",
+        "composed": true,
+        "enforced": true,
+        "evidence": "security_safe_metadata",
+        "conclusion": "passed"
+      },
+      {
+        "layer": "generated_backend",
+        "composed": true,
+        "enforced": true,
+        "evidence": "generated_backend_safe_metadata",
+        "conclusion": "passed"
+      }
+    ],
+    "misuse": {
+      "findings": [
+        {
+          "name": "multicarrierselect_fixed_carrier_default",
+          "detected": true,
+          "risk_bucket": "medium",
+          "safe_error": "blocked_multicarrierselect_fixed_carrier_default"
+        },
+        {
+          "name": "multicarrierselect_profile_insensitive_selection",
+          "detected": true,
+          "risk_bucket": "medium",
+          "safe_error": "blocked_multicarrierselect_profile_insensitive_selection"
+        },
+        {
+          "name": "multicarrierselect_padding_only_selection_variation",
+          "detected": true,
+          "risk_bucket": "medium",
+          "safe_error": "blocked_multicarrierselect_padding_only_selection_variation"
+        },
+        {
+          "name": "multicarrierselect_high_risk_default_allowed",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_high_risk_default_allowed"
+        },
+        {
+          "name": "multicarrierselect_unsafe_fallback_allowed",
+          "detected": true,
+          "risk_bucket": "critical",
+          "safe_error": "blocked_multicarrierselect_unsafe_fallback_allowed"
+        },
+        {
+          "name": "multicarrierselect_measurementreview_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_measurementreview_bypass"
+        },
+        {
+          "name": "multicarrierselect_carrierreview_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_carrierreview_bypass"
+        },
+        {
+          "name": "multicarrierselect_pathhealth_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_pathhealth_bypass"
+        },
+        {
+          "name": "multicarrierselect_pathrace_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_pathrace_bypass"
+        },
+        {
+          "name": "multicarrierselect_transportbundle_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_transportbundle_bypass"
+        },
+        {
+          "name": "multicarrierselect_labegress_bypass",
+          "detected": true,
+          "risk_bucket": "high",
+          "safe_error": "blocked_multicarrierselect_labegress_bypass"
+        },
+        {
+          "name": "multicarrierselect_public_network_allowed",
+          "detected": true,
+          "risk_bucket": "critical",
+          "safe_error": "blocked_multicarrierselect_public_network_allowed"
+        },
+        {
+          "name": "multicarrierselect_payload_logging_allowed",
+          "detected": true,
+          "risk_bucket": "medium",
+          "safe_error": "blocked_multicarrierselect_payload_logging_allowed"
+        },
+        {
+          "name": "multicarrierselect_secret_leak",
+          "detected": true,
+          "risk_bucket": "critical",
+          "safe_error": "blocked_multicarrierselect_secret_leak"
+        },
+        {
+          "name": "multicarrierselect_generated_backend_drift",
+          "detected": true,
+          "risk_bucket": "medium",
+          "safe_error": "blocked_multicarrierselect_generated_backend_drift"
+        }
+      ],
+      "detected_count": 15,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "parity": {
+      "compared_candidates": 9,
+      "semantic_matches": 9,
+      "decision_matches": 9,
+      "generated_markers": [
+        "MultiCarrierSelectSchemaVersion",
+        "GeneratedMultiCarrierSelectFixtureSet",
+        "GeneratedMultiCarrierSelectParity",
+        "MultiCarrierSelectFamilyClasses",
+        "MultiCarrierSelectDecisionClasses",
+        "MultiCarrierSelectMisuseControls"
+      ],
+      "allowed_differences": [
+        "generated_safe_hash_domain"
+      ],
+      "unexpected_differences": null,
+      "payload_logged": false,
+      "secret_logged": false,
+      "conclusion": "passed"
+    },
+    "public_claim_safety": {
+      "docs_checked": 4,
+      "unsafe_claims_found": 0,
+      "blocked_claims": [
+        "bypass_guarantee_claim",
+        "undetectability_claim",
+        "field_readiness_claim",
+        "production_vpn_claim",
+        "real_dns_probe_claim",
+        "real_https_claim"
+      ],
+      "conclusion": "passed"
+    },
+    "fixture_hash": "sha256:da75db0121393be772fd16ea2c7ea464b8941e1873bae82223c1cb0f03985ac4",
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed",
+    "recommended_next_milestone": "M47: carrier collapse and mutation audit"
+  },
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed",
+  "fixture_hash": "sha256:da75db0121393be772fd16ea2c7ea464b8941e1873bae82223c1cb0f03985ac4"
+}
