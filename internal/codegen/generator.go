@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/constrainedcarrierreview"
 	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
@@ -1942,6 +1943,46 @@ func GeneratedHTTPSCarrierAdversaryParity() (httpscarrieradversary.GeneratedPari
 	return set.Parity, nil
 }
 `, quote(httpscarrieradversary.Version), quote(p.ID), p.Seed, quote(httpscarrieradversary.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpscarrieradversary.RecommendedNextMilestone), len(httpsCarrierAdversaryCollapseControls()), len(httpsCarrierAdversaryUnsafeFallbackControls()), len(httpsCarrierAdversaryForbiddenControls()), quoteSlice(httpsCarrierAdversaryScenarios()), quoteSlice(httpsCarrierAdversaryCollapseControls()), quoteSlice(httpsCarrierAdversaryUnsafeFallbackControls()), quoteSlice(httpsCarrierAdversaryReplayControls()), quoteSlice(httpsCarrierAdversaryStreamControls()), quoteSlice(httpsCarrierAdversaryForbiddenControls()))
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierReviewSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/constrainedcarrierreview"
+)
+
+const ConstrainedCarrierReviewSchemaVersion = %[1]s
+const ConstrainedCarrierReviewGeneratedProfileID = %[2]s
+const ConstrainedCarrierReviewGeneratedProfileSeed int64 = %[3]d
+const ConstrainedCarrierReviewBackendVersion = %[4]s
+const ConstrainedCarrierReviewRuntimePolicy = %[5]s
+const ConstrainedCarrierReviewRecommendedNextMilestone = %[6]s
+const ConstrainedCarrierReviewQueryShapeCount = %[7]d
+const ConstrainedCarrierReviewResponseShapeCount = %[8]d
+const ConstrainedCarrierReviewResolverBucketCount = %[9]d
+const ConstrainedCarrierReviewM45RequirementCount = %[10]d
+
+var ConstrainedCarrierReviewBlockedBehaviors = %[11]s
+var ConstrainedCarrierReviewResolverBuckets = %[12]s
+var ConstrainedCarrierReviewQueryShapeClasses = %[13]s
+var ConstrainedCarrierReviewResponseShapeClasses = %[14]s
+var ConstrainedCarrierReviewM45Requirements = %[15]s
+var ConstrainedCarrierReviewMisuseControls = %[16]s
+
+func GeneratedConstrainedCarrierReviewFixtureSet() (constrainedcarrierreview.FixtureSet, error) {
+	return constrainedcarrierreview.GenerateFixtureSet()
+}
+
+func GeneratedConstrainedCarrierReviewParity() (constrainedcarrierreview.ParityReport, error) {
+	set, err := constrainedcarrierreview.GenerateFixtureSet()
+	if err != nil {
+		return constrainedcarrierreview.ParityReport{}, err
+	}
+	return set.Report.Parity, nil
+}
+`, quote(constrainedcarrierreview.Version), quote(p.ID), p.Seed, quote(constrainedcarrierreview.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(constrainedcarrierreview.RecommendedNextMilestone), len(constrainedCarrierReviewQueryShapeClasses()), len(constrainedCarrierReviewResponseShapeClasses()), len(constrainedCarrierReviewResolverBuckets()), len(constrainedCarrierReviewM45Requirements()), quoteSlice(constrainedCarrierReviewBlockedBehaviors()), quoteSlice(constrainedCarrierReviewResolverBuckets()), quoteSlice(constrainedCarrierReviewQueryShapeClasses()), quoteSlice(constrainedCarrierReviewResponseShapeClasses()), quoteSlice(constrainedCarrierReviewM45Requirements()), quoteSlice(constrainedcarrierreview.RequiredMisuseNames()))
 	if err != nil {
 		return nil, err
 	}
@@ -5382,6 +5423,89 @@ func TestGeneratedHTTPSCarrierAdversaryHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	constrainedCarrierReviewTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/constrainedcarrierreview"
+)
+
+func TestGeneratedConstrainedCarrierReview(t *testing.T) {
+	if ConstrainedCarrierReviewSchemaVersion != constrainedcarrierreview.Version || ConstrainedCarrierReviewGeneratedProfileID != ProfileID {
+		t.Fatalf("generated constrained carrier review constants drifted")
+	}
+	set, err := GeneratedConstrainedCarrierReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || set.BackendVersion != constrainedcarrierreview.BackendVersion {
+		t.Fatalf("generated constrained carrier review fixture failed: %%+v", set)
+	}
+	if ConstrainedCarrierReviewQueryShapeCount < 10 || ConstrainedCarrierReviewResponseShapeCount < 9 || ConstrainedCarrierReviewResolverBucketCount < 4 {
+		t.Fatalf("generated constrained carrier review taxonomy constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierReviewParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedConstrainedCarrierReviewParity(t *testing.T) {
+	parity, err := GeneratedConstrainedCarrierReviewParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated constrained carrier review parity failed: %%+v", parity)
+	}
+	if ConstrainedCarrierReviewRuntimePolicy == "" || ConstrainedCarrierReviewRecommendedNextMilestone == "" || len(ConstrainedCarrierReviewMisuseControls) < 20 {
+		t.Fatalf("constrained carrier review generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	constrainedCarrierReviewHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/constrainedcarrierreview"
+)
+
+func TestGeneratedConstrainedCarrierReviewHygiene(t *testing.T) {
+	set, err := GeneratedConstrainedCarrierReviewFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := constrainedcarrierreview.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_secret": "synthetic"},
+		map[string]string{"resolver_address_value": "synthetic"},
+		map[string]string{"exact_query_value": "synthetic"},
+		map[string]bool{"public_resolver_behavior": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := constrainedcarrierreview.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe constrained carrier review metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5734,6 +5858,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpscarrierreview_generated.go", Content: httpsCarrierReviewSource, Go: true},
 		{RelPath: "protocol/httpslikecarrier_generated.go", Content: httpsLikeCarrierSource, Go: true},
 		{RelPath: "protocol/httpscarrieradversary_generated.go", Content: httpsCarrierAdversarySource, Go: true},
+		{RelPath: "protocol/constrainedcarrierreview_generated.go", Content: constrainedCarrierReviewSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5835,6 +5960,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpscarrieradversary_test.go", Content: httpsCarrierAdversaryTestSource, Go: true},
 		{RelPath: "protocol/httpscarrieradversary_parity_test.go", Content: httpsCarrierAdversaryParityTestSource, Go: true},
 		{RelPath: "protocol/httpscarrieradversary_hygiene_test.go", Content: httpsCarrierAdversaryHygieneTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrierreview_test.go", Content: constrainedCarrierReviewTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrierreview_parity_test.go", Content: constrainedCarrierReviewParityTestSource, Go: true},
+		{RelPath: "protocol/constrainedcarrierreview_hygiene_test.go", Content: constrainedCarrierReviewHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -6760,6 +6888,62 @@ func httpsCarrierAdversaryForbiddenControls() []string {
 			"httpscarrieradversary_generated_backend_drift",
 			"httpscarrieradversary_public_claim_overstatement",
 		}...)
+}
+
+func constrainedCarrierReviewBlockedBehaviors() []string {
+	return []string{
+		"public_resolver_use",
+		"real_query_default",
+		"resolver_dialing",
+		"tunneling_runtime",
+		"exact_query_logging",
+		"resolver_address_logging",
+		"wildcard_resolver_configuration",
+		"domain_dependence",
+		"public_network_egress",
+		"arbitrary_proxying",
+		"payload_forwarding",
+		"packet_capture",
+		"payload_logging",
+		"measurement_upload",
+	}
+}
+
+func constrainedCarrierReviewResolverBuckets() []string {
+	return []string{"loopback_harness", "fixture_resolver", "failure_fixture", "poison_fixture"}
+}
+
+func constrainedCarrierReviewQueryShapeClasses() []string {
+	return []string{
+		"small_query_marker",
+		"chunked_query_marker",
+		"repeated_query_marker",
+		"delayed_query_marker",
+		"truncated_query_marker",
+		"retry_query_marker",
+		"failure_query_marker",
+		"control_exact_query_leak",
+		"control_domain_leak",
+		"control_resolver_leak",
+	}
+}
+
+func constrainedCarrierReviewResponseShapeClasses() []string {
+	return []string{
+		"small_response_marker",
+		"truncated_response_marker",
+		"delayed_response_marker",
+		"failure_response_marker",
+		"retry_response_marker",
+		"poisoning_failure_marker",
+		"reset_response_marker",
+		"control_payload_leak",
+		"control_resolver_leak",
+	}
+}
+
+func constrainedCarrierReviewM45Requirements() []string {
+	return []string{"quick_full_verify_compare", "generated_parity", "trace_hygiene", "fixture_drift", "mutation_detection"}
 }
 
 func findRepoRoot() (string, error) {

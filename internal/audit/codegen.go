@@ -121,6 +121,7 @@ type CodegenAuditSummary struct {
 	HTTPSCarrierReviewParity         string                         `json:"httpscarrierreview_generated_backend_parity"`
 	HTTPSLikeCarrierParity           string                         `json:"httpslikecarrier_generated_backend_parity"`
 	HTTPSCarrierAdversaryParity      string                         `json:"httpscarrieradversary_generated_backend_parity"`
+	ConstrainedCarrierReviewParity   string                         `json:"constrainedcarrierreview_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -231,6 +232,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	httpsCarrierReviewGate := GeneratedHTTPSCarrierReviewParityGate(corpus, testFailures)
 	httpsLikeCarrierGate := GeneratedHTTPSLikeCarrierParityGate(corpus, testFailures)
 	httpsCarrierAdversaryGate := GeneratedHTTPSCarrierAdversaryParityGate(corpus, testFailures)
+	constrainedCarrierReviewGate := GeneratedConstrainedCarrierReviewParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -281,6 +283,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		httpsCarrierReviewGate,
 		httpsLikeCarrierGate,
 		httpsCarrierAdversaryGate,
+		constrainedCarrierReviewGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1081,6 +1084,10 @@ func GeneratedHTTPSCarrierAdversaryParityGate(corpus GeneratedBackendTraceCorpus
 	return generatedMilestoneSourceGate(corpus, testFailures, "httpscarrieradversary", "HTTPS carrier adversary", "HTTPSCarrierAdversarySchemaVersion")
 }
 
+func GeneratedConstrainedCarrierReviewParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "constrainedcarrierreview", "constrained carrier review", "ConstrainedCarrierReviewSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1290,6 +1297,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		HTTPSCarrierReviewParity:         status("httpscarrierreview_generated_backend_parity"),
 		HTTPSLikeCarrierParity:           status("httpslikecarrier_generated_backend_parity"),
 		HTTPSCarrierAdversaryParity:      status("httpscarrieradversary_generated_backend_parity"),
+		ConstrainedCarrierReviewParity:   status("constrainedcarrierreview_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
