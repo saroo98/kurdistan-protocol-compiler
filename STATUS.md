@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T02:35:02Z`
+- Generated at: `2026-07-02T03:14:19Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -453,6 +453,25 @@
 | `multicarrierselect_public_claim_safety` | PASS | `required` | 4 public docs scanned |
 | `multicarrierselect_mutant_detection` | PASS | `required` | 15/15 multi-carrier selection mutant modes detected |
 | `multicarrierselect_fixture_drift` | PASS | `required` | passed |
+| `carriercollapse_family_diversity` | PASS | `required` | 3 carrier families |
+| `carriercollapse_shape_diversity` | PASS | `required` | 12 shape classes |
+| `carriercollapse_profile_sensitivity` | PASS | `required` | 9 profile hashes |
+| `carriercollapse_bundle_sensitivity` | PASS | `required` | transport bundle sensitivity checked |
+| `carriercollapse_pathrace_enforcement` | PASS | `required` | pathrace bypasses rejected=1 |
+| `carriercollapse_pathhealth_enforcement` | PASS | `required` | pathhealth bypasses rejected=1 |
+| `carriercollapse_measurementreview_enforcement` | PASS | `required` | measurementreview bypasses rejected=1 |
+| `carriercollapse_carrierreview_enforcement` | PASS | `required` | carrierreview bypasses rejected=1 |
+| `carriercollapse_labegress_enforcement` | PASS | `required` | labegress bypasses rejected=1 |
+| `carriercollapse_fallback_safety` | PASS | `required` | 3 fallback classes blocked |
+| `carriercollapse_runtime_security_metadata` | PASS | `required` | runtime/security metadata consistent |
+| `carriercollapse_stream_isolation` | PASS | `required` | stream isolation preserved |
+| `carriercollapse_backpressure_visibility` | PASS | `required` | backpressure visible |
+| `carriercollapse_reset_propagation` | PASS | `required` | reset propagation checked |
+| `carriercollapse_generated_backend_parity` | PASS | `required` | 4 generated markers checked |
+| `carriercollapse_trace_hygiene` | PASS | `required` | 19 fixtures scanned |
+| `carriercollapse_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `carriercollapse_mutant_detection` | PASS | `required` | 16/16 carrier collapse mutant modes detected |
+| `carriercollapse_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -466,9 +485,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `89 ms`
+- Profile generation: `87 ms`
 - Trace generation: `20 ms`
-- Total audit runtime: `2198 ms`
+- Total audit runtime: `2215 ms`
 
 ## Corpus Diversity Summary
 
@@ -491,9 +510,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3190646229639785`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.3198526734991525`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 

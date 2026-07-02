@@ -137,8 +137,8 @@ go run ./cmd/kcheck codegen --quick
 
 ## Limitations
 
-M46 is still a deterministic lab selection model. It does not implement public carrier routing, real carrier probing, arbitrary target forwarding, public-network egress, packet capture, payload logging, or automatic deployment behavior. It proves that selection evidence can be composed and audited before a broader carrier mutation audit begins.
+M46 is still a deterministic lab selection model. It does not implement public carrier routing, real carrier probing, arbitrary target forwarding, public-network egress, packet capture, payload logging, or automatic deployment behavior. It proves that selection evidence can be composed and audited before a broader carrier mutation audit.
 
 ## Next Milestone
 
-M47 should attack the selector and carrier composition layer for fixed-carrier collapse, profile-insensitive selection, padding-only selection variation, unsafe fallback, high-risk default selection, review-gate bypasses, and generated backend drift.
+M47 adds the cross-carrier collapse and mutation audit for fixed-carrier collapse, profile-insensitive selection, padding-only selection variation, unsafe fallback, high-risk default selection, review-gate bypasses, and generated backend drift. M48 should review payload-bearing local proxy adapter behavior before any local proxy adapter implementation is allowed.
