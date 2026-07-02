@@ -19,6 +19,7 @@ import (
 	"kurdistan/internal/classifierdata"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/constrainedcarrier"
 	"kurdistan/internal/constrainedcarrierreview"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
@@ -173,6 +174,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "constrainedcarrierreview" {
 		os.Exit(runConstrainedCarrierReview(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "constrainedcarrier" {
+		os.Exit(runConstrainedCarrier(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -5705,6 +5709,178 @@ func writeConstrainedCarrierReviewCompanions(out string, set constrainedcarrierr
 	}
 	for _, write := range writes {
 		if err := constrainedcarrierreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runConstrainedCarrier(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runConstrainedCarrierGenerate(args[1:])
+		case "verify":
+			return runConstrainedCarrierVerify(args[1:])
+		case "compare":
+			return runConstrainedCarrierCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck constrainedcarrier", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick constrained carrier audit")
+	full := flags.Bool("full", false, "run full constrained carrier audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunConstrainedCarrierAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runConstrainedCarrierGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck constrainedcarrier generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "constrainedcarrier", "constrainedcarrier-report-golden.json"), "constrained carrier fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := constrainedcarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := constrainedcarrier.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeConstrainedCarrierCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote constrainedcarrier fixtures: %s (%d scenarios, %d controls)\n", *out, len(set.Scenarios), set.Report.Misuse.DetectedCount)
+	return 0
+}
+
+func runConstrainedCarrierVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck constrainedcarrier verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "constrainedcarrier", "constrainedcarrier-report-golden.json"), "constrained carrier fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := constrainedcarrier.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := constrainedcarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := constrainedcarrier.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runConstrainedCarrierCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck constrainedcarrier compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old constrained carrier fixture")
+	newPath := flags.String("new", "", "new constrained carrier fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := constrainedcarrier.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := constrainedcarrier.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := constrainedcarrier.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := constrainedcarrier.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeConstrainedCarrierCompanions(out string, set constrainedcarrier.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"harness-report.json", set.Report.Harness},
+		{"query-shape-report.json", set.Report.QueryShapes},
+		{"response-shape-report.json", set.Report.ResponseShapes},
+		{"capacity-truncation-report.json", set.Report.CapacityTruncation},
+		{"retry-failure-report.json", set.Report.RetryFailure},
+		{"profile-sensitivity-report.json", set.Report.ProfileSensitivity},
+		{"stream-mapping-report.json", set.Report.Streams},
+		{"backpressure-report.json", set.Report.Backpressure},
+		{"reset-error-report.json", set.Report.ResetError},
+		{"integration-report.json", set.Report.Integrations},
+		{"diagnostics-report.json", set.Report.Diagnostics},
+		{"resource-limits-report.json", set.Report.ResourceLimits},
+		{"constrainedcarrier-misuse-report.json", set.Report.Misuse},
+		{"constrainedcarrier-parity-report.json", set.Report.Parity},
+	}
+	for _, write := range writes {
+		if err := constrainedcarrier.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
