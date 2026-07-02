@@ -124,6 +124,7 @@ type CodegenAuditSummary struct {
 	ConstrainedCarrierReviewParity   string                         `json:"constrainedcarrierreview_generated_backend_parity"`
 	ConstrainedCarrierParity         string                         `json:"constrainedcarrier_generated_backend_parity"`
 	MultiCarrierSelectParity         string                         `json:"multicarrierselect_generated_backend_parity"`
+	CarrierCollapseParity            string                         `json:"carriercollapse_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -237,6 +238,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	constrainedCarrierReviewGate := GeneratedConstrainedCarrierReviewParityGate(corpus, testFailures)
 	constrainedCarrierGate := GeneratedConstrainedCarrierParityGate(corpus, testFailures)
 	multiCarrierSelectGate := GeneratedMultiCarrierSelectParityGate(corpus, testFailures)
+	carrierCollapseGate := GeneratedCarrierCollapseParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -290,6 +292,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		constrainedCarrierReviewGate,
 		constrainedCarrierGate,
 		multiCarrierSelectGate,
+		carrierCollapseGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1102,6 +1105,10 @@ func GeneratedMultiCarrierSelectParityGate(corpus GeneratedBackendTraceCorpus, t
 	return generatedMilestoneSourceGate(corpus, testFailures, "multicarrierselect", "multi-carrier selection", "MultiCarrierSelectSchemaVersion")
 }
 
+func GeneratedCarrierCollapseParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "carriercollapse", "carrier collapse", "CarrierCollapseSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1314,6 +1321,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		ConstrainedCarrierReviewParity:   status("constrainedcarrierreview_generated_backend_parity"),
 		ConstrainedCarrierParity:         status("constrainedcarrier_generated_backend_parity"),
 		MultiCarrierSelectParity:         status("multicarrierselect_generated_backend_parity"),
+		CarrierCollapseParity:            status("carriercollapse_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

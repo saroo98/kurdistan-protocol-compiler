@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
@@ -2069,6 +2070,41 @@ func GeneratedMultiCarrierSelectCandidate(policyClass string) multicarrierselect
 	return multicarrierselect.SelectCarrier(int(MultiCarrierSelectGeneratedProfileSeed), policyClass)
 }
 `, quote(multicarrierselect.Version), quote(p.ID), p.Seed, quote(multicarrierselect.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(multicarrierselect.RecommendedNextMilestone), len(multicarrierselect.RequiredFamilyClasses()), len(multicarrierselect.RequiredDecisionClasses()), len(multicarrierselect.RequiredMisuseNames()), quoteSlice(multicarrierselect.RequiredFamilyClasses()), quoteSlice(multicarrierselect.RequiredDecisionClasses()), quoteSlice(multicarrierselect.RequiredMisuseNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
+	if err != nil {
+		return nil, err
+	}
+
+	carrierCollapseSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/carriercollapse"
+)
+
+const CarrierCollapseSchemaVersion = %[1]s
+const CarrierCollapseGeneratedProfileID = %[2]s
+const CarrierCollapseGeneratedProfileSeed int64 = %[3]d
+const CarrierCollapseBackendVersion = %[4]s
+const CarrierCollapseRuntimePolicy = %[5]s
+const CarrierCollapseRecommendedNextMilestone = %[6]s
+const CarrierCollapseControlCount = %[7]d
+const CarrierCollapseDimensionCount = %[8]d
+
+var CarrierCollapseClasses = %[9]s
+var CarrierCollapseControls = %[10]s
+var CarrierCollapseProfileHints = %[11]s
+
+func GeneratedCarrierCollapseFixtureSet() (carriercollapse.FixtureSet, error) {
+	return carriercollapse.GenerateFixtureSet()
+}
+
+func GeneratedCarrierCollapseParity() (carriercollapse.ParityReport, error) {
+	set, err := carriercollapse.GenerateFixtureSet()
+	if err != nil {
+		return carriercollapse.ParityReport{}, err
+	}
+	return set.Report.Parity, nil
+}
+`, quote(carriercollapse.Version), quote(p.ID), p.Seed, quote(carriercollapse.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(carriercollapse.RecommendedNextMilestone), len(carriercollapse.RequiredMutationNames()), len(carriercollapse.RequiredAuditDimensions()), quoteSlice(carriercollapse.RequiredCollapseClasses()), quoteSlice(carriercollapse.RequiredMutationNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
 	if err != nil {
 		return nil, err
 	}
@@ -5760,6 +5796,88 @@ func TestGeneratedMultiCarrierSelectHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	carrierCollapseTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carriercollapse"
+)
+
+func TestGeneratedCarrierCollapse(t *testing.T) {
+	if CarrierCollapseSchemaVersion != carriercollapse.Version || CarrierCollapseGeneratedProfileID != ProfileID {
+		t.Fatalf("generated carrier collapse constants drifted")
+	}
+	set, err := GeneratedCarrierCollapseFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := carriercollapse.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(CarrierCollapseClasses) < len(carriercollapse.RequiredCollapseClasses()) || len(CarrierCollapseControls) < len(carriercollapse.RequiredMutationNames()) {
+		t.Fatalf("generated carrier collapse constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierCollapseParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedCarrierCollapseParity(t *testing.T) {
+	parity, err := GeneratedCarrierCollapseParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated carrier collapse parity failed: %%+v", parity)
+	}
+	if CarrierCollapseRuntimePolicy == "" || CarrierCollapseRecommendedNextMilestone == "" || CarrierCollapseControlCount < 10 {
+		t.Fatalf("carrier collapse generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	carrierCollapseHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/carriercollapse"
+)
+
+func TestGeneratedCarrierCollapseHygiene(t *testing.T) {
+	set, err := GeneratedCarrierCollapseFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := carriercollapse.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"resolver_ip": "synthetic"},
+		map[string]string{"host_header_value": "synthetic"},
+		map[string]bool{"payload_logged": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := carriercollapse.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe carrier collapse metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -6115,6 +6233,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/constrainedcarrierreview_generated.go", Content: constrainedCarrierReviewSource, Go: true},
 		{RelPath: "protocol/constrainedcarrier_generated.go", Content: constrainedCarrierSource, Go: true},
 		{RelPath: "protocol/multicarrierselect_generated.go", Content: multiCarrierSelectSource, Go: true},
+		{RelPath: "protocol/carriercollapse_generated.go", Content: carrierCollapseSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6225,6 +6344,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/multicarrierselect_test.go", Content: multiCarrierSelectTestSource, Go: true},
 		{RelPath: "protocol/multicarrierselect_parity_test.go", Content: multiCarrierSelectParityTestSource, Go: true},
 		{RelPath: "protocol/multicarrierselect_hygiene_test.go", Content: multiCarrierSelectHygieneTestSource, Go: true},
+		{RelPath: "protocol/carriercollapse_test.go", Content: carrierCollapseTestSource, Go: true},
+		{RelPath: "protocol/carriercollapse_parity_test.go", Content: carrierCollapseParityTestSource, Go: true},
+		{RelPath: "protocol/carriercollapse_hygiene_test.go", Content: carrierCollapseHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
