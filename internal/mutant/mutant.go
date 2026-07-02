@@ -446,6 +446,30 @@ const (
 	ModeHTTPSCarrierAdversaryPipelineBypass            = "httpscarrieradversary_pipeline_bypass"
 	ModeHTTPSCarrierAdversaryGeneratedBackendDrift     = "httpscarrieradversary_generated_backend_drift"
 	ModeHTTPSCarrierAdversaryPublicClaimOverstatement  = "httpscarrieradversary_public_claim_overstatement"
+
+	ModeConstrainedCarrierReviewAllowsPublicResolver         = "constrainedcarrierreview_allows_public_resolver"
+	ModeConstrainedCarrierReviewAllowsRealDNSQueryDefault    = "constrainedcarrierreview_allows_real_dns_query_default"
+	ModeConstrainedCarrierReviewLogsExactQuery               = "constrainedcarrierreview_logs_exact_query"
+	ModeConstrainedCarrierReviewLogsResolverIP               = "constrainedcarrierreview_logs_resolver_ip"
+	ModeConstrainedCarrierReviewAllowsDomainDependency       = "constrainedcarrierreview_allows_domain_dependency"
+	ModeConstrainedCarrierReviewAllowsWildcardResolver       = "constrainedcarrierreview_allows_wildcard_resolver"
+	ModeConstrainedCarrierReviewAllowsPublicNetwork          = "constrainedcarrierreview_allows_public_network"
+	ModeConstrainedCarrierReviewAllowsArbitraryEgress        = "constrainedcarrierreview_allows_arbitrary_egress"
+	ModeConstrainedCarrierReviewAllowsPayloadLogging         = "constrainedcarrierreview_allows_payload_logging"
+	ModeConstrainedCarrierReviewAllowsPacketCapture          = "constrainedcarrierreview_allows_packet_capture"
+	ModeConstrainedCarrierReviewAllowsMeasurementUpload      = "constrainedcarrierreview_allows_measurement_upload"
+	ModeConstrainedCarrierReviewMissingResolverHarness       = "constrainedcarrierreview_missing_resolver_harness"
+	ModeConstrainedCarrierReviewMissingQueryShapeTaxonomy    = "constrainedcarrierreview_missing_query_shape_taxonomy"
+	ModeConstrainedCarrierReviewMissingResponseShapeTaxonomy = "constrainedcarrierreview_missing_response_shape_taxonomy"
+	ModeConstrainedCarrierReviewMissingTruncationContract    = "constrainedcarrierreview_missing_truncation_contract"
+	ModeConstrainedCarrierReviewMissingRetryFailureContract  = "constrainedcarrierreview_missing_retry_failure_contract"
+	ModeConstrainedCarrierReviewMissingProfileSensitivity    = "constrainedcarrierreview_missing_profile_sensitivity"
+	ModeConstrainedCarrierReviewMeasurementReviewBypass      = "constrainedcarrierreview_measurementreview_bypass"
+	ModeConstrainedCarrierReviewPublicDocsClaimRealDNS       = "constrainedcarrierreview_public_docs_claim_real_dns"
+	ModeConstrainedCarrierReviewPublicDocsClaimFieldReady    = "constrainedcarrierreview_public_docs_claim_field_ready"
+	ModeConstrainedCarrierReviewPayloadLeak                  = "constrainedcarrierreview_payload_leak"
+	ModeConstrainedCarrierReviewSecretLeak                   = "constrainedcarrierreview_secret_leak"
+	ModeConstrainedCarrierReviewGeneratedBackendDrift        = "constrainedcarrierreview_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -872,6 +896,29 @@ func Modes() []string {
 		ModeHTTPSCarrierAdversaryPipelineBypass,
 		ModeHTTPSCarrierAdversaryGeneratedBackendDrift,
 		ModeHTTPSCarrierAdversaryPublicClaimOverstatement,
+		ModeConstrainedCarrierReviewAllowsPublicResolver,
+		ModeConstrainedCarrierReviewAllowsRealDNSQueryDefault,
+		ModeConstrainedCarrierReviewLogsExactQuery,
+		ModeConstrainedCarrierReviewLogsResolverIP,
+		ModeConstrainedCarrierReviewAllowsDomainDependency,
+		ModeConstrainedCarrierReviewAllowsWildcardResolver,
+		ModeConstrainedCarrierReviewAllowsPublicNetwork,
+		ModeConstrainedCarrierReviewAllowsArbitraryEgress,
+		ModeConstrainedCarrierReviewAllowsPayloadLogging,
+		ModeConstrainedCarrierReviewAllowsPacketCapture,
+		ModeConstrainedCarrierReviewAllowsMeasurementUpload,
+		ModeConstrainedCarrierReviewMissingResolverHarness,
+		ModeConstrainedCarrierReviewMissingQueryShapeTaxonomy,
+		ModeConstrainedCarrierReviewMissingResponseShapeTaxonomy,
+		ModeConstrainedCarrierReviewMissingTruncationContract,
+		ModeConstrainedCarrierReviewMissingRetryFailureContract,
+		ModeConstrainedCarrierReviewMissingProfileSensitivity,
+		ModeConstrainedCarrierReviewMeasurementReviewBypass,
+		ModeConstrainedCarrierReviewPublicDocsClaimRealDNS,
+		ModeConstrainedCarrierReviewPublicDocsClaimFieldReady,
+		ModeConstrainedCarrierReviewPayloadLeak,
+		ModeConstrainedCarrierReviewSecretLeak,
+		ModeConstrainedCarrierReviewGeneratedBackendDrift,
 	}
 }
 
