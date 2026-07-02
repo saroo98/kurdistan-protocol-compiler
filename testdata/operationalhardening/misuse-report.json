@@ -1,0 +1,19 @@
+{
+  "detected_controls": [
+    "operationalhardening_unsafe_defaults_allowed",
+    "operationalhardening_fail_open_allowed",
+    "operationalhardening_unbounded_retry_loop",
+    "operationalhardening_unbounded_memory_growth",
+    "operationalhardening_verbose_sensitive_logs",
+    "operationalhardening_auth_disabled",
+    "operationalhardening_compatibility_checks_disabled",
+    "operationalhardening_measurementreview_disabled",
+    "operationalhardening_carrierreview_disabled",
+    "operationalhardening_hardening_gates_disabled",
+    "operationalhardening_rollback_without_fail_closed",
+    "operationalhardening_generated_backend_drift"
+  ],
+  "detected_count": 12,
+  "expected_count": 12,
+  "conclusion": "passed"
+}

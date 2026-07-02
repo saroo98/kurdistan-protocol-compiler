@@ -39,6 +39,7 @@ import (
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/operationalhardening"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/productionreadiness"
@@ -213,6 +214,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "relayauthplan" {
 		os.Exit(runRelayAuthPlan(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "operationalhardening" {
+		os.Exit(runOperationalHardening(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -7437,6 +7441,176 @@ func writeRelayAuthPlanCompanions(out string, set relayauthplan.FixtureSet, forc
 	}
 	for _, write := range writes {
 		if err := relayauthplan.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runOperationalHardening(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runOperationalHardeningGenerate(args[1:])
+		case "verify":
+			return runOperationalHardeningVerify(args[1:])
+		case "compare":
+			return runOperationalHardeningCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck operationalhardening", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick operational hardening audit")
+	full := flags.Bool("full", false, "run full operational hardening audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunOperationalHardeningAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runOperationalHardeningGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck operationalhardening generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "operationalhardening", "operationalhardening-report-golden.json"), "operational hardening fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := operationalhardening.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := operationalhardening.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeOperationalHardeningCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote operationalhardening fixtures: %s (%d bounds, %d controls)\n", *out, len(set.ResourceLimits.Bounds), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runOperationalHardeningVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck operationalhardening verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "operationalhardening", "operationalhardening-report-golden.json"), "operational hardening fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := operationalhardening.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := operationalhardening.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := operationalhardening.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runOperationalHardeningCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck operationalhardening compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old operational hardening fixture")
+	newPath := flags.String("new", "", "new operational hardening fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := operationalhardening.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := operationalhardening.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := operationalhardening.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := operationalhardening.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeOperationalHardeningCompanions(out string, set operationalhardening.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"resource-limits.json", set.ResourceLimits},
+		{"config-validation.json", set.ConfigValidation},
+		{"lifecycle-shutdown-restart.json", set.Lifecycle},
+		{"safe-logging-diagnostics.json", set.Logging},
+		{"rollback-update-boundaries.json", set.Rollback},
+		{"health-summary.json", set.Health},
+		{"compatibility-integration.json", set.Compatibility},
+		{"checklist-report.json", set.Checklist},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"operationalhardening-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := operationalhardening.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

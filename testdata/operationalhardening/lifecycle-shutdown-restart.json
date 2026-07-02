@@ -1,0 +1,24 @@
+{
+  "policy": "deterministic_bounded_shutdown_restart",
+  "shutdown_phases": [
+    "stop_accepting_new_sessions",
+    "close_inflight_streams_with_safe_reason",
+    "flush_redacted_diagnostics",
+    "close_runtime_links",
+    "mark_terminal"
+  ],
+  "restart_phases": [
+    "validate_config",
+    "validate_profile_compatibility",
+    "restore_compatibility_state",
+    "start_with_bounded_retry"
+  ],
+  "in_flight_session_policy": "bounded_drain_then_safe_close",
+  "compatibility_state_policy": "compatibility_state_revalidated_before_reopen",
+  "deterministic_shutdown": true,
+  "idempotent_restart": true,
+  "unbounded_restart_loop_allowed": false,
+  "in_flight_sessions_dropped_open": false,
+  "compatibility_state_bypassable": false,
+  "conclusion": "passed"
+}

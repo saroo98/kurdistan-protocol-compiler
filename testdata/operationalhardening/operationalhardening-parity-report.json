@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "OperationalHardeningSchemaVersion",
+    "OperationalHardeningBackendVersion",
+    "OperationalHardeningDecision",
+    "OperationalHardeningMisuseCount",
+    "OperationalHardeningSafeErrorClasses",
+    "OperationalHardeningNextMilestone"
+  ],
+  "interpreted_hash": "sha256:3d8ccf16baddb735681fcba0067fef3e1a2f3a704d08243d82143b43e17138a7",
+  "generated_hash": "sha256:3d8ccf16baddb735681fcba0067fef3e1a2f3a704d08243d82143b43e17138a7",
+  "conclusion": "passed"
+}
