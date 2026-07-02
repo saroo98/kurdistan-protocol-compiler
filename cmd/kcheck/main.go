@@ -22,6 +22,7 @@ import (
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
 	"kurdistan/internal/httpscarrierreview"
+	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
@@ -161,6 +162,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "httpscarrierreview" {
 		os.Exit(runHTTPSCarrierReview(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "httpslikecarrier" {
+		os.Exit(runHTTPSLikeCarrier(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -5178,6 +5182,177 @@ func writeHTTPSCarrierReviewCompanions(out string, set httpscarrierreview.Fixtur
 	}
 	for _, write := range writes {
 		if err := httpscarrierreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runHTTPSLikeCarrier(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runHTTPSLikeCarrierGenerate(args[1:])
+		case "verify":
+			return runHTTPSLikeCarrierVerify(args[1:])
+		case "compare":
+			return runHTTPSLikeCarrierCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck httpslikecarrier", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick HTTPS-like carrier prototype audit")
+	full := flags.Bool("full", false, "run full HTTPS-like carrier prototype audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunHTTPSLikeCarrierAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSLikeCarrierGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpslikecarrier generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "httpslikecarrier", "httpslikecarrier-report-golden.json"), "HTTPS-like carrier prototype fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := httpslikecarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := httpslikecarrier.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeHTTPSLikeCarrierCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote httpslikecarrier fixtures: %s (%d scenarios, %d shape events)\n", *out, len(set.Scenarios), len(set.Report.ShapeEvents))
+	return 0
+}
+
+func runHTTPSLikeCarrierVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpslikecarrier verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "httpslikecarrier", "httpslikecarrier-report-golden.json"), "HTTPS-like carrier prototype fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := httpslikecarrier.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpslikecarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpslikecarrier.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSLikeCarrierCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpslikecarrier compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old HTTPS-like carrier prototype fixture")
+	newPath := flags.String("new", "", "new HTTPS-like carrier prototype fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := httpslikecarrier.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpslikecarrier.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpslikecarrier.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := httpslikecarrier.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeHTTPSLikeCarrierCompanions(out string, set httpslikecarrier.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"scope-report.json", set.Report.ScopesBlocked},
+		{"request-shapes-golden.json", set.Report.RequestShapes},
+		{"response-shapes-golden.json", set.Report.ResponseShapes},
+		{"control-shapes.json", set.Report.ControlShapes},
+		{"shape-events-golden.json", set.Report.ShapeEvents},
+		{"session-lifecycle-report.json", set.Report.Sessions},
+		{"stream-lifecycle-report.json", set.Report.Streams},
+		{"fixture-exchange-report.json", set.Report.FixtureExchange},
+		{"integration-report.json", set.Report.Integrations},
+		{"runtime-security-report.json", set.Report.RuntimeSecurity},
+		{"resource-limits-report.json", set.Report.ResourceLimits},
+		{"httpslikecarrier-misuse-report.json", set.Misuse},
+		{"httpslikecarrier-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := httpslikecarrier.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
