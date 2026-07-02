@@ -1,0 +1,128 @@
+[
+  {
+    "name": "service_lifecycle",
+    "role": "client_or_relay",
+    "state_path": [
+      "created",
+      "configured",
+      "starting",
+      "ready",
+      "draining",
+      "stopped"
+    ],
+    "terminal_states": [
+      "stopped",
+      "failed"
+    ],
+    "required_handlers": [
+      "bounded_start",
+      "idempotent_stop",
+      "drain_sessions"
+    ],
+    "blocked_fallbacks": [
+      "background_public_retry",
+      "unbounded_restart_loop"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "session_lifecycle",
+    "role": "client_or_relay",
+    "state_path": [
+      "new",
+      "negotiating",
+      "open",
+      "draining",
+      "closed"
+    ],
+    "terminal_states": [
+      "closed",
+      "reset",
+      "failed"
+    ],
+    "required_handlers": [
+      "capability_check",
+      "profile_compatibility",
+      "secure_context_create"
+    ],
+    "blocked_fallbacks": [
+      "accept_profile_mismatch",
+      "accept_downgrade"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "carrier_lifecycle",
+    "role": "relay",
+    "state_path": [
+      "inactive",
+      "bound_to_profile",
+      "opening",
+      "active",
+      "draining",
+      "closed"
+    ],
+    "terminal_states": [
+      "closed",
+      "failed"
+    ],
+    "required_handlers": [
+      "carrierreview_gate",
+      "measurementreview_gate",
+      "pathhealth_gate"
+    ],
+    "blocked_fallbacks": [
+      "unsafe_public_fallback",
+      "provider_specific_auto_config"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "listener_lifecycle",
+    "role": "relay",
+    "state_path": [
+      "disabled",
+      "configured",
+      "loopback_ready",
+      "draining",
+      "closed"
+    ],
+    "terminal_states": [
+      "closed",
+      "failed"
+    ],
+    "required_handlers": [
+      "lab_scope_check",
+      "loopback_policy_check"
+    ],
+    "blocked_fallbacks": [
+      "wildcard_bind",
+      "public_bind"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "egress_lifecycle",
+    "role": "relay",
+    "state_path": [
+      "disabled",
+      "configured",
+      "lab_target_ready",
+      "draining",
+      "closed"
+    ],
+    "terminal_states": [
+      "closed",
+      "failed"
+    ],
+    "required_handlers": [
+      "labegress_allowlist",
+      "target_redaction"
+    ],
+    "blocked_fallbacks": [
+      "arbitrary_target_proxying",
+      "payload_forwarding_default"
+    ],
+    "conclusion": "passed"
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "config_id": "relayprocess-config-contract-v1",
+  "loading_policy": "explicit_lab_config_only",
+  "profile_bundle_policy": "signed_manifest_placeholder_no_key_exchange_change",
+  "requires_explicit_lab_mode": true,
+  "allow_public_deployment_defaults": false,
+  "allow_cloud_provider_dependency": false,
+  "allow_production_keying_changes": false,
+  "allowed_config_classes": [
+    "process_role",
+    "profile_bundle_id",
+    "resource_bucket",
+    "observability_bucket",
+    "compatibility_floor"
+  ],
+  "blocked_config_classes": [
+    "secret_material_class",
+    "provider_dependency_class",
+    "public_route_class",
+    "account_metadata_class",
+    "auto_update_channel_class",
+    "production_keying_class"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

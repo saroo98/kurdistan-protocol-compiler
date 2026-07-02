@@ -1,0 +1,22 @@
+{
+  "detected_controls": [
+    "relayprocess_public_deployment_default",
+    "relayprocess_payload_logging_allowed",
+    "relayprocess_packet_capture_allowed",
+    "relayprocess_secret_logging_allowed",
+    "relayprocess_cloud_provider_dependency",
+    "relayprocess_public_observability_upload",
+    "relayprocess_unreviewed_auto_update",
+    "relayprocess_missing_shutdown_policy",
+    "relayprocess_missing_resource_policy",
+    "relayprocess_missing_compatibility_policy",
+    "relayprocess_production_keying_modified",
+    "relayprocess_android_behavior_added",
+    "relayprocess_payload_leak",
+    "relayprocess_secret_leak",
+    "relayprocess_generated_backend_drift"
+  ],
+  "detected_count": 15,
+  "expected_count": 15,
+  "conclusion": "passed"
+}

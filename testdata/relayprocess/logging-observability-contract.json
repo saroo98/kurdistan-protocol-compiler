@@ -1,0 +1,27 @@
+{
+  "policy": "structured_safe_metadata_only",
+  "allowed_fields": [
+    "role_class",
+    "state_class",
+    "resource_bucket",
+    "event_count",
+    "error_bucket",
+    "compatibility_result"
+  ],
+  "forbidden_fields": [
+    "payload_material_class",
+    "packet_observation_class",
+    "secret_material_class",
+    "key_material_class",
+    "proof_material_class",
+    "provider_metadata_class",
+    "account_metadata_class",
+    "public_route_class",
+    "auto_update_channel_class",
+    "production_keying_class"
+  ],
+  "public_upload_allowed": false,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

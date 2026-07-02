@@ -1,0 +1,12 @@
+{
+  "docs_checked": 5,
+  "forbidden_claims": [
+    "guaranteed bypass",
+    "undetectable",
+    "field-ready",
+    "production relay",
+    "working VPN app",
+    "public deployment ready"
+  ],
+  "conclusion": "passed"
+}

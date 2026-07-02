@@ -1,0 +1,14 @@
+{
+  "policy": "versioned_capability_floor",
+  "capability_checks": [
+    "backend_version",
+    "profile_hash",
+    "capability_set",
+    "carrier_family_review",
+    "security_policy"
+  ],
+  "upgrade_policy": "manual_reviewed_upgrade_only",
+  "rollback_policy": "rollback_to_prior_reviewed_profile_bundle",
+  "rejects_downgrade": true,
+  "conclusion": "passed"
+}

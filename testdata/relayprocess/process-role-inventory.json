@@ -1,0 +1,54 @@
+[
+  {
+    "name": "client_process",
+    "kind": "client",
+    "allowed_scope": "bounded_lab_process_architecture",
+    "blocked_behaviors": [
+      "payload logging",
+      "packet capture",
+      "public observability upload",
+      "unreviewed auto-update"
+    ],
+    "required_policies": [
+      "config_contract",
+      "profile_bundle_contract",
+      "shutdown_policy",
+      "resource_policy"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_process",
+    "kind": "relay",
+    "allowed_scope": "bounded_lab_process_architecture",
+    "blocked_behaviors": [
+      "production relay provisioning",
+      "cloud provider integration",
+      "public deployment defaults",
+      "production key exchange changes"
+    ],
+    "required_policies": [
+      "listener_lifecycle",
+      "egress_lifecycle",
+      "compatibility_policy",
+      "abuse_control_placeholder"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "supervisor_process",
+    "kind": "supervisor",
+    "allowed_scope": "bounded_lab_process_architecture",
+    "blocked_behaviors": [
+      "field-test tooling",
+      "Android behavior",
+      "real user account systems"
+    ],
+    "required_policies": [
+      "crash_recovery_policy",
+      "upgrade_rollback_policy",
+      "observability_policy"
+    ],
+    "conclusion": "passed"
+  }
+]

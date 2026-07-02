@@ -1,0 +1,358 @@
+{
+  "version": "relayprocess-v1",
+  "fixture_id": "relay_process_architecture_v1",
+  "generated_at": "2026-02-17T00:00:00Z",
+  "backend_version": "0.52.0-lab",
+  "recommended_next_milestone": "M53: production key exchange review",
+  "roles": [
+    {
+      "name": "client_process",
+      "kind": "client",
+      "allowed_scope": "bounded_lab_process_architecture",
+      "blocked_behaviors": [
+        "payload logging",
+        "packet capture",
+        "public observability upload",
+        "unreviewed auto-update"
+      ],
+      "required_policies": [
+        "config_contract",
+        "profile_bundle_contract",
+        "shutdown_policy",
+        "resource_policy"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_process",
+      "kind": "relay",
+      "allowed_scope": "bounded_lab_process_architecture",
+      "blocked_behaviors": [
+        "production relay provisioning",
+        "cloud provider integration",
+        "public deployment defaults",
+        "production key exchange changes"
+      ],
+      "required_policies": [
+        "listener_lifecycle",
+        "egress_lifecycle",
+        "compatibility_policy",
+        "abuse_control_placeholder"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "supervisor_process",
+      "kind": "supervisor",
+      "allowed_scope": "bounded_lab_process_architecture",
+      "blocked_behaviors": [
+        "field-test tooling",
+        "Android behavior",
+        "real user account systems"
+      ],
+      "required_policies": [
+        "crash_recovery_policy",
+        "upgrade_rollback_policy",
+        "observability_policy"
+      ],
+      "conclusion": "passed"
+    }
+  ],
+  "config": {
+    "config_id": "relayprocess-config-contract-v1",
+    "loading_policy": "explicit_lab_config_only",
+    "profile_bundle_policy": "signed_manifest_placeholder_no_key_exchange_change",
+    "requires_explicit_lab_mode": true,
+    "allow_public_deployment_defaults": false,
+    "allow_cloud_provider_dependency": false,
+    "allow_production_keying_changes": false,
+    "allowed_config_classes": [
+      "process_role",
+      "profile_bundle_id",
+      "resource_bucket",
+      "observability_bucket",
+      "compatibility_floor"
+    ],
+    "blocked_config_classes": [
+      "secret_material_class",
+      "provider_dependency_class",
+      "public_route_class",
+      "account_metadata_class",
+      "auto_update_channel_class",
+      "production_keying_class"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "lifecycle": [
+    {
+      "name": "service_lifecycle",
+      "role": "client_or_relay",
+      "state_path": [
+        "created",
+        "configured",
+        "starting",
+        "ready",
+        "draining",
+        "stopped"
+      ],
+      "terminal_states": [
+        "stopped",
+        "failed"
+      ],
+      "required_handlers": [
+        "bounded_start",
+        "idempotent_stop",
+        "drain_sessions"
+      ],
+      "blocked_fallbacks": [
+        "background_public_retry",
+        "unbounded_restart_loop"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "session_lifecycle",
+      "role": "client_or_relay",
+      "state_path": [
+        "new",
+        "negotiating",
+        "open",
+        "draining",
+        "closed"
+      ],
+      "terminal_states": [
+        "closed",
+        "reset",
+        "failed"
+      ],
+      "required_handlers": [
+        "capability_check",
+        "profile_compatibility",
+        "secure_context_create"
+      ],
+      "blocked_fallbacks": [
+        "accept_profile_mismatch",
+        "accept_downgrade"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "carrier_lifecycle",
+      "role": "relay",
+      "state_path": [
+        "inactive",
+        "bound_to_profile",
+        "opening",
+        "active",
+        "draining",
+        "closed"
+      ],
+      "terminal_states": [
+        "closed",
+        "failed"
+      ],
+      "required_handlers": [
+        "carrierreview_gate",
+        "measurementreview_gate",
+        "pathhealth_gate"
+      ],
+      "blocked_fallbacks": [
+        "unsafe_public_fallback",
+        "provider_specific_auto_config"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "listener_lifecycle",
+      "role": "relay",
+      "state_path": [
+        "disabled",
+        "configured",
+        "loopback_ready",
+        "draining",
+        "closed"
+      ],
+      "terminal_states": [
+        "closed",
+        "failed"
+      ],
+      "required_handlers": [
+        "lab_scope_check",
+        "loopback_policy_check"
+      ],
+      "blocked_fallbacks": [
+        "wildcard_bind",
+        "public_bind"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "egress_lifecycle",
+      "role": "relay",
+      "state_path": [
+        "disabled",
+        "configured",
+        "lab_target_ready",
+        "draining",
+        "closed"
+      ],
+      "terminal_states": [
+        "closed",
+        "failed"
+      ],
+      "required_handlers": [
+        "labegress_allowlist",
+        "target_redaction"
+      ],
+      "blocked_fallbacks": [
+        "arbitrary_target_proxying",
+        "payload_forwarding_default"
+      ],
+      "conclusion": "passed"
+    }
+  ],
+  "logging": {
+    "policy": "structured_safe_metadata_only",
+    "allowed_fields": [
+      "role_class",
+      "state_class",
+      "resource_bucket",
+      "event_count",
+      "error_bucket",
+      "compatibility_result"
+    ],
+    "forbidden_fields": [
+      "payload_material_class",
+      "packet_observation_class",
+      "secret_material_class",
+      "key_material_class",
+      "proof_material_class",
+      "provider_metadata_class",
+      "account_metadata_class",
+      "public_route_class",
+      "auto_update_channel_class",
+      "production_keying_class"
+    ],
+    "public_upload_allowed": false,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "shutdown": {
+    "policy": "bounded_graceful_shutdown",
+    "graceful_phases": [
+      "stop_accepting",
+      "drain_sessions",
+      "close_carriers",
+      "flush_safe_summary",
+      "terminal"
+    ],
+    "crash_recovery_policy": "local_safe_restart_plan_no_public_retry",
+    "idempotent_close": true,
+    "unreviewed_auto_update": false,
+    "conclusion": "passed"
+  },
+  "compatibility": {
+    "policy": "versioned_capability_floor",
+    "capability_checks": [
+      "backend_version",
+      "profile_hash",
+      "capability_set",
+      "carrier_family_review",
+      "security_policy"
+    ],
+    "upgrade_policy": "manual_reviewed_upgrade_only",
+    "rollback_policy": "rollback_to_prior_reviewed_profile_bundle",
+    "rejects_downgrade": true,
+    "conclusion": "passed"
+  },
+  "resource": {
+    "policy": "bounded_process_resources",
+    "bounds": [
+      "max_sessions_bucket",
+      "max_streams_bucket",
+      "max_carriers_bucket",
+      "max_log_events_bucket",
+      "max_restart_attempts_bucket"
+    ],
+    "abuse_control_policy": "placeholder_only_rate_bucket_and_reset_bucket_no_user_accounts",
+    "missing_resource_policy": false,
+    "conclusion": "passed"
+  },
+  "m53_preconditions": {
+    "review_id": "m53-production-key-exchange-review-preconditions",
+    "preconditions": [
+      "relayprocess contracts passed",
+      "security transcript binding unchanged",
+      "generated backend parity passed",
+      "trace hygiene passed",
+      "public deployment defaults remain blocked"
+    ],
+    "blocked_until_m53": [
+      "production key exchange changes",
+      "long term key distribution",
+      "operator credential storage"
+    ],
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "relayprocess_public_deployment_default",
+      "relayprocess_payload_logging_allowed",
+      "relayprocess_packet_capture_allowed",
+      "relayprocess_secret_logging_allowed",
+      "relayprocess_cloud_provider_dependency",
+      "relayprocess_public_observability_upload",
+      "relayprocess_unreviewed_auto_update",
+      "relayprocess_missing_shutdown_policy",
+      "relayprocess_missing_resource_policy",
+      "relayprocess_missing_compatibility_policy",
+      "relayprocess_production_keying_modified",
+      "relayprocess_android_behavior_added",
+      "relayprocess_payload_leak",
+      "relayprocess_secret_leak",
+      "relayprocess_generated_backend_drift"
+    ],
+    "detected_count": 15,
+    "expected_count": 15,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "fixtures_scanned": 13,
+    "payload_logged": false,
+    "secret_logged": false,
+    "packet_captured": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "guaranteed bypass",
+      "undetectable",
+      "field-ready",
+      "production relay",
+      "working VPN app",
+      "public deployment ready"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "RelayProcessSchemaVersion",
+      "RelayProcessBackendVersion",
+      "RelayProcessRoleCount",
+      "RelayProcessLifecycleCount",
+      "RelayProcessMisuseCount",
+      "RelayProcessNextMilestone"
+    ],
+    "interpreted_hash": "sha256:ad7ce5201e040bf514030b6469db7ab4126f0889bfb67a900bebb513e32866fe",
+    "generated_hash": "sha256:ad7ce5201e040bf514030b6469db7ab4126f0889bfb67a900bebb513e32866fe",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:d9970c9fd50e1cc33f71607e0720708a38624f0ec2bcc37b6f3f124d8603a4e4",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
