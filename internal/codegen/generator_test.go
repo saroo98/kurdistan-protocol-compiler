@@ -150,6 +150,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/constrainedcarrier_test.go",
 		"protocol/constrainedcarrier_parity_test.go",
 		"protocol/constrainedcarrier_hygiene_test.go",
+		"protocol/multicarrierselect_generated.go",
+		"protocol/multicarrierselect_test.go",
+		"protocol/multicarrierselect_parity_test.go",
+		"protocol/multicarrierselect_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -217,6 +221,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const MeasurementReviewSchemaVersion") ||
 		!strings.Contains(protocolSource, "const HTTPSCarrierAdversarySchemaVersion") ||
 		!strings.Contains(protocolSource, "const ConstrainedCarrierReviewSchemaVersion") ||
+		!strings.Contains(protocolSource, "const ConstrainedCarrierSchemaVersion") ||
+		!strings.Contains(protocolSource, "const MultiCarrierSelectSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -298,6 +304,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	constrainedCarrierReviewB := mustRead(t, filepath.Join(outB, "protocol", "constrainedcarrierreview_generated.go"))
 	constrainedCarrierA := mustRead(t, filepath.Join(outA, "protocol", "constrainedcarrier_generated.go"))
 	constrainedCarrierB := mustRead(t, filepath.Join(outB, "protocol", "constrainedcarrier_generated.go"))
+	multiCarrierSelectA := mustRead(t, filepath.Join(outA, "protocol", "multicarrierselect_generated.go"))
+	multiCarrierSelectB := mustRead(t, filepath.Join(outB, "protocol", "multicarrierselect_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -357,6 +365,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if constrainedCarrierA == constrainedCarrierB {
 		t.Fatalf("constrained carrier generation did not differ across profiles")
+	}
+	if multiCarrierSelectA == multiCarrierSelectB {
+		t.Fatalf("multi-carrier selection generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

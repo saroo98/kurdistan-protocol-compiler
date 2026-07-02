@@ -29,6 +29,7 @@ import (
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/multicarrierselect"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/productionreadiness"
@@ -2027,6 +2028,47 @@ func GeneratedConstrainedCarrierParity() (constrainedcarrier.ParityReport, error
 	return set.Report.Parity, nil
 }
 `, quote(constrainedcarrier.Version), quote(p.ID), p.Seed, quote(constrainedcarrier.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(constrainedcarrier.CarrierFamily), quote(constrainedcarrier.RecommendedNextMilestone), len(constrainedcarrier.QueryShapeClasses()), len(constrainedcarrier.ResponseShapeClasses()), len(constrainedcarrier.CapacityBuckets()), len(constrainedcarrier.RetryBuckets()), len(constrainedcarrier.FailureBuckets()), quoteSlice(constrainedcarrier.QueryShapeClasses()), quoteSlice(constrainedcarrier.ResponseShapeClasses()), quoteSlice(constrainedcarrier.CapacityBuckets()), quoteSlice(constrainedcarrier.RetryBuckets()), quoteSlice(constrainedcarrier.FailureBuckets()), quoteSlice(constrainedcarrier.BlockedScopes()), quoteSlice(constrainedcarrier.RequiredMisuseNames()))
+	if err != nil {
+		return nil, err
+	}
+
+	multiCarrierSelectSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/multicarrierselect"
+)
+
+const MultiCarrierSelectSchemaVersion = %[1]s
+const MultiCarrierSelectGeneratedProfileID = %[2]s
+const MultiCarrierSelectGeneratedProfileSeed int64 = %[3]d
+const MultiCarrierSelectBackendVersion = %[4]s
+const MultiCarrierSelectRuntimePolicy = %[5]s
+const MultiCarrierSelectRecommendedNextMilestone = %[6]s
+const MultiCarrierSelectFamilyClassCount = %[7]d
+const MultiCarrierSelectDecisionClassCount = %[8]d
+const MultiCarrierSelectMisuseControlCount = %[9]d
+
+var MultiCarrierSelectFamilyClasses = %[10]s
+var MultiCarrierSelectDecisionClasses = %[11]s
+var MultiCarrierSelectMisuseControls = %[12]s
+var MultiCarrierSelectProfileSelectionHints = %[13]s
+
+func GeneratedMultiCarrierSelectFixtureSet() (multicarrierselect.FixtureSet, error) {
+	return multicarrierselect.GenerateFixtureSet()
+}
+
+func GeneratedMultiCarrierSelectParity() (multicarrierselect.ParityReport, error) {
+	set, err := multicarrierselect.GenerateFixtureSet()
+	if err != nil {
+		return multicarrierselect.ParityReport{}, err
+	}
+	return set.Report.Parity, nil
+}
+
+func GeneratedMultiCarrierSelectCandidate(policyClass string) multicarrierselect.CarrierCandidate {
+	return multicarrierselect.SelectCarrier(int(MultiCarrierSelectGeneratedProfileSeed), policyClass)
+}
+`, quote(multicarrierselect.Version), quote(p.ID), p.Seed, quote(multicarrierselect.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(multicarrierselect.RecommendedNextMilestone), len(multicarrierselect.RequiredFamilyClasses()), len(multicarrierselect.RequiredDecisionClasses()), len(multicarrierselect.RequiredMisuseNames()), quoteSlice(multicarrierselect.RequiredFamilyClasses()), quoteSlice(multicarrierselect.RequiredDecisionClasses()), quoteSlice(multicarrierselect.RequiredMisuseNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
 	if err != nil {
 		return nil, err
 	}
@@ -5633,6 +5675,91 @@ func TestGeneratedConstrainedCarrierHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	multiCarrierSelectTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/multicarrierselect"
+)
+
+func TestGeneratedMultiCarrierSelect(t *testing.T) {
+	if MultiCarrierSelectSchemaVersion != multicarrierselect.Version || MultiCarrierSelectGeneratedProfileID != ProfileID {
+		t.Fatalf("generated multi-carrier selection constants drifted")
+	}
+	set, err := GeneratedMultiCarrierSelectFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := multicarrierselect.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(MultiCarrierSelectFamilyClasses) < len(multicarrierselect.RequiredFamilyClasses()) || len(MultiCarrierSelectDecisionClasses) < len(multicarrierselect.RequiredDecisionClasses()) {
+		t.Fatalf("generated multi-carrier taxonomy constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	multiCarrierSelectParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedMultiCarrierSelectParity(t *testing.T) {
+	parity, err := GeneratedMultiCarrierSelectParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated multi-carrier selection parity failed: %%+v", parity)
+	}
+	if MultiCarrierSelectRuntimePolicy == "" || MultiCarrierSelectRecommendedNextMilestone == "" || len(MultiCarrierSelectMisuseControls) < 10 {
+		t.Fatalf("multi-carrier selection generated specialization markers missing")
+	}
+	if GeneratedMultiCarrierSelectCandidate("default").Family == "" {
+		t.Fatalf("generated multi-carrier selection candidate missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	multiCarrierSelectHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/multicarrierselect"
+)
+
+func TestGeneratedMultiCarrierSelectHygiene(t *testing.T) {
+	set, err := GeneratedMultiCarrierSelectFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := multicarrierselect.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"resolver_ip": "synthetic"},
+		map[string]string{"host_header": "synthetic"},
+		map[string]bool{"allow_public_network": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := multicarrierselect.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe multi-carrier selection metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5987,6 +6114,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpscarrieradversary_generated.go", Content: httpsCarrierAdversarySource, Go: true},
 		{RelPath: "protocol/constrainedcarrierreview_generated.go", Content: constrainedCarrierReviewSource, Go: true},
 		{RelPath: "protocol/constrainedcarrier_generated.go", Content: constrainedCarrierSource, Go: true},
+		{RelPath: "protocol/multicarrierselect_generated.go", Content: multiCarrierSelectSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6094,6 +6222,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/constrainedcarrier_test.go", Content: constrainedCarrierTestSource, Go: true},
 		{RelPath: "protocol/constrainedcarrier_parity_test.go", Content: constrainedCarrierParityTestSource, Go: true},
 		{RelPath: "protocol/constrainedcarrier_hygiene_test.go", Content: constrainedCarrierHygieneTestSource, Go: true},
+		{RelPath: "protocol/multicarrierselect_test.go", Content: multiCarrierSelectTestSource, Go: true},
+		{RelPath: "protocol/multicarrierselect_parity_test.go", Content: multiCarrierSelectParityTestSource, Go: true},
+		{RelPath: "protocol/multicarrierselect_hygiene_test.go", Content: multiCarrierSelectHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
