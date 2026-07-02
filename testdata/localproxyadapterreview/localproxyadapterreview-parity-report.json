@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "LocalProxyAdapterReviewSchemaVersion",
+    "LocalProxyAdapterReviewGeneratedProfileID",
+    "LocalProxyAdapterReviewM49Decision",
+    "LocalProxyAdapterReviewPayloadPolicy",
+    "LocalProxyAdapterReviewTargetRedaction"
+  ],
+  "interpreted_hash": "sha256:ad5dd220156a3c5881a29d71646105a5f59af7e4eb5aa8779e3aeefad399b723",
+  "generated_hash": "sha256:ad5dd220156a3c5881a29d71646105a5f59af7e4eb5aa8779e3aeefad399b723",
+  "unexpected_drift": null,
+  "conclusion": "passed"
+}

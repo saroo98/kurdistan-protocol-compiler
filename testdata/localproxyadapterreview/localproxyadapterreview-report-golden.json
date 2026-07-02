@@ -1,0 +1,345 @@
+{
+  "version": "localproxyadapterreview-v1",
+  "fixture_id": "payload_bearing_local_proxy_adapter_review_v1",
+  "generated_at": "2026-02-17T00:00:00Z",
+  "backend_version": "0.48.0-lab",
+  "scope": {
+    "allowed_behaviors": [
+      "local_only_opaque_stream_bytes",
+      "symbolic_stream_content_classes",
+      "loopback_policy_context",
+      "bounded_runtime_mapping",
+      "aggregate_local_diagnostics"
+    ],
+    "blocked_behaviors": [
+      "public_deployment",
+      "external_target_proxying_beyond_controlled_policy",
+      "dns_resolution_by_default",
+      "transparent_os_wide_vpn_behavior",
+      "tun_vpn_packet_capture",
+      "android_behavior",
+      "payload_logging",
+      "packet_capture",
+      "credential_storage",
+      "browser_os_configuration_automation",
+      "field_testing"
+    ],
+    "decision": "ready_for_m49_local_only_prototype"
+  },
+  "protocols": {
+    "accepted_protocols": [
+      "local_socks_like_stream_adapter_semantics",
+      "local_http_connect_like_stream_adapter_semantics"
+    ],
+    "parser_states_that_may_open_stream": [
+      "socks5_like_command_accepted",
+      "socks5_like_target_redacted",
+      "http_connect_like_request_accepted",
+      "http_connect_like_target_redacted"
+    ],
+    "rejected_protocols": [
+      "transparent_vpn",
+      "raw_tun",
+      "public_proxy",
+      "browser_config_automation"
+    ]
+  },
+  "payload": {
+    "opaque_byte_classes": [
+      "interactive_small",
+      "bulk_bounded",
+      "chunked_local",
+      "reset_after_partial"
+    ],
+    "logging_policy": "byte_counts_buckets_and_flags_only",
+    "committed_fixture_rule": "symbolic_classes_only_no_raw_bytes",
+    "segmentation_classes": [
+      "single_chunk",
+      "fixed_chunk",
+      "backpressure_chunk",
+      "half_close_final_chunk"
+    ],
+    "reassembly_classes": [
+      "ordered_reassembly",
+      "bounded_missing_chunk",
+      "reset_clears_reassembly"
+    ],
+    "max_payload_class": "bounded_local_stream_content",
+    "payload_logged": false,
+    "raw_payload_committed": false
+  },
+  "stream_mapping": {
+    "open_triggers": [
+      "parser_state_accept",
+      "target_redaction_complete",
+      "capability_check_passed"
+    ],
+    "stream_classes": [
+      "interactive",
+      "bulk",
+      "control",
+      "error_test"
+    ],
+    "mapping_rules": [
+      "one_local_flow_to_one_runtime_stream",
+      "target_descriptor_bucket_only",
+      "carrier_selection_before_first_payload_chunk"
+    ],
+    "carrier_selection": "invoke_multicarrierselect_with_review_and_health_constraints",
+    "exact_target_excluded": true,
+    "exact_port_excluded": true
+  },
+  "backpressure_reset": {
+    "backpressure_signals": [
+      "adapter_queue_pressure",
+      "runtime_stream_window_pressure",
+      "carrier_selection_pressure",
+      "labegress_policy_pressure"
+    ],
+    "reset_signals": [
+      "parser_reset",
+      "runtime_stream_reset",
+      "target_error_reset",
+      "carrier_reset_bucket"
+    ],
+    "half_close_rules": [
+      "write_half_close_allowed_only_if_capability",
+      "read_side_may_continue_until_bounded_close"
+    ],
+    "safe_error_buckets": [
+      "target_redacted_rejected",
+      "policy_blocked",
+      "resource_limit",
+      "reset_bucket",
+      "parser_misuse"
+    ]
+  },
+  "target_redaction": {
+    "allowed_fields": [
+      "target_class_bucket",
+      "port_class_bucket",
+      "request_class",
+      "priority_class",
+      "policy_bucket"
+    ],
+    "forbidden_fields": [
+      "exact_target",
+      "exact_port",
+      "hostname",
+      "domain",
+      "url",
+      "sni",
+      "host_header"
+    ],
+    "redaction_rules": [
+      "redact_before_stream_open",
+      "redact_before_trace",
+      "redact_before_fixture",
+      "error_strings_use_bucket_only"
+    ],
+    "exact_target_persist": false,
+    "exact_port_persist": false
+  },
+  "integration": {
+    "localprotocoladapter": "must_compose_with_m37_parser_states",
+    "loopbackrelay": "must_use_loopbackrelay_only_for_lab_round_trips",
+    "multicarrierselect": "must_invoke_reviewed_selector_before_payload_chunks",
+    "labegress": "must_obey_controlled_policy_and_allowlist",
+    "measurementreview": "must_keep_diagnostics_aggregate_local_only",
+    "required_gates": [
+      "localprotocoladapter",
+      "loopbackrelay",
+      "labegress",
+      "localpipeline",
+      "multicarrierselect",
+      "measurementreview",
+      "hardening"
+    ]
+  },
+  "resource_limits": {
+    "max_streams_class": "bounded_by_profile_and_adapter_config",
+    "max_buffered_bytes_class": "bounded_local_buffer_bucket",
+    "max_events_class": "bounded_trace_event_bucket",
+    "panic_safety_targets": [
+      "parser_transition",
+      "payload_segmenter",
+      "stream_mapper",
+      "redaction_validator",
+      "diagnostic_builder"
+    ]
+  },
+  "misuse": {
+    "detected_controls": [
+      "localproxyadapterreview_allows_payload_logging",
+      "localproxyadapterreview_allows_packet_capture",
+      "localproxyadapterreview_allows_dns_by_default",
+      "localproxyadapterreview_allows_public_deployment",
+      "localproxyadapterreview_allows_exact_target_persistence",
+      "localproxyadapterreview_allows_credential_storage",
+      "localproxyadapterreview_allows_os_browser_config",
+      "localproxyadapterreview_allows_vpn_packet_capture",
+      "localproxyadapterreview_bypasses_localprotocoladapter",
+      "localproxyadapterreview_bypasses_multicarrierselect",
+      "localproxyadapterreview_bypasses_measurementreview",
+      "localproxyadapterreview_public_claim_working_proxy",
+      "localproxyadapterreview_public_claim_working_vpn",
+      "localproxyadapterreview_payload_leak",
+      "localproxyadapterreview_secret_leak",
+      "localproxyadapterreview_generated_backend_drift"
+    ],
+    "detected_count": 16,
+    "expected_count": 16,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "unsafe_claims_found": null,
+    "allowed_claim_classes": [
+      "design_review",
+      "local_only_contract",
+      "M49_acceptance_criteria",
+      "no_public_deployment_claim"
+    ],
+    "conclusion": "passed"
+  },
+  "m49_contract": {
+    "command_name": "localproxyadapter",
+    "decision": "ready_for_m49_local_only_prototype",
+    "acceptance_requirements": [
+      "carry_opaque_local_stream_bytes_without_logging_payloads",
+      "accept_only_reviewed_local_socks_like_and_connect_like_parser_states",
+      "preserve_target_redaction_before_stream_open",
+      "invoke_multicarrierselect_and_measurementreview_gates",
+      "surface_backpressure_reset_and_half_close_as_safe_metadata",
+      "reject_public_deployment_dns_by_default_vpn_capture_and_browser_configuration",
+      "provide_generated_interpreted_parity_and_fixture_drift_gates"
+    ],
+    "required_integrations": [
+      "localprotocoladapter",
+      "loopbackrelay",
+      "labegress",
+      "localpipeline",
+      "multicarrierselect",
+      "measurementreview",
+      "hardening",
+      "codegen"
+    ],
+    "required_controls": [
+      "localproxyadapterreview_allows_payload_logging",
+      "localproxyadapterreview_allows_packet_capture",
+      "localproxyadapterreview_allows_dns_by_default",
+      "localproxyadapterreview_allows_public_deployment",
+      "localproxyadapterreview_allows_exact_target_persistence",
+      "localproxyadapterreview_allows_credential_storage",
+      "localproxyadapterreview_allows_os_browser_config",
+      "localproxyadapterreview_allows_vpn_packet_capture",
+      "localproxyadapterreview_bypasses_localprotocoladapter",
+      "localproxyadapterreview_bypasses_multicarrierselect",
+      "localproxyadapterreview_bypasses_measurementreview",
+      "localproxyadapterreview_public_claim_working_proxy",
+      "localproxyadapterreview_public_claim_working_vpn",
+      "localproxyadapterreview_payload_leak",
+      "localproxyadapterreview_secret_leak",
+      "localproxyadapterreview_generated_backend_drift"
+    ]
+  },
+  "parity": {
+    "generated_markers": [
+      "LocalProxyAdapterReviewSchemaVersion",
+      "LocalProxyAdapterReviewGeneratedProfileID",
+      "LocalProxyAdapterReviewM49Decision",
+      "LocalProxyAdapterReviewPayloadPolicy",
+      "LocalProxyAdapterReviewTargetRedaction"
+    ],
+    "interpreted_hash": "sha256:ad5dd220156a3c5881a29d71646105a5f59af7e4eb5aa8779e3aeefad399b723",
+    "generated_hash": "sha256:ad5dd220156a3c5881a29d71646105a5f59af7e4eb5aa8779e3aeefad399b723",
+    "unexpected_drift": null,
+    "conclusion": "passed"
+  },
+  "fixtures": [
+    {
+      "name": "local_socks_like_acceptance",
+      "category": "protocol_acceptance",
+      "safe_class": "socks_like_stream",
+      "expected": "accepted_after_target_redaction",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "local_connect_like_acceptance",
+      "category": "protocol_acceptance",
+      "safe_class": "connect_like_stream",
+      "expected": "accepted_after_target_redaction",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "opaque_payload_policy",
+      "category": "payload_handling",
+      "safe_class": "symbolic_bytes_only",
+      "expected": "no_payload_logged",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "stream_mapping_policy",
+      "category": "stream_mapping",
+      "safe_class": "flow_to_stream",
+      "expected": "carrier_selection_before_payload",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "backpressure_policy",
+      "category": "backpressure_reset",
+      "safe_class": "pressure_bucket",
+      "expected": "surfaced_to_adapter",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "reset_policy",
+      "category": "backpressure_reset",
+      "safe_class": "reset_bucket",
+      "expected": "stream_scoped_reset",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "target_redaction_policy",
+      "category": "target_redaction",
+      "safe_class": "target_bucket_only",
+      "expected": "exact_target_excluded",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "resource_limit_policy",
+      "category": "resource_limits",
+      "safe_class": "bounded_buffers",
+      "expected": "bounded",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "public_claim_policy",
+      "category": "public_claims",
+      "safe_class": "review_only",
+      "expected": "no_working_proxy_claim",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "m49_contract_policy",
+      "category": "m49_contract",
+      "safe_class": "go_for_local_prototype",
+      "expected": "ready",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "fixture_hash": "sha256:41e0f9034a9c6f62fc4f86b3a86dab80d051396f908bc56d88bafedc7d1e4ffb",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

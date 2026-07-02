@@ -1,0 +1,23 @@
+{
+  "detected_controls": [
+    "localproxyadapterreview_allows_payload_logging",
+    "localproxyadapterreview_allows_packet_capture",
+    "localproxyadapterreview_allows_dns_by_default",
+    "localproxyadapterreview_allows_public_deployment",
+    "localproxyadapterreview_allows_exact_target_persistence",
+    "localproxyadapterreview_allows_credential_storage",
+    "localproxyadapterreview_allows_os_browser_config",
+    "localproxyadapterreview_allows_vpn_packet_capture",
+    "localproxyadapterreview_bypasses_localprotocoladapter",
+    "localproxyadapterreview_bypasses_multicarrierselect",
+    "localproxyadapterreview_bypasses_measurementreview",
+    "localproxyadapterreview_public_claim_working_proxy",
+    "localproxyadapterreview_public_claim_working_vpn",
+    "localproxyadapterreview_payload_leak",
+    "localproxyadapterreview_secret_leak",
+    "localproxyadapterreview_generated_backend_drift"
+  ],
+  "detected_count": 16,
+  "expected_count": 16,
+  "conclusion": "passed"
+}

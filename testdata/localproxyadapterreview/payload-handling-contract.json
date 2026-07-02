@@ -1,0 +1,24 @@
+{
+  "opaque_byte_classes": [
+    "interactive_small",
+    "bulk_bounded",
+    "chunked_local",
+    "reset_after_partial"
+  ],
+  "logging_policy": "byte_counts_buckets_and_flags_only",
+  "committed_fixture_rule": "symbolic_classes_only_no_raw_bytes",
+  "segmentation_classes": [
+    "single_chunk",
+    "fixed_chunk",
+    "backpressure_chunk",
+    "half_close_final_chunk"
+  ],
+  "reassembly_classes": [
+    "ordered_reassembly",
+    "bounded_missing_chunk",
+    "reset_clears_reassembly"
+  ],
+  "max_payload_class": "bounded_local_stream_content",
+  "payload_logged": false,
+  "raw_payload_committed": false
+}

@@ -1,0 +1,26 @@
+{
+  "allowed_fields": [
+    "target_class_bucket",
+    "port_class_bucket",
+    "request_class",
+    "priority_class",
+    "policy_bucket"
+  ],
+  "forbidden_fields": [
+    "exact_target",
+    "exact_port",
+    "hostname",
+    "domain",
+    "url",
+    "sni",
+    "host_header"
+  ],
+  "redaction_rules": [
+    "redact_before_stream_open",
+    "redact_before_trace",
+    "redact_before_fixture",
+    "error_strings_use_bucket_only"
+  ],
+  "exact_target_persist": false,
+  "exact_port_persist": false
+}

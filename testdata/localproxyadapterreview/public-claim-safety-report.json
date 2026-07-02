@@ -1,0 +1,11 @@
+{
+  "docs_checked": 5,
+  "unsafe_claims_found": null,
+  "allowed_claim_classes": [
+    "design_review",
+    "local_only_contract",
+    "M49_acceptance_criteria",
+    "no_public_deployment_claim"
+  ],
+  "conclusion": "passed"
+}

@@ -1,0 +1,12 @@
+{
+  "max_streams_class": "bounded_by_profile_and_adapter_config",
+  "max_buffered_bytes_class": "bounded_local_buffer_bucket",
+  "max_events_class": "bounded_trace_event_bucket",
+  "panic_safety_targets": [
+    "parser_transition",
+    "payload_segmenter",
+    "stream_mapper",
+    "redaction_validator",
+    "diagnostic_builder"
+  ]
+}
