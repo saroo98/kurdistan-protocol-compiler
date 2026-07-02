@@ -1,0 +1,36 @@
+{
+  "policy": "state_failure_version_resource_redacted_only",
+  "allowed_fields": [
+    "state_bucket",
+    "failure_class",
+    "version_compatibility_bucket",
+    "resource_limit_class",
+    "redaction_status",
+    "rollback_class",
+    "health_summary_bucket"
+  ],
+  "forbidden_fields": [
+    "payload contents",
+    "destination metadata",
+    "profile secret material",
+    "key material",
+    "exact user identifier",
+    "sensitive network metadata",
+    "packet capture artifacts",
+    "telemetry upload marker"
+  ],
+  "redaction_classes": [
+    "redacted_profile",
+    "redacted_relay",
+    "bucketed_version",
+    "bucketed_resource_limit",
+    "bucketed_failure"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "destination_logged": false,
+  "key_material_logged": false,
+  "exact_user_id_logged": false,
+  "network_metadata_leak": false,
+  "conclusion": "passed"
+}

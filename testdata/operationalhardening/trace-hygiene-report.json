@@ -1,0 +1,8 @@
+{
+  "reports_scanned": 10,
+  "payload_logged": false,
+  "secret_logged": false,
+  "destination_logged": false,
+  "key_material_logged": false,
+  "conclusion": "passed"
+}

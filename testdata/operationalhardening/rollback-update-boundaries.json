@@ -1,0 +1,27 @@
+{
+  "policy": "rollback_boundaries_fail_closed_on_ambiguity",
+  "rollbackable_components": [
+    "runtime_config_class",
+    "diagnostic_policy_class",
+    "carrier_selection_policy_class"
+  ],
+  "forward_compatible": [
+    "profile_bundle_version_floor",
+    "relay_compatibility_floor",
+    "generated_backend_marker"
+  ],
+  "profile_rotation_required": [
+    "auth_policy_change",
+    "relay_identity_epoch_change",
+    "profile_wire_policy_change"
+  ],
+  "fail_closed_classes": [
+    "unknown_version",
+    "profile_rotation_required",
+    "compatibility_floor_mismatch",
+    "rollback_policy_missing"
+  ],
+  "fail_closed_required": true,
+  "unsafe_rollback_allowed": false,
+  "conclusion": "passed"
+}

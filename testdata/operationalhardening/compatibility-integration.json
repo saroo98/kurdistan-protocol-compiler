@@ -1,0 +1,30 @@
+{
+  "policy": "operational_hardening_preserves_prior_safety_gates",
+  "required_gates": [
+    "carrierreview",
+    "measurementreview",
+    "pathhealth",
+    "relayauthplan",
+    "keyexchangeplan",
+    "relayprocess",
+    "hardening"
+  ],
+  "compatibility_checks": [
+    "profile_bundle_version",
+    "relay_auth_policy",
+    "rotation_window",
+    "carrier_family_review",
+    "measurement_review_status",
+    "path_health_status",
+    "generated_backend_version"
+  ],
+  "bypasses_carrierreview": false,
+  "bypasses_measurementreview": false,
+  "bypasses_pathhealth": false,
+  "bypasses_relay_auth": false,
+  "bypasses_hardening": false,
+  "allows_generated_backend_drift": false,
+  "allows_profile_rotation_bypass": false,
+  "allows_compatibility_fail_open": false,
+  "conclusion": "passed"
+}

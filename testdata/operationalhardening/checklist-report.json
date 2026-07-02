@@ -1,0 +1,16 @@
+{
+  "items": [
+    "resource_limits_defined",
+    "config_validation_strict",
+    "shutdown_restart_bounded",
+    "safe_logging_diagnostics",
+    "misuse_controls_present",
+    "rollback_update_boundaries",
+    "health_summary_redacted",
+    "prior_gate_integration_preserved",
+    "generated_backend_parity"
+  ],
+  "passed": 9,
+  "failed": 0,
+  "conclusion": "passed"
+}

@@ -1,0 +1,35 @@
+{
+  "policy": "redacted_android_ready_operational_health_summary",
+  "safe_fields": [
+    "state_bucket",
+    "runtime_version_bucket",
+    "profile_version_bucket",
+    "carrier_family_bucket",
+    "relay_compatibility_bucket",
+    "resource_limit_bucket",
+    "failure_class",
+    "recovery_action_bucket",
+    "diagnostic_redaction_status"
+  ],
+  "failure_buckets": [
+    "config_rejected",
+    "resource_limited",
+    "compatibility_mismatch",
+    "rotation_required",
+    "shutdown_in_progress",
+    "restart_exhausted"
+  ],
+  "resource_buckets": [
+    "process",
+    "session",
+    "stream",
+    "queue",
+    "timer",
+    "diagnostic_buffer"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "exact_user_identifier_logged": false,
+  "precise_network_metadata": false,
+  "conclusion": "passed"
+}

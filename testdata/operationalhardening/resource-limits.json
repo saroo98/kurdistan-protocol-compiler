@@ -1,0 +1,23 @@
+{
+  "policy": "bounded_relay_runtime_resources_fail_closed",
+  "bounds": [
+    "relay_process_count_bucket",
+    "runtime_session_count_bucket",
+    "stream_count_bucket",
+    "carrier_queue_depth_bucket",
+    "timer_count_bucket",
+    "generated_profile_count_bucket",
+    "diagnostic_buffer_bytes_bucket",
+    "restart_attempt_bucket"
+  ],
+  "safe_error_classes": [
+    "resource_limit_process",
+    "resource_limit_session",
+    "resource_limit_stream",
+    "resource_limit_queue",
+    "resource_limit_timer",
+    "resource_limit_diagnostic"
+  ],
+  "missing_bounds": false,
+  "conclusion": "passed"
+}

@@ -637,6 +637,19 @@ const (
 	ModeRelayAuthPlanPublicDiscoveryAdded        = "relayauthplan_public_discovery_added"
 	ModeRelayAuthPlanCloudProviderDependency     = "relayauthplan_cloud_provider_dependency"
 	ModeRelayAuthPlanGeneratedBackendDrift       = "relayauthplan_generated_backend_drift"
+
+	ModeOperationalHardeningUnsafeDefaultsAllowed       = "operationalhardening_unsafe_defaults_allowed"
+	ModeOperationalHardeningFailOpenAllowed             = "operationalhardening_fail_open_allowed"
+	ModeOperationalHardeningUnboundedRetryLoop          = "operationalhardening_unbounded_retry_loop"
+	ModeOperationalHardeningUnboundedMemoryGrowth       = "operationalhardening_unbounded_memory_growth"
+	ModeOperationalHardeningVerboseSensitiveLogs        = "operationalhardening_verbose_sensitive_logs"
+	ModeOperationalHardeningAuthDisabled                = "operationalhardening_auth_disabled"
+	ModeOperationalHardeningCompatibilityChecksDisabled = "operationalhardening_compatibility_checks_disabled"
+	ModeOperationalHardeningMeasurementReviewDisabled   = "operationalhardening_measurementreview_disabled"
+	ModeOperationalHardeningCarrierReviewDisabled       = "operationalhardening_carrierreview_disabled"
+	ModeOperationalHardeningHardeningGatesDisabled      = "operationalhardening_hardening_gates_disabled"
+	ModeOperationalHardeningRollbackWithoutFailClosed   = "operationalhardening_rollback_without_fail_closed"
+	ModeOperationalHardeningGeneratedBackendDrift       = "operationalhardening_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1246,6 +1259,18 @@ func Modes() []string {
 		ModeRelayAuthPlanPublicDiscoveryAdded,
 		ModeRelayAuthPlanCloudProviderDependency,
 		ModeRelayAuthPlanGeneratedBackendDrift,
+		ModeOperationalHardeningUnsafeDefaultsAllowed,
+		ModeOperationalHardeningFailOpenAllowed,
+		ModeOperationalHardeningUnboundedRetryLoop,
+		ModeOperationalHardeningUnboundedMemoryGrowth,
+		ModeOperationalHardeningVerboseSensitiveLogs,
+		ModeOperationalHardeningAuthDisabled,
+		ModeOperationalHardeningCompatibilityChecksDisabled,
+		ModeOperationalHardeningMeasurementReviewDisabled,
+		ModeOperationalHardeningCarrierReviewDisabled,
+		ModeOperationalHardeningHardeningGatesDisabled,
+		ModeOperationalHardeningRollbackWithoutFailClosed,
+		ModeOperationalHardeningGeneratedBackendDrift,
 	}
 }
 

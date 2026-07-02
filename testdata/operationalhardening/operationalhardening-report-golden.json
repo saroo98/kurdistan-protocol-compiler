@@ -1,0 +1,290 @@
+{
+  "version": "operationalhardening-v1",
+  "fixture_id": "operational_hardening_v1",
+  "generated_at": "2026-02-20T00:00:00Z",
+  "backend_version": "0.55.0-lab",
+  "recommended_next_milestone": "M56: Android architecture review",
+  "decision": "ready_for_android_architecture_review",
+  "blocker_count": 0,
+  "risk_count": 5,
+  "resource_limits": {
+    "policy": "bounded_relay_runtime_resources_fail_closed",
+    "bounds": [
+      "relay_process_count_bucket",
+      "runtime_session_count_bucket",
+      "stream_count_bucket",
+      "carrier_queue_depth_bucket",
+      "timer_count_bucket",
+      "generated_profile_count_bucket",
+      "diagnostic_buffer_bytes_bucket",
+      "restart_attempt_bucket"
+    ],
+    "safe_error_classes": [
+      "resource_limit_process",
+      "resource_limit_session",
+      "resource_limit_stream",
+      "resource_limit_queue",
+      "resource_limit_timer",
+      "resource_limit_diagnostic"
+    ],
+    "missing_bounds": false,
+    "conclusion": "passed"
+  },
+  "config_validation": {
+    "policy": "strict_operational_config_validation_with_safe_error_classes",
+    "required_fields": [
+      "profile_bundle_version",
+      "relay_compatibility_floor",
+      "carrier_review_gate",
+      "measurement_review_gate",
+      "hardening_gate_status",
+      "diagnostic_policy",
+      "rollback_policy"
+    ],
+    "rejected_config_classes": [
+      "missing_required_config",
+      "ambiguous_config",
+      "unsafe_default_config",
+      "incompatible_version_config",
+      "stale_profile_config",
+      "over_permissive_diagnostics",
+      "disabled_safety_gate"
+    ],
+    "safe_error_classes": [
+      "config_missing_required",
+      "config_ambiguous",
+      "config_unsafe_default",
+      "config_incompatible",
+      "config_stale",
+      "config_over_permissive",
+      "config_gate_disabled"
+    ],
+    "allow_ambiguous_config": false,
+    "allow_overbroad_defaults": false,
+    "conclusion": "passed"
+  },
+  "lifecycle": {
+    "policy": "deterministic_bounded_shutdown_restart",
+    "shutdown_phases": [
+      "stop_accepting_new_sessions",
+      "close_inflight_streams_with_safe_reason",
+      "flush_redacted_diagnostics",
+      "close_runtime_links",
+      "mark_terminal"
+    ],
+    "restart_phases": [
+      "validate_config",
+      "validate_profile_compatibility",
+      "restore_compatibility_state",
+      "start_with_bounded_retry"
+    ],
+    "in_flight_session_policy": "bounded_drain_then_safe_close",
+    "compatibility_state_policy": "compatibility_state_revalidated_before_reopen",
+    "deterministic_shutdown": true,
+    "idempotent_restart": true,
+    "unbounded_restart_loop_allowed": false,
+    "in_flight_sessions_dropped_open": false,
+    "compatibility_state_bypassable": false,
+    "conclusion": "passed"
+  },
+  "logging_diagnostics": {
+    "policy": "state_failure_version_resource_redacted_only",
+    "allowed_fields": [
+      "state_bucket",
+      "failure_class",
+      "version_compatibility_bucket",
+      "resource_limit_class",
+      "redaction_status",
+      "rollback_class",
+      "health_summary_bucket"
+    ],
+    "forbidden_fields": [
+      "payload contents",
+      "destination metadata",
+      "profile secret material",
+      "key material",
+      "exact user identifier",
+      "sensitive network metadata",
+      "packet capture artifacts",
+      "telemetry upload marker"
+    ],
+    "redaction_classes": [
+      "redacted_profile",
+      "redacted_relay",
+      "bucketed_version",
+      "bucketed_resource_limit",
+      "bucketed_failure"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "destination_logged": false,
+    "key_material_logged": false,
+    "exact_user_id_logged": false,
+    "network_metadata_leak": false,
+    "conclusion": "passed"
+  },
+  "rollback_update_boundaries": {
+    "policy": "rollback_boundaries_fail_closed_on_ambiguity",
+    "rollbackable_components": [
+      "runtime_config_class",
+      "diagnostic_policy_class",
+      "carrier_selection_policy_class"
+    ],
+    "forward_compatible": [
+      "profile_bundle_version_floor",
+      "relay_compatibility_floor",
+      "generated_backend_marker"
+    ],
+    "profile_rotation_required": [
+      "auth_policy_change",
+      "relay_identity_epoch_change",
+      "profile_wire_policy_change"
+    ],
+    "fail_closed_classes": [
+      "unknown_version",
+      "profile_rotation_required",
+      "compatibility_floor_mismatch",
+      "rollback_policy_missing"
+    ],
+    "fail_closed_required": true,
+    "unsafe_rollback_allowed": false,
+    "conclusion": "passed"
+  },
+  "health_summary": {
+    "policy": "redacted_android_ready_operational_health_summary",
+    "safe_fields": [
+      "state_bucket",
+      "runtime_version_bucket",
+      "profile_version_bucket",
+      "carrier_family_bucket",
+      "relay_compatibility_bucket",
+      "resource_limit_bucket",
+      "failure_class",
+      "recovery_action_bucket",
+      "diagnostic_redaction_status"
+    ],
+    "failure_buckets": [
+      "config_rejected",
+      "resource_limited",
+      "compatibility_mismatch",
+      "rotation_required",
+      "shutdown_in_progress",
+      "restart_exhausted"
+    ],
+    "resource_buckets": [
+      "process",
+      "session",
+      "stream",
+      "queue",
+      "timer",
+      "diagnostic_buffer"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "exact_user_identifier_logged": false,
+    "precise_network_metadata": false,
+    "conclusion": "passed"
+  },
+  "compatibility_integration": {
+    "policy": "operational_hardening_preserves_prior_safety_gates",
+    "required_gates": [
+      "carrierreview",
+      "measurementreview",
+      "pathhealth",
+      "relayauthplan",
+      "keyexchangeplan",
+      "relayprocess",
+      "hardening"
+    ],
+    "compatibility_checks": [
+      "profile_bundle_version",
+      "relay_auth_policy",
+      "rotation_window",
+      "carrier_family_review",
+      "measurement_review_status",
+      "path_health_status",
+      "generated_backend_version"
+    ],
+    "bypasses_carrierreview": false,
+    "bypasses_measurementreview": false,
+    "bypasses_pathhealth": false,
+    "bypasses_relay_auth": false,
+    "bypasses_hardening": false,
+    "allows_generated_backend_drift": false,
+    "allows_profile_rotation_bypass": false,
+    "allows_compatibility_fail_open": false,
+    "conclusion": "passed"
+  },
+  "checklist": {
+    "items": [
+      "resource_limits_defined",
+      "config_validation_strict",
+      "shutdown_restart_bounded",
+      "safe_logging_diagnostics",
+      "misuse_controls_present",
+      "rollback_update_boundaries",
+      "health_summary_redacted",
+      "prior_gate_integration_preserved",
+      "generated_backend_parity"
+    ],
+    "passed": 9,
+    "failed": 0,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "operationalhardening_unsafe_defaults_allowed",
+      "operationalhardening_fail_open_allowed",
+      "operationalhardening_unbounded_retry_loop",
+      "operationalhardening_unbounded_memory_growth",
+      "operationalhardening_verbose_sensitive_logs",
+      "operationalhardening_auth_disabled",
+      "operationalhardening_compatibility_checks_disabled",
+      "operationalhardening_measurementreview_disabled",
+      "operationalhardening_carrierreview_disabled",
+      "operationalhardening_hardening_gates_disabled",
+      "operationalhardening_rollback_without_fail_closed",
+      "operationalhardening_generated_backend_drift"
+    ],
+    "detected_count": 12,
+    "expected_count": 12,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "reports_scanned": 10,
+    "payload_logged": false,
+    "secret_logged": false,
+    "destination_logged": false,
+    "key_material_logged": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "public-network deployment ready",
+      "field-ready",
+      "guaranteed bypass",
+      "undetectable",
+      "Android ready",
+      "production VPN"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "OperationalHardeningSchemaVersion",
+      "OperationalHardeningBackendVersion",
+      "OperationalHardeningDecision",
+      "OperationalHardeningMisuseCount",
+      "OperationalHardeningSafeErrorClasses",
+      "OperationalHardeningNextMilestone"
+    ],
+    "interpreted_hash": "sha256:3d8ccf16baddb735681fcba0067fef3e1a2f3a704d08243d82143b43e17138a7",
+    "generated_hash": "sha256:3d8ccf16baddb735681fcba0067fef3e1a2f3a704d08243d82143b43e17138a7",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:e40603cc8d1f4eaabb5cc8561f692870c9038882a9820b6ac158ad784bc9a13d",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

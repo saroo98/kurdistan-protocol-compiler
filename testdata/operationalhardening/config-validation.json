@@ -1,0 +1,33 @@
+{
+  "policy": "strict_operational_config_validation_with_safe_error_classes",
+  "required_fields": [
+    "profile_bundle_version",
+    "relay_compatibility_floor",
+    "carrier_review_gate",
+    "measurement_review_gate",
+    "hardening_gate_status",
+    "diagnostic_policy",
+    "rollback_policy"
+  ],
+  "rejected_config_classes": [
+    "missing_required_config",
+    "ambiguous_config",
+    "unsafe_default_config",
+    "incompatible_version_config",
+    "stale_profile_config",
+    "over_permissive_diagnostics",
+    "disabled_safety_gate"
+  ],
+  "safe_error_classes": [
+    "config_missing_required",
+    "config_ambiguous",
+    "config_unsafe_default",
+    "config_incompatible",
+    "config_stale",
+    "config_over_permissive",
+    "config_gate_disabled"
+  ],
+  "allow_ambiguous_config": false,
+  "allow_overbroad_defaults": false,
+  "conclusion": "passed"
+}
