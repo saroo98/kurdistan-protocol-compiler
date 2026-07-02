@@ -1,0 +1,25 @@
+{
+  "backpressure_signals": [
+    "adapter_queue_pressure",
+    "runtime_stream_window_pressure",
+    "carrier_selection_pressure",
+    "labegress_policy_pressure"
+  ],
+  "reset_signals": [
+    "parser_reset",
+    "runtime_stream_reset",
+    "target_error_reset",
+    "carrier_reset_bucket"
+  ],
+  "half_close_rules": [
+    "write_half_close_allowed_only_if_capability",
+    "read_side_may_continue_until_bounded_close"
+  ],
+  "safe_error_buckets": [
+    "target_redacted_rejected",
+    "policy_blocked",
+    "resource_limit",
+    "reset_bucket",
+    "parser_misuse"
+  ]
+}

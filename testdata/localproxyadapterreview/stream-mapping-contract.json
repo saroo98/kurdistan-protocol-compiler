@@ -1,0 +1,21 @@
+{
+  "open_triggers": [
+    "parser_state_accept",
+    "target_redaction_complete",
+    "capability_check_passed"
+  ],
+  "stream_classes": [
+    "interactive",
+    "bulk",
+    "control",
+    "error_test"
+  ],
+  "mapping_rules": [
+    "one_local_flow_to_one_runtime_stream",
+    "target_descriptor_bucket_only",
+    "carrier_selection_before_first_payload_chunk"
+  ],
+  "carrier_selection": "invoke_multicarrierselect_with_review_and_health_constraints",
+  "exact_target_excluded": true,
+  "exact_port_excluded": true
+}

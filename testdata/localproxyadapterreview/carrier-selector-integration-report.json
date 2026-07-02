@@ -1,0 +1,16 @@
+{
+  "localprotocoladapter": "must_compose_with_m37_parser_states",
+  "loopbackrelay": "must_use_loopbackrelay_only_for_lab_round_trips",
+  "multicarrierselect": "must_invoke_reviewed_selector_before_payload_chunks",
+  "labegress": "must_obey_controlled_policy_and_allowlist",
+  "measurementreview": "must_keep_diagnostics_aggregate_local_only",
+  "required_gates": [
+    "localprotocoladapter",
+    "loopbackrelay",
+    "labegress",
+    "localpipeline",
+    "multicarrierselect",
+    "measurementreview",
+    "hardening"
+  ]
+}

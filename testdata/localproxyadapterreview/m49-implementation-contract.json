@@ -1,0 +1,41 @@
+{
+  "command_name": "localproxyadapter",
+  "decision": "ready_for_m49_local_only_prototype",
+  "acceptance_requirements": [
+    "carry_opaque_local_stream_bytes_without_logging_payloads",
+    "accept_only_reviewed_local_socks_like_and_connect_like_parser_states",
+    "preserve_target_redaction_before_stream_open",
+    "invoke_multicarrierselect_and_measurementreview_gates",
+    "surface_backpressure_reset_and_half_close_as_safe_metadata",
+    "reject_public_deployment_dns_by_default_vpn_capture_and_browser_configuration",
+    "provide_generated_interpreted_parity_and_fixture_drift_gates"
+  ],
+  "required_integrations": [
+    "localprotocoladapter",
+    "loopbackrelay",
+    "labegress",
+    "localpipeline",
+    "multicarrierselect",
+    "measurementreview",
+    "hardening",
+    "codegen"
+  ],
+  "required_controls": [
+    "localproxyadapterreview_allows_payload_logging",
+    "localproxyadapterreview_allows_packet_capture",
+    "localproxyadapterreview_allows_dns_by_default",
+    "localproxyadapterreview_allows_public_deployment",
+    "localproxyadapterreview_allows_exact_target_persistence",
+    "localproxyadapterreview_allows_credential_storage",
+    "localproxyadapterreview_allows_os_browser_config",
+    "localproxyadapterreview_allows_vpn_packet_capture",
+    "localproxyadapterreview_bypasses_localprotocoladapter",
+    "localproxyadapterreview_bypasses_multicarrierselect",
+    "localproxyadapterreview_bypasses_measurementreview",
+    "localproxyadapterreview_public_claim_working_proxy",
+    "localproxyadapterreview_public_claim_working_vpn",
+    "localproxyadapterreview_payload_leak",
+    "localproxyadapterreview_secret_leak",
+    "localproxyadapterreview_generated_backend_drift"
+  ]
+}

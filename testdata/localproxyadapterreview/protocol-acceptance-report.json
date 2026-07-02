@@ -1,0 +1,18 @@
+{
+  "accepted_protocols": [
+    "local_socks_like_stream_adapter_semantics",
+    "local_http_connect_like_stream_adapter_semantics"
+  ],
+  "parser_states_that_may_open_stream": [
+    "socks5_like_command_accepted",
+    "socks5_like_target_redacted",
+    "http_connect_like_request_accepted",
+    "http_connect_like_target_redacted"
+  ],
+  "rejected_protocols": [
+    "transparent_vpn",
+    "raw_tun",
+    "public_proxy",
+    "browser_config_automation"
+  ]
+}

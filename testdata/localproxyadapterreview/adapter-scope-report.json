@@ -1,0 +1,23 @@
+{
+  "allowed_behaviors": [
+    "local_only_opaque_stream_bytes",
+    "symbolic_stream_content_classes",
+    "loopback_policy_context",
+    "bounded_runtime_mapping",
+    "aggregate_local_diagnostics"
+  ],
+  "blocked_behaviors": [
+    "public_deployment",
+    "external_target_proxying_beyond_controlled_policy",
+    "dns_resolution_by_default",
+    "transparent_os_wide_vpn_behavior",
+    "tun_vpn_packet_capture",
+    "android_behavior",
+    "payload_logging",
+    "packet_capture",
+    "credential_storage",
+    "browser_os_configuration_automation",
+    "field_testing"
+  ],
+  "decision": "ready_for_m49_local_only_prototype"
+}
