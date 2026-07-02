@@ -32,6 +32,7 @@ import (
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/localproxyadapter"
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
@@ -171,6 +172,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	carrierCollapseDrift := carrierCollapseComparison(filepath.Join(fixtureRoot, "testdata", "carriercollapse", "carriercollapse-report-golden.json"), carrierCollapseSet)
 	localProxyAdapterReviewSet, localProxyAdapterReviewErr := localproxyadapterreview.GenerateFixtureSet()
 	localProxyAdapterReviewDrift := localProxyAdapterReviewComparison(filepath.Join(fixtureRoot, "testdata", "localproxyadapterreview", "localproxyadapterreview-report-golden.json"), localProxyAdapterReviewSet)
+	localProxyAdapterSet, localProxyAdapterErr := localproxyadapter.GenerateFixtureSet()
+	localProxyAdapterDrift := localProxyAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localproxyadapter", "localproxyadapter-report-golden.json"), localProxyAdapterSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -435,6 +438,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalProxyAdapterReviewGates(localProxyAdapterReviewSet, localProxyAdapterReviewDrift)...)
 	} else {
 		gates = append(gates, gate("localproxyadapterreview_scope_contract", false, "required", localProxyAdapterReviewErr.Error(), nil, []string{localProxyAdapterReviewErr.Error()}))
+	}
+	if localProxyAdapterErr == nil {
+		gates = append(gates, LocalProxyAdapterGates(localProxyAdapterSet, localProxyAdapterDrift)...)
+	} else {
+		gates = append(gates, gate("localproxyadapter_session_lifecycle", false, "required", localProxyAdapterErr.Error(), nil, []string{localProxyAdapterErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

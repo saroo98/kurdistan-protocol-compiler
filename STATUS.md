@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T04:03:07Z`
+- Generated at: `2026-07-02T04:38:02Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -486,6 +486,20 @@
 | `localproxyadapterreview_generated_backend_parity` | PASS | `required` | 5 generated markers checked |
 | `localproxyadapterreview_trace_hygiene` | PASS | `required` | 10 fixtures scanned |
 | `localproxyadapterreview_fixture_drift` | PASS | `required` | passed |
+| `localproxyadapter_session_lifecycle` | PASS | `required` | 1 session opened and 1 closed |
+| `localproxyadapter_request_stream_mapping` | PASS | `required` | 3 accepted requests |
+| `localproxyadapter_opaque_content` | PASS | `required` | 11 stream classes |
+| `localproxyadapter_stream_lifecycle` | PASS | `required` | 8 opened, 7 closed, 1 reset |
+| `localproxyadapter_backpressure_reset` | PASS | `required` | 1 pressure events; 1 resets |
+| `localproxyadapter_carrier_selection` | PASS | `required` | 8 carrier selections |
+| `localproxyadapter_pipeline_integration` | PASS | `required` | 8 localpipeline mappings |
+| `localproxyadapter_labegress_connector` | PASS | `required` | 8 labegress exchanges |
+| `localproxyadapter_measurementreview_enforcement` | PASS | `required` | 8 measurement reviews |
+| `localproxyadapter_resource_limits` | PASS | `required` | 3 rejected controls |
+| `localproxyadapter_misuse_detection` | PASS | `required` | 17/17 misuse controls detected |
+| `localproxyadapter_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `localproxyadapter_trace_hygiene` | PASS | `required` | 11 stream runs scanned |
+| `localproxyadapter_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -499,9 +513,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `119 ms`
-- Trace generation: `30 ms`
-- Total audit runtime: `3113 ms`
+- Profile generation: `85 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2190 ms`
 
 ## Corpus Diversity Summary
 
@@ -526,8 +540,8 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3187497711832676`
-- `same_profile_distance`: `0.007462686567164179`
+- `different_profile_average_distance`: `0.31894931477048555`
+- `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
