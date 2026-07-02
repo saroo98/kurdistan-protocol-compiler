@@ -1,0 +1,19 @@
+{
+  "profile_count": 3,
+  "adversarial_markers": [
+    "httpscarrieradversary_generated.go",
+    "httpscarrieradversary_test.go",
+    "httpscarrieradversary_parity_test.go",
+    "httpscarrieradversary_hygiene_test.go",
+    "HTTPSCarrierAdversarySchemaVersion",
+    "HTTPSCarrierAdversaryGeneratedProfileID"
+  ],
+  "collapse_controls": 4,
+  "profile_sensitivity": true,
+  "padding_only_rejected": true,
+  "forbidden_controls": 24,
+  "semantic_matches": 13,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

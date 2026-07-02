@@ -1,0 +1,12 @@
+{
+  "reset_swallowed_controls": 1,
+  "session_reset_misclassification_controls": 1,
+  "raw_error_string_controls": 1,
+  "unrelated_stream_reset_controls": 1,
+  "safe_error_classes": [
+    "stream_reset_bucket",
+    "target_error_bucket",
+    "session_close_bucket"
+  ],
+  "conclusion": "passed"
+}

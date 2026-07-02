@@ -1,0 +1,20 @@
+{
+  "controls": [
+    "m41_contract_bypass",
+    "carrierreadiness_bypass",
+    "carrierreview_bypass",
+    "measurementreview_bypass",
+    "labegress_bypass",
+    "loopbackrelay_bypass",
+    "localpipeline_bypass",
+    "relaybridge_bypass",
+    "pathhealth_bypass",
+    "pathrace_bypass"
+  ],
+  "bypasses_detected": 10,
+  "bypasses_rejected": 10,
+  "carrier_review_bound": true,
+  "measurement_review_bound": true,
+  "pathhealth_bound": true,
+  "conclusion": "passed"
+}

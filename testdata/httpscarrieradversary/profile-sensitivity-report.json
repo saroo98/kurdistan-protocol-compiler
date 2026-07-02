@@ -1,0 +1,13 @@
+{
+  "profile_classes": 3,
+  "distinct_shape_fingerprints": 18,
+  "generated_markers_checked": [
+    "HTTPSCarrierAdversarySchemaVersion",
+    "HTTPSCarrierAdversaryGeneratedProfileID",
+    "HTTPSCarrierAdversaryCollapseControlCount"
+  ],
+  "profile_inputs_influence": true,
+  "generated_profile_influence": true,
+  "profile_insensitive_controls": 2,
+  "conclusion": "passed"
+}

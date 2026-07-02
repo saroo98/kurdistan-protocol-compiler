@@ -1,0 +1,9 @@
+{
+  "multi_stream_fixtures": 4,
+  "cross_stream_reset_controls": 1,
+  "cross_stream_pressure_controls": 1,
+  "cross_stream_error_controls": 1,
+  "shape_contamination_controls": 1,
+  "isolation_failures": 0,
+  "conclusion": "passed"
+}
