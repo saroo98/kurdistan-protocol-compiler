@@ -1,0 +1,18 @@
+{
+  "max_streams_class": "profile_bounded_streams",
+  "max_buffered_bytes_class": "bounded_local_adapter_buffer",
+  "max_events_class": "bounded_adapter_events",
+  "panic_safety_targets": [
+    "metadata_to_stream_mapping",
+    "content_segmenter",
+    "half_close_drain",
+    "reset_propagation",
+    "summary_builder"
+  ],
+  "rejected_controls": [
+    "control_payload_leak",
+    "control_unbounded_stream",
+    "control_target_leak"
+  ],
+  "conclusion": "passed"
+}

@@ -1,0 +1,32 @@
+{
+  "localprotocoladapter": "accepted_m37_metadata_is_source_of_stream_descriptor",
+  "loopbackrelay": "loopbackrelay_only_for_local_round_trip_evidence",
+  "multicarrierselect": "stream_class_forwarded_to_reviewed_selector",
+  "httpslikecarrier": "https_like_candidate_allowed_only_after_m41_m43_gates",
+  "dnssurvivalcarrier": "dns_survival_candidate_allowed_only_after_m44_m45_gates",
+  "labegress": "controlled_connector_policy_checked",
+  "relaybridge": "flow_to_relay_stream_mapping_checked",
+  "localpipeline": "local_pipeline_summary_returns_to_adapter",
+  "pathhealth": "pathhealth_summary_returned_to_adapter",
+  "pathrace": "pathrace_decision_recorded_before_stream_chunks",
+  "measurementreview": "aggregate_local_diagnostics_only",
+  "carrierreview": "carrier_family_review_gate_enforced",
+  "hardening": "trace_hygiene_and_resource_checks_composed",
+  "required_gates": [
+    "localprotocoladapter",
+    "loopbackrelay",
+    "multicarrierselect",
+    "httpslikecarrier",
+    "constrainedcarrier",
+    "labegress",
+    "relaybridge",
+    "localpipeline",
+    "pathhealth",
+    "pathrace",
+    "measurementreview",
+    "carrierreview",
+    "hardening",
+    "codegen"
+  ],
+  "conclusion": "passed"
+}
