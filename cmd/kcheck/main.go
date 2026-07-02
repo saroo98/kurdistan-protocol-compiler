@@ -47,6 +47,7 @@ import (
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
 	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/vpnsemantics"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregencompare"
@@ -193,6 +194,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "localproxyadapter" {
 		os.Exit(runLocalProxyAdapter(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "vpnsemantics" {
+		os.Exit(runVPNSemantics(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -6573,6 +6577,171 @@ func writeLocalProxyAdapterCompanions(out string, set localproxyadapter.FixtureS
 	}
 	for _, write := range writes {
 		if err := localproxyadapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runVPNSemantics(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runVPNSemanticsGenerate(args[1:])
+		case "verify":
+			return runVPNSemanticsVerify(args[1:])
+		case "compare":
+			return runVPNSemanticsCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck vpnsemantics", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick VPN semantics audit")
+	full := flags.Bool("full", false, "run full VPN semantics audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunVPNSemanticsAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runVPNSemanticsGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck vpnsemantics generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "vpnsemantics", "vpnsemantics-report-golden.json"), "VPN semantics fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := vpnsemantics.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := vpnsemantics.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeVPNSemanticsCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote vpnsemantics fixtures: %s (%d fixtures, %d controls)\n", *out, len(set.Fixtures), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runVPNSemanticsVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck vpnsemantics verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "vpnsemantics", "vpnsemantics-report-golden.json"), "VPN semantics fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := vpnsemantics.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := vpnsemantics.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := vpnsemantics.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runVPNSemanticsCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck vpnsemantics compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old VPN semantics fixture")
+	newPath := flags.String("new", "", "new VPN semantics fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := vpnsemantics.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := vpnsemantics.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := vpnsemantics.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := vpnsemantics.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeVPNSemanticsCompanions(out string, set vpnsemantics.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"packet-flow-taxonomy.json", set.Taxonomy},
+		{"flow-stream-mapping.json", set.Mapping},
+		{"mtu-fragmentation-semantics.json", set.MTU},
+		{"boundary-policy-report.json", set.Boundaries},
+		{"m51-implementation-contract.json", set.M51Contract},
+		{"misuse-report.json", set.Misuse},
+		{"vpnsemantics-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := vpnsemantics.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

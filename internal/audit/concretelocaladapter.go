@@ -16,7 +16,7 @@ import (
 )
 
 type ConcreteLocalAdapterAuditSummary struct {
-	Version        string                                       `json:"version"`
+	Version       string                                       `json:"version"`
 	ScenarioCount int                                          `json:"scenario_count"`
 	SummaryCount  int                                          `json:"summary_count"`
 	Comparison    concretelocaladapter.FixtureComparisonReport `json:"comparison"`
@@ -37,7 +37,7 @@ func RunConcreteLocalAdapterAudit(ctx context.Context, cfg AuditConfig) (AuditRe
 	comparison := concreteLocalAdapterComparison(filepath.Join(root, "testdata", "concretelocaladapter", "concretelocaladapter-golden.json"), set)
 	gates := ConcreteLocalAdapterGates(set, comparison)
 	summary := ConcreteLocalAdapterAuditSummary{
-		Version:        concretelocaladapter.Version,
+		Version:       concretelocaladapter.Version,
 		ScenarioCount: len(set.Scenarios),
 		SummaryCount:  len(set.Summaries),
 		Comparison:    comparison,

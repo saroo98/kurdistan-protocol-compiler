@@ -52,6 +52,7 @@ import (
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/vpnsemantics"
 	"kurdistan/internal/wireeval"
 	"kurdistan/internal/wirefeatures"
 	"kurdistan/internal/wiregen"
@@ -174,6 +175,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localProxyAdapterReviewDrift := localProxyAdapterReviewComparison(filepath.Join(fixtureRoot, "testdata", "localproxyadapterreview", "localproxyadapterreview-report-golden.json"), localProxyAdapterReviewSet)
 	localProxyAdapterSet, localProxyAdapterErr := localproxyadapter.GenerateFixtureSet()
 	localProxyAdapterDrift := localProxyAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localproxyadapter", "localproxyadapter-report-golden.json"), localProxyAdapterSet)
+	vpnSemanticsSet, vpnSemanticsErr := vpnsemantics.GenerateFixtureSet()
+	vpnSemanticsDrift := vpnSemanticsComparison(filepath.Join(fixtureRoot, "testdata", "vpnsemantics", "vpnsemantics-report-golden.json"), vpnSemanticsSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -443,6 +446,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalProxyAdapterGates(localProxyAdapterSet, localProxyAdapterDrift)...)
 	} else {
 		gates = append(gates, gate("localproxyadapter_session_lifecycle", false, "required", localProxyAdapterErr.Error(), nil, []string{localProxyAdapterErr.Error()}))
+	}
+	if vpnSemanticsErr == nil {
+		gates = append(gates, VPNSemanticsGates(vpnSemanticsSet, vpnSemanticsDrift)...)
+	} else {
+		gates = append(gates, gate("vpnsemantics_scope_contract", false, "required", vpnSemanticsErr.Error(), nil, []string{vpnSemanticsErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
