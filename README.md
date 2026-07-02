@@ -198,6 +198,9 @@ internal/localproxyadapterreview
 internal/localproxyadapter
   controlled local proxy adapter prototype, accepted request-to-stream mapping, opaque stream content classes, backpressure/reset/half-close summaries, carrier selector composition, trace hygiene, fixture drift checks, and generated parity
 
+internal/vpnsemantics
+  local packet-flow semantics model for future TUN/VPN work, packet-flow taxonomy, flow-to-stream mapping, MTU/retry/reset/backpressure buckets, DNS/routing/privacy boundaries, M51 contract, misuse controls, fixture drift checks, and generated parity
+
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
@@ -937,6 +940,22 @@ go run ./cmd/kcheck localproxyadapter verify
 go run ./cmd/kcheck localproxyadapter compare --old testdata/localproxyadapter/localproxyadapter-report-golden.json --new testdata/localproxyadapter/localproxyadapter-report-golden.json
 ```
 
+## Local TUN/VPN Semantics Model
+
+Milestone 50 freezes the local packet-flow semantics needed before a future desktop packet-style adapter. It is a model and review layer: it describes packet-flow classes, flow identity classes, app-identity boundaries, MTU buckets, fragmentation/reassembly classes, retry/reset/backpressure semantics, kill-switch policy classes, routing boundaries, DNS privacy boundaries, local diagnostics policy, and the M51 implementation contract.
+
+The `internal/vpnsemantics` package records only classes, buckets, counts, hashes, and safe hygiene flags. It blocks real TUN device creation, packet capture, OS route modification, Android VpnService behavior, app traffic interception, real DNS interception, public-network behavior, payload logging, packet dumps, per-app identity logging, and precise endpoint logging.
+
+Run:
+
+```bash
+go run ./cmd/kcheck vpnsemantics --quick
+go run ./cmd/kcheck vpnsemantics --full --out testdata/audit/vpnsemantics.json
+go run ./cmd/kcheck vpnsemantics generate --out testdata/vpnsemantics/vpnsemantics-report-golden.json --force
+go run ./cmd/kcheck vpnsemantics verify
+go run ./cmd/kcheck vpnsemantics compare --old testdata/vpnsemantics/vpnsemantics-report-golden.json --new testdata/vpnsemantics/vpnsemantics-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -972,7 +991,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local proxy adapter adversarial hardening.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype.
 
 ## Research Positioning
 

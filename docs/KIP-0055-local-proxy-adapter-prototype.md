@@ -71,4 +71,4 @@ The prototype is intentionally bounded and deterministic. It proves the adapter 
 
 ## Next Milestone
 
-M50 should adversarially harden this local proxy adapter prototype against fixed behavior, payload leakage, target leakage, unsafe fallback, stream isolation failure, backpressure bypass, reset swallowing, and generated backend drift.
+M50 defines the local TUN/VPN packet-flow semantics needed before a future desktop packet-style adapter. It remains a model/review step and does not create a TUN device, capture packets, change OS routes, intercept app traffic, or implement Android VpnService behavior.

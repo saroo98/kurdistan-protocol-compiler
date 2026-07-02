@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T04:38:02Z`
+- Generated at: `2026-07-02T09:38:39Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -500,6 +500,19 @@
 | `localproxyadapter_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
 | `localproxyadapter_trace_hygiene` | PASS | `required` | 11 stream runs scanned |
 | `localproxyadapter_fixture_drift` | PASS | `required` | passed |
+| `vpnsemantics_scope_contract` | PASS | `required` | 11 blocked behaviors |
+| `vpnsemantics_packet_flow_taxonomy` | PASS | `required` | 6 packet flow classes |
+| `vpnsemantics_flow_stream_mapping` | PASS | `required` | 4 mapping rules |
+| `vpnsemantics_mtu_fragmentation` | PASS | `required` | 3 mtu buckets |
+| `vpnsemantics_retry_reset_backpressure` | PASS | `required` | 3 retry buckets; 4 pressure buckets |
+| `vpnsemantics_dns_boundary_policy` | PASS | `required` | 3 DNS boundary classes |
+| `vpnsemantics_kill_switch_semantics` | PASS | `required` | 3 kill-switch policy classes |
+| `vpnsemantics_diagnostics_privacy` | PASS | `required` | aggregate_buckets_only |
+| `vpnsemantics_m51_contract` | PASS | `required` | 7 acceptance requirements |
+| `vpnsemantics_misuse_detection` | PASS | `required` | 13/13 misuse controls detected |
+| `vpnsemantics_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `vpnsemantics_trace_hygiene` | PASS | `required` | 10 fixtures scanned |
+| `vpnsemantics_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -513,9 +526,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `85 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `2190 ms`
+- Profile generation: `87 ms`
+- Trace generation: `18 ms`
+- Total audit runtime: `2155 ms`
 
 ## Corpus Diversity Summary
 
@@ -540,7 +553,7 @@
 - Gate result: `true`
 - `cluster_count`: `4`
 - `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31894931477048555`
+- `different_profile_average_distance`: `0.31871119477298226`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
