@@ -50,6 +50,7 @@ import (
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/relayprocess"
 	"kurdistan/internal/runtimeadversary"
 	ktrace "kurdistan/internal/trace"
 	"kurdistan/internal/transportbundle"
@@ -180,6 +181,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	vpnSemanticsDrift := vpnSemanticsComparison(filepath.Join(fixtureRoot, "testdata", "vpnsemantics", "vpnsemantics-report-golden.json"), vpnSemanticsSet)
 	localVPNAdapterSet, localVPNAdapterErr := localvpnadapter.GenerateFixtureSet()
 	localVPNAdapterDrift := localVPNAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localvpnadapter", "localvpnadapter-report-golden.json"), localVPNAdapterSet)
+	relayProcessSet, relayProcessErr := relayprocess.GenerateFixtureSet()
+	relayProcessDrift := relayProcessComparison(filepath.Join(fixtureRoot, "testdata", "relayprocess", "relayprocess-report-golden.json"), relayProcessSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -459,6 +462,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, LocalVPNAdapterGates(localVPNAdapterSet, localVPNAdapterDrift)...)
 	} else {
 		gates = append(gates, gate("localvpnadapter_lifecycle", false, "required", localVPNAdapterErr.Error(), nil, []string{localVPNAdapterErr.Error()}))
+	}
+	if relayProcessErr == nil {
+		gates = append(gates, RelayProcessGates(relayProcessSet, relayProcessDrift)...)
+	} else {
+		gates = append(gates, gate("relayprocess_role_inventory", false, "required", relayProcessErr.Error(), nil, []string{relayProcessErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

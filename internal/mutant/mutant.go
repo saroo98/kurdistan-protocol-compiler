@@ -594,6 +594,22 @@ const (
 	ModeLocalVPNAdapterGeneratedBackendDrift  = "localvpnadapter_generated_backend_drift"
 	ModeLocalVPNAdapterPayloadLeak            = "localvpnadapter_payload_leak"
 	ModeLocalVPNAdapterSecretLeak             = "localvpnadapter_secret_leak"
+
+	ModeRelayProcessPublicDeploymentDefault = "relayprocess_public_deployment_default"
+	ModeRelayProcessPayloadLoggingAllowed   = "relayprocess_payload_logging_allowed"
+	ModeRelayProcessPacketCaptureAllowed    = "relayprocess_packet_capture_allowed"
+	ModeRelayProcessSecretLoggingAllowed    = "relayprocess_secret_logging_allowed"
+	ModeRelayProcessCloudProviderDependency = "relayprocess_cloud_provider_dependency"
+	ModeRelayProcessPublicObservability     = "relayprocess_public_observability_upload"
+	ModeRelayProcessUnreviewedAutoUpdate    = "relayprocess_unreviewed_auto_update"
+	ModeRelayProcessMissingShutdownPolicy   = "relayprocess_missing_shutdown_policy"
+	ModeRelayProcessMissingResourcePolicy   = "relayprocess_missing_resource_policy"
+	ModeRelayProcessMissingCompatibility    = "relayprocess_missing_compatibility_policy"
+	ModeRelayProcessProductionKeyingChanged = "relayprocess_production_keying_modified"
+	ModeRelayProcessAndroidBehaviorAdded    = "relayprocess_android_behavior_added"
+	ModeRelayProcessPayloadLeak             = "relayprocess_payload_leak"
+	ModeRelayProcessSecretLeak              = "relayprocess_secret_leak"
+	ModeRelayProcessGeneratedBackendDrift   = "relayprocess_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1163,6 +1179,21 @@ func Modes() []string {
 		ModeLocalVPNAdapterGeneratedBackendDrift,
 		ModeLocalVPNAdapterPayloadLeak,
 		ModeLocalVPNAdapterSecretLeak,
+		ModeRelayProcessPublicDeploymentDefault,
+		ModeRelayProcessPayloadLoggingAllowed,
+		ModeRelayProcessPacketCaptureAllowed,
+		ModeRelayProcessSecretLoggingAllowed,
+		ModeRelayProcessCloudProviderDependency,
+		ModeRelayProcessPublicObservability,
+		ModeRelayProcessUnreviewedAutoUpdate,
+		ModeRelayProcessMissingShutdownPolicy,
+		ModeRelayProcessMissingResourcePolicy,
+		ModeRelayProcessMissingCompatibility,
+		ModeRelayProcessProductionKeyingChanged,
+		ModeRelayProcessAndroidBehaviorAdded,
+		ModeRelayProcessPayloadLeak,
+		ModeRelayProcessSecretLeak,
+		ModeRelayProcessGeneratedBackendDrift,
 	}
 }
 

@@ -47,6 +47,7 @@ import (
 	"kurdistan/internal/proxyingressreview"
 	"kurdistan/internal/relaybridge"
 	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/relayprocess"
 	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/vpnsemantics"
 	"kurdistan/internal/wireeval"
@@ -201,6 +202,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "localvpnadapter" {
 		os.Exit(runLocalVPNAdapter(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "relayprocess" {
+		os.Exit(runRelayProcess(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -6912,6 +6916,177 @@ func writeLocalVPNAdapterCompanions(out string, set localvpnadapter.FixtureSet, 
 	}
 	for _, write := range writes {
 		if err := localvpnadapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runRelayProcess(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runRelayProcessGenerate(args[1:])
+		case "verify":
+			return runRelayProcessVerify(args[1:])
+		case "compare":
+			return runRelayProcessCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck relayprocess", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick relay process architecture audit")
+	full := flags.Bool("full", false, "run full relay process architecture audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunRelayProcessAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runRelayProcessGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayprocess generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "relayprocess", "relayprocess-report-golden.json"), "relay process fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := relayprocess.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := relayprocess.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeRelayProcessCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote relayprocess fixtures: %s (%d roles, %d controls)\n", *out, len(set.Roles), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runRelayProcessVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayprocess verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "relayprocess", "relayprocess-report-golden.json"), "relay process fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := relayprocess.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relayprocess.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relayprocess.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runRelayProcessCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck relayprocess compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old relay process fixture")
+	newPath := flags.String("new", "", "new relay process fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := relayprocess.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := relayprocess.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := relayprocess.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := relayprocess.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeRelayProcessCompanions(out string, set relayprocess.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"process-role-inventory.json", set.Roles},
+		{"config-contract.json", set.Config},
+		{"lifecycle-contract.json", set.Lifecycle},
+		{"logging-observability-contract.json", set.Logging},
+		{"shutdown-crash-recovery-contract.json", set.Shutdown},
+		{"compatibility-contract.json", set.Compatibility},
+		{"resource-contract.json", set.Resource},
+		{"abuse-control-placeholder-contract.json", set.Resource.AbuseControlPolicy},
+		{"m53-preconditions.json", set.M53Preconditions},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"relayprocess-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := relayprocess.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
