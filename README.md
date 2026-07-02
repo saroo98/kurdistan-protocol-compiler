@@ -108,7 +108,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Generated transport bundle compiler with deterministic bundle modes, candidate roles, profile/wire-policy references, synthetic relay binding, fallback hints, collapse controls, fixtures, and generated-backend parity.
 - Path racing and short-lived scoring harness with deterministic synthetic race scenarios, parallel scheduler modeling, candidate verification, freshness decay, ranking/tie-break controls, misuse detection, fixtures, and generated-backend parity.
 - Continuous path health monitoring and failover modeling with deterministic health scenarios, score decay, relay burn quarantine, confidence expiry, fixture drift gates, and generated-backend parity.
-- Carrier-family design review and prototype gates for synthetic carrier readiness, risk gating, HTTPS-like lab carrier shape classes, constrained-carrier design locks, misuse detection, trace-hygiene preconditions, fixture drift, and generated parity.
+- Carrier-family design review and prototype gates for synthetic carrier readiness, risk gating, HTTPS-like lab carrier shape classes, constrained-carrier lab shape classes, misuse detection, trace-hygiene preconditions, fixture drift, and generated parity.
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
@@ -246,6 +246,7 @@ go run ./cmd/kcheck pathrace --quick
 go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck constrainedcarrierreview --quick
+go run ./cmd/kcheck constrainedcarrier --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -377,6 +378,7 @@ go run ./cmd/kcheck pathrace --quick
 go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck constrainedcarrierreview --quick
+go run ./cmd/kcheck constrainedcarrier --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -837,6 +839,19 @@ go run ./cmd/kcheck constrainedcarrierreview --quick
 go run ./cmd/kcheck constrainedcarrierreview verify
 ```
 
+## DNS-Survival / Constrained-Carrier Lab Prototype
+
+Milestone 45 implements the second bounded carrier-family prototype. The `internal/constrainedcarrier` package models local deterministic constrained request/response behavior with symbolic query/response shape buckets, capacity/truncation limits, bounded retries, timeout and poison/failure classes, stream mapping, backpressure, reset/error isolation, pathhealth feedback, measurement-review enforcement, fixture drift checks, and generated-backend parity.
+
+This prototype remains local and deterministic. It does not perform public resolver use, resolver-network probing, domain-dependent routing, exact query logging, resolver address logging, payload logging, packet capture, public-network egress, or deployment behavior.
+
+Run:
+
+```bash
+go run ./cmd/kcheck constrainedcarrier --quick
+go run ./cmd/kcheck constrainedcarrier verify
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -872,7 +887,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection.
 
 ## Research Positioning
 
