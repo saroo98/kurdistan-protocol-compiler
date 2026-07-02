@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T21:40:49Z`
+- Generated at: `2026-07-02T22:23:59Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -596,6 +596,19 @@
 | `androidreview_trace_hygiene` | PASS | `required` | 12 reports scanned |
 | `androidreview_public_claim_safety` | PASS | `required` | 5 docs checked |
 | `androidreview_fixture_drift` | PASS | `required` | passed |
+| `androidruntime_report` | PASS | `required` | decision=ready_for_android_vpnservice_prototype blockers=0 risks=6 checklist_failed=0 |
+| `androidruntime_initialization` | PASS | `required` | validated_profile_android_local_runtime_startup |
+| `androidruntime_lifecycle` | PASS | `required` | 11 lifecycle events |
+| `androidruntime_storage_boundaries` | PASS | `required` | android_private_storage_with_ephemeral_runtime_state |
+| `androidruntime_diagnostics` | PASS | `required` | bounded_redacted_local_runtime_diagnostics |
+| `androidruntime_concurrency` | PASS | `required` | tasks=6 lifecycle_events=64 diagnostic_events=128 |
+| `androidruntime_compatibility` | PASS | `required` | android_local_runtime_preserves_existing_gates |
+| `androidruntime_shutdown` | PASS | `required` | safe_idempotent_android_local_runtime_shutdown |
+| `androidruntime_misuse_detection` | PASS | `required` | 10/10 misuse controls detected |
+| `androidruntime_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `androidruntime_trace_hygiene` | PASS | `required` | 14 reports scanned |
+| `androidruntime_public_claim_safety` | PASS | `required` | 5 docs checked |
+| `androidruntime_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -603,15 +616,15 @@
 | `hardening_trace_hygiene` | PASS | `required` | 20 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 25 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 26 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `96 ms`
-- Trace generation: `25 ms`
-- Total audit runtime: `2214 ms`
+- Profile generation: `79 ms`
+- Trace generation: `20 ms`
+- Total audit runtime: `2176 ms`
 
 ## Corpus Diversity Summary
 
@@ -636,7 +649,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3176487624499798`
+- `different_profile_average_distance`: `0.3159078133277868`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -868,6 +881,23 @@
 - `androidreview_public_claim_safety`: `passed`
 - `androidreview_fixture_drift`: `passed`
 
+## Android Local Runtime Port
+
+- Gate result: `true`
+- `androidruntime_report`: `passed`
+- `androidruntime_initialization`: `passed`
+- `androidruntime_lifecycle`: `passed`
+- `androidruntime_storage_boundaries`: `passed`
+- `androidruntime_diagnostics`: `passed`
+- `androidruntime_concurrency`: `passed`
+- `androidruntime_compatibility`: `passed`
+- `androidruntime_shutdown`: `passed`
+- `androidruntime_misuse_detection`: `passed`
+- `androidruntime_generated_backend_parity`: `passed`
+- `androidruntime_trace_hygiene`: `passed`
+- `androidruntime_public_claim_safety`: `passed`
+- `androidruntime_fixture_drift`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -881,7 +911,8 @@
 - Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.
 - Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.
 - Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.
-- Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts; it does not implement an Android runtime port or VpnService.
+- Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts.
+- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown; it does not implement VpnService traffic handling.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -890,4 +921,4 @@
 
 ## Next Milestone
 
-Milestone 57 should port the local runtime to the Android architecture contract without implementing full VpnService traffic behavior before M58.
+Milestone 58 should add the Android VpnService prototype boundary after M57 proved local Android-shaped runtime initialization, lifecycle, diagnostics, and generated parity.
