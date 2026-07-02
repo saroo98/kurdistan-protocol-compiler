@@ -109,6 +109,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Path racing and short-lived scoring harness with deterministic synthetic race scenarios, parallel scheduler modeling, candidate verification, freshness decay, ranking/tie-break controls, misuse detection, fixtures, and generated-backend parity.
 - Continuous path health monitoring and failover modeling with deterministic health scenarios, score decay, relay burn quarantine, confidence expiry, fixture drift gates, and generated-backend parity.
 - Carrier-family design review and prototype gates for synthetic carrier readiness, risk gating, HTTPS-like lab carrier shape classes, constrained-carrier lab shape classes, misuse detection, trace-hygiene preconditions, fixture drift, and generated parity.
+- Multi-carrier runtime selection across reviewed HTTPS-like and constrained lab carrier families, with pathrace/pathhealth/review gating, failover/fallback blocking, fixture drift checks, and generated parity.
 - Safe measurement-client design review with bucketed observation taxonomy, consent/retention policy, local diagnostic summaries, privacy misuse controls, and fixture drift gates.
 - Local proxy egress and relay bridge model with trace-safe egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, and generated-backend parity.
 - End-to-end local proxy pipeline model with ingress-to-egress binding, relay bridge composition, byte transport metadata, adaptive prerequisite binding, descriptor rejection, collapse controls, and generated-backend parity.
@@ -185,6 +186,9 @@ internal/proxyegress + internal/relaybridge
 internal/localpipeline
   deterministic end-to-end local proxy pipeline fixtures, boundary integration checks, descriptor rejection, collapse controls, misuse detection, and generated parity checks
 
+internal/multicarrierselect
+  reviewed carrier-family inventory, candidate bundle selection, pathrace/pathhealth composition, failover/fallback controls, misuse detection, fixture drift checks, and generated parity
+
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
@@ -247,6 +251,7 @@ go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck constrainedcarrierreview --quick
 go run ./cmd/kcheck constrainedcarrier --quick
+go run ./cmd/kcheck multicarrierselect --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -379,6 +384,7 @@ go run ./cmd/kcheck pathhealth --quick
 go run ./cmd/kcheck carrierreview --quick
 go run ./cmd/kcheck constrainedcarrierreview --quick
 go run ./cmd/kcheck constrainedcarrier --quick
+go run ./cmd/kcheck multicarrierselect --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -852,6 +858,22 @@ go run ./cmd/kcheck constrainedcarrier --quick
 go run ./cmd/kcheck constrainedcarrier verify
 ```
 
+## Multi-Carrier Runtime Selection
+
+Milestone 46 composes the reviewed HTTPS-like and constrained carrier lab families into a deterministic runtime selection model. The `internal/multicarrierselect` package records carrier-family inventory, candidate bundles, profile-sensitive eligibility, pathrace and pathhealth inputs, failover/fallback decisions, review-gate composition, high-risk blocking, unsafe fallback blocking, fixture drift checks, and generated-backend parity.
+
+Selection output is safe metadata only: family classes, decision buckets, counts, gate conclusions, and stable hashes. It does not add public-network carrier selection, uncontrolled fallback, real carrier probing, arbitrary egress, payload logging, packet capture, or secret-bearing traces.
+
+Run:
+
+```bash
+go run ./cmd/kcheck multicarrierselect --quick
+go run ./cmd/kcheck multicarrierselect --full --out testdata/audit/multicarrierselect.json
+go run ./cmd/kcheck multicarrierselect generate --out testdata/multicarrierselect/multicarrierselect-report-golden.json --force
+go run ./cmd/kcheck multicarrierselect verify
+go run ./cmd/kcheck multicarrierselect compare --old testdata/multicarrierselect/multicarrierselect-report-golden.json --new testdata/multicarrierselect/multicarrierselect-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -887,7 +909,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit.
 
 ## Research Positioning
 
