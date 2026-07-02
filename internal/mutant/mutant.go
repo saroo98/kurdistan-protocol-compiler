@@ -650,6 +650,17 @@ const (
 	ModeOperationalHardeningHardeningGatesDisabled      = "operationalhardening_hardening_gates_disabled"
 	ModeOperationalHardeningRollbackWithoutFailClosed   = "operationalhardening_rollback_without_fail_closed"
 	ModeOperationalHardeningGeneratedBackendDrift       = "operationalhardening_generated_backend_drift"
+
+	ModeAndroidReviewBypassesVPNPermission            = "androidreview_bypasses_vpn_permission"
+	ModeAndroidReviewProfileImportWithoutVerification = "androidreview_profile_import_without_verification"
+	ModeAndroidReviewPayloadDiagnostics               = "androidreview_payload_diagnostics"
+	ModeAndroidReviewSecretDiagnostics                = "androidreview_secret_diagnostics"
+	ModeAndroidReviewAutoTelemetry                    = "androidreview_auto_telemetry"
+	ModeAndroidReviewKillSwitchFailOpen               = "androidreview_kill_switch_fail_open"
+	ModeAndroidReviewBackgroundServiceUnbounded       = "androidreview_background_service_unbounded"
+	ModeAndroidReviewRawNetworkMetadata               = "androidreview_raw_network_metadata"
+	ModeAndroidReviewAndroidReadyClaim                = "androidreview_android_ready_claim"
+	ModeAndroidReviewGeneratedBackendDrift            = "androidreview_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1271,6 +1282,16 @@ func Modes() []string {
 		ModeOperationalHardeningHardeningGatesDisabled,
 		ModeOperationalHardeningRollbackWithoutFailClosed,
 		ModeOperationalHardeningGeneratedBackendDrift,
+		ModeAndroidReviewBypassesVPNPermission,
+		ModeAndroidReviewProfileImportWithoutVerification,
+		ModeAndroidReviewPayloadDiagnostics,
+		ModeAndroidReviewSecretDiagnostics,
+		ModeAndroidReviewAutoTelemetry,
+		ModeAndroidReviewKillSwitchFailOpen,
+		ModeAndroidReviewBackgroundServiceUnbounded,
+		ModeAndroidReviewRawNetworkMetadata,
+		ModeAndroidReviewAndroidReadyClaim,
+		ModeAndroidReviewGeneratedBackendDrift,
 	}
 }
 

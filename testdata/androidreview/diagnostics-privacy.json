@@ -1,0 +1,30 @@
+{
+  "policy": "local_user_export_only_redacted_diagnostic_bundle",
+  "allowed_fields": [
+    "app_version_bucket",
+    "profile_version_bucket",
+    "relay_compatibility_bucket",
+    "carrier_family_bucket",
+    "pathhealth_bucket",
+    "permission_state_bucket",
+    "failure_class",
+    "resource_limit_bucket",
+    "redaction_status",
+    "user_note_length_bucket"
+  ],
+  "redaction_classes": [
+    "bucketed_profile",
+    "bucketed_relay",
+    "bucketed_carrier",
+    "bucketed_permission",
+    "bucketed_failure",
+    "user_note_private_content_not_collected"
+  ],
+  "user_note_policy": "optional_local_note_length_bucket_only",
+  "payload_logged": false,
+  "secret_logged": false,
+  "network_content_logged": false,
+  "device_identifier_saved": false,
+  "auto_upload_allowed": false,
+  "conclusion": "passed"
+}

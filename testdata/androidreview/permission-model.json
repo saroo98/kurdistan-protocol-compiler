@@ -1,0 +1,25 @@
+{
+  "policy": "platform_permission_first_foreground_service_bounded",
+  "required_permissions": [
+    "vpn_permission_user_grant",
+    "foreground_service_notification",
+    "network_state_visibility",
+    "local_profile_file_access"
+  ],
+  "foreground_service_contract": [
+    "persistent_status_notification",
+    "explicit_disconnect_action",
+    "bounded_reconnect_attempts",
+    "redacted_failure_class"
+  ],
+  "background_boundaries": [
+    "no_silent_vpn_start_without_permission",
+    "optional_boot_requires_user_enabled_setting",
+    "battery_optimization_guidance_only",
+    "no_unbounded_background_worker"
+  ],
+  "bypasses_vpn_permission": false,
+  "unbounded_background_work": false,
+  "silent_boot_start_allowed": false,
+  "conclusion": "passed"
+}
