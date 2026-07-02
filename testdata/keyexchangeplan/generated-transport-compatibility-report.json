@@ -1,0 +1,18 @@
+{
+  "policy": "generated_transport_compatibility_hash_bound_to_handshake",
+  "generated_constraints": [
+    "profile_specific_wire_policy_bound",
+    "carrier_family_policy_bound",
+    "runtime_capability_policy_bound",
+    "trace_hygiene_policy_bound",
+    "generated_backend_version_bound"
+  ],
+  "compatibility_checks": [
+    "generated_backend_version_match",
+    "profile_hash_match",
+    "carrier_policy_match",
+    "capability_floor_match"
+  ],
+  "generated_drift_allowed": false,
+  "conclusion": "passed"
+}

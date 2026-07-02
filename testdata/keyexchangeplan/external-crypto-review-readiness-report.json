@@ -1,0 +1,15 @@
+{
+  "package_id": "m62-independent-cryptography-review-package-precondition",
+  "required_artifacts": [
+    "key_exchange_design_contract",
+    "threat_model",
+    "test_vector_plan",
+    "failure_mode_matrix",
+    "nonce_replay_invariants",
+    "downgrade_resistance_invariants",
+    "rotation_and_compatibility_questions"
+  ],
+  "independent_review_required": true,
+  "review_bypass_allowed": false,
+  "conclusion": "passed"
+}

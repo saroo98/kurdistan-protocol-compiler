@@ -1,0 +1,355 @@
+{
+  "version": "keyexchangeplan-v1",
+  "fixture_id": "production_key_exchange_design_v1",
+  "generated_at": "2026-02-18T00:00:00Z",
+  "backend_version": "0.53.0-lab",
+  "recommended_next_milestone": "M54: relay auth, rotation, and compatibility",
+  "design_inventory": [
+    {
+      "name": "client_ephemeral_policy",
+      "policy": "fresh_ephemeral_key_per_session_design_contract",
+      "required_inputs": [
+        "client_ephemeral_class",
+        "session_id_bucket"
+      ],
+      "required_outputs": [
+        "ephemeral_freshness_result"
+      ],
+      "blocked_classes": [
+        "key_reuse_across_contexts",
+        "ephemeral_fixture_persistence"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "downgrade_resistance",
+      "policy": "version_and_algorithm_selection_bound_to_transcript",
+      "required_inputs": [
+        "version_floor",
+        "algorithm_suite_bucket",
+        "capability_hash"
+      ],
+      "required_outputs": [
+        "downgrade_result"
+      ],
+      "blocked_classes": [
+        "silent_downgrade",
+        "algorithm_confusion"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "external_crypto_review",
+      "policy": "review_package_required_before_claiming_production_cryptography",
+      "required_inputs": [
+        "test_vectors",
+        "threat_model",
+        "failure_modes",
+        "invariants"
+      ],
+      "required_outputs": [
+        "review_package_result"
+      ],
+      "blocked_classes": [
+        "independent_review_bypass",
+        "production_claim"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "handshake_transcript_binding",
+      "policy": "bind_profile_relay_client_ephemeral_versions_and_capabilities",
+      "required_inputs": [
+        "profile_hash",
+        "relay_identity_bucket",
+        "client_ephemeral_class",
+        "capability_set"
+      ],
+      "required_outputs": [
+        "transcript_hash_class",
+        "compatibility_result"
+      ],
+      "blocked_classes": [
+        "payload_material",
+        "secret_material"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "key_separation",
+      "policy": "separate_context_labels_for_handshake_transport_exporter_and_trace_safe_summaries",
+      "required_inputs": [
+        "context_label",
+        "direction_class"
+      ],
+      "required_outputs": [
+        "key_context_result"
+      ],
+      "blocked_classes": [
+        "key_reuse_across_contexts",
+        "exported_secret_logging"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "nonce_replay_policy",
+      "policy": "directional_nonce_space_with_bounded_replay_window",
+      "required_inputs": [
+        "direction_class",
+        "sequence_bucket",
+        "epoch_bucket"
+      ],
+      "required_outputs": [
+        "replay_result",
+        "nonce_uniqueness_result"
+      ],
+      "blocked_classes": [
+        "nonce_logging",
+        "replay_acceptance"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "profile_identity_binding",
+      "policy": "profile_hash_and_wire_policy_bound_to_handshake_context",
+      "required_inputs": [
+        "profile_id",
+        "profile_hash",
+        "wire_policy_hash"
+      ],
+      "required_outputs": [
+        "profile_binding_result"
+      ],
+      "blocked_classes": [
+        "profile_version_confusion",
+        "unbound_profile_id"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_identity_binding",
+      "policy": "relay_identity_required_before_session_open",
+      "required_inputs": [
+        "relay_identity_bucket",
+        "rotation_epoch_bucket"
+      ],
+      "required_outputs": [
+        "relay_identity_result"
+      ],
+      "blocked_classes": [
+        "unauthenticated_relay_identity",
+        "silent_identity_fallback"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "relay_key_policy",
+      "policy": "static_or_rotating_relay_identity_with_reviewed_rotation_interface",
+      "required_inputs": [
+        "relay_identity_bucket",
+        "rotation_policy"
+      ],
+      "required_outputs": [
+        "rotation_readiness_result"
+      ],
+      "blocked_classes": [
+        "private_key_fixture",
+        "operator_secret_fixture"
+      ],
+      "conclusion": "passed"
+    },
+    {
+      "name": "session_resumption",
+      "policy": "disabled_until_independent_review_or_explicit_reviewed_ticket_contract",
+      "required_inputs": [
+        "review_status"
+      ],
+      "required_outputs": [
+        "resumption_policy_result"
+      ],
+      "blocked_classes": [
+        "unreviewed_resumption",
+        "ticket_secret_fixture"
+      ],
+      "conclusion": "passed"
+    }
+  ],
+  "transcript_binding": {
+    "binding_id": "keyexchangeplan-transcript-binding-v1",
+    "bound_components": [
+      "profile_id_hash",
+      "relay_identity_bucket",
+      "client_ephemeral_class",
+      "relay_rotation_epoch_bucket",
+      "version_floor",
+      "algorithm_suite_bucket",
+      "generated_transport_compatibility_hash"
+    ],
+    "rejects_confusion": true,
+    "payload_logged": false,
+    "secret_logged": false,
+    "conclusion": "passed"
+  },
+  "identity_binding": {
+    "policy": "profile_and_relay_identity_bound_before_session_open",
+    "profile_binding": "profile_hash_plus_generated_transport_policy_hash",
+    "relay_identity_binding": "reviewed_relay_identity_bucket_with_rotation_epoch",
+    "unauthenticated_relay_identity": false,
+    "required_checks": [
+      "profile_hash_match",
+      "relay_identity_required",
+      "version_floor_match",
+      "capability_set_match"
+    ],
+    "conclusion": "passed"
+  },
+  "nonce_replay": {
+    "nonce_policy": "directional_monotonic_nonce_space_with_context_label",
+    "replay_policy": "bounded_replay_window_reject_duplicate_old_and_future_jump",
+    "nonce_logged": false,
+    "replay_accepted": false,
+    "required_checks": [
+      "nonce_context_unique",
+      "duplicate_replay_rejected",
+      "old_sequence_rejected",
+      "future_jump_rejected",
+      "close_reset_terminal"
+    ],
+    "safety_invariants": [
+      "nonce_never_logged",
+      "replay_never_accepted",
+      "nonce_context_bound_to_transcript"
+    ],
+    "conclusion": "passed"
+  },
+  "downgrade_resistance": {
+    "version_negotiation_boundary": "minimum_supported_version_and_profile_compatibility_floor_bound_to_transcript",
+    "algorithm_agility_boundary": "named_suite_registry_only_no_custom_primitive_design",
+    "rejects_silent_downgrade": true,
+    "required_checks": [
+      "version_floor_bound",
+      "algorithm_suite_bound",
+      "capability_hash_bound",
+      "downgrade_attempt_rejected"
+    ],
+    "conclusion": "passed"
+  },
+  "key_separation": {
+    "policy": "context_labeled_key_schedule_contract_no_custom_primitives",
+    "separated_contexts": [
+      "handshake_context",
+      "client_to_relay_transport_context",
+      "relay_to_client_transport_context",
+      "exporter_context",
+      "trace_summary_context"
+    ],
+    "exported_secret_rule": "exporters_are_named_and_reviewed_no_fixture_secret_material",
+    "key_reuse_allowed": false,
+    "conclusion": "passed"
+  },
+  "rotation_readiness": {
+    "policy": "rotation_interfaces_defined_for_m54_no_key_material_in_fixtures",
+    "relay_key_policy": "static_or_rotating_identity_bucket_with_epoch_and_overlap_contract",
+    "resumption_policy": "disabled_until_reviewed_resumption_contract",
+    "forward_secrecy_goal": "fresh_client_ephemeral_per_session_and_relay_rotation_support",
+    "post_compromise_recovery_goal": "post_compromise_recovery_requires_epoch_rotation_and_session_rekey_boundary",
+    "required_interfaces": [
+      "relay_identity_epoch",
+      "rotation_overlap_window",
+      "compatibility_floor",
+      "safe_failure_reason",
+      "review_artifact_linkage"
+    ],
+    "conclusion": "passed"
+  },
+  "transport_compatibility": {
+    "policy": "generated_transport_compatibility_hash_bound_to_handshake",
+    "generated_constraints": [
+      "profile_specific_wire_policy_bound",
+      "carrier_family_policy_bound",
+      "runtime_capability_policy_bound",
+      "trace_hygiene_policy_bound",
+      "generated_backend_version_bound"
+    ],
+    "compatibility_checks": [
+      "generated_backend_version_match",
+      "profile_hash_match",
+      "carrier_policy_match",
+      "capability_floor_match"
+    ],
+    "generated_drift_allowed": false,
+    "conclusion": "passed"
+  },
+  "external_review_readiness": {
+    "package_id": "m62-independent-cryptography-review-package-precondition",
+    "required_artifacts": [
+      "key_exchange_design_contract",
+      "threat_model",
+      "test_vector_plan",
+      "failure_mode_matrix",
+      "nonce_replay_invariants",
+      "downgrade_resistance_invariants",
+      "rotation_and_compatibility_questions"
+    ],
+    "independent_review_required": true,
+    "review_bypass_allowed": false,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "keyexchangeplan_custom_crypto_allowed",
+      "keyexchangeplan_secret_logged",
+      "keyexchangeplan_nonce_logged",
+      "keyexchangeplan_auth_tag_logged",
+      "keyexchangeplan_private_key_fixture",
+      "keyexchangeplan_replay_allowed",
+      "keyexchangeplan_downgrade_allowed",
+      "keyexchangeplan_missing_transcript_binding",
+      "keyexchangeplan_missing_identity_binding",
+      "keyexchangeplan_missing_key_separation",
+      "keyexchangeplan_independent_review_bypass",
+      "keyexchangeplan_production_claim",
+      "keyexchangeplan_generated_backend_drift"
+    ],
+    "detected_count": 13,
+    "expected_count": 13,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "reports_scanned": 12,
+    "payload_logged": false,
+    "secret_logged": false,
+    "nonce_logged": false,
+    "auth_tag_logged": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "reviewed production cryptography",
+      "production-ready key exchange",
+      "guaranteed bypass",
+      "undetectable",
+      "field-ready",
+      "independent crypto review complete"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "KeyExchangePlanSchemaVersion",
+      "KeyExchangePlanBackendVersion",
+      "KeyExchangePlanDesignCount",
+      "KeyExchangePlanMisuseCount",
+      "KeyExchangePlanTranscriptPolicy",
+      "KeyExchangePlanNextMilestone"
+    ],
+    "interpreted_hash": "sha256:b9add65a2ad1cc0dfd61389254eceb535e62881b6594f2b73c49e4f9df171e2e",
+    "generated_hash": "sha256:b9add65a2ad1cc0dfd61389254eceb535e62881b6594f2b73c49e4f9df171e2e",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:2aa7cab3a2bc17677ced3d62438796b3a3d56a6dd02743536e84076e9c3ea8aa",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "name": "client_ephemeral_policy",
+    "policy": "fresh_ephemeral_key_per_session_design_contract",
+    "required_inputs": [
+      "client_ephemeral_class",
+      "session_id_bucket"
+    ],
+    "required_outputs": [
+      "ephemeral_freshness_result"
+    ],
+    "blocked_classes": [
+      "key_reuse_across_contexts",
+      "ephemeral_fixture_persistence"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "downgrade_resistance",
+    "policy": "version_and_algorithm_selection_bound_to_transcript",
+    "required_inputs": [
+      "version_floor",
+      "algorithm_suite_bucket",
+      "capability_hash"
+    ],
+    "required_outputs": [
+      "downgrade_result"
+    ],
+    "blocked_classes": [
+      "silent_downgrade",
+      "algorithm_confusion"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "external_crypto_review",
+    "policy": "review_package_required_before_claiming_production_cryptography",
+    "required_inputs": [
+      "test_vectors",
+      "threat_model",
+      "failure_modes",
+      "invariants"
+    ],
+    "required_outputs": [
+      "review_package_result"
+    ],
+    "blocked_classes": [
+      "independent_review_bypass",
+      "production_claim"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "handshake_transcript_binding",
+    "policy": "bind_profile_relay_client_ephemeral_versions_and_capabilities",
+    "required_inputs": [
+      "profile_hash",
+      "relay_identity_bucket",
+      "client_ephemeral_class",
+      "capability_set"
+    ],
+    "required_outputs": [
+      "transcript_hash_class",
+      "compatibility_result"
+    ],
+    "blocked_classes": [
+      "payload_material",
+      "secret_material"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "key_separation",
+    "policy": "separate_context_labels_for_handshake_transport_exporter_and_trace_safe_summaries",
+    "required_inputs": [
+      "context_label",
+      "direction_class"
+    ],
+    "required_outputs": [
+      "key_context_result"
+    ],
+    "blocked_classes": [
+      "key_reuse_across_contexts",
+      "exported_secret_logging"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "nonce_replay_policy",
+    "policy": "directional_nonce_space_with_bounded_replay_window",
+    "required_inputs": [
+      "direction_class",
+      "sequence_bucket",
+      "epoch_bucket"
+    ],
+    "required_outputs": [
+      "replay_result",
+      "nonce_uniqueness_result"
+    ],
+    "blocked_classes": [
+      "nonce_logging",
+      "replay_acceptance"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "profile_identity_binding",
+    "policy": "profile_hash_and_wire_policy_bound_to_handshake_context",
+    "required_inputs": [
+      "profile_id",
+      "profile_hash",
+      "wire_policy_hash"
+    ],
+    "required_outputs": [
+      "profile_binding_result"
+    ],
+    "blocked_classes": [
+      "profile_version_confusion",
+      "unbound_profile_id"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_identity_binding",
+    "policy": "relay_identity_required_before_session_open",
+    "required_inputs": [
+      "relay_identity_bucket",
+      "rotation_epoch_bucket"
+    ],
+    "required_outputs": [
+      "relay_identity_result"
+    ],
+    "blocked_classes": [
+      "unauthenticated_relay_identity",
+      "silent_identity_fallback"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_key_policy",
+    "policy": "static_or_rotating_relay_identity_with_reviewed_rotation_interface",
+    "required_inputs": [
+      "relay_identity_bucket",
+      "rotation_policy"
+    ],
+    "required_outputs": [
+      "rotation_readiness_result"
+    ],
+    "blocked_classes": [
+      "private_key_fixture",
+      "operator_secret_fixture"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "session_resumption",
+    "policy": "disabled_until_independent_review_or_explicit_reviewed_ticket_contract",
+    "required_inputs": [
+      "review_status"
+    ],
+    "required_outputs": [
+      "resumption_policy_result"
+    ],
+    "blocked_classes": [
+      "unreviewed_resumption",
+      "ticket_secret_fixture"
+    ],
+    "conclusion": "passed"
+  }
+]

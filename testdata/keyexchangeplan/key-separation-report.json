@@ -1,0 +1,13 @@
+{
+  "policy": "context_labeled_key_schedule_contract_no_custom_primitives",
+  "separated_contexts": [
+    "handshake_context",
+    "client_to_relay_transport_context",
+    "relay_to_client_transport_context",
+    "exporter_context",
+    "trace_summary_context"
+  ],
+  "exported_secret_rule": "exporters_are_named_and_reviewed_no_fixture_secret_material",
+  "key_reuse_allowed": false,
+  "conclusion": "passed"
+}
