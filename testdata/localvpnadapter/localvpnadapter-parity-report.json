@@ -1,0 +1,14 @@
+{
+  "generated_markers": [
+    "PacketAdapterSchemaVersion",
+    "PacketAdapterGeneratedProfileID",
+    "PacketAdapterBackendVersion",
+    "PacketAdapterRuntimePolicy",
+    "PacketAdapterFlowClasses",
+    "GeneratedPacketAdapterFixtureSet"
+  ],
+  "interpreted_hash": "sha256:d35a56dd04211255cf20b33b5f1eb91a5119a6405844f9c10bb4c730184181a6",
+  "generated_hash": "sha256:d35a56dd04211255cf20b33b5f1eb91a5119a6405844f9c10bb4c730184181a6",
+  "unexpected_drift": null,
+  "conclusion": "passed"
+}

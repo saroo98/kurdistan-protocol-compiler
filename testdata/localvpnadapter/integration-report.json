@@ -1,0 +1,23 @@
+{
+  "vpnsemantics": "m50_contract_is_source_of_packet_flow_policy",
+  "localproxyadapter": "local_proxy_boundary_composed_without_bypass",
+  "multicarrierselect": "reviewed_carrier_selection_required",
+  "relaybridge": "packet_flow_streams_mapped_to_relay_bridge",
+  "localpipeline": "local_pipeline_summary_round_trip",
+  "pathhealth": "pathhealth_report_required_before_carrier_use",
+  "measurementreview": "aggregate_local_diagnostics_only",
+  "hardening": "resource_panic_trace_hygiene_checks_composed",
+  "required_gates": [
+    "vpnsemantics",
+    "localproxyadapter",
+    "multicarrierselect",
+    "carriercollapse",
+    "relaybridge",
+    "localpipeline",
+    "pathhealth",
+    "measurementreview",
+    "hardening",
+    "codegen"
+  ],
+  "conclusion": "passed"
+}

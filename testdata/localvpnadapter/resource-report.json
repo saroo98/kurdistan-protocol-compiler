@@ -1,0 +1,12 @@
+{
+  "max_flow_class": "profile_bounded_packet_flows",
+  "max_buffered_packet_class": "bounded_packet_descriptor_buffer",
+  "max_events_class": "bounded_packet_adapter_events",
+  "rejected_controls": [
+    "control_payload_logging",
+    "control_route_mutation",
+    "control_android_service",
+    "control_endpoint_logging"
+  ],
+  "conclusion": "passed"
+}
