@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/concretelocaladapter"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/labegress"
@@ -165,6 +166,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "httpslikecarrier" {
 		os.Exit(runHTTPSLikeCarrier(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "httpscarrieradversary" {
+		os.Exit(runHTTPSCarrierAdversary(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -5353,6 +5357,177 @@ func writeHTTPSLikeCarrierCompanions(out string, set httpslikecarrier.FixtureSet
 	}
 	for _, write := range writes {
 		if err := httpslikecarrier.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runHTTPSCarrierAdversary(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runHTTPSCarrierAdversaryGenerate(args[1:])
+		case "verify":
+			return runHTTPSCarrierAdversaryVerify(args[1:])
+		case "compare":
+			return runHTTPSCarrierAdversaryCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck httpscarrieradversary", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick HTTPS carrier adversary audit")
+	full := flags.Bool("full", false, "run full HTTPS carrier adversary audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunHTTPSCarrierAdversaryAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSCarrierAdversaryGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrieradversary generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "httpscarrieradversary", "httpscarrieradversary-report-golden.json"), "HTTPS carrier adversary fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := httpscarrieradversary.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := httpscarrieradversary.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeHTTPSCarrierAdversaryCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote httpscarrieradversary fixtures: %s (%d scenarios, %d controls)\n", *out, len(set.Scenarios), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runHTTPSCarrierAdversaryVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrieradversary verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "httpscarrieradversary", "httpscarrieradversary-report-golden.json"), "HTTPS carrier adversary fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := httpscarrieradversary.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpscarrieradversary.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpscarrieradversary.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runHTTPSCarrierAdversaryCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck httpscarrieradversary compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old HTTPS carrier adversary fixture")
+	newPath := flags.String("new", "", "new HTTPS carrier adversary fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := httpscarrieradversary.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := httpscarrieradversary.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := httpscarrieradversary.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := httpscarrieradversary.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeHTTPSCarrierAdversaryCompanions(out string, set httpscarrieradversary.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"collapse-report.json", set.Report.Collapse},
+		{"profile-sensitivity-report.json", set.Report.ProfileSensitivity},
+		{"padding-variation-report.json", set.Report.PaddingVariation},
+		{"unsafe-fallback-report.json", set.Report.UnsafeFallback},
+		{"trace-hygiene-report.json", set.Report.TraceHygiene},
+		{"replay-control-report.json", set.Report.ReplayControls},
+		{"stream-isolation-report.json", set.Report.StreamIsolation},
+		{"backpressure-report.json", set.Report.Backpressure},
+		{"reset-error-report.json", set.Report.ResetError},
+		{"integration-bypass-report.json", set.Report.IntegrationBypass},
+		{"public-claim-safety-report.json", set.Report.PublicClaims},
+		{"httpscarrieradversary-misuse-report.json", set.Misuse},
+		{"httpscarrieradversary-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := httpscarrieradversary.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
