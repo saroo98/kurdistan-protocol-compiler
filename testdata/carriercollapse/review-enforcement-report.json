@@ -1,0 +1,35 @@
+[
+  {
+    "name": "measurementreview",
+    "checked": true,
+    "enforced": true,
+    "bypasses_rejected": 1,
+    "controls": [
+      "measurementreview_bypass",
+      "measurementreview_composition_required"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "carrierreview",
+    "checked": true,
+    "enforced": true,
+    "bypasses_rejected": 1,
+    "controls": [
+      "carrierreview_bypass",
+      "carrierreview_composition_required"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "labegress",
+    "checked": true,
+    "enforced": true,
+    "bypasses_rejected": 1,
+    "controls": [
+      "labegress_bypass",
+      "labegress_composition_required"
+    ],
+    "conclusion": "passed"
+  }
+]

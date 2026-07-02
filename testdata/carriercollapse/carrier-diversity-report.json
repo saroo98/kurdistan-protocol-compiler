@@ -1,0 +1,45 @@
+{
+  "carrier_families": [
+    "https_like_lab",
+    "dns_survival_lab",
+    "constrained_request_response_lab"
+  ],
+  "shape_classes": [
+    "constrained:chunked_query_marker-delayed_response_marker",
+    "constrained:delayed_query_marker-reset_response_marker",
+    "constrained:repeated_query_marker-retry_response_marker",
+    "constrained:small_query_marker-small_response_marker",
+    "https:request-chunked_request_marker",
+    "https:request-large_object_request_marker",
+    "https:request-reset_error_request_marker",
+    "https:request-short_request_marker",
+    "https:response-chunked_response_marker",
+    "https:response-delayed_large_response_marker",
+    "https:response-fixed_response_marker",
+    "https:response-reset_error_response_marker"
+  ],
+  "profile_sensitive": true,
+  "bundle_sensitive": true,
+  "profile_hash_count": 9,
+  "shape_hash_count": 12,
+  "diversity_score": 0.88,
+  "collapse_classes_tested": [
+    "single_carrier_collapse",
+    "single_shape_collapse",
+    "padding_only_variation",
+    "profile_insensitive_output",
+    "bundle_insensitive_output",
+    "pathhealth_ignored",
+    "pathrace_ignored",
+    "measurementreview_bypassed",
+    "carrierreview_bypassed",
+    "unsafe_fallback_enabled",
+    "high_risk_default_enabled",
+    "fixed_error_behavior",
+    "reset_swallowed",
+    "backpressure_hidden",
+    "stream_isolation_broken",
+    "generated_backend_drift"
+  ],
+  "conclusion": "passed"
+}

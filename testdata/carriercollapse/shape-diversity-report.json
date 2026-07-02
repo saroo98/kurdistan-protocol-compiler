@@ -1,0 +1,14 @@
+[
+  "constrained:chunked_query_marker-delayed_response_marker",
+  "constrained:delayed_query_marker-reset_response_marker",
+  "constrained:repeated_query_marker-retry_response_marker",
+  "constrained:small_query_marker-small_response_marker",
+  "https:request-chunked_request_marker",
+  "https:request-large_object_request_marker",
+  "https:request-reset_error_request_marker",
+  "https:request-short_request_marker",
+  "https:response-chunked_response_marker",
+  "https:response-delayed_large_response_marker",
+  "https:response-fixed_response_marker",
+  "https:response-reset_error_response_marker"
+]

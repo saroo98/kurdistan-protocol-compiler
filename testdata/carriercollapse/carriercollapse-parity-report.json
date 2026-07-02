@@ -1,0 +1,18 @@
+{
+  "compared_families": 3,
+  "semantic_matches": 3,
+  "generated_markers": [
+    "CarrierCollapseSchemaVersion",
+    "CarrierCollapseGeneratedProfileID",
+    "CarrierCollapseControlCount",
+    "CarrierCollapseBackendVersion"
+  ],
+  "allowed_differences": [
+    "profile_specific_shape_hash",
+    "carrier_family_rank"
+  ],
+  "unexpected_differences": null,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,23 @@
+{
+  "carrier_families": [
+    "https_like_lab",
+    "dns_survival_lab",
+    "constrained_request_response_lab"
+  ],
+  "shape_classes": [
+    "https_request_response_shape",
+    "constrained_request_response_shape",
+    "dns_survival_shape"
+  ],
+  "profile_sensitive": true,
+  "bundle_sensitive": true,
+  "profile_hash_count": 9,
+  "shape_hash_count": 3,
+  "diversity_score": 0.89,
+  "collapse_classes_tested": [
+    "single_carrier_collapse",
+    "profile_insensitive_output",
+    "padding_only_variation"
+  ],
+  "conclusion": "passed"
+}

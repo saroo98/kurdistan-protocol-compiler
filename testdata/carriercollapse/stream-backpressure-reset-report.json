@@ -1,0 +1,14 @@
+{
+  "runtime_security_metadata_consistent": true,
+  "stream_isolation_preserved": true,
+  "backpressure_visible": true,
+  "reset_propagated": true,
+  "fixed_error_behavior_detected": true,
+  "controls": [
+    "stream_isolation_broken",
+    "backpressure_hidden",
+    "reset_swallowed",
+    "fixed_error_behavior"
+  ],
+  "conclusion": "passed"
+}

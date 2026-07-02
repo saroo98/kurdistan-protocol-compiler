@@ -1,0 +1,169 @@
+{
+  "findings": [
+    {
+      "name": "carriercollapse_single_carrier_default",
+      "class": "single_carrier_collapse",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_single_shape_default",
+      "class": "single_shape_collapse",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_padding_only_variation",
+      "class": "padding_only_variation",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_profile_insensitive",
+      "class": "profile_insensitive_output",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_bundle_insensitive",
+      "class": "bundle_insensitive_output",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_pathrace_bypass",
+      "class": "pathrace_ignored",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_pathhealth_bypass",
+      "class": "pathhealth_ignored",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_measurementreview_bypass",
+      "class": "measurementreview_bypassed",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_carrierreview_bypass",
+      "class": "carrierreview_bypassed",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_labegress_bypass",
+      "class": "carrier_collapse_control",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_unsafe_fallback",
+      "class": "unsafe_fallback_enabled",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_high_risk_default",
+      "class": "high_risk_default_enabled",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_payload_leak",
+      "class": "trace_hygiene_violation",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_secret_leak",
+      "class": "trace_hygiene_violation",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_generated_backend_drift",
+      "class": "generated_backend_drift",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    },
+    {
+      "name": "carriercollapse_trace_hygiene_bypass",
+      "class": "trace_hygiene_violation",
+      "family": "cross_carrier",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked_by_carriercollapse_gate",
+      "payload_logged": false,
+      "secret_logged": false
+    }
+  ],
+  "detected_count": 16,
+  "expected_count": 16,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

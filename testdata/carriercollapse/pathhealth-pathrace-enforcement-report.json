@@ -1,0 +1,24 @@
+[
+  {
+    "name": "pathhealth",
+    "checked": true,
+    "enforced": true,
+    "bypasses_rejected": 1,
+    "controls": [
+      "pathhealth_bypass",
+      "pathhealth_composition_required"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "pathrace",
+    "checked": true,
+    "enforced": true,
+    "bypasses_rejected": 1,
+    "controls": [
+      "pathrace_bypass",
+      "pathrace_composition_required"
+    ],
+    "conclusion": "passed"
+  }
+]
