@@ -20,6 +20,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/ir"
@@ -153,6 +154,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	httpsCarrierReviewDrift := httpsCarrierReviewComparison(filepath.Join(fixtureRoot, "testdata", "httpscarrierreview", "httpscarrierreview-report-golden.json"), httpsCarrierReviewSet)
 	httpsLikeCarrierSet, httpsLikeCarrierErr := httpslikecarrier.GenerateFixtureSet()
 	httpsLikeCarrierDrift := httpsLikeCarrierComparison(filepath.Join(fixtureRoot, "testdata", "httpslikecarrier", "httpslikecarrier-report-golden.json"), httpsLikeCarrierSet)
+	httpsCarrierAdversarySet, httpsCarrierAdversaryErr := httpscarrieradversary.GenerateFixtureSet()
+	httpsCarrierAdversaryDrift := httpsCarrierAdversaryComparison(filepath.Join(fixtureRoot, "testdata", "httpscarrieradversary", "httpscarrieradversary-report-golden.json"), httpsCarrierAdversarySet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -387,6 +390,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, HTTPSLikeCarrierGates(httpsLikeCarrierSet, httpsLikeCarrierDrift)...)
 	} else {
 		gates = append(gates, gate("httpslikecarrier_scope", false, "required", httpsLikeCarrierErr.Error(), nil, []string{httpsLikeCarrierErr.Error()}))
+	}
+	if httpsCarrierAdversaryErr == nil {
+		gates = append(gates, HTTPSCarrierAdversaryGates(httpsCarrierAdversarySet, httpsCarrierAdversaryDrift)...)
+	} else {
+		gates = append(gates, gate("httpscarrieradversary_collapse_detection", false, "required", httpsCarrierAdversaryErr.Error(), nil, []string{httpsCarrierAdversaryErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

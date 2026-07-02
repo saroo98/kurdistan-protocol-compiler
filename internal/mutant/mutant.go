@@ -421,6 +421,31 @@ const (
 	ModeHTTPSLikeCarrierGeneratedBackendDrift   = "httpslikecarrier_generated_backend_drift"
 	ModeHTTPSLikeCarrierPayloadLeak             = "httpslikecarrier_payload_leak"
 	ModeHTTPSLikeCarrierSecretLeak              = "httpslikecarrier_secret_leak"
+
+	ModeHTTPSCarrierAdversaryFixedShape                = "httpscarrieradversary_fixed_shape"
+	ModeHTTPSCarrierAdversaryFixedRequestSequence      = "httpscarrieradversary_fixed_request_sequence"
+	ModeHTTPSCarrierAdversaryFixedResponseSequence     = "httpscarrieradversary_fixed_response_sequence"
+	ModeHTTPSCarrierAdversaryPaddingOnlyVariation      = "httpscarrieradversary_padding_only_variation"
+	ModeHTTPSCarrierAdversaryProfileInsensitive        = "httpscarrieradversary_profile_insensitive"
+	ModeHTTPSCarrierAdversaryGeneratedProfileIgnored   = "httpscarrieradversary_generated_profile_ignored"
+	ModeHTTPSCarrierAdversaryPublicNetworkFallback     = "httpscarrieradversary_public_network_fallback"
+	ModeHTTPSCarrierAdversaryArbitraryEgressFallback   = "httpscarrieradversary_arbitrary_egress_fallback"
+	ModeHTTPSCarrierAdversaryRealTLSFallback           = "httpscarrieradversary_real_tls_fallback"
+	ModeHTTPSCarrierAdversarySNIFallback               = "httpscarrieradversary_sni_fallback"
+	ModeHTTPSCarrierAdversaryHostHeaderFallback        = "httpscarrieradversary_host_header_fallback"
+	ModeHTTPSCarrierAdversaryDomainFallback            = "httpscarrieradversary_domain_fallback"
+	ModeHTTPSCarrierAdversaryPayloadForwardingFallback = "httpscarrieradversary_payload_forwarding_fallback"
+	ModeHTTPSCarrierAdversaryMeasurementUploadFallback = "httpscarrieradversary_measurement_upload_fallback"
+	ModeHTTPSCarrierAdversaryRawFixtureLeak            = "httpscarrieradversary_raw_fixture_leak"
+	ModeHTTPSCarrierAdversaryPayloadLeak               = "httpscarrieradversary_payload_leak"
+	ModeHTTPSCarrierAdversarySecretLeak                = "httpscarrieradversary_secret_leak"
+	ModeHTTPSCarrierAdversaryReplayMarkerAccepted      = "httpscarrieradversary_replay_marker_accepted"
+	ModeHTTPSCarrierAdversaryCrossStreamReset          = "httpscarrieradversary_cross_stream_reset"
+	ModeHTTPSCarrierAdversaryBackpressureIgnored       = "httpscarrieradversary_backpressure_ignored"
+	ModeHTTPSCarrierAdversaryResetSwallowed            = "httpscarrieradversary_reset_swallowed"
+	ModeHTTPSCarrierAdversaryPipelineBypass            = "httpscarrieradversary_pipeline_bypass"
+	ModeHTTPSCarrierAdversaryGeneratedBackendDrift     = "httpscarrieradversary_generated_backend_drift"
+	ModeHTTPSCarrierAdversaryPublicClaimOverstatement  = "httpscarrieradversary_public_claim_overstatement"
 )
 
 func Modes() []string {
@@ -823,6 +848,30 @@ func Modes() []string {
 		ModeHTTPSLikeCarrierGeneratedBackendDrift,
 		ModeHTTPSLikeCarrierPayloadLeak,
 		ModeHTTPSLikeCarrierSecretLeak,
+		ModeHTTPSCarrierAdversaryFixedShape,
+		ModeHTTPSCarrierAdversaryFixedRequestSequence,
+		ModeHTTPSCarrierAdversaryFixedResponseSequence,
+		ModeHTTPSCarrierAdversaryPaddingOnlyVariation,
+		ModeHTTPSCarrierAdversaryProfileInsensitive,
+		ModeHTTPSCarrierAdversaryGeneratedProfileIgnored,
+		ModeHTTPSCarrierAdversaryPublicNetworkFallback,
+		ModeHTTPSCarrierAdversaryArbitraryEgressFallback,
+		ModeHTTPSCarrierAdversaryRealTLSFallback,
+		ModeHTTPSCarrierAdversarySNIFallback,
+		ModeHTTPSCarrierAdversaryHostHeaderFallback,
+		ModeHTTPSCarrierAdversaryDomainFallback,
+		ModeHTTPSCarrierAdversaryPayloadForwardingFallback,
+		ModeHTTPSCarrierAdversaryMeasurementUploadFallback,
+		ModeHTTPSCarrierAdversaryRawFixtureLeak,
+		ModeHTTPSCarrierAdversaryPayloadLeak,
+		ModeHTTPSCarrierAdversarySecretLeak,
+		ModeHTTPSCarrierAdversaryReplayMarkerAccepted,
+		ModeHTTPSCarrierAdversaryCrossStreamReset,
+		ModeHTTPSCarrierAdversaryBackpressureIgnored,
+		ModeHTTPSCarrierAdversaryResetSwallowed,
+		ModeHTTPSCarrierAdversaryPipelineBypass,
+		ModeHTTPSCarrierAdversaryGeneratedBackendDrift,
+		ModeHTTPSCarrierAdversaryPublicClaimOverstatement,
 	}
 }
 
