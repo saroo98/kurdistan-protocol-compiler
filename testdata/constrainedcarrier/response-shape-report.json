@@ -1,0 +1,107 @@
+[
+  {
+    "id": "response_01",
+    "direction": "response",
+    "shape_class": "small_response_marker",
+    "marker_class": "small_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_tiny_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_tiny_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:5e5ea1d531c50f8f7059fc2963356d3e221280f4e30cf20a1cd27125e637d963"
+  },
+  {
+    "id": "response_02",
+    "direction": "response",
+    "shape_class": "truncated_response_marker",
+    "marker_class": "truncated_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_small_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_small_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:04672d1e95608a428d881bac424c85d2c7cf36f2cd23dc489000a5cec3e7d955"
+  },
+  {
+    "id": "response_03",
+    "direction": "response",
+    "shape_class": "delayed_response_marker",
+    "marker_class": "delayed_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_split_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_split_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:3c89a91a9032f6ca90ab7f739234f775d6a1dccd51fc5dc46359a123fdbb5e8a"
+  },
+  {
+    "id": "response_04",
+    "direction": "response",
+    "shape_class": "failure_response_marker",
+    "marker_class": "failure_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_retry_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_retry_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:3835c6521d3fa2a226046c9553950604b4356416c5636867b06f42031de21127"
+  },
+  {
+    "id": "response_05",
+    "direction": "response",
+    "shape_class": "retry_response_marker",
+    "marker_class": "retry_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_tiny_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_tiny_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:ec9a6a590b5d8c8d50e02e2e01a9626f783f5c1098ed88acdb51aa3246123f35"
+  },
+  {
+    "id": "response_06",
+    "direction": "response",
+    "shape_class": "poison_failure_response_marker",
+    "marker_class": "poison_failure_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_small_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_small_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:3d754b97e2e003c54d53a20dfc0cae8c54a388643720480de4ad070d02cfa288"
+  },
+  {
+    "id": "response_07",
+    "direction": "response",
+    "shape_class": "reset_response_marker",
+    "marker_class": "reset_response_marker_safe_bucket",
+    "capacity_bucket": "capacity_split_bucket",
+    "scenario_classes": [
+      "response_carrier_shape",
+      "capacity_split_bucket"
+    ],
+    "profile_sensitive": true,
+    "payload_free": true,
+    "control": false,
+    "hash": "sha256:5afa36377ec66dfb298b70a2007a1701e3496112f2fccfcbe2ea33e2a411ac07"
+  }
+]

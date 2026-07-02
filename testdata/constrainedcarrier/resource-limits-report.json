@@ -1,0 +1,12 @@
+{
+  "max_sessions": 3,
+  "max_streams": 8,
+  "max_query_markers": 48,
+  "max_response_markers": 48,
+  "max_retries": 3,
+  "max_retained_events": 96,
+  "max_queue_depth": 16,
+  "deterministic_shutdown": true,
+  "panic_safety_checked": true,
+  "oversized_marker_rejected": true
+}

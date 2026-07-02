@@ -1,0 +1,20 @@
+{
+  "local_only_diagnostics": true,
+  "aggregate_only": true,
+  "upload_allowed": false,
+  "exact_query_stored": false,
+  "resolver_ip_stored": false,
+  "exact_port_stored": false,
+  "account_device_location_data": false,
+  "safe_fields": [
+    "scenario_bucket",
+    "query_shape_bucket",
+    "response_shape_bucket",
+    "truncation_bucket",
+    "retry_bucket",
+    "failure_bucket",
+    "pathhealth_bucket",
+    "backpressure_count_bucket"
+  ],
+  "conclusion": "passed"
+}

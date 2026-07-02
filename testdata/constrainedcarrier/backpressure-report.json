@@ -1,0 +1,20 @@
+{
+  "capacity_pressure_buckets": [
+    "capacity_pressure_none",
+    "capacity_pressure_soft",
+    "capacity_pressure_hard"
+  ],
+  "truncation_pressure_buckets": [
+    "truncation_pressure_none",
+    "truncation_pressure_retry"
+  ],
+  "retry_pressure_buckets": [
+    "retry_pressure_none",
+    "retry_pressure_bounded"
+  ],
+  "localpipeline_summary": true,
+  "bounded_queues": true,
+  "ignored_pressure_controls": 2,
+  "backpressure_events": 4,
+  "conclusion": "passed"
+}

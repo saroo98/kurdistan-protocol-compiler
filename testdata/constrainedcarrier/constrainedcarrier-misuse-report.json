@@ -1,0 +1,164 @@
+{
+  "findings": [
+    {
+      "name": "constrainedcarrier_public_resolver_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_real_dns_query_default",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_exact_query_logged",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_resolver_ip_logged",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_domain_dependency_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_wildcard_resolver_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_public_network_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_arbitrary_egress_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_payload_forwarding_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_payload_logging_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_packet_capture_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_measurement_upload_allowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_fixed_query_shape",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_padding_only_variation",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_profile_insensitive",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_retry_storm",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_truncation_misclassified",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_poison_failure_misclassified",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_backpressure_ignored",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_reset_swallowed",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_cross_stream_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_pathhealth_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_measurementreview_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_generated_backend_drift",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_payload_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    },
+    {
+      "name": "constrainedcarrier_secret_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "blocked by constrained carrier prototype gate"
+    }
+  ],
+  "detected_count": 26,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,30 @@
+{
+  "profile_count": 100,
+  "query_shape_fingerprints": [
+    "sha256:3444aa316cbdc237d66143cfce91b79c9b14af085c63549f60e4e6ec54a00513",
+    "sha256:545f25c8bea89de9e69449736be6e8778f0766490961cab18e10323bed76f91a",
+    "sha256:554f905ccc2ef1fe605332fd21d73c4c7f2a324b97e4666a7d00b7d92dddaf49",
+    "sha256:75b0b0ead395cab3192c7169880145f7756f8bc6d9c4fc5b9faff6a816ecfe9f",
+    "sha256:8cf0bdd7fe0245c1cca74356a90cd5dd9ecd70d537f47a7ef6fcf98ae81c445a",
+    "sha256:8fb2f3a80b9c307d04cf8bd8a3bd233ccb782d8b3fefa2270ffc846f26015d5c",
+    "sha256:a3cd139914dcf221e08cd4952fa1896662b99caeceab2c292a7be357fa7be299",
+    "sha256:a552270ed11ca468ed7598ceff73a30014614f3443db5a6f24027514d359da6f",
+    "sha256:b6b6e3934517af3ec25600059d1017d4da75e22beb32ddfa5ccc9856761a5c3c",
+    "sha256:d37d70b79a77307263afd7a44863ced3006473aed8282c3f05a618e5c330d45f",
+    "sha256:e0af953e4b8447d8639e87413f2ee286d8ac689c9d33b2395474b6a8719e67e4",
+    "sha256:ea28a0c15720f848384b888dbe10c64106033887382cf274cf5a84bd46443a06"
+  ],
+  "response_shape_fingerprints": [
+    "response_fp_a",
+    "response_fp_b",
+    "response_fp_c",
+    "response_fp_d",
+    "response_fp_e",
+    "response_fp_f"
+  ],
+  "diversity_score": 0.88,
+  "fixed_shape_controls": 2,
+  "padding_only_controls": 2,
+  "generated_profile_controls": 2,
+  "conclusion": "passed"
+}

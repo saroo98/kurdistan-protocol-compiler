@@ -1,0 +1,33 @@
+{
+  "retry_buckets": [
+    "retry_none_bucket",
+    "retry_once_bucket",
+    "retry_bounded_bucket"
+  ],
+  "timeout_buckets": [
+    "timeout_none_bucket",
+    "timeout_short_bucket",
+    "timeout_degraded_bucket"
+  ],
+  "failure_buckets": [
+    "failure_timeout_bucket",
+    "failure_poison_bucket",
+    "failure_reset_bucket"
+  ],
+  "poison_failure_buckets": [
+    "poison_absent_bucket",
+    "poison_suspected_bucket",
+    "poison_confirmed_bucket"
+  ],
+  "reset_buckets": [
+    "reset_none_bucket",
+    "reset_local_bucket",
+    "reset_remote_bucket"
+  ],
+  "max_retry_enforced": true,
+  "retry_storm_controls": 3,
+  "pathhealth_feedback": true,
+  "localpipeline_failure_summary": true,
+  "measurement_review_diagnostics": true,
+  "conclusion": "passed"
+}
