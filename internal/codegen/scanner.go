@@ -94,6 +94,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/constrainedcarrier_generated.go",
 		"protocol/multicarrierselect_generated.go",
 		"protocol/carriercollapse_generated.go",
+		"protocol/localproxyadapterreview_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
