@@ -1,0 +1,34 @@
+{
+  "policy": "android_lifecycle_events_drive_runtime_state_machine",
+  "events": [
+    "app_start",
+    "profile_import",
+    "profile_validation",
+    "connect_intent",
+    "disconnect_intent",
+    "background_transition",
+    "foreground_transition",
+    "network_change_notification",
+    "permission_loss",
+    "crash_recovery",
+    "shutdown"
+  ],
+  "valid_transitions": [
+    "app_start_to_profile_import",
+    "profile_validation_to_connect_intent",
+    "connect_intent_to_local_session_open",
+    "network_change_to_reconnect_decision",
+    "disconnect_intent_to_shutdown",
+    "crash_recovery_to_safe_reset"
+  ],
+  "invalid_transitions_rejected": [
+    "connect_without_valid_profile",
+    "reuse_stale_session_after_permission_loss",
+    "background_unbounded_worker_start",
+    "shutdown_then_send",
+    "crash_recovery_without_safe_reset"
+  ],
+  "stale_session_reused": false,
+  "uncontrolled_background_work": false,
+  "conclusion": "passed"
+}

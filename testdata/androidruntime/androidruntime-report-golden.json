@@ -1,0 +1,253 @@
+{
+  "version": "androidruntime-v1",
+  "fixture_id": "android_local_runtime_port_v1",
+  "generated_at": "2026-02-22T00:00:00Z",
+  "backend_version": "0.57.0-lab",
+  "recommended_next_milestone": "M58: Android VpnService prototype",
+  "decision": "ready_for_android_vpnservice_prototype",
+  "blocker_count": 0,
+  "risk_count": 6,
+  "initialization": {
+    "policy": "validated_profile_android_local_runtime_startup",
+    "steps": [
+      "app_start",
+      "profile_import",
+      "profile_validation",
+      "runtime_config_build",
+      "capability_negotiation",
+      "carrier_selection_prepare",
+      "session_open_local_mode",
+      "diagnostics_scope_attach"
+    ],
+    "safe_defaults": [
+      "no_vpn_traffic_capture",
+      "no_public_network_dial",
+      "no_auto_telemetry",
+      "fail_closed_on_invalid_profile",
+      "bounded_runtime_events"
+    ],
+    "profile_validated": true,
+    "runtime_initialized": true,
+    "android_mode_local": true,
+    "vpn_traffic_captured": false,
+    "public_network_dialed": false,
+    "conclusion": "passed"
+  },
+  "lifecycle": {
+    "policy": "android_lifecycle_events_drive_runtime_state_machine",
+    "events": [
+      "app_start",
+      "profile_import",
+      "profile_validation",
+      "connect_intent",
+      "disconnect_intent",
+      "background_transition",
+      "foreground_transition",
+      "network_change_notification",
+      "permission_loss",
+      "crash_recovery",
+      "shutdown"
+    ],
+    "valid_transitions": [
+      "app_start_to_profile_import",
+      "profile_validation_to_connect_intent",
+      "connect_intent_to_local_session_open",
+      "network_change_to_reconnect_decision",
+      "disconnect_intent_to_shutdown",
+      "crash_recovery_to_safe_reset"
+    ],
+    "invalid_transitions_rejected": [
+      "connect_without_valid_profile",
+      "reuse_stale_session_after_permission_loss",
+      "background_unbounded_worker_start",
+      "shutdown_then_send",
+      "crash_recovery_without_safe_reset"
+    ],
+    "stale_session_reused": false,
+    "uncontrolled_background_work": false,
+    "conclusion": "passed"
+  },
+  "storage": {
+    "policy": "android_private_storage_with_ephemeral_runtime_state",
+    "profile_storage": "validated_profile_bundle_private_app_storage",
+    "diagnostic_storage": "user_exported_redacted_bundle_only",
+    "cache_storage": "bounded_cache_no_private_content",
+    "generated_artifact_storage": "profile_specific_generated_runtime_markers_only",
+    "temporary_state_storage": "ephemeral_session_state_cleared_on_shutdown",
+    "raw_packet_stored": false,
+    "secret_stored": false,
+    "private_endpoint_stored": false,
+    "conclusion": "passed"
+  },
+  "diagnostics": {
+    "policy": "bounded_redacted_local_runtime_diagnostics",
+    "allowed_fields": [
+      "runtime_state_bucket",
+      "profile_validation_result",
+      "carrier_compatibility_bucket",
+      "relay_auth_bucket",
+      "pathhealth_bucket",
+      "lifecycle_event_count",
+      "failure_class",
+      "recovery_action",
+      "shutdown_status",
+      "redaction_status"
+    ],
+    "failure_classes": [
+      "profile_invalid",
+      "profile_expired",
+      "permission_lost",
+      "carrier_incompatible",
+      "runtime_startup_failed",
+      "stale_session_rejected",
+      "shutdown_timeout_bucket"
+    ],
+    "recovery_actions": [
+      "reimport_profile",
+      "retry_connect",
+      "safe_disconnect",
+      "clear_ephemeral_state",
+      "export_redacted_diagnostics"
+    ],
+    "payload_logged": false,
+    "secret_logged": false,
+    "raw_packet_logged": false,
+    "destination_metadata_logged": false,
+    "auto_upload_allowed": false,
+    "conclusion": "passed"
+  },
+  "concurrency": {
+    "policy": "bounded_android_runtime_tasks_and_queues",
+    "bounded_resources": [
+      "runtime_task_count",
+      "lifecycle_event_queue",
+      "diagnostic_event_queue",
+      "session_state",
+      "shutdown_wait"
+    ],
+    "max_runtime_tasks": 6,
+    "max_lifecycle_events": 64,
+    "max_diagnostic_events": 128,
+    "unbounded_workers": false,
+    "unbounded_queues": false,
+    "stale_session_allowed": false,
+    "conclusion": "passed"
+  },
+  "compatibility": {
+    "policy": "android_local_runtime_preserves_existing_gates",
+    "required_checks": [
+      "m56_architecture_contract",
+      "m55_operational_hardening",
+      "relayauth_profile_rotation",
+      "carrier_selection",
+      "measurementreview",
+      "carrierreview",
+      "pathhealth",
+      "generated_backend_version",
+      "trace_hygiene"
+    ],
+    "m56_contract_linked": true,
+    "m55_operational_linked": true,
+    "relay_auth_linked": true,
+    "carrier_selection_linked": true,
+    "measurement_review_linked": true,
+    "carrier_review_linked": true,
+    "pathhealth_linked": true,
+    "generated_backend_compatible": true,
+    "bypasses_profile_validation": false,
+    "bypasses_operational_hardening": false,
+    "allows_generated_drift": false,
+    "conclusion": "passed"
+  },
+  "shutdown": {
+    "policy": "safe_idempotent_android_local_runtime_shutdown",
+    "actions": [
+      "reject_new_connect_intent",
+      "close_local_session",
+      "drain_lifecycle_queue",
+      "flush_redacted_diagnostics",
+      "clear_ephemeral_state",
+      "mark_shutdown_terminal"
+    ],
+    "close_idempotent": true,
+    "queues_drained": true,
+    "diagnostics_flushed": true,
+    "leaked_workers": 0,
+    "post_shutdown_allowed": false,
+    "conclusion": "passed"
+  },
+  "checklist": {
+    "items": [
+      "m56_contract_linked",
+      "profile_validation_before_startup",
+      "android_lifecycle_events_modeled",
+      "storage_boundaries_validated",
+      "diagnostics_redacted",
+      "concurrency_bounded",
+      "stale_session_rejected",
+      "safe_shutdown_idempotent",
+      "carrier_runtime_compatibility_preserved",
+      "generated_backend_parity",
+      "m58_contract_ready"
+    ],
+    "passed": 11,
+    "failed": 0,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "androidruntime_unvalidated_profile_start",
+      "androidruntime_vpn_capture_enabled",
+      "androidruntime_payload_diagnostics",
+      "androidruntime_secret_diagnostics",
+      "androidruntime_auto_telemetry",
+      "androidruntime_unbounded_background_work",
+      "androidruntime_stale_session_reuse",
+      "androidruntime_storage_leak",
+      "androidruntime_operational_bypass",
+      "androidruntime_generated_backend_drift"
+    ],
+    "detected_count": 10,
+    "expected_count": 10,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "reports_scanned": 14,
+    "payload_logged": false,
+    "secret_logged": false,
+    "raw_packet_logged": false,
+    "destination_logged": false,
+    "device_identifier_logged": false,
+    "telemetry_marker_logged": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "Android VPN traffic capture complete",
+      "production Android VPN",
+      "guaranteed bypass",
+      "undetectable",
+      "field-ready",
+      "automatic telemetry"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "AndroidRuntimeSchemaVersion",
+      "AndroidRuntimeBackendVersion",
+      "AndroidRuntimeDecision",
+      "AndroidRuntimeLifecycleEventCount",
+      "AndroidRuntimeMisuseCount",
+      "AndroidRuntimeNextMilestone"
+    ],
+    "interpreted_hash": "sha256:e66df8793986a23f1789e3728fc8093be8413fdc8c31d591d10ac7d7bcab847c",
+    "generated_hash": "sha256:e66df8793986a23f1789e3728fc8093be8413fdc8c31d591d10ac7d7bcab847c",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:b0ce93f05472e4517f9131d070134e2ab890f668362a7c5b382202ea899e18b4",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

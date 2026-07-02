@@ -1,0 +1,17 @@
+{
+  "detected_controls": [
+    "androidruntime_unvalidated_profile_start",
+    "androidruntime_vpn_capture_enabled",
+    "androidruntime_payload_diagnostics",
+    "androidruntime_secret_diagnostics",
+    "androidruntime_auto_telemetry",
+    "androidruntime_unbounded_background_work",
+    "androidruntime_stale_session_reuse",
+    "androidruntime_storage_leak",
+    "androidruntime_operational_bypass",
+    "androidruntime_generated_backend_drift"
+  ],
+  "detected_count": 10,
+  "expected_count": 10,
+  "conclusion": "passed"
+}

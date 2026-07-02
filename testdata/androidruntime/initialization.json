@@ -1,0 +1,26 @@
+{
+  "policy": "validated_profile_android_local_runtime_startup",
+  "steps": [
+    "app_start",
+    "profile_import",
+    "profile_validation",
+    "runtime_config_build",
+    "capability_negotiation",
+    "carrier_selection_prepare",
+    "session_open_local_mode",
+    "diagnostics_scope_attach"
+  ],
+  "safe_defaults": [
+    "no_vpn_traffic_capture",
+    "no_public_network_dial",
+    "no_auto_telemetry",
+    "fail_closed_on_invalid_profile",
+    "bounded_runtime_events"
+  ],
+  "profile_validated": true,
+  "runtime_initialized": true,
+  "android_mode_local": true,
+  "vpn_traffic_captured": false,
+  "public_network_dialed": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "AndroidRuntimeSchemaVersion",
+    "AndroidRuntimeBackendVersion",
+    "AndroidRuntimeDecision",
+    "AndroidRuntimeLifecycleEventCount",
+    "AndroidRuntimeMisuseCount",
+    "AndroidRuntimeNextMilestone"
+  ],
+  "interpreted_hash": "sha256:e66df8793986a23f1789e3728fc8093be8413fdc8c31d591d10ac7d7bcab847c",
+  "generated_hash": "sha256:e66df8793986a23f1789e3728fc8093be8413fdc8c31d591d10ac7d7bcab847c",
+  "conclusion": "passed"
+}

@@ -661,6 +661,17 @@ const (
 	ModeAndroidReviewRawNetworkMetadata               = "androidreview_raw_network_metadata"
 	ModeAndroidReviewAndroidReadyClaim                = "androidreview_android_ready_claim"
 	ModeAndroidReviewGeneratedBackendDrift            = "androidreview_generated_backend_drift"
+
+	ModeAndroidRuntimeUnvalidatedProfileStart = "androidruntime_unvalidated_profile_start"
+	ModeAndroidRuntimeVPNCaptureEnabled       = "androidruntime_vpn_capture_enabled"
+	ModeAndroidRuntimePayloadDiagnostics      = "androidruntime_payload_diagnostics"
+	ModeAndroidRuntimeSecretDiagnostics       = "androidruntime_secret_diagnostics"
+	ModeAndroidRuntimeAutoTelemetry           = "androidruntime_auto_telemetry"
+	ModeAndroidRuntimeUnboundedBackgroundWork = "androidruntime_unbounded_background_work"
+	ModeAndroidRuntimeStaleSessionReuse       = "androidruntime_stale_session_reuse"
+	ModeAndroidRuntimeStorageLeak             = "androidruntime_storage_leak"
+	ModeAndroidRuntimeOperationalBypass       = "androidruntime_operational_bypass"
+	ModeAndroidRuntimeGeneratedBackendDrift   = "androidruntime_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1292,6 +1303,16 @@ func Modes() []string {
 		ModeAndroidReviewRawNetworkMetadata,
 		ModeAndroidReviewAndroidReadyClaim,
 		ModeAndroidReviewGeneratedBackendDrift,
+		ModeAndroidRuntimeUnvalidatedProfileStart,
+		ModeAndroidRuntimeVPNCaptureEnabled,
+		ModeAndroidRuntimePayloadDiagnostics,
+		ModeAndroidRuntimeSecretDiagnostics,
+		ModeAndroidRuntimeAutoTelemetry,
+		ModeAndroidRuntimeUnboundedBackgroundWork,
+		ModeAndroidRuntimeStaleSessionReuse,
+		ModeAndroidRuntimeStorageLeak,
+		ModeAndroidRuntimeOperationalBypass,
+		ModeAndroidRuntimeGeneratedBackendDrift,
 	}
 }
 

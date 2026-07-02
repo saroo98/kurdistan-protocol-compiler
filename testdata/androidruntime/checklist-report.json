@@ -1,0 +1,18 @@
+{
+  "items": [
+    "m56_contract_linked",
+    "profile_validation_before_startup",
+    "android_lifecycle_events_modeled",
+    "storage_boundaries_validated",
+    "diagnostics_redacted",
+    "concurrency_bounded",
+    "stale_session_rejected",
+    "safe_shutdown_idempotent",
+    "carrier_runtime_compatibility_preserved",
+    "generated_backend_parity",
+    "m58_contract_ready"
+  ],
+  "passed": 11,
+  "failed": 0,
+  "conclusion": "passed"
+}

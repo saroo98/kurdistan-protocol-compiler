@@ -1,0 +1,12 @@
+{
+  "docs_checked": 5,
+  "forbidden_claims": [
+    "Android VPN traffic capture complete",
+    "production Android VPN",
+    "guaranteed bypass",
+    "undetectable",
+    "field-ready",
+    "automatic telemetry"
+  ],
+  "conclusion": "passed"
+}

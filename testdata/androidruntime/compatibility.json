@@ -1,0 +1,26 @@
+{
+  "policy": "android_local_runtime_preserves_existing_gates",
+  "required_checks": [
+    "m56_architecture_contract",
+    "m55_operational_hardening",
+    "relayauth_profile_rotation",
+    "carrier_selection",
+    "measurementreview",
+    "carrierreview",
+    "pathhealth",
+    "generated_backend_version",
+    "trace_hygiene"
+  ],
+  "m56_contract_linked": true,
+  "m55_operational_linked": true,
+  "relay_auth_linked": true,
+  "carrier_selection_linked": true,
+  "measurement_review_linked": true,
+  "carrier_review_linked": true,
+  "pathhealth_linked": true,
+  "generated_backend_compatible": true,
+  "bypasses_profile_validation": false,
+  "bypasses_operational_hardening": false,
+  "allows_generated_drift": false,
+  "conclusion": "passed"
+}

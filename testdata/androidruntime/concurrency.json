@@ -1,0 +1,17 @@
+{
+  "policy": "bounded_android_runtime_tasks_and_queues",
+  "bounded_resources": [
+    "runtime_task_count",
+    "lifecycle_event_queue",
+    "diagnostic_event_queue",
+    "session_state",
+    "shutdown_wait"
+  ],
+  "max_runtime_tasks": 6,
+  "max_lifecycle_events": 64,
+  "max_diagnostic_events": 128,
+  "unbounded_workers": false,
+  "unbounded_queues": false,
+  "stale_session_allowed": false,
+  "conclusion": "passed"
+}
