@@ -1,0 +1,48 @@
+{
+  "command_name": "vpnsemantics",
+  "decision": "ready_for_m51_local_desktop_tun_vpn_prototype",
+  "may_implement": [
+    "deterministic_local_desktop_packet_flow_harness",
+    "packet_flow_to_stream_mapping",
+    "mtu_bucket_fragmentation_model",
+    "stream_result_to_flow_summary_mapping",
+    "local_diagnostics_buckets"
+  ],
+  "must_not_implement": [
+    "real_tun_device_creation",
+    "real_packet_capture",
+    "os_route_modification",
+    "android_vpnservice",
+    "public_network_behavior",
+    "real_dns_interception",
+    "payload_logging",
+    "packet_dumps",
+    "per_app_identity_logging",
+    "precise_endpoint_logging"
+  ],
+  "required_fixtures": [
+    "packet_flow_taxonomy",
+    "flow_to_stream_mapping",
+    "mtu_fragmentation",
+    "retry_reset_backpressure",
+    "dns_boundary",
+    "kill_switch_policy",
+    "privacy_review"
+  ],
+  "required_gates": [
+    "vpnsemantics",
+    "localproxyadapter",
+    "measurementreview",
+    "hardening",
+    "codegen"
+  ],
+  "acceptance_requirements": [
+    "no_real_packet_capture",
+    "no_os_route_changes",
+    "no_android_vpnservice",
+    "no_real_dns_interception",
+    "payload_free_summaries",
+    "endpoint_bucket_only",
+    "generated_interpreted_parity"
+  ]
+}

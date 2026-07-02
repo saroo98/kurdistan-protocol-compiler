@@ -1,0 +1,24 @@
+{
+  "mtu_buckets": [
+    "small_mtu_bucket",
+    "standard_mtu_bucket",
+    "large_mtu_bucket"
+  ],
+  "fragmentation_buckets": [
+    "no_fragment",
+    "bounded_fragment",
+    "mtu_bucket_fragment"
+  ],
+  "reassembly_buckets": [
+    "ordered_reassembly",
+    "bounded_missing_fragment",
+    "reset_clears_reassembly"
+  ],
+  "retry_buckets": [
+    "no_retry",
+    "bounded_retry",
+    "policy_blocked_retry"
+  ],
+  "max_packet_class": "bounded_synthetic_packet_class",
+  "packet_dumps_allowed": false
+}
