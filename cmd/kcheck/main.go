@@ -27,6 +27,7 @@ import (
 	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
+	"kurdistan/internal/keyexchangeplan"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
@@ -205,6 +206,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "relayprocess" {
 		os.Exit(runRelayProcess(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "keyexchangeplan" {
+		os.Exit(runKeyExchangePlan(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -7087,6 +7091,177 @@ func writeRelayProcessCompanions(out string, set relayprocess.FixtureSet, force 
 	}
 	for _, write := range writes {
 		if err := relayprocess.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runKeyExchangePlan(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runKeyExchangePlanGenerate(args[1:])
+		case "verify":
+			return runKeyExchangePlanVerify(args[1:])
+		case "compare":
+			return runKeyExchangePlanCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck keyexchangeplan", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick production key exchange design audit")
+	full := flags.Bool("full", false, "run full production key exchange design audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunKeyExchangePlanAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runKeyExchangePlanGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck keyexchangeplan generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "keyexchangeplan", "keyexchangeplan-report-golden.json"), "key exchange plan fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := keyexchangeplan.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := keyexchangeplan.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeKeyExchangePlanCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote keyexchangeplan fixtures: %s (%d design items, %d controls)\n", *out, len(set.DesignInventory), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runKeyExchangePlanVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck keyexchangeplan verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "keyexchangeplan", "keyexchangeplan-report-golden.json"), "key exchange plan fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := keyexchangeplan.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := keyexchangeplan.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := keyexchangeplan.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runKeyExchangePlanCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck keyexchangeplan compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old key exchange plan fixture")
+	newPath := flags.String("new", "", "new key exchange plan fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := keyexchangeplan.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := keyexchangeplan.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := keyexchangeplan.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := keyexchangeplan.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeKeyExchangePlanCompanions(out string, set keyexchangeplan.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"design-inventory.json", set.DesignInventory},
+		{"transcript-binding-report.json", set.TranscriptBinding},
+		{"identity-binding-report.json", set.IdentityBinding},
+		{"nonce-replay-report.json", set.NonceReplay},
+		{"downgrade-resistance-report.json", set.DowngradeResistance},
+		{"key-separation-report.json", set.KeySeparation},
+		{"rotation-readiness-report.json", set.RotationReadiness},
+		{"generated-transport-compatibility-report.json", set.TransportCompatibility},
+		{"external-crypto-review-readiness-report.json", set.ExternalReviewReadiness},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"keyexchangeplan-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := keyexchangeplan.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
