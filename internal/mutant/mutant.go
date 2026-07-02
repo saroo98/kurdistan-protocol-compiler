@@ -512,6 +512,22 @@ const (
 	ModeMultiCarrierSelectPayloadLoggingAllowed         = "multicarrierselect_payload_logging_allowed"
 	ModeMultiCarrierSelectSecretLeak                    = "multicarrierselect_secret_leak"
 	ModeMultiCarrierSelectGeneratedBackendDrift         = "multicarrierselect_generated_backend_drift"
+	ModeCarrierCollapseSingleCarrierDefault             = "carriercollapse_single_carrier_default"
+	ModeCarrierCollapseSingleShapeDefault               = "carriercollapse_single_shape_default"
+	ModeCarrierCollapsePaddingOnlyVariation             = "carriercollapse_padding_only_variation"
+	ModeCarrierCollapseProfileInsensitive               = "carriercollapse_profile_insensitive"
+	ModeCarrierCollapseBundleInsensitive                = "carriercollapse_bundle_insensitive"
+	ModeCarrierCollapsePathRaceBypass                   = "carriercollapse_pathrace_bypass"
+	ModeCarrierCollapsePathHealthBypass                 = "carriercollapse_pathhealth_bypass"
+	ModeCarrierCollapseMeasurementReviewBypass          = "carriercollapse_measurementreview_bypass"
+	ModeCarrierCollapseCarrierReviewBypass              = "carriercollapse_carrierreview_bypass"
+	ModeCarrierCollapseLabEgressBypass                  = "carriercollapse_labegress_bypass"
+	ModeCarrierCollapseUnsafeFallback                   = "carriercollapse_unsafe_fallback"
+	ModeCarrierCollapseHighRiskDefault                  = "carriercollapse_high_risk_default"
+	ModeCarrierCollapsePayloadLeak                      = "carriercollapse_payload_leak"
+	ModeCarrierCollapseSecretLeak                       = "carriercollapse_secret_leak"
+	ModeCarrierCollapseGeneratedBackendDrift            = "carriercollapse_generated_backend_drift"
+	ModeCarrierCollapseTraceHygieneBypass               = "carriercollapse_trace_hygiene_bypass"
 )
 
 func Modes() []string {
@@ -1002,6 +1018,22 @@ func Modes() []string {
 		ModeMultiCarrierSelectPayloadLoggingAllowed,
 		ModeMultiCarrierSelectSecretLeak,
 		ModeMultiCarrierSelectGeneratedBackendDrift,
+		ModeCarrierCollapseSingleCarrierDefault,
+		ModeCarrierCollapseSingleShapeDefault,
+		ModeCarrierCollapsePaddingOnlyVariation,
+		ModeCarrierCollapseProfileInsensitive,
+		ModeCarrierCollapseBundleInsensitive,
+		ModeCarrierCollapsePathRaceBypass,
+		ModeCarrierCollapsePathHealthBypass,
+		ModeCarrierCollapseMeasurementReviewBypass,
+		ModeCarrierCollapseCarrierReviewBypass,
+		ModeCarrierCollapseLabEgressBypass,
+		ModeCarrierCollapseUnsafeFallback,
+		ModeCarrierCollapseHighRiskDefault,
+		ModeCarrierCollapsePayloadLeak,
+		ModeCarrierCollapseSecretLeak,
+		ModeCarrierCollapseGeneratedBackendDrift,
+		ModeCarrierCollapseTraceHygieneBypass,
 	}
 }
 
