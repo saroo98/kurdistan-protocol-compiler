@@ -1,0 +1,38 @@
+[
+  {
+    "name": "public_resolver_accident",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  },
+  {
+    "name": "exact_query_logging",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  },
+  {
+    "name": "resolver_address_logging",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  },
+  {
+    "name": "retry_storm",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  },
+  {
+    "name": "pathhealth_bypass",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  },
+  {
+    "name": "public_claim_overstatement",
+    "severity": "high",
+    "mitigation": "deterministic_design_lock_gate",
+    "accepted": false
+  }
+]

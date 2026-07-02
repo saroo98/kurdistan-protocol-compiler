@@ -1,0 +1,132 @@
+[
+  {
+    "id": "query_shape_01",
+    "direction": "query",
+    "shape_class": "small_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:dd449190608ed71e4e56d69fefcbd97b4757709fb4c6307f1a1088cd5b0fb95f"
+  },
+  {
+    "id": "query_shape_02",
+    "direction": "query",
+    "shape_class": "chunked_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:28b12808b752defe45cec93e686eb31fdb666df6ad2ebd1cda65a000640cf64f"
+  },
+  {
+    "id": "query_shape_03",
+    "direction": "query",
+    "shape_class": "repeated_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:c89f81a39b74cd67ca0531e64078369e74362a7b002cafa05739613f784bf4a0"
+  },
+  {
+    "id": "query_shape_04",
+    "direction": "query",
+    "shape_class": "delayed_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:dbb9702c42e3ac24f5bd7251929d4ad03a4763b1a6c07959fb09afbc513a3304"
+  },
+  {
+    "id": "query_shape_05",
+    "direction": "query",
+    "shape_class": "truncated_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:7aff37b0ab9eeafcf532c2056a7c469d688b31a7c770211ef389b3a9338a92fe"
+  },
+  {
+    "id": "query_shape_06",
+    "direction": "query",
+    "shape_class": "retry_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:58cfc763fc44dfd0837a2176cb030fdc831a0aa18cebc9f48f518a6b29cc9fdc"
+  },
+  {
+    "id": "query_shape_07",
+    "direction": "query",
+    "shape_class": "failure_query_marker",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": false,
+    "stable_hash": "sha256:9b93e79112caf036a0b2718e568f0d96a179d90e7b83e76fc71cb0f3ccb43b05"
+  },
+  {
+    "id": "query_shape_08",
+    "direction": "query",
+    "shape_class": "control_exact_query_leak",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": true,
+    "stable_hash": "sha256:9f8ab4e5fb371c3ffc226ee9471a7150fdddd830bf9acd21428a5c7ff6752424"
+  },
+  {
+    "id": "query_shape_09",
+    "direction": "query",
+    "shape_class": "control_domain_leak",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": true,
+    "stable_hash": "sha256:336ad20ce60836a40a621597fa1b9dc22a015ffc5ba565eec8922ba8296a7b1d"
+  },
+  {
+    "id": "query_shape_10",
+    "direction": "query",
+    "shape_class": "control_resolver_leak",
+    "marker_class": "symbolic_query_bucket",
+    "safe_buckets": [
+      "size_bucket",
+      "timing_bucket",
+      "failure_bucket"
+    ],
+    "control": true,
+    "stable_hash": "sha256:a99820cbc4b1c5760a1d8f8ba59a8726dd3bcdba2a3a04c58d43717a4fa2888d"
+  }
+]

@@ -1,0 +1,146 @@
+{
+  "findings": [
+    {
+      "name": "constrainedcarrierreview_allows_public_resolver",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_real_dns_query_default",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_logs_exact_query",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_logs_resolver_ip",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_domain_dependency",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_wildcard_resolver",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_public_network",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_arbitrary_egress",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_payload_logging",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_packet_capture",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_allows_measurement_upload",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_resolver_harness",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_query_shape_taxonomy",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_response_shape_taxonomy",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_truncation_contract",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_retry_failure_contract",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_missing_profile_sensitivity",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_measurementreview_bypass",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_public_docs_claim_real_dns",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_public_docs_claim_field_ready",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_payload_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_secret_leak",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    },
+    {
+      "name": "constrainedcarrierreview_generated_backend_drift",
+      "detected": true,
+      "severity": "required",
+      "evidence": "deterministic design-lock control flagged"
+    }
+  ],
+  "detected_count": 23,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,17 @@
+{
+  "harness_id": "local_deterministic_resolver_harness_contract",
+  "local_only": true,
+  "deterministic_fixture_scope": true,
+  "loopback_only": true,
+  "public_resolver_behavior": false,
+  "resolver_address_persisted": false,
+  "exact_query_persisted": false,
+  "wildcard_resolver_allowed": false,
+  "resolver_class_buckets": [
+    "loopback_harness",
+    "fixture_resolver",
+    "failure_fixture",
+    "poison_fixture"
+  ],
+  "conclusion": "passed"
+}

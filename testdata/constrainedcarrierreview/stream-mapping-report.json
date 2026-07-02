@@ -1,0 +1,24 @@
+{
+  "stream_class_mappings": [
+    "interactive_to_small_query",
+    "bulk_to_chunked_query",
+    "control_to_failure_query",
+    "reset_to_reset_marker"
+  ],
+  "response_shape_mappings": [
+    "small_to_small_response",
+    "truncated_to_retry_response",
+    "failure_to_failure_response",
+    "reset_to_reset_response"
+  ],
+  "multi_stream_isolation_required": true,
+  "reset_isolation_required": true,
+  "backpressure_mapping_required": true,
+  "profile_sensitive_selection": true,
+  "collapse_controls": [
+    "fixed_constrained_shape",
+    "padding_only_constrained_shape",
+    "profile_insensitive_query_shape"
+  ],
+  "conclusion": "passed"
+}
