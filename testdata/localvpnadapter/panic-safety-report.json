@@ -1,0 +1,12 @@
+{
+  "targets": [
+    "flow_descriptor_validator",
+    "mtu_bucket_mapper",
+    "fragmentation_bucket_mapper",
+    "retry_reset_mapper",
+    "diagnostic_summary_builder",
+    "trace_hygiene_scanner"
+  ],
+  "checked": 6,
+  "conclusion": "passed"
+}

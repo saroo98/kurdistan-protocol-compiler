@@ -1,0 +1,24 @@
+{
+  "detected_controls": [
+    "localvpnadapter_payload_logging_allowed",
+    "localvpnadapter_packet_dump_allowed",
+    "localvpnadapter_android_vpnservice_added",
+    "localvpnadapter_unreviewed_route_mutation",
+    "localvpnadapter_exact_endpoint_logged",
+    "localvpnadapter_app_identity_logged",
+    "localvpnadapter_dns_interception_allowed",
+    "localvpnadapter_killswitch_bypass",
+    "localvpnadapter_unbounded_flows",
+    "localvpnadapter_backpressure_ignored",
+    "localvpnadapter_reset_swallowed",
+    "localvpnadapter_localproxyadapter_bypass",
+    "localvpnadapter_multicarrierselect_bypass",
+    "localvpnadapter_measurementreview_bypass",
+    "localvpnadapter_generated_backend_drift",
+    "localvpnadapter_payload_leak",
+    "localvpnadapter_secret_leak"
+  ],
+  "detected_count": 17,
+  "expected_count": 17,
+  "conclusion": "passed"
+}
