@@ -576,6 +576,24 @@ const (
 	ModeVPNSemanticsPayloadLeak             = "vpnsemantics_payload_leak"
 	ModeVPNSemanticsSecretLeak              = "vpnsemantics_secret_leak"
 	ModeVPNSemanticsGeneratedBackendDrift   = "vpnsemantics_generated_backend_drift"
+
+	ModeLocalVPNAdapterPayloadLoggingAllowed  = "localvpnadapter_payload_logging_allowed"
+	ModeLocalVPNAdapterPacketDumpAllowed      = "localvpnadapter_packet_dump_allowed"
+	ModeLocalVPNAdapterAndroidServiceAdded    = "localvpnadapter_android_vpnservice_added"
+	ModeLocalVPNAdapterUnreviewedRouteMutate  = "localvpnadapter_unreviewed_route_mutation"
+	ModeLocalVPNAdapterExactEndpointLogged    = "localvpnadapter_exact_endpoint_logged"
+	ModeLocalVPNAdapterAppIdentityLogged      = "localvpnadapter_app_identity_logged"
+	ModeLocalVPNAdapterDNSInterceptionAllowed = "localvpnadapter_dns_interception_allowed"
+	ModeLocalVPNAdapterKillSwitchBypass       = "localvpnadapter_killswitch_bypass"
+	ModeLocalVPNAdapterUnboundedFlows         = "localvpnadapter_unbounded_flows"
+	ModeLocalVPNAdapterBackpressureIgnored    = "localvpnadapter_backpressure_ignored"
+	ModeLocalVPNAdapterResetSwallowed         = "localvpnadapter_reset_swallowed"
+	ModeLocalVPNAdapterLocalProxyBypass       = "localvpnadapter_localproxyadapter_bypass"
+	ModeLocalVPNAdapterMultiCarrierBypass     = "localvpnadapter_multicarrierselect_bypass"
+	ModeLocalVPNAdapterMeasurementBypass      = "localvpnadapter_measurementreview_bypass"
+	ModeLocalVPNAdapterGeneratedBackendDrift  = "localvpnadapter_generated_backend_drift"
+	ModeLocalVPNAdapterPayloadLeak            = "localvpnadapter_payload_leak"
+	ModeLocalVPNAdapterSecretLeak             = "localvpnadapter_secret_leak"
 )
 
 func Modes() []string {
@@ -1128,6 +1146,23 @@ func Modes() []string {
 		ModeVPNSemanticsPayloadLeak,
 		ModeVPNSemanticsSecretLeak,
 		ModeVPNSemanticsGeneratedBackendDrift,
+		ModeLocalVPNAdapterPayloadLoggingAllowed,
+		ModeLocalVPNAdapterPacketDumpAllowed,
+		ModeLocalVPNAdapterAndroidServiceAdded,
+		ModeLocalVPNAdapterUnreviewedRouteMutate,
+		ModeLocalVPNAdapterExactEndpointLogged,
+		ModeLocalVPNAdapterAppIdentityLogged,
+		ModeLocalVPNAdapterDNSInterceptionAllowed,
+		ModeLocalVPNAdapterKillSwitchBypass,
+		ModeLocalVPNAdapterUnboundedFlows,
+		ModeLocalVPNAdapterBackpressureIgnored,
+		ModeLocalVPNAdapterResetSwallowed,
+		ModeLocalVPNAdapterLocalProxyBypass,
+		ModeLocalVPNAdapterMultiCarrierBypass,
+		ModeLocalVPNAdapterMeasurementBypass,
+		ModeLocalVPNAdapterGeneratedBackendDrift,
+		ModeLocalVPNAdapterPayloadLeak,
+		ModeLocalVPNAdapterSecretLeak,
 	}
 }
 

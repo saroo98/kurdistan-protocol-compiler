@@ -34,6 +34,7 @@ import (
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/localvpnadapter"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/multicarrierselect"
@@ -197,6 +198,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "vpnsemantics" {
 		os.Exit(runVPNSemantics(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "localvpnadapter" {
+		os.Exit(runLocalVPNAdapter(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -6742,6 +6746,172 @@ func writeVPNSemanticsCompanions(out string, set vpnsemantics.FixtureSet, force 
 	}
 	for _, write := range writes {
 		if err := vpnsemantics.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runLocalVPNAdapter(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runLocalVPNAdapterGenerate(args[1:])
+		case "verify":
+			return runLocalVPNAdapterVerify(args[1:])
+		case "compare":
+			return runLocalVPNAdapterCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck localvpnadapter", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick local packet adapter audit")
+	full := flags.Bool("full", false, "run full local packet adapter audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunLocalVPNAdapterAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runLocalVPNAdapterGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck localvpnadapter generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "localvpnadapter", "localvpnadapter-report-golden.json"), "local packet adapter fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := localvpnadapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := localvpnadapter.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeLocalVPNAdapterCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote localvpnadapter fixtures: %s (%d flows, %d controls)\n", *out, len(set.Runs), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runLocalVPNAdapterVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck localvpnadapter verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "localvpnadapter", "localvpnadapter-report-golden.json"), "local packet adapter fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := localvpnadapter.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localvpnadapter.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localvpnadapter.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runLocalVPNAdapterCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck localvpnadapter compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old local packet adapter fixture")
+	newPath := flags.String("new", "", "new local packet adapter fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := localvpnadapter.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := localvpnadapter.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := localvpnadapter.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := localvpnadapter.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeLocalVPNAdapterCompanions(out string, set localvpnadapter.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"flow-descriptors.json", set.Descriptors},
+		{"flow-runs.json", set.Runs},
+		{"integration-report.json", set.Integration},
+		{"resource-report.json", set.Resource},
+		{"panic-safety-report.json", set.PanicSafety},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"misuse-report.json", set.Misuse},
+		{"localvpnadapter-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := localvpnadapter.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}
