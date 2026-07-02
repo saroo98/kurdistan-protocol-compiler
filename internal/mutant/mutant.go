@@ -470,6 +470,33 @@ const (
 	ModeConstrainedCarrierReviewPayloadLeak                  = "constrainedcarrierreview_payload_leak"
 	ModeConstrainedCarrierReviewSecretLeak                   = "constrainedcarrierreview_secret_leak"
 	ModeConstrainedCarrierReviewGeneratedBackendDrift        = "constrainedcarrierreview_generated_backend_drift"
+
+	ModeConstrainedCarrierPublicResolverAllowed      = "constrainedcarrier_public_resolver_allowed"
+	ModeConstrainedCarrierRealDNSQueryDefault        = "constrainedcarrier_real_dns_query_default"
+	ModeConstrainedCarrierExactQueryLogged           = "constrainedcarrier_exact_query_logged"
+	ModeConstrainedCarrierResolverIPLogged           = "constrainedcarrier_resolver_ip_logged"
+	ModeConstrainedCarrierDomainDependencyAllowed    = "constrainedcarrier_domain_dependency_allowed"
+	ModeConstrainedCarrierWildcardResolverAllowed    = "constrainedcarrier_wildcard_resolver_allowed"
+	ModeConstrainedCarrierPublicNetworkAllowed       = "constrainedcarrier_public_network_allowed"
+	ModeConstrainedCarrierArbitraryEgressAllowed     = "constrainedcarrier_arbitrary_egress_allowed"
+	ModeConstrainedCarrierPayloadForwardingAllowed   = "constrainedcarrier_payload_forwarding_allowed"
+	ModeConstrainedCarrierPayloadLoggingAllowed      = "constrainedcarrier_payload_logging_allowed"
+	ModeConstrainedCarrierPacketCaptureAllowed       = "constrainedcarrier_packet_capture_allowed"
+	ModeConstrainedCarrierMeasurementUploadAllowed   = "constrainedcarrier_measurement_upload_allowed"
+	ModeConstrainedCarrierFixedQueryShape            = "constrainedcarrier_fixed_query_shape"
+	ModeConstrainedCarrierPaddingOnlyVariation       = "constrainedcarrier_padding_only_variation"
+	ModeConstrainedCarrierProfileInsensitive         = "constrainedcarrier_profile_insensitive"
+	ModeConstrainedCarrierRetryStorm                 = "constrainedcarrier_retry_storm"
+	ModeConstrainedCarrierTruncationMisclassified    = "constrainedcarrier_truncation_misclassified"
+	ModeConstrainedCarrierPoisonFailureMisclassified = "constrainedcarrier_poison_failure_misclassified"
+	ModeConstrainedCarrierBackpressureIgnored        = "constrainedcarrier_backpressure_ignored"
+	ModeConstrainedCarrierResetSwallowed             = "constrainedcarrier_reset_swallowed"
+	ModeConstrainedCarrierCrossStreamLeak            = "constrainedcarrier_cross_stream_leak"
+	ModeConstrainedCarrierPathHealthBypass           = "constrainedcarrier_pathhealth_bypass"
+	ModeConstrainedCarrierMeasurementReviewBypass    = "constrainedcarrier_measurementreview_bypass"
+	ModeConstrainedCarrierGeneratedBackendDrift      = "constrainedcarrier_generated_backend_drift"
+	ModeConstrainedCarrierPayloadLeak                = "constrainedcarrier_payload_leak"
+	ModeConstrainedCarrierSecretLeak                 = "constrainedcarrier_secret_leak"
 )
 
 func Modes() []string {
@@ -919,6 +946,32 @@ func Modes() []string {
 		ModeConstrainedCarrierReviewPayloadLeak,
 		ModeConstrainedCarrierReviewSecretLeak,
 		ModeConstrainedCarrierReviewGeneratedBackendDrift,
+		ModeConstrainedCarrierPublicResolverAllowed,
+		ModeConstrainedCarrierRealDNSQueryDefault,
+		ModeConstrainedCarrierExactQueryLogged,
+		ModeConstrainedCarrierResolverIPLogged,
+		ModeConstrainedCarrierDomainDependencyAllowed,
+		ModeConstrainedCarrierWildcardResolverAllowed,
+		ModeConstrainedCarrierPublicNetworkAllowed,
+		ModeConstrainedCarrierArbitraryEgressAllowed,
+		ModeConstrainedCarrierPayloadForwardingAllowed,
+		ModeConstrainedCarrierPayloadLoggingAllowed,
+		ModeConstrainedCarrierPacketCaptureAllowed,
+		ModeConstrainedCarrierMeasurementUploadAllowed,
+		ModeConstrainedCarrierFixedQueryShape,
+		ModeConstrainedCarrierPaddingOnlyVariation,
+		ModeConstrainedCarrierProfileInsensitive,
+		ModeConstrainedCarrierRetryStorm,
+		ModeConstrainedCarrierTruncationMisclassified,
+		ModeConstrainedCarrierPoisonFailureMisclassified,
+		ModeConstrainedCarrierBackpressureIgnored,
+		ModeConstrainedCarrierResetSwallowed,
+		ModeConstrainedCarrierCrossStreamLeak,
+		ModeConstrainedCarrierPathHealthBypass,
+		ModeConstrainedCarrierMeasurementReviewBypass,
+		ModeConstrainedCarrierGeneratedBackendDrift,
+		ModeConstrainedCarrierPayloadLeak,
+		ModeConstrainedCarrierSecretLeak,
 	}
 }
 
