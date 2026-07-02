@@ -35,6 +35,7 @@ import (
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/multicarrierselect"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/productionreadiness"
@@ -162,6 +163,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	constrainedCarrierReviewDrift := constrainedCarrierReviewComparison(filepath.Join(fixtureRoot, "testdata", "constrainedcarrierreview", "constrainedcarrierreview-report-golden.json"), constrainedCarrierReviewSet)
 	constrainedCarrierSet, constrainedCarrierErr := constrainedcarrier.GenerateFixtureSet()
 	constrainedCarrierDrift := constrainedCarrierComparison(filepath.Join(fixtureRoot, "testdata", "constrainedcarrier", "constrainedcarrier-report-golden.json"), constrainedCarrierSet)
+	multiCarrierSelectSet, multiCarrierSelectErr := multicarrierselect.GenerateFixtureSet()
+	multiCarrierSelectDrift := multiCarrierSelectComparison(filepath.Join(fixtureRoot, "testdata", "multicarrierselect", "multicarrierselect-report-golden.json"), multiCarrierSelectSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -411,6 +414,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, ConstrainedCarrierGates(constrainedCarrierSet, constrainedCarrierDrift)...)
 	} else {
 		gates = append(gates, gate("constrainedcarrier_harness", false, "required", constrainedCarrierErr.Error(), nil, []string{constrainedCarrierErr.Error()}))
+	}
+	if multiCarrierSelectErr == nil {
+		gates = append(gates, MultiCarrierSelectGates(multiCarrierSelectSet, multiCarrierSelectDrift)...)
+	} else {
+		gates = append(gates, gate("multicarrierselect_inventory", false, "required", multiCarrierSelectErr.Error(), nil, []string{multiCarrierSelectErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
