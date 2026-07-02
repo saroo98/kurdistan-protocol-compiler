@@ -1,0 +1,16 @@
+{
+  "duplicate_carrier_markers_rejected": 3,
+  "replayed_session_markers_rejected": 2,
+  "replayed_stream_markers_rejected": 2,
+  "stale_reset_markers_rejected": 1,
+  "duplicate_backpressure_markers_rejected": 1,
+  "production_crypto_changed": false,
+  "control_markers": [
+    "duplicate_carrier_marker",
+    "replayed_session_marker",
+    "replayed_stream_marker",
+    "stale_reset_marker",
+    "duplicated_backpressure_marker"
+  ],
+  "conclusion": "passed"
+}

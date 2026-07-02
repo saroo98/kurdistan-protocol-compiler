@@ -1,0 +1,35 @@
+{
+  "profile_count": 3,
+  "request_shape_sequences": [
+    "chunked_request_marker",
+    "large_object_request_marker",
+    "reset_error_request_marker",
+    "short_request_marker"
+  ],
+  "response_shape_sequences": [
+    "chunked_response_marker",
+    "delayed_large_response_marker",
+    "fixed_response_marker",
+    "reset_error_response_marker"
+  ],
+  "accepted_shape_pairs": [
+    "chunked_request_marker-\u003ereset_error_response_marker",
+    "large_object_request_marker-\u003edelayed_large_response_marker",
+    "large_object_request_marker-\u003ereset_error_response_marker",
+    "reset_error_request_marker-\u003echunked_response_marker",
+    "reset_error_request_marker-\u003efixed_response_marker",
+    "reset_error_request_marker-\u003ereset_error_response_marker",
+    "short_request_marker-\u003echunked_response_marker",
+    "short_request_marker-\u003edelayed_large_response_marker"
+  ],
+  "diversity_score": 0.83,
+  "dominant_shape_ratio": 0.34,
+  "fixed_shape_detected": true,
+  "fixed_request_sequence": true,
+  "fixed_response_sequence": true,
+  "identical_shape_pair_collapse": true,
+  "padding_only_variation": true,
+  "profile_insensitive_detected": true,
+  "accepted_profiles_non_collapsed": true,
+  "conclusion": "passed"
+}

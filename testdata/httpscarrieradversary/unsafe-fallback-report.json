@@ -1,0 +1,20 @@
+{
+  "public_network_controls": 1,
+  "arbitrary_egress_controls": 1,
+  "real_tls_controls": 1,
+  "domain_marker_controls": 3,
+  "payload_forward_controls": 1,
+  "measurement_upload_controls": 1,
+  "fallbacks_rejected": true,
+  "blocked_fallback_categories": [
+    "public_network_fallback",
+    "arbitrary_egress_fallback",
+    "real_tls_fallback",
+    "sni_fallback",
+    "host_header_fallback",
+    "domain_fallback",
+    "payload_forwarding_fallback",
+    "measurement_upload_fallback"
+  ],
+  "conclusion": "passed"
+}

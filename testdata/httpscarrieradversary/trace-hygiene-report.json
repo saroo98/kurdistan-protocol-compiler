@@ -1,0 +1,19 @@
+{
+  "fixtures_scanned": 24,
+  "generated_outputs_scanned": 3,
+  "audit_reports_scanned": 2,
+  "docs_scanned": 4,
+  "forbidden_markers": [
+    "payload_material_bucket",
+    "byte_material_bucket",
+    "packet_capture_bucket",
+    "secret_material_bucket",
+    "resolver_material_bucket",
+    "provider_metadata_bucket",
+    "account_device_location_bucket",
+    "unsafe_public_claim_bucket"
+  ],
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}
