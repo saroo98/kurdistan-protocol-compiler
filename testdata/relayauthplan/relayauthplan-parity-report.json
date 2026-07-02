@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "RelayAuthPlanSchemaVersion",
+    "RelayAuthPlanBackendVersion",
+    "RelayAuthPlanInventoryCount",
+    "RelayAuthPlanMisuseCount",
+    "RelayAuthPlanCompatibilityPolicy",
+    "RelayAuthPlanNextMilestone"
+  ],
+  "interpreted_hash": "sha256:aa4ecef621a1b22b3a7fc30ba1477da9019f978d1f269ce92cb590ebd58e0f82",
+  "generated_hash": "sha256:aa4ecef621a1b22b3a7fc30ba1477da9019f978d1f269ce92cb590ebd58e0f82",
+  "conclusion": "passed"
+}

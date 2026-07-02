@@ -1,0 +1,14 @@
+{
+  "policy": "bounded_epoch_rotation_with_required_overlap_window",
+  "rotation_window_policy": "current_and_next_epoch_overlap_bucket_required",
+  "split_brain_rotation_policy": "split_brain_epochs_fail_closed_with_rotation_hint_bucket",
+  "required_checks": [
+    "epoch_overlap_present",
+    "current_epoch_accepted",
+    "next_epoch_accepted_inside_window",
+    "old_epoch_rejected_after_window",
+    "split_brain_rejected"
+  ],
+  "rotation_without_window": false,
+  "conclusion": "passed"
+}

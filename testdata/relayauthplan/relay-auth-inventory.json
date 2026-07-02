@@ -1,0 +1,235 @@
+[
+  {
+    "name": "carrier_compatibility_matrix",
+    "policy": "carrier_family_and_review_gate_bound_to_relay_auth_decision",
+    "required_inputs": [
+      "carrier_family",
+      "review_gate_status"
+    ],
+    "required_outputs": [
+      "carrier_compatibility_result"
+    ],
+    "blocked_classes": [
+      "carrier_review_bypass"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "client_profile_identity_policy",
+    "policy": "client_profile_hash_bound_to_profile_bundle_version",
+    "required_inputs": [
+      "profile_id",
+      "profile_hash",
+      "profile_bundle_version"
+    ],
+    "required_outputs": [
+      "profile_identity_result"
+    ],
+    "blocked_classes": [
+      "profile_confusion"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "diagnostics_policy",
+    "policy": "safe_bucketed_reasons_no_accounts_no_keys_no_payloads",
+    "required_inputs": [
+      "failure_bucket",
+      "compatibility_bucket"
+    ],
+    "required_outputs": [
+      "diagnostic_summary"
+    ],
+    "blocked_classes": [
+      "secret_logging",
+      "key_material_logging",
+      "account_tracking"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "downgrade_rejection_policy",
+    "policy": "version_floor_and_capability_hash_bound_to_auth_result",
+    "required_inputs": [
+      "version_floor",
+      "capability_hash"
+    ],
+    "required_outputs": [
+      "downgrade_result"
+    ],
+    "blocked_classes": [
+      "silent_downgrade"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "profile_bundle_version_policy",
+    "policy": "version_floor_and_bundle_epoch_bound_to_compatibility_matrix",
+    "required_inputs": [
+      "bundle_version",
+      "compatibility_floor"
+    ],
+    "required_outputs": [
+      "version_policy_result"
+    ],
+    "blocked_classes": [
+      "unknown_version_fail_open"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "profile_expiry_policy",
+    "policy": "expired_profiles_fail_closed_with_safe_reason_bucket",
+    "required_inputs": [
+      "profile_expiry_bucket",
+      "current_epoch_bucket"
+    ],
+    "required_outputs": [
+      "expiry_result"
+    ],
+    "blocked_classes": [
+      "stale_profile_fail_open"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_auth_policy",
+    "policy": "authenticated_relay_identity_required_no_public_discovery",
+    "required_inputs": [
+      "relay_identity_bucket",
+      "auth_policy_class"
+    ],
+    "required_outputs": [
+      "relay_auth_result"
+    ],
+    "blocked_classes": [
+      "public_discovery",
+      "account_tracking"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_compatibility_matrix",
+    "policy": "relay_profile_transport_carrier_versions_checked_before_open",
+    "required_inputs": [
+      "relay_version",
+      "profile_version",
+      "transport_version",
+      "carrier_family"
+    ],
+    "required_outputs": [
+      "compatibility_result"
+    ],
+    "blocked_classes": [
+      "generated_backend_drift"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "relay_identity_policy",
+    "policy": "relay_identity_bucket_required_before_session_open",
+    "required_inputs": [
+      "relay_identity_bucket",
+      "relay_epoch_bucket"
+    ],
+    "required_outputs": [
+      "relay_identity_result"
+    ],
+    "blocked_classes": [
+      "unauthenticated_relay_acceptance"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "revocation_policy",
+    "policy": "revocation_list_bucket_required_and_checked_before_session_open",
+    "required_inputs": [
+      "revocation_epoch_bucket",
+      "relay_identity_bucket"
+    ],
+    "required_outputs": [
+      "revocation_result"
+    ],
+    "blocked_classes": [
+      "revocation_missing"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "rotation_window_policy",
+    "policy": "overlap_window_required_for_epoch_rotation",
+    "required_inputs": [
+      "current_epoch",
+      "next_epoch",
+      "overlap_window_bucket"
+    ],
+    "required_outputs": [
+      "rotation_window_result"
+    ],
+    "blocked_classes": [
+      "rotation_without_window"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "safe_failure_policy",
+    "policy": "closed_failure_buckets_with_no_retry_to_public_discovery",
+    "required_inputs": [
+      "failure_bucket",
+      "diagnostic_bucket"
+    ],
+    "required_outputs": [
+      "safe_failure_result"
+    ],
+    "blocked_classes": [
+      "unsafe_fail_open",
+      "public_relay_discovery"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "stale_profile_policy",
+    "policy": "stale_profiles_rejected_by_default_with_rotation_hint_bucket",
+    "required_inputs": [
+      "profile_epoch",
+      "relay_epoch"
+    ],
+    "required_outputs": [
+      "stale_profile_result"
+    ],
+    "blocked_classes": [
+      "stale_profile_acceptance"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "transport_compatibility_matrix",
+    "policy": "generated_transport_policy_hash_bound_to_compatibility_floor",
+    "required_inputs": [
+      "transport_policy_hash",
+      "backend_version"
+    ],
+    "required_outputs": [
+      "transport_compatibility_result"
+    ],
+    "blocked_classes": [
+      "transport_confusion"
+    ],
+    "conclusion": "passed"
+  },
+  {
+    "name": "unknown_version_policy",
+    "policy": "unknown_versions_rejected_by_default_pending_explicit_matrix_entry",
+    "required_inputs": [
+      "presented_version",
+      "matrix_entry"
+    ],
+    "required_outputs": [
+      "unknown_version_result"
+    ],
+    "blocked_classes": [
+      "unknown_version_acceptance"
+    ],
+    "conclusion": "passed"
+  }
+]

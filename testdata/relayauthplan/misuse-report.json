@@ -1,0 +1,19 @@
+{
+  "detected_controls": [
+    "relayauthplan_unauthenticated_relay_allowed",
+    "relayauthplan_silent_downgrade_allowed",
+    "relayauthplan_unknown_version_fail_open",
+    "relayauthplan_stale_profile_fail_open",
+    "relayauthplan_rotation_without_window",
+    "relayauthplan_revocation_missing",
+    "relayauthplan_secret_logged",
+    "relayauthplan_key_material_logged",
+    "relayauthplan_account_tracking_added",
+    "relayauthplan_public_discovery_added",
+    "relayauthplan_cloud_provider_dependency",
+    "relayauthplan_generated_backend_drift"
+  ],
+  "detected_count": 12,
+  "expected_count": 12,
+  "conclusion": "passed"
+}

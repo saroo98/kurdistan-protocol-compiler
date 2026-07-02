@@ -1,0 +1,15 @@
+{
+  "policy": "relay_and_profile_identity_required_before_session_open",
+  "relay_identity_required": true,
+  "client_profile_identity_required": true,
+  "bound_components": [
+    "relay_identity_bucket",
+    "relay_rotation_epoch_bucket",
+    "profile_id_hash",
+    "profile_bundle_version",
+    "compatibility_floor",
+    "capability_hash"
+  ],
+  "unauthenticated_relay_allowed": false,
+  "conclusion": "passed"
+}
