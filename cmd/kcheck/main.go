@@ -13,6 +13,7 @@ import (
 
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/adversary"
+	"kurdistan/internal/androidreview"
 	"kurdistan/internal/audit"
 	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
@@ -217,6 +218,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "operationalhardening" {
 		os.Exit(runOperationalHardening(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "androidreview" {
+		os.Exit(runAndroidReview(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -7611,6 +7615,177 @@ func writeOperationalHardeningCompanions(out string, set operationalhardening.Fi
 	}
 	for _, write := range writes {
 		if err := operationalhardening.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runAndroidReview(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runAndroidReviewGenerate(args[1:])
+		case "verify":
+			return runAndroidReviewVerify(args[1:])
+		case "compare":
+			return runAndroidReviewCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck androidreview", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick Android architecture review audit")
+	full := flags.Bool("full", false, "run full Android architecture review audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunAndroidReviewAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidReviewGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidreview generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "androidreview", "androidreview-report-golden.json"), "Android review fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := androidreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := androidreview.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeAndroidReviewCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote androidreview fixtures: %s (%d flows, %d controls)\n", *out, len(set.UserFlows.Flows), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runAndroidReviewVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidreview verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "androidreview", "androidreview-report-golden.json"), "Android review fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := androidreview.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidreview.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidreview.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidReviewCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidreview compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old Android review fixture")
+	newPath := flags.String("new", "", "new Android review fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := androidreview.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidreview.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidreview.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := androidreview.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeAndroidReviewCompanions(out string, set androidreview.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"user-flows.json", set.UserFlows},
+		{"permission-model.json", set.Permissions},
+		{"ui-states.json", set.UIStates},
+		{"diagnostics-privacy.json", set.Diagnostics},
+		{"privacy-boundaries.json", set.Privacy},
+		{"kill-switch.json", set.KillSwitch},
+		{"runtime-composition.json", set.Integration},
+		{"m57-m58-contracts.json", set.Contracts},
+		{"checklist-report.json", set.Checklist},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"androidreview-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := androidreview.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

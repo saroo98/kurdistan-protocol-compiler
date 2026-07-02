@@ -1,0 +1,12 @@
+{
+  "docs_checked": 5,
+  "forbidden_claims": [
+    "working Android VPN app",
+    "production Android VPN",
+    "guaranteed bypass",
+    "undetectable",
+    "field-ready",
+    "live probing"
+  ],
+  "conclusion": "passed"
+}

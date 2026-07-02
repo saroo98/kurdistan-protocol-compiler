@@ -1,0 +1,28 @@
+{
+  "policy": "local_storage_minimized_redacted_feedback_only",
+  "storage_boundaries": [
+    "signed_profile_bundle_private_app_storage",
+    "runtime_state_ephemeral",
+    "diagnostic_bundle_user_export_only",
+    "no_persistent_session_secret_material"
+  ],
+  "log_boundaries": [
+    "state_buckets_only",
+    "safe_failure_classes_only",
+    "no_network_content",
+    "no_device_identity"
+  ],
+  "feedback_boundaries": [
+    "user_initiated_export",
+    "private_content_not_required",
+    "no_automatic_upload",
+    "redaction_status_visible"
+  ],
+  "raw_packet_stored": false,
+  "private_endpoint_stored": false,
+  "credential_stored_in_logs": false,
+  "phone_identifier_collected": false,
+  "precise_location_collected": false,
+  "telemetry_upload_by_default": false,
+  "conclusion": "passed"
+}

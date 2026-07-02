@@ -1,0 +1,26 @@
+{
+  "policy": "signed_profile_import_then_explicit_connect",
+  "flows": [
+    "onboarding_intro",
+    "profile_import",
+    "profile_verification",
+    "profile_expiry",
+    "profile_rotation",
+    "connect",
+    "disconnect",
+    "reconnect",
+    "failure_display",
+    "diagnostic_export",
+    "safe_reset"
+  ],
+  "safe_error_classes": [
+    "profile_invalid",
+    "profile_expired",
+    "relay_incompatible",
+    "carrier_unavailable",
+    "permission_required",
+    "network_changed",
+    "diagnostics_redacted"
+  ],
+  "conclusion": "passed"
+}

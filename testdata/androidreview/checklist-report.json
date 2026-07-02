@@ -1,0 +1,18 @@
+{
+  "items": [
+    "user_flows_defined",
+    "profile_import_verification_defined",
+    "permission_model_defined",
+    "ui_states_defined",
+    "diagnostics_redacted",
+    "privacy_boundaries_explicit",
+    "kill_switch_fail_closed",
+    "runtime_gate_composition_defined",
+    "m57_contract_defined",
+    "m58_contract_defined",
+    "generated_backend_parity"
+  ],
+  "passed": 11,
+  "failed": 0,
+  "conclusion": "passed"
+}

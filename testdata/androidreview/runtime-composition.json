@@ -1,0 +1,30 @@
+{
+  "policy": "android_state_composes_with_existing_runtime_gates",
+  "required_compositions": [
+    "carrier_selection",
+    "pathhealth",
+    "relay_auth_compatibility",
+    "profile_rotation",
+    "measurementreview",
+    "carrierreview",
+    "operationalhardening",
+    "generated_backend_compatibility"
+  ],
+  "compatibility_checks": [
+    "profile_bundle_version",
+    "relay_auth_policy",
+    "carrier_family_review",
+    "path_health_status",
+    "measurement_review_status",
+    "generated_backend_version",
+    "operational_health_summary"
+  ],
+  "bypasses_carrier_selection": false,
+  "bypasses_pathhealth": false,
+  "bypasses_relay_auth": false,
+  "bypasses_measurementreview": false,
+  "bypasses_carrierreview": false,
+  "bypasses_hardening": false,
+  "allows_generated_drift": false,
+  "conclusion": "passed"
+}

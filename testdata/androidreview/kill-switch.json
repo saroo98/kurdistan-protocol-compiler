@@ -1,0 +1,23 @@
+{
+  "policy": "fail_closed_on_profile_permission_runtime_or_carrier_invalid",
+  "fail_closed_triggers": [
+    "vpn_permission_lost",
+    "profile_invalid",
+    "profile_expired",
+    "relay_incompatible",
+    "carrier_selection_failed",
+    "runtime_security_failed",
+    "kill_switch_enabled_network_change"
+  ],
+  "recovery_classes": [
+    "user_regrant_permission",
+    "import_rotated_profile",
+    "retry_after_network_change",
+    "safe_disconnect_then_reconnect"
+  ],
+  "fail_closed_required": true,
+  "bypass_allowed": false,
+  "profile_invalid_fails_open": false,
+  "permission_loss_fails_open": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "AndroidReviewSchemaVersion",
+    "AndroidReviewBackendVersion",
+    "AndroidReviewDecision",
+    "AndroidReviewUIStateCount",
+    "AndroidReviewMisuseCount",
+    "AndroidReviewNextMilestone"
+  ],
+  "interpreted_hash": "sha256:dff5d9a8c0eac40cd21695f3c990ecbb4e2c33b0151e0d34579c6e58d17f62c3",
+  "generated_hash": "sha256:dff5d9a8c0eac40cd21695f3c990ecbb4e2c33b0151e0d34579c6e58d17f62c3",
+  "conclusion": "passed"
+}

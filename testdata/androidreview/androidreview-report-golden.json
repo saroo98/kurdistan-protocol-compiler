@@ -1,0 +1,300 @@
+{
+  "version": "androidreview-v1",
+  "fixture_id": "android_architecture_review_v1",
+  "generated_at": "2026-02-21T00:00:00Z",
+  "backend_version": "0.56.0-lab",
+  "recommended_next_milestone": "M57: Android local runtime port",
+  "decision": "ready_for_android_local_runtime_port",
+  "blocker_count": 0,
+  "risk_count": 6,
+  "user_flows": {
+    "policy": "signed_profile_import_then_explicit_connect",
+    "flows": [
+      "onboarding_intro",
+      "profile_import",
+      "profile_verification",
+      "profile_expiry",
+      "profile_rotation",
+      "connect",
+      "disconnect",
+      "reconnect",
+      "failure_display",
+      "diagnostic_export",
+      "safe_reset"
+    ],
+    "safe_error_classes": [
+      "profile_invalid",
+      "profile_expired",
+      "relay_incompatible",
+      "carrier_unavailable",
+      "permission_required",
+      "network_changed",
+      "diagnostics_redacted"
+    ],
+    "conclusion": "passed"
+  },
+  "permissions": {
+    "policy": "platform_permission_first_foreground_service_bounded",
+    "required_permissions": [
+      "vpn_permission_user_grant",
+      "foreground_service_notification",
+      "network_state_visibility",
+      "local_profile_file_access"
+    ],
+    "foreground_service_contract": [
+      "persistent_status_notification",
+      "explicit_disconnect_action",
+      "bounded_reconnect_attempts",
+      "redacted_failure_class"
+    ],
+    "background_boundaries": [
+      "no_silent_vpn_start_without_permission",
+      "optional_boot_requires_user_enabled_setting",
+      "battery_optimization_guidance_only",
+      "no_unbounded_background_worker"
+    ],
+    "bypasses_vpn_permission": false,
+    "unbounded_background_work": false,
+    "silent_boot_start_allowed": false,
+    "conclusion": "passed"
+  },
+  "ui_states": {
+    "policy": "single_source_of_truth_connection_state_machine",
+    "states": [
+      "disconnected",
+      "validating_profile",
+      "connecting",
+      "carrier_selecting",
+      "relay_handshaking",
+      "connected",
+      "reconnecting",
+      "blocked_by_kill_switch",
+      "profile_expired",
+      "relay_incompatible",
+      "carrier_failed",
+      "network_changed",
+      "vpn_permission_revoked",
+      "diagnostic_bundle_ready",
+      "crashed_recovered"
+    ],
+    "terminal_states": [
+      "disconnected",
+      "blocked_by_kill_switch"
+    ],
+    "recoverable_states": [
+      "network_changed",
+      "carrier_failed",
+      "relay_incompatible",
+      "vpn_permission_revoked",
+      "crashed_recovered"
+    ],
+    "conclusion": "passed"
+  },
+  "diagnostics": {
+    "policy": "local_user_export_only_redacted_diagnostic_bundle",
+    "allowed_fields": [
+      "app_version_bucket",
+      "profile_version_bucket",
+      "relay_compatibility_bucket",
+      "carrier_family_bucket",
+      "pathhealth_bucket",
+      "permission_state_bucket",
+      "failure_class",
+      "resource_limit_bucket",
+      "redaction_status",
+      "user_note_length_bucket"
+    ],
+    "redaction_classes": [
+      "bucketed_profile",
+      "bucketed_relay",
+      "bucketed_carrier",
+      "bucketed_permission",
+      "bucketed_failure",
+      "user_note_private_content_not_collected"
+    ],
+    "user_note_policy": "optional_local_note_length_bucket_only",
+    "payload_logged": false,
+    "secret_logged": false,
+    "network_content_logged": false,
+    "device_identifier_saved": false,
+    "auto_upload_allowed": false,
+    "conclusion": "passed"
+  },
+  "privacy_boundaries": {
+    "policy": "local_storage_minimized_redacted_feedback_only",
+    "storage_boundaries": [
+      "signed_profile_bundle_private_app_storage",
+      "runtime_state_ephemeral",
+      "diagnostic_bundle_user_export_only",
+      "no_persistent_session_secret_material"
+    ],
+    "log_boundaries": [
+      "state_buckets_only",
+      "safe_failure_classes_only",
+      "no_network_content",
+      "no_device_identity"
+    ],
+    "feedback_boundaries": [
+      "user_initiated_export",
+      "private_content_not_required",
+      "no_automatic_upload",
+      "redaction_status_visible"
+    ],
+    "raw_packet_stored": false,
+    "private_endpoint_stored": false,
+    "credential_stored_in_logs": false,
+    "phone_identifier_collected": false,
+    "precise_location_collected": false,
+    "telemetry_upload_by_default": false,
+    "conclusion": "passed"
+  },
+  "kill_switch": {
+    "policy": "fail_closed_on_profile_permission_runtime_or_carrier_invalid",
+    "fail_closed_triggers": [
+      "vpn_permission_lost",
+      "profile_invalid",
+      "profile_expired",
+      "relay_incompatible",
+      "carrier_selection_failed",
+      "runtime_security_failed",
+      "kill_switch_enabled_network_change"
+    ],
+    "recovery_classes": [
+      "user_regrant_permission",
+      "import_rotated_profile",
+      "retry_after_network_change",
+      "safe_disconnect_then_reconnect"
+    ],
+    "fail_closed_required": true,
+    "bypass_allowed": false,
+    "profile_invalid_fails_open": false,
+    "permission_loss_fails_open": false,
+    "conclusion": "passed"
+  },
+  "integration": {
+    "policy": "android_state_composes_with_existing_runtime_gates",
+    "required_compositions": [
+      "carrier_selection",
+      "pathhealth",
+      "relay_auth_compatibility",
+      "profile_rotation",
+      "measurementreview",
+      "carrierreview",
+      "operationalhardening",
+      "generated_backend_compatibility"
+    ],
+    "compatibility_checks": [
+      "profile_bundle_version",
+      "relay_auth_policy",
+      "carrier_family_review",
+      "path_health_status",
+      "measurement_review_status",
+      "generated_backend_version",
+      "operational_health_summary"
+    ],
+    "bypasses_carrier_selection": false,
+    "bypasses_pathhealth": false,
+    "bypasses_relay_auth": false,
+    "bypasses_measurementreview": false,
+    "bypasses_carrierreview": false,
+    "bypasses_hardening": false,
+    "allows_generated_drift": false,
+    "conclusion": "passed"
+  },
+  "future_contracts": {
+    "policy": "m57_runtime_port_then_m58_vpnservice_prototype",
+    "m57_requirements": [
+      "pure_runtime_port_boundary",
+      "profile_import_verification_without_vpn_traffic",
+      "foreground_status_model_without_vpnservice",
+      "capability_negotiation_execution",
+      "safe_diagnostics_export",
+      "no_raw_packet_capture"
+    ],
+    "m58_requirements": [
+      "vpnservice_permission_flow",
+      "tun_semantics_mapping_reviewed_before_traffic",
+      "kill_switch_fail_closed_semantics",
+      "network_change_reconnect_policy",
+      "foreground_service_lifecycle",
+      "no_unreviewed_carrier_or_public_network_behavior"
+    ],
+    "reopen_architecture": false,
+    "android_impl_added": false,
+    "conclusion": "passed"
+  },
+  "checklist": {
+    "items": [
+      "user_flows_defined",
+      "profile_import_verification_defined",
+      "permission_model_defined",
+      "ui_states_defined",
+      "diagnostics_redacted",
+      "privacy_boundaries_explicit",
+      "kill_switch_fail_closed",
+      "runtime_gate_composition_defined",
+      "m57_contract_defined",
+      "m58_contract_defined",
+      "generated_backend_parity"
+    ],
+    "passed": 11,
+    "failed": 0,
+    "conclusion": "passed"
+  },
+  "misuse": {
+    "detected_controls": [
+      "androidreview_bypasses_vpn_permission",
+      "androidreview_profile_import_without_verification",
+      "androidreview_payload_diagnostics",
+      "androidreview_secret_diagnostics",
+      "androidreview_auto_telemetry",
+      "androidreview_kill_switch_fail_open",
+      "androidreview_background_service_unbounded",
+      "androidreview_raw_network_metadata",
+      "androidreview_android_ready_claim",
+      "androidreview_generated_backend_drift"
+    ],
+    "detected_count": 10,
+    "expected_count": 10,
+    "conclusion": "passed"
+  },
+  "trace_hygiene": {
+    "reports_scanned": 12,
+    "payload_logged": false,
+    "secret_logged": false,
+    "raw_packet_logged": false,
+    "network_content_logged": false,
+    "device_identifier_logged": false,
+    "telemetry_marker_logged": false,
+    "conclusion": "passed"
+  },
+  "public_claims": {
+    "docs_checked": 5,
+    "forbidden_claims": [
+      "working Android VPN app",
+      "production Android VPN",
+      "guaranteed bypass",
+      "undetectable",
+      "field-ready",
+      "live probing"
+    ],
+    "conclusion": "passed"
+  },
+  "parity": {
+    "generated_markers": [
+      "AndroidReviewSchemaVersion",
+      "AndroidReviewBackendVersion",
+      "AndroidReviewDecision",
+      "AndroidReviewUIStateCount",
+      "AndroidReviewMisuseCount",
+      "AndroidReviewNextMilestone"
+    ],
+    "interpreted_hash": "sha256:dff5d9a8c0eac40cd21695f3c990ecbb4e2c33b0151e0d34579c6e58d17f62c3",
+    "generated_hash": "sha256:dff5d9a8c0eac40cd21695f3c990ecbb4e2c33b0151e0d34579c6e58d17f62c3",
+    "conclusion": "passed"
+  },
+  "fixture_hash": "sha256:a902d422277f5e9c626a73a5c5ebf1923fae3c17f729fe3fc13280a90c985298",
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

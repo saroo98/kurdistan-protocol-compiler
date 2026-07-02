@@ -1,0 +1,32 @@
+{
+  "policy": "single_source_of_truth_connection_state_machine",
+  "states": [
+    "disconnected",
+    "validating_profile",
+    "connecting",
+    "carrier_selecting",
+    "relay_handshaking",
+    "connected",
+    "reconnecting",
+    "blocked_by_kill_switch",
+    "profile_expired",
+    "relay_incompatible",
+    "carrier_failed",
+    "network_changed",
+    "vpn_permission_revoked",
+    "diagnostic_bundle_ready",
+    "crashed_recovered"
+  ],
+  "terminal_states": [
+    "disconnected",
+    "blocked_by_kill_switch"
+  ],
+  "recoverable_states": [
+    "network_changed",
+    "carrier_failed",
+    "relay_incompatible",
+    "vpn_permission_revoked",
+    "crashed_recovered"
+  ],
+  "conclusion": "passed"
+}

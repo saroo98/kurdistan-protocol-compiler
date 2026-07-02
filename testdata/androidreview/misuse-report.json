@@ -1,0 +1,17 @@
+{
+  "detected_controls": [
+    "androidreview_bypasses_vpn_permission",
+    "androidreview_profile_import_without_verification",
+    "androidreview_payload_diagnostics",
+    "androidreview_secret_diagnostics",
+    "androidreview_auto_telemetry",
+    "androidreview_kill_switch_fail_open",
+    "androidreview_background_service_unbounded",
+    "androidreview_raw_network_metadata",
+    "androidreview_android_ready_claim",
+    "androidreview_generated_backend_drift"
+  ],
+  "detected_count": 10,
+  "expected_count": 10,
+  "conclusion": "passed"
+}

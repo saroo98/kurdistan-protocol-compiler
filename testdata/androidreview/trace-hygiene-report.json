@@ -1,0 +1,10 @@
+{
+  "reports_scanned": 12,
+  "payload_logged": false,
+  "secret_logged": false,
+  "raw_packet_logged": false,
+  "network_content_logged": false,
+  "device_identifier_logged": false,
+  "telemetry_marker_logged": false,
+  "conclusion": "passed"
+}

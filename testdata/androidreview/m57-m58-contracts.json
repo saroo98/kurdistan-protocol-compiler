@@ -1,0 +1,22 @@
+{
+  "policy": "m57_runtime_port_then_m58_vpnservice_prototype",
+  "m57_requirements": [
+    "pure_runtime_port_boundary",
+    "profile_import_verification_without_vpn_traffic",
+    "foreground_status_model_without_vpnservice",
+    "capability_negotiation_execution",
+    "safe_diagnostics_export",
+    "no_raw_packet_capture"
+  ],
+  "m58_requirements": [
+    "vpnservice_permission_flow",
+    "tun_semantics_mapping_reviewed_before_traffic",
+    "kill_switch_fail_closed_semantics",
+    "network_change_reconnect_policy",
+    "foreground_service_lifecycle",
+    "no_unreviewed_carrier_or_public_network_behavior"
+  ],
+  "reopen_architecture": false,
+  "android_impl_added": false,
+  "conclusion": "passed"
+}
