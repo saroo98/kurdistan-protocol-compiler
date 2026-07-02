@@ -98,4 +98,4 @@ This milestone freezes a contract. It is not a carrier implementation, not a dep
 
 ## Next Milestone
 
-The recommended next milestone is M42: HTTPS-like carrier lab prototype.
+The implementation milestone is documented in [KIP-0048: HTTPS-like carrier lab prototype](KIP-0048-https-like-carrier-lab-prototype.md). The recommended next milestone after that prototype is M43: HTTPS-like carrier adversarial hardening.

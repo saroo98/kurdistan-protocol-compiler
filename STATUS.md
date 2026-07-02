@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-01T22:32:41Z`
+- Generated at: `2026-07-01T23:41:19Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -371,6 +371,22 @@
 | `httpscarrierreview_public_claim_safety` | PASS | `required` | public claim safety markers checked |
 | `httpscarrierreview_mutant_detection` | PASS | `required` | 27/27 HTTPS carrier review mutant modes detected |
 | `httpscarrierreview_fixture_drift` | PASS | `required` | passed |
+| `httpslikecarrier_scope` | PASS | `required` | 20 blocked scopes checked |
+| `httpslikecarrier_shape_selection` | PASS | `required` | 18 shape events and 18 diversity fingerprints |
+| `httpslikecarrier_session_lifecycle` | PASS | `required` | 4 sessions checked |
+| `httpslikecarrier_stream_lifecycle` | PASS | `required` | 4 streams opened; 1 reset |
+| `httpslikecarrier_fixture_exchange` | PASS | `required` | 12 fixtures; marker bucket <=96 |
+| `httpslikecarrier_backpressure` | PASS | `required` | 4 pressure events |
+| `httpslikecarrier_reset_error` | PASS | `required` | 1 resets and 1 target errors |
+| `httpslikecarrier_relay_integration` | PASS | `required` | loopbackrelay labegress relaybridge proxyegress mappings checked |
+| `httpslikecarrier_pipeline_integration` | PASS | `required` | localpipeline pathhealth carrierreview measurementreview mappings checked |
+| `httpslikecarrier_runtime_security` | PASS | `required` | passed |
+| `httpslikecarrier_resource_limits` | PASS | `required` | sessions=3 streams=8 marker=96 |
+| `httpslikecarrier_misuse_detection` | PASS | `required` | 23 misuse controls detected |
+| `httpslikecarrier_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `httpslikecarrier_trace_hygiene` | PASS | `required` | fixtures and summaries scanned for unsafe material |
+| `httpslikecarrier_mutant_detection` | PASS | `required` | 23/23 HTTPS-like carrier mutant modes detected |
+| `httpslikecarrier_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -384,9 +400,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `85 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `2202 ms`
+- Profile generation: `139 ms`
+- Trace generation: `31 ms`
+- Total audit runtime: `3296 ms`
 
 ## Corpus Diversity Summary
 
@@ -409,10 +425,10 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.31816371549844846`
-- `same_profile_distance`: `0`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3198134487111871`
+- `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison
