@@ -562,6 +562,20 @@ const (
 	ModeLocalProxyAdapterGeneratedBackendDrift    = "localproxyadapter_generated_backend_drift"
 	ModeLocalProxyAdapterPayloadLeak              = "localproxyadapter_payload_leak"
 	ModeLocalProxyAdapterSecretLeak               = "localproxyadapter_secret_leak"
+
+	ModeVPNSemanticsAllowsPacketCapture     = "vpnsemantics_allows_packet_capture"
+	ModeVPNSemanticsAllowsPayloadLogging    = "vpnsemantics_allows_payload_logging"
+	ModeVPNSemanticsAllowsOSRouteMod        = "vpnsemantics_allows_os_route_modification"
+	ModeVPNSemanticsAllowsAndroidVPNService = "vpnsemantics_allows_android_vpnservice"
+	ModeVPNSemanticsAllowsRealDNSIntercept  = "vpnsemantics_allows_real_dns_interception"
+	ModeVPNSemanticsLogsAppIdentity         = "vpnsemantics_logs_app_identity"
+	ModeVPNSemanticsLogsExactEndpoint       = "vpnsemantics_logs_exact_endpoint"
+	ModeVPNSemanticsBypassLocalProxyAdapter = "vpnsemantics_bypasses_localproxyadapter"
+	ModeVPNSemanticsBypassMeasurementReview = "vpnsemantics_bypasses_measurementreview"
+	ModeVPNSemanticsPublicClaimWorkingVPN   = "vpnsemantics_public_claim_working_vpn"
+	ModeVPNSemanticsPayloadLeak             = "vpnsemantics_payload_leak"
+	ModeVPNSemanticsSecretLeak              = "vpnsemantics_secret_leak"
+	ModeVPNSemanticsGeneratedBackendDrift   = "vpnsemantics_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1101,6 +1115,19 @@ func Modes() []string {
 		ModeLocalProxyAdapterGeneratedBackendDrift,
 		ModeLocalProxyAdapterPayloadLeak,
 		ModeLocalProxyAdapterSecretLeak,
+		ModeVPNSemanticsAllowsPacketCapture,
+		ModeVPNSemanticsAllowsPayloadLogging,
+		ModeVPNSemanticsAllowsOSRouteMod,
+		ModeVPNSemanticsAllowsAndroidVPNService,
+		ModeVPNSemanticsAllowsRealDNSIntercept,
+		ModeVPNSemanticsLogsAppIdentity,
+		ModeVPNSemanticsLogsExactEndpoint,
+		ModeVPNSemanticsBypassLocalProxyAdapter,
+		ModeVPNSemanticsBypassMeasurementReview,
+		ModeVPNSemanticsPublicClaimWorkingVPN,
+		ModeVPNSemanticsPayloadLeak,
+		ModeVPNSemanticsSecretLeak,
+		ModeVPNSemanticsGeneratedBackendDrift,
 	}
 }
 
