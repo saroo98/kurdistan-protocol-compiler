@@ -17,6 +17,7 @@ import (
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/ir"
@@ -1902,6 +1903,45 @@ func GeneratedHTTPSLikeCarrierParity() (httpslikecarrier.ParityReport, error) {
 	return set.Parity, nil
 }
 `, quote(httpslikecarrier.Version), quote(p.ID), p.Seed, quote(httpslikecarrier.BackendVersion), quote(httpslikecarrier.CarrierFamily), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpslikecarrier.RecommendedNextMilestone), httpslikecarrier.DefaultConfig().MaxMarkerBytes, len(httpsLikeCarrierRequestShapeClasses()), len(httpsLikeCarrierResponseShapeClasses()), quoteSlice(httpsLikeCarrierBlockedScopes()), quoteSlice(httpsLikeCarrierRequestShapeClasses()), quoteSlice(httpsLikeCarrierResponseShapeClasses()), quoteSlice(httpsLikeCarrierSessionStates()), quoteSlice(httpsLikeCarrierStreamStates()), quoteSlice(httpsLikeCarrierMisuseControls()))
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierAdversarySource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/httpscarrieradversary"
+)
+
+const HTTPSCarrierAdversarySchemaVersion = %[1]s
+const HTTPSCarrierAdversaryGeneratedProfileID = %[2]s
+const HTTPSCarrierAdversaryGeneratedProfileSeed int64 = %[3]d
+const HTTPSCarrierAdversaryBackendVersion = %[4]s
+const HTTPSCarrierAdversaryRuntimePolicy = %[5]s
+const HTTPSCarrierAdversaryRecommendedNextMilestone = %[6]s
+const HTTPSCarrierAdversaryCollapseControlCount = %[7]d
+const HTTPSCarrierAdversaryUnsafeFallbackControlCount = %[8]d
+const HTTPSCarrierAdversaryForbiddenControlCount = %[9]d
+
+var HTTPSCarrierAdversaryScenarios = %[10]s
+var HTTPSCarrierAdversaryCollapseControls = %[11]s
+var HTTPSCarrierAdversaryUnsafeFallbackControls = %[12]s
+var HTTPSCarrierAdversaryReplayControls = %[13]s
+var HTTPSCarrierAdversaryStreamControls = %[14]s
+var HTTPSCarrierAdversaryForbiddenControls = %[15]s
+
+func GeneratedHTTPSCarrierAdversaryFixtureSet() (httpscarrieradversary.FixtureSet, error) {
+	return httpscarrieradversary.GenerateFixtureSet()
+}
+
+func GeneratedHTTPSCarrierAdversaryParity() (httpscarrieradversary.GeneratedParityReport, error) {
+	set, err := httpscarrieradversary.GenerateFixtureSet()
+	if err != nil {
+		return httpscarrieradversary.GeneratedParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(httpscarrieradversary.Version), quote(p.ID), p.Seed, quote(httpscarrieradversary.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(httpscarrieradversary.RecommendedNextMilestone), len(httpsCarrierAdversaryCollapseControls()), len(httpsCarrierAdversaryUnsafeFallbackControls()), len(httpsCarrierAdversaryForbiddenControls()), quoteSlice(httpsCarrierAdversaryScenarios()), quoteSlice(httpsCarrierAdversaryCollapseControls()), quoteSlice(httpsCarrierAdversaryUnsafeFallbackControls()), quoteSlice(httpsCarrierAdversaryReplayControls()), quoteSlice(httpsCarrierAdversaryStreamControls()), quoteSlice(httpsCarrierAdversaryForbiddenControls()))
 	if err != nil {
 		return nil, err
 	}
@@ -5259,6 +5299,89 @@ func TestGeneratedHTTPSLikeCarrierHygiene(t *testing.T) {
 		return nil, err
 	}
 
+	httpsCarrierAdversaryTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpscarrieradversary"
+)
+
+func TestGeneratedHTTPSCarrierAdversary(t *testing.T) {
+	if HTTPSCarrierAdversarySchemaVersion != httpscarrieradversary.Version || HTTPSCarrierAdversaryGeneratedProfileID != ProfileID {
+		t.Fatalf("generated HTTPS carrier adversary constants drifted")
+	}
+	set, err := GeneratedHTTPSCarrierAdversaryFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Conclusion != "passed" || set.BackendVersion != httpscarrieradversary.BackendVersion {
+		t.Fatalf("generated HTTPS carrier adversary fixture failed: %%+v", set)
+	}
+	if HTTPSCarrierAdversaryCollapseControlCount < 4 || HTTPSCarrierAdversaryUnsafeFallbackControlCount < 8 || HTTPSCarrierAdversaryForbiddenControlCount < 20 {
+		t.Fatalf("generated HTTPS carrier adversary controls incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierAdversaryParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedHTTPSCarrierAdversaryParity(t *testing.T) {
+	parity, err := GeneratedHTTPSCarrierAdversaryParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || parity.PayloadLogged || parity.SecretLogged || len(parity.UnexpectedDifferences) != 0 {
+		t.Fatalf("generated HTTPS carrier adversary parity failed: %%+v", parity)
+	}
+	if HTTPSCarrierAdversaryRuntimePolicy == "" || HTTPSCarrierAdversaryRecommendedNextMilestone == "" || len(HTTPSCarrierAdversaryForbiddenControls) < 20 {
+		t.Fatalf("HTTPS carrier adversary generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	httpsCarrierAdversaryHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/httpscarrieradversary"
+)
+
+func TestGeneratedHTTPSCarrierAdversaryHygiene(t *testing.T) {
+	set, err := GeneratedHTTPSCarrierAdversaryFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := httpscarrieradversary.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_secret": "synthetic"},
+		map[string]string{"claim": "guaranteed bypass"},
+		map[string]bool{"contains_sni": true},
+		map[string]bool{"contains_host_header": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := httpscarrieradversary.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe HTTPS carrier adversary metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
 	benchSource, err := renderGo(`package protocol
 
 import "testing"
@@ -5610,6 +5733,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/carrierreadiness_generated.go", Content: carrierReadinessSource, Go: true},
 		{RelPath: "protocol/httpscarrierreview_generated.go", Content: httpsCarrierReviewSource, Go: true},
 		{RelPath: "protocol/httpslikecarrier_generated.go", Content: httpsLikeCarrierSource, Go: true},
+		{RelPath: "protocol/httpscarrieradversary_generated.go", Content: httpsCarrierAdversarySource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -5708,6 +5832,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/httpslikecarrier_test.go", Content: httpsLikeCarrierTestSource, Go: true},
 		{RelPath: "protocol/httpslikecarrier_parity_test.go", Content: httpsLikeCarrierParityTestSource, Go: true},
 		{RelPath: "protocol/httpslikecarrier_hygiene_test.go", Content: httpsLikeCarrierHygieneTestSource, Go: true},
+		{RelPath: "protocol/httpscarrieradversary_test.go", Content: httpsCarrierAdversaryTestSource, Go: true},
+		{RelPath: "protocol/httpscarrieradversary_parity_test.go", Content: httpsCarrierAdversaryParityTestSource, Go: true},
+		{RelPath: "protocol/httpscarrieradversary_hygiene_test.go", Content: httpsCarrierAdversaryHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
@@ -6553,6 +6680,86 @@ func httpsLikeCarrierMisuseControls() []string {
 		"httpslikecarrier_payload_leak",
 		"httpslikecarrier_secret_leak",
 	}
+}
+
+func httpsCarrierAdversaryScenarios() []string {
+	return []string{
+		httpscarrieradversary.ScenarioAcceptedDiversity,
+		httpscarrieradversary.ScenarioFixedShapeControl,
+		httpscarrieradversary.ScenarioPaddingOnlyControl,
+		httpscarrieradversary.ScenarioProfileInsensitive,
+		httpscarrieradversary.ScenarioUnsafeFallback,
+		httpscarrieradversary.ScenarioTraceLeakControl,
+		httpscarrieradversary.ScenarioReplayControl,
+		httpscarrieradversary.ScenarioStreamIsolation,
+		httpscarrieradversary.ScenarioBackpressureControl,
+		httpscarrieradversary.ScenarioResetErrorControl,
+		httpscarrieradversary.ScenarioIntegrationBypass,
+		httpscarrieradversary.ScenarioGeneratedParity,
+		httpscarrieradversary.ScenarioPublicClaimSafety,
+	}
+}
+
+func httpsCarrierAdversaryCollapseControls() []string {
+	return []string{
+		"httpscarrieradversary_fixed_shape",
+		"httpscarrieradversary_fixed_request_sequence",
+		"httpscarrieradversary_fixed_response_sequence",
+		"httpscarrieradversary_padding_only_variation",
+		"httpscarrieradversary_profile_insensitive",
+		"httpscarrieradversary_generated_profile_ignored",
+	}
+}
+
+func httpsCarrierAdversaryUnsafeFallbackControls() []string {
+	return []string{
+		"httpscarrieradversary_public_network_fallback",
+		"httpscarrieradversary_arbitrary_egress_fallback",
+		"httpscarrieradversary_real_tls_fallback",
+		"httpscarrieradversary_sni_fallback",
+		"httpscarrieradversary_host_header_fallback",
+		"httpscarrieradversary_domain_fallback",
+		"httpscarrieradversary_payload_forwarding_fallback",
+		"httpscarrieradversary_measurement_upload_fallback",
+	}
+}
+
+func httpsCarrierAdversaryReplayControls() []string {
+	return []string{
+		"httpscarrieradversary_replay_marker_accepted",
+		"duplicate_carrier_marker",
+		"replayed_session_marker",
+		"replayed_stream_marker",
+		"stale_reset_marker",
+		"duplicated_backpressure_marker",
+	}
+}
+
+func httpsCarrierAdversaryStreamControls() []string {
+	return []string{
+		"httpscarrieradversary_cross_stream_reset",
+		"httpscarrieradversary_backpressure_ignored",
+		"httpscarrieradversary_reset_swallowed",
+		"httpscarrieradversary_pipeline_bypass",
+	}
+}
+
+func httpsCarrierAdversaryForbiddenControls() []string {
+	return append(append(append([]string{},
+		httpsCarrierAdversaryCollapseControls()...),
+		httpsCarrierAdversaryUnsafeFallbackControls()...),
+		[]string{
+			"httpscarrieradversary_raw_fixture_leak",
+			"httpscarrieradversary_payload_leak",
+			"httpscarrieradversary_secret_leak",
+			"httpscarrieradversary_replay_marker_accepted",
+			"httpscarrieradversary_cross_stream_reset",
+			"httpscarrieradversary_backpressure_ignored",
+			"httpscarrieradversary_reset_swallowed",
+			"httpscarrieradversary_pipeline_bypass",
+			"httpscarrieradversary_generated_backend_drift",
+			"httpscarrieradversary_public_claim_overstatement",
+		}...)
 }
 
 func findRepoRoot() (string, error) {

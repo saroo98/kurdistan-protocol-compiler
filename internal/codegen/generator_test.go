@@ -138,6 +138,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/httpslikecarrier_test.go",
 		"protocol/httpslikecarrier_parity_test.go",
 		"protocol/httpslikecarrier_hygiene_test.go",
+		"protocol/httpscarrieradversary_generated.go",
+		"protocol/httpscarrieradversary_test.go",
+		"protocol/httpscarrieradversary_parity_test.go",
+		"protocol/httpscarrieradversary_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -203,6 +207,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const PathHealthSchemaVersion") ||
 		!strings.Contains(protocolSource, "const CarrierReviewSchemaVersion") ||
 		!strings.Contains(protocolSource, "const MeasurementReviewSchemaVersion") ||
+		!strings.Contains(protocolSource, "const HTTPSCarrierAdversarySchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -278,6 +283,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	httpsCarrierReviewB := mustRead(t, filepath.Join(outB, "protocol", "httpscarrierreview_generated.go"))
 	httpsLikeCarrierA := mustRead(t, filepath.Join(outA, "protocol", "httpslikecarrier_generated.go"))
 	httpsLikeCarrierB := mustRead(t, filepath.Join(outB, "protocol", "httpslikecarrier_generated.go"))
+	httpsCarrierAdversaryA := mustRead(t, filepath.Join(outA, "protocol", "httpscarrieradversary_generated.go"))
+	httpsCarrierAdversaryB := mustRead(t, filepath.Join(outB, "protocol", "httpscarrieradversary_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -328,6 +335,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if httpsLikeCarrierA == httpsLikeCarrierB {
 		t.Fatalf("HTTPS-like carrier generation did not differ across profiles")
+	}
+	if httpsCarrierAdversaryA == httpsCarrierAdversaryB {
+		t.Fatalf("HTTPS carrier adversary generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")
