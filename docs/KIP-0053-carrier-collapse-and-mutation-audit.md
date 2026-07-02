@@ -113,4 +113,4 @@ M47 is an audit milestone. It does not prove field readiness and does not add re
 
 ## Next Milestone
 
-M48 should review payload-bearing local proxy adapter behavior before any local proxy adapter implementation is allowed.
+M48 reviews payload-bearing local proxy adapter behavior before any local proxy adapter implementation is allowed. M49 should implement the reviewed local-only proxy adapter prototype.
