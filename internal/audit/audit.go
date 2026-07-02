@@ -36,6 +36,7 @@ import (
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/localvpnadapter"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
 	"kurdistan/internal/multicarrierselect"
@@ -177,6 +178,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	localProxyAdapterDrift := localProxyAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localproxyadapter", "localproxyadapter-report-golden.json"), localProxyAdapterSet)
 	vpnSemanticsSet, vpnSemanticsErr := vpnsemantics.GenerateFixtureSet()
 	vpnSemanticsDrift := vpnSemanticsComparison(filepath.Join(fixtureRoot, "testdata", "vpnsemantics", "vpnsemantics-report-golden.json"), vpnSemanticsSet)
+	localVPNAdapterSet, localVPNAdapterErr := localvpnadapter.GenerateFixtureSet()
+	localVPNAdapterDrift := localVPNAdapterComparison(filepath.Join(fixtureRoot, "testdata", "localvpnadapter", "localvpnadapter-report-golden.json"), localVPNAdapterSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -451,6 +454,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, VPNSemanticsGates(vpnSemanticsSet, vpnSemanticsDrift)...)
 	} else {
 		gates = append(gates, gate("vpnsemantics_scope_contract", false, "required", vpnSemanticsErr.Error(), nil, []string{vpnSemanticsErr.Error()}))
+	}
+	if localVPNAdapterErr == nil {
+		gates = append(gates, LocalVPNAdapterGates(localVPNAdapterSet, localVPNAdapterDrift)...)
+	} else {
+		gates = append(gates, gate("localvpnadapter_lifecycle", false, "required", localVPNAdapterErr.Error(), nil, []string{localVPNAdapterErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
