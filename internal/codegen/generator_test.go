@@ -178,6 +178,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/relayprocess_test.go",
 		"protocol/relayprocess_parity_test.go",
 		"protocol/relayprocess_hygiene_test.go",
+		"protocol/keyexchangeplan_generated.go",
+		"protocol/keyexchangeplan_test.go",
+		"protocol/keyexchangeplan_parity_test.go",
+		"protocol/keyexchangeplan_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -248,6 +252,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const ConstrainedCarrierSchemaVersion") ||
 		!strings.Contains(protocolSource, "const MultiCarrierSelectSchemaVersion") ||
 		!strings.Contains(protocolSource, "const RelayProcessSchemaVersion") ||
+		!strings.Contains(protocolSource, "const KeyExchangePlanSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -343,6 +348,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	localVPNAdapterB := mustRead(t, filepath.Join(outB, "protocol", "localvpnadapter_generated.go"))
 	relayProcessA := mustRead(t, filepath.Join(outA, "protocol", "relayprocess_generated.go"))
 	relayProcessB := mustRead(t, filepath.Join(outB, "protocol", "relayprocess_generated.go"))
+	keyExchangePlanA := mustRead(t, filepath.Join(outA, "protocol", "keyexchangeplan_generated.go"))
+	keyExchangePlanB := mustRead(t, filepath.Join(outB, "protocol", "keyexchangeplan_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -423,6 +430,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if relayProcessA == relayProcessB {
 		t.Fatalf("relay process generation did not differ across profiles")
+	}
+	if keyExchangePlanA == keyExchangePlanB {
+		t.Fatalf("key exchange plan generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

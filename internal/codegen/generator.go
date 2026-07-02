@@ -24,6 +24,7 @@ import (
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
 	"kurdistan/internal/ir"
+	"kurdistan/internal/keyexchangeplan"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
@@ -2295,6 +2296,43 @@ func GeneratedRelayProcessParity() (relayprocess.ParityReport, error) {
 		return nil, err
 	}
 
+	keyExchangePlanSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/keyexchangeplan"
+)
+
+const KeyExchangePlanSchemaVersion = %[1]s
+const KeyExchangePlanGeneratedProfileID = %[2]s
+const KeyExchangePlanGeneratedProfileSeed int64 = %[3]d
+const KeyExchangePlanBackendVersion = %[4]s
+const KeyExchangePlanTranscriptPolicy = %[5]s
+const KeyExchangePlanNoncePolicy = %[6]s
+const KeyExchangePlanCompatibilityPolicy = %[7]s
+const KeyExchangePlanRecommendedNextMilestone = %[8]s
+const KeyExchangePlanDesignCount = %[9]d
+const KeyExchangePlanMisuseCount = %[10]d
+
+var KeyExchangePlanControls = %[11]s
+var KeyExchangePlanBoundComponents = %[12]s
+var KeyExchangePlanGeneratedPolicyHints = %[13]s
+
+func GeneratedKeyExchangePlanFixtureSet() (keyexchangeplan.FixtureSet, error) {
+	return keyexchangeplan.GenerateFixtureSet()
+}
+
+func GeneratedKeyExchangePlanParity() (keyexchangeplan.ParityReport, error) {
+	set, err := keyexchangeplan.GenerateFixtureSet()
+	if err != nil {
+		return keyexchangeplan.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(keyexchangeplan.Version), quote(p.ID), p.Seed, quote(keyexchangeplan.BackendVersion), quote(p.Security.TranscriptMode), quote(p.Security.NonceMode), quote(p.Security.CapabilityNegotiationPolicy+"/"+p.Security.DowngradePolicy), quote(keyexchangeplan.RecommendedNextMilestone), 10, len(keyexchangeplan.RequiredMisuseNames()), quoteSlice(keyexchangeplan.RequiredMisuseNames()), quoteSlice(keyexchangeplan.DefaultTranscriptBindingReport().BoundComponents), quoteSlice([]string{p.Security.TranscriptMode, p.Security.NonceMode, p.Security.ReplayPolicy, p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2768,6 +2806,89 @@ func TestGeneratedRelayProcessHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := relayprocess.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe relay process metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	keyExchangePlanTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/keyexchangeplan"
+)
+
+func TestGeneratedKeyExchangePlan(t *testing.T) {
+	if KeyExchangePlanSchemaVersion != keyexchangeplan.Version || KeyExchangePlanGeneratedProfileID != ProfileID {
+		t.Fatalf("generated key exchange constants drifted")
+	}
+	set, err := GeneratedKeyExchangePlanFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := keyexchangeplan.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if KeyExchangePlanDesignCount < 10 || len(KeyExchangePlanControls) < len(keyexchangeplan.RequiredMisuseNames()) || len(KeyExchangePlanBoundComponents) < 6 {
+		t.Fatalf("generated key exchange constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	keyExchangePlanParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedKeyExchangePlanParity(t *testing.T) {
+	parity, err := GeneratedKeyExchangePlanParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated key exchange parity failed: %%+v", parity)
+	}
+	if KeyExchangePlanTranscriptPolicy == "" || KeyExchangePlanNoncePolicy == "" || KeyExchangePlanCompatibilityPolicy == "" || KeyExchangePlanRecommendedNextMilestone == "" {
+		t.Fatalf("key exchange generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	keyExchangePlanHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/keyexchangeplan"
+)
+
+func TestGeneratedKeyExchangePlanHygiene(t *testing.T) {
+	set, err := GeneratedKeyExchangePlanFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := keyexchangeplan.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"secret_value": "synthetic"},
+		map[string]string{"nonce_value": "synthetic"},
+		map[string]string{"auth_tag": "synthetic"},
+		map[string]string{"private_key": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := keyexchangeplan.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe key exchange metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -6963,6 +7084,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/relayprocess_test.go", Content: relayProcessTestSource, Go: true},
 		{RelPath: "protocol/relayprocess_parity_test.go", Content: relayProcessParityTestSource, Go: true},
 		{RelPath: "protocol/relayprocess_hygiene_test.go", Content: relayProcessHygieneTestSource, Go: true},
+		{RelPath: "protocol/keyexchangeplan_generated.go", Content: keyExchangePlanSource, Go: true},
+		{RelPath: "protocol/keyexchangeplan_test.go", Content: keyExchangePlanTestSource, Go: true},
+		{RelPath: "protocol/keyexchangeplan_parity_test.go", Content: keyExchangePlanParityTestSource, Go: true},
+		{RelPath: "protocol/keyexchangeplan_hygiene_test.go", Content: keyExchangePlanHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
