@@ -186,6 +186,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/relayauthplan_test.go",
 		"protocol/relayauthplan_parity_test.go",
 		"protocol/relayauthplan_hygiene_test.go",
+		"protocol/operationalhardening_generated.go",
+		"protocol/operationalhardening_test.go",
+		"protocol/operationalhardening_parity_test.go",
+		"protocol/operationalhardening_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -258,6 +262,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "const RelayProcessSchemaVersion") ||
 		!strings.Contains(protocolSource, "const KeyExchangePlanSchemaVersion") ||
 		!strings.Contains(protocolSource, "const RelayAuthPlanSchemaVersion") ||
+		!strings.Contains(protocolSource, "const OperationalHardeningSchemaVersion") ||
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
@@ -357,6 +362,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	keyExchangePlanB := mustRead(t, filepath.Join(outB, "protocol", "keyexchangeplan_generated.go"))
 	relayAuthPlanA := mustRead(t, filepath.Join(outA, "protocol", "relayauthplan_generated.go"))
 	relayAuthPlanB := mustRead(t, filepath.Join(outB, "protocol", "relayauthplan_generated.go"))
+	operationalHardeningA := mustRead(t, filepath.Join(outA, "protocol", "operationalhardening_generated.go"))
+	operationalHardeningB := mustRead(t, filepath.Join(outB, "protocol", "operationalhardening_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -443,6 +450,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if relayAuthPlanA == relayAuthPlanB {
 		t.Fatalf("relay auth plan generation did not differ across profiles")
+	}
+	if operationalHardeningA == operationalHardeningB {
+		t.Fatalf("operational hardening generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")
