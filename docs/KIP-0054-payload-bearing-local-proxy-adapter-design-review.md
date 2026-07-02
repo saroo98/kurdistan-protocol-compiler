@@ -104,4 +104,4 @@ M48 is a design review. It does not implement a working proxy, arbitrary target 
 
 ## Next Milestone
 
-M49 should implement the local-only proxy adapter prototype according to this contract.
+M49 implements the local-only proxy adapter prototype according to this contract. M50 should adversarially harden that prototype against leakage, unsafe fallback, collapse, and generated drift.

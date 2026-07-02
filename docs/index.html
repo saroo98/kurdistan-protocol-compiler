@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.48.0-lab</strong>
+            <strong>0.49.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -118,6 +118,7 @@
             <div class="stack-row"><span class="status-dot on"></span><span>multi-carrier selection</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>carrier collapse audit</span><b>implemented</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>local proxy adapter review</span><b>contract locked</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>local proxy adapter</span><b>prototype</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -252,6 +253,7 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Multi-carrier runtime selection</h3><p>Reviewed carrier inventory, profile-sensitive selection, pathrace/pathhealth composition, unsafe fallback blocking, and parity gates.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Carrier collapse audit</h3><p>Cross-carrier collapse scanning, mutation controls, review-bypass checks, unsafe fallback detection, and generated parity.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local proxy adapter review</h3><p>Payload-bearing local adapter contract, target redaction rules, stream mapping, backpressure/reset semantics, and M49 acceptance gates.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Local proxy adapter prototype</h3><p>Controlled local metadata-to-stream mapping, opaque content classes, backpressure/reset/half-close summaries, and carrier selector integration.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Measurement-client privacy review</h3><p>Bucketed observation taxonomy, redaction policy, consent/retention checks, and local diagnostics.</p></article>
           <article class="capability-card"><span class="status-chip review">review</span><h3>Android client architecture</h3><p>Future client architecture review after readiness and safety checks mature.</p></article>
         </div>
@@ -349,7 +351,8 @@
             <p><b>M47:</b> carrier collapse and mutation audit</p>
             <p><b>M48:</b> payload-bearing local proxy adapter design review</p>
             <p><b>M49:</b> local proxy adapter prototype</p>
-            <span class="status-chip implemented">M35-M48 implemented</span>
+            <p><b>M50:</b> local proxy adapter adversarial hardening</p>
+            <span class="status-chip implemented">M35-M49 implemented</span>
           </article>
         </div>
       </section>
@@ -448,6 +451,7 @@
             <a href="KIP-0052-multi-carrier-runtime-selection.md">KIP-0052: Multi-carrier runtime selection</a>
             <a href="KIP-0053-carrier-collapse-and-mutation-audit.md">KIP-0053: Carrier collapse and mutation audit</a>
             <a href="KIP-0054-payload-bearing-local-proxy-adapter-design-review.md">KIP-0054: Payload-bearing local proxy adapter design review</a>
+            <a href="KIP-0055-local-proxy-adapter-prototype.md">KIP-0055: Local proxy adapter prototype</a>
           </article>
         </div>
       </section>

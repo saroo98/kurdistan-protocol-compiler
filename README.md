@@ -195,6 +195,9 @@ internal/carriercollapse
 internal/localproxyadapterreview
   payload-bearing local proxy adapter contract, reviewed local SOCKS-like and CONNECT-like stream semantics, target-redaction rules, misuse controls, M49 acceptance criteria, fixture drift checks, and generated parity
 
+internal/localproxyadapter
+  controlled local proxy adapter prototype, accepted request-to-stream mapping, opaque stream content classes, backpressure/reset/half-close summaries, carrier selector composition, trace hygiene, fixture drift checks, and generated parity
+
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
@@ -260,6 +263,7 @@ go run ./cmd/kcheck constrainedcarrier --quick
 go run ./cmd/kcheck multicarrierselect --quick
 go run ./cmd/kcheck carriercollapse --quick
 go run ./cmd/kcheck localproxyadapterreview --quick
+go run ./cmd/kcheck localproxyadapter --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -395,6 +399,7 @@ go run ./cmd/kcheck constrainedcarrier --quick
 go run ./cmd/kcheck multicarrierselect --quick
 go run ./cmd/kcheck carriercollapse --quick
 go run ./cmd/kcheck localproxyadapterreview --quick
+go run ./cmd/kcheck localproxyadapter --quick
 go run ./cmd/kcheck measurementreview --quick
 go run ./cmd/kcheck proxyegress --quick
 go run ./cmd/kcheck relaybridge --quick
@@ -916,6 +921,22 @@ go run ./cmd/kcheck localproxyadapterreview verify
 go run ./cmd/kcheck localproxyadapterreview compare --old testdata/localproxyadapterreview/localproxyadapterreview-report-golden.json --new testdata/localproxyadapterreview/localproxyadapterreview-report-golden.json
 ```
 
+## Local Proxy Adapter Prototype
+
+Milestone 49 adds the first controlled local proxy adapter prototype. It maps accepted local metadata to internal stream descriptors, runs symbolic opaque stream classes through the runtime/carrier path, and records only byte-count buckets, stream classes, lifecycle counters, content hashes, and safe policy metadata.
+
+The prototype composes with `localprotocoladapter`, `loopbackrelay`, `multicarrierselect`, `httpslikecarrier`, `constrainedcarrier`, `labegress`, `relaybridge`, `localpipeline`, `pathhealth`, `pathrace`, `measurementreview`, `carrierreview`, `hardening`, and generated backend parity checks. It does not add public deployment behavior or unrestricted outbound proxying.
+
+Run:
+
+```bash
+go run ./cmd/kcheck localproxyadapter --quick
+go run ./cmd/kcheck localproxyadapter --full --out testdata/audit/localproxyadapter.json
+go run ./cmd/kcheck localproxyadapter generate --out testdata/localproxyadapter/localproxyadapter-report-golden.json --force
+go run ./cmd/kcheck localproxyadapter verify
+go run ./cmd/kcheck localproxyadapter compare --old testdata/localproxyadapter/localproxyadapter-report-golden.json --new testdata/localproxyadapter/localproxyadapter-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -951,7 +972,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local proxy adapter adversarial hardening.
 
 ## Research Positioning
 
