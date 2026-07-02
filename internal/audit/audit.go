@@ -13,6 +13,7 @@ import (
 	"kurdistan/internal/byteparity"
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
 	"kurdistan/internal/classifierdata"
@@ -165,6 +166,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	constrainedCarrierDrift := constrainedCarrierComparison(filepath.Join(fixtureRoot, "testdata", "constrainedcarrier", "constrainedcarrier-report-golden.json"), constrainedCarrierSet)
 	multiCarrierSelectSet, multiCarrierSelectErr := multicarrierselect.GenerateFixtureSet()
 	multiCarrierSelectDrift := multiCarrierSelectComparison(filepath.Join(fixtureRoot, "testdata", "multicarrierselect", "multicarrierselect-report-golden.json"), multiCarrierSelectSet)
+	carrierCollapseSet, carrierCollapseErr := carriercollapse.GenerateFixtureSet()
+	carrierCollapseDrift := carrierCollapseComparison(filepath.Join(fixtureRoot, "testdata", "carriercollapse", "carriercollapse-report-golden.json"), carrierCollapseSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -419,6 +422,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, MultiCarrierSelectGates(multiCarrierSelectSet, multiCarrierSelectDrift)...)
 	} else {
 		gates = append(gates, gate("multicarrierselect_inventory", false, "required", multiCarrierSelectErr.Error(), nil, []string{multiCarrierSelectErr.Error()}))
+	}
+	if carrierCollapseErr == nil {
+		gates = append(gates, CarrierCollapseGates(carrierCollapseSet, carrierCollapseDrift)...)
+	} else {
+		gates = append(gates, gate("carriercollapse_family_diversity", false, "required", carrierCollapseErr.Error(), nil, []string{carrierCollapseErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)
