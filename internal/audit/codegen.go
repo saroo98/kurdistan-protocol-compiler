@@ -126,6 +126,7 @@ type CodegenAuditSummary struct {
 	MultiCarrierSelectParity         string                         `json:"multicarrierselect_generated_backend_parity"`
 	CarrierCollapseParity            string                         `json:"carriercollapse_generated_backend_parity"`
 	LocalProxyAdapterReviewParity    string                         `json:"localproxyadapterreview_generated_backend_parity"`
+	LocalProxyAdapterParity          string                         `json:"localproxyadapter_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -241,6 +242,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	multiCarrierSelectGate := GeneratedMultiCarrierSelectParityGate(corpus, testFailures)
 	carrierCollapseGate := GeneratedCarrierCollapseParityGate(corpus, testFailures)
 	localProxyAdapterReviewGate := GeneratedLocalProxyAdapterReviewParityGate(corpus, testFailures)
+	localProxyAdapterGate := GeneratedLocalProxyAdapterParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -296,6 +298,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		multiCarrierSelectGate,
 		carrierCollapseGate,
 		localProxyAdapterReviewGate,
+		localProxyAdapterGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1116,6 +1119,10 @@ func GeneratedLocalProxyAdapterReviewParityGate(corpus GeneratedBackendTraceCorp
 	return generatedMilestoneSourceGate(corpus, testFailures, "localproxyadapterreview", "local proxy adapter review", "LocalProxyAdapterReviewSchemaVersion")
 }
 
+func GeneratedLocalProxyAdapterParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "localproxyadapter", "local proxy adapter", "LocalProxyAdapterSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1330,6 +1337,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		MultiCarrierSelectParity:         status("multicarrierselect_generated_backend_parity"),
 		CarrierCollapseParity:            status("carriercollapse_generated_backend_parity"),
 		LocalProxyAdapterReviewParity:    status("localproxyadapterreview_generated_backend_parity"),
+		LocalProxyAdapterParity:          status("localproxyadapter_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

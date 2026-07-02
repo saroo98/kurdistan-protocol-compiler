@@ -27,6 +27,7 @@ import (
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/localproxyadapter"
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/loopbackrelay"
@@ -2147,6 +2148,42 @@ func GeneratedLocalProxyAdapterReviewParity() (localproxyadapterreview.ParityRep
 		return nil, err
 	}
 
+	localProxyAdapterSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/localproxyadapter"
+)
+
+const LocalProxyAdapterSchemaVersion = %[1]s
+const LocalProxyAdapterGeneratedProfileID = %[2]s
+const LocalProxyAdapterGeneratedProfileSeed int64 = %[3]d
+const LocalProxyAdapterBackendVersion = %[4]s
+const LocalProxyAdapterRuntimePolicy = %[5]s
+const LocalProxyAdapterRecommendedNextMilestone = %[6]s
+const LocalProxyAdapterControlCount = %[7]d
+const LocalProxyAdapterMaxStreamsClass = %[8]s
+const LocalProxyAdapterPayloadPolicy = %[9]s
+
+var LocalProxyAdapterStreamClasses = %[10]s
+var LocalProxyAdapterControls = %[11]s
+var LocalProxyAdapterProfileHints = %[12]s
+
+func GeneratedLocalProxyAdapterFixtureSet() (localproxyadapter.FixtureSet, error) {
+	return localproxyadapter.GenerateFixtureSet()
+}
+
+func GeneratedLocalProxyAdapterParity() (localproxyadapter.ParityReport, error) {
+	set, err := localproxyadapter.GenerateFixtureSet()
+	if err != nil {
+		return localproxyadapter.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(localproxyadapter.Version), quote(p.ID), p.Seed, quote(localproxyadapter.BackendVersion), quote(p.AdapterPolicy.RuntimeMappingPolicy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.Security.TranscriptMode), quote(localproxyadapter.RecommendedNextMilestone), len(localproxyadapter.RequiredMisuseNames()), quote("profile_bounded_streams"), quote("opaque_symbolic_classes_only"), quoteSlice(localproxyadapter.DefaultStreamClasses()), quoteSlice(localproxyadapter.RequiredMisuseNames()), quoteSlice([]string{p.CarrierPolicy.CarrierFamily, p.AdapterPolicy.RuntimeMappingPolicy, p.Security.TranscriptMode}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -2292,6 +2329,88 @@ func TestGeneratedLocalProxyAdapterReviewHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := localproxyadapterreview.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe local proxy adapter review metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyAdapterTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localproxyadapter"
+)
+
+func TestGeneratedLocalProxyAdapter(t *testing.T) {
+	if LocalProxyAdapterSchemaVersion != localproxyadapter.Version || LocalProxyAdapterGeneratedProfileID != ProfileID {
+		t.Fatalf("generated local proxy adapter constants drifted")
+	}
+	set, err := GeneratedLocalProxyAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyadapter.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if len(LocalProxyAdapterStreamClasses) < len(localproxyadapter.DefaultStreamClasses()) || len(LocalProxyAdapterControls) < len(localproxyadapter.RequiredMisuseNames()) {
+		t.Fatalf("generated local proxy adapter constants incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyAdapterParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedLocalProxyAdapterParity(t *testing.T) {
+	parity, err := GeneratedLocalProxyAdapterParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated local proxy adapter parity failed: %%+v", parity)
+	}
+	if LocalProxyAdapterRuntimePolicy == "" || LocalProxyAdapterRecommendedNextMilestone == "" || LocalProxyAdapterControlCount < 10 || LocalProxyAdapterPayloadPolicy == "" {
+		t.Fatalf("local proxy adapter generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	localProxyAdapterHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/localproxyadapter"
+)
+
+func TestGeneratedLocalProxyAdapterHygiene(t *testing.T) {
+	set, err := GeneratedLocalProxyAdapterFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localproxyadapter.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_stream_bytes": "synthetic"},
+		map[string]string{"exact_target_value": "synthetic"},
+		map[string]bool{"payload_logged": true},
+	}
+	for _, tc := range unsafeCases {
+		if err := localproxyadapter.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe local proxy adapter metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -6355,6 +6474,7 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/multicarrierselect_generated.go", Content: multiCarrierSelectSource, Go: true},
 		{RelPath: "protocol/carriercollapse_generated.go", Content: carrierCollapseSource, Go: true},
 		{RelPath: "protocol/localproxyadapterreview_generated.go", Content: localProxyAdapterReviewSource, Go: true},
+		{RelPath: "protocol/localproxyadapter_generated.go", Content: localProxyAdapterSource, Go: true},
 		{RelPath: "protocol/scheduler_generated.go", Content: scheduler, Go: true},
 		{RelPath: "protocol/invalid_input_generated.go", Content: invalid, Go: true},
 		{RelPath: "protocol/auth_generated.go", Content: auth, Go: true},
@@ -6471,6 +6591,9 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/localproxyadapterreview_test.go", Content: localProxyAdapterReviewTestSource, Go: true},
 		{RelPath: "protocol/localproxyadapterreview_parity_test.go", Content: localProxyAdapterReviewParityTestSource, Go: true},
 		{RelPath: "protocol/localproxyadapterreview_hygiene_test.go", Content: localProxyAdapterReviewHygieneTestSource, Go: true},
+		{RelPath: "protocol/localproxyadapter_test.go", Content: localProxyAdapterTestSource, Go: true},
+		{RelPath: "protocol/localproxyadapter_parity_test.go", Content: localProxyAdapterParityTestSource, Go: true},
+		{RelPath: "protocol/localproxyadapter_hygiene_test.go", Content: localProxyAdapterHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
