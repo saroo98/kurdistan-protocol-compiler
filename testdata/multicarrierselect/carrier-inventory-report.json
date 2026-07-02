@@ -1,0 +1,7 @@
+{
+  "constrained_request_response_lab": 2,
+  "control_unsafe": 1,
+  "dns_survival_lab": 2,
+  "https_like_lab": 3,
+  "rejected_unsafe": 1
+}

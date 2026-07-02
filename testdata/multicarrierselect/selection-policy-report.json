@@ -1,0 +1,32 @@
+{
+  "policy_id": "multi_carrier_policy_profile_pathhealth_reviewed_lab",
+  "policy_classes": [
+    "profile_sensitive",
+    "review_gated",
+    "health_scored",
+    "race_aware",
+    "fail_closed"
+  ],
+  "decision_classes": [
+    "selected_primary",
+    "selected_backup",
+    "raced_and_selected",
+    "raced_and_rejected",
+    "blocked_by_measurementreview",
+    "blocked_by_carrierreview",
+    "blocked_by_pathhealth",
+    "blocked_by_profile_policy",
+    "blocked_as_high_risk",
+    "blocked_as_unsafe_fallback"
+  ],
+  "profile_sensitive": true,
+  "high_risk_default_rejected": true,
+  "unsafe_fallback_rejected": true,
+  "measurementreview_enforced": true,
+  "carrierreview_enforced": true,
+  "pathhealth_enforced": true,
+  "pathrace_enforced": true,
+  "transportbundle_enforced": true,
+  "labegress_enforced": true,
+  "conclusion": "passed"
+}

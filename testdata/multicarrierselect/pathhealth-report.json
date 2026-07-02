@@ -1,0 +1,14 @@
+{
+  "health_classes": [
+    "healthy_fresh",
+    "healthy_constrained",
+    "degraded_but_usable",
+    "unhealthy",
+    "unknown"
+  ],
+  "reports_checked": 9,
+  "blocked_by_pathhealth": 1,
+  "failover_candidates": 2,
+  "fail_closed_on_no_carrier": true,
+  "conclusion": "passed"
+}

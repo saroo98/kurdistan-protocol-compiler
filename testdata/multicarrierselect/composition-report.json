@@ -1,0 +1,79 @@
+[
+  {
+    "layer": "pathrace",
+    "composed": true,
+    "enforced": true,
+    "evidence": "pathrace_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "pathhealth",
+    "composed": true,
+    "enforced": true,
+    "evidence": "pathhealth_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "transportbundle",
+    "composed": true,
+    "enforced": true,
+    "evidence": "transportbundle_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "measurementreview",
+    "composed": true,
+    "enforced": true,
+    "evidence": "measurementreview_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "carrierreview",
+    "composed": true,
+    "enforced": true,
+    "evidence": "carrierreview_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "relaybridge",
+    "composed": true,
+    "enforced": true,
+    "evidence": "relaybridge_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "labegress",
+    "composed": true,
+    "enforced": true,
+    "evidence": "labegress_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "localpipeline",
+    "composed": true,
+    "enforced": true,
+    "evidence": "localpipeline_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "runtime",
+    "composed": true,
+    "enforced": true,
+    "evidence": "runtime_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "security",
+    "composed": true,
+    "enforced": true,
+    "evidence": "security_safe_metadata",
+    "conclusion": "passed"
+  },
+  {
+    "layer": "generated_backend",
+    "composed": true,
+    "enforced": true,
+    "evidence": "generated_backend_safe_metadata",
+    "conclusion": "passed"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "compared_candidates": 9,
+  "semantic_matches": 9,
+  "decision_matches": 9,
+  "generated_markers": [
+    "MultiCarrierSelectSchemaVersion",
+    "GeneratedMultiCarrierSelectFixtureSet",
+    "GeneratedMultiCarrierSelectParity",
+    "MultiCarrierSelectFamilyClasses",
+    "MultiCarrierSelectDecisionClasses",
+    "MultiCarrierSelectMisuseControls"
+  ],
+  "allowed_differences": [
+    "generated_safe_hash_domain"
+  ],
+  "unexpected_differences": null,
+  "payload_logged": false,
+  "secret_logged": false,
+  "conclusion": "passed"
+}

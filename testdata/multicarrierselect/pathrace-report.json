@@ -1,0 +1,13 @@
+{
+  "race_classes": [
+    "raced_and_selected",
+    "raced_and_rejected",
+    "not_raced"
+  ],
+  "raced_candidates": 3,
+  "selected_candidates": 2,
+  "rejected_candidates": 1,
+  "stale_rejected": 1,
+  "deterministic": true,
+  "conclusion": "passed"
+}
