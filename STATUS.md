@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T01:09:18Z`
+- Generated at: `2026-07-02T01:51:41Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
@@ -419,6 +419,24 @@
 | `constrainedcarrierreview_public_claim_safety` | PASS | `required` | public claim safety markers checked |
 | `constrainedcarrierreview_mutant_detection` | PASS | `required` | 23/23 constrained carrier review mutant modes detected |
 | `constrainedcarrierreview_fixture_drift` | PASS | `required` | passed |
+| `constrainedcarrier_harness` | PASS | `required` | 3 resolver buckets |
+| `constrainedcarrier_query_shapes` | PASS | `required` | 8 query shapes |
+| `constrainedcarrier_response_shapes` | PASS | `required` | 7 response shapes |
+| `constrainedcarrier_capacity_truncation` | PASS | `required` | 3 truncation buckets |
+| `constrainedcarrier_retry_failure` | PASS | `required` | 3 retry buckets |
+| `constrainedcarrier_profile_sensitivity` | PASS | `required` | diversity=0.88 fingerprints=12 |
+| `constrainedcarrier_stream_mapping` | PASS | `required` | 4 streams mapped |
+| `constrainedcarrier_backpressure` | PASS | `required` | 4 backpressure events |
+| `constrainedcarrier_reset_error` | PASS | `required` | 1 resets and 2 errors |
+| `constrainedcarrier_relay_integration` | PASS | `required` | loopbackrelay labegress relaybridge proxyegress mappings checked |
+| `constrainedcarrier_pipeline_integration` | PASS | `required` | localpipeline pathhealth carrierreview measurementreview mappings checked |
+| `constrainedcarrier_local_diagnostics` | PASS | `required` | 8 safe diagnostic fields |
+| `constrainedcarrier_resource_limits` | PASS | `required` | sessions=3 streams=8 retries=3 |
+| `constrainedcarrier_misuse_detection` | PASS | `required` | 26 misuse controls detected |
+| `constrainedcarrier_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `constrainedcarrier_trace_hygiene` | PASS | `required` | fixtures and summaries scanned for unsafe material |
+| `constrainedcarrier_mutant_detection` | PASS | `required` | 26/26 constrained carrier mutant modes detected |
+| `constrainedcarrier_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -432,9 +450,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `107 ms`
-- Trace generation: `25 ms`
-- Total audit runtime: `2265 ms`
+- Profile generation: `92 ms`
+- Trace generation: `22 ms`
+- Total audit runtime: `2235 ms`
 
 ## Corpus Diversity Summary
 
@@ -457,9 +475,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.3194986177155879`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.6`
+- `different_profile_average_distance`: `0.3166703697535589`
 - `same_profile_distance`: `0.007462686567164179`
 - `generated_cluster_conclusion`: `multiple clusters`
 

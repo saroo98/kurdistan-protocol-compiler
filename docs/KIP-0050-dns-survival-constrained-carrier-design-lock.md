@@ -133,6 +133,6 @@ Generated constants specialize the schema version, profile ID, profile seed, bac
 
 M44 is a design lock. It does not implement a DNS carrier, query real resolvers, depend on domains, perform public-network egress, or prove field behavior. It only defines the contract that M45 must satisfy in deterministic local conditions.
 
-## Next Milestone
+## Prototype Follow-Up
 
-M45 should implement the constrained-carrier lab prototype against this contract.
+M45 implements the constrained-carrier lab prototype against this contract. See `KIP-0051` for the deterministic local harness, symbolic query/response shape classes, retry/failure semantics, pathhealth and measurementreview integration, generated parity, and M45 fixture evidence.
