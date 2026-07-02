@@ -91,6 +91,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
 - Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
 - Production-oriented key exchange design contract for transcript binding, identity binding, nonce/replay policy, downgrade resistance, key separation, rotation readiness, generated transport compatibility, and independent review package requirements.
+- Relay authentication, rotation, and compatibility design contract for relay identity, profile/version negotiation, rotation windows, expiry/revocation, fail-closed behavior, stale-profile handling, and M55 prerequisites.
 - Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
 - Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
 - Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
@@ -210,6 +211,9 @@ internal/relayprocess
 
 internal/keyexchangeplan
   production-oriented key exchange design inventory, transcript/profile/relay identity binding, nonce/replay and downgrade policy, key separation, rotation readiness, external review package requirements, misuse controls, fixture drift, and generated parity gates
+
+internal/relayauthplan
+  relay authentication, profile/version compatibility, rotation window, expiry, revocation, safe failure, downgrade rejection, unknown/stale profile, misuse, fixture drift, and generated parity gates
 
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
@@ -1014,6 +1018,22 @@ go run ./cmd/kcheck keyexchangeplan verify
 go run ./cmd/kcheck keyexchangeplan compare --old testdata/keyexchangeplan/keyexchangeplan-report-golden.json --new testdata/keyexchangeplan/keyexchangeplan-report-golden.json
 ```
 
+## Relay Auth, Rotation, and Compatibility
+
+Milestone 54 defines the relay authentication and rotation contract that builds on the M53 key exchange design. It covers relay identity policy, client profile identity policy, profile bundle versions, relay auth policy, relay/transport/carrier compatibility matrices, rotation windows, profile expiry, revocation, fail-closed behavior, downgrade rejection, unknown-version rejection, stale-profile rejection, split-brain rotation handling, and safe diagnostics.
+
+The `internal/relayauthplan` package is a design and review layer. It does not provision relays, add public relay discovery, introduce account tracking, store key material in fixtures, enable deployment, or change runtime relay authentication behavior. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
+
+Run:
+
+```bash
+go run ./cmd/kcheck relayauthplan --quick
+go run ./cmd/kcheck relayauthplan --full --out testdata/audit/relayauthplan.json
+go run ./cmd/kcheck relayauthplan generate --out testdata/relayauthplan/relayauthplan-report-golden.json --force
+go run ./cmd/kcheck relayauthplan verify
+go run ./cmd/kcheck relayauthplan compare --old testdata/relayauthplan/relayauthplan-report-golden.json --new testdata/relayauthplan/relayauthplan-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -1049,7 +1069,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture. M53: production key exchange design. M54: relay auth, rotation, and compatibility.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture. M53: production key exchange design. M54: relay auth, rotation, and compatibility. M55: relay operational hardening.
 
 ## Research Positioning
 

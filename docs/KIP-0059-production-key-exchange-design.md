@@ -94,6 +94,6 @@ protocol/keyexchangeplan_hygiene_test.go
 
 M53 is not an independent cryptography review, not a production cryptography implementation, and not a deployment gate. It does not provide final relay authentication, rotation execution, Android integration, or field-test approval.
 
-## Next Milestone
+## M54 Handoff
 
-M54 should use this contract to define relay authentication, rotation, and compatibility behavior without weakening downgrade resistance, replay rejection, generated transport compatibility, or trace hygiene.
+M54 uses this contract to define relay authentication, rotation, and compatibility behavior without weakening downgrade resistance, replay rejection, generated transport compatibility, or trace hygiene. M55 should harden the resulting relay operational semantics while keeping public relay provisioning, account tracking, payload logging, packet capture, and field-test behavior out of scope.
