@@ -583,6 +583,28 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck pathrace --quick` for synthetic racing and scoring checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Android Architecture Review")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "androidreview_report"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "androidreview_report")
+		renderNamedGateResult(&b, report.Gates, "androidreview_user_flows")
+		renderNamedGateResult(&b, report.Gates, "androidreview_permission_model")
+		renderNamedGateResult(&b, report.Gates, "androidreview_ui_states")
+		renderNamedGateResult(&b, report.Gates, "androidreview_diagnostics_privacy")
+		renderNamedGateResult(&b, report.Gates, "androidreview_kill_switch")
+		renderNamedGateResult(&b, report.Gates, "androidreview_runtime_composition")
+		renderNamedGateResult(&b, report.Gates, "androidreview_m57_m58_contracts")
+		renderNamedGateResult(&b, report.Gates, "androidreview_misuse_detection")
+		renderNamedGateResult(&b, report.Gates, "androidreview_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "androidreview_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "androidreview_public_claim_safety")
+		renderNamedGateResult(&b, report.Gates, "androidreview_fixture_drift")
+	} else {
+		fmt.Fprintln(&b, "- Android architecture review gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck androidreview --quick` for Android architecture contract checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -596,6 +618,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Relay fleet modeling uses synthetic relays, schedule ticks, and safe summaries only; it does not provision relays or rotate real infrastructure.")
 	fmt.Fprintln(&b, "- Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.")
 	fmt.Fprintln(&b, "- Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.")
+	fmt.Fprintln(&b, "- Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts; it does not implement an Android runtime port or VpnService.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -604,7 +627,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 56 should focus on Android architecture review against the hardened relay/runtime operational boundary.")
+	fmt.Fprintln(&b, "Milestone 57 should port the local runtime to the Android architecture contract without implementing full VpnService traffic behavior before M58.")
 	return b.String()
 }
 
