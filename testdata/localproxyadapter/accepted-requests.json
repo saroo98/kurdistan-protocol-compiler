@@ -1,0 +1,47 @@
+[
+  {
+    "request_id": "sha256:db3729fe043d0",
+    "protocol_family": "connect_like_metadata",
+    "parser_state": "mapped",
+    "target_class_bucket": "synthetic_name",
+    "port_class_bucket": "common_service_bucket",
+    "request_class": "interactive",
+    "runtime_stream_class": "interactive_stream",
+    "carrier_candidate_class": "https_like_candidate",
+    "request_hash": "sha256:b9cb8c852a8eef8213b0908842f3be4ebb97ff99153291f39a6f5418aa500ac0",
+    "payload_logged": false,
+    "secret_logged": false,
+    "target_persisted": false,
+    "port_persisted": false
+  },
+  {
+    "request_id": "sha256:a56ac94d6324f",
+    "protocol_family": "socks5_like_metadata",
+    "parser_state": "mapped",
+    "target_class_bucket": "synthetic_name",
+    "port_class_bucket": "common_service_bucket",
+    "request_class": "interactive",
+    "runtime_stream_class": "bulk_stream",
+    "carrier_candidate_class": "dns_survival_candidate",
+    "request_hash": "sha256:a50c1e6017950050df769476c9e425bb556c04e8391bc89b90583bfb8642215e",
+    "payload_logged": false,
+    "secret_logged": false,
+    "target_persisted": false,
+    "port_persisted": false
+  },
+  {
+    "request_id": "sha256:90cd56344fb61",
+    "protocol_family": "connect_like_metadata",
+    "parser_state": "rejected",
+    "target_class_bucket": "rejected_unsafe",
+    "port_class_bucket": "rejected",
+    "request_class": "rejected",
+    "runtime_stream_class": "control_stream",
+    "carrier_candidate_class": "loopback_candidate",
+    "request_hash": "sha256:2843346bba2d28d80f970723037f7842fe1782e45087d722e2bf1de5abd32a50",
+    "payload_logged": false,
+    "secret_logged": false,
+    "target_persisted": false,
+    "port_persisted": false
+  }
+]

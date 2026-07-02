@@ -1,0 +1,17 @@
+{
+  "config_id": "localproxyadapter-config-v1",
+  "accepted_protocol_families": [
+    "connect_like_metadata",
+    "socks5_like_metadata"
+  ],
+  "max_streams_class": "profile_bounded_streams",
+  "max_buffered_bytes_class": "bounded_local_adapter_buffer",
+  "max_events_class": "bounded_adapter_events",
+  "allow_dns_resolution": false,
+  "allow_public_network_default": false,
+  "allow_packet_capture": false,
+  "allow_credential_storage": false,
+  "allow_payload_logging": false,
+  "payload_logged": false,
+  "secret_logged": false
+}

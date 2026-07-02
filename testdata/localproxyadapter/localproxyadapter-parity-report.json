@@ -1,0 +1,14 @@
+{
+  "generated_markers": [
+    "LocalProxyAdapterSchemaVersion",
+    "LocalProxyAdapterGeneratedProfileID",
+    "LocalProxyAdapterBackendVersion",
+    "LocalProxyAdapterRuntimePolicy",
+    "LocalProxyAdapterStreamClasses",
+    "GeneratedLocalProxyAdapterFixtureSet"
+  ],
+  "interpreted_hash": "sha256:75ae9e3191ddf042314b416ce12a71a6e8c41506ca2974e5863a3772dcd6a48b",
+  "generated_hash": "sha256:75ae9e3191ddf042314b416ce12a71a6e8c41506ca2974e5863a3772dcd6a48b",
+  "unexpected_drift": null,
+  "conclusion": "passed"
+}

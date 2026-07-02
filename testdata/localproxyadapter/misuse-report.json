@@ -1,0 +1,24 @@
+{
+  "detected_controls": [
+    "localproxyadapter_payload_logging_allowed",
+    "localproxyadapter_packet_capture_allowed",
+    "localproxyadapter_exact_target_persisted",
+    "localproxyadapter_exact_port_persisted",
+    "localproxyadapter_dns_resolution_allowed",
+    "localproxyadapter_public_network_default",
+    "localproxyadapter_credential_storage_allowed",
+    "localproxyadapter_unbounded_stream",
+    "localproxyadapter_backpressure_ignored",
+    "localproxyadapter_reset_swallowed",
+    "localproxyadapter_stream_isolation_broken",
+    "localproxyadapter_localprotocoladapter_bypass",
+    "localproxyadapter_multicarrierselect_bypass",
+    "localproxyadapter_measurementreview_bypass",
+    "localproxyadapter_generated_backend_drift",
+    "localproxyadapter_payload_leak",
+    "localproxyadapter_secret_leak"
+  ],
+  "detected_count": 17,
+  "expected_count": 17,
+  "conclusion": "passed"
+}

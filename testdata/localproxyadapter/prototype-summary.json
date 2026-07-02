@@ -1,0 +1,22 @@
+{
+  "sessions_opened": 1,
+  "sessions_closed": 1,
+  "requests_accepted": 3,
+  "requests_rejected": 3,
+  "streams_opened": 8,
+  "streams_closed": 7,
+  "streams_reset": 1,
+  "half_closes_observed": 1,
+  "backpressure_events": 1,
+  "carrier_selections": 8,
+  "relaybridge_mappings": 8,
+  "localpipeline_mappings": 8,
+  "labegress_exchanges": 8,
+  "pathhealth_reports": 8,
+  "pathrace_decisions": 8,
+  "measurement_reviews": 8,
+  "resource_limit_rejections": 3,
+  "payload_logged": false,
+  "secret_logged": false,
+  "completed": true
+}
