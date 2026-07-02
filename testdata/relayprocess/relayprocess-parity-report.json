@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "RelayProcessSchemaVersion",
+    "RelayProcessBackendVersion",
+    "RelayProcessRoleCount",
+    "RelayProcessLifecycleCount",
+    "RelayProcessMisuseCount",
+    "RelayProcessNextMilestone"
+  ],
+  "interpreted_hash": "sha256:ad7ce5201e040bf514030b6469db7ab4126f0889bfb67a900bebb513e32866fe",
+  "generated_hash": "sha256:ad7ce5201e040bf514030b6469db7ab4126f0889bfb67a900bebb513e32866fe",
+  "conclusion": "passed"
+}

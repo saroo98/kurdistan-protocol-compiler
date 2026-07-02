@@ -1,0 +1,13 @@
+{
+  "policy": "bounded_process_resources",
+  "bounds": [
+    "max_sessions_bucket",
+    "max_streams_bucket",
+    "max_carriers_bucket",
+    "max_log_events_bucket",
+    "max_restart_attempts_bucket"
+  ],
+  "abuse_control_policy": "placeholder_only_rate_bucket_and_reset_bucket_no_user_accounts",
+  "missing_resource_policy": false,
+  "conclusion": "passed"
+}

@@ -1,0 +1,14 @@
+{
+  "policy": "bounded_graceful_shutdown",
+  "graceful_phases": [
+    "stop_accepting",
+    "drain_sessions",
+    "close_carriers",
+    "flush_safe_summary",
+    "terminal"
+  ],
+  "crash_recovery_policy": "local_safe_restart_plan_no_public_retry",
+  "idempotent_close": true,
+  "unreviewed_auto_update": false,
+  "conclusion": "passed"
+}
