@@ -93,6 +93,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Production-oriented key exchange design contract for transcript binding, identity binding, nonce/replay policy, downgrade resistance, key separation, rotation readiness, generated transport compatibility, and independent review package requirements.
 - Relay authentication, rotation, and compatibility design contract for relay identity, profile/version negotiation, rotation windows, expiry/revocation, fail-closed behavior, and stale-profile handling.
 - Operational hardening for relay/runtime resource limits, strict config validation, deterministic shutdown/restart, safe diagnostics, rollback boundaries, health summaries, misuse controls, and generated parity.
+- Android architecture review for profile import and verification, Android permission boundaries, UI state, lifecycle, reconnect behavior, kill-switch semantics, diagnostics, privacy boundaries, and M57/M58 implementation contracts.
 - Runtime session architecture with role validation, session lifecycle, capability negotiation, profile compatibility checks, secure channel setup, in-memory links, stream manager integration, and runtime adversary scenarios.
 - Implementation hardening checks for invariants, API misuse resistance, panic safety, resource limits, trace hygiene, concurrency/race prep, compatibility, generated parity, and pre-adapter readiness.
 - Adapter interface architecture for bounded ingress/egress contracts, flow lifecycle, capability compatibility, runtime stream mapping, backpressure propagation, and trace-safe summaries.
@@ -219,6 +220,9 @@ internal/relayauthplan
 internal/operationalhardening
   relay/runtime resource limits, strict config validation, deterministic shutdown/restart, safe diagnostics, rollback/update boundaries, redacted health summaries, misuse controls, fixture drift, and generated parity gates
 
+internal/androidreview
+  Android client architecture contract, profile import and validation flows, permission/lifecycle model, UI state vocabulary, diagnostics/privacy boundaries, kill-switch policy, M57/M58 contracts, misuse controls, fixture drift, and generated parity
+
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
@@ -292,6 +296,7 @@ go run ./cmd/kcheck localpipeline --quick
 go run ./cmd/kcheck productionreadiness --quick
 go run ./cmd/kcheck concretelocaladapter --quick
 go run ./cmd/kcheck operationalhardening --quick
+go run ./cmd/kcheck androidreview --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -1055,6 +1060,22 @@ go run ./cmd/kcheck operationalhardening verify
 go run ./cmd/kcheck operationalhardening compare --old testdata/operationalhardening/operationalhardening-report-golden.json --new testdata/operationalhardening/operationalhardening-report-golden.json
 ```
 
+## Android Architecture Review
+
+Milestone 56 defines the Android client architecture before Android implementation expands on device. It covers profile import, profile verification, profile expiry and rotation, platform permission boundaries, foreground-service expectations, UI state, reconnect behavior, kill-switch semantics, local diagnostics, privacy boundaries, runtime composition, and generated-backend parity.
+
+The `internal/androidreview` package is a deterministic contract and audit layer. It does not implement an Android app, Android runtime port, VpnService traffic handling, packet capture, public carrier behavior, automatic telemetry, or field-test behavior. Its fixtures contain only safe state names, policy classes, counts, hashes, and hygiene flags.
+
+Run:
+
+```bash
+go run ./cmd/kcheck androidreview --quick
+go run ./cmd/kcheck androidreview --full --out testdata/audit/androidreview.json
+go run ./cmd/kcheck androidreview generate --out testdata/androidreview/androidreview-report-golden.json --force
+go run ./cmd/kcheck androidreview verify
+go run ./cmd/kcheck androidreview compare --old testdata/androidreview/androidreview-report-golden.json --new testdata/androidreview/androidreview-report-golden.json
+```
+
 ## Security Prerequisite Layer
 
 Milestone 12 adds the security architecture that future real adapters would need before integration work: profile and transcript binding, deterministic key schedule interfaces, directional nonce management, replay windows, downgrade checks, capability negotiation, compatibility validation, config redaction, secure envelope metadata, security mutants, and generated-backend parity.
@@ -1090,7 +1111,7 @@ go run ./cmd/kcheck hardening --race-advice
 4. Phase 4: local proxy pipeline.
    M33: local proxy egress and relay bridge model. M34: end-to-end local proxy pipeline.
 5. Phase 5: readiness and client architecture.
-   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture. M53: production key exchange design. M54: relay auth, rotation, and compatibility. M55: relay operational hardening. M56: Android architecture review.
+   M35: production integration readiness review. M36: concrete local socket adapter. M37: local proxy protocol adapter. M38: local loopback relay transport. M39: controlled lab egress connector. M40: carrier prototype readiness gate. M41: HTTPS-like carrier lab design lock. M42: HTTPS-like carrier lab prototype. M43: HTTPS-like carrier adversarial hardening. M44: DNS-survival / constrained-carrier design lock. M45: constrained-carrier lab prototype. M46: multi-carrier runtime selection. M47: carrier collapse and mutation audit. M48: payload-bearing local proxy adapter design review. M49: local proxy adapter prototype. M50: local TUN/VPN semantics model. M51: local desktop packet-style prototype. M52: relay process architecture. M53: production key exchange design. M54: relay auth, rotation, and compatibility. M55: relay operational hardening. M56: Android architecture review. M57: Android local runtime port.
 
 ## Research Positioning
 

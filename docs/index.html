@@ -96,7 +96,7 @@
         <aside class="research-stack shell-card" data-reveal aria-label="Animated research stack">
           <div class="stack-header">
             <span>research stack</span>
-            <strong>0.55.0-lab</strong>
+            <strong>0.56.0-lab</strong>
           </div>
           <div class="stack-rows">
             <div class="stack-row"><span class="status-dot on"></span><span>protocol compiler</span><b>generated</b></div>
@@ -125,6 +125,7 @@
             <div class="stack-row"><span class="status-dot on"></span><span>key exchange design</span><b>contract locked</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>relay auth rotation</span><b>contract locked</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>operational hardening</span><b>hardened</b></div>
+            <div class="stack-row"><span class="status-dot on"></span><span>Android architecture</span><b>reviewed</b></div>
             <div class="stack-row"><span class="status-dot on"></span><span>trace hygiene</span><b>enforced</b></div>
           </div>
         </aside>
@@ -267,7 +268,7 @@
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Relay auth and rotation</h3><p>Relay identity, profile/version compatibility, rotation windows, expiry, revocation, safe failure, and stale-profile rejection.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Operational hardening</h3><p>Bounded resources, strict config validation, deterministic restart, safe diagnostics, rollback boundaries, health summaries, misuse controls, and generated parity.</p></article>
           <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Measurement-client privacy review</h3><p>Bucketed observation taxonomy, redaction policy, consent/retention checks, and local diagnostics.</p></article>
-          <article class="capability-card"><span class="status-chip review">review</span><h3>Android client architecture</h3><p>Future client architecture review after readiness and safety checks mature.</p></article>
+          <article class="capability-card"><span class="status-chip implemented">implemented</span><h3>Android architecture review</h3><p>Profile import, permission boundaries, UI states, diagnostics, privacy, kill-switch semantics, and M57/M58 contracts.</p></article>
         </div>
       </section>
 
@@ -370,8 +371,9 @@
             <p><b>M54:</b> relay auth, rotation, and compatibility</p>
             <p><b>M55:</b> relay operational hardening</p>
             <p><b>M56:</b> Android architecture review</p>
-            <span class="status-chip implemented">M35-M55 implemented</span>
-            <span class="status-chip review">M56 next</span>
+            <p><b>M57:</b> Android local runtime port</p>
+            <span class="status-chip implemented">M35-M56 implemented</span>
+            <span class="status-chip review">M57 next</span>
           </article>
         </div>
       </section>
@@ -477,6 +479,7 @@
             <a href="KIP-0059-production-key-exchange-design.md">KIP-0059: Production key exchange design</a>
             <a href="KIP-0060-relay-auth-rotation-compatibility.md">KIP-0060: Relay auth, rotation, and compatibility</a>
             <a href="KIP-0061-operational-hardening.md">KIP-0061: Operational hardening</a>
+            <a href="KIP-0062-android-architecture-review.md">KIP-0062: Android architecture review</a>
           </article>
         </div>
       </section>

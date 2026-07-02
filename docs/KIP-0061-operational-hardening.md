@@ -103,4 +103,4 @@ M55 is an operational hardening and audit layer. It does not provide Android arc
 
 ## Next Milestone
 
-M56 should perform the Android architecture review against these hardened relay/runtime operational boundaries before any Android implementation work starts.
+M56 uses these hardened relay/runtime operational boundaries to define the Android architecture review. M57 should port the local runtime against that Android contract while preserving the M55 resource, lifecycle, diagnostics, compatibility, and trace-hygiene gates.

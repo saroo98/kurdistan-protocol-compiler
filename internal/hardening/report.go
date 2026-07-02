@@ -189,6 +189,7 @@ func packagesChecked() []string {
 		"internal/keyexchangeplan",
 		"internal/relayauthplan",
 		"internal/operationalhardening",
+		"internal/androidreview",
 		"internal/productionreadiness",
 		"internal/concretelocaladapter",
 		"internal/transportbundle",
