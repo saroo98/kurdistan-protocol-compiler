@@ -33,6 +33,7 @@ import (
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/loopbackrelay"
 	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/multicarrierselect"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/productionreadiness"
@@ -177,6 +178,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "constrainedcarrier" {
 		os.Exit(runConstrainedCarrier(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "multicarrierselect" {
+		os.Exit(runMultiCarrierSelect(os.Args[2:]))
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
@@ -5881,6 +5885,175 @@ func writeConstrainedCarrierCompanions(out string, set constrainedcarrier.Fixtur
 	}
 	for _, write := range writes {
 		if err := constrainedcarrier.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runMultiCarrierSelect(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runMultiCarrierSelectGenerate(args[1:])
+		case "verify":
+			return runMultiCarrierSelectVerify(args[1:])
+		case "compare":
+			return runMultiCarrierSelectCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck multicarrierselect", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick multi-carrier selection audit")
+	full := flags.Bool("full", false, "run full multi-carrier selection audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunMultiCarrierSelectAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runMultiCarrierSelectGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck multicarrierselect generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "multicarrierselect", "multicarrierselect-report-golden.json"), "multi-carrier selection fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := multicarrierselect.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := multicarrierselect.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeMultiCarrierSelectCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote multicarrierselect fixtures: %s (%d candidates, %d controls)\n", *out, len(set.Report.Candidates), set.Report.Misuse.DetectedCount)
+	return 0
+}
+
+func runMultiCarrierSelectVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck multicarrierselect verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "multicarrierselect", "multicarrierselect-report-golden.json"), "multi-carrier selection fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := multicarrierselect.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := multicarrierselect.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := multicarrierselect.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runMultiCarrierSelectCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck multicarrierselect compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old multi-carrier selection fixture")
+	newPath := flags.String("new", "", "new multi-carrier selection fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := multicarrierselect.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := multicarrierselect.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := multicarrierselect.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := multicarrierselect.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeMultiCarrierSelectCompanions(out string, set multicarrierselect.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"carrier-inventory-report.json", set.Report.Inventory},
+		{"candidate-bundle-report.json", set.Report.Candidates},
+		{"selection-policy-report.json", set.Report.SelectionPolicy},
+		{"profile-sensitivity-report.json", set.Report.ProfileSensitivity},
+		{"pathrace-report.json", set.Report.Race},
+		{"pathhealth-report.json", set.Report.Health},
+		{"failover-fallback-report.json", set.Report.Failover},
+		{"composition-report.json", set.Report.Compositions},
+		{"multicarrierselect-misuse-report.json", set.Report.Misuse},
+		{"multicarrierselect-parity-report.json", set.Report.Parity},
+		{"public-claim-safety-report.json", set.Report.PublicClaimSafety},
+	}
+	for _, write := range writes {
+		if err := multicarrierselect.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

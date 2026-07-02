@@ -471,32 +471,47 @@ const (
 	ModeConstrainedCarrierReviewSecretLeak                   = "constrainedcarrierreview_secret_leak"
 	ModeConstrainedCarrierReviewGeneratedBackendDrift        = "constrainedcarrierreview_generated_backend_drift"
 
-	ModeConstrainedCarrierPublicResolverAllowed      = "constrainedcarrier_public_resolver_allowed"
-	ModeConstrainedCarrierRealDNSQueryDefault        = "constrainedcarrier_real_dns_query_default"
-	ModeConstrainedCarrierExactQueryLogged           = "constrainedcarrier_exact_query_logged"
-	ModeConstrainedCarrierResolverIPLogged           = "constrainedcarrier_resolver_ip_logged"
-	ModeConstrainedCarrierDomainDependencyAllowed    = "constrainedcarrier_domain_dependency_allowed"
-	ModeConstrainedCarrierWildcardResolverAllowed    = "constrainedcarrier_wildcard_resolver_allowed"
-	ModeConstrainedCarrierPublicNetworkAllowed       = "constrainedcarrier_public_network_allowed"
-	ModeConstrainedCarrierArbitraryEgressAllowed     = "constrainedcarrier_arbitrary_egress_allowed"
-	ModeConstrainedCarrierPayloadForwardingAllowed   = "constrainedcarrier_payload_forwarding_allowed"
-	ModeConstrainedCarrierPayloadLoggingAllowed      = "constrainedcarrier_payload_logging_allowed"
-	ModeConstrainedCarrierPacketCaptureAllowed       = "constrainedcarrier_packet_capture_allowed"
-	ModeConstrainedCarrierMeasurementUploadAllowed   = "constrainedcarrier_measurement_upload_allowed"
-	ModeConstrainedCarrierFixedQueryShape            = "constrainedcarrier_fixed_query_shape"
-	ModeConstrainedCarrierPaddingOnlyVariation       = "constrainedcarrier_padding_only_variation"
-	ModeConstrainedCarrierProfileInsensitive         = "constrainedcarrier_profile_insensitive"
-	ModeConstrainedCarrierRetryStorm                 = "constrainedcarrier_retry_storm"
-	ModeConstrainedCarrierTruncationMisclassified    = "constrainedcarrier_truncation_misclassified"
-	ModeConstrainedCarrierPoisonFailureMisclassified = "constrainedcarrier_poison_failure_misclassified"
-	ModeConstrainedCarrierBackpressureIgnored        = "constrainedcarrier_backpressure_ignored"
-	ModeConstrainedCarrierResetSwallowed             = "constrainedcarrier_reset_swallowed"
-	ModeConstrainedCarrierCrossStreamLeak            = "constrainedcarrier_cross_stream_leak"
-	ModeConstrainedCarrierPathHealthBypass           = "constrainedcarrier_pathhealth_bypass"
-	ModeConstrainedCarrierMeasurementReviewBypass    = "constrainedcarrier_measurementreview_bypass"
-	ModeConstrainedCarrierGeneratedBackendDrift      = "constrainedcarrier_generated_backend_drift"
-	ModeConstrainedCarrierPayloadLeak                = "constrainedcarrier_payload_leak"
-	ModeConstrainedCarrierSecretLeak                 = "constrainedcarrier_secret_leak"
+	ModeConstrainedCarrierPublicResolverAllowed         = "constrainedcarrier_public_resolver_allowed"
+	ModeConstrainedCarrierRealDNSQueryDefault           = "constrainedcarrier_real_dns_query_default"
+	ModeConstrainedCarrierExactQueryLogged              = "constrainedcarrier_exact_query_logged"
+	ModeConstrainedCarrierResolverIPLogged              = "constrainedcarrier_resolver_ip_logged"
+	ModeConstrainedCarrierDomainDependencyAllowed       = "constrainedcarrier_domain_dependency_allowed"
+	ModeConstrainedCarrierWildcardResolverAllowed       = "constrainedcarrier_wildcard_resolver_allowed"
+	ModeConstrainedCarrierPublicNetworkAllowed          = "constrainedcarrier_public_network_allowed"
+	ModeConstrainedCarrierArbitraryEgressAllowed        = "constrainedcarrier_arbitrary_egress_allowed"
+	ModeConstrainedCarrierPayloadForwardingAllowed      = "constrainedcarrier_payload_forwarding_allowed"
+	ModeConstrainedCarrierPayloadLoggingAllowed         = "constrainedcarrier_payload_logging_allowed"
+	ModeConstrainedCarrierPacketCaptureAllowed          = "constrainedcarrier_packet_capture_allowed"
+	ModeConstrainedCarrierMeasurementUploadAllowed      = "constrainedcarrier_measurement_upload_allowed"
+	ModeConstrainedCarrierFixedQueryShape               = "constrainedcarrier_fixed_query_shape"
+	ModeConstrainedCarrierPaddingOnlyVariation          = "constrainedcarrier_padding_only_variation"
+	ModeConstrainedCarrierProfileInsensitive            = "constrainedcarrier_profile_insensitive"
+	ModeConstrainedCarrierRetryStorm                    = "constrainedcarrier_retry_storm"
+	ModeConstrainedCarrierTruncationMisclassified       = "constrainedcarrier_truncation_misclassified"
+	ModeConstrainedCarrierPoisonFailureMisclassified    = "constrainedcarrier_poison_failure_misclassified"
+	ModeConstrainedCarrierBackpressureIgnored           = "constrainedcarrier_backpressure_ignored"
+	ModeConstrainedCarrierResetSwallowed                = "constrainedcarrier_reset_swallowed"
+	ModeConstrainedCarrierCrossStreamLeak               = "constrainedcarrier_cross_stream_leak"
+	ModeConstrainedCarrierPathHealthBypass              = "constrainedcarrier_pathhealth_bypass"
+	ModeConstrainedCarrierMeasurementReviewBypass       = "constrainedcarrier_measurementreview_bypass"
+	ModeConstrainedCarrierGeneratedBackendDrift         = "constrainedcarrier_generated_backend_drift"
+	ModeConstrainedCarrierPayloadLeak                   = "constrainedcarrier_payload_leak"
+	ModeConstrainedCarrierSecretLeak                    = "constrainedcarrier_secret_leak"
+	ModeMultiCarrierSelectFixedCarrierDefault           = "multicarrierselect_fixed_carrier_default"
+	ModeMultiCarrierSelectProfileInsensitiveSelection   = "multicarrierselect_profile_insensitive_selection"
+	ModeMultiCarrierSelectPaddingOnlySelectionVariation = "multicarrierselect_padding_only_selection_variation"
+	ModeMultiCarrierSelectHighRiskDefaultAllowed        = "multicarrierselect_high_risk_default_allowed"
+	ModeMultiCarrierSelectUnsafeFallbackAllowed         = "multicarrierselect_unsafe_fallback_allowed"
+	ModeMultiCarrierSelectMeasurementReviewBypass       = "multicarrierselect_measurementreview_bypass"
+	ModeMultiCarrierSelectCarrierReviewBypass           = "multicarrierselect_carrierreview_bypass"
+	ModeMultiCarrierSelectPathHealthBypass              = "multicarrierselect_pathhealth_bypass"
+	ModeMultiCarrierSelectPathRaceBypass                = "multicarrierselect_pathrace_bypass"
+	ModeMultiCarrierSelectTransportBundleBypass         = "multicarrierselect_transportbundle_bypass"
+	ModeMultiCarrierSelectLabEgressBypass               = "multicarrierselect_labegress_bypass"
+	ModeMultiCarrierSelectPublicNetworkAllowed          = "multicarrierselect_public_network_allowed"
+	ModeMultiCarrierSelectPayloadLoggingAllowed         = "multicarrierselect_payload_logging_allowed"
+	ModeMultiCarrierSelectSecretLeak                    = "multicarrierselect_secret_leak"
+	ModeMultiCarrierSelectGeneratedBackendDrift         = "multicarrierselect_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -972,6 +987,21 @@ func Modes() []string {
 		ModeConstrainedCarrierGeneratedBackendDrift,
 		ModeConstrainedCarrierPayloadLeak,
 		ModeConstrainedCarrierSecretLeak,
+		ModeMultiCarrierSelectFixedCarrierDefault,
+		ModeMultiCarrierSelectProfileInsensitiveSelection,
+		ModeMultiCarrierSelectPaddingOnlySelectionVariation,
+		ModeMultiCarrierSelectHighRiskDefaultAllowed,
+		ModeMultiCarrierSelectUnsafeFallbackAllowed,
+		ModeMultiCarrierSelectMeasurementReviewBypass,
+		ModeMultiCarrierSelectCarrierReviewBypass,
+		ModeMultiCarrierSelectPathHealthBypass,
+		ModeMultiCarrierSelectPathRaceBypass,
+		ModeMultiCarrierSelectTransportBundleBypass,
+		ModeMultiCarrierSelectLabEgressBypass,
+		ModeMultiCarrierSelectPublicNetworkAllowed,
+		ModeMultiCarrierSelectPayloadLoggingAllowed,
+		ModeMultiCarrierSelectSecretLeak,
+		ModeMultiCarrierSelectGeneratedBackendDrift,
 	}
 }
 
