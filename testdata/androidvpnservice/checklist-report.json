@@ -1,0 +1,19 @@
+{
+  "items": [
+    "m56_contract_linked",
+    "m57_runtime_linked",
+    "vpn_permission_states_modeled",
+    "vpnservice_lifecycle_state_machine_modeled",
+    "packet_flow_to_runtime_mapping_modeled",
+    "kill_switch_fail_closed_modeled",
+    "diagnostics_redacted",
+    "reconnect_hooks_bounded",
+    "safe_shutdown_idempotent",
+    "local_vpn_semantics_preserved",
+    "carrier_connected_android_traffic_deferred_to_m59",
+    "generated_backend_parity"
+  ],
+  "passed": 12,
+  "failed": 0,
+  "conclusion": "passed"
+}

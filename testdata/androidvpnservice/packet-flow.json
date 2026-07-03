@@ -1,0 +1,33 @@
+{
+  "policy": "android_packet_flow_maps_to_kurdistan_stream_runtime",
+  "flow_classes": [
+    "small_interactive_packet_class",
+    "large_fragmented_packet_class",
+    "backpressured_packet_class",
+    "reset_packet_class",
+    "diagnostic_control_class"
+  ],
+  "runtime_mappings": [
+    "packet_class_to_stream_open",
+    "packet_byte_count_to_target_data",
+    "stream_response_to_packet_count",
+    "stream_reset_to_vpn_reset",
+    "runtime_close_to_vpn_stop"
+  ],
+  "backpressure_mappings": [
+    "vpn_queue_pressure_to_stream_backpressure",
+    "runtime_backpressure_to_vpn_read_pause",
+    "carrier_unavailable_to_fail_closed"
+  ],
+  "reset_error_mappings": [
+    "target_error_to_vpn_failure_class",
+    "target_reset_to_stream_reset",
+    "permission_revoked_to_session_close"
+  ],
+  "packet_flow_mapped": true,
+  "runtime_streams_mapped": 7,
+  "carrier_connected_traffic": false,
+  "raw_packet_captured": false,
+  "packet_payload_logged": false,
+  "conclusion": "passed"
+}

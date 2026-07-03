@@ -1,0 +1,20 @@
+{
+  "policy": "android_vpn_permission_first_fail_closed",
+  "states": [
+    "permission_required",
+    "permission_granted",
+    "blocked_by_policy"
+  ],
+  "required_decisions": [
+    "request_vpn_permission",
+    "reject_start_without_permission",
+    "fail_closed_on_permission_revoked",
+    "diagnostic_ready_after_denial"
+  ],
+  "permission_required_modeled": true,
+  "permission_granted_modeled": true,
+  "permission_revoked_fail_closed": true,
+  "start_without_permission": false,
+  "bypass_allowed": false,
+  "conclusion": "passed"
+}

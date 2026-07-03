@@ -1,0 +1,20 @@
+{
+  "policy": "safe_idempotent_android_vpnservice_shutdown",
+  "actions": [
+    "reject_new_packet_flow",
+    "close_runtime_streams",
+    "close_runtime_session",
+    "drain_vpn_queue",
+    "flush_redacted_diagnostics",
+    "mark_vpn_stopped",
+    "enter_diagnostic_ready"
+  ],
+  "stop_idempotent": true,
+  "runtime_session_closed": true,
+  "queues_drained": true,
+  "diagnostics_flushed": true,
+  "fail_closed_on_unsafe_stop": true,
+  "post_shutdown_allowed": false,
+  "leaked_workers": 0,
+  "conclusion": "passed"
+}

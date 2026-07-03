@@ -1,0 +1,30 @@
+{
+  "policy": "android_vpnservice_preserves_reviewed_runtime_boundaries",
+  "required_links": [
+    "profile_validation",
+    "android_architecture_review",
+    "android_local_runtime",
+    "operational_hardening",
+    "vpn_semantics",
+    "local_vpn_adapter",
+    "pathhealth",
+    "measurementreview",
+    "hardening",
+    "generated_backend"
+  ],
+  "profile_validation_linked": true,
+  "android_review_linked": true,
+  "android_runtime_linked": true,
+  "operational_hardening_linked": true,
+  "vpn_semantics_linked": true,
+  "local_vpn_adapter_linked": true,
+  "pathhealth_linked": true,
+  "measurement_review_linked": true,
+  "hardening_linked": true,
+  "generated_backend_compatible": true,
+  "bypasses_profile_validation": false,
+  "bypasses_measurement_review": false,
+  "allows_generated_drift": false,
+  "allows_carrier_connected_traffic": false,
+  "conclusion": "passed"
+}
