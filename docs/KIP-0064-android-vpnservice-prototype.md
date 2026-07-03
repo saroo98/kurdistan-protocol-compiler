@@ -127,6 +127,6 @@ Generated modules include Android VpnService constants, fixture metadata, parity
 
 M58 does not provide a mobile application, Android UI, foreground service implementation, notification implementation, carrier-connected Android traffic, packet capture, public carrier behavior, raw traffic diagnostics, automatic telemetry, app-store packaging, or field-test readiness.
 
-## Next Milestone
+## Follow-On Work
 
-M59 should connect the Android VpnService prototype to the reviewed carrier runtime while preserving fail-closed behavior, diagnostics hygiene, reconnect bounds, and generated/interpreted parity.
+M59 builds on this boundary in [KIP-0065: Android Carrier Integration](KIP-0065-android-carrier-integration.md), connecting the prototype state model to the reviewed carrier/runtime path while preserving fail-closed behavior, diagnostics hygiene, reconnect bounds, and generated/interpreted parity.

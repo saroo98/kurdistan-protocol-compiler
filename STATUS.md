@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-03T03:06:47Z`
+- Generated at: `2026-07-03T05:49:49Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -20,7 +20,7 @@
 | `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
-| `same_profile_consistency` | PASS | `required` | suspiciously similar |
+| `same_profile_consistency` | PASS | `required` | same-family by canonical feature distance |
 | `different_profile_separation` | PASS | `required` | 190/190 trace pairs separated |
 | `malformed_probe_behavior` | PASS | `required` | invalid-input behavior distribution checked |
 | `multi_stream_semantics` | PASS | `required` | 4 profiles exercised with local multi-stream echo |
@@ -623,6 +623,21 @@
 | `androidvpnservice_trace_hygiene` | PASS | `required` | 17 reports scanned |
 | `androidvpnservice_public_claim_safety` | PASS | `required` | 6 docs checked |
 | `androidvpnservice_fixture_drift` | PASS | `required` | passed |
+| `androidcarrier_report` | PASS | `required` | decision=ready_for_android_adversarial_safety_audit blockers=0 risks=8 checklist_failed=0 |
+| `androidcarrier_runtime_path` | PASS | `required` | android_carrier_runtime_path_validated_before_connect |
+| `androidcarrier_ui_states` | PASS | `required` | 9 states |
+| `androidcarrier_carrier_selection` | PASS | `required` | android_carrier_selection_uses_reviewed_runtime_constraints |
+| `androidcarrier_relay_compatibility` | PASS | `required` | relay_compatibility_checked_before_android_connected_state |
+| `androidcarrier_flow_integration` | PASS | `required` | 8 runtime streams, 13 carrier envelopes |
+| `androidcarrier_failure_diagnostics` | PASS | `required` | 10 failure classes |
+| `androidcarrier_reconnect_fallback` | PASS | `required` | bounded_android_carrier_reconnect_and_fallback |
+| `androidcarrier_profile_validation` | PASS | `required` | profile_validation_and_relay_compatibility_before_android_connected |
+| `androidcarrier_shutdown_safety` | PASS | `required` | android_carrier_integration_safe_shutdown |
+| `androidcarrier_misuse_detection` | PASS | `required` | 14/14 misuse controls detected |
+| `androidcarrier_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `androidcarrier_trace_hygiene` | PASS | `required` | 19 reports scanned |
+| `androidcarrier_public_claim_safety` | PASS | `required` | 6 docs checked |
+| `androidcarrier_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -630,15 +645,15 @@
 | `hardening_trace_hygiene` | PASS | `required` | 20 trace/security hygiene checks run; 0 failures |
 | `hardening_concurrency_safety` | PASS | `required` | 4 concurrency checks run; 0 failures |
 | `hardening_generated_parity` | PASS | `required` | 3 generated_parity checks run; 0 failures |
-| `hardening_pre_adapter_readiness` | PASS | `required` | 26 pre_adapter_readiness checks run; 0 failures |
+| `hardening_pre_adapter_readiness` | PASS | `required` | 27 pre_adapter_readiness checks run; 0 failures |
 | `hardening_mutant_detection` | PASS | `required` | 8/8 hardening mutant modes detected |
 | `fuzz_presence` | PASS | `required` | 4 fuzz target files checked |
 
 ## Benchmark Highlights
 
-- Profile generation: `83 ms`
-- Trace generation: `19 ms`
-- Total audit runtime: `2159 ms`
+- Profile generation: `86 ms`
+- Trace generation: `12 ms`
+- Total audit runtime: `2184 ms`
 
 ## Corpus Diversity Summary
 
@@ -663,7 +678,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3185218828800825`
+- `different_profile_average_distance`: `0.31606201697882513`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
