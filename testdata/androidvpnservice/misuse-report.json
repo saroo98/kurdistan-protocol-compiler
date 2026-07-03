@@ -1,0 +1,19 @@
+{
+  "detected_controls": [
+    "androidvpnservice_bypasses_permission",
+    "androidvpnservice_accepts_invalid_profile",
+    "androidvpnservice_kill_switch_fail_open",
+    "androidvpnservice_carrier_failure_fails_open",
+    "androidvpnservice_relay_incompatible_fails_open",
+    "androidvpnservice_payload_diagnostics",
+    "androidvpnservice_packet_capture",
+    "androidvpnservice_raw_destination_logging",
+    "androidvpnservice_auto_telemetry",
+    "androidvpnservice_unbounded_reconnect",
+    "androidvpnservice_background_policy_bypass",
+    "androidvpnservice_generated_backend_drift"
+  ],
+  "detected_count": 12,
+  "expected_count": 12,
+  "conclusion": "passed"
+}

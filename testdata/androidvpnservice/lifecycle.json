@@ -1,0 +1,39 @@
+{
+  "policy": "android_vpnservice_lifecycle_controls_runtime_session",
+  "states": [
+    "permission_required",
+    "permission_granted",
+    "vpn_starting",
+    "vpn_active",
+    "vpn_stopping",
+    "vpn_stopped",
+    "reconnecting",
+    "failed",
+    "blocked_by_policy",
+    "diagnostic_ready"
+  ],
+  "valid_transitions": [
+    "permission_required_to_permission_granted",
+    "permission_granted_to_vpn_starting",
+    "vpn_starting_to_vpn_active",
+    "vpn_active_to_reconnecting",
+    "reconnecting_to_vpn_active",
+    "vpn_active_to_vpn_stopping",
+    "vpn_stopping_to_vpn_stopped",
+    "failed_to_diagnostic_ready",
+    "blocked_by_policy_to_diagnostic_ready"
+  ],
+  "invalid_transitions_rejected": [
+    "vpn_active_without_permission",
+    "packet_flow_before_vpn_active",
+    "vpn_active_after_policy_block",
+    "vpn_active_after_permission_revoked",
+    "post_stop_packet_flow",
+    "restart_without_safe_shutdown"
+  ],
+  "start_idempotent": true,
+  "stop_idempotent": true,
+  "invalid_transition_allowed": false,
+  "post_stop_packet_accepted": false,
+  "conclusion": "passed"
+}

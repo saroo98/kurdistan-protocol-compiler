@@ -672,6 +672,19 @@ const (
 	ModeAndroidRuntimeStorageLeak             = "androidruntime_storage_leak"
 	ModeAndroidRuntimeOperationalBypass       = "androidruntime_operational_bypass"
 	ModeAndroidRuntimeGeneratedBackendDrift   = "androidruntime_generated_backend_drift"
+
+	ModeAndroidVPNServiceBypassesPermission         = "androidvpnservice_bypasses_permission"
+	ModeAndroidVPNServiceAcceptsInvalidProfile      = "androidvpnservice_accepts_invalid_profile"
+	ModeAndroidVPNServiceKillSwitchFailOpen         = "androidvpnservice_kill_switch_fail_open"
+	ModeAndroidVPNServiceCarrierFailureFailsOpen    = "androidvpnservice_carrier_failure_fails_open"
+	ModeAndroidVPNServiceRelayIncompatibleFailsOpen = "androidvpnservice_relay_incompatible_fails_open"
+	ModeAndroidVPNServicePayloadDiagnostics         = "androidvpnservice_payload_diagnostics"
+	ModeAndroidVPNServicePacketCapture              = "androidvpnservice_packet_capture"
+	ModeAndroidVPNServiceRawDestinationLogging      = "androidvpnservice_raw_destination_logging"
+	ModeAndroidVPNServiceAutoTelemetry              = "androidvpnservice_auto_telemetry"
+	ModeAndroidVPNServiceUnboundedReconnect         = "androidvpnservice_unbounded_reconnect"
+	ModeAndroidVPNServiceBackgroundPolicyBypass     = "androidvpnservice_background_policy_bypass"
+	ModeAndroidVPNServiceGeneratedBackendDrift      = "androidvpnservice_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1313,6 +1326,18 @@ func Modes() []string {
 		ModeAndroidRuntimeStorageLeak,
 		ModeAndroidRuntimeOperationalBypass,
 		ModeAndroidRuntimeGeneratedBackendDrift,
+		ModeAndroidVPNServiceBypassesPermission,
+		ModeAndroidVPNServiceAcceptsInvalidProfile,
+		ModeAndroidVPNServiceKillSwitchFailOpen,
+		ModeAndroidVPNServiceCarrierFailureFailsOpen,
+		ModeAndroidVPNServiceRelayIncompatibleFailsOpen,
+		ModeAndroidVPNServicePayloadDiagnostics,
+		ModeAndroidVPNServicePacketCapture,
+		ModeAndroidVPNServiceRawDestinationLogging,
+		ModeAndroidVPNServiceAutoTelemetry,
+		ModeAndroidVPNServiceUnboundedReconnect,
+		ModeAndroidVPNServiceBackgroundPolicyBypass,
+		ModeAndroidVPNServiceGeneratedBackendDrift,
 	}
 }
 

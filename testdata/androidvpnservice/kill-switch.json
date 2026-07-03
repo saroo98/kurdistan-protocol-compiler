@@ -1,0 +1,18 @@
+{
+  "policy": "android_vpnservice_fail_closed_kill_switch_policy",
+  "fail_closed_triggers": [
+    "profile_validation_failed",
+    "carrier_runtime_unavailable",
+    "relay_compatibility_failed",
+    "android_vpn_revoked",
+    "pathhealth_blocked",
+    "measurementreview_blocked"
+  ],
+  "fail_closed_required": true,
+  "profile_validation_failure_fails_open": false,
+  "carrier_runtime_failure_fails_open": false,
+  "relay_compatibility_fails_open": false,
+  "android_vpn_revocation_fails_open": false,
+  "bypass_allowed": false,
+  "conclusion": "passed"
+}

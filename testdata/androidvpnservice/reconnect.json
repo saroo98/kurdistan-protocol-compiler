@@ -1,0 +1,24 @@
+{
+  "policy": "bounded_android_vpnservice_reconnect_hooks",
+  "hooks": [
+    "network_switch",
+    "sleep_wake",
+    "permission_change",
+    "runtime_restart"
+  ],
+  "bounded_resources": [
+    "reconnect_attempts",
+    "lifecycle_event_queue",
+    "runtime_restart_window",
+    "diagnostic_events"
+  ],
+  "max_reconnect_attempts": 3,
+  "max_queued_lifecycle_events": 64,
+  "network_switch_handled": true,
+  "sleep_wake_handled": true,
+  "permission_change_handled": true,
+  "runtime_restart_handled": true,
+  "unbounded_retry": false,
+  "background_policy_bypassed": false,
+  "conclusion": "passed"
+}

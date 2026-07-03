@@ -1,0 +1,52 @@
+{
+  "policy": "bounded_redacted_android_vpnservice_diagnostics",
+  "allowed_fields": [
+    "vpn_state_bucket",
+    "runtime_state_bucket",
+    "lifecycle_event_count",
+    "permission_state_bucket",
+    "routing_policy_class",
+    "kill_switch_trigger_class",
+    "network_change_bucket",
+    "battery_restriction_bucket",
+    "crash_recovery_class",
+    "redaction_status"
+  ],
+  "failure_classes": [
+    "permission_denied",
+    "permission_revoked",
+    "profile_invalid",
+    "carrier_unavailable",
+    "relay_incompatible",
+    "background_restricted",
+    "network_changed",
+    "runtime_restart_required",
+    "safe_shutdown_timeout_bucket"
+  ],
+  "network_change_events": [
+    "network_available_bucket",
+    "network_lost_bucket",
+    "network_capabilities_changed_bucket",
+    "metered_state_changed_bucket"
+  ],
+  "battery_background_restrictions": [
+    "foreground_required",
+    "background_start_rejected",
+    "battery_optimization_observed",
+    "bounded_restart_window"
+  ],
+  "crash_recovery_classes": [
+    "cold_restart_safe_reset",
+    "runtime_state_rebuild",
+    "diagnostic_ready_after_crash"
+  ],
+  "lifecycle_event_count": 42,
+  "runtime_state_transition_count": 18,
+  "payload_logged": false,
+  "secret_logged": false,
+  "raw_packet_logged": false,
+  "destination_metadata_logged": false,
+  "device_identifier_logged": false,
+  "auto_upload_allowed": false,
+  "conclusion": "passed"
+}

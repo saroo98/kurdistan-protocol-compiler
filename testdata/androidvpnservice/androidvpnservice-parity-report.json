@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "AndroidVPNServiceSchemaVersion",
+    "AndroidVPNServiceBackendVersion",
+    "AndroidVPNServiceDecision",
+    "AndroidVPNServiceStateCount",
+    "AndroidVPNServiceMisuseCount",
+    "AndroidVPNServiceNextMilestone"
+  ],
+  "interpreted_hash": "sha256:b3968e917f04d45222e88ddb85d82af78145ffa50e86261368297710783b9776",
+  "generated_hash": "sha256:b3968e917f04d45222e88ddb85d82af78145ffa50e86261368297710783b9776",
+  "conclusion": "passed"
+}
