@@ -198,6 +198,10 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		"protocol/androidruntime_test.go",
 		"protocol/androidruntime_parity_test.go",
 		"protocol/androidruntime_hygiene_test.go",
+		"protocol/androidvpnservice_generated.go",
+		"protocol/androidvpnservice_test.go",
+		"protocol/androidvpnservice_parity_test.go",
+		"protocol/androidvpnservice_hygiene_test.go",
 		"protocol/protocol_bench_test.go",
 		"protocol/trace_capture_generated.go",
 		"protocol/probe_test.go",
@@ -376,6 +380,8 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	androidReviewB := mustRead(t, filepath.Join(outB, "protocol", "androidreview_generated.go"))
 	androidRuntimeA := mustRead(t, filepath.Join(outA, "protocol", "androidruntime_generated.go"))
 	androidRuntimeB := mustRead(t, filepath.Join(outB, "protocol", "androidruntime_generated.go"))
+	androidVPNServiceA := mustRead(t, filepath.Join(outA, "protocol", "androidvpnservice_generated.go"))
+	androidVPNServiceB := mustRead(t, filepath.Join(outB, "protocol", "androidvpnservice_generated.go"))
 	byteTransportA := mustRead(t, filepath.Join(outA, "protocol", "bytetransport_generated.go"))
 	byteTransportB := mustRead(t, filepath.Join(outB, "protocol", "bytetransport_generated.go"))
 	relayFleetA := mustRead(t, filepath.Join(outA, "protocol", "relayfleet_generated.go"))
@@ -471,6 +477,9 @@ func TestGeneratedConstantsDifferAcrossProfiles(t *testing.T) {
 	}
 	if androidRuntimeA == androidRuntimeB {
 		t.Fatalf("Android runtime generation did not differ across profiles")
+	}
+	if androidVPNServiceA == androidVPNServiceB {
+		t.Fatalf("Android VpnService generation did not differ across profiles")
 	}
 	if byteTransportA == byteTransportB {
 		t.Fatalf("byte transport generation did not differ across profiles")

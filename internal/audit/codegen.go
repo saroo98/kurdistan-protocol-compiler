@@ -135,6 +135,7 @@ type CodegenAuditSummary struct {
 	OperationalHardeningParity       string                         `json:"operationalhardening_generated_backend_parity"`
 	AndroidReviewParity              string                         `json:"androidreview_generated_backend_parity"`
 	AndroidRuntimeParity             string                         `json:"androidruntime_generated_backend_parity"`
+	AndroidVPNServiceParity          string                         `json:"androidvpnservice_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -259,6 +260,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	operationalHardeningGate := GeneratedOperationalHardeningParityGate(corpus, testFailures)
 	androidReviewGate := GeneratedAndroidReviewParityGate(corpus, testFailures)
 	androidRuntimeGate := GeneratedAndroidRuntimeParityGate(corpus, testFailures)
+	androidVPNServiceGate := GeneratedAndroidVPNServiceParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -323,6 +325,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		operationalHardeningGate,
 		androidReviewGate,
 		androidRuntimeGate,
+		androidVPNServiceGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1179,6 +1182,10 @@ func GeneratedAndroidRuntimeParityGate(corpus GeneratedBackendTraceCorpus, testF
 	return generatedMilestoneSourceGate(corpus, testFailures, "androidruntime", "Android local runtime port", "AndroidRuntimeSchemaVersion")
 }
 
+func GeneratedAndroidVPNServiceParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "androidvpnservice", "Android VpnService prototype", "AndroidVpnServiceSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1402,6 +1409,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		OperationalHardeningParity:       status("operationalhardening_generated_backend_parity"),
 		AndroidReviewParity:              status("androidreview_generated_backend_parity"),
 		AndroidRuntimeParity:             status("androidruntime_generated_backend_parity"),
+		AndroidVPNServiceParity:          status("androidvpnservice_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
