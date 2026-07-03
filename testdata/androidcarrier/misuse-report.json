@@ -1,0 +1,21 @@
+{
+  "detected_controls": [
+    "androidcarrier_bypasses_profile_validation",
+    "androidcarrier_bypasses_carrierreview",
+    "androidcarrier_bypasses_measurementreview",
+    "androidcarrier_bypasses_pathhealth",
+    "androidcarrier_accepts_relay_incompatible",
+    "androidcarrier_accepts_profile_expired",
+    "androidcarrier_unbounded_fallback",
+    "androidcarrier_kill_switch_fail_open",
+    "androidcarrier_payload_diagnostics",
+    "androidcarrier_packet_capture",
+    "androidcarrier_raw_destination_logging",
+    "androidcarrier_auto_telemetry",
+    "androidcarrier_public_network_egress",
+    "androidcarrier_generated_backend_drift"
+  ],
+  "detected_count": 14,
+  "expected_count": 14,
+  "conclusion": "passed"
+}

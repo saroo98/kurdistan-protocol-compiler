@@ -1,0 +1,31 @@
+{
+  "policy": "android_carrier_selection_uses_reviewed_runtime_constraints",
+  "required_gates": [
+    "profile_policy",
+    "carrierreview",
+    "measurementreview",
+    "pathhealth",
+    "runtime_compatibility",
+    "operational_safety",
+    "generated_parity"
+  ],
+  "candidate_families": [
+    "https_like_lab_carrier",
+    "constrained_lab_carrier",
+    "loopback_control_carrier"
+  ],
+  "selected_carrier_class": "reviewed_primary_carrier_bucket",
+  "fallback_carrier_class": "reviewed_fallback_carrier_bucket",
+  "selection_respects_profile": true,
+  "carrierreview_enforced": true,
+  "measurementreview_enforced": true,
+  "pathhealth_enforced": true,
+  "runtime_compatibility_enforced": true,
+  "operational_safety_enforced": true,
+  "generated_parity_enforced": true,
+  "high_risk_default_allowed": false,
+  "review_bypass_allowed": false,
+  "unbounded_fallback_allowed": false,
+  "public_carrier_auto_selected": false,
+  "conclusion": "passed"
+}

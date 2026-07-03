@@ -10,6 +10,7 @@ import (
 
 	"kurdistan/internal/adapteradversary"
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/androidcarrier"
 	"kurdistan/internal/androidreview"
 	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/androidvpnservice"
@@ -201,6 +202,8 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	androidRuntimeDrift := androidRuntimeComparison(filepath.Join(fixtureRoot, "testdata", "androidruntime", "androidruntime-report-golden.json"), androidRuntimeSet)
 	androidVPNServiceSet, androidVPNServiceErr := androidvpnservice.GenerateFixtureSet()
 	androidVPNServiceDrift := androidVPNServiceComparison(filepath.Join(fixtureRoot, "testdata", "androidvpnservice", "androidvpnservice-report-golden.json"), androidVPNServiceSet)
+	androidCarrierSet, androidCarrierErr := androidcarrier.GenerateFixtureSet()
+	androidCarrierDrift := androidCarrierComparison(filepath.Join(fixtureRoot, "testdata", "androidcarrier", "androidcarrier-report-golden.json"), androidCarrierSet)
 	if wireEvalErr == nil {
 		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
 		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
@@ -515,6 +518,11 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		gates = append(gates, AndroidVPNServiceGates(androidVPNServiceSet, androidVPNServiceDrift)...)
 	} else {
 		gates = append(gates, gate("androidvpnservice_report", false, "required", androidVPNServiceErr.Error(), nil, []string{androidVPNServiceErr.Error()}))
+	}
+	if androidCarrierErr == nil {
+		gates = append(gates, AndroidCarrierGates(androidCarrierSet, androidCarrierDrift)...)
+	} else {
+		gates = append(gates, gate("androidcarrier_report", false, "required", androidCarrierErr.Error(), nil, []string{androidCarrierErr.Error()}))
 	}
 	gates = append(gates, FuzzPresenceGate())
 	gates = append(gates[:len(gates)-1], append(hardeningGates, gates[len(gates)-1])...)

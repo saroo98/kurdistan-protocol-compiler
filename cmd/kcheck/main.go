@@ -13,6 +13,7 @@ import (
 
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/adversary"
+	"kurdistan/internal/androidcarrier"
 	"kurdistan/internal/androidreview"
 	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/androidvpnservice"
@@ -226,6 +227,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "androidvpnservice" {
 		os.Exit(runAndroidVPNService(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "androidcarrier" {
+		os.Exit(runAndroidCarrier(os.Args[2:]))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "androidreview" {
 		os.Exit(runAndroidReview(os.Args[2:]))
@@ -8135,6 +8139,178 @@ func writeAndroidVPNServiceCompanions(out string, set androidvpnservice.FixtureS
 	}
 	for _, write := range writes {
 		if err := androidvpnservice.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runAndroidCarrier(args []string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "generate":
+			return runAndroidCarrierGenerate(args[1:])
+		case "verify":
+			return runAndroidCarrierVerify(args[1:])
+		case "compare":
+			return runAndroidCarrierCompare(args[1:])
+		}
+	}
+	flags := flag.NewFlagSet("kcheck androidcarrier", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	quick := flags.Bool("quick", false, "run quick Android carrier integration audit")
+	full := flags.Bool("full", false, "run full Android carrier integration audit")
+	out := flags.String("out", "", "optional JSON report path")
+	status := flags.String("status", "", "optional status markdown path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	mode := "quick"
+	if *full {
+		mode = "full"
+	}
+	if *quick {
+		mode = "quick"
+	}
+	cfg := audit.DefaultConfig(mode)
+	cfg.TraceCount = 0
+	cfg.OutputPath = *out
+	cfg.StatusPath = *status
+	report, err := audit.RunAndroidCarrierAudit(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := audit.WriteStatus(cfg.StatusPath, report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(report.HumanSummary())
+	if !report.Passed() {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidCarrierGenerate(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidcarrier generate", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	out := flags.String("out", filepath.Join("testdata", "androidcarrier", "androidcarrier-report-golden.json"), "Android carrier fixture path")
+	force := flags.Bool("force", false, "overwrite fixture")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	set, err := androidcarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := androidcarrier.WriteFixtureSet(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := writeAndroidCarrierCompanions(*out, set, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("wrote androidcarrier fixtures: %s (%d UI states, %d controls)\n", *out, len(set.UIStates.States), set.Misuse.DetectedCount)
+	return 0
+}
+
+func runAndroidCarrierVerify(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidcarrier verify", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	baseline := flags.String("baseline", filepath.Join("testdata", "androidcarrier", "androidcarrier-report-golden.json"), "Android carrier fixture path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	oldSet, err := androidcarrier.LoadFixtureSet(*baseline)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidcarrier.GenerateFixtureSet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidcarrier.CompareFixtureSets(oldSet, newSet)
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func runAndroidCarrierCompare(args []string) int {
+	flags := flag.NewFlagSet("kcheck androidcarrier compare", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	oldPath := flags.String("old", "", "old Android carrier fixture")
+	newPath := flags.String("new", "", "new Android carrier fixture")
+	out := flags.String("out", "", "optional comparison JSON path")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if *oldPath == "" || *newPath == "" {
+		fmt.Fprintln(os.Stderr, "--old and --new are required")
+		return 2
+	}
+	oldSet, err := androidcarrier.LoadFixtureSet(*oldPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	newSet, err := androidcarrier.LoadFixtureSet(*newPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	report := androidcarrier.CompareFixtureSets(oldSet, newSet)
+	if *out != "" {
+		if err := androidcarrier.WriteJSON(*out, report, true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	raw, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(raw))
+	if report.Conclusion != "passed" {
+		return 1
+	}
+	return 0
+}
+
+func writeAndroidCarrierCompanions(out string, set androidcarrier.FixtureSet, force bool) error {
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil && dir != "." {
+		return err
+	}
+	writes := []struct {
+		name  string
+		value any
+	}{
+		{"runtime-path.json", set.RuntimePath},
+		{"ui-states.json", set.UIStates},
+		{"carrier-selection.json", set.CarrierSelection},
+		{"relay-compatibility.json", set.RelayCompatibility},
+		{"flow-integration.json", set.FlowIntegration},
+		{"failure-diagnostics.json", set.FailureDiagnostics},
+		{"reconnect-fallback.json", set.ReconnectFallback},
+		{"profile-validation.json", set.ProfileValidation},
+		{"shutdown-safety.json", set.ShutdownSafety},
+		{"checklist-report.json", set.Checklist},
+		{"misuse-report.json", set.Misuse},
+		{"trace-hygiene-report.json", set.TraceHygiene},
+		{"public-claim-safety-report.json", set.PublicClaims},
+		{"androidcarrier-parity-report.json", set.Parity},
+	}
+	for _, write := range writes {
+		if err := androidcarrier.WriteJSON(filepath.Join(dir, write.name), write.value, force); err != nil {
 			return err
 		}
 	}

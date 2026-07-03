@@ -1,0 +1,13 @@
+{
+  "generated_markers": [
+    "AndroidCarrierSchemaVersion",
+    "AndroidCarrierBackendVersion",
+    "AndroidCarrierDecision",
+    "AndroidCarrierConnectedState",
+    "AndroidCarrierMisuseCount",
+    "AndroidCarrierNextMilestone"
+  ],
+  "interpreted_hash": "sha256:50f24371babd247af7bfb3b7eb8ca6d58b6bf9baf079e164a41c6ef1fb529086",
+  "generated_hash": "sha256:50f24371babd247af7bfb3b7eb8ca6d58b6bf9baf079e164a41c6ef1fb529086",
+  "conclusion": "passed"
+}

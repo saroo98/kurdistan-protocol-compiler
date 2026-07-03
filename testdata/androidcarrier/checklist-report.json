@@ -1,0 +1,19 @@
+{
+  "items": [
+    "m58_vpnservice_linked",
+    "profile_validation_before_connected",
+    "runtime_initialization_linked",
+    "carrier_selection_gates_enforced",
+    "relay_compatibility_checked",
+    "authenticated_session_established",
+    "stream_mapping_completed",
+    "pathhealth_checked",
+    "failure_diagnostics_redacted",
+    "fallback_bounded_fail_closed",
+    "kill_switch_interaction_checked",
+    "generated_backend_parity"
+  ],
+  "passed": 12,
+  "failed": 0,
+  "conclusion": "passed"
+}
