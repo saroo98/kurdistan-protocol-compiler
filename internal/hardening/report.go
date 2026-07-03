@@ -11,7 +11,7 @@ import (
 	"kurdistan/internal/ir"
 )
 
-const Version = "0.57.0-lab"
+const Version = "0.58.0-lab"
 
 const (
 	CategoryInvariants          = "invariants"

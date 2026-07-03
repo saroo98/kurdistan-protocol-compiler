@@ -16,6 +16,7 @@ import (
 	"kurdistan/internal/adaptivepath"
 	"kurdistan/internal/androidreview"
 	"kurdistan/internal/androidruntime"
+	"kurdistan/internal/androidvpnservice"
 	"kurdistan/internal/carriercollapse"
 	"kurdistan/internal/carrierreadiness"
 	"kurdistan/internal/carrierreview"
@@ -2493,6 +2494,49 @@ func GeneratedAndroidRuntimeParity() (androidruntime.ParityReport, error) {
 		return nil, err
 	}
 
+	androidVPNServiceSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/androidvpnservice"
+)
+
+const AndroidVpnServiceSchemaVersion = %[1]s
+const AndroidVpnServiceGeneratedProfileID = %[2]s
+const AndroidVpnServiceGeneratedProfileSeed int64 = %[3]d
+const AndroidVpnServiceBackendVersion = %[4]s
+const AndroidVpnServiceDecision = %[5]s
+const AndroidVpnServicePermissionPolicy = %[6]s
+const AndroidVpnServiceLifecyclePolicy = %[7]s
+const AndroidVpnServicePacketFlowPolicy = %[8]s
+const AndroidVpnServiceKillSwitchPolicy = %[9]s
+const AndroidVpnServiceDiagnosticsPolicy = %[10]s
+const AndroidVpnServiceReconnectPolicy = %[11]s
+const AndroidVpnServiceIntegrationPolicy = %[12]s
+const AndroidVpnServiceNextMilestone = %[13]s
+const AndroidVpnServiceStateCount = %[14]d
+const AndroidVpnServiceRuntimeStreamsMapped = %[15]d
+const AndroidVpnServiceMisuseCount = %[16]d
+
+var AndroidVpnServiceStates = %[17]s
+var AndroidVpnServiceControls = %[18]s
+var AndroidVpnServiceGeneratedPolicyHints = %[19]s
+
+func GeneratedAndroidVpnServiceFixtureSet() (androidvpnservice.FixtureSet, error) {
+	return androidvpnservice.GenerateFixtureSet()
+}
+
+func GeneratedAndroidVpnServiceParity() (androidvpnservice.ParityReport, error) {
+	set, err := androidvpnservice.GenerateFixtureSet()
+	if err != nil {
+		return androidvpnservice.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(androidvpnservice.Version), quote(p.ID), p.Seed, quote(androidvpnservice.BackendVersion), quote(androidvpnservice.DecisionReady), quote(androidvpnservice.DefaultPermissionReport().Policy), quote(androidvpnservice.DefaultLifecycleReport().Policy+"/"+p.AdapterPolicy.RuntimeMappingPolicy), quote(androidvpnservice.DefaultPacketFlowReport().Policy+"/"+p.Stream.IDEncodingMode), quote(androidvpnservice.DefaultKillSwitchReport().Policy), quote(androidvpnservice.DefaultDiagnosticsReport().Policy), quote(androidvpnservice.DefaultReconnectReport().Policy+"/"+p.CarrierPolicy.BackpressurePolicy), quote(androidvpnservice.DefaultIntegrationReport().Policy+"/"+p.Security.ProfileCompatibilityPolicy), quote(androidvpnservice.RecommendedNextMilestone), len(androidvpnservice.RequiredVpnStates()), androidvpnservice.DefaultPacketFlowReport().RuntimeStreamsMapped, len(androidvpnservice.RequiredMisuseNames()), quoteSlice(androidvpnservice.RequiredVpnStates()), quoteSlice(androidvpnservice.RequiredMisuseNames()), quoteSlice([]string{p.AdapterPolicy.RuntimeMappingPolicy, p.CarrierPolicy.CarrierFamily, p.CarrierPolicy.BackpressurePolicy, p.Stream.IDEncodingMode, p.Security.ReplayPolicy, p.Security.ProfileCompatibilityPolicy, p.Security.CapabilityNegotiationPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -3300,6 +3344,95 @@ func TestGeneratedAndroidRuntimeHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := androidruntime.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe Android runtime metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidVPNServiceTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidvpnservice"
+)
+
+func TestGeneratedAndroidVpnService(t *testing.T) {
+	if AndroidVpnServiceSchemaVersion != androidvpnservice.Version || AndroidVpnServiceGeneratedProfileID != ProfileID {
+		t.Fatalf("generated Android VpnService constants drifted")
+	}
+	set, err := GeneratedAndroidVpnServiceFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidvpnservice.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if AndroidVpnServiceStateCount < len(androidvpnservice.RequiredVpnStates()) || AndroidVpnServiceMisuseCount < len(androidvpnservice.RequiredMisuseNames()) || len(AndroidVpnServiceStates) < len(androidvpnservice.RequiredVpnStates()) {
+		t.Fatalf("generated Android VpnService constants incomplete")
+	}
+	if AndroidVpnServiceRuntimeStreamsMapped < 4 {
+		t.Fatalf("runtime stream mapping count too low")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidVPNServiceParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedAndroidVpnServiceParity(t *testing.T) {
+	parity, err := GeneratedAndroidVpnServiceParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated Android VpnService parity failed: %%+v", parity)
+	}
+	if AndroidVpnServicePermissionPolicy == "" || AndroidVpnServiceLifecyclePolicy == "" || AndroidVpnServicePacketFlowPolicy == "" || AndroidVpnServiceNextMilestone == "" {
+		t.Fatalf("Android VpnService generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidVPNServiceHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidvpnservice"
+)
+
+func TestGeneratedAndroidVpnServiceHygiene(t *testing.T) {
+	set, err := GeneratedAndroidVpnServiceFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidvpnservice.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_packet": "synthetic"},
+		map[string]string{"packet_capture": "synthetic"},
+		map[string]string{"visited_domain": "synthetic"},
+		map[string]string{"host_header": "synthetic"},
+		map[string]string{"dns_query": "synthetic"},
+		map[string]string{"phone_identifier": "synthetic"},
+		map[string]string{"telemetry_upload_endpoint": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := androidvpnservice.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe Android VpnService metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7598,6 +7731,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/androidruntime_test.go", Content: androidRuntimeTestSource, Go: true},
 		{RelPath: "protocol/androidruntime_parity_test.go", Content: androidRuntimeParityTestSource, Go: true},
 		{RelPath: "protocol/androidruntime_hygiene_test.go", Content: androidRuntimeHygieneTestSource, Go: true},
+		{RelPath: "protocol/androidvpnservice_generated.go", Content: androidVPNServiceSource, Go: true},
+		{RelPath: "protocol/androidvpnservice_test.go", Content: androidVPNServiceTestSource, Go: true},
+		{RelPath: "protocol/androidvpnservice_parity_test.go", Content: androidVPNServiceParityTestSource, Go: true},
+		{RelPath: "protocol/androidvpnservice_hygiene_test.go", Content: androidVPNServiceHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},

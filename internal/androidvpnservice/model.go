@@ -254,7 +254,7 @@ func GenerateFixtureSet() (FixtureSet, error) {
 	return set, nil
 }
 
-func RequiredVPNStates() []string {
+func RequiredVpnStates() []string {
 	return []string{
 		"permission_required",
 		"permission_granted",
@@ -267,6 +267,10 @@ func RequiredVPNStates() []string {
 		"blocked_by_policy",
 		"diagnostic_ready",
 	}
+}
+
+func RequiredVPNStates() []string {
+	return RequiredVpnStates()
 }
 
 func DefaultPermissionReport() PermissionReport {
@@ -284,7 +288,7 @@ func DefaultPermissionReport() PermissionReport {
 func DefaultLifecycleReport() LifecycleReport {
 	return LifecycleReport{
 		Policy: "android_vpnservice_lifecycle_controls_runtime_session",
-		States: RequiredVPNStates(),
+		States: RequiredVpnStates(),
 		ValidTransitions: []string{
 			"permission_required_to_permission_granted",
 			"permission_granted_to_vpn_starting",
@@ -468,7 +472,7 @@ func ValidateFixtureSet(set FixtureSet) error {
 	if set.Decision != DecisionReady || set.BlockerCount != 0 || set.RiskCount < 7 {
 		return errors.New("Android VpnService decision incomplete")
 	}
-	if !containsAll(set.Lifecycle.States, RequiredVPNStates()) || len(set.Lifecycle.ValidTransitions) < 8 || len(set.Lifecycle.InvalidTransitionsRejected) < 6 || !set.Lifecycle.StartIdempotent || !set.Lifecycle.StopIdempotent || set.Lifecycle.InvalidTransitionAllowed || set.Lifecycle.PostStopPacketAccepted {
+	if !containsAll(set.Lifecycle.States, RequiredVpnStates()) || len(set.Lifecycle.ValidTransitions) < 8 || len(set.Lifecycle.InvalidTransitionsRejected) < 6 || !set.Lifecycle.StartIdempotent || !set.Lifecycle.StopIdempotent || set.Lifecycle.InvalidTransitionAllowed || set.Lifecycle.PostStopPacketAccepted {
 		return errors.New("Android VpnService lifecycle unsafe")
 	}
 	if !set.Permission.PermissionRequiredModeled || !set.Permission.PermissionGrantedModeled || !set.Permission.PermissionRevokedFailClose || set.Permission.StartWithoutPermission || set.Permission.BypassAllowed {
