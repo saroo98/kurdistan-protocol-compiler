@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/androidcarrier"
 	"kurdistan/internal/androidreview"
 	"kurdistan/internal/androidruntime"
 	"kurdistan/internal/androidvpnservice"
@@ -2537,6 +2538,51 @@ func GeneratedAndroidVpnServiceParity() (androidvpnservice.ParityReport, error) 
 		return nil, err
 	}
 
+	androidCarrierSource, err := renderGo(`package protocol
+
+import (
+	"kurdistan/internal/androidcarrier"
+)
+
+const AndroidCarrierSchemaVersion = %[1]s
+const AndroidCarrierGeneratedProfileID = %[2]s
+const AndroidCarrierGeneratedProfileSeed int64 = %[3]d
+const AndroidCarrierBackendVersion = %[4]s
+const AndroidCarrierDecision = %[5]s
+const AndroidCarrierRuntimePathPolicy = %[6]s
+const AndroidCarrierUIStatePolicy = %[7]s
+const AndroidCarrierSelectionPolicy = %[8]s
+const AndroidCarrierRelayCompatibilityPolicy = %[9]s
+const AndroidCarrierFlowIntegrationPolicy = %[10]s
+const AndroidCarrierReconnectPolicy = %[11]s
+const AndroidCarrierProfileValidationPolicy = %[12]s
+const AndroidCarrierNextMilestone = %[13]s
+const AndroidCarrierUIStateCount = %[14]d
+const AndroidCarrierRuntimeStreamsMapped = %[15]d
+const AndroidCarrierCarrierEnvelopesMapped = %[16]d
+const AndroidCarrierMisuseCount = %[17]d
+
+var AndroidCarrierUIStates = %[18]s
+var AndroidCarrierFailureClasses = %[19]s
+var AndroidCarrierControls = %[20]s
+var AndroidCarrierGeneratedPolicyHints = %[21]s
+
+func GeneratedAndroidCarrierFixtureSet() (androidcarrier.FixtureSet, error) {
+	return androidcarrier.GenerateFixtureSet()
+}
+
+func GeneratedAndroidCarrierParity() (androidcarrier.ParityReport, error) {
+	set, err := androidcarrier.GenerateFixtureSet()
+	if err != nil {
+		return androidcarrier.ParityReport{}, err
+	}
+	return set.Parity, nil
+}
+`, quote(androidcarrier.Version), quote(p.ID), p.Seed, quote(androidcarrier.BackendVersion), quote(androidcarrier.DecisionReady), quote(androidcarrier.DefaultRuntimePathReport().Policy+"/"+p.AdapterPolicy.RuntimeMappingPolicy), quote(androidcarrier.DefaultUIStateReport().Policy), quote(androidcarrier.DefaultCarrierSelectionReport().Policy+"/"+p.CarrierPolicy.CarrierFamily+"/"+p.CarrierPolicy.BackpressurePolicy), quote(androidcarrier.DefaultRelayCompatibilityReport().Policy+"/"+p.Security.ProfileCompatibilityPolicy), quote(androidcarrier.DefaultFlowIntegrationReport().Policy+"/"+p.Stream.IDEncodingMode), quote(androidcarrier.DefaultReconnectFallbackReport().Policy+"/"+p.CarrierPolicy.BackpressurePolicy), quote(androidcarrier.DefaultProfileValidationReport().Policy+"/"+p.Security.CapabilityNegotiationPolicy), quote(androidcarrier.RecommendedNextMilestone), len(androidcarrier.RequiredUIStates()), androidcarrier.DefaultFlowIntegrationReport().RuntimeStreamsMapped, androidcarrier.DefaultFlowIntegrationReport().CarrierEnvelopesMapped, len(androidcarrier.RequiredMisuseNames()), quoteSlice(androidcarrier.RequiredUIStates()), quoteSlice(androidcarrier.DefaultFailureDiagnosticsReport().FailureClasses), quoteSlice(androidcarrier.RequiredMisuseNames()), quoteSlice([]string{p.AdapterPolicy.RuntimeMappingPolicy, p.CarrierPolicy.CarrierFamily, p.CarrierPolicy.BackpressurePolicy, p.Stream.IDEncodingMode, p.Security.ReplayPolicy, p.Security.ProfileCompatibilityPolicy, p.Security.CapabilityNegotiationPolicy}))
+	if err != nil {
+		return nil, err
+	}
+
 	scheduler, err := renderGo(`package protocol
 
 import (
@@ -3433,6 +3479,96 @@ func TestGeneratedAndroidVpnServiceHygiene(t *testing.T) {
 	for _, tc := range unsafeCases {
 		if err := androidvpnservice.ScanForLeak(tc); err == nil {
 			t.Fatalf("unsafe Android VpnService metadata accepted: %%v", tc)
+		}
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidCarrierTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidcarrier"
+)
+
+func TestGeneratedAndroidCarrier(t *testing.T) {
+	if AndroidCarrierSchemaVersion != androidcarrier.Version || AndroidCarrierGeneratedProfileID != ProfileID {
+		t.Fatalf("generated Android carrier constants drifted")
+	}
+	set, err := GeneratedAndroidCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidcarrier.ValidateFixtureSet(set); err != nil {
+		t.Fatal(err)
+	}
+	if AndroidCarrierUIStateCount < len(androidcarrier.RequiredUIStates()) || AndroidCarrierMisuseCount < len(androidcarrier.RequiredMisuseNames()) || len(AndroidCarrierUIStates) < len(androidcarrier.RequiredUIStates()) {
+		t.Fatalf("generated Android carrier constants incomplete")
+	}
+	if AndroidCarrierRuntimeStreamsMapped < 4 || AndroidCarrierCarrierEnvelopesMapped < 4 {
+		t.Fatalf("generated Android carrier runtime mapping markers incomplete")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidCarrierParityTestSource, err := renderGo(`package protocol
+
+import "testing"
+
+func TestGeneratedAndroidCarrierParity(t *testing.T) {
+	parity, err := GeneratedAndroidCarrierParity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parity.Conclusion != "passed" || len(parity.UnexpectedDrift) != 0 {
+		t.Fatalf("generated Android carrier parity failed: %%+v", parity)
+	}
+	if AndroidCarrierRuntimePathPolicy == "" || AndroidCarrierSelectionPolicy == "" || AndroidCarrierRelayCompatibilityPolicy == "" || AndroidCarrierNextMilestone == "" {
+		t.Fatalf("Android carrier generated specialization markers missing")
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	androidCarrierHygieneTestSource, err := renderGo(`package protocol
+
+import (
+	"testing"
+
+	"kurdistan/internal/androidcarrier"
+)
+
+func TestGeneratedAndroidCarrierHygiene(t *testing.T) {
+	set, err := GeneratedAndroidCarrierFixtureSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := androidcarrier.ScanForLeak(set); err != nil {
+		t.Fatal(err)
+	}
+	unsafeCases := []any{
+		map[string]string{"raw_payload": "synthetic"},
+		map[string]string{"raw_packet": "synthetic"},
+		map[string]string{"packet_capture": "synthetic"},
+		map[string]string{"visited_domain": "synthetic"},
+		map[string]string{"host_header": "synthetic"},
+		map[string]string{"dns_query": "synthetic"},
+		map[string]string{"resolver_ip": "synthetic"},
+		map[string]string{"phone_identifier": "synthetic"},
+		map[string]string{"telemetry_upload_endpoint": "synthetic"},
+	}
+	for _, tc := range unsafeCases {
+		if err := androidcarrier.ScanForLeak(tc); err == nil {
+			t.Fatalf("unsafe Android carrier metadata accepted: %%v", tc)
 		}
 	}
 }
@@ -7735,6 +7871,10 @@ func readProbeContactPacket(r *bufio.Reader) ([]byte, error) {
 		{RelPath: "protocol/androidvpnservice_test.go", Content: androidVPNServiceTestSource, Go: true},
 		{RelPath: "protocol/androidvpnservice_parity_test.go", Content: androidVPNServiceParityTestSource, Go: true},
 		{RelPath: "protocol/androidvpnservice_hygiene_test.go", Content: androidVPNServiceHygieneTestSource, Go: true},
+		{RelPath: "protocol/androidcarrier_generated.go", Content: androidCarrierSource, Go: true},
+		{RelPath: "protocol/androidcarrier_test.go", Content: androidCarrierTestSource, Go: true},
+		{RelPath: "protocol/androidcarrier_parity_test.go", Content: androidCarrierParityTestSource, Go: true},
+		{RelPath: "protocol/androidcarrier_hygiene_test.go", Content: androidCarrierHygieneTestSource, Go: true},
 		{RelPath: "protocol/protocol_bench_test.go", Content: benchSource, Go: true},
 		{RelPath: "protocol/probe_test.go", Content: probeSource, Go: true},
 		{RelPath: "cmd/generated-client/main.go", Content: client, Go: true},
