@@ -6,7 +6,7 @@
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 - Latest audit mode: `quick`
-- Generated at: `2026-07-02T22:23:59Z`
+- Generated at: `2026-07-03T03:06:47Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -609,6 +609,20 @@
 | `androidruntime_trace_hygiene` | PASS | `required` | 14 reports scanned |
 | `androidruntime_public_claim_safety` | PASS | `required` | 5 docs checked |
 | `androidruntime_fixture_drift` | PASS | `required` | passed |
+| `androidvpnservice_report` | PASS | `required` | decision=ready_for_android_carrier_integration blockers=0 risks=7 checklist_failed=0 |
+| `androidvpnservice_permission_model` | PASS | `required` | android_vpn_permission_first_fail_closed |
+| `androidvpnservice_lifecycle` | PASS | `required` | 10 states |
+| `androidvpnservice_packet_flow_mapping` | PASS | `required` | android_packet_flow_maps_to_kurdistan_stream_runtime |
+| `androidvpnservice_kill_switch` | PASS | `required` | android_vpnservice_fail_closed_kill_switch_policy |
+| `androidvpnservice_diagnostics` | PASS | `required` | bounded_redacted_android_vpnservice_diagnostics |
+| `androidvpnservice_reconnect_hooks` | PASS | `required` | bounded_android_vpnservice_reconnect_hooks |
+| `androidvpnservice_integration` | PASS | `required` | android_vpnservice_preserves_reviewed_runtime_boundaries |
+| `androidvpnservice_shutdown` | PASS | `required` | safe_idempotent_android_vpnservice_shutdown |
+| `androidvpnservice_misuse_detection` | PASS | `required` | 12/12 misuse controls detected |
+| `androidvpnservice_generated_backend_parity` | PASS | `required` | 6 generated markers checked |
+| `androidvpnservice_trace_hygiene` | PASS | `required` | 17 reports scanned |
+| `androidvpnservice_public_claim_safety` | PASS | `required` | 6 docs checked |
+| `androidvpnservice_fixture_drift` | PASS | `required` | passed |
 | `hardening_invariant_registry` | PASS | `required` | 19 invariants checks run; 0 failures |
 | `hardening_api_contracts` | PASS | `required` | 9 api_contracts checks run; 0 failures |
 | `hardening_panic_safety` | PASS | `required` | 12 panic_safety checks run; 0 failures |
@@ -622,9 +636,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `79 ms`
-- Trace generation: `20 ms`
-- Total audit runtime: `2176 ms`
+- Profile generation: `83 ms`
+- Trace generation: `19 ms`
+- Total audit runtime: `2159 ms`
 
 ## Corpus Diversity Summary
 
@@ -649,7 +663,7 @@
 - Gate result: `true`
 - `cluster_count`: `3`
 - `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.3159078133277868`
+- `different_profile_average_distance`: `0.3185218828800825`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -898,6 +912,24 @@
 - `androidruntime_public_claim_safety`: `passed`
 - `androidruntime_fixture_drift`: `passed`
 
+## Android VpnService Prototype
+
+- Gate result: `true`
+- `androidvpnservice_report`: `passed`
+- `androidvpnservice_permission_model`: `passed`
+- `androidvpnservice_lifecycle`: `passed`
+- `androidvpnservice_packet_flow_mapping`: `passed`
+- `androidvpnservice_kill_switch`: `passed`
+- `androidvpnservice_diagnostics`: `passed`
+- `androidvpnservice_reconnect_hooks`: `passed`
+- `androidvpnservice_integration`: `passed`
+- `androidvpnservice_shutdown`: `passed`
+- `androidvpnservice_misuse_detection`: `passed`
+- `androidvpnservice_generated_backend_parity`: `passed`
+- `androidvpnservice_trace_hygiene`: `passed`
+- `androidvpnservice_public_claim_safety`: `passed`
+- `androidvpnservice_fixture_drift`: `passed`
+
 ## Known Limitations
 
 - Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.
@@ -912,7 +944,8 @@
 - Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.
 - Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.
 - Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts.
-- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown; it does not implement VpnService traffic handling.
+- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown.
+- Android VpnService prototype checks permission/lifecycle states, packet-flow mapping, fail-closed behavior, diagnostics, reconnect hooks, and generated parity; it does not connect Android traffic to carriers.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Test-only key material and no production key exchange.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
@@ -921,4 +954,4 @@
 
 ## Next Milestone
 
-Milestone 58 should add the Android VpnService prototype boundary after M57 proved local Android-shaped runtime initialization, lifecycle, diagnostics, and generated parity.
+Milestone 59 should connect the Android VpnService prototype to the reviewed carrier runtime while preserving M58 fail-closed behavior, diagnostics hygiene, and generated parity.

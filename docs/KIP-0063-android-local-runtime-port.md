@@ -152,6 +152,6 @@ go run ./cmd/kcheck androidruntime compare --old testdata/androidruntime/android
 
 M57 does not provide a mobile application, Android UI, Gradle project, JNI binding, Android VpnService integration, packet capture, traffic forwarding, foreground service implementation, notification implementation, automatic telemetry, live carrier behavior, public-network behavior, or field-test readiness. It proves the local runtime contract and fixtures that M58 must preserve when the VpnService prototype boundary is introduced.
 
-## Next Milestone
+## Follow-On
 
-M58 should add the Android VpnService prototype boundary after this local runtime layer proves profile loading, lifecycle handling, diagnostics, storage boundaries, compatibility, safe shutdown, generated backend parity, and trace hygiene in Android-shaped local execution.
+M58 adds the Android VpnService prototype boundary after this local runtime layer proves profile loading, lifecycle handling, diagnostics, storage boundaries, compatibility, safe shutdown, generated backend parity, and trace hygiene in Android-shaped local execution.

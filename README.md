@@ -302,6 +302,7 @@ go run ./cmd/kcheck concretelocaladapter --quick
 go run ./cmd/kcheck operationalhardening --quick
 go run ./cmd/kcheck androidreview --quick
 go run ./cmd/kcheck androidruntime --quick
+go run ./cmd/kcheck androidvpnservice --quick
 go run ./cmd/kcheck codegen --quick
 ```
 
@@ -1095,6 +1096,22 @@ go run ./cmd/kcheck androidruntime --full --out testdata/audit/androidruntime.js
 go run ./cmd/kcheck androidruntime generate --out testdata/androidruntime/androidruntime-report-golden.json --force
 go run ./cmd/kcheck androidruntime verify
 go run ./cmd/kcheck androidruntime compare --old testdata/androidruntime/androidruntime-report-golden.json --new testdata/androidruntime/androidruntime-report-golden.json
+```
+
+## Android VpnService Prototype
+
+Milestone 58 adds the Android VpnService prototype boundary on top of the Android-shaped local runtime. It models permission states, VpnService lifecycle transitions, packet-flow descriptor mapping, fail-closed kill-switch behavior, diagnostic summaries, reconnect hooks, integration with existing runtime/carrier review gates, safe shutdown, misuse controls, fixture drift, and generated-backend parity.
+
+The `internal/androidvpnservice` package is deterministic and local. It does not connect Android traffic to carriers, forward public traffic, capture packets, log raw destinations, run automatic telemetry, or provide app-store packaging or field-test behavior. Its fixtures contain only state names, policy classes, counts, hashes, and hygiene flags.
+
+Run:
+
+```bash
+go run ./cmd/kcheck androidvpnservice --quick
+go run ./cmd/kcheck androidvpnservice --full --out testdata/audit/androidvpnservice.json
+go run ./cmd/kcheck androidvpnservice generate --out testdata/androidvpnservice/androidvpnservice-report-golden.json --force
+go run ./cmd/kcheck androidvpnservice verify
+go run ./cmd/kcheck androidvpnservice compare --old testdata/androidvpnservice/androidvpnservice-report-golden.json --new testdata/androidvpnservice/androidvpnservice-report-golden.json
 ```
 
 ## Security Prerequisite Layer
