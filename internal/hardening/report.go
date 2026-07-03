@@ -191,6 +191,7 @@ func packagesChecked() []string {
 		"internal/operationalhardening",
 		"internal/androidreview",
 		"internal/androidruntime",
+		"internal/androidvpnservice",
 		"internal/productionreadiness",
 		"internal/concretelocaladapter",
 		"internal/transportbundle",

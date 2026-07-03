@@ -128,6 +128,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "pathrace_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "androidreview_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "androidruntime_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "generated_mutant_detection")
 		renderNamedGateResult(&b, report.Gates, "generated_source_scanner")
 		if summary, ok := report.CodegenSummary.(CodegenAuditSummary); ok {
@@ -154,6 +155,7 @@ func RenderStatus(report AuditReport) string {
 			fmt.Fprintf(&b, "- `pathrace_generated_backend_parity`: `%s`\n", summary.PathRaceGeneratedParity)
 			fmt.Fprintf(&b, "- `androidreview_generated_backend_parity`: `%s`\n", summary.AndroidReviewParity)
 			fmt.Fprintf(&b, "- `androidruntime_generated_backend_parity`: `%s`\n", summary.AndroidRuntimeParity)
+			fmt.Fprintf(&b, "- `androidvpnservice_generated_backend_parity`: `%s`\n", summary.AndroidVPNServiceParity)
 			fmt.Fprintf(&b, "- `mutant_detection`: `%s`\n", summary.MutantDetection)
 			fmt.Fprintf(&b, "- `source_scanner`: `%s`\n", summary.SourceScanner)
 		}
@@ -629,6 +631,29 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck androidruntime --quick` for Android local runtime checks.")
 	}
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Android VpnService Prototype")
+	fmt.Fprintln(&b)
+	if gate, ok := gateByName(report.Gates, "androidvpnservice_report"); ok {
+		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_report")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_permission_model")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_lifecycle")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_packet_flow_mapping")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_kill_switch")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_diagnostics")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_reconnect_hooks")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_integration")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_shutdown")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_misuse_detection")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_generated_backend_parity")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_trace_hygiene")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_public_claim_safety")
+		renderNamedGateResult(&b, report.Gates, "androidvpnservice_fixture_drift")
+	} else {
+		fmt.Fprintln(&b, "- Android VpnService prototype gates were not run in this report.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck androidvpnservice --quick` for Android VpnService prototype checks.")
+	}
+	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Known Limitations")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "- Multi-stream support is a loopback-only lab harness, not SOCKS, VPN, HTTP proxying, or external networking.")
@@ -643,7 +668,8 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Transport bundle compiler output is a local candidate bundle and fallback hint model, not a live selector or path-racing runtime.")
 	fmt.Fprintln(&b, "- Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.")
 	fmt.Fprintln(&b, "- Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts.")
-	fmt.Fprintln(&b, "- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown; it does not implement VpnService traffic handling.")
+	fmt.Fprintln(&b, "- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown.")
+	fmt.Fprintln(&b, "- Android VpnService prototype checks permission/lifecycle states, packet-flow mapping, fail-closed behavior, diagnostics, reconnect hooks, and generated parity; it does not connect Android traffic to carriers.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Test-only key material and no production key exchange.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
@@ -652,7 +678,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Next Milestone")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 58 should add the Android VpnService prototype boundary after M57 proved local Android-shaped runtime initialization, lifecycle, diagnostics, and generated parity.")
+	fmt.Fprintln(&b, "Milestone 59 should connect the Android VpnService prototype to the reviewed carrier runtime while preserving M58 fail-closed behavior, diagnostics hygiene, and generated parity.")
 	return b.String()
 }
 
