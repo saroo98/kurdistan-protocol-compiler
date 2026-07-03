@@ -1,0 +1,13 @@
+{
+  "docs_checked": 6,
+  "forbidden_claims": [
+    "guaranteed bypass",
+    "undetectable",
+    "field-ready",
+    "public beta",
+    "production Android VPN",
+    "live probing",
+    "unrestricted carrier forwarding"
+  ],
+  "conclusion": "passed"
+}

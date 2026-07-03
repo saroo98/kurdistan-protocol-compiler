@@ -1,0 +1,20 @@
+{
+  "policy": "android_carrier_integration_safe_shutdown",
+  "actions": [
+    "stop_accepting_android_flows",
+    "close_runtime_streams",
+    "close_carrier_session",
+    "close_relay_session",
+    "engage_fail_closed_on_unsafe_stop",
+    "flush_redacted_diagnostics"
+  ],
+  "carrier_session_closed": true,
+  "runtime_session_closed": true,
+  "android_flow_closed": true,
+  "diagnostics_flushed": true,
+  "kill_switch_engaged_on_unsafe": true,
+  "stop_idempotent": true,
+  "post_shutdown_traffic": false,
+  "leaked_sessions": 0,
+  "conclusion": "passed"
+}

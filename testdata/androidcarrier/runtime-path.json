@@ -1,0 +1,28 @@
+{
+  "policy": "android_carrier_runtime_path_validated_before_connect",
+  "required_stages": [
+    "profile_validation",
+    "android_vpnservice_active",
+    "runtime_initialization",
+    "carrier_selection",
+    "relay_compatibility",
+    "authenticated_session",
+    "stream_mapping",
+    "pathhealth",
+    "safe_shutdown"
+  ],
+  "profile_validation_before_connect": true,
+  "runtime_initialized": true,
+  "carrier_selection_completed": true,
+  "relay_compatibility_checked": true,
+  "authenticated_session_established": true,
+  "stream_mapping_completed": true,
+  "pathhealth_checked": true,
+  "safe_shutdown_linked": true,
+  "bypasses_profile_validation": false,
+  "bypasses_carrier_selection": false,
+  "bypasses_relay_compatibility": false,
+  "unreviewed_public_network_egress": false,
+  "unrestricted_traffic_forwarding": false,
+  "conclusion": "passed"
+}

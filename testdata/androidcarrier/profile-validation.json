@@ -1,0 +1,20 @@
+{
+  "policy": "profile_validation_and_relay_compatibility_before_android_connected",
+  "validation_stages": [
+    "profile_import_validation",
+    "profile_hash_validation",
+    "profile_expiry_validation",
+    "capability_compatibility",
+    "relay_profile_compatibility",
+    "carrier_policy_compatibility"
+  ],
+  "imported_profile_validated": true,
+  "profile_hash_checked": true,
+  "profile_expiry_checked": true,
+  "relay_compatibility_before_start": true,
+  "invalid_profile_fails_closed": true,
+  "expired_profile_fails_closed": true,
+  "stale_profile_rejected": true,
+  "profile_validation_bypassed": false,
+  "conclusion": "passed"
+}

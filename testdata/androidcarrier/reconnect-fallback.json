@@ -1,0 +1,29 @@
+{
+  "policy": "bounded_android_carrier_reconnect_and_fallback",
+  "scenarios": [
+    "success_path",
+    "carrier_failure",
+    "relay_failure",
+    "profile_failure",
+    "network_change_recovery",
+    "fallback_exhaustion",
+    "kill_switch_interaction",
+    "diagnostic_export"
+  ],
+  "fallback_classes": [
+    "primary_carrier_retry",
+    "reviewed_backup_carrier",
+    "no_fallback_fail_closed"
+  ],
+  "max_fallback_attempts": 2,
+  "max_reconnect_attempts": 3,
+  "max_queued_events": 64,
+  "network_change_recovery": true,
+  "carrier_failure_recovery": true,
+  "runtime_restart_recovery": true,
+  "fallback_exhaustion_fail_closed": true,
+  "kill_switch_interaction_checked": true,
+  "unbounded_retry": false,
+  "unsafe_fallback_allowed": false,
+  "conclusion": "passed"
+}

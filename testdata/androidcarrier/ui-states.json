@@ -1,0 +1,31 @@
+{
+  "policy": "android_ui_reflects_carrier_runtime_path",
+  "states": [
+    "selecting_carrier",
+    "connecting_relay",
+    "connected_through_carrier",
+    "carrier_failed",
+    "relay_incompatible",
+    "profile_expired",
+    "reconnecting",
+    "fallback_attempted",
+    "diagnostic_bundle_ready"
+  ],
+  "failure_states": [
+    "carrier_failed",
+    "relay_incompatible",
+    "profile_expired",
+    "fallback_exhausted",
+    "diagnostic_bundle_ready"
+  ],
+  "connected_state": "connected_through_carrier",
+  "diagnostic_state": "diagnostic_bundle_ready",
+  "carrier_failure_visible": true,
+  "relay_failure_visible": true,
+  "profile_expiry_visible": true,
+  "fallback_attempt_visible": true,
+  "diagnostic_ready_visible": true,
+  "field_ready_claim_visible": false,
+  "guaranteed_bypass_displayed": false,
+  "conclusion": "passed"
+}

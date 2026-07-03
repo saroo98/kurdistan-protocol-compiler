@@ -685,6 +685,21 @@ const (
 	ModeAndroidVPNServiceUnboundedReconnect         = "androidvpnservice_unbounded_reconnect"
 	ModeAndroidVPNServiceBackgroundPolicyBypass     = "androidvpnservice_background_policy_bypass"
 	ModeAndroidVPNServiceGeneratedBackendDrift      = "androidvpnservice_generated_backend_drift"
+
+	ModeAndroidCarrierBypassesProfileValidation = "androidcarrier_bypasses_profile_validation"
+	ModeAndroidCarrierBypassesCarrierReview     = "androidcarrier_bypasses_carrierreview"
+	ModeAndroidCarrierBypassesMeasurementReview = "androidcarrier_bypasses_measurementreview"
+	ModeAndroidCarrierBypassesPathHealth        = "androidcarrier_bypasses_pathhealth"
+	ModeAndroidCarrierAcceptsRelayIncompatible  = "androidcarrier_accepts_relay_incompatible"
+	ModeAndroidCarrierAcceptsProfileExpired     = "androidcarrier_accepts_profile_expired"
+	ModeAndroidCarrierUnboundedFallback         = "androidcarrier_unbounded_fallback"
+	ModeAndroidCarrierKillSwitchFailOpen        = "androidcarrier_kill_switch_fail_open"
+	ModeAndroidCarrierPayloadDiagnostics        = "androidcarrier_payload_diagnostics"
+	ModeAndroidCarrierPacketCapture             = "androidcarrier_packet_capture"
+	ModeAndroidCarrierRawDestinationLogging     = "androidcarrier_raw_destination_logging"
+	ModeAndroidCarrierAutoTelemetry             = "androidcarrier_auto_telemetry"
+	ModeAndroidCarrierPublicNetworkEgress       = "androidcarrier_public_network_egress"
+	ModeAndroidCarrierGeneratedBackendDrift     = "androidcarrier_generated_backend_drift"
 )
 
 func Modes() []string {
@@ -1338,6 +1353,20 @@ func Modes() []string {
 		ModeAndroidVPNServiceUnboundedReconnect,
 		ModeAndroidVPNServiceBackgroundPolicyBypass,
 		ModeAndroidVPNServiceGeneratedBackendDrift,
+		ModeAndroidCarrierBypassesProfileValidation,
+		ModeAndroidCarrierBypassesCarrierReview,
+		ModeAndroidCarrierBypassesMeasurementReview,
+		ModeAndroidCarrierBypassesPathHealth,
+		ModeAndroidCarrierAcceptsRelayIncompatible,
+		ModeAndroidCarrierAcceptsProfileExpired,
+		ModeAndroidCarrierUnboundedFallback,
+		ModeAndroidCarrierKillSwitchFailOpen,
+		ModeAndroidCarrierPayloadDiagnostics,
+		ModeAndroidCarrierPacketCapture,
+		ModeAndroidCarrierRawDestinationLogging,
+		ModeAndroidCarrierAutoTelemetry,
+		ModeAndroidCarrierPublicNetworkEgress,
+		ModeAndroidCarrierGeneratedBackendDrift,
 	}
 }
 

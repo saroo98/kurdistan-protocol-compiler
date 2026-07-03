@@ -1,0 +1,33 @@
+{
+  "policy": "relay_compatibility_checked_before_android_connected_state",
+  "required_checks": [
+    "profile_identity_bound",
+    "relay_identity_bound",
+    "relay_auth_checked",
+    "profile_bundle_version_checked",
+    "rotation_window_checked",
+    "expiry_revocation_checked",
+    "downgrade_rejected"
+  ],
+  "compatible_relay_classes": [
+    "relay_profile_match",
+    "relay_carrier_match",
+    "relay_rotation_window_valid"
+  ],
+  "incompatible_failure_classes": [
+    "relay_profile_mismatch",
+    "relay_carrier_incompatible",
+    "relay_profile_expired",
+    "relay_rotation_window_invalid"
+  ],
+  "profile_identity_bound": true,
+  "relay_identity_bound": true,
+  "relay_auth_checked": true,
+  "rotation_window_checked": true,
+  "expired_profile_rejected": true,
+  "unknown_relay_rejected": true,
+  "authenticated_session_established": true,
+  "relay_bypass_allowed": false,
+  "downgrade_accepted": false,
+  "conclusion": "passed"
+}

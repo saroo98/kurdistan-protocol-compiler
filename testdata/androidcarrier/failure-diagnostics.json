@@ -1,0 +1,38 @@
+{
+  "policy": "android_carrier_failures_are_redacted_and_bucketed",
+  "failure_classes": [
+    "profile_invalid",
+    "profile_expired",
+    "carrier_unavailable",
+    "carrier_review_blocked",
+    "measurement_review_blocked",
+    "pathhealth_blocked",
+    "relay_incompatible",
+    "relay_auth_failed",
+    "fallback_exhausted",
+    "runtime_restart_required"
+  ],
+  "allowed_diagnostic_fields": [
+    "android_state_bucket",
+    "carrier_family_bucket",
+    "relay_compatibility_bucket",
+    "pathhealth_bucket",
+    "fallback_attempt_bucket",
+    "failure_class",
+    "redaction_status"
+  ],
+  "carrier_failures_surfaced": true,
+  "runtime_failures_surfaced": true,
+  "relay_failures_surfaced": true,
+  "profile_failures_surfaced": true,
+  "fallback_failures_surfaced": true,
+  "payload_logged": false,
+  "secret_logged": false,
+  "raw_packet_logged": false,
+  "domain_logged": false,
+  "url_logged": false,
+  "sni_host_logged": false,
+  "device_identifier_logged": false,
+  "telemetry_upload_configured": false,
+  "conclusion": "passed"
+}

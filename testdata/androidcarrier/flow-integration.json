@@ -1,0 +1,38 @@
+{
+  "policy": "android_vpn_flow_maps_to_carrier_runtime_streams",
+  "flow_classes": [
+    "small_interactive_vpn_flow",
+    "large_backpressured_vpn_flow",
+    "network_change_reconnect_flow",
+    "carrier_failure_flow",
+    "relay_incompatible_flow",
+    "diagnostic_control_flow"
+  ],
+  "mapping_rules": [
+    "vpn_flow_to_runtime_stream",
+    "runtime_stream_to_carrier_envelope",
+    "carrier_response_to_runtime_stream",
+    "runtime_stream_to_android_flow",
+    "terminal_state_to_android_state"
+  ],
+  "backpressure_rules": [
+    "carrier_queue_pressure_to_vpn_pause",
+    "runtime_backpressure_to_android_flow_pause",
+    "fallback_exhaustion_to_fail_closed"
+  ],
+  "reset_error_rules": [
+    "carrier_failure_to_android_failure_class",
+    "relay_incompatible_to_android_failure_class",
+    "profile_expired_to_fail_closed"
+  ],
+  "android_vpnservice_linked": true,
+  "controlled_traffic_represented": true,
+  "connected_through_carrier": true,
+  "runtime_streams_mapped": 8,
+  "carrier_envelopes_mapped": 13,
+  "packet_payload_logged": false,
+  "packet_capture_enabled": false,
+  "raw_destination_logged": false,
+  "app_identity_logged": false,
+  "conclusion": "passed"
+}
