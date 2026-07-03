@@ -6,7 +6,7 @@ package codegen
 import "kurdistan/internal/ir"
 
 const (
-	Version       = "0.58.0-lab"
+	Version       = "0.59.0-lab"
 	SourceBackend = "go-static-v0"
 )
 

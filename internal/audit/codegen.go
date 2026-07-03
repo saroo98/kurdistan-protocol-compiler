@@ -136,6 +136,7 @@ type CodegenAuditSummary struct {
 	AndroidReviewParity              string                         `json:"androidreview_generated_backend_parity"`
 	AndroidRuntimeParity             string                         `json:"androidruntime_generated_backend_parity"`
 	AndroidVPNServiceParity          string                         `json:"androidvpnservice_generated_backend_parity"`
+	AndroidCarrierParity             string                         `json:"androidcarrier_generated_backend_parity"`
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
@@ -261,6 +262,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 	androidReviewGate := GeneratedAndroidReviewParityGate(corpus, testFailures)
 	androidRuntimeGate := GeneratedAndroidRuntimeParityGate(corpus, testFailures)
 	androidVPNServiceGate := GeneratedAndroidVPNServiceParityGate(corpus, testFailures)
+	androidCarrierGate := GeneratedAndroidCarrierParityGate(corpus, testFailures)
 	mutantGate := GeneratedMutantDetectionGate(ctx, []string{
 		mutant.ModeCosmeticSymbolsOnly,
 		mutant.ModeFixedFrameGrammar,
@@ -326,6 +328,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		androidReviewGate,
 		androidRuntimeGate,
 		androidVPNServiceGate,
+		androidCarrierGate,
 		mutantGate,
 		scannerGate,
 	}
@@ -1186,6 +1189,10 @@ func GeneratedAndroidVPNServiceParityGate(corpus GeneratedBackendTraceCorpus, te
 	return generatedMilestoneSourceGate(corpus, testFailures, "androidvpnservice", "Android VpnService prototype", "AndroidVpnServiceSchemaVersion")
 }
 
+func GeneratedAndroidCarrierParityGate(corpus GeneratedBackendTraceCorpus, testFailures []string) GateResult {
+	return generatedMilestoneSourceGate(corpus, testFailures, "androidcarrier", "Android carrier integration", "AndroidCarrierSchemaVersion")
+}
+
 func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailures []string, slug, label, schemaMarker string) GateResult {
 	failures := []string{}
 	if len(testFailures) > 0 {
@@ -1410,6 +1417,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		AndroidReviewParity:              status("androidreview_generated_backend_parity"),
 		AndroidRuntimeParity:             status("androidruntime_generated_backend_parity"),
 		AndroidVPNServiceParity:          status("androidvpnservice_generated_backend_parity"),
+		AndroidCarrierParity:             status("androidcarrier_generated_backend_parity"),
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,

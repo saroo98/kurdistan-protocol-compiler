@@ -105,6 +105,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		"protocol/androidreview_generated.go",
 		"protocol/androidruntime_generated.go",
 		"protocol/androidvpnservice_generated.go",
+		"protocol/androidcarrier_generated.go",
 		"protocol/scheduler_generated.go",
 		"protocol/invalid_input_generated.go",
 		"protocol/auth_generated.go",
@@ -247,6 +248,8 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const AndroidRuntimeSchemaVersion")
 	module.ProfileSpecificConstantsPresent = module.ProfileSpecificConstantsPresent &&
 		strings.Contains(joined, "const AndroidVpnServiceSchemaVersion")
+	module.ProfileSpecificConstantsPresent = module.ProfileSpecificConstantsPresent &&
+		strings.Contains(joined, "const AndroidCarrierSchemaVersion")
 	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)

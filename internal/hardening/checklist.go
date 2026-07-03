@@ -57,6 +57,7 @@ func PreAdapterReadinessMatrix() []ReadinessItem {
 		item("documentation", "KIP-0020 and PRE_ADAPTER_READINESS evidence"),
 		item("Android architecture review", "M56 user flows, permission model, UI states, diagnostics/privacy, kill-switch, runtime composition, M57/M58 contracts, and generated parity"),
 		item("Android local runtime port", "M57 Android-shaped profile loading, lifecycle, storage boundaries, diagnostics, concurrency assumptions, shutdown, misuse controls, and generated parity"),
+		item("Android carrier integration", "M59 profile-validated Android VPN flows, reviewed carrier selection, relay compatibility, pathhealth, bounded fallback, redacted diagnostics, and generated parity"),
 	}
 }
 
