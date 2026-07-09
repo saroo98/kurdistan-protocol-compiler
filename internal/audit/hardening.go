@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"kurdistan/internal/hardening"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func RunHardeningAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

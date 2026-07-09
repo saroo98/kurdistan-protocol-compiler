@@ -3,7 +3,7 @@
 
 package carrier
 
-import "kurdistan/internal/ir"
+import "kurdistan/internal/protocol/ir"
 
 func Lookup(name string) bool {
 	for _, family := range ir.CarrierFamilies() {

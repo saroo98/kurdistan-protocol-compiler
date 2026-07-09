@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"kurdistan/internal/adversary"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/labtrace"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestAuditConfigDefaults(t *testing.T) {

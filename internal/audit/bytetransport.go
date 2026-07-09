@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"kurdistan/internal/bytetransportadversary"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 )
 

@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 type RuntimeConfig struct {

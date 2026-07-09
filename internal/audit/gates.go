@@ -12,14 +12,14 @@ import (
 	"strings"
 
 	"kurdistan/internal/adversary"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/relay"
 	"kurdistan/internal/streamadversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func ProfileCorpusDiversityGate(summary diversity.CorpusSummary, thresholds AuditThresholds) GateResult {
@@ -632,10 +632,10 @@ func FuzzPresenceGate() GateResult {
 		return gate("fuzz_presence", false, "required", err.Error(), nil, []string{err.Error()})
 	}
 	required := []string{
-		"internal/framing/codec_fuzz_test.go",
-		"internal/ir/validate_fuzz_test.go",
-		"internal/fsm/interpreter_fuzz_test.go",
-		"internal/trace/trace_fuzz_test.go",
+		"internal/protocol/framing/codec_fuzz_test.go",
+		"internal/protocol/ir/validate_fuzz_test.go",
+		"internal/protocol/fsm/interpreter_fuzz_test.go",
+		"internal/observe/trace/trace_fuzz_test.go",
 	}
 	missing := []string{}
 	for _, rel := range required {

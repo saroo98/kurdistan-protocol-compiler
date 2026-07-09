@@ -3,8 +3,8 @@ package mutant
 import (
 	"testing"
 
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestGenerateProfilesModesValidate(t *testing.T) {

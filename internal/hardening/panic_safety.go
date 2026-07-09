@@ -8,15 +8,15 @@ import (
 	"encoding/json"
 
 	"kurdistan/internal/adapter"
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
-	"kurdistan/internal/security"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/crypto/security"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func MustNotPanic(name string, fn func()) CheckResult {

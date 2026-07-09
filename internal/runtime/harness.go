@@ -9,10 +9,10 @@ import (
 	"sort"
 
 	"kurdistan/internal/carrierrelay"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxyadversary"
-	"kurdistan/internal/security"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/crypto/security"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type HarnessOptions struct {

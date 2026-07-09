@@ -7,8 +7,8 @@ import (
 	"context"
 	"strings"
 
-	"kurdistan/internal/bytetransport"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/observe/bytetransport"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 )
 

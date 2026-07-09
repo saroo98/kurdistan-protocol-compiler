@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"kurdistan/internal/byteparity"
+	"kurdistan/internal/observe/byteparity"
 	"kurdistan/internal/fixtures"
 )
 

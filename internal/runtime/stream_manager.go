@@ -6,9 +6,9 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxysem"
-	kstream "kurdistan/internal/stream"
+	kstream "kurdistan/internal/protocol/stream"
 )
 
 type StreamManager struct {

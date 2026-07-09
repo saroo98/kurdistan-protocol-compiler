@@ -15,9 +15,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 )
 
 var update = flag.Bool("update", false, "rewrite the characterization golden")

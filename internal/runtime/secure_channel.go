@@ -6,8 +6,8 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/ir"
-	"kurdistan/internal/security"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/crypto/security"
 )
 
 type SecureChannel struct {

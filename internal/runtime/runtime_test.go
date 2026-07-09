@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxyadversary"
 	"kurdistan/internal/proxysem"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func TestRuntimeConfigValidationAndRedaction(t *testing.T) {

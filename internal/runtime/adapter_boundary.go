@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"kurdistan/internal/adapter"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxysem"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type AdapterBoundaryOptions struct {

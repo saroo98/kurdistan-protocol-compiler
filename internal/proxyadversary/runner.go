@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/proxyrelay"
 	"kurdistan/internal/proxysem"

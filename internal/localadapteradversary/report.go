@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"kurdistan/internal/localadapter"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type ScenarioRun struct {

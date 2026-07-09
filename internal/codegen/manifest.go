@@ -3,7 +3,7 @@
 
 package codegen
 
-import "kurdistan/internal/ir"
+import "kurdistan/internal/protocol/ir"
 
 const (
 	Version       = "0.59.0-lab"

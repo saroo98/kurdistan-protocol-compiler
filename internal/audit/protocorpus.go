@@ -13,8 +13,8 @@ import (
 
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wirefeatures"
 )
 
 type ProtocolCorpusAuditSummary struct {

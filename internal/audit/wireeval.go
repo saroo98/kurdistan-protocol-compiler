@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/classifierdata"
+	"kurdistan/internal/observe/classifierdata"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wireeval"
 )
 
 type WireEvalAuditSummary struct {

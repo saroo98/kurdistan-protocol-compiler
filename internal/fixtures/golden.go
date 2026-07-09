@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 )
 
 type MalformedByteCase struct {

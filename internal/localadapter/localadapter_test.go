@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/adapter"
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func TestSourcePlanDeterminism(t *testing.T) {

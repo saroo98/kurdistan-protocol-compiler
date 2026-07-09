@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/relay"
 )
 

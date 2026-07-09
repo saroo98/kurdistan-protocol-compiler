@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestLocalEchoRoundTrip(t *testing.T) {

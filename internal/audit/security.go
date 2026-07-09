@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

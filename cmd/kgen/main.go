@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func main() {

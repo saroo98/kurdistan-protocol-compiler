@@ -9,7 +9,7 @@ import (
 
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/carrierrelay"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/proxyadversary"
 )

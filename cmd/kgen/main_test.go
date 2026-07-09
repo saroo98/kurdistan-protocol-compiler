@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestRunGeneratesAndRefusesOverwrite(t *testing.T) {

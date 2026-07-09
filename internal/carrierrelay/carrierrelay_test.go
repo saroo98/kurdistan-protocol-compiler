@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/proxyadversary"
 )
 

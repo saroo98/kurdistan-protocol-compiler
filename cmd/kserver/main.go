@@ -12,9 +12,9 @@ import (
 	"os"
 	"os/signal"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func main() {

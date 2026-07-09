@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/framing"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/framing"
 	kruntime "kurdistan/internal/runtime"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func FuzzTraceHygieneScanner(f *testing.F) {

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"kurdistan/internal/ir"
-	"kurdistan/internal/security"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/crypto/security"
 )
 
 func LoadProfile(path, expectedID string) (*ir.Profile, error) {

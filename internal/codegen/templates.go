@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 type generatedFile struct {

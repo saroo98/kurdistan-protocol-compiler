@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/hostdetect"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/hostdetect"
+	"kurdistan/internal/observe/wireeval"
 )
 
 type RelayFleet struct {

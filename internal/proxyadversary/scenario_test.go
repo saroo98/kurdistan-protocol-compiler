@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/mutant"
 )
 

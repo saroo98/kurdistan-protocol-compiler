@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"kurdistan/internal/auth"
-	"kurdistan/internal/framing"
-	"kurdistan/internal/fsm"
-	"kurdistan/internal/ir"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/crypto/auth"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/fsm"
+	"kurdistan/internal/protocol/ir"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const streamID uint32 = 1

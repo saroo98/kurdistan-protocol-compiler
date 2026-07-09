@@ -7,7 +7,7 @@ import (
 	"context"
 	"strings"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/mutant"
 )

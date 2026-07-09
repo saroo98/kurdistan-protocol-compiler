@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/codegen"
 )
 

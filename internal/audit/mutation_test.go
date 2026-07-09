@@ -5,10 +5,10 @@ import (
 	"sort"
 	"testing"
 
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestMutantsFailExpectedGates(t *testing.T) {

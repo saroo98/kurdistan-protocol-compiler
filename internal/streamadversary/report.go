@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type CollapseThresholds struct {

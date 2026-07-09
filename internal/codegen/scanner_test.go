@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func TestScanGeneratedOutputsProfileSpecificAndNoInterpreterArtifacts(t *testing.T) {
@@ -56,8 +56,8 @@ func TestScanGeneratedOutputsRejectsInterpreterWrapper(t *testing.T) {
 
 import (
 	"fmt"
-	"kurdistan/internal/fsm"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/fsm"
+	"kurdistan/internal/protocol/ir"
 )
 
 func StaticProfile() *ir.Profile {

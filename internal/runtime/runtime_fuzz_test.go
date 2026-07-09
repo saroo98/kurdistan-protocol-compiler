@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func FuzzRuntimeConfigValidation(f *testing.F) {

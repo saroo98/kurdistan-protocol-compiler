@@ -6,7 +6,7 @@ package carrier
 import (
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func TestRegistryAndCarrierRoundTrips(t *testing.T) {

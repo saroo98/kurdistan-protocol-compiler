@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestRunHardeningReportPasses(t *testing.T) {

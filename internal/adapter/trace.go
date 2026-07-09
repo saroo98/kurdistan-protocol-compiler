@@ -3,7 +3,7 @@
 
 package adapter
 
-import ktrace "kurdistan/internal/trace"
+import ktrace "kurdistan/internal/observe/trace"
 
 func TraceEvent(cfg AdapterConfig, flow *Flow, event, scenario string, summary AdapterHarnessSummary) ktrace.Event {
 	state := ""
