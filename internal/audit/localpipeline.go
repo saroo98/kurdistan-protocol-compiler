@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/lab/localpipeline"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type LocalPipelineAuditSummary struct {

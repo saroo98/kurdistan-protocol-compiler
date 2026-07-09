@@ -9,7 +9,7 @@ import (
 
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapter"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario) ScenarioRun {

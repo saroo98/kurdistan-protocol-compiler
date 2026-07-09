@@ -14,7 +14,7 @@ import (
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/fixtures"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wirefeatures"
 	"kurdistan/internal/observe/wiregen"

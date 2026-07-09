@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/vpn/localvpnadapter"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunLocalVPNAdapterAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

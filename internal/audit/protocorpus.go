@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/fixtures"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wirefeatures"
 )

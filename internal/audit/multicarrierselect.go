@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/carrier/multicarrierselect"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunMultiCarrierSelectAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

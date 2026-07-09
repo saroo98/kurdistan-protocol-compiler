@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/operator/relayprocess"
 )
 

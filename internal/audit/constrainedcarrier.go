@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/carrier/constrainedcarrier"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunConstrainedCarrierAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

@@ -7,7 +7,7 @@ import (
 
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

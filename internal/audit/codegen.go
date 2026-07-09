@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/adversary"
+	"kurdistan/internal/testkit/adversary"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/labtrace"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/observe/trace"
 )

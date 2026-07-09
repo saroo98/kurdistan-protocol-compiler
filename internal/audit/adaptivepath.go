@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type AdaptivePathAuditSummary struct {

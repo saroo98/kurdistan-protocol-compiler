@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/operator/relaybridge"
 )
 

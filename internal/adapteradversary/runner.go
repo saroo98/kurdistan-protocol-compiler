@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	kruntime "kurdistan/internal/runtime"
 )
 

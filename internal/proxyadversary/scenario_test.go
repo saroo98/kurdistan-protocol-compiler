@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/protocol/compiler"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func TestQuickProxyScenariosRunAndEmitSafeMetadata(t *testing.T) {

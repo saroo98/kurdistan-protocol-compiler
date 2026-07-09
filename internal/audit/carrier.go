@@ -11,7 +11,7 @@ import (
 
 	"kurdistan/internal/carrieradversary"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunCarrierAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/crypto/security"
 )
 

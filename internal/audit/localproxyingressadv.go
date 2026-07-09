@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/localproxyingressadversary"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type LocalProxyIngressAdversarialAuditSummary struct {

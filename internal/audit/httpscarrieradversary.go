@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunHTTPSCarrierAdversaryAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

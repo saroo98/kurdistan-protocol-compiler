@@ -11,7 +11,7 @@ import (
 
 	"kurdistan/internal/bytetransportadversary"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunByteTransportAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

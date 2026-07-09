@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/carrier/carrierreview"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type CarrierReviewAuditSummary struct {
