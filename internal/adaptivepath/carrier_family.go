@@ -36,6 +36,16 @@ type CandidateFamilyDescriptor struct {
 	DescriptorHash     string                `json:"descriptor_hash"`
 }
 
+// FamilyDescriptors returns the adaptive path-selection carrier taxonomy
+// (CandidateFamilyDescriptor: observation signals, TTL/risk buckets) used by the
+// live transport-selection layer.
+//
+// This is one of THREE INTENTIONALLY DISTINCT carrier taxonomies; do not unify
+// them (Stage 5b WO-503 rejected after measurement — they have different structs,
+// string values, and consumers, each pinned by its own goldens):
+//   - this one — path selection (live transport);
+//   - carrierreview.DefaultDescriptors — carrier design-review contract;
+//   - multicarrierselect.carrierFamilies — lab-selection contract.
 func FamilyDescriptors() []CandidateFamilyDescriptor {
 	out := []CandidateFamilyDescriptor{
 		{

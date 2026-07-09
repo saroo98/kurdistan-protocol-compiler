@@ -40,6 +40,11 @@ type CarrierFamilyDescriptor struct {
 	SecretLogged            bool     `json:"secret_logged"`
 }
 
+// DefaultDescriptors returns the carrier design-review taxonomy
+// (CarrierFamilyDescriptor). It is one of THREE INTENTIONALLY DISTINCT carrier
+// taxonomies — do not unify them (Stage 5b WO-503 rejected): see
+// adaptivepath.FamilyDescriptors (path selection, live transport) and
+// multicarrierselect.carrierFamilies (lab-selection contract).
 func DefaultDescriptors() []CarrierFamilyDescriptor {
 	return []CarrierFamilyDescriptor{
 		{
