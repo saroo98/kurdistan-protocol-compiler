@@ -74,6 +74,26 @@ done:
 - **Post-change** — `STATUS.md` is regenerated and docs are reconciled with the
   code.
 
+## KIP ↔ work-order bridge and milestone numbering (D-007)
+
+Milestone specifications live in the `docs/KIP-*.md` documents; planning and
+execution are tracked as work orders. To keep the two in step:
+
+- **Every new KIP** carries, near its top, a `status` and `last_verified` stamp
+  and a short **Work orders** line referencing the work-order IDs that implement
+  or verify it. Existing KIPs adopt this the next time they are edited; they are
+  not mass-rewritten for it.
+- **Milestone numbering is frozen, not renumbered.** The historical `M1`–`M59`
+  numbers are load-bearing: the `adaptivepath_roadmap_public_docs` gate pins
+  specific milestone strings (for example `M27: adaptive path model and candidate
+  taxonomy`), and the KIP filenames encode their numbers. Re-numbering them would
+  break gates and churn every KIP for no behavioural gain. The D-007 re-baseline
+  is therefore **forward-only**: new milestones continue the existing sequence and
+  reference their work orders; the historical numbers stay as recorded.
+- A KIP and its milestone are **model/contract-level** unless a KIP explicitly
+  states a `[live]` capability. The `[live]`/`[model]`/`[plan]` legend in
+  `README.md` and `STATUS.md` is the single source of truth for what is real.
+
 ## Staleness
 
 Plans, docs, and status decay from the moment they are written. On resuming

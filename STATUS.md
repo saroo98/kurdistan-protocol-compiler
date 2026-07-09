@@ -5,8 +5,10 @@
 
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
+> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates are detector self-tests over forced/simulated regressions, not proofs that the runtime enforces those policies (see docs/safety.md and the D-003 crypto review).
+
 - Latest audit mode: `quick`
-- Generated at: `2026-07-03T05:49:49Z`
+- Generated at: `2026-07-09T13:10:07Z`
 - Profile count: `100`
 - Trace count: `20`
 - Conclusion: `passed`
@@ -17,10 +19,10 @@
 | --- | --- | --- | --- |
 | `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
 | `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 3 groups; 0 failures |
+| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
-| `same_profile_consistency` | PASS | `required` | same-family by canonical feature distance |
+| `same_profile_consistency` | PASS | `required` | suspiciously similar |
 | `different_profile_separation` | PASS | `required` | 190/190 trace pairs separated |
 | `malformed_probe_behavior` | PASS | `required` | invalid-input behavior distribution checked |
 | `multi_stream_semantics` | PASS | `required` | 4 profiles exercised with local multi-stream echo |
@@ -51,7 +53,7 @@
 | `security_profile_compatibility` | PASS | `required` | 6 compatibility checks run |
 | `security_config_hygiene` | PASS | `required` | 6 config hygiene checks run |
 | `security_secret_trace_hygiene` | PASS | `required` | 3 secret trace hygiene checks run |
-| `security_mutant_detection` | PASS | `required` | 8/8 security mutant modes detected |
+| `security_mutant_detection` | PASS | `required` | 8/8 security regression modes flagged (detector self-test over forced policy fields; not runtime enforcement — see D-003) |
 | `security_generated_backend_parity` | PASS | `required` | generated backend security support markers checked |
 | `runtime_session_lifecycle` | PASS | `required` | 9 runtime sessions checked |
 | `runtime_capability_negotiation` | PASS | `required` | 3 capability downgrade attempts rejected |
@@ -62,7 +64,7 @@
 | `runtime_backpressure` | PASS | `required` | 137 runtime backpressure events observed |
 | `runtime_error_reset_isolation` | PASS | `required` | 6 target errors and 6 target resets isolated |
 | `runtime_trace_hygiene` | PASS | `required` | 3 runtime traces checked for payload/secret hygiene |
-| `runtime_mutant_detection` | PASS | `required` | 8/8 runtime mutant modes detected |
+| `runtime_mutant_detection` | PASS | `required` | 8/8 runtime regression modes flagged (detector self-test over simulated regressions; not runtime enforcement — see D-003) |
 | `runtime_generated_backend_parity` | PASS | `required` | generated backend runtime support markers checked |
 | `adapter_interface_contracts` | PASS | `required` | adapter ingress/egress contract inputs validated |
 | `adapter_config_validation` | PASS | `required` | adapter config validation and redaction checks run |
@@ -651,9 +653,9 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `86 ms`
-- Trace generation: `12 ms`
-- Total audit runtime: `2184 ms`
+- Profile generation: `88 ms`
+- Trace generation: `19 ms`
+- Total audit runtime: `2249 ms`
 
 ## Corpus Diversity Summary
 
@@ -676,9 +678,9 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `3`
-- `largest_cluster_ratio`: `0.6`
-- `different_profile_average_distance`: `0.31606201697882513`
+- `cluster_count`: `4`
+- `largest_cluster_ratio`: `0.55`
+- `different_profile_average_distance`: `0.319851011498045`
 - `same_profile_distance`: `0`
 - `generated_cluster_conclusion`: `multiple clusters`
 
@@ -967,6 +969,6 @@
 - No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
 - The audit detects local regressions; it cannot prove undetectability or real-world robustness.
 
-## Next Milestone
+## Milestone Frontier
 
-Milestone 59 should connect the Android VpnService prototype to the reviewed carrier runtime while preserving M58 fail-closed behavior, diagnostics hygiene, and generated parity.
+The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It is a model/contract, not live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md).

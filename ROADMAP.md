@@ -1,58 +1,31 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <!-- Copyright 2026 Saro -->
 
-# Kurdistan Stage Roadmap
+# Kurdistan Roadmap
 
-## Stage 1: Scaffold
+Detailed stage and milestone tracking lives in the per-milestone KIP documents
+(`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
+only the current phase and the standing review gates.
 
-- Create the Go module, repository layout, CLI skeletons, safety docs, and local-only agent instructions.
-- Keep the repo standard-library only and avoid any production deployment surface.
+## Current phase
 
-## Stage 2: IR And Validation
+Lab-only research prototype. The compiler generates deterministic protocol
+profiles and validates them through an in-repo audit; carrier, relay, proxy, and
+Android/VPN surfaces exist as **models and design contracts only**, never as live
+transport. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
+`STATUS.md` for what is real versus modelled.
 
-- Define the profile schema for state machines, first contact, framing, auth, scheduler, padding, invalid input, and safety limits.
-- Validate generated profiles before use.
+## Future review gates (still out of scope until separately reviewed)
 
-## Stage 3: Compiler
+Live implementation — as opposed to a loopback-only, payload-free model — of any
+of the following requires a dedicated review before work begins:
 
-- Generate deterministic profiles from a seed.
-- Vary first-contact patterns, state graphs, frame grammars, scheduler policies, padding policies, and invalid-input behavior.
+- multiplexing over real transports
+- production key management and any real or post-quantum cryptography (external review)
+- non-loopback carriers (HTTP/TLS/DNS/QUIC) as live transport
+- UI, mobile, and VPN as shipped products (beyond contract models)
+- SOCKS / HTTP proxy as live transport
+- cloud deployment, public relays, and live-network testing
 
-## Stage 4: FSM
-
-- Interpret generated client and server state machines.
-- Reject wrong role, wrong message, missing proof, and malformed transition graphs.
-
-## Stage 5: Framing
-
-- Encode stable semantic operations through generated frame grammars.
-- Decode under the correct profile, reject mismatched profiles, enforce max sizes, and reconstruct fragments.
-
-## Stage 6: Authentication
-
-- Use HMAC-SHA256 over the first-contact transcript with test-only profile key material.
-- Reject wrong proofs, tampered transcripts, and replayed nonces in the lab model.
-
-## Stage 7: Local Relay
-
-- Implement a single-stream local client, local server, and local echo target.
-- Restrict all runtime network addresses to loopback.
-
-## Stage 8: Trace
-
-- Emit JSONL metadata traces without payloads, keys, proofs, raw frames, or destinations.
-- Compare traces and profiles for structural differences.
-
-## Stage 9: Benchmarks
-
-- Measure generation, frame encode/decode, scheduler, padding, and local round-trip overhead.
-- Report lab numbers only.
-
-## Stage 10: Polish
-
-- Keep docs aligned with implemented behavior.
-- Run formatting, tests, vet, and benchmarks before publishing.
-
-## Future Review Gates
-
-- Multiplexing, production key management, non-loopback carriers, UI, mobile, VPN, SOCKS, HTTP proxy, cloud deployment, and live-network testing are out of scope until separately reviewed.
+The standing safety boundary is defined in `docs/safety.md`; the validation bar
+and enforced boundaries are in `docs/GOVERNANCE.md`.
