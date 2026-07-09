@@ -32,7 +32,7 @@ import (
 	"kurdistan/internal/contracts/lab/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyadapter"
-	"kurdistan/internal/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 	"kurdistan/internal/localproxyingressadversary"
 	"kurdistan/internal/contracts/vpn/localvpnadapter"
 	"kurdistan/internal/contracts/lab/loopbackrelay"
@@ -44,7 +44,7 @@ import (
 	"kurdistan/internal/contracts/readiness/productionreadiness"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxyegress"
-	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
 	"kurdistan/internal/operator/relayauthplan"
 	"kurdistan/internal/operator/relaybridge"
 	"kurdistan/internal/operator/relayprocess"
@@ -1205,7 +1205,7 @@ func GeneratedRelayFleetSummary(ctx context.Context) (relayfleet.RelayFleetSumma
 
 import (
 	"kurdistan/internal/proxyingress"
-	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 
 const ProxyIngressSchemaVersion = "proxyingress-v1"
@@ -2124,7 +2124,7 @@ func GeneratedCarrierCollapseParity() (carriercollapse.ParityReport, error) {
 	localProxyAdapterReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 )
 
 const LocalProxyAdapterReviewSchemaVersion = %[1]s
@@ -2659,7 +2659,7 @@ func AuthKey() ([]byte, error) {
 import (
 	"testing"
 
-	"kurdistan/internal/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 )
 
 func TestGeneratedLocalProxyAdapterReview(t *testing.T) {
@@ -2708,7 +2708,7 @@ func TestGeneratedLocalProxyAdapterReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 )
 
 func TestGeneratedLocalProxyAdapterReviewHygiene(t *testing.T) {
@@ -5242,7 +5242,7 @@ func TestGeneratedProxyIngressContract(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 
 func TestGeneratedProxyIngressParity(t *testing.T) {

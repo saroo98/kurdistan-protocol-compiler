@@ -25,13 +25,17 @@ var forbiddenImportPrefixes = []string{
 }
 
 // allowedImporterPrefixes are the only package paths permitted to import the
-// forbidden trees: the tooling that audits/generates from the models, plus the
-// quarantined trees themselves (intra-tree references are fine).
+// forbidden trees: the analysis/generation tooling that audits, hardens, or
+// generates from the models, plus the quarantined trees themselves (intra-tree
+// references are fine). The boundary's intent is that the product RUNTIME must
+// not depend on models — not that no tool may; analysis tooling legitimately
+// consumes them.
 var allowedImporterPrefixes = []string{
 	modulePath + "/internal/contracts/",
 	modulePath + "/internal/product/",
 	modulePath + "/internal/audit",
 	modulePath + "/internal/codegen",
+	modulePath + "/internal/hardening",
 	modulePath + "/cmd/kcheck",
 }
 
