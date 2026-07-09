@@ -509,6 +509,10 @@ func ScanForLeak(value any) error {
 	return scanObject(value, "")
 }
 
+// carrierFamilies returns the lab-selection carrier taxonomy (CarrierFamily). It
+// is one of THREE INTENTIONALLY DISTINCT carrier taxonomies — do not unify them
+// (Stage 5b WO-503 rejected): see adaptivepath.FamilyDescriptors (path selection,
+// live transport) and carrierreview.DefaultDescriptors (design-review contract).
 func carrierFamilies() []CarrierFamily {
 	families := []CarrierFamily{
 		family(FamilyHTTPSLikeLab, true, true, "reviewed_lab_medium", "bounded_request_response", []string{"real_tls", "sni", "host_header", "cdn_provider", "public_network"}),
