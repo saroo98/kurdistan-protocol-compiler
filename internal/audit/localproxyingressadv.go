@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -145,7 +144,7 @@ func LocalProxyIngressAdvGeneratedBackendParityGate(report localproxyingressadve
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"localproxyingressadv_generated.go", "localproxyingressadv_test.go", "localproxyingressadv_parity_test.go", "localproxyingressadv_hygiene_test.go", "LocalProxyIngressAdversarialSchemaVersion"} {

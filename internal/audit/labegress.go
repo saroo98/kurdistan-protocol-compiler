@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -141,7 +140,7 @@ func LabEgressGeneratedBackendParityGate(set labegress.LabEgressFixtureSet) Gate
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"labegress_generated.go", "labegress_test.go", "labegress_parity_test.go", "labegress_hygiene_test.go", "LabEgressSchemaVersion"} {

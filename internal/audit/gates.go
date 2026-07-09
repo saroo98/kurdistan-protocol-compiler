@@ -824,6 +824,23 @@ func repoRoot() (string, error) {
 	}
 }
 
+// codegenGeneratorSource returns the concatenated codegen generator source used
+// by the *_generated_backend_parity gates for substring marker scanning. Since
+// Stage 4b the emit templates live in generator_templates.go alongside the
+// engine in generator.go, so parity markers may appear in either file.
+func codegenGeneratorSource(root string) ([]byte, error) {
+	var buf []byte
+	for _, name := range []string{"generator.go", "generator_templates.go"} {
+		b, err := os.ReadFile(filepath.Join(root, "internal", "codegen", name))
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+		buf = append(buf, '\n')
+	}
+	return buf, nil
+}
+
 func syntheticFixedSignatureProfiles(n int) []*ir.Profile {
 	base, _ := compiler.Generate(31)
 	profiles := make([]*ir.Profile, 0, n)

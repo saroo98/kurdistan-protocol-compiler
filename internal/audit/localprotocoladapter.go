@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -182,7 +181,7 @@ func LocalProtocolAdapterGeneratedBackendParityGate(set localprotocoladapter.Loc
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"localprotocoladapter_generated.go", "localprotocoladapter_test.go", "localprotocoladapter_parity_test.go", "localprotocoladapter_hygiene_test.go", "LocalProtocolAdapterSchemaVersion"} {

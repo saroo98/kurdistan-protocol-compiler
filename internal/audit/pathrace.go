@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -196,7 +195,7 @@ func PathRaceGeneratedBackendParityGate(set pathrace.PathRaceFixtureSet) GateRes
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"pathrace_generated.go", "pathrace_test.go", "pathrace_parity_test.go", "pathrace_hygiene_test.go", "PathRaceSchemaVersion"} {
