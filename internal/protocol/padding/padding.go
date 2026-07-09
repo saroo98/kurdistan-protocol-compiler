@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
+// LOOM: real — deterministic padding engine; part of the protocol core.
 package padding
 
 import (
