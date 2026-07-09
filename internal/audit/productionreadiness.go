@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/productionreadiness"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
 )
 
 type ProductionReadinessAuditSummary struct {

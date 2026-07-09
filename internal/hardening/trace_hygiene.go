@@ -24,7 +24,7 @@ import (
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/proxyingress"
 	"kurdistan/internal/proxyingressreview"
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/observe/trace"
 	"kurdistan/internal/transportbundle"

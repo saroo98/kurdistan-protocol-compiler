@@ -14,7 +14,7 @@ import (
 	"kurdistan/internal/observe/hostdetect"
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/observe/protocorpus"
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 	"kurdistan/internal/observe/wireeval"
 )
 

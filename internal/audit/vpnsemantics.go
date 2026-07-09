@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 func RunVPNSemanticsAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

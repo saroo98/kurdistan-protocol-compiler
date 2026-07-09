@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 const (

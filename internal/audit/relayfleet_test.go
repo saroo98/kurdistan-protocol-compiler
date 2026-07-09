@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 )
 
 func TestRelayFleetAuditQuickPasses(t *testing.T) {

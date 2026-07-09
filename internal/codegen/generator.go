@@ -14,42 +14,42 @@ import (
 	"time"
 
 	"kurdistan/internal/adaptivepath"
-	"kurdistan/internal/androidcarrier"
-	"kurdistan/internal/androidreview"
-	"kurdistan/internal/androidruntime"
-	"kurdistan/internal/androidvpnservice"
-	"kurdistan/internal/carriercollapse"
-	"kurdistan/internal/carrierreadiness"
-	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/contracts/android/androidcarrier"
+	"kurdistan/internal/contracts/android/androidreview"
+	"kurdistan/internal/contracts/android/androidruntime"
+	"kurdistan/internal/contracts/android/androidvpnservice"
+	"kurdistan/internal/contracts/carrier/carriercollapse"
+	"kurdistan/internal/contracts/carrier/carrierreadiness"
+	"kurdistan/internal/contracts/carrier/carrierreview"
 	"kurdistan/internal/concretelocaladapter"
-	"kurdistan/internal/constrainedcarrier"
-	"kurdistan/internal/constrainedcarrierreview"
-	"kurdistan/internal/httpscarrieradversary"
-	"kurdistan/internal/httpscarrierreview"
-	"kurdistan/internal/httpslikecarrier"
-	"kurdistan/internal/keyexchangeplan"
-	"kurdistan/internal/labegress"
-	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/contracts/carrier/constrainedcarrier"
+	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
+	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
+	"kurdistan/internal/contracts/carrier/httpscarrierreview"
+	"kurdistan/internal/contracts/carrier/httpslikecarrier"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
+	"kurdistan/internal/contracts/lab/labegress"
+	"kurdistan/internal/contracts/lab/localpipeline"
 	"kurdistan/internal/localprotocoladapter"
 	"kurdistan/internal/localproxyadapter"
 	"kurdistan/internal/localproxyadapterreview"
 	"kurdistan/internal/localproxyingressadversary"
-	"kurdistan/internal/localvpnadapter"
-	"kurdistan/internal/loopbackrelay"
-	"kurdistan/internal/measurementreview"
-	"kurdistan/internal/multicarrierselect"
-	"kurdistan/internal/operationalhardening"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
+	"kurdistan/internal/contracts/readiness/measurementreview"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
 	"kurdistan/internal/pathhealth"
 	"kurdistan/internal/pathrace"
-	"kurdistan/internal/productionreadiness"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxyegress"
 	"kurdistan/internal/proxyingressreview"
-	"kurdistan/internal/relayauthplan"
-	"kurdistan/internal/relaybridge"
-	"kurdistan/internal/relayprocess"
+	"kurdistan/internal/operator/relayauthplan"
+	"kurdistan/internal/operator/relaybridge"
+	"kurdistan/internal/operator/relayprocess"
 	"kurdistan/internal/transportbundle"
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 type Options struct {
@@ -1154,7 +1154,7 @@ func GeneratedHostDetectSummary(ctx context.Context) (hostdetect.HostDetectSumma
 import (
 	"context"
 
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 )
 
 const RelayFleetSchemaVersion = "relayfleet-v1"
@@ -1510,7 +1510,7 @@ func GeneratedPathHealthMisuse(ctx context.Context) (pathhealth.PathHealthMisuse
 	carrierReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/contracts/carrier/carrierreview"
 )
 
 const CarrierReviewSchemaVersion = %[1]s
@@ -1533,7 +1533,7 @@ func GeneratedCarrierReview() (carrierreview.CarrierFamilyReview, error) {
 	measurementReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/contracts/readiness/measurementreview"
 )
 
 const MeasurementReviewSchemaVersion = %[1]s
@@ -1589,7 +1589,7 @@ func GeneratedProxyEgressParity() (proxyegress.EgressParityReport, error) {
 	relayBridgeSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/relaybridge"
+	"kurdistan/internal/operator/relaybridge"
 )
 
 const RelayBridgeSchemaVersion = %[1]s
@@ -1620,7 +1620,7 @@ func GeneratedRelayBridgeParity() (relaybridge.RelayBridgeParityReport, error) {
 	localPipelineSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/contracts/lab/localpipeline"
 )
 
 const LocalPipelineSchemaVersion = %[1]s
@@ -1651,7 +1651,7 @@ func GeneratedLocalPipelineParity() (localpipeline.PipelineParityReport, error) 
 	productionReadinessSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/productionreadiness"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
 )
 
 const ProductionReadinessSchemaVersion = %[1]s
@@ -1751,7 +1751,7 @@ func GeneratedLocalProtocolAdapterParity() (localprotocoladapter.LocalProtocolPa
 	loopbackRelaySource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/loopbackrelay"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
 )
 
 const LoopbackRelaySchemaVersion = %[1]s
@@ -1785,7 +1785,7 @@ func GeneratedLoopbackRelayParity() (loopbackrelay.LoopbackParityReport, error) 
 	labEgressSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/labegress"
+	"kurdistan/internal/contracts/lab/labegress"
 )
 
 const LabEgressSchemaVersion = %[1]s
@@ -1819,7 +1819,7 @@ func GeneratedLabEgressParity() (labegress.LabEgressParityReport, error) {
 	carrierReadinessSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/carrierreadiness"
+	"kurdistan/internal/contracts/carrier/carrierreadiness"
 )
 
 const CarrierReadinessSchemaVersion = %[1]s
@@ -1851,7 +1851,7 @@ func GeneratedCarrierReadinessParity() (carrierreadiness.ParityReport, error) {
 	httpsCarrierReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/httpscarrierreview"
+	"kurdistan/internal/contracts/carrier/httpscarrierreview"
 )
 
 const HTTPSCarrierReviewSchemaVersion = %[1]s
@@ -1886,7 +1886,7 @@ func GeneratedHTTPSCarrierReviewParity() (httpscarrierreview.ParityReport, error
 	httpsLikeCarrierSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/httpslikecarrier"
+	"kurdistan/internal/contracts/carrier/httpslikecarrier"
 )
 
 const HTTPSLikeCarrierSchemaVersion = %[1]s
@@ -1926,7 +1926,7 @@ func GeneratedHTTPSLikeCarrierParity() (httpslikecarrier.ParityReport, error) {
 	httpsCarrierAdversarySource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/httpscarrieradversary"
+	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 )
 
 const HTTPSCarrierAdversarySchemaVersion = %[1]s
@@ -1965,7 +1965,7 @@ func GeneratedHTTPSCarrierAdversaryParity() (httpscarrieradversary.GeneratedPari
 	constrainedCarrierReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/constrainedcarrierreview"
+	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
 )
 
 const ConstrainedCarrierReviewSchemaVersion = %[1]s
@@ -2005,7 +2005,7 @@ func GeneratedConstrainedCarrierReviewParity() (constrainedcarrierreview.ParityR
 	constrainedCarrierSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/constrainedcarrier"
+	"kurdistan/internal/contracts/carrier/constrainedcarrier"
 )
 
 const ConstrainedCarrierSchemaVersion = %[1]s
@@ -2048,7 +2048,7 @@ func GeneratedConstrainedCarrierParity() (constrainedcarrier.ParityReport, error
 	multiCarrierSelectSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 )
 
 const MultiCarrierSelectSchemaVersion = %[1]s
@@ -2089,7 +2089,7 @@ func GeneratedMultiCarrierSelectCandidate(policyClass string) multicarrierselect
 	carrierCollapseSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/carriercollapse"
+	"kurdistan/internal/contracts/carrier/carriercollapse"
 )
 
 const CarrierCollapseSchemaVersion = %[1]s
@@ -2197,7 +2197,7 @@ func GeneratedLocalProxyAdapterParity() (localproxyadapter.ParityReport, error) 
 	vpnSemanticsSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 const PacketSemanticsSchemaVersion = %[1]s
@@ -2233,7 +2233,7 @@ func GeneratedPacketSemanticsParity() (vpnsemantics.ParityReport, error) {
 	localVPNAdapterSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/localvpnadapter"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
 )
 
 const PacketAdapterSchemaVersion = %[1]s
@@ -2268,7 +2268,7 @@ func GeneratedPacketAdapterParity() (localvpnadapter.ParityReport, error) {
 	relayProcessSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/relayprocess"
+	"kurdistan/internal/operator/relayprocess"
 )
 
 const RelayProcessSchemaVersion = %[1]s
@@ -2305,7 +2305,7 @@ func GeneratedRelayProcessParity() (relayprocess.ParityReport, error) {
 	keyExchangePlanSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
 )
 
 const KeyExchangePlanSchemaVersion = %[1]s
@@ -2342,7 +2342,7 @@ func GeneratedKeyExchangePlanParity() (keyexchangeplan.ParityReport, error) {
 	relayAuthPlanSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/relayauthplan"
+	"kurdistan/internal/operator/relayauthplan"
 )
 
 const RelayAuthPlanSchemaVersion = %[1]s
@@ -2379,7 +2379,7 @@ func GeneratedRelayAuthPlanParity() (relayauthplan.ParityReport, error) {
 	operationalHardeningSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/operationalhardening"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
 )
 
 const OperationalHardeningSchemaVersion = %[1]s
@@ -2419,7 +2419,7 @@ func GeneratedOperationalHardeningParity() (operationalhardening.ParityReport, e
 	androidReviewSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/androidreview"
+	"kurdistan/internal/contracts/android/androidreview"
 )
 
 const AndroidReviewSchemaVersion = %[1]s
@@ -2458,7 +2458,7 @@ func GeneratedAndroidReviewParity() (androidreview.ParityReport, error) {
 	androidRuntimeSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/androidruntime"
+	"kurdistan/internal/contracts/android/androidruntime"
 )
 
 const AndroidRuntimeSchemaVersion = %[1]s
@@ -2498,7 +2498,7 @@ func GeneratedAndroidRuntimeParity() (androidruntime.ParityReport, error) {
 	androidVPNServiceSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/androidvpnservice"
+	"kurdistan/internal/contracts/android/androidvpnservice"
 )
 
 const AndroidVpnServiceSchemaVersion = %[1]s
@@ -2541,7 +2541,7 @@ func GeneratedAndroidVpnServiceParity() (androidvpnservice.ParityReport, error) 
 	androidCarrierSource, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/androidcarrier"
+	"kurdistan/internal/contracts/android/androidcarrier"
 )
 
 const AndroidCarrierSchemaVersion = %[1]s
@@ -2823,7 +2823,7 @@ func TestGeneratedLocalProxyAdapterHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 func TestGeneratedPacketSemantics(t *testing.T) {
@@ -2872,7 +2872,7 @@ func TestGeneratedPacketSemanticsParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/vpnsemantics"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
 )
 
 func TestGeneratedPacketSemanticsHygiene(t *testing.T) {
@@ -2905,7 +2905,7 @@ func TestGeneratedPacketSemanticsHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/localvpnadapter"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
 )
 
 func TestGeneratedPacketAdapter(t *testing.T) {
@@ -2954,7 +2954,7 @@ func TestGeneratedPacketAdapterParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/localvpnadapter"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
 )
 
 func TestGeneratedPacketAdapterHygiene(t *testing.T) {
@@ -2987,7 +2987,7 @@ func TestGeneratedPacketAdapterHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relayprocess"
+	"kurdistan/internal/operator/relayprocess"
 )
 
 func TestGeneratedRelayProcess(t *testing.T) {
@@ -3036,7 +3036,7 @@ func TestGeneratedRelayProcessParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relayprocess"
+	"kurdistan/internal/operator/relayprocess"
 )
 
 func TestGeneratedRelayProcessHygiene(t *testing.T) {
@@ -3069,7 +3069,7 @@ func TestGeneratedRelayProcessHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
 )
 
 func TestGeneratedKeyExchangePlan(t *testing.T) {
@@ -3118,7 +3118,7 @@ func TestGeneratedKeyExchangePlanParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
 )
 
 func TestGeneratedKeyExchangePlanHygiene(t *testing.T) {
@@ -3152,7 +3152,7 @@ func TestGeneratedKeyExchangePlanHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/operationalhardening"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
 )
 
 func TestGeneratedOperationalHardening(t *testing.T) {
@@ -3201,7 +3201,7 @@ func TestGeneratedOperationalHardeningParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/operationalhardening"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
 )
 
 func TestGeneratedOperationalHardeningHygiene(t *testing.T) {
@@ -3235,7 +3235,7 @@ func TestGeneratedOperationalHardeningHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidreview"
+	"kurdistan/internal/contracts/android/androidreview"
 )
 
 func TestGeneratedAndroidReview(t *testing.T) {
@@ -3284,7 +3284,7 @@ func TestGeneratedAndroidReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidreview"
+	"kurdistan/internal/contracts/android/androidreview"
 )
 
 func TestGeneratedAndroidReviewHygiene(t *testing.T) {
@@ -3318,7 +3318,7 @@ func TestGeneratedAndroidReviewHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidruntime"
+	"kurdistan/internal/contracts/android/androidruntime"
 )
 
 func TestGeneratedAndroidRuntime(t *testing.T) {
@@ -3367,7 +3367,7 @@ func TestGeneratedAndroidRuntimeParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidruntime"
+	"kurdistan/internal/contracts/android/androidruntime"
 )
 
 func TestGeneratedAndroidRuntimeHygiene(t *testing.T) {
@@ -3403,7 +3403,7 @@ func TestGeneratedAndroidRuntimeHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidvpnservice"
+	"kurdistan/internal/contracts/android/androidvpnservice"
 )
 
 func TestGeneratedAndroidVpnService(t *testing.T) {
@@ -3455,7 +3455,7 @@ func TestGeneratedAndroidVpnServiceParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidvpnservice"
+	"kurdistan/internal/contracts/android/androidvpnservice"
 )
 
 func TestGeneratedAndroidVpnServiceHygiene(t *testing.T) {
@@ -3492,7 +3492,7 @@ func TestGeneratedAndroidVpnServiceHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidcarrier"
+	"kurdistan/internal/contracts/android/androidcarrier"
 )
 
 func TestGeneratedAndroidCarrier(t *testing.T) {
@@ -3544,7 +3544,7 @@ func TestGeneratedAndroidCarrierParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/androidcarrier"
+	"kurdistan/internal/contracts/android/androidcarrier"
 )
 
 func TestGeneratedAndroidCarrierHygiene(t *testing.T) {
@@ -3582,7 +3582,7 @@ func TestGeneratedAndroidCarrierHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relayauthplan"
+	"kurdistan/internal/operator/relayauthplan"
 )
 
 func TestGeneratedRelayAuthPlan(t *testing.T) {
@@ -3631,7 +3631,7 @@ func TestGeneratedRelayAuthPlanParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relayauthplan"
+	"kurdistan/internal/operator/relayauthplan"
 )
 
 func TestGeneratedRelayAuthPlanHygiene(t *testing.T) {
@@ -5121,7 +5121,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 )
 
 func TestGeneratedRelayFleetSummary(t *testing.T) {
@@ -5153,7 +5153,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 )
 
 func TestGeneratedRelayFleetParity(t *testing.T) {
@@ -5178,7 +5178,7 @@ func TestGeneratedRelayFleetParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 )
 
 func TestGeneratedRelayFleetHygiene(t *testing.T) {
@@ -5888,7 +5888,7 @@ func TestGeneratedPathHealthHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/contracts/carrier/carrierreview"
 )
 
 func TestGeneratedCarrierReview(t *testing.T) {
@@ -5934,7 +5934,7 @@ func TestGeneratedCarrierReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/contracts/carrier/carrierreview"
 )
 
 func TestGeneratedCarrierReviewHygiene(t *testing.T) {
@@ -5974,7 +5974,7 @@ func TestGeneratedCarrierReviewHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/contracts/readiness/measurementreview"
 )
 
 func TestGeneratedMeasurementReview(t *testing.T) {
@@ -6023,7 +6023,7 @@ func TestGeneratedMeasurementReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/measurementreview"
+	"kurdistan/internal/contracts/readiness/measurementreview"
 )
 
 func TestGeneratedMeasurementReviewHygiene(t *testing.T) {
@@ -6145,7 +6145,7 @@ func TestGeneratedProxyEgressHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relaybridge"
+	"kurdistan/internal/operator/relaybridge"
 )
 
 func TestGeneratedRelayBridge(t *testing.T) {
@@ -6191,7 +6191,7 @@ func TestGeneratedRelayBridgeParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/relaybridge"
+	"kurdistan/internal/operator/relaybridge"
 )
 
 func TestGeneratedRelayBridgeHygiene(t *testing.T) {
@@ -6225,7 +6225,7 @@ func TestGeneratedRelayBridgeHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/contracts/lab/localpipeline"
 )
 
 func TestGeneratedLocalPipeline(t *testing.T) {
@@ -6271,7 +6271,7 @@ func TestGeneratedLocalPipelineParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/localpipeline"
+	"kurdistan/internal/contracts/lab/localpipeline"
 )
 
 func TestGeneratedLocalPipelineHygiene(t *testing.T) {
@@ -6304,7 +6304,7 @@ func TestGeneratedLocalPipelineHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/productionreadiness"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
 )
 
 func TestGeneratedProductionReadiness(t *testing.T) {
@@ -6350,7 +6350,7 @@ func TestGeneratedProductionReadinessParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/productionreadiness"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
 )
 
 func TestGeneratedProductionReadinessHygiene(t *testing.T) {
@@ -6545,7 +6545,7 @@ func TestGeneratedLocalProtocolAdapterHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/loopbackrelay"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
 )
 
 func TestGeneratedLoopbackRelay(t *testing.T) {
@@ -6591,7 +6591,7 @@ func TestGeneratedLoopbackRelayParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/loopbackrelay"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
 )
 
 func TestGeneratedLoopbackRelayHygiene(t *testing.T) {
@@ -6623,7 +6623,7 @@ func TestGeneratedLoopbackRelayHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/labegress"
+	"kurdistan/internal/contracts/lab/labegress"
 )
 
 func TestGeneratedLabEgress(t *testing.T) {
@@ -6669,7 +6669,7 @@ func TestGeneratedLabEgressParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/labegress"
+	"kurdistan/internal/contracts/lab/labegress"
 )
 
 func TestGeneratedLabEgressHygiene(t *testing.T) {
@@ -6702,7 +6702,7 @@ func TestGeneratedLabEgressHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carrierreadiness"
+	"kurdistan/internal/contracts/carrier/carrierreadiness"
 )
 
 func TestGeneratedCarrierReadiness(t *testing.T) {
@@ -6748,7 +6748,7 @@ func TestGeneratedCarrierReadinessParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carrierreadiness"
+	"kurdistan/internal/contracts/carrier/carrierreadiness"
 )
 
 func TestGeneratedCarrierReadinessHygiene(t *testing.T) {
@@ -6780,7 +6780,7 @@ func TestGeneratedCarrierReadinessHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpscarrierreview"
+	"kurdistan/internal/contracts/carrier/httpscarrierreview"
 )
 
 func TestGeneratedHTTPSCarrierReview(t *testing.T) {
@@ -6829,7 +6829,7 @@ func TestGeneratedHTTPSCarrierReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpscarrierreview"
+	"kurdistan/internal/contracts/carrier/httpscarrierreview"
 )
 
 func TestGeneratedHTTPSCarrierReviewHygiene(t *testing.T) {
@@ -6863,7 +6863,7 @@ func TestGeneratedHTTPSCarrierReviewHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpslikecarrier"
+	"kurdistan/internal/contracts/carrier/httpslikecarrier"
 )
 
 func TestGeneratedHTTPSLikeCarrier(t *testing.T) {
@@ -6912,7 +6912,7 @@ func TestGeneratedHTTPSLikeCarrierParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpslikecarrier"
+	"kurdistan/internal/contracts/carrier/httpslikecarrier"
 )
 
 func TestGeneratedHTTPSLikeCarrierHygiene(t *testing.T) {
@@ -6947,7 +6947,7 @@ func TestGeneratedHTTPSLikeCarrierHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpscarrieradversary"
+	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 )
 
 func TestGeneratedHTTPSCarrierAdversary(t *testing.T) {
@@ -6996,7 +6996,7 @@ func TestGeneratedHTTPSCarrierAdversaryParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/httpscarrieradversary"
+	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 )
 
 func TestGeneratedHTTPSCarrierAdversaryHygiene(t *testing.T) {
@@ -7030,7 +7030,7 @@ func TestGeneratedHTTPSCarrierAdversaryHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/constrainedcarrierreview"
+	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
 )
 
 func TestGeneratedConstrainedCarrierReview(t *testing.T) {
@@ -7079,7 +7079,7 @@ func TestGeneratedConstrainedCarrierReviewParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/constrainedcarrierreview"
+	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
 )
 
 func TestGeneratedConstrainedCarrierReviewHygiene(t *testing.T) {
@@ -7113,7 +7113,7 @@ func TestGeneratedConstrainedCarrierReviewHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/constrainedcarrier"
+	"kurdistan/internal/contracts/carrier/constrainedcarrier"
 )
 
 func TestGeneratedConstrainedCarrier(t *testing.T) {
@@ -7162,7 +7162,7 @@ func TestGeneratedConstrainedCarrierParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/constrainedcarrier"
+	"kurdistan/internal/contracts/carrier/constrainedcarrier"
 )
 
 func TestGeneratedConstrainedCarrierHygiene(t *testing.T) {
@@ -7196,7 +7196,7 @@ func TestGeneratedConstrainedCarrierHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 )
 
 func TestGeneratedMultiCarrierSelect(t *testing.T) {
@@ -7248,7 +7248,7 @@ func TestGeneratedMultiCarrierSelectParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 )
 
 func TestGeneratedMultiCarrierSelectHygiene(t *testing.T) {
@@ -7281,7 +7281,7 @@ func TestGeneratedMultiCarrierSelectHygiene(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carriercollapse"
+	"kurdistan/internal/contracts/carrier/carriercollapse"
 )
 
 func TestGeneratedCarrierCollapse(t *testing.T) {
@@ -7330,7 +7330,7 @@ func TestGeneratedCarrierCollapseParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/carriercollapse"
+	"kurdistan/internal/contracts/carrier/carriercollapse"
 )
 
 func TestGeneratedCarrierCollapseHygiene(t *testing.T) {
