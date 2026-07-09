@@ -62,177 +62,78 @@ import (
 	"kurdistan/internal/observe/wiregencompare"
 )
 
+// commandRegistry maps each kcheck subsystem subcommand to its handler.
+// Dispatch order is irrelevant (names are mutually exclusive). Any first
+// argument that is not a registered subcommand falls through to runAudit,
+// preserving the historical behaviour that `kcheck [flags]` runs an audit and
+// an unrecognised bare word does NOT error.
+func commandRegistry() map[string]func([]string) int {
+	return map[string]func([]string) int{
+		"compare":                  runCompare,
+		"adversary":                runAdversary,
+		"codegen":                  runCodegen,
+		"streamadversary":          runStreamAdversary,
+		"proxysem":                 runProxySemantics,
+		"carrier":                  runCarrier,
+		"security":                 runSecurity,
+		"runtime":                  runRuntime,
+		"hardening":                runHardening,
+		"adapter":                  runAdapter,
+		"localadapter":             runLocalAdapter,
+		"bytetransport":            runByteTransport,
+		"fixtures":                 runFixtures,
+		"bytepath":                 runBytePath,
+		"protocorpus":              runProtocolCorpus,
+		"wirefeatures":             runWireFeatures,
+		"wiregen":                  runWireGen,
+		"wireeval":                 runWireEval,
+		"hostdetect":               runHostDetect,
+		"relayfleet":               runRelayFleet,
+		"proxyingress":             runProxyIngress,
+		"localproxyingress":        runLocalProxyIngress,
+		"localproxyingressadv":     runLocalProxyIngressAdversarial,
+		"adaptivepath":             runAdaptivePath,
+		"transportbundle":          runTransportBundle,
+		"pathrace":                 runPathRace,
+		"pathhealth":               runPathHealth,
+		"carrierreview":            runCarrierReview,
+		"measurementreview":        runMeasurementReview,
+		"proxyegress":              runProxyEgress,
+		"relaybridge":              runRelayBridge,
+		"localpipeline":            runLocalPipeline,
+		"productionreadiness":      runProductionReadiness,
+		"concretelocaladapter":     runConcreteLocalAdapter,
+		"localprotocoladapter":     runLocalProtocolAdapter,
+		"loopbackrelay":            runLoopbackRelay,
+		"labegress":                runLabEgress,
+		"carrierreadiness":         runCarrierReadiness,
+		"httpscarrierreview":       runHTTPSCarrierReview,
+		"httpslikecarrier":         runHTTPSLikeCarrier,
+		"httpscarrieradversary":    runHTTPSCarrierAdversary,
+		"constrainedcarrierreview": runConstrainedCarrierReview,
+		"constrainedcarrier":       runConstrainedCarrier,
+		"multicarrierselect":       runMultiCarrierSelect,
+		"carriercollapse":          runCarrierCollapse,
+		"localproxyadapterreview":  runLocalProxyAdapterReview,
+		"localproxyadapter":        runLocalProxyAdapter,
+		"vpnsemantics":             runVPNSemantics,
+		"localvpnadapter":          runLocalVPNAdapter,
+		"relayprocess":             runRelayProcess,
+		"keyexchangeplan":          runKeyExchangePlan,
+		"relayauthplan":            runRelayAuthPlan,
+		"operationalhardening":     runOperationalHardening,
+		"androidruntime":           runAndroidRuntime,
+		"androidvpnservice":        runAndroidVPNService,
+		"androidcarrier":           runAndroidCarrier,
+		"androidreview":            runAndroidReview,
+	}
+}
+
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "compare" {
-		os.Exit(runCompare(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "adversary" {
-		os.Exit(runAdversary(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "codegen" {
-		os.Exit(runCodegen(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "streamadversary" {
-		os.Exit(runStreamAdversary(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "proxysem" {
-		os.Exit(runProxySemantics(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "carrier" {
-		os.Exit(runCarrier(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "security" {
-		os.Exit(runSecurity(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "runtime" {
-		os.Exit(runRuntime(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "hardening" {
-		os.Exit(runHardening(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "adapter" {
-		os.Exit(runAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localadapter" {
-		os.Exit(runLocalAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "bytetransport" {
-		os.Exit(runByteTransport(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "fixtures" {
-		os.Exit(runFixtures(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "bytepath" {
-		os.Exit(runBytePath(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "protocorpus" {
-		os.Exit(runProtocolCorpus(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "wirefeatures" {
-		os.Exit(runWireFeatures(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "wiregen" {
-		os.Exit(runWireGen(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "wireeval" {
-		os.Exit(runWireEval(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "hostdetect" {
-		os.Exit(runHostDetect(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "relayfleet" {
-		os.Exit(runRelayFleet(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "proxyingress" {
-		os.Exit(runProxyIngress(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localproxyingress" {
-		os.Exit(runLocalProxyIngress(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localproxyingressadv" {
-		os.Exit(runLocalProxyIngressAdversarial(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "adaptivepath" {
-		os.Exit(runAdaptivePath(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "transportbundle" {
-		os.Exit(runTransportBundle(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "pathrace" {
-		os.Exit(runPathRace(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "pathhealth" {
-		os.Exit(runPathHealth(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "carrierreview" {
-		os.Exit(runCarrierReview(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "measurementreview" {
-		os.Exit(runMeasurementReview(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "proxyegress" {
-		os.Exit(runProxyEgress(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "relaybridge" {
-		os.Exit(runRelayBridge(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localpipeline" {
-		os.Exit(runLocalPipeline(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "productionreadiness" {
-		os.Exit(runProductionReadiness(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "concretelocaladapter" {
-		os.Exit(runConcreteLocalAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localprotocoladapter" {
-		os.Exit(runLocalProtocolAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "loopbackrelay" {
-		os.Exit(runLoopbackRelay(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "labegress" {
-		os.Exit(runLabEgress(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "carrierreadiness" {
-		os.Exit(runCarrierReadiness(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "httpscarrierreview" {
-		os.Exit(runHTTPSCarrierReview(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "httpslikecarrier" {
-		os.Exit(runHTTPSLikeCarrier(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "httpscarrieradversary" {
-		os.Exit(runHTTPSCarrierAdversary(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "constrainedcarrierreview" {
-		os.Exit(runConstrainedCarrierReview(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "constrainedcarrier" {
-		os.Exit(runConstrainedCarrier(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "multicarrierselect" {
-		os.Exit(runMultiCarrierSelect(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "carriercollapse" {
-		os.Exit(runCarrierCollapse(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localproxyadapterreview" {
-		os.Exit(runLocalProxyAdapterReview(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localproxyadapter" {
-		os.Exit(runLocalProxyAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "vpnsemantics" {
-		os.Exit(runVPNSemantics(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "localvpnadapter" {
-		os.Exit(runLocalVPNAdapter(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "relayprocess" {
-		os.Exit(runRelayProcess(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "keyexchangeplan" {
-		os.Exit(runKeyExchangePlan(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "relayauthplan" {
-		os.Exit(runRelayAuthPlan(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "operationalhardening" {
-		os.Exit(runOperationalHardening(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "androidruntime" {
-		os.Exit(runAndroidRuntime(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "androidvpnservice" {
-		os.Exit(runAndroidVPNService(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "androidcarrier" {
-		os.Exit(runAndroidCarrier(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "androidreview" {
-		os.Exit(runAndroidReview(os.Args[2:]))
+	if len(os.Args) > 1 {
+		if handler, ok := commandRegistry()[os.Args[1]]; ok {
+			os.Exit(handler(os.Args[2:]))
+		}
 	}
 	os.Exit(runAudit(os.Args[1:]))
 }
