@@ -289,6 +289,12 @@ func SecuritySecretTraceHygieneGate(profiles []*ir.Profile) GateResult {
 	return gate("security_secret_trace_hygiene", len(failures) == 0, "required", fmt.Sprintf("%d secret trace hygiene checks run", len(selectProfiles(profiles, 3))), nil, failures)
 }
 
+// SecurityMutantDetectionGate is a DETECTOR SELF-TEST over the security-policy
+// mutant modes. It confirms the audit's securityMutantReasons detector responds
+// to each forced policy-field value. It does NOT prove the runtime enforces
+// those policies — the crypto/runtime layers do not read the ir.Security fields
+// (see securityMutantReasons and internal/crypto/security/envelope.go). Genuine
+// enforcement is Option A, gated on D-003 external crypto review.
 func SecurityMutantDetectionGate(ctx context.Context) GateResult {
 	_ = ctx
 	modes := []string{
@@ -315,9 +321,10 @@ func SecurityMutantDetectionGate(ctx context.Context) GateResult {
 			detected = append(detected, mode)
 		}
 	}
-	return gate("security_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d security mutant modes detected", len(detected), len(modes)), map[string]any{
+	return gate("security_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d security regression modes flagged (detector self-test over forced policy fields; not runtime enforcement — see D-003)", len(detected), len(modes)), map[string]any{
 		"detected_modes": detected,
 		"missed_modes":   missed,
+		"self_test":      "detector responds to forced ir.Security policy values; runtime does not read these fields",
 	}, missed)
 }
 
@@ -342,39 +349,59 @@ func SecurityGeneratedBackendParityGate() GateResult {
 	}, failures)
 }
 
+// securityMutantReasons reports which forced security-policy field values the
+// audit's regression detector observes across a set of mutated profiles.
+//
+// HONESTY NOTE (Stage 6, Option B — 2026-07-09). This is a DETECTOR SELF-TEST,
+// not a proof of runtime security. Each case keys on the exact ir.Security /
+// ir.InvalidInput field value that mutant.GenerateProfiles forces for that mode.
+// Those forced values are themselves ordinary options the compiler picks at
+// random (see internal/protocol/compiler/generator.go), and the crypto/runtime
+// layers do NOT read these fields — internal/crypto/security/envelope.go
+// hardcodes the nonce/replay behaviour. So a PASS proves only that the detector
+// responds to a forced policy-field value; it does NOT prove the runtime rejects
+// replay/downgrade/mismatch. Real enforcement is Option A (wire the fields into
+// crypto/runtime), gated on D-003 external crypto review.
+//
+// The previously unconditional ModeReusedNonce reason (which fired for every
+// profile, clean or not) has been removed so this self-test can no longer pass
+// vacuously; TestSecurityMutantReasonsDiscriminates pins that a canonical-strong
+// clean profile yields zero reasons while each mutant yields at least one.
 func securityMutantReasons(mode string, profiles []*ir.Profile) []string {
 	reasons := []string{}
 	for _, p := range profiles {
 		switch mode {
 		case mutant.ModeNoTranscriptBinding:
 			if p.Security.TranscriptMode == "canonical_v1" {
-				reasons = append(reasons, "transcript mode lacks full binding")
+				reasons = append(reasons, "transcript mode forced to minimal binding value")
 			}
 		case mutant.ModeReusedNonce:
-			reasons = append(reasons, "duplicate nonce simulation rejected")
+			if p.Security.NonceMode == "counter_xor_base" {
+				reasons = append(reasons, "nonce mode forced to reuse-prone value")
+			}
 		case mutant.ModeAcceptsReplay:
 			if p.InvalidInput.Replay == "ordinary_error_shaped_response" {
-				reasons = append(reasons, "replay acceptance behavior detected")
+				reasons = append(reasons, "replay-handling value forced")
 			}
 		case mutant.ModeAcceptsDowngrade:
 			if p.Security.DowngradePolicy != "strict_suite_and_capabilities" {
-				reasons = append(reasons, "downgrade policy weakened")
+				reasons = append(reasons, "downgrade policy forced off canonical value")
 			}
 		case mutant.ModeCapabilityMismatchAccepted:
 			if p.Security.CapabilityNegotiationPolicy == "intersection_with_required" {
-				reasons = append(reasons, "capability mismatch policy weakened")
+				reasons = append(reasons, "capability negotiation policy value forced")
 			}
 		case mutant.ModeProfileMismatchAccepted:
 			if p.Security.ProfileCompatibilityPolicy == "strict_schema" {
-				reasons = append(reasons, "profile compatibility policy weakened")
+				reasons = append(reasons, "profile compatibility policy value forced")
 			}
 		case mutant.ModeUnsafeConfigAllowed:
 			if p.Security.ConfigValidationPolicy == "strict_required" {
-				reasons = append(reasons, "config hygiene policy weakened")
+				reasons = append(reasons, "config validation policy value forced")
 			}
 		case mutant.ModeSecretTraceLeak:
 			if p.Security.SecureEnvelopeMode == "metadata_authenticated" {
-				reasons = append(reasons, "secret trace leak simulation detected")
+				reasons = append(reasons, "secure envelope mode value forced")
 			}
 		}
 	}
