@@ -6,6 +6,7 @@ package fixtures
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"kurdistan/internal/observe/bytetransport"
 )
@@ -75,6 +76,14 @@ func RunMalformedCase(tc MalformedByteCase) MalformedCaseResult {
 	reject := func(bucket string) MalformedCaseResult {
 		return MalformedCaseResult{Name: tc.Name, Rejected: true, RejectBucket: bucket, SafeError: true}
 	}
+	// Stateful / multi-frame malformations (fragment reassembly, sequence
+	// tracking, terminal-stream, and metadata bounds) cannot be expressed as a
+	// single-frame byte decode. They are driven through the real reassembler,
+	// sequence validator, and frame validator instead, so the result reflects
+	// actual decoder behaviour rather than a hardcoded verdict.
+	if res, ok := runStatefulMalformedCase(tc, cfg); ok {
+		return res
+	}
 	frame := bytetransport.ByteFrame{
 		SessionID:     cfg.RuntimeID,
 		StreamID:      1,
@@ -109,28 +118,8 @@ func RunMalformedCase(tc MalformedByteCase) MalformedCaseResult {
 	case "invalid_fragment":
 		raw = mutateU16(raw, 3, 5)
 		rewriteChecksum(raw)
-	case "fragment_mismatch":
-		return reject("fragment_count_mismatch")
-	case "duplicate_fragment":
-		return reject("duplicate_fragment")
-	case "missing_fragment":
-		return reject("incomplete_reassembly")
-	case "oversized_reassembly":
-		return reject("oversized_reassembly")
-	case "sequence_replay":
-		return reject("sequence_replay")
-	case "old_sequence":
-		return reject("sequence_replay")
-	case "future_sequence":
-		return reject("sequence_future")
-	case "post_close_data", "post_reset_data":
-		return reject("terminal")
 	case "corrupted_checksum":
 		raw[len(raw)-1] ^= 0xff
-	case "invalid_metadata":
-		return reject("metadata")
-	case "oversized_metadata":
-		return reject("metadata")
 	case "random_noise":
 		raw = []byte{17, 23, 42, 99, 5, 8}
 	}
@@ -142,6 +131,130 @@ func RunMalformedCase(tc MalformedByteCase) MalformedCaseResult {
 		return MalformedCaseResult{Name: tc.Name, Rejected: true, RejectBucket: normalizeRejectBucket(result.RejectReason), SafeError: true}
 	}
 	return MalformedCaseResult{Name: tc.Name, Rejected: false, RejectBucket: "accepted", SafeError: true}
+}
+
+// runStatefulMalformedCase drives the multi-frame / stateful malformation
+// classes through the real bytetransport reassembler, sequence validator, and
+// frame validator. It returns (result, true) for the classes it handles; the
+// Rejected flag is true only when the real component actually rejects, so the
+// corpus assertion depends on decoder behaviour, not a literal.
+func runStatefulMalformedCase(tc MalformedByteCase, cfg bytetransport.ByteTransportConfig) (MalformedCaseResult, bool) {
+	base := bytetransport.ByteFrame{
+		SessionID:     cfg.RuntimeID,
+		StreamID:      1,
+		Sequence:      1,
+		Kind:          bytetransport.FrameData,
+		FragmentIndex: 0,
+		FragmentCount: 1,
+		ByteCount:     8,
+		MetadataClass: "malformed",
+	}
+	result := func(bucket string, rejected, safe bool) (MalformedCaseResult, bool) {
+		if !rejected {
+			return MalformedCaseResult{Name: tc.Name, Rejected: false, RejectBucket: "accepted", SafeError: safe}, true
+		}
+		return MalformedCaseResult{Name: tc.Name, Rejected: true, RejectBucket: bucket, SafeError: safe}, true
+	}
+	switch tc.InputClass {
+	case "fragment_mismatch":
+		f := base
+		f.FragmentCount = cfg.MaxFragments + 1
+		rej, safe := reassemblerRejects(cfg, []bytetransport.ByteFrame{f})
+		return result("fragment_count_mismatch", rej, safe)
+	case "duplicate_fragment":
+		f := base
+		f.FragmentCount = 3
+		rej, safe := reassemblerRejects(cfg, []bytetransport.ByteFrame{f, f})
+		return result("duplicate_fragment", rej, safe)
+	case "missing_fragment":
+		f0, f1 := base, base
+		f0.FragmentCount, f1.FragmentCount = 3, 3
+		f0.FragmentIndex, f1.FragmentIndex = 0, 1
+		rej, safe := reassemblerRejects(cfg, []bytetransport.ByteFrame{f0, f1})
+		return result("incomplete_reassembly", rej, safe)
+	case "oversized_reassembly":
+		f0, f1, f2 := base, base, base
+		for _, f := range []*bytetransport.ByteFrame{&f0, &f1, &f2} {
+			f.FragmentCount = 4
+			f.ByteCount = 200
+		}
+		f0.FragmentIndex, f1.FragmentIndex, f2.FragmentIndex = 0, 1, 2
+		rej, safe := reassemblerRejects(cfg, []bytetransport.ByteFrame{f0, f1, f2})
+		return result("oversized_reassembly", rej, safe)
+	case "sequence_replay":
+		a := base
+		a.Sequence = 5
+		rej, safe := sequenceRejects(0, []bytetransport.ByteFrame{a, a})
+		return result("sequence_replay", rej, safe)
+	case "old_sequence":
+		a, b := base, base
+		a.Sequence, b.Sequence = 5, 3
+		rej, safe := sequenceRejects(0, []bytetransport.ByteFrame{a, b})
+		return result("sequence_replay", rej, safe)
+	case "future_sequence":
+		a, b := base, base
+		a.Sequence, b.Sequence = 5, 105
+		rej, safe := sequenceRejects(8, []bytetransport.ByteFrame{a, b})
+		return result("sequence_future", rej, safe)
+	case "post_close_data":
+		c, d := base, base
+		c.Kind, c.Sequence = bytetransport.FrameClose, 1
+		d.Kind, d.Sequence = bytetransport.FrameData, 2
+		rej, safe := sequenceRejects(0, []bytetransport.ByteFrame{c, d})
+		return result("terminal", rej, safe)
+	case "post_reset_data":
+		c, d := base, base
+		c.Kind, c.Reset, c.Sequence = bytetransport.FrameReset, true, 1
+		d.Kind, d.Sequence = bytetransport.FrameData, 2
+		rej, safe := sequenceRejects(0, []bytetransport.ByteFrame{c, d})
+		return result("terminal", rej, safe)
+	case "invalid_metadata":
+		f := base
+		f.MetadataClass = strings.Repeat("x", 200)
+		err := bytetransport.ValidateFrame(cfg, f)
+		return result("metadata", err != nil, safeRejectError(err))
+	case "oversized_metadata":
+		f := base
+		f.MetadataClass = strings.Repeat("x", 500)
+		err := bytetransport.ValidateFrame(cfg, f)
+		return result("metadata", err != nil, safeRejectError(err))
+	default:
+		return MalformedCaseResult{}, false
+	}
+}
+
+// reassemblerRejects feeds frames to a real Reassembler and reports whether the
+// reassembly was rejected (an Add error or a rejected result) or never completed
+// (incomplete reassembly withholds the payload, which is also a safe rejection).
+func reassemblerRejects(cfg bytetransport.ByteTransportConfig, frames []bytetransport.ByteFrame) (bool, bool) {
+	r, err := bytetransport.NewReassembler(cfg)
+	if err != nil {
+		return true, safeRejectError(err)
+	}
+	var last bytetransport.DecodeResult
+	for _, f := range frames {
+		res, aerr := r.Add(f)
+		if aerr != nil {
+			return true, safeRejectError(aerr)
+		}
+		if res.Rejected {
+			return true, true
+		}
+		last = res
+	}
+	return !last.Complete, true
+}
+
+// sequenceRejects feeds frames to a real SequenceValidator and reports whether
+// any frame was rejected.
+func sequenceRejects(maxAhead uint64, frames []bytetransport.ByteFrame) (bool, bool) {
+	v := bytetransport.NewSequenceValidator(maxAhead)
+	for _, f := range frames {
+		if err := v.Accept(f); err != nil {
+			return true, safeRejectError(err)
+		}
+	}
+	return false, true
 }
 
 func ValidateMalformedCorpus(cases []MalformedByteCase) error {
