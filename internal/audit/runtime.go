@@ -172,6 +172,12 @@ func RuntimeTraceHygieneGate(ctx context.Context, profiles []*ir.Profile) GateRe
 	return gate("runtime_trace_hygiene", len(failures) == 0, "required", fmt.Sprintf("%d runtime traces checked for payload/secret hygiene", len(runs)), nil, failures)
 }
 
+// RuntimeMutantDetectionGate is a DETECTOR SELF-TEST over the runtime mutant
+// modes. RunMutantScenarioCorpus stamps a simulated regression onto each run
+// summary (e.g. ReplayRejected=0, SecretLogged=true) and this gate confirms the
+// detector flags it. The real runtime harness is never made to misbehave, so a
+// PASS proves detector wiring, not that the runtime enforces the policy. Genuine
+// enforcement is Option A, gated on D-003 external crypto review.
 func RuntimeMutantDetectionGate(ctx context.Context) GateResult {
 	modes := []string{
 		mutant.ModeRuntimeAcceptsCapabilityDowngrade,
@@ -199,7 +205,7 @@ func RuntimeMutantDetectionGate(ctx context.Context) GateResult {
 			missed = append(missed, mode)
 		}
 	}
-	return gate("runtime_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d runtime mutant modes detected", len(detected), len(modes)), map[string]any{"detected_modes": detected, "missed_modes": missed}, missed)
+	return gate("runtime_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d runtime regression modes flagged (detector self-test over simulated regressions; not runtime enforcement — see D-003)", len(detected), len(modes)), map[string]any{"detected_modes": detected, "missed_modes": missed, "self_test": "RunMutantScenarioCorpus injects a simulated regression into the run summary; the real runtime is not made to misbehave"}, missed)
 }
 
 func RuntimeGeneratedBackendParityGate() GateResult {

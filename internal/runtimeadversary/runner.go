@@ -63,6 +63,15 @@ func RunScenarioCorpus(ctx context.Context, profiles []*ir.Profile, scenarios []
 	return runs
 }
 
+// RunMutantScenarioCorpus runs the real scenario corpus and then INJECTS a
+// simulated regression into the resulting run summaries for the given mutant
+// mode (e.g. forcing ReplayRejected=0 or SecretLogged=true). This is a detector
+// self-test fixture: it deliberately fabricates the bad summary so the audit's
+// runtime mutant gate can confirm it would flag such a regression. It does NOT
+// make the real runtime harness (RunScenario -> kruntime.RunLocalHarness)
+// misbehave — the baseline scenarios still exercise the genuine runtime, which
+// really does reject replay. Real policy enforcement wired from ir.Security is
+// Option A, gated on D-003 external crypto review.
 func RunMutantScenarioCorpus(ctx context.Context, mode string, profiles []*ir.Profile, scenarios []Scenario) []ScenarioRun {
 	runs := RunScenarioCorpus(ctx, profiles, scenarios)
 	for i := range runs {
