@@ -9,9 +9,9 @@ import (
 	"sort"
 
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxyadversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type Result struct {

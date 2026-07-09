@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"kurdistan/internal/labtrace"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func main() {

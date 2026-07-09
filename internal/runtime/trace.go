@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"kurdistan/internal/security"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/crypto/security"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func RuntimeTraceEvent(profileID string, s *Session, eventType string) ktrace.Event {

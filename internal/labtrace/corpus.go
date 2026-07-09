@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type CorpusOptions struct {

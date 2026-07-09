@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"sync"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	kruntime "kurdistan/internal/runtime"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func RunConcurrencyChecks(profiles []*ir.Profile) []CheckResult {

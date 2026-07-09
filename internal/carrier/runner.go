@@ -3,7 +3,7 @@
 
 package carrier
 
-import "kurdistan/internal/ir"
+import "kurdistan/internal/protocol/ir"
 
 type RoundTripResult struct {
 	Family          string     `json:"family"`

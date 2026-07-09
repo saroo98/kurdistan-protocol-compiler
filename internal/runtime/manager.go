@@ -6,7 +6,7 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 type Runtime struct {

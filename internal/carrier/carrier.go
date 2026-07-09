@@ -3,7 +3,7 @@
 
 package carrier
 
-import "kurdistan/internal/ir"
+import "kurdistan/internal/protocol/ir"
 
 const (
 	FamilyStream         = "stream_carrier"

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {

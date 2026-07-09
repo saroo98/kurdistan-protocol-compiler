@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapteradversary"
 	"kurdistan/internal/mutant"
 )

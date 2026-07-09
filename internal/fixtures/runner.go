@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func GenerateBytePathManifest(ctx context.Context, opts ManifestOptions) (FixtureManifest, error) {

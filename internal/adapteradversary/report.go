@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"kurdistan/internal/adapter"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type ScenarioRun struct {

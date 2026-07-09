@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const firstNFrameCount = 5

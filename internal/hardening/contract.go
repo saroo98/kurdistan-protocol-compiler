@@ -8,14 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func RunAPIContractChecks(ctx context.Context, profiles []*ir.Profile) []CheckResult {

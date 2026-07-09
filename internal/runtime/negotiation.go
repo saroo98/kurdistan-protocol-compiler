@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 type NegotiationResult struct {

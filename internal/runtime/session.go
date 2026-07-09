@@ -6,8 +6,8 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/security"
-	kstream "kurdistan/internal/stream"
+	"kurdistan/internal/crypto/security"
+	kstream "kurdistan/internal/protocol/stream"
 )
 
 type Session struct {

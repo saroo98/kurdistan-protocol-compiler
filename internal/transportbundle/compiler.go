@@ -9,9 +9,9 @@ import (
 	"sort"
 
 	"kurdistan/internal/adaptivepath"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wiregen"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wiregen"
 )
 
 func Compile(ctx context.Context, policy TransportBundlePolicy) (CompiledBundle, error) {

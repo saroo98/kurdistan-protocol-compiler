@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	kruntime "kurdistan/internal/runtime"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type ScenarioRun struct {

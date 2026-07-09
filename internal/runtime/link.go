@@ -6,7 +6,7 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 type LinkFrame struct {

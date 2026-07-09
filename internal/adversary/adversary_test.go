@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/labtrace"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestExtractFeaturesDeterministicAndPayloadFree(t *testing.T) {

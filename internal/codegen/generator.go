@@ -27,7 +27,7 @@ import (
 	"kurdistan/internal/httpscarrieradversary"
 	"kurdistan/internal/httpscarrierreview"
 	"kurdistan/internal/httpslikecarrier"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/keyexchangeplan"
 	"kurdistan/internal/labegress"
 	"kurdistan/internal/localpipeline"
@@ -189,7 +189,7 @@ func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest) 
 func renderGoFiles(p *ir.Profile, modulePath string) ([]generatedFile, error) {
 	profileStatic, err := renderGo(`package protocol
 
-import "kurdistan/internal/ir"
+import "kurdistan/internal/protocol/ir"
 
 const ProfileID = %[1]s
 const ProfileSeed int64 = %[2]d
@@ -260,8 +260,8 @@ func FirstContactSequence() []GeneratedFirstContactStep {
 	framing, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 )
 
 const FrameLengthMode = %[1]s
@@ -306,7 +306,7 @@ import (
 	"context"
 
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const DefaultStreamID uint32 = 1
@@ -347,7 +347,7 @@ import (
 	"context"
 
 	"kurdistan/internal/proxyadversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const ProxyRelayIntentEncoding = %[1]s
@@ -425,7 +425,7 @@ import (
 	"context"
 
 	"kurdistan/internal/carrieradversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const CarrierFamily = %[1]s
@@ -505,8 +505,8 @@ func CaptureCarrierTrace(ctx context.Context, carrierName string, streamCount in
 import (
 	"context"
 
-	"kurdistan/internal/security"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/crypto/security"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const SecurityVersion = %[1]s
@@ -622,7 +622,7 @@ import (
 
 	"kurdistan/internal/proxyadversary"
 	kruntime "kurdistan/internal/runtime"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const RuntimeProfileID = %[1]s
@@ -667,9 +667,9 @@ func CaptureRuntimeTrace(ctx context.Context, streams int) ([]ktrace.Event, Trac
 import (
 	"context"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/hardening"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const HardeningProfileID = %[1]s
@@ -735,7 +735,7 @@ import (
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/adapteradversary"
 	kruntime "kurdistan/internal/runtime"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const AdapterGeneratedProfileID = %[1]s
@@ -818,7 +818,7 @@ import (
 
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/localadapteradversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const LocalAdapterGeneratedProfileID = %[1]s
@@ -896,9 +896,9 @@ func LocalAdapterAdversaryDemo(ctx context.Context, scenario string) (localadapt
 import (
 	"context"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/bytetransportadversary"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 const ByteTransportGeneratedProfileID = %[1]s
@@ -959,7 +959,7 @@ func ByteTransportAdversaryDemo(ctx context.Context, scenario string) (bytetrans
 
 	protocolCorpusSource, err := renderGo(`package protocol
 
-import "kurdistan/internal/protocorpus"
+import "kurdistan/internal/observe/protocorpus"
 
 const ProtocolCorpusSchemaVersion = "protocorpus-v1"
 const ProtocolCorpusFeatureSchemaVersion = "wirefeatures-v1"
@@ -986,8 +986,8 @@ import (
 	"context"
 
 	"kurdistan/internal/fixtures"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wirefeatures"
 )
 
 const WireFeatureSchemaVersion = "wirefeatures-v1"
@@ -1026,10 +1026,10 @@ func GeneratedWireFeatureVectors(ctx context.Context) ([]wirefeatures.WireFeatur
 import (
 	"context"
 
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wirefeatures"
-	"kurdistan/internal/wiregen"
-	"kurdistan/internal/wiregencompare"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wirefeatures"
+	"kurdistan/internal/observe/wiregen"
+	"kurdistan/internal/observe/wiregencompare"
 )
 
 const WireGenPolicyVersion = %[1]s
@@ -1075,9 +1075,9 @@ func GeneratedWireGenBaseline(ctx context.Context) (wiregencompare.BaselineManif
 import (
 	"context"
 
-	"kurdistan/internal/classifierdata"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/classifierdata"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wireeval"
 )
 
 const WireEvalDatasetVersion = "wireeval-v1"
@@ -1122,7 +1122,7 @@ func GeneratedWireEvalJSONL(ctx context.Context) ([]byte, error) {
 import (
 	"context"
 
-	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/observe/hostdetect"
 )
 
 const HostDetectSchemaVersion = "hostdetect-v1"
@@ -2586,7 +2586,7 @@ func GeneratedAndroidCarrierParity() (androidcarrier.ParityReport, error) {
 	scheduler, err := renderGo(`package protocol
 
 import (
-	"kurdistan/internal/scheduler"
+	"kurdistan/internal/protocol/scheduler"
 )
 
 const SchedulerMode = %[1]s
@@ -2633,7 +2633,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"kurdistan/internal/auth"
+	"kurdistan/internal/crypto/auth"
 )
 
 const AuthMode = %[1]s
@@ -3667,9 +3667,9 @@ import (
 	"fmt"
 	"net"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func ValidateProfile() error {
@@ -3719,7 +3719,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestStaticProfileValidates(t *testing.T) {
@@ -4031,7 +4031,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func TestGeneratedSecurityTranscriptAndCapabilityParity(t *testing.T) {
@@ -4136,7 +4136,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func TestGeneratedSecurityAdversaryRejectsDowngradeAndBadConfig(t *testing.T) {
@@ -4306,7 +4306,7 @@ import (
 	"time"
 
 	"kurdistan/internal/hardening"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func TestGeneratedHardeningDemoAndConstants(t *testing.T) {
@@ -4484,7 +4484,7 @@ import (
 	"time"
 
 	"kurdistan/internal/adapteradversary"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestGeneratedAdapterAdversaryQuickCorpus(t *testing.T) {
@@ -4574,7 +4574,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapteradversary"
 )
 
@@ -4601,7 +4601,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 )
 
 func TestGeneratedByteTransportDemo(t *testing.T) {
@@ -4673,7 +4673,7 @@ import (
 	"time"
 
 	"kurdistan/internal/bytetransportadversary"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestGeneratedByteTransportAdversaryQuickCorpus(t *testing.T) {
@@ -4741,7 +4741,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/byteparity"
+	"kurdistan/internal/observe/byteparity"
 )
 
 func TestGeneratedBytePathParity(t *testing.T) {
@@ -4765,7 +4765,7 @@ func TestGeneratedBytePathParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/observe/protocorpus"
 )
 
 func TestGeneratedProtocolCorpusConstants(t *testing.T) {
@@ -4795,7 +4795,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/wirefeatures"
+	"kurdistan/internal/observe/wirefeatures"
 )
 
 func TestGeneratedWireFeatureExtraction(t *testing.T) {
@@ -4868,7 +4868,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/wiregencompare"
+	"kurdistan/internal/observe/wiregencompare"
 )
 
 func TestGeneratedWireGenParity(t *testing.T) {
@@ -4897,9 +4897,9 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/wirefeatures"
-	"kurdistan/internal/wiregen"
-	"kurdistan/internal/wiregencompare"
+	"kurdistan/internal/observe/wirefeatures"
+	"kurdistan/internal/observe/wiregen"
+	"kurdistan/internal/observe/wiregencompare"
 )
 
 func TestGeneratedWireGenFeatures(t *testing.T) {
@@ -4934,7 +4934,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/wireeval"
 )
 
 func TestGeneratedWireEvalDataset(t *testing.T) {
@@ -4966,7 +4966,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/classifierdata"
+	"kurdistan/internal/observe/classifierdata"
 )
 
 func TestGeneratedWireEvalExports(t *testing.T) {
@@ -4999,7 +4999,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/wireeval"
 )
 
 func TestGeneratedWireEvalParity(t *testing.T) {
@@ -5030,7 +5030,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/observe/hostdetect"
 )
 
 func TestGeneratedHostDetectSummary(t *testing.T) {
@@ -5062,7 +5062,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/observe/hostdetect"
 )
 
 func TestGeneratedHostDetectParity(t *testing.T) {
@@ -5090,7 +5090,7 @@ func TestGeneratedHostDetectParity(t *testing.T) {
 import (
 	"testing"
 
-	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/observe/hostdetect"
 )
 
 func TestGeneratedHostDetectHygiene(t *testing.T) {
@@ -7391,7 +7391,7 @@ import (
 	"sort"
 
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type TraceCaptureSummary struct {
@@ -8157,7 +8157,7 @@ import (
 	"os"
 	"time"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 
 	%[1]s
 )

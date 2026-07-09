@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"kurdistan/internal/hostdetect"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/hostdetect"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wireeval"
 )
 
 func TestGenerateGoldenSummary(t *testing.T) {

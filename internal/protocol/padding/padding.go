@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 type Engine struct {

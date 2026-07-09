@@ -6,7 +6,7 @@ package carrier
 import (
 	"fmt"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 type Envelope struct {

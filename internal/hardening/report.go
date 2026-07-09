@@ -7,8 +7,8 @@ import (
 	"context"
 	"sort"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
 )
 
 const Version = "0.59.0-lab"
@@ -162,23 +162,23 @@ func fail(name, category, details string, evidence map[string]string) CheckResul
 
 func packagesChecked() []string {
 	return []string{
-		"internal/compiler",
-		"internal/ir",
-		"internal/framing",
-		"internal/stream",
+		"internal/protocol/compiler",
+		"internal/protocol/ir",
+		"internal/protocol/framing",
+		"internal/protocol/stream",
 		"internal/proxysem",
 		"internal/carrier",
-		"internal/security",
+		"internal/crypto/security",
 		"internal/runtime",
 		"internal/adapter",
 		"internal/localadapter",
-		"internal/bytetransport",
+		"internal/observe/bytetransport",
 		"internal/fixtures",
-		"internal/byteparity",
-		"internal/protocorpus",
-		"internal/wireeval",
-		"internal/classifierdata",
-		"internal/hostdetect",
+		"internal/observe/byteparity",
+		"internal/observe/protocorpus",
+		"internal/observe/wireeval",
+		"internal/observe/classifierdata",
+		"internal/observe/hostdetect",
 		"internal/relayfleet",
 		"internal/localpipeline",
 		"internal/localproxyadapterreview",
@@ -207,11 +207,11 @@ func packagesChecked() []string {
 		"internal/constrainedcarrier",
 		"internal/multicarrierselect",
 		"internal/carriercollapse",
-		"internal/wirefeatures",
-		"internal/wiregen",
-		"internal/wiregencompare",
+		"internal/observe/wirefeatures",
+		"internal/observe/wiregen",
+		"internal/observe/wiregencompare",
 		"internal/codegen",
-		"internal/trace",
+		"internal/observe/trace",
 	}
 }
 

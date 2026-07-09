@@ -6,14 +6,14 @@ import (
 	"net"
 	"testing"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/protocol/padding"
 	"kurdistan/internal/relay"
-	"kurdistan/internal/scheduler"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/protocol/scheduler"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func BenchmarkProfileGeneration(b *testing.B) {

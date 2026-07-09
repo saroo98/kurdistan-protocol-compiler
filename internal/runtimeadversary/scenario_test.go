@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/mutant"
 )
 

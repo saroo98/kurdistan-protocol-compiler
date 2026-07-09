@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/fixtures"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wirefeatures"
-	"kurdistan/internal/wiregen"
-	"kurdistan/internal/wiregencompare"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wirefeatures"
+	"kurdistan/internal/observe/wiregen"
+	"kurdistan/internal/observe/wiregencompare"
 )
 
 type WireGenAuditSummary struct {

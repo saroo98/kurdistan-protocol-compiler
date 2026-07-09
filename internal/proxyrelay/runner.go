@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/proxysem"
-	kstream "kurdistan/internal/stream"
-	ktrace "kurdistan/internal/trace"
+	kstream "kurdistan/internal/protocol/stream"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type IntentRequest struct {

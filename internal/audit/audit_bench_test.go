@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/mutant"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func BenchmarkQuickAudit(b *testing.B) {

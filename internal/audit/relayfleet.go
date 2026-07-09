@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/hostdetect"
+	"kurdistan/internal/observe/hostdetect"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/protocorpus"
+	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/relayfleet"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/wireeval"
 )
 
 type RelayFleetAuditSummary struct {

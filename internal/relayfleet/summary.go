@@ -6,9 +6,9 @@ package relayfleet
 import (
 	"context"
 
-	"kurdistan/internal/hostdetect"
-	"kurdistan/internal/protocorpus"
-	"kurdistan/internal/wireeval"
+	"kurdistan/internal/observe/hostdetect"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wireeval"
 )
 
 type RelayFleetSummary struct {

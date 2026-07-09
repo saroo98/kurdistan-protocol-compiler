@@ -6,7 +6,7 @@ package adapteradversary
 import (
 	"context"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 	kruntime "kurdistan/internal/runtime"
 )

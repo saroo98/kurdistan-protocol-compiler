@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"kurdistan/internal/adapter"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	kruntime "kurdistan/internal/runtime"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type RunResult struct {

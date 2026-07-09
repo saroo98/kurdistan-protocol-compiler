@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/bytetransport"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/observe/bytetransport"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type ScenarioRun struct {

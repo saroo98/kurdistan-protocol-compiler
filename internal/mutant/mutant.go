@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/ir"
-	ktrace "kurdistan/internal/trace"
-	"kurdistan/internal/wiregen"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/protocol/ir"
+	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/observe/wiregen"
 )
 
 const (

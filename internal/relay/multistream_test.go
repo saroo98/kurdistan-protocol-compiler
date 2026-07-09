@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func TestSimulateMultiStreamEchoInterleavesClosesAndResets(t *testing.T) {

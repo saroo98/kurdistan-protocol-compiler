@@ -4,8 +4,8 @@
 package localadapter
 
 import (
-	"kurdistan/internal/ir"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/protocol/ir"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TraceEvent(p *ir.Profile, cfg LocalAdapterConfig, eventType, scenario string, sum LocalAdapterSummary) ktrace.Event {

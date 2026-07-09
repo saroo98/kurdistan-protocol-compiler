@@ -8,14 +8,14 @@ import (
 	"fmt"
 
 	"kurdistan/internal/adapter"
-	"kurdistan/internal/bytetransport"
+	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/carrier"
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapter"
 	"kurdistan/internal/proxysem"
 	kruntime "kurdistan/internal/runtime"
-	kstream "kurdistan/internal/stream"
+	kstream "kurdistan/internal/protocol/stream"
 )
 
 func RunResourceLimitChecks(ctx context.Context, profiles []*ir.Profile, opts Options) []CheckResult {

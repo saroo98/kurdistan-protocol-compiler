@@ -6,7 +6,7 @@ package carrier
 import (
 	"strings"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TraceEvents(profileID, scenario string, envelopes []Envelope, reconstructed bool) []ktrace.Event {

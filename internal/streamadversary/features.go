@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 func ExtractStreamFeatures(events []ktrace.Event) StreamFeatureVector {

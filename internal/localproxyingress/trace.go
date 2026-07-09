@@ -3,7 +3,7 @@
 
 package localproxyingress
 
-import ktrace "kurdistan/internal/trace"
+import ktrace "kurdistan/internal/observe/trace"
 
 func TraceEvents(summary LocalProxyIngressSummary) []ktrace.Event {
 	return []ktrace.Event{{

@@ -3,7 +3,7 @@
 
 package bytetransportadversary
 
-import "kurdistan/internal/bytetransport"
+import "kurdistan/internal/observe/bytetransport"
 
 const (
 	ScenarioHappyPath         = "byte_single_flow_happy_path"

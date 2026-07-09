@@ -16,12 +16,12 @@ import (
 
 	"kurdistan/internal/adversary"
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/labtrace"
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type CodegenAuditConfig struct {

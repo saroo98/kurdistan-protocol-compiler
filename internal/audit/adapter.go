@@ -13,7 +13,7 @@ import (
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/adapteradversary"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 )
 

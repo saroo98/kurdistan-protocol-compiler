@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"kurdistan/internal/auth"
-	"kurdistan/internal/compiler"
-	"kurdistan/internal/diversity"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/crypto/auth"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/transportbundle"
 )
 

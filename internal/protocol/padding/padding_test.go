@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 func TestNoPaddingMode(t *testing.T) {

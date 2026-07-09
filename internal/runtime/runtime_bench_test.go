@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/proxyadversary"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func BenchmarkRuntimeHarnessHappyPath(b *testing.B) {

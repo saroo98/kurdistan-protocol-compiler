@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	ktrace "kurdistan/internal/trace"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type ControlFamily struct {

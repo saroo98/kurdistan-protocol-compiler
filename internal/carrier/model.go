@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 )
 
 type profileModel struct {

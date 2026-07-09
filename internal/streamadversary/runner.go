@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"strings"
 
-	"kurdistan/internal/framing"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/scheduler"
-	kstream "kurdistan/internal/stream"
-	ktrace "kurdistan/internal/trace"
+	"kurdistan/internal/protocol/scheduler"
+	kstream "kurdistan/internal/protocol/stream"
+	ktrace "kurdistan/internal/observe/trace"
 )
 
 type streamHandle struct {

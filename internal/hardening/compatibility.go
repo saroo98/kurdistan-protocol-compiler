@@ -9,10 +9,10 @@ import (
 
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/ir"
+	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/mutant"
 	kruntime "kurdistan/internal/runtime"
-	"kurdistan/internal/security"
+	"kurdistan/internal/crypto/security"
 )
 
 func RunCompatibilityChecks(profiles []*ir.Profile) []CheckResult {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/compiler"
+	"kurdistan/internal/protocol/compiler"
 )
 
 func BenchmarkSimulateMultiStreamEchoFour(b *testing.B) {
