@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"kurdistan/internal/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 	"kurdistan/internal/mutant"
 )
 

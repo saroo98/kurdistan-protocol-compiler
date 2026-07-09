@@ -13,7 +13,7 @@ import (
 
 	"kurdistan/internal/mutant"
 	"kurdistan/internal/proxyingress"
-	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 
 type ProxyIngressAuditSummary struct {

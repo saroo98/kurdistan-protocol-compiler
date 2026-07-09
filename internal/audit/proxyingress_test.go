@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/proxyingress"
-	"kurdistan/internal/proxyingressreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 
 func TestProxyIngressGatesPass(t *testing.T) {
