@@ -13,7 +13,7 @@ import (
 	"io"
 
 	"kurdistan/internal/ir"
-	"kurdistan/internal/padding"
+	"kurdistan/internal/protocol/padding"
 	"kurdistan/internal/proxysem"
 	"kurdistan/internal/scheduler"
 )

@@ -10,7 +10,7 @@ import (
 	"kurdistan/internal/diversity"
 	"kurdistan/internal/framing"
 	"kurdistan/internal/ir"
-	"kurdistan/internal/padding"
+	"kurdistan/internal/protocol/padding"
 	"kurdistan/internal/relay"
 	"kurdistan/internal/scheduler"
 	ktrace "kurdistan/internal/trace"
