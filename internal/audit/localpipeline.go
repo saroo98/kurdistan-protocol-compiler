@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -176,7 +175,7 @@ func LocalPipelineGeneratedBackendParityGate(set localpipeline.PipelineFixtureSe
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"localpipeline_generated.go", "localpipeline_test.go", "localpipeline_parity_test.go", "localpipeline_hygiene_test.go", "LocalPipelineSchemaVersion"} {

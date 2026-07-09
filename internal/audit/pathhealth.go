@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -190,7 +189,7 @@ func PathHealthGeneratedBackendParityGate(set pathhealth.PathHealthFixtureSet) G
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"pathhealth_generated.go", "pathhealth_test.go", "pathhealth_parity_test.go", "pathhealth_hygiene_test.go", "PathHealthSchemaVersion"} {

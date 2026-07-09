@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -151,7 +150,7 @@ func CarrierReadinessGeneratedBackendParityGate(set carrierreadiness.FixtureSet)
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"carrierreadiness_generated.go", "carrierreadiness_test.go", "carrierreadiness_parity_test.go", "carrierreadiness_hygiene_test.go", "CarrierReadinessSchemaVersion"} {

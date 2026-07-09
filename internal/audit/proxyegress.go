@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -215,7 +214,7 @@ func ProxyEgressGeneratedBackendParityGate(set proxyegress.EgressFixtureSet) Gat
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"proxyegress_generated.go", "proxyegress_test.go", "proxyegress_parity_test.go", "proxyegress_hygiene_test.go", "ProxyEgressSchemaVersion"} {

@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -174,7 +173,7 @@ func ProductionReadinessGeneratedBackendParityGate(review productionreadiness.Pr
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"productionreadiness_generated.go", "productionreadiness_test.go", "productionreadiness_parity_test.go", "productionreadiness_hygiene_test.go", "ProductionReadinessSchemaVersion"} {

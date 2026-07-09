@@ -6,8 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -209,7 +207,7 @@ func RuntimeGeneratedBackendParityGate() GateResult {
 	if err != nil {
 		return gate("runtime_generated_backend_parity", false, "required", err.Error(), nil, []string{err.Error()})
 	}
-	source, err := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+	source, err := codegenGeneratorSource(root)
 	if err != nil {
 		return gate("runtime_generated_backend_parity", false, "required", err.Error(), nil, []string{err.Error()})
 	}

@@ -6,7 +6,6 @@ package audit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -152,7 +151,7 @@ func LoopbackRelayGeneratedBackendParityGate(set loopbackrelay.LoopbackRelayFixt
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			source := string(raw)
 			for _, marker := range []string{"loopbackrelay_generated.go", "loopbackrelay_test.go", "loopbackrelay_parity_test.go", "loopbackrelay_hygiene_test.go", "LoopbackRelaySchemaVersion"} {

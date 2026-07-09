@@ -836,7 +836,7 @@ func GeneratedLocalProxyIngressAdvParityGate(corpus GeneratedBackendTraceCorpus,
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"localproxyingressadv_generated.go", "localproxyingressadv_test.go", "localproxyingressadv_parity_test.go", "localproxyingressadv_hygiene_test.go", "LocalProxyIngressAdversarialSchemaVersion"} {
@@ -873,7 +873,7 @@ func GeneratedAdaptivePathParityGate(corpus GeneratedBackendTraceCorpus, testFai
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"adaptivepath_generated.go", "adaptivepath_test.go", "adaptivepath_parity_test.go", "adaptivepath_hygiene_test.go", "AdaptivePathSchemaVersion"} {
@@ -910,7 +910,7 @@ func GeneratedTransportBundleParityGate(corpus GeneratedBackendTraceCorpus, test
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"transportbundle_generated.go", "transportbundle_test.go", "transportbundle_parity_test.go", "transportbundle_hygiene_test.go", "TransportBundleSchemaVersion"} {
@@ -948,7 +948,7 @@ func GeneratedPathRaceParityGate(corpus GeneratedBackendTraceCorpus, testFailure
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"pathrace_generated.go", "pathrace_test.go", "pathrace_parity_test.go", "pathrace_hygiene_test.go", "PathRaceSchemaVersion"} {
@@ -986,7 +986,7 @@ func GeneratedPathHealthParityGate(corpus GeneratedBackendTraceCorpus, testFailu
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"pathhealth_generated.go", "pathhealth_test.go", "pathhealth_parity_test.go", "pathhealth_hygiene_test.go", "PathHealthSchemaVersion"} {
@@ -1024,7 +1024,7 @@ func GeneratedCarrierReviewParityGate(corpus GeneratedBackendTraceCorpus, testFa
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"carrierreview_generated.go", "carrierreview_test.go", "carrierreview_parity_test.go", "carrierreview_hygiene_test.go", "CarrierReviewSchemaVersion"} {
@@ -1062,7 +1062,7 @@ func GeneratedMeasurementReviewParityGate(corpus GeneratedBackendTraceCorpus, te
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{"measurementreview_generated.go", "measurementreview_test.go", "measurementreview_parity_test.go", "measurementreview_hygiene_test.go", "MeasurementReviewSchemaVersion"} {
@@ -1213,7 +1213,7 @@ func generatedMilestoneSourceGate(corpus GeneratedBackendTraceCorpus, testFailur
 	}
 	root, err := repoRoot()
 	if err == nil {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr == nil {
 			text := string(raw)
 			for _, marker := range []string{slug + "_generated.go", slug + "_test.go", slug + "_parity_test.go", slug + "_hygiene_test.go", schemaMarker} {
@@ -1269,7 +1269,7 @@ func GeneratedBytePathFixtureParityGate(corpus GeneratedBackendTraceCorpus, test
 	if err != nil {
 		failures = append(failures, err.Error())
 	} else {
-		raw, readErr := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator.go"))
+		raw, readErr := codegenGeneratorSource(root)
 		if readErr != nil {
 			failures = append(failures, readErr.Error())
 		} else {
