@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/observe/hostdetect"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wireeval"
 )

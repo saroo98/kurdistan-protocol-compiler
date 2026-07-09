@@ -8,7 +8,7 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func TestRequiredScenariosRunAndStayPayloadFree(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/proxyrelay"
 	"kurdistan/internal/proxysem"
 )

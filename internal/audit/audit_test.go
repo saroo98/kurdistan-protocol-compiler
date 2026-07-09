@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"kurdistan/internal/adversary"
+	"kurdistan/internal/testkit/adversary"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/labtrace"

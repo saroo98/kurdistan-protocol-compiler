@@ -11,7 +11,7 @@ import (
 
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/localadapteradversary"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunLocalAdapterAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

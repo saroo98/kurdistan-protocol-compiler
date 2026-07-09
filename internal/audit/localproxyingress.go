@@ -12,7 +12,7 @@ import (
 
 	"kurdistan/internal/localproxyingress"
 	"kurdistan/internal/localproxyingressadversary"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type LocalProxyIngressAuditSummary struct {

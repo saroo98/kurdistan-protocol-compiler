@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/android/androidvpnservice"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunAndroidVPNServiceAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

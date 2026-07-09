@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/carrier/httpslikecarrier"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunHTTPSLikeCarrierAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

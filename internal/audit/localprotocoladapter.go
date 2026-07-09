@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/localprotocoladapter"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type LocalProtocolAdapterAuditSummary struct {

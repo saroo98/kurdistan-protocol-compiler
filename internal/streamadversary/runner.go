@@ -12,7 +12,7 @@ import (
 
 	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/protocol/scheduler"
 	kstream "kurdistan/internal/protocol/stream"
 	ktrace "kurdistan/internal/observe/trace"

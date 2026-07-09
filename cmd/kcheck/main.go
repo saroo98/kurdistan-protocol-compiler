@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 
 	"kurdistan/internal/adaptivepath"
-	"kurdistan/internal/adversary"
+	"kurdistan/internal/testkit/adversary"
 	"kurdistan/internal/contracts/android/androidcarrier"
 	"kurdistan/internal/contracts/android/androidreview"
 	"kurdistan/internal/contracts/android/androidruntime"

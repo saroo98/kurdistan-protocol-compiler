@@ -10,7 +10,7 @@ import (
 	"kurdistan/internal/carrier"
 	"kurdistan/internal/carrierrelay"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/proxyadversary"
 )
 

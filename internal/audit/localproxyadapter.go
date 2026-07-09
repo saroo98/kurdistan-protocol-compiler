@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/localproxyadapter"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunLocalProxyAdapterAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

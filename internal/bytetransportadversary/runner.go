@@ -9,7 +9,7 @@ import (
 
 	"kurdistan/internal/observe/bytetransport"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunScenario(ctx context.Context, p *ir.Profile, scenario Scenario) ScenarioRun {

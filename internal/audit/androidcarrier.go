@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/android/androidcarrier"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunAndroidCarrierAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

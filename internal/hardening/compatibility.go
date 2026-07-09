@@ -10,7 +10,7 @@ import (
 	"kurdistan/internal/adapter"
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/crypto/security"
 )

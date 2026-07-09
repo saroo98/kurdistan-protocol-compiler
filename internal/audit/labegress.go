@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/lab/labegress"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunLabEgressAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

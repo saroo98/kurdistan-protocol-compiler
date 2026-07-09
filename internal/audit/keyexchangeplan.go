@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/contracts/readiness/keyexchangeplan"
-	"kurdistan/internal/mutant"
+	"kurdistan/internal/testkit/mutant"
 )
 
 func RunKeyExchangePlanAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
