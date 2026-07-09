@@ -1,0 +1,78 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
+# KIP-0066: Product Layer Scaffold (contracts-only)
+
+- status: design-lock
+- last_verified: 2026-07-09
+- Work orders: Stage 8 (WO-801 design-lock, WO-802 envelope, WO-803 strategy, WO-804 android); gated by D-002 (build = yes) and D-003 (crypto path).
+
+Milestone 60 lays honest, contract-only homes for a future product layer without
+implementing any live VPN, relay, carrier, or cryptography. It adds
+`internal/product/{envelope,strategy,android}` as `[plan]`/`[model]` design
+contracts behind the `internal/testkit/importrules` boundary. Nothing in the live
+runtime imports these packages, and no real sockets, packet capture, or
+production cryptography are introduced.
+
+This milestone is a scaffold and on-ramp. It does not claim undetectability,
+guaranteed bypass, or censorship resistance, and it does not ship a product.
+
+## Scope limits (hard)
+
+- No live VpnService, TUN, packet capture, or non-loopback networking.
+- No real profile encryption or production cryptography. Sealing is an interface
+  only; real sealing is gated on external cryptographic review (D-003).
+- No public relays, operator provisioning, or field-test tooling.
+- No Kotlin/Java or Gradle build wired.
+- The product runtime must not import the model/contract trees (enforced by
+  `internal/testkit/importrules`).
+
+## kurd:// envelope contract (`internal/product/envelope`)
+
+A `kurd://` link is a profile-distribution envelope that carries metadata and an
+opaque profile reference only — never payloads, secrets, keys, or raw profile
+material. `Parse`/`Format`/`Validate` enforce the shape and the safety
+invariants:
+
+- issuer, opaque profile reference, positive expiry, revocation id, and
+  compatibility version are required;
+- the reference must be opaque (embedded key/secret/payload material is rejected);
+- `payload_embedded` must be false;
+- the only admitted seal mode is `unsealed_contract`; sealed modes await D-003.
+
+The `Sealer` interface has no implementation. `UnavailableSealer` returns
+`ErrSealingUnavailable` for both `Seal` and `Open`, because real sealing is
+production cryptography gated on external review (D-003).
+
+## Strategy selection surface (`internal/product/strategy`)
+
+A profile-scoped, modelled selection contract that **reuses** the existing
+carrier design-review taxonomy (`carrierreview.DefaultDescriptors`) rather than
+defining a fourth family list (Stage 5b WO-503 rejected unifying the three
+distinct taxonomies). `Select` ranks reviewed, default-eligible families under a
+risk tolerance, excludes the unsafe control and risk-blocked families, and marks
+its result synthetic. It performs no probing, dialing, resolving, or network I/O.
+
+## Android source contract (`internal/product/android`)
+
+A design contract for a future real `android/` Gradle tree, deliberately distinct
+from the Go runtime models in `internal/contracts/android/**`. `Validate`
+enforces the safety invariants: permission-first, fail-closed kill switch,
+bounded fallback, redacted diagnostics, and no payload or destination logging. It
+wires no Android build.
+
+## Verification
+
+- `go build ./...` and `go run ./cmd/gate` are green.
+- The `internal/testkit/importrules` boundary test confirms no live/real package
+  imports `internal/product/**`.
+- The package tests bite: each contract's `Validate` rejects unsafe or incomplete
+  input (payload embedding, missing expiry, unbounded fallback, not fail-closed,
+  secret-looking references), and sealing is proven unavailable.
+
+## Out of scope / follow-ups
+
+- `kcheck product` subcommand and a STATUS section (the safety checks currently
+  run via `go test ./...`, which `go run ./cmd/gate` invokes).
+- Real sealing, live Android sources, and live carrier transport — each gated on
+  its own review (D-002 execution, D-003 crypto).
