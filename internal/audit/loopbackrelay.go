@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/loopbackrelay"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
 	"kurdistan/internal/mutant"
 )
 

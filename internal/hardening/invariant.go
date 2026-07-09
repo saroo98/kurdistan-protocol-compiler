@@ -18,7 +18,7 @@ import (
 	"kurdistan/internal/pathrace"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/proxysem"
-	"kurdistan/internal/relayfleet"
+	"kurdistan/internal/operator/relayfleet"
 	kstream "kurdistan/internal/protocol/stream"
 	"kurdistan/internal/transportbundle"
 	"kurdistan/internal/observe/wireeval"

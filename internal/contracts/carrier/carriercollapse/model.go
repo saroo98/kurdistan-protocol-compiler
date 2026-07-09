@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/constrainedcarrier"
-	"kurdistan/internal/httpscarrieradversary"
-	"kurdistan/internal/httpslikecarrier"
-	"kurdistan/internal/multicarrierselect"
+	"kurdistan/internal/contracts/carrier/constrainedcarrier"
+	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
+	"kurdistan/internal/contracts/carrier/httpslikecarrier"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 )
 
 const (

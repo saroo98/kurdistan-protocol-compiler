@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/constrainedcarrierreview"
+	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
 )
 
 func RunConstrainedCarrierReviewAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

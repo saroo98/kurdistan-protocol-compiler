@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"kurdistan/internal/androidvpnservice"
+	"kurdistan/internal/contracts/android/androidvpnservice"
 	"kurdistan/internal/mutant"
 )
 

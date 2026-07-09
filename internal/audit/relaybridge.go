@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/relaybridge"
+	"kurdistan/internal/operator/relaybridge"
 )
 
 type RelayBridgeAuditSummary struct {

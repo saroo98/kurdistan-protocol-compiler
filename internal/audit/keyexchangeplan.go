@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"kurdistan/internal/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
 	"kurdistan/internal/mutant"
 )
 

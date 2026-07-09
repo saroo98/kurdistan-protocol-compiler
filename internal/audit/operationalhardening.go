@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/operationalhardening"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
 )
 
 func RunOperationalHardeningAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

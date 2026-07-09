@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/mutant"
-	"kurdistan/internal/relayauthplan"
+	"kurdistan/internal/operator/relayauthplan"
 )
 
 func RunRelayAuthPlanAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/carrierreview"
+	"kurdistan/internal/contracts/carrier/carrierreview"
 	"kurdistan/internal/mutant"
 )
 
