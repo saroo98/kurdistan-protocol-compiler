@@ -30,6 +30,17 @@ Current profile generation covers:
 
 The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
 
+## Legend: `[live]`, `[model]`, `[plan]`
+
+To keep this document honest about what runs versus what is only designed,
+capabilities fall into three classes:
+
+- `[live]` — runs and does real work in the lab. Real network I/O is loopback-only and limited to the `relay`, `labtrace`, and `concretelocaladapter` packages.
+- `[model]` — a deterministic, in-memory, payload-free contract or simulation. It validates shapes and semantics but performs no real networking.
+- `[plan]` — a design spec or review contract only; no implementation yet.
+
+Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The audit gates prove local regressions and detector wiring; several security regression gates are detector self-tests, not proofs of runtime enforcement (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
+
 ## Why This Project Exists
 
 Many censorship-resistant networking systems and pluggable transports must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.

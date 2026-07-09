@@ -176,7 +176,7 @@ func TestStatusRendering(t *testing.T) {
 		Conclusion:       "passed",
 	}
 	status := RenderStatus(report)
-	for _, want := range []string{"Kurdistan Protocol Compiler Status", "Lab-only", "profile_corpus_diversity", "adversarial_black_box_clustering", "Next Milestone"} {
+	for _, want := range []string{"Kurdistan Protocol Compiler Status", "Lab-only", "profile_corpus_diversity", "adversarial_black_box_clustering", "Milestone Frontier"} {
 		if !strings.Contains(status, want) {
 			t.Fatalf("status missing %q:\n%s", want, status)
 		}

@@ -20,6 +20,8 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "> Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.")
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates are detector self-tests over forced/simulated regressions, not proofs that the runtime enforces those policies (see docs/safety.md and the D-003 crypto review).")
+	fmt.Fprintln(&b)
 	fmt.Fprintf(&b, "- Latest audit mode: `%s`\n", report.Mode)
 	fmt.Fprintf(&b, "- Generated at: `%s`\n", report.GeneratedAt)
 	fmt.Fprintf(&b, "- Profile count: `%d`\n", report.ProfileCount)
@@ -676,10 +678,24 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
 	fmt.Fprintln(&b, "- The audit detects local regressions; it cannot prove undetectability or real-world robustness.")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "## Next Milestone")
+	fmt.Fprintln(&b, "## Milestone Frontier")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Milestone 59 should connect the Android VpnService prototype to the reviewed carrier runtime while preserving M58 fail-closed behavior, diagnostics hygiene, and generated parity.")
+	fmt.Fprintln(&b, milestoneFrontierNote(report))
 	return b.String()
+}
+
+// milestoneFrontierNote derives an honest current-frontier line from the gates
+// actually present in this report, instead of a hardcoded (and lagging) future
+// milestone claim. It names the latest modelled surface that was evaluated and
+// points at the KIP docs and the safety boundary.
+func milestoneFrontierNote(report AuditReport) string {
+	if _, ok := gateByName(report.Gates, "androidcarrier_report"); ok {
+		return "The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It is a model/contract, not live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md)."
+	}
+	if _, ok := gateByName(report.Gates, "androidvpnservice_report"); ok {
+		return "The latest modelled surface evaluated in this report is the Android VpnService prototype (`androidvpnservice_*` gates), a fail-closed model rather than live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md)."
+	}
+	return "Per-milestone tracking lives in the `docs/KIP-*.md` documents and the gate table above. Live transport remains out of scope (see docs/safety.md)."
 }
 
 func WriteStatus(path string, report AuditReport) error {
