@@ -149,7 +149,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		report.Failures = append(report.Failures, "generated source appears to be wrapper-only")
 	}
 	if report.DirectFSMUse {
-		report.Failures = append(report.Failures, "generated source directly imports or invokes internal/fsm")
+		report.Failures = append(report.Failures, "generated source directly imports or invokes internal/protocol/fsm")
 	}
 	if report.RuntimeProfileLoad {
 		report.Failures = append(report.Failures, "generated source loads profile.json or calls LoadProfile at runtime")
@@ -250,7 +250,7 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		strings.Contains(joined, "const AndroidVpnServiceSchemaVersion")
 	module.ProfileSpecificConstantsPresent = module.ProfileSpecificConstantsPresent &&
 		strings.Contains(joined, "const AndroidCarrierSchemaVersion")
-	module.DirectFSMUse = strings.Contains(joined, "internal/fsm") || strings.Contains(joined, "fsm.New(")
+	module.DirectFSMUse = strings.Contains(joined, "internal/protocol/fsm") || strings.Contains(joined, "fsm.New(")
 	module.RuntimeProfileLoad = strings.Contains(joined, "LoadProfile(") || strings.Contains(joined, "profile.json")
 	module.WrapperOnly = IsGeneratedWrapperOnly(joined) || (!module.ProfileSpecificConstantsPresent && module.RuntimeProfileLoad)
 	module.PayloadLogging = looksLikePayloadLogging(joined)
@@ -259,7 +259,7 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		module.Failures = append(module.Failures, fmt.Sprintf("%s: profile-specific constants missing", label))
 	}
 	if module.DirectFSMUse {
-		module.Failures = append(module.Failures, fmt.Sprintf("%s: internal/fsm direct use", label))
+		module.Failures = append(module.Failures, fmt.Sprintf("%s: internal/protocol/fsm direct use", label))
 	}
 	if module.RuntimeProfileLoad {
 		module.Failures = append(module.Failures, fmt.Sprintf("%s: runtime profile.json load", label))

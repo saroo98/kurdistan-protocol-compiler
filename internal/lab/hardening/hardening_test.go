@@ -5,11 +5,14 @@ package hardening
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
+	ktrace "kurdistan/internal/observe/trace"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
-	ktrace "kurdistan/internal/observe/trace"
 )
 
 func TestRunHardeningReportPasses(t *testing.T) {
@@ -19,6 +22,24 @@ func TestRunHardeningReportPasses(t *testing.T) {
 	}
 	if report.InvariantsChecked == 0 || report.TraceHygieneChecks == 0 || report.GeneratedParityChecks == 0 {
 		t.Fatalf("missing hardening coverage: %#v", report)
+	}
+}
+
+func TestPackagesCheckedExist(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate hardening test source")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	for _, pkg := range packagesChecked() {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(pkg)))
+		if err != nil {
+			t.Errorf("reported package %q does not exist: %v", pkg, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("reported package %q is not a directory", pkg)
+		}
 	}
 }
 
