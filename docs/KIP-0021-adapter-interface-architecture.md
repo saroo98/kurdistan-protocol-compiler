@@ -35,7 +35,7 @@ Milestone 15 implements deterministic in-memory contracts for these shapes. Conc
 
 ## Contracts
 
-The package `internal/adapter` defines:
+The package `internal/transport/adapter` defines:
 
 - adapter config validation
 - ingress and egress interfaces
@@ -126,7 +126,7 @@ They do not include raw payloads, raw packet contents, raw destinations, keys, n
 
 ## Adapter Adversary Scenarios
 
-`internal/adapteradversary` provides deterministic scenarios:
+`internal/lab/adapteradversary` provides deterministic scenarios:
 
 - `single_flow_happy_path`
 - `many_small_flows`

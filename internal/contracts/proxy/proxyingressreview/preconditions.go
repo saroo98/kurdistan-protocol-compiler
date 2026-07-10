@@ -3,7 +3,7 @@
 
 package proxyingressreview
 
-import "kurdistan/internal/proxyingress"
+import "kurdistan/internal/lab/proxyingress"
 
 func SecurityPreconditions(contract proxyingress.ProxyIngressContract) []string {
 	out := []string{}

@@ -34,13 +34,13 @@ The prototype remains deterministic and in-memory. It does not open sockets, lis
 
 ## Package Layout
 
-`internal/localproxyingress` provides:
+`internal/lab/localproxyingress` provides:
 
 - config validation
 - synthetic source events
 - bounded request queues
 - dispatcher summaries
-- target binding through `internal/proxyingress`
+- target binding through `internal/lab/proxyingress`
 - runtime stream bridge metadata
 - lifecycle execution
 - backpressure reports
@@ -48,7 +48,7 @@ The prototype remains deterministic and in-memory. It does not open sockets, lis
 - fixture generation and comparison
 - safe trace events
 
-`internal/localproxyingressadversary` provides:
+`internal/lab/localproxyingressadversary` provides:
 
 - scenario features
 - collapse scanning

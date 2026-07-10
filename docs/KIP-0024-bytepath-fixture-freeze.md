@@ -27,7 +27,7 @@ profile seed
 
 ## Fixture Manifest
 
-`internal/fixtures` defines a versioned manifest with:
+`internal/lab/fixtures` defines a versioned manifest with:
 
 - fixture schema version
 - deterministic generation timestamp

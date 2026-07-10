@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/observe/bytetransport"
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 func TestRunParityPasses(t *testing.T) {

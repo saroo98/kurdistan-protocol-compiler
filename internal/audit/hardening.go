@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"kurdistan/internal/hardening"
+	"kurdistan/internal/lab/hardening"
 	"kurdistan/internal/protocol/ir"
 )
 

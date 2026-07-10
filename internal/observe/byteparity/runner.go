@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 // Run compares two byte-path fixture manifests produced for the same profile

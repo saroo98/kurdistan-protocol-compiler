@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"kurdistan/internal/protocol/compiler"
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/observe/protocorpus"

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/lab/localadapteradversary"
 	"kurdistan/internal/testkit/mutant"
 )
 

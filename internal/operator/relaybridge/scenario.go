@@ -3,7 +3,7 @@
 
 package relaybridge
 
-import "kurdistan/internal/proxyegress"
+import "kurdistan/internal/lab/proxyegress"
 
 func DefaultScenarios() []RelayBridgeScenario {
 	return []RelayBridgeScenario{

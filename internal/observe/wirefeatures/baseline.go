@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/observe/protocorpus"
 )
 

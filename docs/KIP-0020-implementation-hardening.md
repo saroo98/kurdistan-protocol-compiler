@@ -11,7 +11,7 @@ This milestone is about misuse resistance and regression detection. It does not 
 
 ## Hardening Model
 
-The `internal/hardening` package provides reusable checks:
+The `internal/lab/hardening` package provides reusable checks:
 
 - invariant registry
 - API contract and misuse checks

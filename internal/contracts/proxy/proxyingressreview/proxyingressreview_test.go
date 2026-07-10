@@ -6,7 +6,7 @@ package proxyingressreview
 import (
 	"testing"
 
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 )
 
 func TestDesignReviewGoNoGo(t *testing.T) {

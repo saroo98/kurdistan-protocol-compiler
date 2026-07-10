@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/proxysem"
+	"kurdistan/internal/protocol/proxysem"
 	kstream "kurdistan/internal/protocol/stream"
 )
 

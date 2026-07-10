@@ -167,7 +167,7 @@ Run tests and fuzz targets:
 
 ```bash
 go test ./...
-go test -fuzz=Fuzz ./internal/proxysem
+go test -fuzz=Fuzz ./internal/protocol/proxysem
 go test -fuzz=Fuzz ./internal/framing
 ```
 

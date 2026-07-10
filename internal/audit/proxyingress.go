@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 

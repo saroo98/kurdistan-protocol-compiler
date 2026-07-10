@@ -11,7 +11,7 @@ import (
 
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/runtimeadversary"
+	"kurdistan/internal/lab/runtimeadversary"
 )
 
 func RunRuntimeAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

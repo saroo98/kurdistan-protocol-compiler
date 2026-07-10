@@ -28,7 +28,7 @@ conclusions only.
 
 ## Adversarial Corpus
 
-`internal/localproxyingressadversary` defines the adversarial corpus. Scenario
+`internal/lab/localproxyingressadversary` defines the adversarial corpus. Scenario
 classes include malformed event ordering, missing or duplicate open events,
 duplicate event IDs, data before open, data after close, reset-before-open,
 target-error lifecycle abuse, queue overflow, descriptor abuse, fixed mapping

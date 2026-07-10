@@ -11,7 +11,7 @@ import (
 
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 )
 
 func RunProxySemanticsAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

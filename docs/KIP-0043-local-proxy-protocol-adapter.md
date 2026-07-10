@@ -11,7 +11,7 @@ The adapter is a deterministic parser and mapping layer. It is not a production 
 
 ## Model
 
-The package `internal/localprotocoladapter` defines:
+The package `internal/lab/localprotocoladapter` defines:
 
 - local protocol adapter configuration and validation
 - CONNECT-like metadata parsing

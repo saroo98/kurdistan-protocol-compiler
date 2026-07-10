@@ -9,7 +9,7 @@ import (
 
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

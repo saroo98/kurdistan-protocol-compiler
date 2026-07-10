@@ -152,28 +152,28 @@ internal/ir + internal/compiler
 internal/fsm + internal/framing + internal/scheduler + internal/stream
   runtime model for state machines, frames, scheduling, and streams
 
-internal/proxysem + internal/proxyrelay + internal/proxyadversary
+internal/protocol/proxysem + internal/transport/proxyrelay + internal/transport/proxyadversary
   synthetic proxy-semantics model, relay-intent runner, and proxy collapse scanning
 
-internal/carrier + internal/carrierrelay + internal/carrieradversary
+internal/transport/carrier + internal/transport/carrierrelay + internal/lab/carrieradversary
   abstract carrier envelopes, semantic reconstruction, carrier collapse scanning, and carrier mutants
 
 internal/security
   transcript binding, key schedule, nonce/replay policy, capability negotiation, compatibility, config hygiene, and secure envelope model
 
-internal/runtime + internal/runtimeadversary
+internal/runtime + internal/lab/runtimeadversary
   runtime roles, session lifecycle, compatibility negotiation, in-memory links, runtime traces, and runtime collapse scanning
 
-internal/adapter + internal/adapteradversary
+internal/transport/adapter + internal/lab/adapteradversary
   ingress/egress contracts, flow lifecycle, deterministic harness, runtime boundary checks, adapter traces, and collapse scanning
 
-internal/localadapter + internal/localadapteradversary
+internal/lab/localadapter + internal/lab/localadapteradversary
   memory ingress/egress adapters, deterministic source/sink models, runtime runner, local adapter traces, and collapse scanning
 
-internal/bytetransport + internal/bytetransportadversary
+internal/bytetransport + internal/lab/bytetransportadversary
   byte frame encoder/decoder, fragmentation/reassembly, bounded byte pipe, sequence checks, byte transport traces, and collapse scanning
 
-internal/fixtures + internal/byteparity
+internal/lab/fixtures + internal/byteparity
   byte-path fixture manifests, malformed byte corpus metadata, stable hashes, drift checks, and generated/interpreted parity reports
 
 internal/protocorpus + internal/wirefeatures
@@ -191,13 +191,13 @@ internal/hostdetect
 internal/relayfleet
   synthetic relay fleet lifecycle, profile assignment, churn schedules, migration events, burn-risk scoring, collapse detection, and relay-fleet fixtures
 
-internal/proxyingress + internal/proxyingressreview
+internal/lab/proxyingress + internal/proxyingressreview
   local proxy ingress request contracts, target descriptor validation, capability mapping, design review matrix, and misuse checks
 
-internal/localproxyingress + internal/localproxyingressadversary
+internal/lab/localproxyingress + internal/lab/localproxyingressadversary
   deterministic local proxy ingress prototype, adversarial request corpus, descriptor-abuse hardening, lifecycle/pressure stress, reset/error isolation, mapping collapse controls, parity checks, and fixtures
 
-internal/proxyegress + internal/relaybridge
+internal/lab/proxyegress + internal/relaybridge
   trace-safe local proxy egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, misuse controls, and generated parity checks
 
 internal/localpipeline
@@ -212,7 +212,7 @@ internal/carriercollapse
 internal/localproxyadapterreview
   payload-bearing local proxy adapter contract, reviewed local SOCKS-like and CONNECT-like stream semantics, target-redaction rules, misuse controls, M49 acceptance criteria, fixture drift checks, and generated parity
 
-internal/localproxyadapter
+internal/lab/localproxyadapter
   controlled local proxy adapter prototype, accepted request-to-stream mapping, opaque stream content classes, backpressure/reset/half-close summaries, carrier selector composition, trace hygiene, fixture drift checks, and generated parity
 
 internal/vpnsemantics
@@ -245,25 +245,25 @@ internal/androidcarrier
 internal/productionreadiness
   structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
 
-internal/concretelocaladapter
+internal/lab/concretelocaladapter
   strict loopback-only socket bind validation, deterministic local listener probes, safe socket summaries, fixture drift checks, misuse controls, and generated parity
 
-internal/adaptivepath
+internal/transport/adaptivepath
   candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
 
-internal/transportbundle
+internal/transport/transportbundle
   generated transport bundle policies, seed plans, candidate manifests, adaptive-path mapping, synthetic relay binding, fallback hints, collapse controls, and fixture drift gates
 
-internal/pathrace
+internal/transport/pathrace
   synthetic path racing, candidate verification, short-lived scoring, deterministic ranking, misuse controls, and pathrace fixtures
 
-internal/hardening
+internal/lab/hardening
   invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
 
 cmd/kgen + internal/codegen
   generated Go source backend for profile-specific modules
 
-internal/trace + internal/adversary + internal/streamadversary
+internal/trace + internal/adversary + internal/lab/streamadversary
   payload-free trace features, clustering, collapse scanning, and adversarial controls
 
 cmd/kcheck + internal/audit
@@ -489,7 +489,7 @@ go run ./cmd/kcheck adapter --full --out testdata/audit/adapter.json
 
 ## Deterministic Local Adapter Prototype
 
-Milestone 16 implements the first concrete local adapter prototype on top of the adapter contracts. `internal/localadapter` provides memory ingress, memory egress, a combined local pipe, deterministic source models, sink sequence validation, runtime-boundary execution, safe trace metadata, and bounded summaries.
+Milestone 16 implements the first concrete local adapter prototype on top of the adapter contracts. `internal/lab/localadapter` provides memory ingress, memory egress, a combined local pipe, deterministic source models, sink sequence validation, runtime-boundary execution, safe trace metadata, and bounded summaries.
 
 The prototype exercises single-flow echo, many small flows, large-flow backpressure, slow drip input, mixed flows, reset isolation, target error/reset mapping, half-close behavior, queue pressure, and malformed source chunks. It remains an in-memory deterministic harness, not a concrete network adapter.
 
@@ -515,7 +515,7 @@ go run ./cmd/kcheck bytetransport --full --out testdata/audit/bytetransport.json
 
 ## Byte-Path Fixture Freeze
 
-Milestone 18 freezes deterministic byte-path baselines before broader wire-shape work. `internal/fixtures` stores safe byte-path summaries, stable hashes, malformed byte corpus metadata, and broad performance buckets. `internal/byteparity` compares interpreted and generated backend summaries at the semantic level while reporting safe byte-shape differences separately.
+Milestone 18 freezes deterministic byte-path baselines before broader wire-shape work. `internal/lab/fixtures` stores safe byte-path summaries, stable hashes, malformed byte corpus metadata, and broad performance buckets. `internal/byteparity` compares interpreted and generated backend summaries at the semantic level while reporting safe byte-shape differences separately.
 
 Committed fixtures live under `testdata/fixtures/` and contain only summaries, buckets, scenario names, hashes, and expected results.
 
@@ -609,7 +609,7 @@ go run ./cmd/kcheck relayfleet compare --old testdata/relayfleet/relayfleet-gold
 
 ## Concrete Local Proxy Ingress Design Review
 
-Milestone 24 defines the contract a future local proxy ingress must satisfy before any concrete adapter is implemented. `internal/proxyingress` models safe request descriptors, target descriptor validation, lifecycle states, capability mappings, runtime mapping metadata, and bounded summaries. `internal/proxyingressreview` freezes the design-review checklist and failure-mode matrix.
+Milestone 24 defines the contract a future local proxy ingress must satisfy before any concrete adapter is implemented. `internal/lab/proxyingress` models safe request descriptors, target descriptor validation, lifecycle states, capability mappings, runtime mapping metadata, and bounded summaries. `internal/proxyingressreview` freezes the design-review checklist and failure-mode matrix.
 
 The committed fixtures under `testdata/proxyingress/` contain only safe contracts, request classes, target classes, mapping summaries, lifecycle summaries, review outcomes, and hashes.
 
@@ -625,9 +625,9 @@ go run ./cmd/kcheck proxyingress compare --old testdata/proxyingress/proxyingres
 
 ## Deterministic Local Proxy Ingress Prototype
 
-Milestone 25 implements a deterministic local proxy ingress prototype without introducing concrete network adapters. `internal/localproxyingress` consumes synthetic CONNECT-like request events, validates target descriptors, maps requests to runtime stream metadata, exercises bounded queue pressure, propagates backpressure, isolates reset/error behavior, and emits trace-safe summaries.
+Milestone 25 implements a deterministic local proxy ingress prototype without introducing concrete network adapters. `internal/lab/localproxyingress` consumes synthetic CONNECT-like request events, validates target descriptors, maps requests to runtime stream metadata, exercises bounded queue pressure, propagates backpressure, isolates reset/error behavior, and emits trace-safe summaries.
 
-`internal/localproxyingressadversary` extracts payload-free features, scans for collapse, and provides controls for fixed descriptors, fixed stream mappings, ignored backpressure, cross-request reset leakage, unbounded queues, and trace hygiene failures. M25 fixtures live under `testdata/localproxyingress/`.
+`internal/lab/localproxyingressadversary` extracts payload-free features, scans for collapse, and provides controls for fixed descriptors, fixed stream mappings, ignored backpressure, cross-request reset leakage, unbounded queues, and trace hygiene failures. M25 fixtures live under `testdata/localproxyingress/`.
 
 Run:
 
@@ -657,7 +657,7 @@ go run ./cmd/kcheck localproxyingressadv compare --old testdata/localproxyingres
 
 ## Adaptive Path Model
 
-Milestone 27 introduces the first adaptive-runtime abstraction. `internal/adaptivepath` represents generated transports as candidate paths with carrier families, relay-risk buckets, synthetic condition observations, short-lived freshness metadata, uncertainty buckets, viability states, and future decision inputs.
+Milestone 27 introduces the first adaptive-runtime abstraction. `internal/transport/adaptivepath` represents generated transports as candidate paths with carrier families, relay-risk buckets, synthetic condition observations, short-lived freshness metadata, uncertainty buckets, viability states, and future decision inputs.
 
 The model is deterministic and synthetic. It records safe classes and hashes only, and it does not perform real probing, resolver testing, endpoint handling, or path racing.
 
@@ -675,7 +675,7 @@ go run ./cmd/kcheck adaptivepath compare --old testdata/adaptivepath/path-candid
 
 ## Generated Transport Bundle Compiler
 
-Milestone 28 compiles adaptive-path candidates into deterministic transport bundles. `internal/transportbundle` creates bundle policies, profile seed plans, candidate manifests, safe adaptive-path mappings, synthetic relay binding reports, fallback hints, collapsed controls, and generated/interpreted parity summaries.
+Milestone 28 compiles adaptive-path candidates into deterministic transport bundles. `internal/transport/transportbundle` creates bundle policies, profile seed plans, candidate manifests, safe adaptive-path mappings, synthetic relay binding reports, fallback hints, collapsed controls, and generated/interpreted parity summaries.
 
 The bundle compiler produces candidate plans for review and future path racing. It does not select a live winner, probe paths, dial relays, resolve DNS, or use real endpoints.
 
@@ -696,7 +696,7 @@ go run ./cmd/kdc summarize-bundle --bundle profiles/examples/bundle-12345.json
 
 ## Path Racing And Short-Lived Scoring
 
-Milestone 29 races generated bundle candidates over deterministic synthetic observations. `internal/pathrace` models parallel candidate starts, verification of usable synthetic states, short-lived scoring, stale-evidence decay, ranking/tie-break behavior, misuse controls, and generated/interpreted parity.
+Milestone 29 races generated bundle candidates over deterministic synthetic observations. `internal/transport/pathrace` models parallel candidate starts, verification of usable synthetic states, short-lived scoring, stale-evidence decay, ranking/tie-break behavior, misuse controls, and generated/interpreted parity.
 
 The pathrace harness can produce a synthetic winner for a local scenario. It does not probe paths, dial relays, resolve DNS, contact endpoints, or select a production active path.
 
@@ -714,7 +714,7 @@ go run ./cmd/kcheck pathrace compare --old testdata/pathrace/pathrace-report-gol
 
 ## Continuous Path Health And Failover
 
-Milestone 30 monitors the selected adaptive path over deterministic synthetic event streams. `internal/pathhealth` models active-path state, progress windows, stalls, reset bursts, blackhole-like failures, relay burn quarantine, score decay, confidence expiry, flapping, reconnect loops, failover decisions, controls, and generated/interpreted parity.
+Milestone 30 monitors the selected adaptive path over deterministic synthetic event streams. `internal/transport/pathhealth` models active-path state, progress windows, stalls, reset bursts, blackhole-like failures, relay burn quarantine, score decay, confidence expiry, flapping, reconnect loops, failover decisions, controls, and generated/interpreted parity.
 
 The pathhealth harness does not run network probes, dial relays, resolve names, or operate a production failover system. Fixtures live under `testdata/pathhealth/`.
 
@@ -759,7 +759,7 @@ go run ./cmd/kcheck measurementreview verify
 
 ## Local Proxy Egress And Relay Bridge Model
 
-Milestone 33 adds a trace-safe model for the local proxy egress side and the relay bridge that connects ingress requests to synthetic egress targets. `internal/proxyegress` defines bounded egress descriptors, synthetic target classes, ingress-to-egress mapping, lifecycle reports, adaptive prerequisite binding, backpressure, reset/error isolation, misuse controls, fixture drift checks, and generated/interpreted parity.
+Milestone 33 adds a trace-safe model for the local proxy egress side and the relay bridge that connects ingress requests to synthetic egress targets. `internal/lab/proxyegress` defines bounded egress descriptors, synthetic target classes, ingress-to-egress mapping, lifecycle reports, adaptive prerequisite binding, backpressure, reset/error isolation, misuse controls, fixture drift checks, and generated/interpreted parity.
 
 `internal/relaybridge` models bridge sessions and streams using safe synthetic identifiers, stream isolation, adaptive runtime binding, bridge backpressure, reset/error propagation, and fixture drift gates. It does not dial real relays, record destinations, or add deployment behavior.
 
@@ -805,7 +805,7 @@ go run ./cmd/kcheck productionreadiness verify
 
 ## Concrete Local Socket Adapter
 
-Milestone 36 adds the first concrete local socket adapter harness, constrained to loopback-only behavior. `internal/concretelocaladapter` validates bind configuration, rejects wildcard and external hosts, runs deterministic local listener probes on ephemeral loopback ports, records safe flow/runtime mapping summaries, and freezes fixture drift checks.
+Milestone 36 adds the first concrete local socket adapter harness, constrained to loopback-only behavior. `internal/lab/concretelocaladapter` validates bind configuration, rejects wildcard and external hosts, runs deterministic local listener probes on ephemeral loopback ports, records safe flow/runtime mapping summaries, and freezes fixture drift checks.
 
 The harness exercises socket single-flow echo, many small flows, large backpressure, reset isolation, target error/reset mapping, loopback bind policy, malformed local events, external bind controls, and leak controls. It does not implement SOCKS, TUN, VPN, HTTP, TLS, WebSocket, CDN, deployment, external targets, or public-network behavior.
 

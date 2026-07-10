@@ -3,7 +3,7 @@
 
 package byteparity
 
-import "kurdistan/internal/fixtures"
+import "kurdistan/internal/lab/fixtures"
 
 type ByteParityReport struct {
 	ProfileCount          int      `json:"profile_count"`

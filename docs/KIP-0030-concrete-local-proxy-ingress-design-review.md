@@ -13,7 +13,7 @@ The review asks whether local proxy-style request metadata can be represented sa
 
 The milestone adds:
 
-- `internal/proxyingress` for request contracts, target descriptors, capability mappings, lifecycle constraints, runtime mapping metadata, and safe summaries.
+- `internal/lab/proxyingress` for request contracts, target descriptors, capability mappings, lifecycle constraints, runtime mapping metadata, and safe summaries.
 - `internal/proxyingressreview` for design-review checklists, failure-mode matrices, misuse controls, readiness decisions, and stable hashes.
 - `testdata/proxyingress/` for small safe fixture baselines.
 - `kcheck proxyingress` commands for audit, fixture generation, verification, and comparison.

@@ -38,7 +38,7 @@ Out of scope:
 
 ## Package
 
-`internal/concretelocaladapter` provides:
+`internal/lab/concretelocaladapter` provides:
 
 - `BindConfig` for bounded loopback-only configuration
 - `SocketScenario` for deterministic scenario metadata

@@ -1,0 +1,167 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Saro
+
+package hardening
+
+import (
+	"context"
+	"fmt"
+
+	"kurdistan/internal/transport/adapter"
+	"kurdistan/internal/observe/bytetransport"
+	"kurdistan/internal/transport/carrier"
+	"kurdistan/internal/protocol/framing"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/lab/localadapter"
+	"kurdistan/internal/protocol/proxysem"
+	kruntime "kurdistan/internal/runtime"
+	kstream "kurdistan/internal/protocol/stream"
+)
+
+func RunResourceLimitChecks(ctx context.Context, profiles []*ir.Profile, opts Options) []CheckResult {
+	_ = ctx
+	p := firstProfile(profiles)
+	return []CheckResult{
+		check("audit_profile_count_respected", CategoryResourceLimits, func() error {
+			limit := opts.ProfileCount
+			if opts.Mode == "quick" && limit > 100 {
+				return fmt.Errorf("quick profile count too high")
+			}
+			if opts.Mode == "full" && limit > 1000 {
+				return fmt.Errorf("full profile count too high")
+			}
+			return nil
+		}),
+		check("frame_size_limit_enforced", CategoryResourceLimits, func() error {
+			payload := make([]byte, p.Limits.MaxPayloadBytes+1)
+			if _, err := framing.EncodeOperation(p, framing.Operation{Semantic: ir.SemanticData, StreamID: 1, Payload: payload}, p.Seed); err == nil {
+				return fmt.Errorf("oversized frame accepted")
+			}
+			return nil
+		}),
+		check("stream_and_session_limits_enforced", CategoryResourceLimits, func() error {
+			s, err := kstream.NewSession(kstream.Config{MaxConcurrentStreams: 1, InitialStreamWindowBytes: 4, InitialSessionWindowBytes: 4})
+			if err != nil {
+				return err
+			}
+			if _, err := s.OpenStream("interactive"); err != nil {
+				return err
+			}
+			if _, err := s.OpenStream("bulk"); err == nil {
+				return fmt.Errorf("stream limit ignored")
+			}
+			cfg := kruntime.DefaultConfig(kruntime.RoleClient, "rt", []byte("secret"))
+			cfg.MaxSessions = 1
+			rt, err := kruntime.NewRuntime(cfg, p)
+			if err != nil {
+				return err
+			}
+			manager := kruntime.NewManager(rt)
+			if _, err := manager.CreateSession(); err != nil {
+				return err
+			}
+			if _, err := manager.CreateSession(); err == nil {
+				return fmt.Errorf("session limit ignored")
+			}
+			return nil
+		}),
+		check("carrier_queue_depth_enforced", CategoryResourceLimits, func() error {
+			link := kruntime.NewMemoryLink(1)
+			if err := link.Send(kruntime.LinkFrame{Direction: "client_to_server"}); err != nil {
+				return err
+			}
+			if err := link.Send(kruntime.LinkFrame{Direction: "client_to_server"}); err == nil {
+				return fmt.Errorf("link queue depth ignored")
+			}
+			return nil
+		}),
+		check("target_request_response_limits_enforced", CategoryResourceLimits, func() error {
+			registry := proxysem.DefaultRegistry()
+			_, _, err := registry.Run(proxysem.TargetDescriptor{Class: proxysem.TargetEcho}, proxysem.TargetRequest{StreamID: 1, Bytes: proxysem.DefaultMaxRequestBytes + 1}, 1)
+			if err == nil {
+				return fmt.Errorf("oversized target request accepted")
+			}
+			if err := registry.Validate(proxysem.TargetDescriptor{Class: proxysem.TargetFixedResponse, Parameters: map[string]string{"bytes": fmt.Sprint(proxysem.DefaultMaxResponseBytes + 1)}}); err == nil {
+				return fmt.Errorf("oversized target response accepted")
+			}
+			return nil
+		}),
+		check("carrier_envelope_limit_enforced", CategoryResourceLimits, func() error {
+			if err := carrier.ValidateEnvelope(p, carrier.Envelope{CarrierFamily: p.CarrierPolicy.CarrierFamily, Sequence: 1, Kind: "data", StreamID: 1, MessageCount: 1, ByteCount: p.CarrierPolicy.MaxEnvelopeBytes + 1}); err == nil {
+				return fmt.Errorf("oversized envelope accepted")
+			}
+			return nil
+		}),
+		check("adapter_resource_limits_enforced", CategoryResourceLimits, func() error {
+			cfg := adapter.DefaultConfig("hardening-adapter", adapter.AdapterKindIngress)
+			cfg.MaxFlows = 1
+			cfg.MaxBufferedBytes = 128
+			h, err := adapter.NewHarness(cfg, adapter.DefaultCapabilities())
+			if err != nil {
+				return err
+			}
+			desc := adapter.FlowDescriptor{ID: "flow-1", Class: "synthetic", Direction: "bidirectional", RequestClass: "interactive", PriorityClass: "interactive", MaxReadBytes: 1024, MaxWriteBytes: 1024, MetadataPolicy: "bucketed"}
+			if err := h.OpenFlow(desc); err != nil {
+				return err
+			}
+			desc.ID = "flow-2"
+			if err := h.OpenFlow(desc); err == nil {
+				return fmt.Errorf("adapter max flow limit ignored")
+			}
+			if _, err := h.ReadFlow("flow-1", 256); err != adapter.ErrBackpressure {
+				return fmt.Errorf("adapter buffered byte limit was not surfaced")
+			}
+			return nil
+		}),
+		check("local_adapter_resource_limits_enforced", CategoryResourceLimits, func() error {
+			cfg := localadapter.DefaultConfig("hardening-local")
+			cfg.MaxFlows = 1
+			cfg.MaxBufferedBytes = 64
+			cfg.MaxChunkBytes = 128
+			if err := localadapter.ValidateConfig(cfg); err != nil {
+				return err
+			}
+			if _, err := localadapter.GenerateSourcePlan(localadapter.SourceSmallBurst, 2, cfg); err == nil {
+				return fmt.Errorf("local adapter source flow limit ignored")
+			}
+			pipe, err := localadapter.NewMemoryPipe(cfg)
+			if err != nil {
+				return err
+			}
+			desc := localadapter.FlowDescriptor("local-hardening", 128)
+			if err := pipe.Ingress.OpenFlow(desc); err != nil {
+				return err
+			}
+			if _, err := pipe.Ingress.ReadSource(localadapter.LocalSourceChunk{FlowID: "local-hardening", Sequence: 1, ByteCount: 256}); err == nil {
+				return fmt.Errorf("local adapter chunk limit ignored")
+			}
+			return nil
+		}),
+		check("byte_transport_resource_limits_enforced", CategoryResourceLimits, func() error {
+			cfg := bytetransport.DefaultConfig("byte-resource")
+			cfg.MaxFrameBytes = 512
+			cfg.MaxPayloadBytes = 256
+			if _, err := bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: bytetransport.FrameData, ByteCount: 512}); err == nil {
+				return fmt.Errorf("oversized byte payload accepted")
+			}
+			pipe, err := bytetransport.NewBytePipe(cfg)
+			if err != nil {
+				return err
+			}
+			encoded, err := bytetransport.EncodeFrame(cfg, bytetransport.ByteFrame{SessionID: "s", StreamID: 1, Sequence: 1, Kind: bytetransport.FrameData, ByteCount: 32})
+			if err != nil {
+				return err
+			}
+			for i := 0; i < cfg.MaxPipeQueueDepth; i++ {
+				encoded.Sequence = uint64(i + 1)
+				if err := pipe.Write(encoded); err != nil {
+					return err
+				}
+			}
+			if err := pipe.Write(encoded); err != bytetransport.ErrBackpressure {
+				return fmt.Errorf("byte pipe backpressure not surfaced")
+			}
+			return nil
+		}),
+	}
+}

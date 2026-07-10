@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/proxyegress"
+	"kurdistan/internal/lab/proxyegress"
 )
 
 type ProxyEgressAuditSummary struct {

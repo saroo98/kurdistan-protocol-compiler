@@ -92,7 +92,7 @@ Required scenario coverage includes:
 
 ## Byte Transport Adversary
 
-`internal/bytetransportadversary` extracts payload-free features:
+`internal/lab/bytetransportadversary` extracts payload-free features:
 
 - frame count
 - fragment count

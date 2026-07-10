@@ -9,7 +9,7 @@ import (
 	"kurdistan/internal/testkit/adversary"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/carrierrelay"
+	"kurdistan/internal/transport/carrierrelay"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 	"kurdistan/internal/crypto/security"
 	ktrace "kurdistan/internal/observe/trace"
 )

@@ -24,7 +24,7 @@ deterministic local source
 
 ## Local Ingress And Egress Models
 
-`internal/localadapter` provides:
+`internal/lab/localadapter` provides:
 
 - `MemoryIngressAdapter`
 - `MemoryEgressAdapter`
@@ -84,7 +84,7 @@ The prototype verifies that local adapter buffer pressure and runtime/carrier pr
 
 ## Local Adapter Adversary
 
-`internal/localadapteradversary` extracts payload-free features from local adapter scenario runs:
+`internal/lab/localadapteradversary` extracts payload-free features from local adapter scenario runs:
 
 - flow count
 - source and sink chunk counts

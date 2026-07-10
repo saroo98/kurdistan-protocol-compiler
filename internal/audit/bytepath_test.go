@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/observe/byteparity"
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 func TestBytePathParityGateFailsOnUnexpectedDrift(t *testing.T) {

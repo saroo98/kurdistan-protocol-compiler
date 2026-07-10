@@ -15,14 +15,14 @@ selector.
 
 ## Relationship to Adaptive Path and Bundles
 
-`internal/adaptivepath` defines candidate families, synthetic conditions,
+`internal/transport/adaptivepath` defines candidate families, synthetic conditions,
 freshness, uncertainty, and viability metadata.
 
-`internal/transportbundle` compiles those candidates into deterministic bundle
+`internal/transport/transportbundle` compiles those candidates into deterministic bundle
 manifests with profile seeds, wire-policy references, roles, fallback hints, and
 synthetic relay binding metadata.
 
-`internal/pathrace` races the bundle candidates against deterministic synthetic
+`internal/transport/pathrace` races the bundle candidates against deterministic synthetic
 scenario events and produces safe reports, score buckets, ranking summaries, and
 misuse-control results.
 

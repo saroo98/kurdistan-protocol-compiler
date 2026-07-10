@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 	"kurdistan/internal/crypto/security"
 )
 

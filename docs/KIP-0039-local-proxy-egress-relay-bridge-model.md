@@ -27,7 +27,7 @@ The model checks:
 
 ## Proxy Egress Model
 
-`internal/proxyegress` defines deterministic fixtures for:
+`internal/lab/proxyegress` defines deterministic fixtures for:
 
 - egress request descriptors
 - synthetic egress target descriptors

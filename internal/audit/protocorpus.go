@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wirefeatures"

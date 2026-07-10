@@ -10,7 +10,7 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/streamadversary"
+	"kurdistan/internal/lab/streamadversary"
 )
 
 func RunStreamAdversaryAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {

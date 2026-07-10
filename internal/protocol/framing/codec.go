@@ -14,7 +14,7 @@ import (
 
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/protocol/padding"
-	"kurdistan/internal/proxysem"
+	"kurdistan/internal/protocol/proxysem"
 	"kurdistan/internal/protocol/scheduler"
 )
 

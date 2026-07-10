@@ -9,7 +9,7 @@ The goal is to evaluate local synthetic evidence after a path has been selected:
 
 ## Model
 
-`internal/pathhealth` defines:
+`internal/transport/pathhealth` defines:
 
 - active path identity and state
 - health events and transition timelines

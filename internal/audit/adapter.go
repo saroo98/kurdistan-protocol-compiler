@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/adapter"
-	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/transport/adapter"
+	"kurdistan/internal/lab/adapteradversary"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
 )

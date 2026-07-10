@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 )
 
 func TestPathRaceGatesPassAndDetectControls(t *testing.T) {
