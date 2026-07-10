@@ -144,130 +144,52 @@ That boundary is intentional while the protocol model, audit gates, and generate
 
 ```text
 cmd/kdc
-  profile generation, validation, corpus summaries
-
-internal/ir + internal/compiler
-  protocol profile schema and deterministic profile compiler
-
-internal/fsm + internal/framing + internal/scheduler + internal/stream
-  runtime model for state machines, frames, scheduling, and streams
-
-internal/protocol/proxysem + internal/transport/proxyrelay + internal/transport/proxyadversary
-  synthetic proxy-semantics model, relay-intent runner, and proxy collapse scanning
-
-internal/transport/carrier + internal/transport/carrierrelay + internal/lab/carrieradversary
-  abstract carrier envelopes, semantic reconstruction, carrier collapse scanning, and carrier mutants
-
-internal/security
-  transcript binding, key schedule, nonce/replay policy, capability negotiation, compatibility, config hygiene, and secure envelope model
-
-internal/runtime + internal/lab/runtimeadversary
-  runtime roles, session lifecycle, compatibility negotiation, in-memory links, runtime traces, and runtime collapse scanning
-
-internal/transport/adapter + internal/lab/adapteradversary
-  ingress/egress contracts, flow lifecycle, deterministic harness, runtime boundary checks, adapter traces, and collapse scanning
-
-internal/lab/localadapter + internal/lab/localadapteradversary
-  memory ingress/egress adapters, deterministic source/sink models, runtime runner, local adapter traces, and collapse scanning
-
-internal/bytetransport + internal/lab/bytetransportadversary
-  byte frame encoder/decoder, fragmentation/reassembly, bounded byte pipe, sequence checks, byte transport traces, and collapse scanning
-
-internal/lab/fixtures + internal/byteparity
-  byte-path fixture manifests, malformed byte corpus metadata, stable hashes, drift checks, and generated/interpreted parity reports
-
-internal/protocorpus + internal/wirefeatures
-  abstract protocol-feature taxonomy, corpus manifests, first-N packet-shape model, safe feature vectors, corpus comparison, and wire-shape baselines
-
-internal/wiregen + internal/wiregencompare
-  deterministic wire-shape policy sampling, profile policy integration, expected feature comparison, fixture baselines, and collapse scanning
-
-internal/wireeval + internal/classifierdata
-  payload-free wire evaluation records, classifier-ready CSV/JSONL exports, deterministic splits, control datasets, drift checks, and readiness reports
-
-internal/hostdetect
-  synthetic host observation aggregation, timeline windows, confidence scoring, resistance reports, collapse detection, fixture drift checks, and host-level hygiene scans
-
-internal/relayfleet
-  synthetic relay fleet lifecycle, profile assignment, churn schedules, migration events, burn-risk scoring, collapse detection, and relay-fleet fixtures
-
-internal/lab/proxyingress + internal/proxyingressreview
-  local proxy ingress request contracts, target descriptor validation, capability mapping, design review matrix, and misuse checks
-
-internal/lab/localproxyingress + internal/lab/localproxyingressadversary
-  deterministic local proxy ingress prototype, adversarial request corpus, descriptor-abuse hardening, lifecycle/pressure stress, reset/error isolation, mapping collapse controls, parity checks, and fixtures
-
-internal/lab/proxyegress + internal/relaybridge
-  trace-safe local proxy egress descriptors, synthetic target binding, ingress-to-egress mapping, relay bridge session/stream fixtures, adaptive prerequisite binding, misuse controls, and generated parity checks
-
-internal/localpipeline
-  deterministic end-to-end local proxy pipeline fixtures, boundary integration checks, descriptor rejection, collapse controls, misuse detection, and generated parity checks
-
-internal/multicarrierselect
-  reviewed carrier-family inventory, candidate bundle selection, pathrace/pathhealth composition, failover/fallback controls, misuse detection, fixture drift checks, and generated parity
-
-internal/carriercollapse
-  cross-carrier collapse scanning, mutation controls, unsafe fallback detection, review-gate bypass checks, trace hygiene, fixture drift checks, and generated parity
-
-internal/localproxyadapterreview
-  payload-bearing local proxy adapter contract, reviewed local SOCKS-like and CONNECT-like stream semantics, target-redaction rules, misuse controls, M49 acceptance criteria, fixture drift checks, and generated parity
-
-internal/lab/localproxyadapter
-  controlled local proxy adapter prototype, accepted request-to-stream mapping, opaque stream content classes, backpressure/reset/half-close summaries, carrier selector composition, trace hygiene, fixture drift checks, and generated parity
-
-internal/vpnsemantics
-  local packet-flow semantics model for future TUN/VPN work, packet-flow taxonomy, flow-to-stream mapping, MTU/retry/reset/backpressure buckets, DNS/routing/privacy boundaries, M51 contract, misuse controls, fixture drift checks, and generated parity
-
-internal/localvpnadapter
-  controlled local desktop packet-style adapter prototype, packet-flow descriptors, flow-to-stream summaries, MTU/retry/reset/backpressure handling, kill-switch and DNS boundary summaries, resource checks, misuse controls, fixture drift checks, and generated parity
-
-internal/relayprocess
-  long-running client/relay process architecture contracts, config/profile bundle policy, lifecycle, shutdown/recovery, logging/observability, compatibility, resource, misuse, fixture drift, and generated parity gates
-
-internal/keyexchangeplan
-  production-oriented key exchange design inventory, transcript/profile/relay identity binding, nonce/replay and downgrade policy, key separation, rotation readiness, external review package requirements, misuse controls, fixture drift, and generated parity gates
-
-internal/relayauthplan
-  relay authentication, profile/version compatibility, rotation window, expiry, revocation, safe failure, downgrade rejection, unknown/stale profile, misuse, fixture drift, and generated parity gates
-
-internal/operationalhardening
-  relay/runtime resource limits, strict config validation, deterministic shutdown/restart, safe diagnostics, rollback/update boundaries, redacted health summaries, misuse controls, fixture drift, and generated parity gates
-
-internal/androidreview
-  Android client architecture contract, profile import and validation flows, permission/lifecycle model, UI state vocabulary, diagnostics/privacy boundaries, kill-switch policy, M57/M58 contracts, misuse controls, fixture drift, and generated parity
-
-internal/androidruntime
-  Android-shaped local runtime initialization, validated profile loading, lifecycle transitions, storage boundaries, diagnostics, concurrency assumptions, compatibility checks, safe shutdown, misuse controls, fixture drift, and generated parity
-
-internal/androidcarrier
-  Android VPN flow integration with the reviewed runtime/carrier path, profile validation, carrier selection, relay compatibility, authenticated session state, stream mapping, pathhealth, redacted diagnostics, bounded fallback, fixture drift, and generated parity
-
-internal/productionreadiness
-  structured readiness inventory, dependency graph, closed-boundary reviews, future milestone contracts, blocker register, fixture drift checks, and generated parity
-
-internal/lab/concretelocaladapter
-  strict loopback-only socket bind validation, deterministic local listener probes, safe socket summaries, fixture drift checks, misuse controls, and generated parity
-
-internal/transport/adaptivepath
-  candidate path taxonomy, synthetic condition observations, freshness and uncertainty metadata, viability reports, decision inputs, misuse scanning, and adaptive path fixtures
-
-internal/transport/transportbundle
-  generated transport bundle policies, seed plans, candidate manifests, adaptive-path mapping, synthetic relay binding, fallback hints, collapse controls, and fixture drift gates
-
-internal/transport/pathrace
-  synthetic path racing, candidate verification, short-lived scoring, deterministic ranking, misuse controls, and pathrace fixtures
-
-internal/lab/hardening
-  invariant registry, API contract checks, panic-safety harness, resource bounds, trace hygiene, concurrency checks, adapter coverage, and readiness matrix
+  deterministic profile and transport-bundle generation, validation, and corpus summaries
 
 cmd/kgen + internal/codegen
-  generated Go source backend for profile-specific modules
+  profile-specific Go source generation, manifests, templates, and generated-source scanning
 
-internal/trace + internal/adversary + internal/lab/streamadversary
-  payload-free trace features, clustering, collapse scanning, and adversarial controls
+cmd/kclient + cmd/kserver + cmd/kecho
+  loopback-only client, server, relay, and echo demonstration harnesses
 
-cmd/kcheck + internal/audit
-  regression gates, generated-backend audit, stream adversary audit, STATUS.md generation
+cmd/ktrace
+  payload-free lab trace comparison, scanning, and corpus analysis
+
+cmd/kcheck + internal/audit + cmd/gate
+  regression/audit command registry and the build, vet, test, and full-audit merge gate
+
+internal/protocol/{compiler,framing,fsm,ir,padding,scheduler,stream}
+  deterministic profile compiler and protocol runtime primitives
+
+internal/protocol/proxysem
+  synthetic proxy request, target, and relay-intent semantics
+
+internal/crypto/{auth,security}
+  controlled-test authentication and lab runtime security prerequisites; no production key exchange or production cryptography
+
+internal/runtime + internal/relay
+  session lifecycle, compatibility negotiation, stream management, in-memory links, and loopback-only relay execution
+
+internal/transport/{adapter,adaptivepath,carrier,carrierrelay,pathhealth,pathrace,proxyadversary,proxyrelay,transportbundle}
+  adapter boundaries and synthetic carrier, proxy, adaptive-path, health, racing, bundle, and collapse models
+
+internal/observe/{byteparity,bytetransport,classifierdata,diversity,hostdetect,labtrace,protocorpus,trace,wireeval,wirefeatures,wiregen,wiregencompare}
+  byte-path execution, payload-free tracing, diversity and corpus analysis, wire evaluation, classifier exports, and parity checks
+
+internal/lab/{adapteradversary,bytetransportadversary,carrieradversary,concretelocaladapter,fixtures,hardening,localadapter,localadapteradversary,localprotocoladapter,localproxyadapter,localproxyingress,localproxyingressadversary,proxyegress,proxyingress,runtimeadversary,streamadversary}
+  controlled in-memory and loopback-only prototypes, adversarial scenarios, fixtures, and hardening checks
+
+internal/contracts/{android,carrier,lab,proxy,readiness,vpn}
+  quarantined [model]/[plan] design, review, readiness, Android, carrier, proxy, lab, and VPN contracts
+
+internal/operator/{relayauthplan,relaybridge,relayfleet,relayprocess}
+  [model]/[plan] relay bridge, fleet, process, authentication, rotation, and compatibility contracts
+
+internal/product/{android,envelope,strategy}
+  contracts-only [model]/[plan] product scaffold; no Android build, sealing, packet capture, live carrier, or non-loopback networking
+
+internal/characterization + internal/testkit/{adversary,bench,importrules,mutant}
+  observable-behavior goldens, reusable test support, mutation controls, benchmarks, and enforced import-boundary checks
 ```
 
 The interpreted runtime supports fast research iteration. The generated source backend exists because a shared interpreter can introduce common implementation artifacts. `kgen` emits profile-specific Go constants and tables so generated modules can compile and interoperate locally.
