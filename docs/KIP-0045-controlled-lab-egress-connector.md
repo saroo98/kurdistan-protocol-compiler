@@ -11,7 +11,7 @@ This is not a public egress connector, production relay, DNS resolver, SOCKS/HTT
 
 ## Model
 
-`internal/labegress` models:
+`internal/contracts/lab/labegress` models:
 
 - loopback allowlist validation
 - synthetic target classes

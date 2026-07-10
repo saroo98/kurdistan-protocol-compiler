@@ -11,7 +11,7 @@ This milestone does not provision relays, enable public discovery, add account s
 
 ## Scope
 
-The `internal/relayauthplan` package defines deterministic safe reports for:
+The `internal/operator/relayauthplan` package defines deterministic safe reports for:
 
 - relay auth inventory
 - identity binding policy

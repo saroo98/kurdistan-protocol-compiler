@@ -79,10 +79,36 @@ func StaticProfile() *ir.Profile {
 		t.Fatalf("wrapper scan unexpectedly passed: %+v", report)
 	}
 	joined := strings.Join(report.Failures, "\n")
-	for _, want := range []string{"internal/fsm", "profile.json", "payload logging", "wrapper"} {
+	for _, want := range []string{"internal/protocol/fsm", "profile.json", "payload logging", "wrapper"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("scan failures missing %q: %+v", want, report.Failures)
 		}
+	}
+}
+
+func TestScanModuleRejectsRelocatedFSMImportWithoutInvocation(t *testing.T) {
+	root := t.TempDir()
+	module := filepath.Join(root, "import-only")
+	if err := os.MkdirAll(filepath.Join(module, "protocol"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	source := `package protocol
+
+import _ "kurdistan/internal/protocol/fsm"
+`
+	if err := os.WriteFile(filepath.Join(module, "protocol", "profile_static.go"), []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report, _, err := scanModule(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.DirectFSMUse {
+		t.Fatalf("relocated FSM import was not detected: %+v", report)
+	}
+	if joined := strings.Join(report.Failures, "\n"); !strings.Contains(joined, "internal/protocol/fsm direct use") {
+		t.Fatalf("relocated FSM failure missing from report: %+v", report.Failures)
 	}
 }
 

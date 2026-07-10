@@ -437,7 +437,7 @@ go run ./cmd/kcheck bytetransport --full --out testdata/audit/bytetransport.json
 
 ## Byte-Path Fixture Freeze
 
-Milestone 18 freezes deterministic byte-path baselines before broader wire-shape work. `internal/lab/fixtures` stores safe byte-path summaries, stable hashes, malformed byte corpus metadata, and broad performance buckets. `internal/byteparity` compares interpreted and generated backend summaries at the semantic level while reporting safe byte-shape differences separately.
+Milestone 18 freezes deterministic byte-path baselines before broader wire-shape work. `internal/lab/fixtures` stores safe byte-path summaries, stable hashes, malformed byte corpus metadata, and broad performance buckets. `internal/observe/byteparity` compares interpreted and generated backend summaries at the semantic level while reporting safe byte-shape differences separately.
 
 Committed fixtures live under `testdata/fixtures/` and contain only summaries, buckets, scenario names, hashes, and expected results.
 
@@ -455,7 +455,7 @@ go run ./cmd/kcheck bytepath --full --out testdata/audit/bytepath.json
 
 Milestone 19 adds the first abstract protocol-feature corpus and wire-feature baseline layer. The corpus describes coarse, safe protocol-shape features such as phases, field kinds, visibility classes, first-flight buckets, frame-size buckets, fragment rhythm, control richness, and metadata exposure. It does not copy or implement third-party protocols.
 
-`internal/wirefeatures` extracts payload-free feature vectors from deterministic byte-path fixtures, computes a first-N packet-shape model, compares generated profiles against the abstract corpus, and scans for collapse. Golden baselines live under `testdata/wirefeatures/`.
+`internal/observe/wirefeatures` extracts payload-free feature vectors from deterministic byte-path fixtures, computes a first-N packet-shape model, compares generated profiles against the abstract corpus, and scans for collapse. Golden baselines live under `testdata/wirefeatures/`.
 
 Run:
 
@@ -469,9 +469,9 @@ go run ./cmd/kcheck wirefeatures verify
 
 ## Wire-Shape Generator Prototype
 
-Milestone 20 adds the first deterministic wire-shape generator prototype. `internal/wiregen` samples policy plans from the abstract protocol-feature corpus, validates safe policy metadata, hashes generated policies, and attaches a `wire_shape` section to every compiled profile.
+Milestone 20 adds the first deterministic wire-shape generator prototype. `internal/observe/wiregen` samples policy plans from the abstract protocol-feature corpus, validates safe policy metadata, hashes generated policies, and attaches a `wire_shape` section to every compiled profile.
 
-`internal/wiregencompare` builds expected safe feature vectors from those policies, compares them against byte-path features, scans for collapse, and stores committed regression fixtures under `testdata/wiregen/`.
+`internal/observe/wiregencompare` builds expected safe feature vectors from those policies, compares them against byte-path features, scans for collapse, and stores committed regression fixtures under `testdata/wiregen/`.
 
 Run:
 
@@ -485,7 +485,7 @@ go run ./cmd/kcheck wiregen compare --old testdata/wiregen/wiregen-policy-golden
 
 ## Wire Evaluation And Classifier Datasets
 
-Milestone 21 exports deterministic wire-shape observations as offline classifier-ready datasets. `internal/wireeval` builds safe records from generated profiles and bytepath scenarios, while `internal/classifierdata` emits deterministic CSV and JSONL with stable columns.
+Milestone 21 exports deterministic wire-shape observations as offline classifier-ready datasets. `internal/observe/wireeval` builds safe records from generated profiles and bytepath scenarios, while `internal/observe/classifierdata` emits deterministic CSV and JSONL with stable columns.
 
 The fixture set under `testdata/wireeval/` stores safe summaries, split metadata, control records, and hashes only. It does not store raw bytes, payloads, endpoint addresses, captures, or secrets.
 
@@ -500,7 +500,7 @@ go run ./cmd/kcheck wireeval compare --old testdata/wireeval/wireeval-dataset-go
 
 ## Host-Based Detection Resistance
 
-Milestone 22 models repeated observations of generated relay behavior against synthetic host identities. `internal/hostdetect` groups safe wire-evaluation records by synthetic host, applies deterministic timeline windows, scores consistency, flags collapsed controls, and reports whether generated profiles are becoming too stable at a host level.
+Milestone 22 models repeated observations of generated relay behavior against synthetic host identities. `internal/observe/hostdetect` groups safe wire-evaluation records by synthetic host, applies deterministic timeline windows, scores consistency, flags collapsed controls, and reports whether generated profiles are becoming too stable at a host level.
 
 The fixture set under `testdata/hostdetect/` stores synthetic host IDs, bucketed features, hashes, aggregate reports, and expected detection outcomes. It does not store raw bytes, payloads, endpoint addresses, captures, or secrets.
 
@@ -515,7 +515,7 @@ go run ./cmd/kcheck hostdetect compare --old testdata/hostdetect/host-observatio
 
 ## Relay Churn And Fleet Lifecycle
 
-Milestone 23 models synthetic relay fleets above host-level observations. `internal/relayfleet` assigns generated profiles to synthetic relays, enforces lifecycle transitions, builds deterministic churn schedules, models migration events, scores burn risk, detects collapsed fleet behavior, and freezes small safe fixtures under `testdata/relayfleet/`.
+Milestone 23 models synthetic relay fleets above host-level observations. `internal/operator/relayfleet` assigns generated profiles to synthetic relays, enforces lifecycle transitions, builds deterministic churn schedules, models migration events, scores burn risk, detects collapsed fleet behavior, and freezes small safe fixtures under `testdata/relayfleet/`.
 
 The model uses only synthetic relay IDs, synthetic host IDs, policy buckets, hashes, state names, and aggregate counts. It does not contain real endpoints, cloud providers, deployment data, packet captures, payloads, or secrets.
 
@@ -531,7 +531,7 @@ go run ./cmd/kcheck relayfleet compare --old testdata/relayfleet/relayfleet-gold
 
 ## Concrete Local Proxy Ingress Design Review
 
-Milestone 24 defines the contract a future local proxy ingress must satisfy before any concrete adapter is implemented. `internal/lab/proxyingress` models safe request descriptors, target descriptor validation, lifecycle states, capability mappings, runtime mapping metadata, and bounded summaries. `internal/proxyingressreview` freezes the design-review checklist and failure-mode matrix.
+Milestone 24 defines the contract a future local proxy ingress must satisfy before any concrete adapter is implemented. `internal/lab/proxyingress` models safe request descriptors, target descriptor validation, lifecycle states, capability mappings, runtime mapping metadata, and bounded summaries. `internal/contracts/proxy/proxyingressreview` freezes the design-review checklist and failure-mode matrix.
 
 The committed fixtures under `testdata/proxyingress/` contain only safe contracts, request classes, target classes, mapping summaries, lifecycle summaries, review outcomes, and hashes.
 
@@ -651,7 +651,7 @@ go run ./cmd/kcheck pathhealth verify
 
 ## Carrier-Family Design Review
 
-Milestone 31 adds design-review gates before any concrete carrier-family work. `internal/carrierreview` records synthetic readiness, risk gating, default eligibility, manual-review requirements, trace-hygiene preconditions, misuse controls, and generated/interpreted parity for carrier-family ideas.
+Milestone 31 adds design-review gates before any concrete carrier-family work. `internal/contracts/carrier/carrierreview` records synthetic readiness, risk gating, default eligibility, manual-review requirements, trace-hygiene preconditions, misuse controls, and generated/interpreted parity for carrier-family ideas.
 
 This is a review layer only. It does not implement concrete HTTP, TLS, DNS, UDP, QUIC, CDN, bridge, deployment, or external-network behavior. Fixtures live under `testdata/carrierreview/`.
 
@@ -666,7 +666,7 @@ go run ./cmd/kcheck carrierreview verify
 
 ## Safe Measurement-Client Design Review
 
-Milestone 32 adds privacy and readiness checks for a future local measurement-client design. `internal/measurementreview` defines bucketed observation classes, redaction classes, consent modes, retention classes, local diagnostic summaries, misuse controls, fixture drift checks, and generated/interpreted parity.
+Milestone 32 adds privacy and readiness checks for a future local measurement-client design. `internal/contracts/readiness/measurementreview` defines bucketed observation classes, redaction classes, consent modes, retention classes, local diagnostic summaries, misuse controls, fixture drift checks, and generated/interpreted parity.
 
 This is not a measurement client or telemetry system. It does not collect field data, upload telemetry, run background measurement, contact resolvers, probe destinations, or record packet, payload, account, location, device, or secret material. Fixtures live under `testdata/measurementreview/`.
 
@@ -683,7 +683,7 @@ go run ./cmd/kcheck measurementreview verify
 
 Milestone 33 adds a trace-safe model for the local proxy egress side and the relay bridge that connects ingress requests to synthetic egress targets. `internal/lab/proxyegress` defines bounded egress descriptors, synthetic target classes, ingress-to-egress mapping, lifecycle reports, adaptive prerequisite binding, backpressure, reset/error isolation, misuse controls, fixture drift checks, and generated/interpreted parity.
 
-`internal/relaybridge` models bridge sessions and streams using safe synthetic identifiers, stream isolation, adaptive runtime binding, bridge backpressure, reset/error propagation, and fixture drift gates. It does not dial real relays, record destinations, or add deployment behavior.
+`internal/operator/relaybridge` models bridge sessions and streams using safe synthetic identifiers, stream isolation, adaptive runtime binding, bridge backpressure, reset/error propagation, and fixture drift gates. It does not dial real relays, record destinations, or add deployment behavior.
 
 Run:
 
@@ -708,13 +708,13 @@ go run ./cmd/kcheck localpipeline verify
 
 Milestone 34 adds a deterministic local pipeline model that composes local proxy ingress evidence, proxy egress descriptors, relay bridge sessions, byte transport metadata, runtime stream mapping, and adaptive-path prerequisites into one trace-safe fixture set.
 
-`internal/localpipeline` defines synthetic scenarios for single-flow echo, many small requests, large backpressure, slow chunked response, reset isolation, target error isolation, bridge backpressure, path failover, descriptor rejection, mixed synthetic targets, collapse controls, and leak controls. The audit checks boundary integration, backpressure, reset/error isolation, descriptor rejection, collapse resistance, fixture drift, trace hygiene, and generated/interpreted parity.
+`internal/contracts/lab/localpipeline` defines synthetic scenarios for single-flow echo, many small requests, large backpressure, slow chunked response, reset isolation, target error isolation, bridge backpressure, path failover, descriptor rejection, mixed synthetic targets, collapse controls, and leak controls. The audit checks boundary integration, backpressure, reset/error isolation, descriptor rejection, collapse resistance, fixture drift, trace hygiene, and generated/interpreted parity.
 
 The model records only counts, buckets, state paths, hashes, and hygiene flags. It does not implement a socket listener, outbound dialer, real relay, DNS resolver, packet capture, deployment behavior, or concrete proxy/VPN adapter.
 
 ## Production Integration Readiness Review
 
-Milestone 35 adds a structured readiness review before any concrete socket adapter work. `internal/productionreadiness` records readiness inventory items, dependency edges, closed boundary reviews, future milestone contracts, blocker-register entries, misuse controls, generated/interpreted parity, trace hygiene, and fixture drift.
+Milestone 35 adds a structured readiness review before any concrete socket adapter work. `internal/contracts/readiness/productionreadiness` records readiness inventory items, dependency edges, closed boundary reviews, future milestone contracts, blocker-register entries, misuse controls, generated/interpreted parity, trace hygiene, and fixture drift.
 
 Run:
 
@@ -796,7 +796,7 @@ go run ./cmd/kcheck httpscarrierreview verify
 
 ## HTTPS-Like Carrier Lab Prototype
 
-Milestone 42 implements the first bounded carrier-family prototype. The `internal/httpslikecarrier` package maps internal stream events to symbolic request/response-shaped carrier markers, records carrier session and stream lifecycle summaries, models backpressure/reset/error behavior, and verifies relay/localpipeline/pathhealth/measurementreview integration through safe fixture metadata.
+Milestone 42 implements the first bounded carrier-family prototype. The `internal/contracts/carrier/httpslikecarrier` package maps internal stream events to symbolic request/response-shaped carrier markers, records carrier session and stream lifecycle summaries, models backpressure/reset/error behavior, and verifies relay/localpipeline/pathhealth/measurementreview integration through safe fixture metadata.
 
 This prototype is not TLS mimicry and does not implement a real HTTPS client, SNI routing, Host header routing, domain dependence, CDN/provider integration, public-network egress, arbitrary target proxying, packet capture, measurement upload, or payload logging.
 
@@ -809,7 +809,7 @@ go run ./cmd/kcheck httpslikecarrier verify
 
 ## HTTPS-Like Carrier Adversarial Hardening
 
-Milestone 43 adds adversarial gates for the M42 carrier prototype. The `internal/httpscarrieradversary` package checks fixed-shape collapse, request/response sequence collapse, padding-only variation, profile-insensitive output, unsafe fallback, trace hygiene, symbolic replay/control markers, stream isolation, backpressure/reset/error regressions, integration bypass, public claim safety, and generated-backend drift.
+Milestone 43 adds adversarial gates for the M42 carrier prototype. The `internal/contracts/carrier/httpscarrieradversary` package checks fixed-shape collapse, request/response sequence collapse, padding-only variation, profile-insensitive output, unsafe fallback, trace hygiene, symbolic replay/control markers, stream isolation, backpressure/reset/error regressions, integration bypass, public claim safety, and generated-backend drift.
 
 Run:
 
@@ -820,7 +820,7 @@ go run ./cmd/kcheck httpscarrieradversary verify
 
 ## DNS-Survival / Constrained-Carrier Design Lock
 
-Milestone 44 defines the contract for the next carrier family before implementation starts. The `internal/constrainedcarrierreview` package locks a local deterministic resolver harness contract, query/response shape taxonomies, size/truncation/retry/failure buckets, stream mapping, privacy and measurement-review rules, misuse controls, fixture drift checks, and generated-backend parity.
+Milestone 44 defines the contract for the next carrier family before implementation starts. The `internal/contracts/carrier/constrainedcarrierreview` package locks a local deterministic resolver harness contract, query/response shape taxonomies, size/truncation/retry/failure buckets, stream mapping, privacy and measurement-review rules, misuse controls, fixture drift checks, and generated-backend parity.
 
 This is a review artifact, not a DNS implementation. It blocks public resolver use, real DNS queries by default, resolver address logging, exact query logging, domain dependence, wildcard resolver configuration, public-network egress, arbitrary target proxying, payload logging, packet capture, and measurement upload.
 
@@ -833,7 +833,7 @@ go run ./cmd/kcheck constrainedcarrierreview verify
 
 ## DNS-Survival / Constrained-Carrier Lab Prototype
 
-Milestone 45 implements the second bounded carrier-family prototype. The `internal/constrainedcarrier` package models local deterministic constrained request/response behavior with symbolic query/response shape buckets, capacity/truncation limits, bounded retries, timeout and poison/failure classes, stream mapping, backpressure, reset/error isolation, pathhealth feedback, measurement-review enforcement, fixture drift checks, and generated-backend parity.
+Milestone 45 implements the second bounded carrier-family prototype. The `internal/contracts/carrier/constrainedcarrier` package models local deterministic constrained request/response behavior with symbolic query/response shape buckets, capacity/truncation limits, bounded retries, timeout and poison/failure classes, stream mapping, backpressure, reset/error isolation, pathhealth feedback, measurement-review enforcement, fixture drift checks, and generated-backend parity.
 
 This prototype remains local and deterministic. It does not perform public resolver use, resolver-network probing, domain-dependent routing, exact query logging, resolver address logging, payload logging, packet capture, public-network egress, or deployment behavior.
 
@@ -846,7 +846,7 @@ go run ./cmd/kcheck constrainedcarrier verify
 
 ## Multi-Carrier Runtime Selection
 
-Milestone 46 composes the reviewed HTTPS-like and constrained carrier lab families into a deterministic runtime selection model. The `internal/multicarrierselect` package records carrier-family inventory, candidate bundles, profile-sensitive eligibility, pathrace and pathhealth inputs, failover/fallback decisions, review-gate composition, high-risk blocking, unsafe fallback blocking, fixture drift checks, and generated-backend parity.
+Milestone 46 composes the reviewed HTTPS-like and constrained carrier lab families into a deterministic runtime selection model. The `internal/contracts/carrier/multicarrierselect` package records carrier-family inventory, candidate bundles, profile-sensitive eligibility, pathrace and pathhealth inputs, failover/fallback decisions, review-gate composition, high-risk blocking, unsafe fallback blocking, fixture drift checks, and generated-backend parity.
 
 Selection output is safe metadata only: family classes, decision buckets, counts, gate conclusions, and stable hashes. It does not add public-network carrier selection, uncontrolled fallback, real carrier probing, arbitrary egress, payload logging, packet capture, or secret-bearing traces.
 
@@ -864,7 +864,7 @@ go run ./cmd/kcheck multicarrierselect compare --old testdata/multicarrierselect
 
 Milestone 47 audits the reviewed carrier families and multi-carrier selector for fixed behavior, padding-only variation, profile-insensitive output, unsafe fallback, high-risk default choices, review-gate bypass, stream isolation failure, hidden backpressure, swallowed resets, trace leakage, public-claim overstatement, and generated-backend drift.
 
-The `internal/carriercollapse` package composes HTTPS-like carrier evidence, constrained carrier evidence, multi-carrier selection reports, pathrace/pathhealth inputs, measurementreview/carrierreview/labegress enforcement, mutation controls, fixture drift checks, and generated parity. It remains an audit layer only and does not add a new carrier family or public-network behavior.
+The `internal/contracts/carrier/carriercollapse` package composes HTTPS-like carrier evidence, constrained carrier evidence, multi-carrier selection reports, pathrace/pathhealth inputs, measurementreview/carrierreview/labegress enforcement, mutation controls, fixture drift checks, and generated parity. It remains an audit layer only and does not add a new carrier family or public-network behavior.
 
 Run:
 
@@ -880,7 +880,7 @@ go run ./cmd/kcheck carriercollapse compare --old testdata/carriercollapse/carri
 
 Milestone 48 freezes the contract for a future local-only proxy adapter that may carry opaque local stream bytes without logging payloads, persisting exact targets, bypassing carrier gates, or implying public deployment readiness. It is a design review and does not implement payload forwarding.
 
-The `internal/localproxyadapterreview` package defines local SOCKS-like and HTTP CONNECT-like stream semantics, parser states that may open runtime streams, payload segmentation/reassembly classes, backpressure and reset handling, target redaction preservation, `localprotocoladapter` composition, `multicarrierselect` invocation, `loopbackrelay`/`labegress`/`localpipeline`/`measurementreview` integration, resource limits, misuse controls, fixture drift checks, and generated parity.
+The `internal/contracts/proxy/localproxyadapterreview` package defines local SOCKS-like and HTTP CONNECT-like stream semantics, parser states that may open runtime streams, payload segmentation/reassembly classes, backpressure and reset handling, target redaction preservation, `localprotocoladapter` composition, `multicarrierselect` invocation, `loopbackrelay`/`labegress`/`localpipeline`/`measurementreview` integration, resource limits, misuse controls, fixture drift checks, and generated parity.
 
 Run:
 
@@ -912,7 +912,7 @@ go run ./cmd/kcheck localproxyadapter compare --old testdata/localproxyadapter/l
 
 Milestone 50 freezes the local packet-flow semantics needed before a future desktop packet-style adapter. It is a model and review layer: it describes packet-flow classes, flow identity classes, app-identity boundaries, MTU buckets, fragmentation/reassembly classes, retry/reset/backpressure semantics, kill-switch policy classes, routing boundaries, DNS privacy boundaries, local diagnostics policy, and the M51 implementation contract.
 
-The `internal/vpnsemantics` package records only classes, buckets, counts, hashes, and safe hygiene flags. It blocks real TUN device creation, packet capture, OS route modification, Android VpnService behavior, app traffic interception, real DNS interception, public-network behavior, payload logging, packet dumps, per-app identity logging, and precise endpoint logging.
+The `internal/contracts/vpn/vpnsemantics` package records only classes, buckets, counts, hashes, and safe hygiene flags. It blocks real TUN device creation, packet capture, OS route modification, Android VpnService behavior, app traffic interception, real DNS interception, public-network behavior, payload logging, packet dumps, per-app identity logging, and precise endpoint logging.
 
 Run:
 
@@ -926,7 +926,7 @@ go run ./cmd/kcheck vpnsemantics compare --old testdata/vpnsemantics/vpnsemantic
 
 ## Local Desktop Packet-Style Adapter Prototype
 
-Milestone 51 adds the first controlled desktop packet-style adapter prototype. It does not create a real TUN device or change OS routing. Instead, `internal/localvpnadapter` accepts deterministic packet-flow descriptors that follow the M50 contract, maps them to runtime stream classes, and records only safe packet-flow classes, buckets, counts, hashes, and hygiene flags.
+Milestone 51 adds the first controlled desktop packet-style adapter prototype. It does not create a real TUN device or change OS routing. Instead, `internal/contracts/vpn/localvpnadapter` accepts deterministic packet-flow descriptors that follow the M50 contract, maps them to runtime stream classes, and records only safe packet-flow classes, buckets, counts, hashes, and hygiene flags.
 
 The prototype covers flow descriptor lifecycle, flow-to-stream mapping, stream-to-flow result mapping, MTU and fragmentation buckets, retry/reset/backpressure handling, kill-switch policy summaries, DNS boundary enforcement, local proxy adapter composition, multi-carrier selection, relay bridge and local pipeline integration, pathhealth and measurementreview gates, resource limits, panic-safety checks, trace hygiene, and generated parity.
 
@@ -944,7 +944,7 @@ go run ./cmd/kcheck localvpnadapter compare --old testdata/localvpnadapter/local
 
 Milestone 52 defines the long-running client and relay process architecture needed before Kurdistan can move beyond single-shot lab harnesses. It is a review and contract milestone: it defines client, relay, and supervisor process roles; config and profile-bundle loading policy; service, session, carrier, listener, and egress lifecycle; logging and observability policy; shutdown and crash recovery; compatibility, upgrade, rollback, resource, and abuse-control placeholder policy.
 
-The `internal/relayprocess` package does not provision relays, deploy services, add account systems, upload observability, change production key exchange, add Android behavior, or enable field-test tooling. Its fixtures contain only roles, state classes, policy classes, counts, hashes, and hygiene flags.
+The `internal/operator/relayprocess` package does not provision relays, deploy services, add account systems, upload observability, change production key exchange, add Android behavior, or enable field-test tooling. Its fixtures contain only roles, state classes, policy classes, counts, hashes, and hygiene flags.
 
 Run:
 
@@ -960,7 +960,7 @@ go run ./cmd/kcheck relayprocess compare --old testdata/relayprocess/relayproces
 
 Milestone 53 defines the production-oriented key exchange contract that later relay authentication, rotation, Android, and review packages must follow. It covers handshake transcript binding, profile and relay identity binding, client ephemeral policy, relay static/rotating key policy, nonce and replay policy, downgrade resistance, version negotiation boundaries, algorithm agility boundaries, key separation, exported-secret policy, resumption policy, rotation readiness, generated transport compatibility, logging constraints, and external cryptography review package requirements.
 
-The `internal/keyexchangeplan` package is a design and review layer. It does not introduce custom cryptographic primitives, claim independent cryptographic approval, store key material in fixtures, enable deployment, or change runtime key exchange behavior. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
+The `internal/contracts/readiness/keyexchangeplan` package is a design and review layer. It does not introduce custom cryptographic primitives, claim independent cryptographic approval, store key material in fixtures, enable deployment, or change runtime key exchange behavior. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
 
 Run:
 
@@ -976,7 +976,7 @@ go run ./cmd/kcheck keyexchangeplan compare --old testdata/keyexchangeplan/keyex
 
 Milestone 54 defines the relay authentication and rotation contract that builds on the M53 key exchange design. It covers relay identity policy, client profile identity policy, profile bundle versions, relay auth policy, relay/transport/carrier compatibility matrices, rotation windows, profile expiry, revocation, fail-closed behavior, downgrade rejection, unknown-version rejection, stale-profile rejection, split-brain rotation handling, and safe diagnostics.
 
-The `internal/relayauthplan` package is a design and review layer. It does not provision relays, add public relay discovery, introduce account tracking, store key material in fixtures, enable deployment, or change runtime relay authentication behavior. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
+The `internal/operator/relayauthplan` package is a design and review layer. It does not provision relays, add public relay discovery, introduce account tracking, store key material in fixtures, enable deployment, or change runtime relay authentication behavior. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
 
 Run:
 
@@ -992,7 +992,7 @@ go run ./cmd/kcheck relayauthplan compare --old testdata/relayauthplan/relayauth
 
 Milestone 55 hardens the relay/runtime operational surface around the M52-M54 contracts. It covers bounded process/session/stream/queue/timer/diagnostic classes, strict operational config validation, deterministic shutdown and restart, safe logging and diagnostics, rollback/update boundaries, redacted health summaries, compatibility-gate preservation, operational misuse controls, fixture drift checks, and generated-backend parity.
 
-The `internal/operationalhardening` package is an operational contract and audit layer. It does not add Android behavior, public relay provisioning, public deployment automation, account tracking, live network testing, or field-test tooling. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
+The `internal/contracts/readiness/operationalhardening` package is an operational contract and audit layer. It does not add Android behavior, public relay provisioning, public deployment automation, account tracking, live network testing, or field-test tooling. Its fixtures contain only policy names, safe buckets, hashes, counts, and hygiene flags.
 
 Run:
 
@@ -1008,7 +1008,7 @@ go run ./cmd/kcheck operationalhardening compare --old testdata/operationalharde
 
 Milestone 56 defines the Android client architecture before Android implementation expands on device. It covers profile import, profile verification, profile expiry and rotation, platform permission boundaries, foreground-service expectations, UI state, reconnect behavior, kill-switch semantics, local diagnostics, privacy boundaries, runtime composition, and generated-backend parity.
 
-The `internal/androidreview` package is a deterministic contract and audit layer. It does not implement an Android app, Android runtime port, VpnService traffic handling, packet capture, public carrier behavior, automatic telemetry, or field-test behavior. Its fixtures contain only safe state names, policy classes, counts, hashes, and hygiene flags.
+The `internal/contracts/android/androidreview` package is a deterministic contract and audit layer. It does not implement an Android app, Android runtime port, VpnService traffic handling, packet capture, public carrier behavior, automatic telemetry, or field-test behavior. Its fixtures contain only safe state names, policy classes, counts, hashes, and hygiene flags.
 
 Run:
 
@@ -1024,7 +1024,7 @@ go run ./cmd/kcheck androidreview compare --old testdata/androidreview/androidre
 
 Milestone 57 prepares the Kurdistan runtime to execute in an Android-shaped local mode before VpnService traffic handling. It validates profile-backed startup, lifecycle events, storage boundaries, redacted diagnostics, concurrency assumptions, compatibility with relay/auth/carrier/pathhealth gates, safe shutdown, misuse controls, fixture drift, and generated-backend parity.
 
-The `internal/androidruntime` package is deterministic and local. It does not implement Android packet capture, Android UI, foreground service code, automatic telemetry, public carrier behavior, app-store packaging, or field-test behavior. Its fixtures contain only safe policy classes, lifecycle state names, counts, hashes, and hygiene flags.
+The `internal/contracts/android/androidruntime` package is deterministic and local. It does not implement Android packet capture, Android UI, foreground service code, automatic telemetry, public carrier behavior, app-store packaging, or field-test behavior. Its fixtures contain only safe policy classes, lifecycle state names, counts, hashes, and hygiene flags.
 
 Run:
 
@@ -1040,7 +1040,7 @@ go run ./cmd/kcheck androidruntime compare --old testdata/androidruntime/android
 
 Milestone 58 adds the Android VpnService prototype boundary on top of the Android-shaped local runtime. It models permission states, VpnService lifecycle transitions, packet-flow descriptor mapping, fail-closed kill-switch behavior, diagnostic summaries, reconnect hooks, integration with existing runtime/carrier review gates, safe shutdown, misuse controls, fixture drift, and generated-backend parity.
 
-The `internal/androidvpnservice` package is deterministic and local. It does not connect Android traffic to carriers, forward public traffic, capture packets, log raw destinations, run automatic telemetry, or provide app-store packaging or field-test behavior. Its fixtures contain only state names, policy classes, counts, hashes, and hygiene flags.
+The `internal/contracts/android/androidvpnservice` package is deterministic and local. It does not connect Android traffic to carriers, forward public traffic, capture packets, log raw destinations, run automatic telemetry, or provide app-store packaging or field-test behavior. Its fixtures contain only state names, policy classes, counts, hashes, and hygiene flags.
 
 Run:
 
@@ -1056,7 +1056,7 @@ go run ./cmd/kcheck androidvpnservice compare --old testdata/androidvpnservice/a
 
 Milestone 59 connects the deterministic Android VpnService prototype to the reviewed Kurdistan runtime/carrier path. It models profile validation, Android VPN flow state, runtime initialization, carrier selection through review gates, relay compatibility, authenticated session setup, stream mapping, pathhealth, bounded reconnect/fallback, redacted diagnostics, and safe shutdown.
 
-The `internal/androidcarrier` package is deterministic and metadata-only. It represents Android traffic as controlled flow classes passing through the reviewed carrier/runtime path; it does not add public-network deployment, unrestricted field testing, ad hoc carrier fallback, packet capture, raw destination logging, automatic telemetry, or app-store packaging. Diagnostics use redacted failure classes and safe counters only.
+The `internal/contracts/android/androidcarrier` package is deterministic and metadata-only. It represents Android traffic as controlled flow classes passing through the reviewed carrier/runtime path; it does not add public-network deployment, unrestricted field testing, ad hoc carrier fallback, packet capture, raw destination logging, automatic telemetry, or app-store packaging. Diagnostics use redacted failure classes and safe counters only.
 
 Run:
 

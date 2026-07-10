@@ -11,7 +11,7 @@ M55 does not implement Android behavior, public deployment automation, public re
 
 ## Scope
 
-The `internal/operationalhardening` package defines deterministic safe reports for:
+The `internal/contracts/readiness/operationalhardening` package defines deterministic safe reports for:
 
 - relay/runtime resource limits
 - operational config validation

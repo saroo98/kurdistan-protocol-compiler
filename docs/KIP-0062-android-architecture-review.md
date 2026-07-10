@@ -102,7 +102,7 @@ M57 should implement an Android local runtime port against this review. It shoul
 - remain local and deterministic for tests
 - avoid full VpnService traffic handling until M58
 
-The M57 contract is implemented in KIP-0063 and the `internal/androidruntime` audit package. Its fixtures validate Android-shaped local runtime initialization, lifecycle, storage boundaries, diagnostics, concurrency assumptions, compatibility, safe shutdown, trace hygiene, misuse controls, and generated backend parity.
+The M57 contract is implemented in KIP-0063 and the `internal/contracts/android/androidruntime` audit package. Its fixtures validate Android-shaped local runtime initialization, lifecycle, storage boundaries, diagnostics, concurrency assumptions, compatibility, safe shutdown, trace hygiene, misuse controls, and generated backend parity.
 
 ## M58 Contract
 

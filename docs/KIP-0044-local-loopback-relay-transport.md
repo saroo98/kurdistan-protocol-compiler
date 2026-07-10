@@ -11,7 +11,7 @@ This milestone does not add a public relay, remote transport, deployment path, D
 
 ## Model
 
-`internal/loopbackrelay` models:
+`internal/contracts/lab/loopbackrelay` models:
 
 - loopback-only bind policy
 - loopback-only dial policy

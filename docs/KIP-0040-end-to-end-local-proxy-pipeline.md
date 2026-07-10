@@ -22,7 +22,7 @@ The model answers:
 
 ## Pipeline Model
 
-`internal/localpipeline` defines deterministic local pipeline scenarios, runs, fixture manifests, boundary reports, misuse reports, parity reports, collapse reports, and fixture comparison helpers.
+`internal/contracts/lab/localpipeline` defines deterministic local pipeline scenarios, runs, fixture manifests, boundary reports, misuse reports, parity reports, collapse reports, and fixture comparison helpers.
 
 Each scenario includes safe metadata for:
 

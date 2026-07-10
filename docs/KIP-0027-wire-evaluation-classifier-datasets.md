@@ -25,7 +25,7 @@ The harness supports:
 
 ## Dataset Record Schema
 
-`internal/wireeval` defines a versioned `WireEvalRecord` with stable fields:
+`internal/observe/wireeval` defines a versioned `WireEvalRecord` with stable fields:
 
 - `record_id`
 - `profile_id`
@@ -69,7 +69,7 @@ The committed fixture set uses deterministic generated profile seeds and represe
 
 Classifier exports include feature buckets and hashes only. They do not include raw packet bytes, encoded frames, decoded frames, payloads, captures, endpoint addresses, domains, SNI, host headers, keys, nonces, auth tags, or proof material.
 
-Forbidden columns are rejected by `internal/classifierdata`.
+Forbidden columns are rejected by `internal/observe/classifierdata`.
 
 ## Baselines And Controls
 

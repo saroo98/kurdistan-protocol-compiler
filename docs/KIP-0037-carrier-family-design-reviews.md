@@ -9,7 +9,7 @@ The review layer records which carrier families are safe for synthetic modeling,
 
 ## Reviewed Families
 
-`internal/carrierreview` evaluates design descriptors for:
+`internal/contracts/carrier/carrierreview` evaluates design descriptors for:
 
 - `https_like_tcp`
 - `dns_survival`

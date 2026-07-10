@@ -9,7 +9,7 @@ This is a local regression method. It is not evidence of real-world performance,
 
 ## Mutant Generators
 
-Mutant generators are test-only profile families in `internal/mutant`. They are not used by production CLI commands. Each mutant simulates a specific design regression:
+Mutant generators are test-only profile families in `internal/testkit/mutant`. They are not used by production CLI commands. Each mutant simulates a specific design regression:
 
 - `fixed_first_contact`: IDs and symbols vary, but first-contact message count, direction sequence, frame sizes, and state path shape are fixed.
 - `fixed_frame_grammar`: state names and symbols vary, but frame length mode, type mode, header order, fragmentation, checksum, and padding placement are fixed.

@@ -25,7 +25,7 @@ It tracks:
 
 ## Review Inventory
 
-`internal/productionreadiness` builds deterministic review items for the compiler, profile validation, framing, stream semantics, proxy semantics, carrier abstraction, security context, runtime session lifecycle, adapter interfaces, local adapter prototype, byte transport harness, byte-path fixtures, wire baselines, host and relay risk models, local proxy ingress, proxy egress, relay bridge, local pipeline, trace hygiene, generated backend parity, and documentation.
+`internal/contracts/readiness/productionreadiness` builds deterministic review items for the compiler, profile validation, framing, stream semantics, proxy semantics, carrier abstraction, security context, runtime session lifecycle, adapter interfaces, local adapter prototype, byte transport harness, byte-path fixtures, wire baselines, host and relay risk models, local proxy ingress, proxy egress, relay bridge, local pipeline, trace hygiene, generated backend parity, and documentation.
 
 Each item records:
 

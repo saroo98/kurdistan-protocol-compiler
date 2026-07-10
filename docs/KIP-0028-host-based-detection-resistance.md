@@ -11,7 +11,7 @@ The model is still local and synthetic. It uses safe fixture metadata from gener
 
 ## Model
 
-`internal/hostdetect` builds a versioned `HostObservationSet` from `internal/wireeval` records. Each observation contains:
+`internal/observe/hostdetect` builds a versioned `HostObservationSet` from `internal/observe/wireeval` records. Each observation contains:
 
 - synthetic host ID
 - host class

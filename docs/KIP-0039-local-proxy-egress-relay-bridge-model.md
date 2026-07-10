@@ -44,7 +44,7 @@ Synthetic target classes include echo, fixed response, chunked response, slow re
 
 ## Relay Bridge Model
 
-`internal/relaybridge` models:
+`internal/operator/relaybridge` models:
 
 - bridge sessions
 - bridge streams

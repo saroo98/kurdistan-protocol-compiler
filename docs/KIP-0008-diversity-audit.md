@@ -86,7 +86,7 @@ Run tests and fuzz targets:
 
 ```bash
 go test ./...
-go test -fuzz=Fuzz ./internal/framing
+go test -fuzz=Fuzz ./internal/protocol/framing
 ```
 
 ## Interpreting Results

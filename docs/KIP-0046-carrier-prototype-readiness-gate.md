@@ -11,7 +11,7 @@ This milestone does not implement a carrier, deployment path, public relay, DNS 
 
 ## Readiness Model
 
-`internal/carrierreadiness` records:
+`internal/contracts/carrier/carrierreadiness` records:
 
 - prerequisite inventory
 - dependency graph

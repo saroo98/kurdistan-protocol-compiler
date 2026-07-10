@@ -11,7 +11,7 @@ M41 froze the implementation contract: allowed shape classes, blocked behavior, 
 
 M42 turns that contract into repository behavior:
 
-- `internal/httpslikecarrier`
+- `internal/contracts/carrier/httpslikecarrier`
 - `testdata/httpslikecarrier`
 - `kcheck httpslikecarrier`
 - generated backend source markers and tests

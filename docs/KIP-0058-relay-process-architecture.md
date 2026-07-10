@@ -7,7 +7,7 @@ Milestone 52 defines the long-running client and relay process architecture that
 
 ## Scope
 
-The `internal/relayprocess` package freezes deterministic contracts for:
+The `internal/operator/relayprocess` package freezes deterministic contracts for:
 
 - client process role
 - relay process role

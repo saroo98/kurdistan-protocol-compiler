@@ -9,7 +9,7 @@ The model is local, synthetic, and payload-free. It does not upload telemetry, c
 
 ## Observation Taxonomy
 
-`internal/measurementreview` defines bucketed observation classes such as:
+`internal/contracts/readiness/measurementreview` defines bucketed observation classes such as:
 
 - path availability bucket
 - handshake outcome bucket

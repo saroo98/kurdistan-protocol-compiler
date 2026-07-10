@@ -11,7 +11,7 @@ The model is local, synthetic, and payload-free. It does not provision infrastru
 
 ## Relationship To Host Detection
 
-`internal/hostdetect` produces safe host-level observation summaries. `internal/relayfleet` consumes those summaries together with wire-evaluation records and builds a synthetic relay fleet:
+`internal/observe/hostdetect` produces safe host-level observation summaries. `internal/operator/relayfleet` consumes those summaries together with wire-evaluation records and builds a synthetic relay fleet:
 
 ```text
 wire evaluation records

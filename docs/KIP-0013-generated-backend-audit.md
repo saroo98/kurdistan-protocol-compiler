@@ -63,7 +63,7 @@ Quick mode keeps the corpus small. Full mode runs more profiles but remains loca
 
 `multi_stream_generated_parity` fails if generated modules cannot complete the same lab-only multi-stream semantic exercise as the interpreted runtime, or if generated multi-stream traces collapse across profiles.
 
-`generated_source_scanner` fails if generated source looks like a trivial wrapper, directly imports `internal/fsm`, loads `profile.json` at runtime, logs payloads, or lacks profile-specific constants.
+`generated_source_scanner` fails if generated source looks like a trivial wrapper, directly imports `internal/protocol/fsm`, loads `profile.json` at runtime, logs payloads, or lacks profile-specific constants.
 
 ## Code Skeleton Artifact Scanner
 
@@ -71,7 +71,7 @@ The source scanner checks generated modules for:
 
 - profile-specific constants and tables
 - specialized files differing across profiles
-- absence of direct `internal/fsm` imports
+- absence of direct `internal/protocol/fsm` imports
 - absence of runtime `profile.json` loading
 - absence of wrapper-only markers
 - absence of payload logging patterns

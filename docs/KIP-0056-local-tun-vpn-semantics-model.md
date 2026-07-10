@@ -9,7 +9,7 @@ The model answers one narrow question: can packet-like local flow concepts be ma
 
 ## Scope
 
-The `internal/vpnsemantics` package defines deterministic reports for:
+The `internal/contracts/vpn/vpnsemantics` package defines deterministic reports for:
 
 - packet-flow taxonomy
 - flow identity classes

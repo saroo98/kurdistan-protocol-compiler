@@ -98,7 +98,7 @@ These classes describe whether a field is modeled as visible metadata, encrypted
 
 ## First-N Packet Model
 
-`internal/wirefeatures` models first-N packet shapes using only:
+`internal/observe/wirefeatures` models first-N packet shapes using only:
 
 - packet index
 - direction bucket

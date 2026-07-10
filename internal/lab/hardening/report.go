@@ -181,7 +181,7 @@ func packagesChecked() []string {
 		"internal/observe/hostdetect",
 		"internal/operator/relayfleet",
 		"internal/contracts/lab/localpipeline",
-		"internal/localproxyadapterreview",
+		"internal/contracts/proxy/localproxyadapterreview",
 		"internal/lab/localproxyadapter",
 		"internal/contracts/vpn/vpnsemantics",
 		"internal/contracts/vpn/localvpnadapter",

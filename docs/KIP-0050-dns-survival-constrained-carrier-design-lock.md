@@ -73,7 +73,7 @@ The contract requires:
 
 M45 must provide:
 
-- `internal/constrainedcarrier` or equivalent package
+- `internal/contracts/carrier/constrainedcarrier` or equivalent package
 - deterministic local resolver/request-response harness
 - `kcheck constrainedcarrier --quick|--full|verify|compare`
 - generated backend constants and tests

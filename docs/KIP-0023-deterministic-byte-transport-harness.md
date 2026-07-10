@@ -24,7 +24,7 @@ local source
 
 ## Byte Frame Model
 
-`internal/bytetransport` defines metadata-only byte frames with:
+`internal/observe/bytetransport` defines metadata-only byte frames with:
 
 - session ID class
 - stream ID

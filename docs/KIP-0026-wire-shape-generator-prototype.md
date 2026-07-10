@@ -27,7 +27,7 @@ Milestone 21 builds on this by exporting generated wire-shape observations into 
 
 ## Policy Model
 
-`internal/wiregen` defines a versioned `WireShapePolicy` with:
+`internal/observe/wiregen` defines a versioned `WireShapePolicy` with:
 
 - selected protocol-feature corpus family and entry
 - phase plan
@@ -54,7 +54,7 @@ The compiler samples a policy deterministically from the profile seed and embeds
 
 ## Expected Feature Matching
 
-`internal/wiregencompare` derives expected wire-feature vectors from wiregen policies and compares them with applied bytepath feature vectors.
+`internal/observe/wiregencompare` derives expected wire-feature vectors from wiregen policies and compares them with applied bytepath feature vectors.
 
 The comparison checks:
 

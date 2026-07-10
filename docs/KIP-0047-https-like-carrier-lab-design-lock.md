@@ -11,7 +11,7 @@ M41 does not implement real TLS, real HTTPS requests, SNI routing, Host header r
 
 ## Contract Package
 
-`internal/httpscarrierreview` records:
+`internal/contracts/carrier/httpscarrierreview` records:
 
 - allowed lab-only behavior
 - blocked behavior matrix

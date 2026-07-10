@@ -13,7 +13,7 @@ The HTTPS-like carrier prototype models one high-level request/response shape. M
 
 ## Local Deterministic Harness
 
-`internal/constrainedcarrier` exposes a local deterministic harness. It uses fixture-only resolver classes and symbolic buckets:
+`internal/contracts/carrier/constrainedcarrier` exposes a local deterministic harness. It uses fixture-only resolver classes and symbolic buckets:
 
 - `loopback_resolver_bucket`
 - `fixture_resolver_bucket`

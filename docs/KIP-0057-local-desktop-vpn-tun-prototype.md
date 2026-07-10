@@ -7,7 +7,7 @@ Milestone 51 implements the first controlled desktop packet-style adapter protot
 
 ## Scope
 
-The `internal/localvpnadapter` package models packet-style adapter behavior through descriptors and summaries:
+The `internal/contracts/vpn/localvpnadapter` package models packet-style adapter behavior through descriptors and summaries:
 
 - packet-flow descriptor lifecycle
 - flow-to-stream mapping

@@ -11,7 +11,7 @@ This milestone does not implement a new production cryptographic protocol. It fr
 
 ## Design Scope
 
-The `internal/keyexchangeplan` package defines safe, deterministic reports for:
+The `internal/contracts/readiness/keyexchangeplan` package defines safe, deterministic reports for:
 
 - key exchange design inventory
 - handshake transcript binding
