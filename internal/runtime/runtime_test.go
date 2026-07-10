@@ -13,8 +13,8 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/proxyadversary"
-	"kurdistan/internal/proxysem"
+	"kurdistan/internal/transport/proxyadversary"
+	"kurdistan/internal/protocol/proxysem"
 	"kurdistan/internal/crypto/security"
 )
 

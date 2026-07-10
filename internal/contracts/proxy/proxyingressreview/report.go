@@ -3,7 +3,7 @@
 
 package proxyingressreview
 
-import "kurdistan/internal/proxyingress"
+import "kurdistan/internal/lab/proxyingress"
 
 type ProxyIngressMisuseReport struct {
 	ContractID        string   `json:"contract_id"`

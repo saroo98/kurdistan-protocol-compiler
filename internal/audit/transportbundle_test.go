@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func TestTransportBundleGatesPassAndDetectControls(t *testing.T) {

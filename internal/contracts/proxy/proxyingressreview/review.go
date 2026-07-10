@@ -3,7 +3,7 @@
 
 package proxyingressreview
 
-import "kurdistan/internal/proxyingress"
+import "kurdistan/internal/lab/proxyingress"
 
 const Version = "proxyingress-review-v1"
 

@@ -35,7 +35,7 @@ var allowedImporterPrefixes = []string{
 	modulePath + "/internal/product/",
 	modulePath + "/internal/audit",
 	modulePath + "/internal/codegen",
-	modulePath + "/internal/hardening",
+	modulePath + "/internal/lab/hardening",
 	modulePath + "/cmd/kcheck",
 }
 

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 func ExtractFromFixtureManifest(manifest fixtures.FixtureManifest) ([]WireFeatureVector, FeatureExtractionReport) {

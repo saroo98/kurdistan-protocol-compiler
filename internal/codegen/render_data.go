@@ -8,22 +8,22 @@
 package codegen
 
 import (
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 	"kurdistan/internal/contracts/carrier/carrierreview"
-	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/lab/concretelocaladapter"
 	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 	"kurdistan/internal/contracts/carrier/httpslikecarrier"
 	"kurdistan/internal/contracts/lab/labegress"
 	"kurdistan/internal/contracts/lab/localpipeline"
-	"kurdistan/internal/localprotocoladapter"
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localprotocoladapter"
+	"kurdistan/internal/lab/localproxyingressadversary"
 	"kurdistan/internal/contracts/lab/loopbackrelay"
 	"kurdistan/internal/contracts/readiness/measurementreview"
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 	"kurdistan/internal/contracts/readiness/productionreadiness"
-	"kurdistan/internal/proxyegress"
+	"kurdistan/internal/lab/proxyegress"
 	"kurdistan/internal/operator/relaybridge"
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func localProxyIngressAdversarialDescriptorClasses(cases []localproxyingressadversary.DescriptorAbuseCase) []string {

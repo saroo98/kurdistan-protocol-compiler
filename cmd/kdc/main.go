@@ -15,7 +15,7 @@ import (
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func main() {

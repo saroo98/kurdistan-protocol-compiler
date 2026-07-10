@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/lab/carrieradversary"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
 )

@@ -3,7 +3,7 @@
 
 package proxyingressreview
 
-import "kurdistan/internal/proxyingress"
+import "kurdistan/internal/lab/proxyingress"
 
 func HashValue(value any) string {
 	return proxyingress.HashValue(value)

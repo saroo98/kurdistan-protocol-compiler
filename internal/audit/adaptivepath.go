@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 	"kurdistan/internal/testkit/mutant"
 )
 

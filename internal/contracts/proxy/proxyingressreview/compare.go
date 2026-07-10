@@ -3,7 +3,7 @@
 
 package proxyingressreview
 
-import "kurdistan/internal/proxyingress"
+import "kurdistan/internal/lab/proxyingress"
 
 type ProxyIngressParityReport struct {
 	ComparedContracts      int      `json:"compared_contracts"`

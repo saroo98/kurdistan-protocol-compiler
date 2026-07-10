@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/bytetransportadversary"
+	"kurdistan/internal/lab/bytetransportadversary"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/mutant"
 )

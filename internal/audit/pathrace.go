@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 )
 
 type PathRaceAuditSummary struct {

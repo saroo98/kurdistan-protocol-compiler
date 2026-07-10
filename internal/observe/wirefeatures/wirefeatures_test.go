@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/observe/protocorpus"
 )
 

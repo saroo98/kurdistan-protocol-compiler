@@ -15,10 +15,10 @@ import (
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/relay"
-	"kurdistan/internal/streamadversary"
+	"kurdistan/internal/lab/streamadversary"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

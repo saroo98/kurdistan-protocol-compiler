@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	"kurdistan/internal/adapter"
+	"kurdistan/internal/transport/adapter"
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/proxysem"
+	"kurdistan/internal/protocol/proxysem"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

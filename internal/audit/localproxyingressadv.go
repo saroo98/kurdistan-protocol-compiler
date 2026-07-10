@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 	"kurdistan/internal/testkit/mutant"
 )
 

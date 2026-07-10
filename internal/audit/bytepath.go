@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"kurdistan/internal/observe/byteparity"
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 type BytePathAuditSummary struct {

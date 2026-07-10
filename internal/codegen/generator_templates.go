@@ -154,7 +154,7 @@ const genTmpl005 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 	ktrace "kurdistan/internal/observe/trace"
 )
 
@@ -229,7 +229,7 @@ const genTmpl006 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/lab/carrieradversary"
 	ktrace "kurdistan/internal/observe/trace"
 )
 
@@ -419,7 +419,7 @@ const genTmpl008 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/observe/trace"
 )
@@ -464,7 +464,7 @@ import (
 	"context"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/hardening"
+	"kurdistan/internal/lab/hardening"
 	ktrace "kurdistan/internal/observe/trace"
 )
 
@@ -525,8 +525,8 @@ const genTmpl010 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/adapter"
-	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/transport/adapter"
+	"kurdistan/internal/lab/adapteradversary"
 	kruntime "kurdistan/internal/runtime"
 	ktrace "kurdistan/internal/observe/trace"
 )
@@ -602,8 +602,8 @@ const genTmpl011 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/localadapter"
-	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/lab/localadapter"
+	"kurdistan/internal/lab/localadapteradversary"
 	ktrace "kurdistan/internal/observe/trace"
 )
 
@@ -666,7 +666,7 @@ import (
 	"context"
 
 	"kurdistan/internal/observe/bytetransport"
-	"kurdistan/internal/bytetransportadversary"
+	"kurdistan/internal/lab/bytetransportadversary"
 	ktrace "kurdistan/internal/observe/trace"
 )
 
@@ -748,7 +748,7 @@ const genTmpl014 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wirefeatures"
 )
@@ -952,7 +952,7 @@ func GeneratedRelayFleetSummary(ctx context.Context) (relayfleet.RelayFleetSumma
 const genTmpl019 = `package protocol
 
 import (
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 	"kurdistan/internal/contracts/proxy/proxyingressreview"
 )
 
@@ -987,7 +987,7 @@ const genTmpl020 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/lab/localproxyingress"
 )
 
 const LocalProxyIngressSchemaVersion = "localproxyingress-v1"
@@ -1027,7 +1027,7 @@ const genTmpl021 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 )
 
 const LocalProxyIngressAdversarialSchemaVersion = %[1]s
@@ -1061,7 +1061,7 @@ const genTmpl022 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 const AdaptivePathSchemaVersion = %[1]s
@@ -1113,7 +1113,7 @@ const genTmpl023 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 const TransportBundleSchemaVersion = %[1]s
@@ -1159,7 +1159,7 @@ const genTmpl024 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 )
 
 const PathRaceSchemaVersion = %[1]s
@@ -1199,7 +1199,7 @@ const genTmpl025 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/pathhealth"
+	"kurdistan/internal/transport/pathhealth"
 )
 
 const PathHealthSchemaVersion = %[1]s
@@ -1278,7 +1278,7 @@ func GeneratedMeasurementReview() (measurementreview.MeasurementReview, error) {
 const genTmpl028 = `package protocol
 
 import (
-	"kurdistan/internal/proxyegress"
+	"kurdistan/internal/lab/proxyegress"
 )
 
 const ProxyEgressSchemaVersion = %[1]s
@@ -1392,7 +1392,7 @@ const genTmpl032 = `package protocol
 import (
 	"context"
 
-	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/lab/concretelocaladapter"
 )
 
 const ConcreteLocalAdapterSchemaVersion = %[1]s
@@ -1422,7 +1422,7 @@ func GeneratedConcreteLocalAdapterParity(ctx context.Context) (concretelocaladap
 const genTmpl033 = `package protocol
 
 import (
-	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/lab/localprotocoladapter"
 )
 
 const LocalProtocolAdapterSchemaVersion = %[1]s
@@ -1830,7 +1830,7 @@ func GeneratedLocalProxyAdapterReviewParity() (localproxyadapterreview.ParityRep
 const genTmpl045 = `package protocol
 
 import (
-	"kurdistan/internal/localproxyadapter"
+	"kurdistan/internal/lab/localproxyadapter"
 )
 
 const LocalProxyAdapterSchemaVersion = %[1]s
@@ -2359,7 +2359,7 @@ const genTmpl062 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/localproxyadapter"
+	"kurdistan/internal/lab/localproxyadapter"
 )
 
 func TestGeneratedLocalProxyAdapter(t *testing.T) {
@@ -2402,7 +2402,7 @@ const genTmpl064 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/localproxyadapter"
+	"kurdistan/internal/lab/localproxyadapter"
 )
 
 func TestGeneratedLocalProxyAdapterHygiene(t *testing.T) {
@@ -3302,7 +3302,7 @@ import (
 	"time"
 
 	"kurdistan/internal/relay"
-	"kurdistan/internal/streamadversary"
+	"kurdistan/internal/lab/streamadversary"
 )
 
 func TestGeneratedMultiStreamEcho(t *testing.T) {
@@ -3390,7 +3390,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 )
 
 func TestGeneratedProxySemDemo(t *testing.T) {
@@ -3434,7 +3434,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 )
 
 func TestGeneratedProxyAdversaryScenarios(t *testing.T) {
@@ -3493,7 +3493,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/carrieradversary"
+	"kurdistan/internal/lab/carrieradversary"
 )
 
 func TestGeneratedCarrierAdversaryScenarios(t *testing.T) {
@@ -3685,7 +3685,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/proxyadversary"
+	"kurdistan/internal/transport/proxyadversary"
 	kruntime "kurdistan/internal/runtime"
 )
 
@@ -3755,7 +3755,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/runtimeadversary"
+	"kurdistan/internal/lab/runtimeadversary"
 )
 
 func TestGeneratedRuntimeAdversaryScenarios(t *testing.T) {
@@ -3791,7 +3791,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/hardening"
+	"kurdistan/internal/lab/hardening"
 	"kurdistan/internal/crypto/security"
 )
 
@@ -3881,8 +3881,8 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/adapter"
-	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/transport/adapter"
+	"kurdistan/internal/lab/adapteradversary"
 )
 
 func TestGeneratedAdapterConfigAndDemo(t *testing.T) {
@@ -3963,7 +3963,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/adapteradversary"
+	"kurdistan/internal/lab/adapteradversary"
 	"kurdistan/internal/protocol/ir"
 )
 
@@ -3987,7 +3987,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/localadapter"
+	"kurdistan/internal/lab/localadapter"
 )
 
 func TestGeneratedLocalAdapterDemo(t *testing.T) {
@@ -4049,7 +4049,7 @@ import (
 	"time"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/localadapteradversary"
+	"kurdistan/internal/lab/localadapteradversary"
 )
 
 func TestGeneratedLocalAdapterAdversaryQuickCorpus(t *testing.T) {
@@ -4140,7 +4140,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/bytetransportadversary"
+	"kurdistan/internal/lab/bytetransportadversary"
 	"kurdistan/internal/protocol/ir"
 )
 
@@ -4162,7 +4162,7 @@ import (
 	"testing"
 	"time"
 
-	"kurdistan/internal/fixtures"
+	"kurdistan/internal/lab/fixtures"
 )
 
 func TestGeneratedBytePathFixtureManifest(t *testing.T) {
@@ -4629,7 +4629,7 @@ const genTmpl129 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 )
 
 func TestGeneratedProxyIngressContract(t *testing.T) {
@@ -4679,7 +4679,7 @@ const genTmpl131 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 )
 
 func TestGeneratedProxyIngressHygiene(t *testing.T) {
@@ -4709,7 +4709,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/lab/localproxyingress"
 )
 
 func TestGeneratedLocalProxyIngressSummary(t *testing.T) {
@@ -4735,7 +4735,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingress"
+	"kurdistan/internal/lab/localproxyingress"
 )
 
 func TestGeneratedLocalProxyIngressParity(t *testing.T) {
@@ -4757,7 +4757,7 @@ const genTmpl134 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/proxyingress"
+	"kurdistan/internal/lab/proxyingress"
 )
 
 func TestGeneratedLocalProxyIngressHygiene(t *testing.T) {
@@ -4786,7 +4786,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 )
 
 func TestGeneratedLocalProxyIngressAdversarialFixtureSet(t *testing.T) {
@@ -4815,7 +4815,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 )
 
 func TestGeneratedLocalProxyIngressAdversarialParity(t *testing.T) {
@@ -4845,7 +4845,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 )
 
 func TestGeneratedLocalProxyIngressAdversarialHygiene(t *testing.T) {
@@ -4881,7 +4881,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 func TestGeneratedAdaptivePathFixtureSet(t *testing.T) {
@@ -4910,7 +4910,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 func TestGeneratedAdaptivePathParity(t *testing.T) {
@@ -4937,7 +4937,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 func TestGeneratedAdaptivePathHygiene(t *testing.T) {
@@ -4974,7 +4974,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func TestGeneratedTransportBundleFixtureSet(t *testing.T) {
@@ -5003,7 +5003,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func TestGeneratedTransportBundleParity(t *testing.T) {
@@ -5030,7 +5030,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func TestGeneratedTransportBundleHygiene(t *testing.T) {
@@ -5067,7 +5067,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 )
 
 func TestGeneratedPathRaceFixtureSet(t *testing.T) {
@@ -5121,7 +5121,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/pathrace"
+	"kurdistan/internal/transport/pathrace"
 )
 
 func TestGeneratedPathRaceHygiene(t *testing.T) {
@@ -5158,7 +5158,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/pathhealth"
+	"kurdistan/internal/transport/pathhealth"
 )
 
 func TestGeneratedPathHealthFixtureSet(t *testing.T) {
@@ -5206,7 +5206,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/pathhealth"
+	"kurdistan/internal/transport/pathhealth"
 )
 
 func TestGeneratedPathHealthHygiene(t *testing.T) {
@@ -5400,7 +5400,7 @@ const genTmpl156 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/proxyegress"
+	"kurdistan/internal/lab/proxyegress"
 )
 
 func TestGeneratedProxyEgress(t *testing.T) {
@@ -5440,7 +5440,7 @@ const genTmpl158 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/proxyegress"
+	"kurdistan/internal/lab/proxyegress"
 )
 
 func TestGeneratedProxyEgressHygiene(t *testing.T) {
@@ -5684,7 +5684,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/lab/concretelocaladapter"
 )
 
 func TestGeneratedConcreteLocalAdapter(t *testing.T) {
@@ -5728,7 +5728,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/concretelocaladapter"
+	"kurdistan/internal/lab/concretelocaladapter"
 )
 
 func TestGeneratedConcreteLocalAdapterHygiene(t *testing.T) {
@@ -5757,7 +5757,7 @@ const genTmpl171 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/lab/localprotocoladapter"
 )
 
 func TestGeneratedLocalProtocolAdapter(t *testing.T) {
@@ -5797,7 +5797,7 @@ const genTmpl173 = `package protocol
 import (
 	"testing"
 
-	"kurdistan/internal/localprotocoladapter"
+	"kurdistan/internal/lab/localprotocoladapter"
 )
 
 func TestGeneratedLocalProtocolAdapterHygiene(t *testing.T) {

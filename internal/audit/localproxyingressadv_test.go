@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/localproxyingressadversary"
+	"kurdistan/internal/lab/localproxyingressadversary"
 )
 
 func TestLocalProxyIngressAdversarialGatesPass(t *testing.T) {

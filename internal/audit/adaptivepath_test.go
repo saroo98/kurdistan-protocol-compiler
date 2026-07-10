@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"kurdistan/internal/adaptivepath"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 func TestAdaptivePathGatesPass(t *testing.T) {

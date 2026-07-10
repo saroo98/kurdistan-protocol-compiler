@@ -18,7 +18,7 @@ import (
 	"kurdistan/internal/codegen"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/observe/trace"

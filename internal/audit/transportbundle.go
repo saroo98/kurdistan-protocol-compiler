@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/transportbundle"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 type TransportBundleAuditSummary struct {

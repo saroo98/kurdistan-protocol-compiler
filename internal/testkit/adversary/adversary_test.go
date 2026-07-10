@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/protocol/compiler"
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

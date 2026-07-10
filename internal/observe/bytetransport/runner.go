@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/localadapter"
+	"kurdistan/internal/lab/localadapter"
 	ktrace "kurdistan/internal/observe/trace"
 	"kurdistan/internal/observe/wiregen"
 )

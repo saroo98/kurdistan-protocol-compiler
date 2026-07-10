@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"kurdistan/internal/labtrace"
+	"kurdistan/internal/observe/labtrace"
 	ktrace "kurdistan/internal/observe/trace"
 )
 

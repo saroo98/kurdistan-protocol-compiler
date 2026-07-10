@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/pathhealth"
+	"kurdistan/internal/transport/pathhealth"
 )
 
 type PathHealthAuditSummary struct {
