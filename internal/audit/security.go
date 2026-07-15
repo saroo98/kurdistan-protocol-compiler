@@ -95,12 +95,26 @@ type m2MaintenanceManifestV1 struct {
 	ValidatorOverlays           map[string]m2LayeredOverlayV1           `json:"validator_overlays"`
 	ValidatorConsumerOverlays   map[string]m2LayeredOverlayV1           `json:"validator_consumer_overlays"`
 	EvidenceConvergenceOverlays map[string]m2LayeredOverlayV1           `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase2_complete_overlays"`
 }
 
 type m2LayeredOverlayV1 struct {
 	Version                string                 `json:"version"`
 	PredecessorManifestSHA string                 `json:"predecessor_manifest_sha256"`
 	Entries                []m2MaintenanceEntryV1 `json:"entries"`
+}
+
+type m2Phase2CompleteOverlayV1 struct {
+	Version                   string                           `json:"version"`
+	PredecessorManifestSHA256 string                           `json:"predecessor_manifest_sha256"`
+	Paths                     []string                         `json:"paths"`
+	Entries                   []m2Phase2CompleteOverlayEntryV1 `json:"entries"`
+}
+
+type m2Phase2CompleteOverlayEntryV1 struct {
+	Path        string `json:"path"`
+	PreEvidence string `json:"pre_evidence"`
+	PostSHA256  string `json:"post_sha256"`
 }
 
 var m2MaintenancePathsV1 = []string{
@@ -121,6 +135,8 @@ const (
 	m2ValidatorOverlayV1           = "m2-governance-foundation-validators-v1"
 	m2ValidatorConsumerOverlayV1   = "m2-governance-foundation-validator-consumer-v1"
 	m2EvidenceConvergenceOverlayV1 = "m2-governance-foundation-evidence-convergence-v1"
+	m2Phase2CompleteOverlayNameV1  = "m2-governance-foundation-phase2-complete-v1"
+	m2Phase2PredecessorManifestV1  = "c89a6be543ec35e68bef3cd6d5a91b685b1a05e523aca264faabc6d4933c398b"
 )
 
 var m2HelperPathsV1 = []string{"internal/audit/codegen_test.go", "internal/codegen/authorization_v1_test.go", "cmd/kgen/main_test.go"}
@@ -131,6 +147,7 @@ var m2ValidatorPathsV1 = []string{"internal/audit/security.go", "internal/audit/
 var m2ValidatorPreV1 = []string{"b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17", "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3", "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136"}
 var m2ConvergencePathsV1 = []string{"cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go"}
 var m2ConvergencePreV1 = []string{"aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0", "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae", "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9", "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"}
+var m2Phase2CompletePathsV1 = []string{"README.md", "ROADMAP.md", "cmd/kgen/main_test.go", "docs/GOVERNANCE.md", "docs/KIP-0001-threat-model.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md", "docs/safety.md", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1}
 
 func validSHA256V1(value string) bool {
 	decoded, err := hex.DecodeString(value)
@@ -146,7 +163,11 @@ func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return nil, fmt.Errorf("M2 maintenance manifest: %w", err)
 	}
-	currentAtPre, err := validateM2ConvergenceV1(root, manifest.EvidenceConvergenceOverlays)
+	phase2Pre, err := validateM2Phase2CompleteV1(root, manifest.Phase2CompleteOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtPre, err := validateM2ConvergenceV1(phase2Pre, manifest.EvidenceConvergenceOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +246,9 @@ func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
 		return nil, fmt.Errorf("M2 maintenance entries=%d want %d", len(overlay.Entries), len(m2MaintenancePathsV1)-1)
 	}
 	pre := map[string]string{overlay.SelfPath: overlay.SelfPreSHA256}
+	for path, historical := range phase2Pre {
+		pre[path] = historical
+	}
 	for path, historical := range helperPre {
 		pre[path] = historical
 	}
@@ -261,7 +285,31 @@ func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
 	return pre, nil
 }
 
-func validateM2ConvergenceV1(root string, overlays map[string]m2LayeredOverlayV1) (map[string]string, error) {
+func validateM2Phase2CompleteV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+	overlay, ok := overlays[m2Phase2CompleteOverlayNameV1]
+	if len(overlays) != 1 || !ok || overlay.Version != m2Phase2CompleteOverlayNameV1 || overlay.PredecessorManifestSHA256 != m2Phase2PredecessorManifestV1 || len(overlay.Paths) != len(m2Phase2CompletePathsV1) || len(overlay.Entries) != len(m2Phase2CompletePathsV1)-1 {
+		return nil, fmt.Errorf("invalid M2 phase2-complete identity/cardinality")
+	}
+	for i, path := range m2Phase2CompletePathsV1 {
+		if overlay.Paths[i] != path {
+			return nil, fmt.Errorf("M2 phase2-complete path[%d]=%q want %q", i, overlay.Paths[i], path)
+		}
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if entry.Path != m2Phase2CompletePathsV1[i] || entry.Path == m2MaintenanceSelfPathV1 || !validSHA256V1(entry.PostSHA256) || (entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" && !validSHA256V1(entry.PreEvidence)) {
+			return nil, fmt.Errorf("invalid M2 phase2-complete entry %d", i)
+		}
+		actual, err := m2FileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M2 phase2-complete hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		pre[entry.Path] = entry.PreEvidence
+	}
+	return pre, nil
+}
+
+func validateM2ConvergenceV1(currentAtPost map[string]string, overlays map[string]m2LayeredOverlayV1) (map[string]string, error) {
 	convergence, ok := overlays[m2EvidenceConvergenceOverlayV1]
 	if len(overlays) != 1 || !ok || convergence.Version != m2EvidenceConvergenceOverlayV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != len(m2ConvergencePathsV1) {
 		return nil, fmt.Errorf("invalid M2 convergence identity/cardinality")
@@ -271,9 +319,9 @@ func validateM2ConvergenceV1(root string, overlays map[string]m2LayeredOverlayV1
 		if entry.Path != m2ConvergencePathsV1[i] || entry.PreSHA256 != m2ConvergencePreV1[i] || !validSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
 			return nil, fmt.Errorf("invalid M2 convergence entry %d", i)
 		}
-		actual, err := m2FileSHA256V1(root, entry.Path)
-		if err != nil || actual != entry.PostSHA256 {
-			return nil, fmt.Errorf("M2 convergence hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		actual := currentAtPost[entry.Path]
+		if actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M2 convergence hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
 		}
 		currentAtPre[entry.Path] = entry.PreSHA256
 	}
@@ -375,6 +423,9 @@ func m0CandidateManifestFromPathsWithPreHashesV1(root string, inventory []string
 			continue
 		}
 		seen[path] = true
+		if preHashes[path] == "ABSENT" {
+			continue
+		}
 		if expected, ok := m0WO058MaintenanceHashesV1[path]; ok {
 			actual := preHashes[path]
 			if actual == "" {
@@ -566,6 +617,8 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		"maintenance_union_file_count":  manifest.MaintenanceUnionCount,
 		"m2_maintenance_overlay":        m2MaintenanceOverlayV1,
 		"m2_maintenance_paths":          m2MaintenancePathsV1,
+		"m2_phase2_complete_overlay":    m2Phase2CompleteOverlayNameV1,
+		"m2_phase2_complete_paths":      m2Phase2CompletePathsV1,
 		"wo014_allowed_touches":         []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"},
 		"wo014_completion_hash":         "not-created-no-commit-authority",
 		"policy_seed_csv_sha256":        seedHash,

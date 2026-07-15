@@ -409,6 +409,7 @@ type committedEvidenceManifestV1 struct {
 	ValidatorOverlays           map[string]helperOwnerOverlayV1          `json:"validator_overlays"`
 	ValidatorConsumerOverlays   map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
 	EvidenceConvergenceOverlays map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays      map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -430,12 +431,27 @@ type helperOwnerOverlayEntryV1 struct {
 	PostSHA256 string `json:"post_sha256"`
 }
 
+type phase2CompleteOverlayV1 struct {
+	Version                   string                         `json:"version"`
+	PredecessorManifestSHA256 string                         `json:"predecessor_manifest_sha256"`
+	Paths                     []string                       `json:"paths"`
+	Entries                   []phase2CompleteOverlayEntryV1 `json:"entries"`
+}
+
+type phase2CompleteOverlayEntryV1 struct {
+	Path        string `json:"path"`
+	PreEvidence string `json:"pre_evidence"`
+	PostSHA256  string `json:"post_sha256"`
+}
+
 const helperOwnerOverlayNameV1 = "m2-governance-foundation-helper-owners-v1"
 const helperOwnerOverlayNameV2 = "m2-governance-foundation-helper-owners-v2"
 const maintenanceOverlayNameV1 = "m2-governance-foundation-v1"
 const validatorOverlayNameV1 = "m2-governance-foundation-validators-v1"
 const validatorConsumerOverlayNameV1 = "m2-governance-foundation-validator-consumer-v1"
 const evidenceConvergenceOverlayNameV1 = "m2-governance-foundation-evidence-convergence-v1"
+const phase2CompleteOverlayNameV1 = "m2-governance-foundation-phase2-complete-v1"
+const phase2PredecessorManifestSHA256V1 = "c89a6be543ec35e68bef3cd6d5a91b685b1a05e523aca264faabc6d4933c398b"
 
 var helperOwnerPathsV1 = []string{"internal/audit/codegen_test.go", "internal/codegen/authorization_v1_test.go", "cmd/kgen/main_test.go"}
 var helperOwnerPreHashesV1 = []string{"0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec", "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac", "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d"}
@@ -447,6 +463,7 @@ var validatorPathsV1 = []string{"internal/audit/security.go", "internal/audit/se
 var validatorPreHashesV1 = []string{"b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17", "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3", "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136"}
 var convergencePathsV1 = []string{"cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go"}
 var convergencePreHashesV1 = []string{"aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0", "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae", "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9", "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"}
+var phase2CompletePathsV1 = []string{"README.md", "ROADMAP.md", "cmd/kgen/main_test.go", "docs/GOVERNANCE.md", "docs/KIP-0001-threat-model.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md", "docs/safety.md", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", committedEvidenceManifestPathV1}
 
 type committedEvidenceEntryV1 struct {
 	Path        string `json:"path"`
@@ -524,7 +541,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtPre, err := validateConvergenceOverlayV1(root, manifest.EvidenceConvergenceOverlays)
+	currentAtPre, err := validatePhase2CompleteOverlayV1(root, manifest.Phase2CompleteOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtPre, err = validateConvergenceOverlayV1(currentAtPre, manifest.EvidenceConvergenceOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +622,33 @@ func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV
 	return historical, nil
 }
 
-func validateConvergenceOverlayV1(root string, overlays map[string]helperOwnerOverlayV1) (map[string]string, error) {
+func validatePhase2CompleteOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	overlay, ok := overlays[phase2CompleteOverlayNameV1]
+	if len(overlays) != 1 || !ok || overlay.Version != phase2CompleteOverlayNameV1 || overlay.PredecessorManifestSHA256 != phase2PredecessorManifestSHA256V1 || len(overlay.Paths) != len(phase2CompletePathsV1) || len(overlay.Entries) != len(phase2CompletePathsV1)-1 {
+		return nil, fmt.Errorf("invalid phase2-complete overlay identity/cardinality")
+	}
+	for i, path := range phase2CompletePathsV1 {
+		if overlay.Paths[i] != path {
+			return nil, fmt.Errorf("phase2-complete path[%d]=%q want %q", i, overlay.Paths[i], path)
+		}
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if entry.Path != phase2CompletePathsV1[i] || entry.Path == committedEvidenceManifestPathV1 || !validHelperOwnerSHA256V1(entry.PostSHA256) || (entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" && !validHelperOwnerSHA256V1(entry.PreEvidence)) {
+			return nil, fmt.Errorf("invalid phase2-complete entry %d", i)
+		}
+		actual, err := fileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase2-complete hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validateConvergenceOverlayV1(currentAtPost map[string]string, overlays map[string]helperOwnerOverlayV1) (map[string]string, error) {
 	convergence, ok := overlays[evidenceConvergenceOverlayNameV1]
 	if len(overlays) != 1 || !ok || convergence.Version != evidenceConvergenceOverlayNameV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != 7 {
 		return nil, fmt.Errorf("invalid convergence overlay identity/cardinality")
@@ -611,9 +658,9 @@ func validateConvergenceOverlayV1(root string, overlays map[string]helperOwnerOv
 		if entry.Path != convergencePathsV1[i] || entry.PreSHA256 != convergencePreHashesV1[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
 			return nil, fmt.Errorf("invalid convergence entry %d", i)
 		}
-		actual, err := fileSHA256V1(root, entry.Path)
-		if err != nil || actual != entry.PostSHA256 {
-			return nil, fmt.Errorf("convergence hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		actual := currentAtPost[entry.Path]
+		if actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("convergence hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
 		}
 		result[entry.Path] = entry.PreSHA256
 	}
