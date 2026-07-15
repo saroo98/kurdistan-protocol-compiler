@@ -5,6 +5,8 @@ package runtime
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -1198,20 +1200,8 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 				t.Fatalf("clean tracked WO-050 path missing: %s: %v", path, err)
 			}
 		}
-	} else {
-		if len(changed) != len(allowed) {
-			t.Fatalf("repo status paths=%d want cumulative union=%d", len(changed), len(allowed))
-		}
-		for path := range changed {
-			if !allowed[path] {
-				t.Fatalf("unapproved repository status path: %s", path)
-			}
-		}
-		for path := range allowed {
-			if !changed[path] {
-				t.Fatalf("frozen cumulative status path missing: %s", path)
-			}
-		}
+	} else if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
+		t.Fatal(err)
 	}
 	baselineExportedFunctions := map[string]map[string]bool{
 		"internal/runtime/implementation_support.go": {
@@ -1333,4 +1323,361 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 			t.Fatal("normal memory link gained fault selector")
 		}
 	}
+}
+
+type policyMaintenanceEntryV1 struct {
+	Path       string `json:"path"`
+	PreSHA256  string `json:"pre_sha256"`
+	PostSHA256 string `json:"post_sha256"`
+}
+
+type policyMaintenanceOverlayV1 struct {
+	Version       string                     `json:"version"`
+	SelfPath      string                     `json:"self_path"`
+	SelfPreSHA256 string                     `json:"self_pre_sha256"`
+	Paths         []string                   `json:"paths"`
+	Entries       []policyMaintenanceEntryV1 `json:"entries"`
+}
+
+type policyLayeredOverlayV1 struct {
+	Version                string                     `json:"version"`
+	PredecessorManifestSHA string                     `json:"predecessor_manifest_sha256"`
+	Entries                []policyMaintenanceEntryV1 `json:"entries"`
+}
+
+const policyMaintenanceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
+const policyMaintenanceOverlayNameV1 = "m2-governance-foundation-v1"
+const policyHelperOverlayNameV1 = "m2-governance-foundation-helper-owners-v1"
+const policyHelperOverlayNameV2 = "m2-governance-foundation-helper-owners-v2"
+const policyValidatorOverlayNameV1 = "m2-governance-foundation-validators-v1"
+const policyValidatorConsumerOverlayNameV1 = "m2-governance-foundation-validator-consumer-v1"
+const policyEvidenceConvergenceOverlayNameV1 = "m2-governance-foundation-evidence-convergence-v1"
+
+var policyMaintenancePathsV1 = []string{
+	"README.md", "ROADMAP.md", "docs/GOVERNANCE.md", "docs/safety.md",
+	"internal/audit/security.go", "internal/audit/security_test.go",
+	"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go",
+	policyMaintenanceManifestPathV1,
+}
+
+var policyHelperPathsV1 = []string{"internal/audit/codegen_test.go", "internal/codegen/authorization_v1_test.go", "cmd/kgen/main_test.go"}
+var policyHelperPreV1 = []string{"0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec", "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac", "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d"}
+var policyHelperV1PostV1 = []string{"5e7fff88d4e75aadf0b2306c9d9574b76e13a62c585deeebda53ba6a191832d1", "96e6e30ccfe131cfa0384fc4463ac2f75a4e9d0630179233dc40157f7839f30b", "bad5ffb692075048785a98b0c048761f06003462f1a202660b60bddf4c9103e4"}
+var policyHelperV2PostV1 = []string{"7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0"}
+var policyValidatorPathsV1 = []string{"internal/audit/security.go", "internal/audit/security_test.go", "internal/runtime/policy_enforcement_test.go"}
+var policyValidatorPreV1 = []string{"b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17", "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3", "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136"}
+var policyConvergencePathsV1 = []string{"cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go"}
+var policyConvergencePreV1 = []string{"aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0", "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae", "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9", "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"}
+
+func validatePolicyMaintenanceStatusV1(root string, changed, historical map[string]bool) error {
+	if exactPathSetV1(changed, historical) {
+		return nil
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	if err != nil {
+		return err
+	}
+	var manifest struct {
+		MaintenanceOverlays         map[string]policyMaintenanceOverlayV1 `json:"maintenance_overlays"`
+		HelperOwnerOverlays         map[string]policyLayeredOverlayV1     `json:"helper_owner_overlays"`
+		ValidatorOverlays           map[string]policyLayeredOverlayV1     `json:"validator_overlays"`
+		ValidatorConsumerOverlays   map[string]policyLayeredOverlayV1     `json:"validator_consumer_overlays"`
+		EvidenceConvergenceOverlays map[string]policyLayeredOverlayV1     `json:"evidence_convergence_overlays"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return err
+	}
+	return validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays)
+}
+
+func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maintenanceOverlays map[string]policyMaintenanceOverlayV1, helperOverlays, validatorOverlays, consumerOverlays, convergenceOverlays map[string]policyLayeredOverlayV1) error {
+	currentAtPre, err := validatePolicyConvergenceV1(root, convergenceOverlays)
+	if err != nil {
+		return err
+	}
+	maintenance, ok := maintenanceOverlays[policyMaintenanceOverlayNameV1]
+	if len(maintenanceOverlays) != 1 || !ok || maintenance.Version != policyMaintenanceOverlayNameV1 || maintenance.SelfPath != policyMaintenanceManifestPathV1 || len(maintenance.Paths) != 9 || len(maintenance.Entries) != 8 || !validPolicySHA256V1(maintenance.SelfPreSHA256) {
+		return fmt.Errorf("invalid M2 maintenance overlay")
+	}
+	want := map[string]bool{}
+	for i, path := range policyMaintenancePathsV1 {
+		if maintenance.Paths[i] != path {
+			return fmt.Errorf("M2 maintenance path[%d]=%q want %q", i, maintenance.Paths[i], path)
+		}
+		want[path] = true
+	}
+	if len(helperOverlays) != 2 {
+		return fmt.Errorf("invalid M2 helper overlay count")
+	}
+	v1, ok1 := helperOverlays[policyHelperOverlayNameV1]
+	v2, ok2 := helperOverlays[policyHelperOverlayNameV2]
+	if !ok1 || v1.Version != policyHelperOverlayNameV1 || v1.PredecessorManifestSHA != "b2a95c93332afbc13c73a4bb08e92067db97e93e843cb55e1f191b9c398e3c7b" || len(v1.Entries) != 3 || !ok2 || v2.Version != policyHelperOverlayNameV2 || v2.PredecessorManifestSHA != "7258697b4806469afea99342d981e96b328114036668e874f7c0e5a597a94cc6" || len(v2.Entries) != 3 {
+		return fmt.Errorf("invalid M2 helper overlay identity/cardinality")
+	}
+	for i, path := range policyHelperPathsV1 {
+		oldEntry, newEntry := v1.Entries[i], v2.Entries[i]
+		if oldEntry.Path != path || oldEntry.PreSHA256 != policyHelperPreV1[i] || oldEntry.PostSHA256 != policyHelperV1PostV1[i] || newEntry.Path != path || newEntry.PreSHA256 != oldEntry.PostSHA256 || newEntry.PostSHA256 != policyHelperV2PostV1[i] {
+			return fmt.Errorf("invalid M2 helper overlay entry %d", i)
+		}
+		actual := currentAtPre[path]
+		if actual != newEntry.PostSHA256 {
+			return fmt.Errorf("M2 helper hash drift %s=%s want %s: %v", path, actual, newEntry.PostSHA256, err)
+		}
+		want[path] = true
+	}
+	validators, ok := validatorOverlays[policyValidatorOverlayNameV1]
+	if len(validatorOverlays) != 1 || !ok || validators.Version != policyValidatorOverlayNameV1 || validators.PredecessorManifestSHA != "7924eff0ab8d66440bd370af1c6073ca9dc9beb320ac68acd82748b7f2d4f87b" || len(validators.Entries) != 3 {
+		return fmt.Errorf("invalid M2 validator overlay identity/cardinality")
+	}
+	validatorByPath := map[string]policyMaintenanceEntryV1{}
+	for i, entry := range validators.Entries {
+		if entry.Path != policyValidatorPathsV1[i] || entry.PreSHA256 != policyValidatorPreV1[i] || !validPolicySHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
+			return fmt.Errorf("invalid M2 validator entry %d", i)
+		}
+		actual := currentAtPre[entry.Path]
+		if actual != entry.PostSHA256 {
+			return fmt.Errorf("M2 validator hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		validatorByPath[entry.Path] = entry
+	}
+	consumer, ok := consumerOverlays[policyValidatorConsumerOverlayNameV1]
+	if len(consumerOverlays) != 1 || !ok || consumer.Version != policyValidatorConsumerOverlayNameV1 || consumer.PredecessorManifestSHA != "7924eff0ab8d66440bd370af1c6073ca9dc9beb320ac68acd82748b7f2d4f87b" || len(consumer.Entries) != 1 {
+		return fmt.Errorf("invalid M2 validator-consumer overlay identity/cardinality")
+	}
+	consumerEntry := consumer.Entries[0]
+	if consumerEntry.Path != "internal/testkit/importrules/importrules_test.go" || consumerEntry.PreSHA256 != "3a170c4752fea63a728d55abff9b0c8a7c91e25e0c98d14bdd4c401e3b56a178" || !validPolicySHA256V1(consumerEntry.PostSHA256) || consumerEntry.PostSHA256 == consumerEntry.PreSHA256 {
+		return fmt.Errorf("invalid M2 validator-consumer entry")
+	}
+	actualConsumer := currentAtPre[consumerEntry.Path]
+	if actualConsumer != consumerEntry.PostSHA256 {
+		return fmt.Errorf("M2 validator-consumer hash drift %s=%s want %s: %v", consumerEntry.Path, actualConsumer, consumerEntry.PostSHA256, err)
+	}
+	if !exactPathSetV1(changed, want) {
+		return fmt.Errorf("repository status matches neither historical M0 nor exact composed M2 state: paths=%d", len(changed))
+	}
+	for i, entry := range maintenance.Entries {
+		if entry.Path != policyMaintenancePathsV1[i] || !validPolicySHA256V1(entry.PreSHA256) || !validPolicySHA256V1(entry.PostSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return fmt.Errorf("invalid M2 maintenance entry %d", i)
+		}
+		actual := currentAtPre[entry.Path]
+		if actual == "" {
+			actual, err = policyFileSHA256V1(root, entry.Path)
+		}
+		if err != nil {
+			return err
+		}
+		if validator, layered := validatorByPath[entry.Path]; layered {
+			if validator.PreSHA256 != entry.PostSHA256 || actual != validator.PostSHA256 {
+				return fmt.Errorf("M2 validator chain drift %s", entry.Path)
+			}
+			actual = validator.PreSHA256
+		}
+		if entry.Path == consumerEntry.Path {
+			if actual != consumerEntry.PostSHA256 {
+				return fmt.Errorf("M2 validator-consumer chain drift %s", entry.Path)
+			}
+			actual = consumerEntry.PreSHA256
+		}
+		if actual != entry.PostSHA256 {
+			return fmt.Errorf("M2 maintenance hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
+		}
+	}
+	return nil
+}
+
+func validatePolicyConvergenceV1(root string, overlays map[string]policyLayeredOverlayV1) (map[string]string, error) {
+	convergence, ok := overlays[policyEvidenceConvergenceOverlayNameV1]
+	if len(overlays) != 1 || !ok || convergence.Version != policyEvidenceConvergenceOverlayNameV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != 7 {
+		return nil, fmt.Errorf("invalid convergence overlay identity/cardinality")
+	}
+	result := map[string]string{}
+	for i, entry := range convergence.Entries {
+		if entry.Path != policyConvergencePathsV1[i] || entry.PreSHA256 != policyConvergencePreV1[i] || !validPolicySHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
+			return nil, fmt.Errorf("invalid convergence entry %d", i)
+		}
+		actual, err := policyFileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("convergence hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		result[entry.Path] = entry.PreSHA256
+	}
+	return result, nil
+}
+
+func policyFileSHA256V1(root, path string) (string, error) {
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+}
+
+func validatePolicyM2MaintenanceV1(root string, changed map[string]bool, overlay policyMaintenanceOverlayV1) error {
+	if overlay.Version != policyMaintenanceOverlayNameV1 || overlay.SelfPath != policyMaintenanceManifestPathV1 || len(overlay.Paths) != 9 || len(overlay.Entries) != 8 || !validPolicySHA256V1(overlay.SelfPreSHA256) {
+		return fmt.Errorf("invalid M2 maintenance identity/cardinality")
+	}
+	want := map[string]bool{}
+	for i, path := range policyMaintenancePathsV1 {
+		if overlay.Paths[i] != path {
+			return fmt.Errorf("M2 maintenance path[%d]=%q want %q", i, overlay.Paths[i], path)
+		}
+		want[path] = true
+	}
+	if !exactPathSetV1(changed, want) {
+		return fmt.Errorf("repository status matches neither historical M0 set nor exact M2 maintenance set: paths=%d", len(changed))
+	}
+	for i, entry := range overlay.Entries {
+		if entry.Path != policyMaintenancePathsV1[i] || !validPolicySHA256V1(entry.PreSHA256) || !validPolicySHA256V1(entry.PostSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return fmt.Errorf("invalid M2 maintenance entry %d", i)
+		}
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			return err
+		}
+		actual := fmt.Sprintf("%x", sha256.Sum256(content))
+		if actual != entry.PostSHA256 {
+			return fmt.Errorf("M2 maintenance hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
+		}
+	}
+	return nil
+}
+
+func exactPathSetV1(got, want map[string]bool) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for path := range want {
+		if !got[path] {
+			return false
+		}
+	}
+	return true
+}
+
+func validPolicySHA256V1(value string) bool {
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == sha256.Size && value == strings.ToLower(value) && value != strings.Repeat("0", 64)
+}
+
+func TestPolicyMatrixMaintenanceExactStatesV1(t *testing.T) {
+	root := t.TempDir()
+	overlay := policyMaintenanceOverlayV1{
+		Version: policyMaintenanceOverlayNameV1, SelfPath: policyMaintenanceManifestPathV1, SelfPreSHA256: strings.Repeat("1", 64),
+		Paths: append([]string(nil), policyMaintenancePathsV1...),
+	}
+	changed := map[string]bool{}
+	for _, path := range policyMaintenancePathsV1 {
+		changed[path] = true
+		if path == policyMaintenanceManifestPathV1 {
+			continue
+		}
+		content := []byte("content:" + path)
+		target := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		overlay.Entries = append(overlay.Entries, policyMaintenanceEntryV1{Path: path, PreSHA256: strings.Repeat("2", 64), PostSHA256: fmt.Sprintf("%x", sha256.Sum256(content))})
+	}
+	if err := validatePolicyM2MaintenanceV1(root, changed, overlay); err != nil {
+		t.Fatal(err)
+	}
+	partial := make(map[string]bool, len(changed)-1)
+	for path := range changed {
+		if path != "README.md" {
+			partial[path] = true
+		}
+	}
+	if err := validatePolicyM2MaintenanceV1(root, partial, overlay); err == nil {
+		t.Fatal("partial M2 set accepted")
+	}
+	superset := make(map[string]bool, len(changed)+1)
+	for path := range changed {
+		superset[path] = true
+	}
+	superset["extra"] = true
+	if err := validatePolicyM2MaintenanceV1(root, superset, overlay); err == nil {
+		t.Fatal("M2 superset accepted")
+	}
+	drift := overlay
+	drift.Entries = append([]policyMaintenanceEntryV1(nil), overlay.Entries...)
+	drift.Entries[0].PostSHA256 = strings.Repeat("3", 64)
+	if err := validatePolicyM2MaintenanceV1(root, changed, drift); err == nil || !strings.Contains(err.Error(), "hash drift") {
+		t.Fatalf("M2 content drift error=%v", err)
+	}
+}
+
+func TestPolicyMatrixComposedM2ExactStatesV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		MaintenanceOverlays         map[string]policyMaintenanceOverlayV1 `json:"maintenance_overlays"`
+		HelperOwnerOverlays         map[string]policyLayeredOverlayV1     `json:"helper_owner_overlays"`
+		ValidatorOverlays           map[string]policyLayeredOverlayV1     `json:"validator_overlays"`
+		ValidatorConsumerOverlays   map[string]policyLayeredOverlayV1     `json:"validator_consumer_overlays"`
+		EvidenceConvergenceOverlays map[string]policyLayeredOverlayV1     `json:"evidence_convergence_overlays"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	changed := map[string]bool{}
+	for _, path := range append(append([]string(nil), policyMaintenancePathsV1...), policyHelperPathsV1...) {
+		changed[path] = true
+	}
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays); err != nil {
+		t.Fatal(err)
+	}
+	partial := clonePathSetV1(changed)
+	delete(partial, policyHelperPathsV1[0])
+	if err := validatePolicyM2ComposedStateV1(root, partial, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays); err == nil {
+		t.Fatal("composed M2 subset accepted")
+	}
+	superset := clonePathSetV1(changed)
+	superset["extra"] = true
+	if err := validatePolicyM2ComposedStateV1(root, superset, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays); err == nil {
+		t.Fatal("composed M2 superset accepted")
+	}
+	badHelpers := clonePolicyLayeredOverlaysV1(manifest.HelperOwnerOverlays)
+	v2 := badHelpers[policyHelperOverlayNameV2]
+	v2.Entries[0], v2.Entries[1] = v2.Entries[1], v2.Entries[0]
+	badHelpers[policyHelperOverlayNameV2] = v2
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, badHelpers, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays); err == nil {
+		t.Fatal("reordered helper overlay accepted")
+	}
+	badValidators := clonePolicyLayeredOverlaysV1(manifest.ValidatorOverlays)
+	validator := badValidators[policyValidatorOverlayNameV1]
+	validator.Entries[0].PostSHA256 = strings.Repeat("3", 64)
+	badValidators[policyValidatorOverlayNameV1] = validator
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, badValidators, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays); err == nil {
+		t.Fatal("drifted validator overlay accepted")
+	}
+	badConsumers := clonePolicyLayeredOverlaysV1(manifest.ValidatorConsumerOverlays)
+	consumer := badConsumers[policyValidatorConsumerOverlayNameV1]
+	consumer.Entries[0].PreSHA256 = strings.Repeat("4", 64)
+	badConsumers[policyValidatorConsumerOverlayNameV1] = consumer
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, badConsumers, manifest.EvidenceConvergenceOverlays); err == nil {
+		t.Fatal("drifted validator-consumer overlay accepted")
+	}
+}
+
+func clonePathSetV1(source map[string]bool) map[string]bool {
+	clone := make(map[string]bool, len(source))
+	for path, present := range source {
+		clone[path] = present
+	}
+	return clone
+}
+
+func clonePolicyLayeredOverlaysV1(source map[string]policyLayeredOverlayV1) map[string]policyLayeredOverlayV1 {
+	clone := make(map[string]policyLayeredOverlayV1, len(source))
+	for name, overlay := range source {
+		overlay.Entries = append([]policyMaintenanceEntryV1(nil), overlay.Entries...)
+		clone[name] = overlay
+	}
+	return clone
 }

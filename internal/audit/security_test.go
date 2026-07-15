@@ -152,6 +152,12 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 	if got := result.Details["maintenance_union_file_count"]; got != 14 {
 		t.Fatalf("maintenance union files=%v", got)
 	}
+	if got := result.Details["m2_maintenance_overlay"]; got != m2MaintenanceOverlayV1 {
+		t.Fatalf("M2 maintenance overlay=%v", got)
+	}
+	if got := result.Details["m2_maintenance_paths"]; !reflect.DeepEqual(got, m2MaintenancePathsV1) {
+		t.Fatalf("M2 maintenance paths=%v", got)
+	}
 	wantTouches := []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"}
 	if got := result.Details["wo014_allowed_touches"]; !reflect.DeepEqual(got, wantTouches) {
 		t.Fatalf("allowed touches=%v", got)
@@ -269,7 +275,11 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 
-	manifest, err := m0CandidateManifestFromPathsV1(fixture, paths)
+	preHashes, err := loadM2MaintenancePreHashesV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, paths, preHashes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,14 +298,14 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	withUnlisted := append(append([]string(nil), paths...), unlisted)
-	unlistedManifest, err := m0CandidateManifestFromPathsV1(fixture, withUnlisted)
+	unlistedManifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, withUnlisted, preHashes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if unlistedManifest.OutsideScopeFileCount != manifest.OutsideScopeFileCount+1 || unlistedManifest.OutsideScopeSHA256 == manifest.OutsideScopeSHA256 {
 		t.Fatalf("unlisted tracked path was excluded: before=%+v after=%+v", manifest, unlistedManifest)
 	}
-	if _, err := m0CandidateManifestFromPathsV1(fixture, paths[:len(paths)-1]); err == nil || !strings.Contains(err.Error(), "maintenance paths missing") {
+	if _, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, paths[:len(paths)-1], preHashes); err == nil || !strings.Contains(err.Error(), "maintenance paths missing") {
 		t.Fatalf("missing maintenance path error=%v", err)
 	}
 	driftPath := filepath.Join(fixture, filepath.FromSlash(paths[0]))
@@ -304,6 +314,208 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	}
 	if _, err := m0CandidateManifestFromPathsV1(fixture, paths); err == nil || !strings.Contains(err.Error(), "maintenance hash drift cmd/gate/main.go") {
 		t.Fatalf("maintenance hash drift error=%v", err)
+	}
+}
+
+func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := loadM2MaintenancePreHashesV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pre) != 12 || pre[m2MaintenanceSelfPathV1] != m0WO058MaintenanceHashesV1[m2MaintenanceSelfPathV1] {
+		t.Fatalf("M2 pre-hash overlay=%v", pre)
+	}
+	for path, want := range map[string]string{
+		"README.md":          "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
+		"ROADMAP.md":         "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
+		"docs/GOVERNANCE.md": "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
+		"docs/safety.md":     "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
+	} {
+		if pre[path] != want {
+			t.Fatalf("M2 pre-hash %s=%s want %s", path, pre[path], want)
+		}
+	}
+
+	fixture := t.TempDir()
+	fixturePaths := append(append([]string(nil), m2MaintenancePathsV1...), m2HelperPathsV1...)
+	for _, path := range fixturePaths {
+		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		target := filepath.Join(fixture, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err != nil {
+		t.Fatal(err)
+	}
+	drift := filepath.Join(fixture, "README.md")
+	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 maintenance hash drift README.md") {
+		t.Fatalf("changed listed content error=%v", err)
+	}
+	if err := os.Remove(drift); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 maintenance path README.md") {
+		t.Fatalf("missing listed path error=%v", err)
+	}
+
+	original := m0WO058MaintenanceHashesV1["cmd/gate/main.go"]
+	m0WO058MaintenanceHashesV1["cmd/gate/main.go"] = strings.Repeat("1", 64)
+	t.Cleanup(func() { m0WO058MaintenanceHashesV1["cmd/gate/main.go"] = original })
+	if _, err := m0CandidateManifestFromPathsWithPreHashesV1(root, []string{"cmd/gate/main.go"}, nil); err == nil || !strings.Contains(err.Error(), "maintenance hash drift") {
+		t.Fatalf("altered historical value error=%v", err)
+	}
+}
+
+func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := t.TempDir()
+	for _, path := range append(append([]string(nil), m2MaintenancePathsV1...), m2HelperPathsV1...) {
+		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		target := filepath.Join(fixture, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	base := manifest.ValidatorOverlays[m2ValidatorOverlayV1]
+	mutations := []func(*m2LayeredOverlayV1){
+		func(v *m2LayeredOverlayV1) { v.Version = "wrong" },
+		func(v *m2LayeredOverlayV1) { v.PredecessorManifestSHA = strings.Repeat("1", 64) },
+		func(v *m2LayeredOverlayV1) { v.Entries = v.Entries[:2] },
+		func(v *m2LayeredOverlayV1) { v.Entries = append(v.Entries, m2MaintenanceEntryV1{}) },
+		func(v *m2LayeredOverlayV1) { v.Entries[0], v.Entries[1] = v.Entries[1], v.Entries[0] },
+		func(v *m2LayeredOverlayV1) { v.Entries[0].PreSHA256 = strings.Repeat("2", 64) },
+		func(v *m2LayeredOverlayV1) { v.Entries[0].PostSHA256 = strings.Repeat("3", 64) },
+	}
+	for i, mutate := range mutations {
+		copyManifest := manifest
+		copyOverlay := base
+		copyOverlay.Entries = append([]m2MaintenanceEntryV1(nil), base.Entries...)
+		mutate(&copyOverlay)
+		copyManifest.ValidatorOverlays = map[string]m2LayeredOverlayV1{m2ValidatorOverlayV1: copyOverlay}
+		encoded, err := json.Marshal(copyManifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+			t.Fatalf("validator overlay mutation %d accepted", i)
+		}
+	}
+	copyManifest := manifest
+	consumer := manifest.ValidatorConsumerOverlays[m2ValidatorConsumerOverlayV1]
+	consumer.Entries = append([]m2MaintenanceEntryV1(nil), consumer.Entries...)
+	consumer.Entries[0].PreSHA256 = strings.Repeat("4", 64)
+	copyManifest.ValidatorConsumerOverlays = map[string]m2LayeredOverlayV1{m2ValidatorConsumerOverlayV1: consumer}
+	encoded, err := json.Marshal(copyManifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+		t.Fatal("validator-consumer mutation accepted")
+	}
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	driftPath := filepath.Join(fixture, filepath.FromSlash(m2ValidatorPathsV1[0]))
+	if err := os.WriteFile(driftPath, []byte("validator drift"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "hash drift") {
+		t.Fatalf("validator content drift error=%v", err)
+	}
+}
+
+func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := t.TempDir()
+	for _, path := range append(append([]string(nil), m2MaintenancePathsV1...), m2HelperPathsV1...) {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := filepath.Join(fixture, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	base := manifest.EvidenceConvergenceOverlays[m2EvidenceConvergenceOverlayV1]
+	mutations := []func(*m2LayeredOverlayV1){
+		func(v *m2LayeredOverlayV1) { v.Version = "wrong" },
+		func(v *m2LayeredOverlayV1) { v.PredecessorManifestSHA = strings.Repeat("1", 64) },
+		func(v *m2LayeredOverlayV1) { v.Entries = v.Entries[:6] },
+		func(v *m2LayeredOverlayV1) { v.Entries = append(v.Entries, m2MaintenanceEntryV1{}) },
+		func(v *m2LayeredOverlayV1) { v.Entries[0], v.Entries[1] = v.Entries[1], v.Entries[0] },
+		func(v *m2LayeredOverlayV1) { v.Entries[0].PreSHA256 = strings.Repeat("2", 64) },
+		func(v *m2LayeredOverlayV1) { v.Entries[0].PostSHA256 = strings.Repeat("3", 64) },
+	}
+	for i, mutate := range mutations {
+		copyManifest := manifest
+		copyOverlay := base
+		copyOverlay.Entries = append([]m2MaintenanceEntryV1(nil), base.Entries...)
+		mutate(&copyOverlay)
+		copyManifest.EvidenceConvergenceOverlays = map[string]m2LayeredOverlayV1{m2EvidenceConvergenceOverlayV1: copyOverlay}
+		encoded, err := json.Marshal(copyManifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+			t.Fatalf("convergence mutation %d accepted", i)
+		}
 	}
 }
 

@@ -153,5 +153,188 @@
         "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
       }
     ]
+  },
+  "maintenance_overlays": {
+    "m2-governance-foundation-v1": {
+      "version": "m2-governance-foundation-v1",
+      "self_path": "testdata/evidence/phase1-m0-committed-sha256.json",
+      "self_pre_sha256": "4400e503524d1277329f893be0773dee202d5108265f62d22830e09fc8f8fa53",
+      "paths": [
+        "README.md",
+        "ROADMAP.md",
+        "docs/GOVERNANCE.md",
+        "docs/safety.md",
+        "internal/audit/security.go",
+        "internal/audit/security_test.go",
+        "internal/runtime/policy_enforcement_test.go",
+        "internal/testkit/importrules/importrules_test.go",
+        "testdata/evidence/phase1-m0-committed-sha256.json"
+      ],
+      "entries": [
+        {
+          "path": "README.md",
+          "pre_sha256": "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
+          "post_sha256": "2014b1d01767cd945f1a8196f90c327ceeadbf50da69eb5185cdd215d85f29d2"
+        },
+        {
+          "path": "ROADMAP.md",
+          "pre_sha256": "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
+          "post_sha256": "77e6ded9aebca49b2d57138860c4b9131ae2e93683b6d59c858506862a47cc85"
+        },
+        {
+          "path": "docs/GOVERNANCE.md",
+          "pre_sha256": "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
+          "post_sha256": "3d12024c334399629bed5f9f4e41b21b3639aeab96448770e49609268010b3b6"
+        },
+        {
+          "path": "docs/safety.md",
+          "pre_sha256": "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
+          "post_sha256": "2fd18a43301b48f2f0cc43c542de044989173e0cae756bd417751ce0599454b8"
+        },
+        {
+          "path": "internal/audit/security.go",
+          "pre_sha256": "18a050fdb8278db4ab71c61974d08db75e200a4e451067ab66ca669ade9543ea",
+          "post_sha256": "b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17"
+        },
+        {
+          "path": "internal/audit/security_test.go",
+          "pre_sha256": "3ecb03c06bceae8ba073755a02d56a45fdfbb1899342958b1057214b304bf053",
+          "post_sha256": "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3"
+        },
+        {
+          "path": "internal/runtime/policy_enforcement_test.go",
+          "pre_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4",
+          "post_sha256": "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136"
+        },
+        {
+          "path": "internal/testkit/importrules/importrules_test.go",
+          "pre_sha256": "1128d762990de6bac542df8afbbb08de06cc726c1117ecf55ec8feb69edfe167",
+          "post_sha256": "3a170c4752fea63a728d55abff9b0c8a7c91e25e0c98d14bdd4c401e3b56a178"
+        }
+      ]
+    }
+  },
+  "helper_owner_overlays": {
+    "m2-governance-foundation-helper-owners-v1": {
+      "version": "m2-governance-foundation-helper-owners-v1",
+      "predecessor_manifest_sha256": "b2a95c93332afbc13c73a4bb08e92067db97e93e843cb55e1f191b9c398e3c7b",
+      "entries": [
+        {
+          "path": "internal/audit/codegen_test.go",
+          "pre_sha256": "0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec",
+          "post_sha256": "5e7fff88d4e75aadf0b2306c9d9574b76e13a62c585deeebda53ba6a191832d1"
+        },
+        {
+          "path": "internal/codegen/authorization_v1_test.go",
+          "pre_sha256": "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac",
+          "post_sha256": "96e6e30ccfe131cfa0384fc4463ac2f75a4e9d0630179233dc40157f7839f30b"
+        },
+        {
+          "path": "cmd/kgen/main_test.go",
+          "pre_sha256": "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d",
+          "post_sha256": "bad5ffb692075048785a98b0c048761f06003462f1a202660b60bddf4c9103e4"
+        }
+      ]
+    },
+    "m2-governance-foundation-helper-owners-v2": {
+      "version": "m2-governance-foundation-helper-owners-v2",
+      "predecessor_manifest_sha256": "7258697b4806469afea99342d981e96b328114036668e874f7c0e5a597a94cc6",
+      "entries": [
+        {
+          "path": "internal/audit/codegen_test.go",
+          "pre_sha256": "5e7fff88d4e75aadf0b2306c9d9574b76e13a62c585deeebda53ba6a191832d1",
+          "post_sha256": "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d"
+        },
+        {
+          "path": "internal/codegen/authorization_v1_test.go",
+          "pre_sha256": "96e6e30ccfe131cfa0384fc4463ac2f75a4e9d0630179233dc40157f7839f30b",
+          "post_sha256": "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935"
+        },
+        {
+          "path": "cmd/kgen/main_test.go",
+          "pre_sha256": "bad5ffb692075048785a98b0c048761f06003462f1a202660b60bddf4c9103e4",
+          "post_sha256": "aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0"
+        }
+      ]
+    }
+  },
+  "validator_overlays": {
+    "m2-governance-foundation-validators-v1": {
+      "version": "m2-governance-foundation-validators-v1",
+      "predecessor_manifest_sha256": "7924eff0ab8d66440bd370af1c6073ca9dc9beb320ac68acd82748b7f2d4f87b",
+      "entries": [
+        {
+          "path": "internal/audit/security.go",
+          "pre_sha256": "b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17",
+          "post_sha256": "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae"
+        },
+        {
+          "path": "internal/audit/security_test.go",
+          "pre_sha256": "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3",
+          "post_sha256": "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3"
+        },
+        {
+          "path": "internal/runtime/policy_enforcement_test.go",
+          "pre_sha256": "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136",
+          "post_sha256": "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9"
+        }
+      ]
+    }
+  },
+  "validator_consumer_overlays": {
+    "m2-governance-foundation-validator-consumer-v1": {
+      "version": "m2-governance-foundation-validator-consumer-v1",
+      "predecessor_manifest_sha256": "7924eff0ab8d66440bd370af1c6073ca9dc9beb320ac68acd82748b7f2d4f87b",
+      "entries": [
+        {
+          "path": "internal/testkit/importrules/importrules_test.go",
+          "pre_sha256": "3a170c4752fea63a728d55abff9b0c8a7c91e25e0c98d14bdd4c401e3b56a178",
+          "post_sha256": "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"
+        }
+      ]
+    }
+  },
+  "evidence_convergence_overlays": {
+    "m2-governance-foundation-evidence-convergence-v1": {
+      "version": "m2-governance-foundation-evidence-convergence-v1",
+      "predecessor_manifest_sha256": "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e",
+      "entries": [
+        {
+          "path": "cmd/kgen/main_test.go",
+          "pre_sha256": "aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0",
+          "post_sha256": "145b6178b15e2643e19088aa13b8bb165f8daab334fb24a2d997f17ac48c89eb"
+        },
+        {
+          "path": "internal/audit/codegen_test.go",
+          "pre_sha256": "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d",
+          "post_sha256": "5199cc064f1f82dfde17038d5b3992c97899326bd4c784652fc5a3cb9c4fe178"
+        },
+        {
+          "path": "internal/audit/security.go",
+          "pre_sha256": "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae",
+          "post_sha256": "1618099829b998592f37c0af03ff735d20addf275268280ec2f300ee3eef8f4b"
+        },
+        {
+          "path": "internal/audit/security_test.go",
+          "pre_sha256": "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3",
+          "post_sha256": "1d5e106e7e48852a1372f52309327a608f9ab2a1c2a1603e8417b8e25a0d0d95"
+        },
+        {
+          "path": "internal/codegen/authorization_v1_test.go",
+          "pre_sha256": "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935",
+          "post_sha256": "89f0ee4f6932212c642d7c200ce13bdcfd2d9db9f341aca198d774fee4a68198"
+        },
+        {
+          "path": "internal/runtime/policy_enforcement_test.go",
+          "pre_sha256": "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9",
+          "post_sha256": "be0188227f3aba3024b0ef789933d37371f059dfc742d6a9e787ecf685d22a64"
+        },
+        {
+          "path": "internal/testkit/importrules/importrules_test.go",
+          "pre_sha256": "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f",
+          "post_sha256": "164b35bee5ce9c38a01f88118436aa9235729b31c323f75453ccff0537f66c23"
+        }
+      ]
+    }
   }
 }

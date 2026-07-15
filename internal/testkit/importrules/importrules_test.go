@@ -933,11 +933,59 @@ func TestVersionMigrationBoundaryDeterministicPostScopeManifestV1(t *testing.T) 
 const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
 
 type committedEvidenceManifestV1 struct {
-	Schema          string                                `json:"schema"`
-	HashAlgorithm   string                                `json:"hash_algorithm"`
-	SourceCandidate string                                `json:"source_candidate"`
-	Sets            map[string][]committedEvidenceEntryV1 `json:"sets"`
+	Schema                      string                                   `json:"schema"`
+	HashAlgorithm               string                                   `json:"hash_algorithm"`
+	SourceCandidate             string                                   `json:"source_candidate"`
+	Sets                        map[string][]committedEvidenceEntryV1    `json:"sets"`
+	MaintenanceOverlays         map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
+	HelperOwnerOverlays         map[string]committedLayeredOverlayV1     `json:"helper_owner_overlays"`
+	ValidatorOverlays           map[string]committedLayeredOverlayV1     `json:"validator_overlays"`
+	ValidatorConsumerOverlays   map[string]committedLayeredOverlayV1     `json:"validator_consumer_overlays"`
+	EvidenceConvergenceOverlays map[string]committedLayeredOverlayV1     `json:"evidence_convergence_overlays"`
 }
+
+type committedMaintenanceOverlayV1 struct {
+	Version       string                        `json:"version"`
+	SelfPath      string                        `json:"self_path"`
+	SelfPreSHA256 string                        `json:"self_pre_sha256"`
+	Paths         []string                      `json:"paths"`
+	Entries       []committedMaintenanceEntryV1 `json:"entries"`
+}
+
+type committedMaintenanceEntryV1 struct {
+	Path       string `json:"path"`
+	PreSHA256  string `json:"pre_sha256"`
+	PostSHA256 string `json:"post_sha256"`
+}
+
+type committedLayeredOverlayV1 struct {
+	Version                string                        `json:"version"`
+	PredecessorManifestSHA string                        `json:"predecessor_manifest_sha256"`
+	Entries                []committedMaintenanceEntryV1 `json:"entries"`
+}
+
+const m2MaintenanceOverlayNameV1 = "m2-governance-foundation-v1"
+const m2HelperOverlayNameV1 = "m2-governance-foundation-helper-owners-v1"
+const m2HelperOverlayNameV2 = "m2-governance-foundation-helper-owners-v2"
+const m2ValidatorOverlayNameV1 = "m2-governance-foundation-validators-v1"
+const m2ValidatorConsumerOverlayNameV1 = "m2-governance-foundation-validator-consumer-v1"
+const m2EvidenceConvergenceOverlayNameV1 = "m2-governance-foundation-evidence-convergence-v1"
+
+var m2MaintenanceExactPathsV1 = []string{
+	"README.md", "ROADMAP.md", "docs/GOVERNANCE.md", "docs/safety.md",
+	"internal/audit/security.go", "internal/audit/security_test.go",
+	"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go",
+	committedEvidenceManifestPathV1,
+}
+
+var m2HelperExactPathsV1 = []string{"internal/audit/codegen_test.go", "internal/codegen/authorization_v1_test.go", "cmd/kgen/main_test.go"}
+var m2HelperPreV1 = []string{"0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec", "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac", "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d"}
+var m2HelperV1PostV1 = []string{"5e7fff88d4e75aadf0b2306c9d9574b76e13a62c585deeebda53ba6a191832d1", "96e6e30ccfe131cfa0384fc4463ac2f75a4e9d0630179233dc40157f7839f30b", "bad5ffb692075048785a98b0c048761f06003462f1a202660b60bddf4c9103e4"}
+var m2HelperV2PostV1 = []string{"7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0"}
+var m2ValidatorExactPathsV1 = []string{"internal/audit/security.go", "internal/audit/security_test.go", "internal/runtime/policy_enforcement_test.go"}
+var m2ValidatorPreV1 = []string{"b5be3c78bf856be24b92751f21fe54c7cb4a197c9f68aa7bf10d1129e6ba5c17", "b7449bc1148e01edaadfffed21626f0acc45c1fd114d606bf9abe4275a5a56e3", "a799b17b7218f806217ca551bb8807d380d193206c7151dab96add53affe0136"}
+var m2ConvergencePathsV1 = []string{"cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go"}
+var m2ConvergencePreV1 = []string{"aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0", "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae", "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9", "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"}
 
 type committedEvidenceEntryV1 struct {
 	Path        string `json:"path"`
@@ -962,6 +1010,10 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 	}
 	if manifest.Schema != "kurdistan.phase1-m0.committed-sha256.v1" || manifest.HashAlgorithm != "sha256" || manifest.SourceCandidate != "cad48bb4be28a09a6293944f78724d7026de4c12" {
 		t.Fatalf("invalid committed evidence manifest identity: %+v", manifest)
+	}
+	historicalByPath, err := validateCommittedEvidenceOverlaysV1(root, manifest)
+	if err != nil {
+		t.Fatal(err)
 	}
 	requiredSets := map[string]bool{"WO-040": true, "WO-041": true, "WO-042": true, "WO-043": true, "WO-044": true}
 	if len(manifest.Sets) != len(requiredSets) {
@@ -1000,10 +1052,186 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 		}
 		sum := sha256.Sum256(current)
 		post := hex.EncodeToString(sum[:])
+		if historical, maintained := historicalByPath[entry.Path]; maintained {
+			post = historical
+		}
 		if post != entry.PostSHA256 {
 			t.Fatalf("%s committed SHA-256 %s=%s want %s", set, entry.Path, post, entry.PostSHA256)
 		}
 		t.Logf("%s-SHA256 %s pre=%s post=%s", set, entry.Path, entry.PreEvidence, post)
+	}
+}
+
+func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
+	currentAtPre, err := validateCommittedConvergenceV1(root, manifest.EvidenceConvergenceOverlays)
+	if err != nil {
+		return nil, err
+	}
+	overlay, ok := manifest.MaintenanceOverlays[m2MaintenanceOverlayNameV1]
+	if len(manifest.MaintenanceOverlays) != 1 || !ok {
+		return nil, fmt.Errorf("invalid maintenance overlays")
+	}
+	if overlay.Version != m2MaintenanceOverlayNameV1 || overlay.SelfPath != committedEvidenceManifestPathV1 || len(overlay.Paths) != len(m2MaintenanceExactPathsV1) || len(overlay.Entries) != len(m2MaintenanceExactPathsV1)-1 {
+		return nil, fmt.Errorf("invalid M2 maintenance overlay identity/cardinality")
+	}
+	if !validCommittedSHA256V1(overlay.SelfPreSHA256) {
+		return nil, fmt.Errorf("invalid M2 self pre-hash")
+	}
+	for i, path := range m2MaintenanceExactPathsV1 {
+		if overlay.Paths[i] != path {
+			return nil, fmt.Errorf("M2 maintenance path[%d]=%q want %q", i, overlay.Paths[i], path)
+		}
+	}
+	if len(manifest.HelperOwnerOverlays) != 2 {
+		return nil, fmt.Errorf("invalid helper overlay count")
+	}
+	helperV1, ok1 := manifest.HelperOwnerOverlays[m2HelperOverlayNameV1]
+	helperV2, ok2 := manifest.HelperOwnerOverlays[m2HelperOverlayNameV2]
+	if !ok1 || helperV1.Version != m2HelperOverlayNameV1 || helperV1.PredecessorManifestSHA != "b2a95c93332afbc13c73a4bb08e92067db97e93e843cb55e1f191b9c398e3c7b" || len(helperV1.Entries) != 3 || !ok2 || helperV2.Version != m2HelperOverlayNameV2 || helperV2.PredecessorManifestSHA != "7258697b4806469afea99342d981e96b328114036668e874f7c0e5a597a94cc6" || len(helperV2.Entries) != 3 {
+		return nil, fmt.Errorf("invalid helper overlay identity/cardinality")
+	}
+	historical := map[string]string{overlay.SelfPath: overlay.SelfPreSHA256}
+	for i, path := range m2HelperExactPathsV1 {
+		oldEntry, newEntry := helperV1.Entries[i], helperV2.Entries[i]
+		if oldEntry.Path != path || oldEntry.PreSHA256 != m2HelperPreV1[i] || oldEntry.PostSHA256 != m2HelperV1PostV1[i] || newEntry.Path != path || newEntry.PreSHA256 != oldEntry.PostSHA256 || newEntry.PostSHA256 != m2HelperV2PostV1[i] {
+			return nil, fmt.Errorf("invalid helper overlay entry %d", i)
+		}
+		actual := currentAtPre[path]
+		if actual != newEntry.PostSHA256 {
+			return nil, fmt.Errorf("helper hash drift %s=%s want %s: %v", path, actual, newEntry.PostSHA256, err)
+		}
+		historical[path] = oldEntry.PreSHA256
+	}
+	validators, ok := manifest.ValidatorOverlays[m2ValidatorOverlayNameV1]
+	if len(manifest.ValidatorOverlays) != 1 || !ok || validators.Version != m2ValidatorOverlayNameV1 || validators.PredecessorManifestSHA != "7924eff0ab8d66440bd370af1c6073ca9dc9beb320ac68acd82748b7f2d4f87b" || len(validators.Entries) != 3 {
+		return nil, fmt.Errorf("invalid validator overlay identity/cardinality")
+	}
+	validatorByPath := map[string]committedMaintenanceEntryV1{}
+	for i, entry := range validators.Entries {
+		if entry.Path != m2ValidatorExactPathsV1[i] || entry.PreSHA256 != m2ValidatorPreV1[i] || !validCommittedSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
+			return nil, fmt.Errorf("invalid validator entry %d", i)
+		}
+		actual := currentAtPre[entry.Path]
+		if actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("validator hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		validatorByPath[entry.Path] = entry
+	}
+	consumer, ok := manifest.ValidatorConsumerOverlays[m2ValidatorConsumerOverlayNameV1]
+	if len(manifest.ValidatorConsumerOverlays) != 1 || !ok || consumer.Version != m2ValidatorConsumerOverlayNameV1 || !validCommittedSHA256V1(consumer.PredecessorManifestSHA) || len(consumer.Entries) != 1 {
+		return nil, fmt.Errorf("invalid validator-consumer overlay identity/cardinality")
+	}
+	consumerEntry := consumer.Entries[0]
+	if consumerEntry.Path != "internal/testkit/importrules/importrules_test.go" || consumerEntry.PreSHA256 != "3a170c4752fea63a728d55abff9b0c8a7c91e25e0c98d14bdd4c401e3b56a178" || !validCommittedSHA256V1(consumerEntry.PostSHA256) || consumerEntry.PostSHA256 == consumerEntry.PreSHA256 {
+		return nil, fmt.Errorf("invalid validator-consumer entry")
+	}
+	actualConsumer := currentAtPre[consumerEntry.Path]
+	if actualConsumer != consumerEntry.PostSHA256 {
+		return nil, fmt.Errorf("validator-consumer hash drift %s=%s want %s: %v", consumerEntry.Path, actualConsumer, consumerEntry.PostSHA256, err)
+	}
+	for i, entry := range overlay.Entries {
+		if entry.Path != m2MaintenanceExactPathsV1[i] || entry.Path == overlay.SelfPath || !validCommittedSHA256V1(entry.PreSHA256) || !validCommittedSHA256V1(entry.PostSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid M2 maintenance entry %d", i)
+		}
+		actual := currentAtPre[entry.Path]
+		if actual == "" {
+			actual, err = committedFileSHA256V1(root, entry.Path)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("M2 maintenance path %s: %w", entry.Path, err)
+		}
+		if validator, layered := validatorByPath[entry.Path]; layered {
+			if validator.PreSHA256 != entry.PostSHA256 || actual != validator.PostSHA256 {
+				return nil, fmt.Errorf("validator chain drift %s", entry.Path)
+			}
+			actual = validator.PreSHA256
+		}
+		if entry.Path == consumerEntry.Path {
+			if consumerEntry.PreSHA256 != entry.PostSHA256 || actual != consumerEntry.PostSHA256 {
+				return nil, fmt.Errorf("validator-consumer chain drift %s", entry.Path)
+			}
+			actual = consumerEntry.PreSHA256
+		}
+		if actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M2 maintenance hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
+		}
+		historical[entry.Path] = entry.PreSHA256
+	}
+	return historical, nil
+}
+
+func validateCommittedConvergenceV1(root string, overlays map[string]committedLayeredOverlayV1) (map[string]string, error) {
+	convergence, ok := overlays[m2EvidenceConvergenceOverlayNameV1]
+	if len(overlays) != 1 || !ok || convergence.Version != m2EvidenceConvergenceOverlayNameV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != 7 {
+		return nil, fmt.Errorf("invalid convergence overlay identity/cardinality")
+	}
+	result := map[string]string{}
+	for i, entry := range convergence.Entries {
+		if entry.Path != m2ConvergencePathsV1[i] || entry.PreSHA256 != m2ConvergencePreV1[i] || !validCommittedSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
+			return nil, fmt.Errorf("invalid convergence entry %d", i)
+		}
+		actual, err := committedFileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("convergence hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		result[entry.Path] = entry.PreSHA256
+	}
+	return result, nil
+}
+
+func committedFileSHA256V1(root, path string) (string, error) {
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+}
+
+func validCommittedSHA256V1(value string) bool {
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == sha256.Size && value == strings.ToLower(value) && value != strings.Repeat("0", 64)
+}
+
+func TestM2MaintenanceOverlayExactContentAndMutationsV1(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest committedEvidenceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	overlay := manifest.MaintenanceOverlays[m2MaintenanceOverlayNameV1]
+	if _, err := validateCommittedEvidenceOverlaysV1(root, manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	missing := overlay
+	missing.Paths = append([]string(nil), overlay.Paths[:len(overlay.Paths)-1]...)
+	missingManifest := manifest
+	missingManifest.MaintenanceOverlays = map[string]committedMaintenanceOverlayV1{m2MaintenanceOverlayNameV1: missing}
+	if _, err := validateCommittedEvidenceOverlaysV1(root, missingManifest); err == nil {
+		t.Fatal("missing M2 path accepted")
+	}
+	extra := overlay
+	extra.Paths = append(append([]string(nil), overlay.Paths...), "extra.md")
+	extraManifest := manifest
+	extraManifest.MaintenanceOverlays = map[string]committedMaintenanceOverlayV1{m2MaintenanceOverlayNameV1: extra}
+	if _, err := validateCommittedEvidenceOverlaysV1(root, extraManifest); err == nil {
+		t.Fatal("extra M2 path accepted")
+	}
+	drift := overlay
+	drift.Entries = append([]committedMaintenanceEntryV1(nil), overlay.Entries...)
+	drift.Entries[0].PostSHA256 = strings.Repeat("1", 64)
+	driftManifest := manifest
+	driftManifest.MaintenanceOverlays = map[string]committedMaintenanceOverlayV1{m2MaintenanceOverlayNameV1: drift}
+	if _, err := validateCommittedEvidenceOverlaysV1(root, driftManifest); err == nil || !strings.Contains(err.Error(), "hash drift") {
+		t.Fatalf("changed M2 content error=%v", err)
+	}
+	historical := manifest.Sets["WO-044"][4]
+	if historical.PostSHA256 != "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b" {
+		t.Fatalf("historical README binding changed: %+v", historical)
 	}
 }
 
