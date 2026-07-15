@@ -41,6 +41,17 @@ capabilities fall into three classes:
 
 Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The security and runtime `*_mutant_detection` gates measure bounded real lab fault-injection detector sensitivity with paired controls: they show that named detectors turn red for deliberate lab faults while their paired controls stay green. They do not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
 
+## Current governed milestone: M2
+
+M2 is a governance foundation for documentation and design contracts only. It
+may clarify product boundaries and evolve deterministic, local-only
+`[model]`/`[plan]` contracts, but it does not authorize source/runtime product
+behavior, an Android application, VPN/TUN or proxy operation, relay or operator
+services, non-loopback networking, telemetry, deployment, or production
+cryptography. The running system remains the lab-only compiler, runtime harness,
+generator, and audit surface described here. Any M3-or-later implementation
+requires its own scoped review and fresh authorization.
+
 ## Why This Project Exists
 
 Many censorship-resistant networking systems and pluggable transports must defend against protocol fingerprinting, traffic analysis, probing, and active interference. Fixed protocol families can develop recognizable signatures over time, even when payload encryption is correct.

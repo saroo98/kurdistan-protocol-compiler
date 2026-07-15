@@ -47,6 +47,24 @@ current committed bytes.
 whenever the audit gate set or its results change, so the committed status
 always reflects the code.
 
+## M2 product-governance boundary
+
+M2 authorizes documentation and deterministic, local-only design-contract work
+that keeps the repository's product boundaries explicit and testable. It does
+not authorize source/runtime product behavior, an Android application,
+VPN/TUN or proxy operation, relay or operator services, non-loopback
+networking, telemetry, deployment, credentials, production key management, or
+production cryptography. The current runtime remains the lab-only compiler,
+runtime harness, generator, and audit system; `[model]` and `[plan]` surfaces do
+not become `[live]` because their governance is documented.
+
+Work stays in a milestone-specific branch rooted at the reviewed `main`
+baseline. Each milestone declares its exact paths and validation before edits,
+and a green gate does not authorize the next milestone. M3 and later require a
+fresh scoped review and authorization; their code, app, service, network,
+credential, signing, deployment, pilot, and release decisions remain closed
+until then.
+
 ## Enforced architectural boundaries
 
 These are not conventions — they fail tests when violated:

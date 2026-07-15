@@ -12,6 +12,16 @@ and payload-free (see the `[live]` / `[model]` / `[plan]` legend in `README.md`
 and `STATUS.md`). Modelling such behaviour as a contract is in scope; wiring it
 to real I/O is not.
 
+## Current authorization: M2 governance foundation
+
+M2 permits documentation and deterministic, local-only design-contract work
+only. It does not authorize source/runtime product behavior, an Android
+application, VPN/TUN or proxy operation, relay or operator services,
+non-loopback networking, telemetry, deployment, credentials, production key
+management, or production cryptography. The runtime remains lab-only, and every
+M3-or-later implementation requires a separate scoped review and fresh
+authorization. Nothing in M2 relaxes the hard boundary below.
+
 ## Hard boundary — do NOT implement live
 
 Live implementation of any of the following remains out of scope pending a
