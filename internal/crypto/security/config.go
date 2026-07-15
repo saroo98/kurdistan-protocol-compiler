@@ -7,6 +7,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
+
+	"kurdistan/internal/protocol/ir"
 )
 
 type redactedValue string
@@ -27,6 +30,45 @@ type SecurityConfig struct {
 	TranscriptHash   string   `json:"transcript_hash"`
 	CapabilityHash   string   `json:"capability_hash"`
 	Debug            bool     `json:"debug,omitempty"`
+}
+
+type PolicyBoundConfig struct {
+	config SecurityConfig
+	policy ir.EffectiveSecurityPolicy
+}
+
+func BindEffectivePolicy(cfg SecurityConfig, policy ir.EffectiveSecurityPolicy) (PolicyBoundConfig, error) {
+	if err := ValidateConfig(cfg); err != nil {
+		return PolicyBoundConfig{}, err
+	}
+	if err := ir.ValidateEffectiveSecurityPolicy(policy); err != nil {
+		return PolicyBoundConfig{}, fmt.Errorf("%w: effective policy", ErrInvalidConfig)
+	}
+	if cfg.ProfileID != policy.ProfileID || cfg.ProfileHash != policy.ProfileHash || cfg.ReplayWindow != policy.ReplayWindowSize {
+		return PolicyBoundConfig{}, fmt.Errorf("%w: effective policy identity", ErrInvalidConfig)
+	}
+	if cfg.Suite.KDF != policy.KDFSuite || cfg.Suite.AEAD != policy.AEADSuite || cfg.Suite.MAC != policy.MACSuite {
+		return PolicyBoundConfig{}, fmt.Errorf("%w: effective policy suite", ErrInvalidConfig)
+	}
+	capabilities, err := canonicalCapabilities(cfg.Capabilities)
+	if err != nil || !slices.Equal(capabilities, policy.SelectedCapabilities) {
+		return PolicyBoundConfig{}, fmt.Errorf("%w: effective policy capabilities", ErrInvalidConfig)
+	}
+	return PolicyBoundConfig{config: cloneSecurityConfig(cfg), policy: policy.Clone()}, nil
+}
+
+func (c PolicyBoundConfig) Config() SecurityConfig {
+	return cloneSecurityConfig(c.config)
+}
+
+func (c PolicyBoundConfig) EffectivePolicy() ir.EffectiveSecurityPolicy {
+	return c.policy.Clone()
+}
+
+func cloneSecurityConfig(cfg SecurityConfig) SecurityConfig {
+	cfg.InputSecret = append([]byte(nil), cfg.InputSecret...)
+	cfg.Capabilities = append([]string(nil), cfg.Capabilities...)
+	return cfg
 }
 
 func ValidateConfig(cfg SecurityConfig) error {

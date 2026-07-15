@@ -53,6 +53,39 @@ type DecodedFrame struct {
 	FragCount    int
 }
 
+var ErrFragmentCoverage = errors.New("fragment coverage")
+
+type FragmentErrorKind string
+
+const (
+	FragmentErrorEmpty            FragmentErrorKind = "empty"
+	FragmentErrorMissing          FragmentErrorKind = "missing"
+	FragmentErrorConflictingCount FragmentErrorKind = "conflicting_count"
+	FragmentErrorSemantic         FragmentErrorKind = "semantic"
+	FragmentErrorStream           FragmentErrorKind = "stream"
+	FragmentErrorMessage          FragmentErrorKind = "message"
+	FragmentErrorOperation        FragmentErrorKind = "operation"
+	FragmentErrorOutOfRange       FragmentErrorKind = "out_of_range"
+	FragmentErrorDuplicate        FragmentErrorKind = "duplicate"
+	FragmentErrorReordered        FragmentErrorKind = "reordered"
+)
+
+type FragmentError struct {
+	Kind FragmentErrorKind
+}
+
+func (e *FragmentError) Error() string {
+	return fmt.Sprintf("fragment coverage: %s", e.Kind)
+}
+
+func (e *FragmentError) Unwrap() error {
+	return ErrFragmentCoverage
+}
+
+func fragmentError(kind FragmentErrorKind) error {
+	return &FragmentError{Kind: kind}
+}
+
 func EncodeOperation(p *ir.Profile, op Operation, seed int64) ([][]byte, error) {
 	if err := ir.Validate(p); err != nil {
 		return nil, err
@@ -98,28 +131,59 @@ func DecodeFrames(p *ir.Profile, frames [][]byte) (Operation, []DecodedFrame, er
 		decoded = append(decoded, part)
 	}
 	if len(decoded) == 0 {
-		return Operation{}, nil, fmt.Errorf("no frames")
+		return Operation{}, nil, fragmentError(FragmentErrorEmpty)
 	}
-	if decoded[0].FragCount != len(decoded) {
-		return Operation{}, decoded, fmt.Errorf("missing fragments")
+	expected := decoded[0]
+	if expected.FragCount != len(decoded) {
+		return Operation{}, decoded, fragmentError(FragmentErrorMissing)
+	}
+	expectedMetadata, err := encodeOperationMetadata(expected.Operation)
+	if err != nil {
+		return Operation{}, decoded, fragmentError(FragmentErrorOperation)
 	}
 	payloads := make([][]byte, len(decoded))
+	seen := make([]bool, len(decoded))
 	total := 0
-	for _, part := range decoded {
-		if part.Operation.Semantic != decoded[0].Operation.Semantic || part.Operation.StreamID != decoded[0].Operation.StreamID {
-			return Operation{}, decoded, fmt.Errorf("fragment semantic mismatch")
+	for position, part := range decoded {
+		if part.FragCount != expected.FragCount {
+			return Operation{}, decoded, fragmentError(FragmentErrorConflictingCount)
 		}
 		if part.FragIndex < 0 || part.FragIndex >= len(decoded) {
-			return Operation{}, decoded, fmt.Errorf("fragment index out of range")
+			return Operation{}, decoded, fragmentError(FragmentErrorOutOfRange)
+		}
+		if seen[part.FragIndex] {
+			return Operation{}, decoded, fragmentError(FragmentErrorDuplicate)
+		}
+		seen[part.FragIndex] = true
+		if part.FragIndex != position {
+			return Operation{}, decoded, fragmentError(FragmentErrorReordered)
+		}
+		if part.Operation.Semantic != expected.Operation.Semantic {
+			return Operation{}, decoded, fragmentError(FragmentErrorSemantic)
+		}
+		if part.Operation.StreamID != expected.Operation.StreamID {
+			return Operation{}, decoded, fragmentError(FragmentErrorStream)
+		}
+		if part.WireSymbol != expected.WireSymbol {
+			return Operation{}, decoded, fragmentError(FragmentErrorMessage)
+		}
+		metadata, err := encodeOperationMetadata(part.Operation)
+		if err != nil || !bytes.Equal(metadata, expectedMetadata) {
+			return Operation{}, decoded, fragmentError(FragmentErrorOperation)
 		}
 		payloads[part.FragIndex] = part.Operation.Payload
 		total += len(part.Operation.Payload)
+	}
+	for _, present := range seen {
+		if !present {
+			return Operation{}, decoded, fragmentError(FragmentErrorMissing)
+		}
 	}
 	payload := make([]byte, 0, total)
 	for _, part := range payloads {
 		payload = append(payload, part...)
 	}
-	result := decoded[0].Operation
+	result := expected.Operation
 	result.Payload = payload
 	return result, decoded, nil
 }

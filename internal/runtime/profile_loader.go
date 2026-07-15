@@ -4,44 +4,63 @@
 package runtime
 
 import (
-	"encoding/json"
-	"fmt"
+	"errors"
+	"io"
 	"os"
 
-	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/protocol/ir"
 )
+
+const maxRuntimeProfileBytesV1 = 1 << 20
+
+var checkRuntimeProfileCompatibilityV1 = security.CheckProfileCompatibility
 
 func LoadProfile(path, expectedID string) (*ir.Profile, error) {
 	if path == "" {
-		return nil, fmt.Errorf("%w: missing profile path", ErrProfileLoad)
+		return nil, newProfileLoadFailureV1(nil)
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProfileLoad, err)
+		return nil, newProfileLoadFailureV1(nil)
 	}
-	var p ir.Profile
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, fmt.Errorf("%w: malformed profile JSON", ErrProfileLoad)
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, maxRuntimeProfileBytesV1+1))
+	if err != nil {
+		return nil, newProfileLoadFailureV1(nil)
+	}
+	if len(raw) > maxRuntimeProfileBytesV1 {
+		return nil, newProfileLoadFailureV1(ir.ErrProfileMalformed)
+	}
+	p, err := ir.DecodeProfileV1(raw)
+	if err != nil {
+		return nil, newProfileLoadFailureV1(profileDecodeCauseV1(err))
 	}
 	if expectedID != "" && p.ID != expectedID {
-		return nil, fmt.Errorf("%w: profile id mismatch", ErrProfileLoad)
+		return nil, newProfileLoadFailureV1(ir.ErrProfileMismatch)
 	}
-	if err := ValidateLoadedProfile(&p); err != nil {
-		return nil, err
-	}
-	return &p, nil
+	return p, nil
 }
 
 func ValidateLoadedProfile(p *ir.Profile) error {
 	if err := ir.Validate(p); err != nil {
-		return fmt.Errorf("%w: %v", ErrProfileLoad, err)
+		return newProfileLoadFailureV1(ir.ErrProfileInvalid)
 	}
-	if p.Security.SecurityVersion == "" {
-		return fmt.Errorf("%w: missing security policy", ErrProfileLoad)
-	}
-	if err := security.CheckProfileCompatibility(p, security.DefaultRuntimeCompatibility()); err != nil {
-		return fmt.Errorf("%w: %v", ErrCompatibility, err)
+	return checkProfileCompatibilityV1(p)
+}
+
+func checkProfileCompatibilityV1(p *ir.Profile) error {
+	if err := checkRuntimeProfileCompatibilityV1(p, security.DefaultRuntimeCompatibility()); err != nil {
+		return ErrCompatibility
 	}
 	return nil
+}
+
+func profileDecodeCauseV1(err error) error {
+	for _, cause := range []error{ir.ErrProfileMalformed, ir.ErrMigrationRequired, ir.ErrProfileVersionMismatch, ir.ErrProfileVersionUnsupported, ir.ErrProfileInvalid} {
+		if errors.Is(err, cause) {
+			return cause
+		}
+	}
+	return ir.ErrProfileInvalid
 }

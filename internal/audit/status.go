@@ -20,10 +20,9 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "> Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates are detector self-tests over forced/simulated regressions, not proofs that the runtime enforces those policies (see docs/safety.md and the D-003 crypto review).")
+	fmt.Fprintln(&b, "> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.")
 	fmt.Fprintln(&b)
 	fmt.Fprintf(&b, "- Latest audit mode: `%s`\n", report.Mode)
-	fmt.Fprintf(&b, "- Generated at: `%s`\n", report.GeneratedAt)
 	fmt.Fprintf(&b, "- Profile count: `%d`\n", report.ProfileCount)
 	fmt.Fprintf(&b, "- Trace count: `%d`\n", report.TraceCount)
 	fmt.Fprintf(&b, "- Conclusion: `%s`\n", report.Conclusion)
@@ -42,13 +41,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Benchmark Highlights")
 	fmt.Fprintln(&b)
-	if summary, ok := report.BenchmarkSummary.(BenchmarkSummary); ok {
-		fmt.Fprintf(&b, "- Profile generation: `%d ms`\n", summary.ProfileGenerationMillis)
-		fmt.Fprintf(&b, "- Trace generation: `%d ms`\n", summary.TraceGenerationMillis)
-		fmt.Fprintf(&b, "- Total audit runtime: `%d ms`\n", summary.TotalMillis)
-	} else {
-		fmt.Fprintln(&b, "- Benchmark summary unavailable.")
-	}
+	fmt.Fprintln(&b, "- Volatile wall-clock timings are omitted from the committed status snapshot. Use the audit JSON or command output for local performance diagnostics.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Corpus Diversity Summary")
 	fmt.Fprintln(&b)
@@ -80,8 +73,6 @@ func RenderStatus(report AuditReport) string {
 		fmt.Fprintf(&b, "- Gate result: `%t`\n", gate.Passed)
 		renderGateDetail(&b, gate, "cluster_count")
 		renderGateDetail(&b, gate, "largest_cluster_ratio")
-		renderGateDetail(&b, gate, "different_profile_average_distance")
-		renderGateDetail(&b, gate, "same_profile_distance")
 		renderGateDetail(&b, gate, "generated_cluster_conclusion")
 	} else {
 		fmt.Fprintln(&b, "- Adversarial clustering gate has not been run.")

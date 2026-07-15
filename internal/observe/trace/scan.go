@@ -4,12 +4,131 @@
 package trace
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
+
+// ContainsSensitiveValue recursively inspects structured diagnostic values.
+// It recognizes raw, hexadecimal, and JSON-string representations so nesting
+// cannot bypass the same value check used for top-level event fields.
+func ContainsSensitiveValue(value any, sensitive ...[]byte) bool {
+	needles := make([][]byte, 0, len(sensitive)*2)
+	for _, item := range sensitive {
+		if len(item) == 0 {
+			continue
+		}
+		hexValue := hex.EncodeToString(item)
+		jsonValue, _ := json.Marshal(string(item))
+		needles = append(needles,
+			append([]byte(nil), item...),
+			[]byte(hexValue), []byte(strings.ToUpper(hexValue)),
+			[]byte(base64.StdEncoding.EncodeToString(item)),
+			[]byte(base64.RawStdEncoding.EncodeToString(item)),
+			[]byte(base64.URLEncoding.EncodeToString(item)),
+			[]byte(base64.RawURLEncoding.EncodeToString(item)),
+			jsonValue,
+		)
+	}
+	type visitV1 struct {
+		typeName string
+		pointer  uintptr
+		kind     reflect.Kind
+	}
+	visited := make(map[visitV1]bool)
+	var scan func(reflect.Value) bool
+	scan = func(current reflect.Value) bool {
+		if !current.IsValid() {
+			return false
+		}
+		if current.Kind() == reflect.Interface {
+			if current.IsNil() {
+				return false
+			}
+			return scan(current.Elem())
+		}
+		if current.Kind() == reflect.Pointer {
+			if current.IsNil() {
+				return false
+			}
+			identity := visitV1{typeName: current.Type().String(), pointer: current.Pointer(), kind: current.Kind()}
+			if visited[identity] {
+				return false
+			}
+			visited[identity] = true
+			return scan(current.Elem())
+		}
+		switch current.Kind() {
+		case reflect.String:
+			text := []byte(current.String())
+			for _, needle := range needles {
+				if bytes.Contains(text, needle) {
+					return true
+				}
+			}
+		case reflect.Slice:
+			if current.IsNil() {
+				return false
+			}
+			identity := visitV1{typeName: current.Type().String(), pointer: current.Pointer(), kind: current.Kind()}
+			if identity.pointer != 0 {
+				if visited[identity] {
+					return false
+				}
+				visited[identity] = true
+			}
+			if current.Type().Elem().Kind() == reflect.Uint8 {
+				text := current.Bytes()
+				for _, needle := range needles {
+					if bytes.Contains(text, needle) {
+						return true
+					}
+				}
+			}
+			for i := 0; i < current.Len(); i++ {
+				if scan(current.Index(i)) {
+					return true
+				}
+			}
+		case reflect.Array:
+			for i := 0; i < current.Len(); i++ {
+				if scan(current.Index(i)) {
+					return true
+				}
+			}
+		case reflect.Map:
+			if current.IsNil() {
+				return false
+			}
+			identity := visitV1{typeName: current.Type().String(), pointer: current.Pointer(), kind: current.Kind()}
+			if visited[identity] {
+				return false
+			}
+			visited[identity] = true
+			iter := current.MapRange()
+			for iter.Next() {
+				if scan(iter.Key()) || scan(iter.Value()) {
+					return true
+				}
+			}
+		case reflect.Struct:
+			for i := 0; i < current.NumField(); i++ {
+				if scan(current.Field(i)) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return scan(reflect.ValueOf(value))
+}
 
 const DefaultStabilityThreshold = 0.80
 

@@ -10,12 +10,41 @@ import (
 	"math/rand"
 	"strings"
 
-	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/observe/wiregen"
+	"kurdistan/internal/protocol/ir"
 )
 
+type CandidateRequestV1 struct {
+	Seed           int64
+	Route          string
+	NonceSource    string
+	SecretSource   string
+	IdentitySource string
+	TrustSource    string
+}
+
+var errCandidateMigrationPendingV1 = fmt.Errorf("candidate generation rejected: version/codegen migration pending")
+
+func ValidateCandidateRequestV1(request CandidateRequestV1) error {
+	if request.Route != "strict_candidate" || request.NonceSource != "authenticated_entropy" || request.SecretSource != "caller_secret" || request.IdentitySource != "authenticated_owner" || request.TrustSource != "owner_registry" {
+		return fmt.Errorf("candidate request rejected")
+	}
+	return nil
+}
+
+func GenerateCandidateV1(request CandidateRequestV1) (*ir.Profile, error) {
+	if err := ValidateCandidateRequestV1(request); err != nil {
+		return nil, err
+	}
+	// Fail closed until the strict candidate version and codegen pipeline no
+	// longer emit model-only TestKeyHex/test-only authentication material.
+	return nil, errCandidateMigrationPendingV1
+}
+
 func Generate(seed int64) (*ir.Profile, error) {
+	// Generate emits lab/model profiles. Auth.TestKeyHex and related test-only
+	// fields are evidence fixtures, never product provisioning material.
 	rng := rand.New(rand.NewSource(seed))
 	id := profileID(seed)
 	pattern := firstContactPatterns()[rng.Intn(len(firstContactPatterns()))]
@@ -339,7 +368,7 @@ func securityPolicy(rng *rand.Rand) ir.SecurityPolicy {
 		keyLifetime = maxSession
 	}
 	return ir.SecurityPolicy{
-		SecurityVersion:             "0.12.0-lab",
+		SecurityVersion:             ir.SupportedSecurityVersion,
 		TranscriptMode:              []string{"canonical_v1", "canonical_with_capabilities_v1", "canonical_with_carrier_binding_v1", "canonical_full_binding_v1"}[rng.Intn(4)],
 		KDFSuite:                    "kdf_hkdf_sha256",
 		AEADSuite:                   "aead_aes_256_gcm",
@@ -362,7 +391,7 @@ func compatibilityMetadata(stream ir.StreamPolicy, carrier ir.CarrierPolicy, ada
 	return ir.CompatibilityMetadata{
 		SchemaVersion:            ir.SupportedVersion,
 		CompilerSecurityVersion:  security.SecurityVersion,
-		MinimumRuntimeVersion:    "0.12.0-lab",
+		MinimumRuntimeVersion:    ir.SupportedSecurityVersion,
 		SupportedSecuritySuites:  []string{ir.SecuritySuiteString()},
 		RequiredCapabilities:     ir.SecurityCapabilities(),
 		SupportedCarrierFamilies: ir.CarrierFamilies(),

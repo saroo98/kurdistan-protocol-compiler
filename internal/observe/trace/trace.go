@@ -6,16 +6,127 @@ package trace
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"sync"
 	"time"
 )
 
+const DiagnosticSchemaV1 = "diagnostic_v1"
+
+var ErrDiagnosticEventInvalidV1 = errors.New("diagnostic_event_invalid")
+var ErrDiagnosticRecorderLimitV1 = errors.New("diagnostic_recorder_limit")
+
+// DiagnosticEventV1 is the strict operational diagnostic schema. It has no
+// timestamp, profile, peer, stream, relay, destination, hash, or free-text
+// field. Coarse combinations may still correlate activity, so this schema is
+// data-minimized but does not claim anonymity.
+type DiagnosticEventV1 struct {
+	SchemaVersion   string `json:"schema_version"`
+	EventClass      string `json:"event_class"`
+	RoleBucket      string `json:"role_bucket,omitempty"`
+	StateBucket     string `json:"state_bucket,omitempty"`
+	OutcomeBucket   string `json:"outcome_bucket,omitempty"`
+	DirectionBucket string `json:"direction_bucket,omitempty"`
+	SizeBucket      string `json:"size_bucket,omitempty"`
+	CountBucket     string `json:"count_bucket,omitempty"`
+	ReasonBucket    string `json:"reason_bucket,omitempty"`
+	HygieneResult   string `json:"hygiene_result,omitempty"`
+}
+
+var diagnosticAllowedV1 = map[string]map[string]bool{
+	"event_class":      {"runtime": true, "channel": true, "replay": true, "rekey": true, "failure": true, "close": true, "security_envelope": true},
+	"role_bucket":      {"client": true, "relay": true},
+	"state_bucket":     {"starting": true, "active": true, "terminal": true},
+	"outcome_bucket":   {"accepted": true, "rejected": true, "completed": true},
+	"direction_bucket": {"client_to_relay": true, "relay_to_client": true},
+	"size_bucket":      {"none": true, "small": true, "medium": true, "large": true},
+	"count_bucket":     {"none": true, "one": true, "few": true, "many": true},
+	"reason_bucket":    {"replay": true, "policy": true, "profile": true, "capability": true, "config": true, "resource": true, "timeout": true, "closed": true, "other": true},
+	"hygiene_result":   {"redacted": true},
+}
+
+func ValidateDiagnosticEventV1(event DiagnosticEventV1) error {
+	if event.SchemaVersion != DiagnosticSchemaV1 || !diagnosticAllowedV1["event_class"][event.EventClass] {
+		return ErrDiagnosticEventInvalidV1
+	}
+	values := map[string]string{"role_bucket": event.RoleBucket, "state_bucket": event.StateBucket, "outcome_bucket": event.OutcomeBucket, "direction_bucket": event.DirectionBucket, "size_bucket": event.SizeBucket, "count_bucket": event.CountBucket, "reason_bucket": event.ReasonBucket, "hygiene_result": event.HygieneResult}
+	for field, value := range values {
+		if value != "" && !diagnosticAllowedV1[field][value] {
+			return ErrDiagnosticEventInvalidV1
+		}
+	}
+	return nil
+}
+
+func ValidateDiagnosticSequenceV1(events []DiagnosticEventV1) error {
+	for _, event := range events {
+		if err := ValidateDiagnosticEventV1(event); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type DiagnosticRecorderV1 struct {
+	mu              sync.Mutex
+	events          []DiagnosticEventV1
+	encodedBytes    int
+	maxEvents       int
+	maxEncodedBytes int
+}
+
+func NewDiagnosticRecorderV1(maxEvents, maxEncodedBytes int) (*DiagnosticRecorderV1, error) {
+	if maxEvents <= 0 || maxEvents > 4096 || maxEncodedBytes <= 0 || maxEncodedBytes > 4<<20 {
+		return nil, ErrDiagnosticRecorderLimitV1
+	}
+	return &DiagnosticRecorderV1{events: make([]DiagnosticEventV1, 0, minIntV1(maxEvents, 64)), maxEvents: maxEvents, maxEncodedBytes: maxEncodedBytes}, nil
+}
+
+func (recorder *DiagnosticRecorderV1) Record(event DiagnosticEventV1) error {
+	if recorder == nil {
+		return ErrDiagnosticRecorderLimitV1
+	}
+	if err := ValidateDiagnosticEventV1(event); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	if len(recorder.events) >= recorder.maxEvents || recorder.encodedBytes+len(raw) > recorder.maxEncodedBytes {
+		return ErrDiagnosticRecorderLimitV1
+	}
+	recorder.events = append(recorder.events, event)
+	recorder.encodedBytes += len(raw)
+	return nil
+}
+
+func (recorder *DiagnosticRecorderV1) Snapshot() []DiagnosticEventV1 {
+	if recorder == nil {
+		return nil
+	}
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	return append([]DiagnosticEventV1(nil), recorder.events...)
+}
+
+func minIntV1(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
+}
+
+// Event is the legacy research-only trace schema. Strict operational paths
+// must use DiagnosticEventV1 and DiagnosticRecorderV1.
 type Event struct {
 	TimeUnixNano                       int64  `json:"time_unix_nano"`
 	Role                               string `json:"role"`
-	ProfileID                          string `json:"profile_id"`
+	ProfileID                          string `json:"profile_id,omitempty"`
 	EventType                          string `json:"event_type"`
 	State                              string `json:"state,omitempty"`
 	Semantic                           string `json:"semantic,omitempty"`
@@ -153,10 +264,28 @@ type Event struct {
 	Note                               string `json:"note,omitempty"`
 }
 
+// Recorder is a legacy research-only arbitrary-writer recorder.
 type Recorder struct {
 	mu sync.Mutex
 	w  io.Writer
 	c  io.Closer
+}
+
+const diagnosticTimeQuantum = time.Minute
+
+// MinimizeDiagnosticEvent removes values that can act as stable cross-session
+// identifiers and reduces wall-clock precision. It does not claim that the
+// remaining coarse operational data is anonymous.
+func MinimizeDiagnosticEvent(ev Event) Event {
+	ev.ProfileID = ""
+	ev.StreamLabel = ""
+	ev.RelayFleetID = ""
+	ev.RelayIDBucket = ""
+	ev.Note = ""
+	if ev.TimeUnixNano != 0 {
+		ev.TimeUnixNano = time.Unix(0, ev.TimeUnixNano).UTC().Truncate(diagnosticTimeQuantum).UnixNano()
+	}
+	return ev
 }
 
 func NewRecorder(w io.Writer) *Recorder {
@@ -191,8 +320,9 @@ func (r *Recorder) Record(ev Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if ev.TimeUnixNano == 0 {
-		ev.TimeUnixNano = time.Now().UnixNano()
+		ev.TimeUnixNano = time.Now().UTC().Truncate(diagnosticTimeQuantum).UnixNano()
 	}
+	ev = MinimizeDiagnosticEvent(ev)
 	raw, err := json.Marshal(ev)
 	if err != nil {
 		return err

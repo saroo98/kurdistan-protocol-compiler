@@ -6,60 +6,70 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"kurdistan/internal/transport/adaptivepath"
-	"kurdistan/internal/testkit/adversary"
+	"kurdistan/internal/audit"
+	"kurdistan/internal/codegen"
 	"kurdistan/internal/contracts/android/androidcarrier"
 	"kurdistan/internal/contracts/android/androidreview"
 	"kurdistan/internal/contracts/android/androidruntime"
 	"kurdistan/internal/contracts/android/androidvpnservice"
-	"kurdistan/internal/audit"
 	"kurdistan/internal/contracts/carrier/carriercollapse"
 	"kurdistan/internal/contracts/carrier/carrierreadiness"
 	"kurdistan/internal/contracts/carrier/carrierreview"
-	"kurdistan/internal/observe/classifierdata"
-	"kurdistan/internal/codegen"
-	"kurdistan/internal/lab/concretelocaladapter"
 	"kurdistan/internal/contracts/carrier/constrainedcarrier"
 	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
-	"kurdistan/internal/lab/fixtures"
-	"kurdistan/internal/observe/hostdetect"
 	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 	"kurdistan/internal/contracts/carrier/httpscarrierreview"
 	"kurdistan/internal/contracts/carrier/httpslikecarrier"
-	"kurdistan/internal/contracts/readiness/keyexchangeplan"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 	"kurdistan/internal/contracts/lab/labegress"
 	"kurdistan/internal/contracts/lab/localpipeline"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/measurementreview"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
+	"kurdistan/internal/lab/concretelocaladapter"
+	"kurdistan/internal/lab/fixtures"
 	"kurdistan/internal/lab/localprotocoladapter"
 	"kurdistan/internal/lab/localproxyadapter"
-	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 	"kurdistan/internal/lab/localproxyingress"
 	"kurdistan/internal/lab/localproxyingressadversary"
-	"kurdistan/internal/contracts/vpn/localvpnadapter"
-	"kurdistan/internal/contracts/lab/loopbackrelay"
-	"kurdistan/internal/contracts/readiness/measurementreview"
-	"kurdistan/internal/contracts/carrier/multicarrierselect"
-	"kurdistan/internal/contracts/readiness/operationalhardening"
-	"kurdistan/internal/transport/pathhealth"
-	"kurdistan/internal/transport/pathrace"
-	"kurdistan/internal/contracts/readiness/productionreadiness"
-	"kurdistan/internal/observe/protocorpus"
 	"kurdistan/internal/lab/proxyegress"
 	"kurdistan/internal/lab/proxyingress"
-	"kurdistan/internal/contracts/proxy/proxyingressreview"
+	"kurdistan/internal/observe/classifierdata"
+	"kurdistan/internal/observe/hostdetect"
+	"kurdistan/internal/observe/protocorpus"
+	"kurdistan/internal/observe/wireeval"
+	"kurdistan/internal/observe/wirefeatures"
+	"kurdistan/internal/observe/wiregencompare"
 	"kurdistan/internal/operator/relayauthplan"
 	"kurdistan/internal/operator/relaybridge"
 	"kurdistan/internal/operator/relayfleet"
 	"kurdistan/internal/operator/relayprocess"
+	"kurdistan/internal/testkit/adversary"
+	"kurdistan/internal/transport/adaptivepath"
+	"kurdistan/internal/transport/pathhealth"
+	"kurdistan/internal/transport/pathrace"
 	"kurdistan/internal/transport/transportbundle"
-	"kurdistan/internal/contracts/vpn/vpnsemantics"
-	"kurdistan/internal/observe/wireeval"
-	"kurdistan/internal/observe/wirefeatures"
-	"kurdistan/internal/observe/wiregencompare"
+)
+
+var (
+	errCodegenAuditV1 = errors.New("kcheck codegen audit failed")
+	kcheckLstatV1     = os.Lstat
+	kcheckOpenV1      = os.Open
+	kcheckSameFileV1  = os.SameFile
 )
 
 // commandRegistry maps each kcheck subsystem subcommand to its handler.
@@ -300,6 +310,7 @@ func runCodegen(args []string) int {
 	status := flags.String("status", "", "optional STATUS.md output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional generated profile count override")
+	authorizationPath := flags.String("authorization-catalog", "", "explicit authorization catalog absolute path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -310,17 +321,55 @@ func runCodegen(args []string) int {
 	if *quick {
 		mode = "quick"
 	}
-	cfg := audit.DefaultCodegenAuditConfig(mode)
-	if *startSeed != 0 {
-		cfg.StartSeed = *startSeed
+	visited := map[string]bool{}
+	flags.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+	rangeVisited := visited["start-seed"] || visited["profiles"]
+	if rangeVisited != visited["authorization-catalog"] {
+		fmt.Fprintln(os.Stderr, errCodegenAuditV1)
+		return 2
 	}
-	if *profiles != 0 {
-		cfg.ProfileCount = *profiles
+	var cfg audit.CodegenAuditConfig
+	if !rangeVisited {
+		cfg = audit.DefaultCodegenAuditConfig(mode)
+	} else {
+		raw, err := readKcheckCatalogV1(*authorizationPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, errCodegenAuditV1)
+			return 1
+		}
+		catalog, err := codegen.ParseAuthorizationCatalogV1(raw)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, fmt.Errorf("%w: %w", errCodegenAuditV1, codegen.ErrAuthorizationCatalogInvalid))
+			return 1
+		}
+		start, count := int64(1), 3
+		if mode == "full" {
+			count = 8
+		}
+		if visited["start-seed"] {
+			start = *startSeed
+		}
+		if visited["profiles"] {
+			count = *profiles
+		}
+		cfg, err = audit.NewExplicitCodegenAuditConfig(mode, start, count, catalog)
+		if err != nil {
+			if errors.Is(err, codegen.ErrAuthorizationCatalogInvalid) || errors.Is(err, codegen.ErrStrictSeedRange) {
+				fmt.Fprintln(os.Stderr, fmt.Errorf("%w: %w", errCodegenAuditV1, err))
+			} else {
+				fmt.Fprintln(os.Stderr, errCodegenAuditV1)
+			}
+			return 1
+		}
 	}
 	cfg.OutputPath = *out
 	report, err := audit.RunCodegenAudit(context.Background(), cfg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if errors.Is(err, codegen.ErrAuthorizationCatalogInvalid) || errors.Is(err, codegen.ErrAuthorizationMismatch) || errors.Is(err, codegen.ErrStrictSeedRange) || errors.Is(err, codegen.ErrStrictModulePath) {
+			fmt.Fprintln(os.Stderr, fmt.Errorf("%w: %w", errCodegenAuditV1, err))
+		} else {
+			fmt.Fprintln(os.Stderr, errCodegenAuditV1)
+		}
 		return 1
 	}
 	if err := audit.WriteJSON(cfg.OutputPath, report); err != nil {
@@ -336,6 +385,47 @@ func runCodegen(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// readKcheckCatalogV1 is a portable best-effort local check. It does not make
+// a concurrently hostile filesystem atomic; no-follow handles are a later boundary.
+func readKcheckCatalogV1(path string) ([]byte, error) {
+	if path == "" || !filepath.IsAbs(path) {
+		return nil, errCodegenAuditV1
+	}
+	clean := filepath.Clean(path)
+	volume := filepath.VolumeName(clean)
+	rest := strings.TrimPrefix(clean, volume)
+	current := volume + string(os.PathSeparator)
+	root, err := kcheckLstatV1(current)
+	if err != nil || root.Mode()&os.ModeSymlink != 0 || !root.IsDir() {
+		return nil, errCodegenAuditV1
+	}
+	for _, component := range strings.FieldsFunc(rest, func(r rune) bool { return r == '/' || r == '\\' }) {
+		current = filepath.Join(current, component)
+		info, err := kcheckLstatV1(current)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || info.Mode()&(os.ModeDevice|os.ModeNamedPipe|os.ModeSocket|os.ModeCharDevice|os.ModeIrregular) != 0 {
+			return nil, errCodegenAuditV1
+		}
+	}
+	final, err := kcheckLstatV1(clean)
+	if err != nil || !final.Mode().IsRegular() {
+		return nil, errCodegenAuditV1
+	}
+	f, err := kcheckOpenV1(clean)
+	if err != nil {
+		return nil, errCodegenAuditV1
+	}
+	defer f.Close()
+	opened, err := f.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !kcheckSameFileV1(final, opened) {
+		return nil, errCodegenAuditV1
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		return nil, errCodegenAuditV1
+	}
+	return raw, nil
 }
 
 func runStreamAdversary(args []string) int {

@@ -7174,3 +7174,27 @@ func main() {
 	}
 }
 `
+
+func strictRuntimeTemplateV1() string {
+	return `// Package strictv1 provides strictv1/runtime.go, the sole strict evidentiary surface; sibling protocol/** and cmd/** are legacy parity-only and non-evidentiary.
+package strictv1
+
+import (
+	auth "kurdistan/internal/crypto/auth"
+	kruntime "kurdistan/internal/runtime"
+)
+
+const (
+	ProtocolSchemaVersion = "0.2.0-lab"
+	SecurityVersion = "0.13.0-lab"
+	RuntimeSecurityVersion = "0.13.0-lab"
+	HandshakeVersion = "kurdistan-handshake-v1"
+	PolicyEncodingVersion = "policy-v1"
+	RecordVersion = "record-v1"
+)
+
+func NewStrictRuntimeV1(client, relay auth.Dependencies, clientRegistry kruntime.` + "ClientProfileAuthorization" + `RegistryV1, relayRegistry kruntime.` + "RelayProfileAuthorization" + `RegistryV1) (*kruntime.` + "Handshake" + `Runtime, error) {
+	return kruntime.` + "NewStrictHandshake" + `RuntimeV1(client, relay, clientRegistry, relayRegistry)
+}
+`
+}

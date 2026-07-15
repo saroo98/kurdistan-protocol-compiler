@@ -1,7 +1,12 @@
 package codegen
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +18,119 @@ import (
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 )
+
+var _ func(*ir.Profile, string, Options, AuthorizationCatalogV1) (Result, error) = GenerateStrict
+
+func TestStrictGenerateAPISignatureV1(t *testing.T) {
+	if AuthorizationCatalogVersionV1 == "" || AuthorizationCatalogScopeDefaultAuditV1 == "" || AuthorizationCatalogScopeExplicitV1 == "" {
+		t.Fatal("strict authorization constants")
+	}
+}
+
+func TestStrictGeneratedIdentifiersAndRoleSeparatedAuthorization(t *testing.T) {
+	p, err := compiler.Generate(42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := catalogFixtureV1(t, p)
+	out := filepath.Join(t.TempDir(), "strict")
+	if _, err := GenerateStrict(p, out, Options{GeneratedAt: fixedTime(t)}, c); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "strictv1", "runtime.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, want := range []string{"package strictv1", "auth \"kurdistan/internal/crypto/auth\"", "kruntime \"kurdistan/internal/runtime\"", "ProtocolSchemaVersion", `"0.2.0-lab"`, "SecurityVersion", "RuntimeSecurityVersion", `"0.13.0-lab"`, "HandshakeVersion", `"kurdistan-handshake-v1"`, "PolicyEncodingVersion", `"policy-v1"`, "RecordVersion", `"record-v1"`, "func NewStrictRuntimeV1(client, relay auth.Dependencies", "kruntime.NewStrictHandshakeRuntimeV1(client, relay, clientRegistry, relayRegistry)"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	legacy := filepath.Join(t.TempDir(), "legacy")
+	if _, err := Generate(p, legacy, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(legacy, "strictv1", "runtime.go")); !os.IsNotExist(err) {
+		t.Fatal("legacy Generate emitted strict surface")
+	}
+	cmd := exec.Command("go", "test", "./strictv1")
+	cmd.Dir = out
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("strict package build: %v\n%s", err, output)
+	}
+	f, err := parser.ParseFile(token.NewFileSet(), "runtime.go", raw, parser.ParseComments)
+	if err != nil {
+		t.Fatal(err)
+	}
+	funcs, consts := 0, 0
+	for _, decl := range f.Decls {
+		switch x := decl.(type) {
+		case *ast.FuncDecl:
+			funcs++
+			if x.Name.Name != "NewStrictRuntimeV1" || x.Recv != nil {
+				t.Fatal("factory inventory")
+			}
+		case *ast.GenDecl:
+			if x.Tok == token.CONST {
+				for _, spec := range x.Specs {
+					consts += len(spec.(*ast.ValueSpec).Names)
+				}
+			}
+		}
+	}
+	if funcs != 1 || consts != 6 || len(f.Imports) != 2 {
+		t.Fatalf("AST funcs=%d consts=%d imports=%d", funcs, consts, len(f.Imports))
+	}
+}
+
+func TestModulePathSafety(t *testing.T) {
+	for id, suffix := range map[string]string{"ABC__def": "abc-def", "---": "generated", "éA/../B": "a-b", "A  B": "a-b", "İ": "generated", "ＡＢＣ": "generated", "--A---B--": "a-b", "A💣💣B": "a-b", "a_b": "a-b", "a-b": "a-b"} {
+		if got := strictModulePathV1(id); got != "kurdistan/generated/"+suffix {
+			t.Fatalf("%q => %q", id, got)
+		}
+	}
+	p, _ := compiler.Generate(42)
+	c := catalogFixtureV1(t, p)
+	exact := strictModulePathV1(p.ID)
+	if _, err := GenerateStrict(p, filepath.Join(t.TempDir(), "ok"), Options{ModulePath: exact}, c); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"example.com/external", exact + "/x", "kurdistan/generated/../x", strings.ToUpper(exact)} {
+		out := filepath.Join(t.TempDir(), "bad")
+		if _, err := GenerateStrict(p, out, Options{ModulePath: bad}, c); err != ErrStrictModulePath {
+			t.Fatalf("%q err=%v", bad, err)
+		}
+		if _, err := os.Stat(out); !os.IsNotExist(err) {
+			t.Fatal("module rejection mutated output")
+		}
+	}
+}
+
+func TestStrictGeneratedIdentifiersSixPathSHAEvidence(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	paths := []string{"internal/codegen/generator.go", "internal/codegen/generator_templates.go", "internal/codegen/generator_test.go", "internal/codegen/scanner.go", "internal/codegen/scanner_test.go", "internal/runtime/policy_enforcement_test.go"}
+	for _, path := range paths {
+		cmd := exec.Command("git", "show", "HEAD:"+path)
+		cmd.Dir = root
+		before, err := cmd.Output()
+		pre := "ABSENT"
+		if err == nil {
+			sum := sha256.Sum256(before)
+			pre = hex.EncodeToString(sum[:])
+		}
+		after, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(after)
+		post := hex.EncodeToString(sum[:])
+		if pre == post {
+			t.Fatalf("%s unchanged", path)
+		}
+		t.Logf("WO-043-SHA256 %s pre=%s post=%s", path, pre, post)
+	}
+}
 
 func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 	p := mustProfile(t, 12345)
@@ -214,6 +332,19 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(rel))); err != nil {
 			t.Fatalf("missing generated file %s: %v", rel, err)
 		}
+	}
+	goModRaw, err := os.ReadFile(filepath.Join(out, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var goDirectives []string
+	for _, line := range strings.Split(strings.ReplaceAll(string(goModRaw), "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "go ") {
+			goDirectives = append(goDirectives, line)
+		}
+	}
+	if len(goDirectives) != 1 || goDirectives[0] != "go 1.24" {
+		t.Fatalf("generated go.mod directives = %q, want exactly [go 1.24]", goDirectives)
 	}
 
 	manifestRaw, err := os.ReadFile(filepath.Join(out, "manifest.json"))

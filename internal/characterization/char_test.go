@@ -11,10 +11,12 @@ package characterization
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/protocol/ir"
@@ -25,11 +27,38 @@ var update = flag.Bool("update", false, "rewrite the characterization golden")
 const seedCount = 50
 
 type charEntry struct {
-	Seed          int64  `json:"seed"`
-	ID            string `json:"id"`
-	Hash          string `json:"hash"`
-	FirstFrameLen int    `json:"first_frame_len"`
-	FrameCount    int    `json:"frame_count"`
+	Seed                       int64  `json:"seed"`
+	ID                         string `json:"id"`
+	Hash                       string `json:"hash"`
+	ProfileVersion             string `json:"profile_version"`
+	SecurityVersion            string `json:"security_version"`
+	CompatibilitySchemaVersion string `json:"compatibility_schema_version"`
+	CompilerSecurityVersion    string `json:"compiler_security_version"`
+	MinimumRuntimeVersion      string `json:"minimum_runtime_version"`
+	HandshakeVersion           string `json:"handshake_version"`
+	PolicyEncodingVersion      string `json:"policy_encoding_version"`
+	RecordVersion              string `json:"record_version"`
+	FirstFrameLen              int    `json:"first_frame_len"`
+	FrameCount                 int    `json:"frame_count"`
+}
+
+func validateCharacterizationVersionEvidenceV1(entry charEntry) error {
+	want := map[string][2]string{
+		"profile_version":              {entry.ProfileVersion, ir.SupportedVersion},
+		"security_version":             {entry.SecurityVersion, ir.SupportedSecurityVersion},
+		"compatibility_schema_version": {entry.CompatibilitySchemaVersion, ir.SupportedVersion},
+		"compiler_security_version":    {entry.CompilerSecurityVersion, ir.SupportedSecurityVersion},
+		"minimum_runtime_version":      {entry.MinimumRuntimeVersion, ir.SupportedSecurityVersion},
+		"handshake_version":            {entry.HandshakeVersion, security.HandshakeVersionV1},
+		"policy_encoding_version":      {entry.PolicyEncodingVersion, security.PolicyEncodingVersionV1},
+		"record_version":               {entry.RecordVersion, security.RecordVersionV1},
+	}
+	for field, pair := range want {
+		if pair[0] == "" || pair[0] != pair[1] {
+			return fmt.Errorf("%s=%q want=%q", field, pair[0], pair[1])
+		}
+	}
+	return nil
 }
 
 func computeBaseline(t *testing.T) []charEntry {
@@ -56,14 +85,57 @@ func computeBaseline(t *testing.T) []charEntry {
 			t.Fatalf("seed %d: no frames produced", seed)
 		}
 		out = append(out, charEntry{
-			Seed:          seed,
-			ID:            p.ID,
-			Hash:          hash,
-			FirstFrameLen: len(frames[0]),
-			FrameCount:    len(frames),
+			Seed:                       seed,
+			ID:                         p.ID,
+			Hash:                       hash,
+			ProfileVersion:             p.Version,
+			SecurityVersion:            p.Security.SecurityVersion,
+			CompatibilitySchemaVersion: p.Compatibility.SchemaVersion,
+			CompilerSecurityVersion:    p.Compatibility.CompilerSecurityVersion,
+			MinimumRuntimeVersion:      p.Compatibility.MinimumRuntimeVersion,
+			HandshakeVersion:           security.HandshakeVersionV1,
+			PolicyEncodingVersion:      security.PolicyEncodingVersionV1,
+			RecordVersion:              security.RecordVersionV1,
+			FirstFrameLen:              len(frames[0]),
+			FrameCount:                 len(frames),
 		})
+		if err := validateCharacterizationVersionEvidenceV1(out[len(out)-1]); err != nil {
+			t.Fatalf("seed %d version evidence: %v", seed, err)
+		}
 	}
 	return out
+}
+
+func TestCharacterizationVersionObservabilityV1(t *testing.T) {
+	if ir.LegacySchemaVersionV1 != "0.1.0-lab" || ir.NextSchemaVersionV1 != "0.2.0-lab" ||
+		ir.LegacySecurityVersionV1 != "0.12.0-lab" || ir.NextSecurityVersionV1 != "0.13.0-lab" ||
+		ir.SupportedVersion != ir.NextSchemaVersionV1 || ir.SupportedSecurityVersion != ir.NextSecurityVersionV1 ||
+		ir.SupportedVersion == ir.LegacySchemaVersionV1 || ir.SupportedSecurityVersion == ir.LegacySecurityVersionV1 {
+		t.Fatal("dormant-versus-active version authority drifted")
+	}
+	base := computeBaseline(t)[0]
+	mutations := []struct {
+		name string
+		set  func(*charEntry, string)
+	}{
+		{"profile_version", func(v *charEntry, s string) { v.ProfileVersion = s }},
+		{"security_version", func(v *charEntry, s string) { v.SecurityVersion = s }},
+		{"compatibility_schema_version", func(v *charEntry, s string) { v.CompatibilitySchemaVersion = s }},
+		{"compiler_security_version", func(v *charEntry, s string) { v.CompilerSecurityVersion = s }},
+		{"minimum_runtime_version", func(v *charEntry, s string) { v.MinimumRuntimeVersion = s }},
+		{"handshake_version", func(v *charEntry, s string) { v.HandshakeVersion = s }},
+		{"policy_encoding_version", func(v *charEntry, s string) { v.PolicyEncodingVersion = s }},
+		{"record_version", func(v *charEntry, s string) { v.RecordVersion = s }},
+	}
+	for _, mutation := range mutations {
+		for _, value := range []string{"", "altered"} {
+			changed := base
+			mutation.set(&changed, value)
+			if err := validateCharacterizationVersionEvidenceV1(changed); err == nil {
+				t.Fatalf("%s accepted mutation %q", mutation.name, value)
+			}
+		}
+	}
 }
 
 func goldenPath() string {
