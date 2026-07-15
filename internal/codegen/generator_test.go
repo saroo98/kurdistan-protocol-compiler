@@ -1,8 +1,6 @@
 package codegen
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"go/ast"
 	"go/parser"
@@ -109,27 +107,14 @@ func TestModulePathSafety(t *testing.T) {
 
 func TestStrictGeneratedIdentifiersSixPathSHAEvidence(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	paths := []string{"internal/codegen/generator.go", "internal/codegen/generator_templates.go", "internal/codegen/generator_test.go", "internal/codegen/scanner.go", "internal/codegen/scanner_test.go", "internal/runtime/policy_enforcement_test.go"}
-	for _, path := range paths {
-		cmd := exec.Command("git", "show", "HEAD:"+path)
-		cmd.Dir = root
-		before, err := cmd.Output()
-		pre := "ABSENT"
-		if err == nil {
-			sum := sha256.Sum256(before)
-			pre = hex.EncodeToString(sum[:])
-		}
-		after, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		sum := sha256.Sum256(after)
-		post := hex.EncodeToString(sum[:])
-		if pre == post {
-			t.Fatalf("%s unchanged", path)
-		}
-		t.Logf("WO-043-SHA256 %s pre=%s post=%s", path, pre, post)
-	}
+	verifyCommittedEvidenceSetV1(t, root, "WO-043", []committedEvidenceExpectationV1{
+		{"internal/codegen/generator.go", "06873bd0001f41d358cc21a9e2920ef1fc2c67b3e561141171ebed46f8da6142"},
+		{"internal/codegen/generator_templates.go", "a0dfd4c908849a554e94a34db244f403253d30bdea23dca528efc6b13caf4c91"},
+		{"internal/codegen/generator_test.go", "0dcbb2a95f14de69a198013bc7c64597716cf00f4f3b284f950e233571e0acbe"},
+		{"internal/codegen/scanner.go", "fffcddbc632e5c2ceb418555ad8e571638e23843d04749e52c0a792a4687e960"},
+		{"internal/codegen/scanner_test.go", "40ff6664134ed86769c5adf0c25b26b1690f50b55f7c8adfffee933f3a805306"},
+		{"internal/runtime/policy_enforcement_test.go", "ABSENT"},
+	})
 }
 
 func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
