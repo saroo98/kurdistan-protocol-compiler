@@ -1,0 +1,157 @@
+{
+  "schema": "kurdistan.phase1-m0.committed-sha256.v1",
+  "hash_algorithm": "sha256",
+  "source_candidate": "cad48bb4be28a09a6293944f78724d7026de4c12",
+  "sets": {
+    "WO-040": [
+      {
+        "path": "internal/codegen/authorization_v1.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "2facf6c4ddfeb2bda0f5f42f010e683a950825b0980e8ebf36cb740632c23a82"
+      },
+      {
+        "path": "internal/codegen/authorization_v1_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac"
+      },
+      {
+        "path": "internal/codegen/generator.go",
+        "pre_evidence": "06873bd0001f41d358cc21a9e2920ef1fc2c67b3e561141171ebed46f8da6142",
+        "post_sha256": "fd599b9a8da6fbb6588b375a5d7823575d7f235a2bd51930e99a953fe81e94fa"
+      },
+      {
+        "path": "internal/codegen/generator_test.go",
+        "pre_evidence": "0dcbb2a95f14de69a198013bc7c64597716cf00f4f3b284f950e233571e0acbe",
+        "post_sha256": "bcaa712289d2909c3125f1ca59fd976a378ca09653c1b1ef1db699e4ac38b4c6"
+      },
+      {
+        "path": "internal/codegen/manifest.go",
+        "pre_evidence": "8a44ade86b14c5aab5d2f67239cdfc76bd8b4ef90fbc40ac75de837f579c2f98",
+        "post_sha256": "10022311c7175ba7605057877b672ab4aad19624307f0421c5fd1bf48b4b5d24"
+      },
+      {
+        "path": "internal/runtime/policy_enforcement_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
+      }
+    ],
+    "WO-041": [
+      {
+        "path": "cmd/kgen/main.go",
+        "pre_evidence": "79c6bb76ae234e08b8f2b1e2248ea1e4d4d0770fa52e9fcab1aa3914618a3ed4",
+        "post_sha256": "f0b6d672bf3aa6bb23380bfe2eeb1a527594886dfd943502e1ee2a8a36c25f7e"
+      },
+      {
+        "path": "cmd/kgen/main_test.go",
+        "pre_evidence": "bf6f2a7e2840c12d56a652f486fecda8297f839d36697bef786b31cfd6e2273b",
+        "post_sha256": "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d"
+      },
+      {
+        "path": "internal/runtime/policy_enforcement_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
+      },
+      {
+        "path": "internal/runtime/profile_loader_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "06c2c59436f474080e22de34b0520ace6e1bc94ab410f434e3197eff3435b489"
+      }
+    ],
+    "WO-042": [
+      {
+        "path": "internal/audit/codegen.go",
+        "pre_evidence": "a81e381a01dd4122f83e7c38bb5f1d4fa95e7e27d30949743055e5cebebf50ab",
+        "post_sha256": "e1dd6e92ca1c4aa5f8c3e27e6b1187d2611bfbe0ad529e5ffe1caf8e5153e83e"
+      },
+      {
+        "path": "internal/audit/codegen_test.go",
+        "pre_evidence": "d23ba4b99175f3289628a694d788edfcebb06d004b9df8bda759bf26ddea2aaa",
+        "post_sha256": "0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec"
+      },
+      {
+        "path": "testdata/codegen/profile-authorization-v1.json",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "88b4f930665ada6bb9cce2a6e79f4f11b93086f9791f55c9c0e5659c0f210b08"
+      },
+      {
+        "path": "cmd/kcheck/main.go",
+        "pre_evidence": "21e2b04eab3fb4ba8daac4d977174239523bd458d9a6d53e7896357e70200bcb",
+        "post_sha256": "9722b9e34b2a324c3a3a02e02934d888dc2242755884c69a6fa0560908a3b833"
+      },
+      {
+        "path": "cmd/kcheck/registry_test.go",
+        "pre_evidence": "86772d52db8f6a8348c8e766e35063e2522bacb4ecea85a1ddea891c024a81bf",
+        "post_sha256": "059f427a664d2ba80e34e5c564c811c7c1789bb02b925e9ed3e71a45d041f316"
+      },
+      {
+        "path": "internal/runtime/policy_enforcement_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
+      }
+    ],
+    "WO-043": [
+      {
+        "path": "internal/codegen/generator.go",
+        "pre_evidence": "06873bd0001f41d358cc21a9e2920ef1fc2c67b3e561141171ebed46f8da6142",
+        "post_sha256": "fd599b9a8da6fbb6588b375a5d7823575d7f235a2bd51930e99a953fe81e94fa"
+      },
+      {
+        "path": "internal/codegen/generator_templates.go",
+        "pre_evidence": "a0dfd4c908849a554e94a34db244f403253d30bdea23dca528efc6b13caf4c91",
+        "post_sha256": "53651959c9fbc7a936c23d4ae6cf5e4821e2322befc38596cbf215f3f24ff643"
+      },
+      {
+        "path": "internal/codegen/generator_test.go",
+        "pre_evidence": "0dcbb2a95f14de69a198013bc7c64597716cf00f4f3b284f950e233571e0acbe",
+        "post_sha256": "bcaa712289d2909c3125f1ca59fd976a378ca09653c1b1ef1db699e4ac38b4c6"
+      },
+      {
+        "path": "internal/codegen/scanner.go",
+        "pre_evidence": "fffcddbc632e5c2ceb418555ad8e571638e23843d04749e52c0a792a4687e960",
+        "post_sha256": "6c2465f81c1bd70f989286d08c998bab71e8dde9e7e3283de805571729d983e5"
+      },
+      {
+        "path": "internal/codegen/scanner_test.go",
+        "pre_evidence": "40ff6664134ed86769c5adf0c25b26b1690f50b55f7c8adfffee933f3a805306",
+        "post_sha256": "60e88e8f3dc21c5bda81d4e692a9f9d310fecf0d93caa0d3dc1d5dc3f48bd816"
+      },
+      {
+        "path": "internal/runtime/policy_enforcement_test.go",
+        "pre_evidence": "ABSENT",
+        "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
+      }
+    ],
+    "WO-044": [
+      {
+        "path": "internal/testkit/importrules/importrules_test.go",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "1128d762990de6bac542df8afbbb08de06cc726c1117ecf55ec8feb69edfe167"
+      },
+      {
+        "path": "docs/KIP-0067-stage6a-version-migration.md",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "fed35c21d2fa86e413d07628f38d63765b7f1d7cdca679fa05a7b46bb4f3313a"
+      },
+      {
+        "path": "docs/KIP-0012-generated-source-backend.md",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "a76fb154dc5480cb2e85d661845cd873a315f758c5fb03dac32895d853d2ce9f"
+      },
+      {
+        "path": "docs/KIP-0013-generated-backend-audit.md",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "cae9b3bab3e7711c9c5df2a2f9a66281033c8a153979aac0ec2ae708e9453ff9"
+      },
+      {
+        "path": "README.md",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b"
+      },
+      {
+        "path": "internal/runtime/policy_enforcement_test.go",
+        "pre_evidence": "UNRECORDED",
+        "post_sha256": "eb04ddfd64ede4e3d1fab0ed53f008b31afcf18a2a3a157dcb21d296c77045d4"
+      }
+    ]
+  }
+}

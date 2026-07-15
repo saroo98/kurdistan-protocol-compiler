@@ -13,12 +13,12 @@ package importrules
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -919,50 +919,92 @@ func TestVersionMigrationBoundaryDeterministicPostScopeManifestV1(t *testing.T) 
 			t.Fatalf("invalid sealed %s binding", label)
 		}
 	}
-	paths := []string{"internal/testkit/importrules/importrules_test.go", "docs/KIP-0067-stage6a-version-migration.md", "docs/KIP-0012-generated-source-backend.md", "docs/KIP-0013-generated-backend-audit.md", "README.md", "internal/runtime/policy_enforcement_test.go"}
-	seen := map[string]bool{}
-	for _, path := range paths {
-		if seen[path] {
-			t.Fatalf("duplicate WO-044 path: %s", path)
-		}
-		seen[path] = true
-		after, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		sum := sha256.Sum256(after)
-		post := hex.EncodeToString(sum[:])
-		if post == strings.Repeat("0", 64) {
-			t.Fatalf("invalid WO-044 post hash: %s", path)
-		}
-		t.Logf("WO-044-POST-SHA256 %s post=%s", path, post)
-	}
-	if len(seen) != 6 {
-		t.Fatalf("WO-044 scope=%d want 6", len(seen))
-	}
-	args := append([]string{"status", "--porcelain", "--untracked-files=all", "--"}, paths...)
-	statusCmd := exec.Command("git", args...)
-	statusCmd.Dir = root
-	statusRaw, err := statusCmd.Output()
+	verifyCommittedEvidenceSetV1(t, root, "WO-044", []committedEvidenceExpectationV1{
+		{"internal/testkit/importrules/importrules_test.go", "UNRECORDED"},
+		{"docs/KIP-0067-stage6a-version-migration.md", "UNRECORDED"},
+		{"docs/KIP-0012-generated-source-backend.md", "UNRECORDED"},
+		{"docs/KIP-0013-generated-backend-audit.md", "UNRECORDED"},
+		{"README.md", "UNRECORDED"},
+		{"internal/runtime/policy_enforcement_test.go", "UNRECORDED"},
+	})
+	t.Logf("WO-044-SEALED-BASE authorized_repo_state=%s prior_lifecycle_sha256=%s; exact per-file pre-WO hashes were not captured and are not claimed", sealedRepoState, priorLifecycleSHA256)
+}
+
+const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
+
+type committedEvidenceManifestV1 struct {
+	Schema          string                                `json:"schema"`
+	HashAlgorithm   string                                `json:"hash_algorithm"`
+	SourceCandidate string                                `json:"source_candidate"`
+	Sets            map[string][]committedEvidenceEntryV1 `json:"sets"`
+}
+
+type committedEvidenceEntryV1 struct {
+	Path        string `json:"path"`
+	PreEvidence string `json:"pre_evidence"`
+	PostSHA256  string `json:"post_sha256"`
+}
+
+type committedEvidenceExpectationV1 struct {
+	Path        string
+	PreEvidence string
+}
+
+func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committedEvidenceExpectationV1) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	statusSeen := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimRight(strings.ReplaceAll(string(statusRaw), "\\", "/"), "\r\n"), "\n") {
-		if len(line) < 4 {
-			continue
+	var manifest committedEvidenceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Schema != "kurdistan.phase1-m0.committed-sha256.v1" || manifest.HashAlgorithm != "sha256" || manifest.SourceCandidate != "cad48bb4be28a09a6293944f78724d7026de4c12" {
+		t.Fatalf("invalid committed evidence manifest identity: %+v", manifest)
+	}
+	requiredSets := map[string]bool{"WO-040": true, "WO-041": true, "WO-042": true, "WO-043": true, "WO-044": true}
+	if len(manifest.Sets) != len(requiredSets) {
+		t.Fatalf("committed evidence sets=%v", manifest.Sets)
+	}
+	for name := range manifest.Sets {
+		if !requiredSets[name] {
+			t.Fatalf("unexpected committed evidence set %q", name)
 		}
-		statusSeen[strings.TrimSpace(line[3:])] = true
 	}
-	if len(statusSeen) != 6 {
-		t.Fatalf("WO-044 Git-visible scope=%v want exact six paths", statusSeen)
+	entries, ok := manifest.Sets[set]
+	if !ok || len(entries) != len(want) {
+		t.Fatalf("%s evidence entries=%v want %d", set, entries, len(want))
 	}
-	for path := range seen {
-		if !statusSeen[path] {
-			t.Fatalf("WO-044 scope path not Git-visible: %s", path)
+	for i, expected := range want {
+		entry := entries[i]
+		if entry.Path != expected.Path || entry.PreEvidence != expected.PreEvidence {
+			t.Fatalf("%s evidence[%d]=%+v want path=%s pre=%s", set, i, entry, expected.Path, expected.PreEvidence)
 		}
+		if entry.Path == committedEvidenceManifestPathV1 || filepath.IsAbs(entry.Path) || filepath.ToSlash(filepath.Clean(entry.Path)) != entry.Path {
+			t.Fatalf("%s invalid evidence path %q", set, entry.Path)
+		}
+		postBytes, err := hex.DecodeString(entry.PostSHA256)
+		if err != nil || len(postBytes) != sha256.Size || entry.PostSHA256 != strings.ToLower(entry.PostSHA256) || entry.PostSHA256 == strings.Repeat("0", 64) {
+			t.Fatalf("%s invalid post SHA-256 for %s", set, entry.Path)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			preBytes, err := hex.DecodeString(entry.PreEvidence)
+			if err != nil || len(preBytes) != sha256.Size || entry.PreEvidence != strings.ToLower(entry.PreEvidence) || entry.PreEvidence == entry.PostSHA256 {
+				t.Fatalf("%s invalid pre evidence for %s", set, entry.Path)
+			}
+		}
+		current, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(current)
+		post := hex.EncodeToString(sum[:])
+		if post != entry.PostSHA256 {
+			t.Fatalf("%s committed SHA-256 %s=%s want %s", set, entry.Path, post, entry.PostSHA256)
+		}
+		t.Logf("%s-SHA256 %s pre=%s post=%s", set, entry.Path, entry.PreEvidence, post)
 	}
-	t.Logf("WO-044-SEALED-BASE authorized_repo_state=%s prior_lifecycle_sha256=%s; exact per-file pre-WO hashes were not captured and are not claimed", sealedRepoState, priorLifecycleSHA256)
 }
 
 // allowedImporterPrefixes are the only package paths permitted to import the

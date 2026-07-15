@@ -110,6 +110,48 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 	if got := result.Details["outside_scope_file_count"]; got != m0OutsideScopeFileCount {
 		t.Fatalf("outside-scope files=%v", got)
 	}
+	wantMaintenancePaths := []string{
+		"cmd/gate/main.go",
+		"cmd/gate/main_test.go",
+		"cmd/kgen/main_test.go",
+		"docs/GOVERNANCE.md",
+		"internal/audit/codegen_test.go",
+		"internal/codegen/authorization_v1_test.go",
+		"internal/codegen/generator_test.go",
+		"internal/testkit/importrules/importrules_test.go",
+		"testdata/evidence/phase1-m0-committed-sha256.json",
+	}
+	if got := result.Details["wo058_maintenance_paths"]; !reflect.DeepEqual(got, wantMaintenancePaths) {
+		t.Fatalf("WO-058 maintenance paths=%v", got)
+	}
+	if got := result.Details["wo058_maintenance_file_count"]; got != m0WO058MaintenanceCount {
+		t.Fatalf("WO-058 maintenance files=%v", got)
+	}
+	if got := result.Details["wo058_maintenance_sha256"]; got != m0WO058MaintenanceHashV1 {
+		t.Fatalf("WO-058 maintenance digest=%v", got)
+	}
+	wantMaintenanceUnion := []string{
+		"STATUS.md",
+		"cmd/gate/main.go",
+		"cmd/gate/main_test.go",
+		"cmd/kgen/main_test.go",
+		"docs/GOVERNANCE.md",
+		"internal/audit/codegen_test.go",
+		"internal/audit/hardening_test.go",
+		"internal/audit/runtime.go",
+		"internal/audit/security.go",
+		"internal/audit/security_test.go",
+		"internal/codegen/authorization_v1_test.go",
+		"internal/codegen/generator_test.go",
+		"internal/testkit/importrules/importrules_test.go",
+		"testdata/evidence/phase1-m0-committed-sha256.json",
+	}
+	if got := result.Details["maintenance_union_paths"]; !reflect.DeepEqual(got, wantMaintenanceUnion) {
+		t.Fatalf("maintenance union paths=%v", got)
+	}
+	if got := result.Details["maintenance_union_file_count"]; got != 14 {
+		t.Fatalf("maintenance union files=%v", got)
+	}
 	wantTouches := []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"}
 	if got := result.Details["wo014_allowed_touches"]; !reflect.DeepEqual(got, wantTouches) {
 		t.Fatalf("allowed touches=%v", got)
@@ -193,6 +235,75 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("integration evidence overclaim %q: %s", forbidden, raw)
 		}
+	}
+}
+
+func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{
+		"cmd/gate/main.go",
+		"cmd/gate/main_test.go",
+		"cmd/kgen/main_test.go",
+		"docs/GOVERNANCE.md",
+		"internal/audit/codegen_test.go",
+		"internal/codegen/authorization_v1_test.go",
+		"internal/codegen/generator_test.go",
+		"internal/testkit/importrules/importrules_test.go",
+		"testdata/evidence/phase1-m0-committed-sha256.json",
+	}
+	fixture := t.TempDir()
+	for _, path := range paths {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := filepath.Join(fixture, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	manifest, err := m0CandidateManifestFromPathsV1(fixture, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(manifest.MaintenancePaths, paths) || manifest.MaintenanceFileCount != 9 || manifest.MaintenanceSHA256 != "41262d1712a957de91e550df01375a2d6f7a7e370635cc96566b9acedfc148a6" {
+		t.Fatalf("maintenance manifest=%+v", manifest)
+	}
+	if manifest.MaintenanceUnionCount != 14 {
+		t.Fatalf("maintenance union=%v/%d", manifest.MaintenanceUnionPaths, manifest.MaintenanceUnionCount)
+	}
+	unlisted := "unlisted/newly-tracked.txt"
+	unlistedTarget := filepath.Join(fixture, filepath.FromSlash(unlisted))
+	if err := os.MkdirAll(filepath.Dir(unlistedTarget), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(unlistedTarget, []byte("must remain historically visible"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withUnlisted := append(append([]string(nil), paths...), unlisted)
+	unlistedManifest, err := m0CandidateManifestFromPathsV1(fixture, withUnlisted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unlistedManifest.OutsideScopeFileCount != manifest.OutsideScopeFileCount+1 || unlistedManifest.OutsideScopeSHA256 == manifest.OutsideScopeSHA256 {
+		t.Fatalf("unlisted tracked path was excluded: before=%+v after=%+v", manifest, unlistedManifest)
+	}
+	if _, err := m0CandidateManifestFromPathsV1(fixture, paths[:len(paths)-1]); err == nil || !strings.Contains(err.Error(), "maintenance paths missing") {
+		t.Fatalf("missing maintenance path error=%v", err)
+	}
+	driftPath := filepath.Join(fixture, filepath.FromSlash(paths[0]))
+	if err := os.WriteFile(driftPath, []byte("hash drift"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m0CandidateManifestFromPathsV1(fixture, paths); err == nil || !strings.Contains(err.Error(), "maintenance hash drift cmd/gate/main.go") {
+		t.Fatalf("maintenance hash drift error=%v", err)
 	}
 }
 

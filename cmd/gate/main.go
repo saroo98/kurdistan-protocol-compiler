@@ -26,6 +26,19 @@ type step struct {
 	args []string
 }
 
+func gateSteps(quick bool, jsonOut, statusOut string) []step {
+	auditMode := "--full"
+	if quick {
+		auditMode = "--quick"
+	}
+	return []step{
+		{"build", []string{"build", "./..."}},
+		{"vet", []string{"vet", "./..."}},
+		{"test", []string{"test", "-count=1", "./..."}},
+		{"audit", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}},
+	}
+}
+
 func main() {
 	quick := false
 	for _, a := range os.Args[1:] {
@@ -34,19 +47,9 @@ func main() {
 		}
 	}
 
-	auditMode := "--full"
-	if quick {
-		auditMode = "--quick"
-	}
 	statusOut := filepath.Join(os.TempDir(), "kcheck-gate-status.md")
 	jsonOut := filepath.Join(os.TempDir(), "kcheck-gate-report.json")
-
-	steps := []step{
-		{"build", []string{"build", "./..."}},
-		{"vet", []string{"vet", "./..."}},
-		{"test", []string{"test", "./..."}},
-		{"audit", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}},
-	}
+	steps := gateSteps(quick, jsonOut, statusOut)
 
 	failed := []string{}
 	for _, s := range steps {

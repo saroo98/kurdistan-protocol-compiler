@@ -9,7 +9,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -390,26 +389,88 @@ func TestNoImplicitPinsFourPathSHA256Evidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths := []string{"cmd/kgen/main.go", "cmd/kgen/main_test.go", "internal/runtime/policy_enforcement_test.go", "internal/runtime/profile_loader_test.go"}
-	for _, path := range paths {
-		cmd := exec.Command("git", "show", "HEAD:"+path)
-		cmd.Dir = root
-		before, err := cmd.Output()
-		pre := "ABSENT"
-		if err == nil {
-			sum := sha256.Sum256(before)
-			pre = hex.EncodeToString(sum[:])
+	verifyCommittedEvidenceSetV1(t, root, "WO-041", []committedEvidenceExpectationV1{
+		{"cmd/kgen/main.go", "79c6bb76ae234e08b8f2b1e2248ea1e4d4d0770fa52e9fcab1aa3914618a3ed4"},
+		{"cmd/kgen/main_test.go", "bf6f2a7e2840c12d56a652f486fecda8297f839d36697bef786b31cfd6e2273b"},
+		{"internal/runtime/policy_enforcement_test.go", "ABSENT"},
+		{"internal/runtime/profile_loader_test.go", "ABSENT"},
+	})
+}
+
+const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
+
+type committedEvidenceManifestV1 struct {
+	Schema          string                                `json:"schema"`
+	HashAlgorithm   string                                `json:"hash_algorithm"`
+	SourceCandidate string                                `json:"source_candidate"`
+	Sets            map[string][]committedEvidenceEntryV1 `json:"sets"`
+}
+
+type committedEvidenceEntryV1 struct {
+	Path        string `json:"path"`
+	PreEvidence string `json:"pre_evidence"`
+	PostSHA256  string `json:"post_sha256"`
+}
+
+type committedEvidenceExpectationV1 struct {
+	Path        string
+	PreEvidence string
+}
+
+func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committedEvidenceExpectationV1) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest committedEvidenceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Schema != "kurdistan.phase1-m0.committed-sha256.v1" || manifest.HashAlgorithm != "sha256" || manifest.SourceCandidate != "cad48bb4be28a09a6293944f78724d7026de4c12" {
+		t.Fatalf("invalid committed evidence manifest identity: %+v", manifest)
+	}
+	requiredSets := map[string]bool{"WO-040": true, "WO-041": true, "WO-042": true, "WO-043": true, "WO-044": true}
+	if len(manifest.Sets) != len(requiredSets) {
+		t.Fatalf("committed evidence sets=%v", manifest.Sets)
+	}
+	for name := range manifest.Sets {
+		if !requiredSets[name] {
+			t.Fatalf("unexpected committed evidence set %q", name)
 		}
-		after, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	}
+	entries, ok := manifest.Sets[set]
+	if !ok || len(entries) != len(want) {
+		t.Fatalf("%s evidence entries=%v want %d", set, entries, len(want))
+	}
+	for i, expected := range want {
+		entry := entries[i]
+		if entry.Path != expected.Path || entry.PreEvidence != expected.PreEvidence {
+			t.Fatalf("%s evidence[%d]=%+v want path=%s pre=%s", set, i, entry, expected.Path, expected.PreEvidence)
+		}
+		if entry.Path == committedEvidenceManifestPathV1 || filepath.IsAbs(entry.Path) || filepath.ToSlash(filepath.Clean(entry.Path)) != entry.Path {
+			t.Fatalf("%s invalid evidence path %q", set, entry.Path)
+		}
+		postBytes, err := hex.DecodeString(entry.PostSHA256)
+		if err != nil || len(postBytes) != sha256.Size || entry.PostSHA256 != strings.ToLower(entry.PostSHA256) || entry.PostSHA256 == strings.Repeat("0", 64) {
+			t.Fatalf("%s invalid post SHA-256 for %s", set, entry.Path)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			preBytes, err := hex.DecodeString(entry.PreEvidence)
+			if err != nil || len(preBytes) != sha256.Size || entry.PreEvidence != strings.ToLower(entry.PreEvidence) || entry.PreEvidence == entry.PostSHA256 {
+				t.Fatalf("%s invalid pre evidence for %s", set, entry.Path)
+			}
+		}
+		current, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
 		if err != nil {
 			t.Fatal(err)
 		}
-		sum := sha256.Sum256(after)
+		sum := sha256.Sum256(current)
 		post := hex.EncodeToString(sum[:])
-		if pre == post || post == strings.Repeat("0", 64) {
-			t.Fatalf("%s SHA evidence invalid", path)
+		if post != entry.PostSHA256 {
+			t.Fatalf("%s committed SHA-256 %s=%s want %s", set, entry.Path, post, entry.PostSHA256)
 		}
-		t.Logf("WO-041-SHA256 %s pre=%s post=%s", path, pre, post)
+		t.Logf("%s-SHA256 %s pre=%s post=%s", set, entry.Path, entry.PreEvidence, post)
 	}
 }
 

@@ -62,12 +62,14 @@ func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error)
 }
 
 const (
-	m0AuthorizedRepoStateV1 = "6f04295c52a0a37b83d2a13c38e9028f90ccbaf8854929f8557e36c64ad5532c"
-	m0LifecycleEvidenceV1   = "1f63391af51b23c4eca802e76d5164a98398a857070b8a7dd2cf99d055e4588e"
-	m0PolicySeedCSVV1       = "1,2,3,4,6,7,19,25,26,27,35,40,42,58,66,69,78,80,91,94,102,107,110,123,135,171,174,202,223"
-	m0PolicySeedCSVHashV1   = "2577a6114b5df02b44d43ae02fd80fa08f8c593c2449f79a46f84aa63fa5efaa"
-	m0OutsideScopeHashV1    = "efae3ee45109577aa76fa6fd1c932fe7de1691da977557d9c269c4d0a852660f"
-	m0OutsideScopeFileCount = 1329
+	m0AuthorizedRepoStateV1  = "6f04295c52a0a37b83d2a13c38e9028f90ccbaf8854929f8557e36c64ad5532c"
+	m0LifecycleEvidenceV1    = "1f63391af51b23c4eca802e76d5164a98398a857070b8a7dd2cf99d055e4588e"
+	m0PolicySeedCSVV1        = "1,2,3,4,6,7,19,25,26,27,35,40,42,58,66,69,78,80,91,94,102,107,110,123,135,171,174,202,223"
+	m0PolicySeedCSVHashV1    = "2577a6114b5df02b44d43ae02fd80fa08f8c593c2449f79a46f84aa63fa5efaa"
+	m0OutsideScopeHashV1     = "efae3ee45109577aa76fa6fd1c932fe7de1691da977557d9c269c4d0a852660f"
+	m0OutsideScopeFileCount  = 1329
+	m0WO058MaintenanceHashV1 = "41262d1712a957de91e550df01375a2d6f7a7e370635cc96566b9acedfc148a6"
+	m0WO058MaintenanceCount  = 9
 )
 
 type m0EvidenceRowV1 struct {
@@ -80,7 +82,7 @@ type m0EvidenceRowV1 struct {
 	OwningWOEvidenceSHA256 string `json:"owning_wo_evidence_sha256"`
 }
 
-var m0WO014AllowedTouchesV1 = map[string]bool{
+var m0HistoricalWO014TouchesV1 = map[string]bool{
 	"STATUS.md":                        true,
 	"internal/audit/security.go":       true,
 	"internal/audit/security_test.go":  true,
@@ -88,37 +90,164 @@ var m0WO014AllowedTouchesV1 = map[string]bool{
 	"internal/audit/hardening_test.go": true,
 }
 
-func m0CandidateOutsideScopeManifestV1(root string) (string, int, error) {
+var m0WO058MaintenanceHashesV1 = map[string]string{
+	"cmd/gate/main.go":                                  "c7d9d7127fec76e135fe0ea7bebd86285764025c735d8e733c12b9a0e662663f",
+	"cmd/gate/main_test.go":                             "aac61d15fe907cdd439d03ea9701a85712300489b2aba593c15e3ffe5ecadb87",
+	"cmd/kgen/main_test.go":                             "a80d10983b1e5684faf64011ee482a3a8216f2ab2393fbe9cd7570cbf4d5524d",
+	"docs/GOVERNANCE.md":                                "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
+	"internal/audit/codegen_test.go":                    "0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec",
+	"internal/codegen/authorization_v1_test.go":         "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac",
+	"internal/codegen/generator_test.go":                "bcaa712289d2909c3125f1ca59fd976a378ca09653c1b1ef1db699e4ac38b4c6",
+	"internal/testkit/importrules/importrules_test.go":  "1128d762990de6bac542df8afbbb08de06cc726c1117ecf55ec8feb69edfe167",
+	"testdata/evidence/phase1-m0-committed-sha256.json": "4400e503524d1277329f893be0773dee202d5108265f62d22830e09fc8f8fa53",
+}
+
+var m0WO058HistoricalOutsideScopeHashesV1 = map[string]string{
+	"cmd/gate/main.go":                                 "3bb816f92ef6a14ea72791057ab31d3a1d14766259efc3cc9f99ad9caedbb90f",
+	"cmd/kgen/main_test.go":                            "3625c2657a23772a21137b98623733309e0c85a3d56a5063a1860fc5fad28de7",
+	"docs/GOVERNANCE.md":                               "971cf99e586b22782058af5ebb083491e0169214065c39f717507ed8f9e98bfa",
+	"internal/audit/codegen_test.go":                   "c7e3e5e6db1e13e4b7951f8f82d20f256a287f938f366c8d7f449428bdb7cca3",
+	"internal/codegen/authorization_v1_test.go":        "34dafde20553b8f2079c8fc9cd668ffa723ca5b183ea1a644e5e99c089f75c2c",
+	"internal/codegen/generator_test.go":               "d2fe0bd0bd5918f52e2dc32708d35ef0d5cc0e852ba9857a57381d4bc36db5c4",
+	"internal/testkit/importrules/importrules_test.go": "436134fc57e2082ffc0ad4eba5e74bfc4a31dae078ef86cb6a0ef879d8f1ac35",
+}
+
+type m0CandidateManifestV1 struct {
+	OutsideScopeSHA256    string
+	OutsideScopeFileCount int
+	MaintenancePaths      []string
+	MaintenanceFileCount  int
+	MaintenanceSHA256     string
+	MaintenanceUnionPaths []string
+	MaintenanceUnionCount int
+}
+
+func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	cmd.Dir = root
 	raw, err := cmd.Output()
 	if err != nil {
-		return "", 0, fmt.Errorf("git-visible candidate inventory: %w", err)
+		return m0CandidateManifestV1{}, fmt.Errorf("git-visible candidate inventory: %w", err)
+	}
+	parts := make([]string, 0, len(bytes.Split(raw, []byte{0})))
+	for _, part := range bytes.Split(raw, []byte{0}) {
+		parts = append(parts, filepath.ToSlash(string(part)))
+	}
+	return m0CandidateManifestFromPathsV1(root, parts)
+}
+
+func m0CandidateManifestFromPathsV1(root string, inventory []string) (m0CandidateManifestV1, error) {
+	maintenanceUnion, err := m0MaintenanceUnionV1()
+	if err != nil {
+		return m0CandidateManifestV1{}, err
 	}
 	seen := map[string]bool{}
-	paths := []string{}
-	for _, part := range bytes.Split(raw, []byte{0}) {
-		path := filepath.ToSlash(string(part))
-		if path == "" || m0WO014AllowedTouchesV1[path] || seen[path] {
+	maintenanceSeen := map[string]string{}
+	historicalOverrides := map[string]string{}
+	outsidePaths := []string{}
+	for _, rawPath := range inventory {
+		path := filepath.ToSlash(rawPath)
+		if path == "" || m0HistoricalWO014TouchesV1[path] || seen[path] {
 			continue
 		}
 		seen[path] = true
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	h := sha256.New()
-	for _, path := range paths {
-		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if readErr != nil {
-			return "", 0, fmt.Errorf("candidate path %s: %w", path, readErr)
+		if expected, ok := m0WO058MaintenanceHashesV1[path]; ok {
+			content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if readErr != nil {
+				return m0CandidateManifestV1{}, fmt.Errorf("WO-058 maintenance path %s: %w", path, readErr)
+			}
+			actual := fmt.Sprintf("%x", sha256.Sum256(content))
+			if actual != expected {
+				return m0CandidateManifestV1{}, fmt.Errorf("WO-058 maintenance hash drift %s=%s want %s", path, actual, expected)
+			}
+			maintenanceSeen[path] = actual
+			if historicalHash, existed := m0WO058HistoricalOutsideScopeHashesV1[path]; existed {
+				historicalOverrides[path] = historicalHash
+				outsidePaths = append(outsidePaths, path)
+			}
+			continue
 		}
-		fileHash := fmt.Sprintf("%x", sha256.Sum256(content))
+		outsidePaths = append(outsidePaths, path)
+	}
+	if len(maintenanceSeen) != len(m0WO058MaintenanceHashesV1) {
+		missing := []string{}
+		for path := range m0WO058MaintenanceHashesV1 {
+			if _, ok := maintenanceSeen[path]; !ok {
+				missing = append(missing, path)
+			}
+		}
+		sort.Strings(missing)
+		return m0CandidateManifestV1{}, fmt.Errorf("WO-058 maintenance paths missing: %v", missing)
+	}
+	maintenancePaths := make([]string, 0, len(maintenanceSeen))
+	for path := range maintenanceSeen {
+		maintenancePaths = append(maintenancePaths, path)
+	}
+	sort.Strings(maintenancePaths)
+	maintenanceHasher := sha256.New()
+	for _, path := range maintenancePaths {
+		_, _ = maintenanceHasher.Write([]byte(path))
+		_, _ = maintenanceHasher.Write([]byte{0})
+		_, _ = maintenanceHasher.Write([]byte(maintenanceSeen[path]))
+		_, _ = maintenanceHasher.Write([]byte{'\n'})
+	}
+	maintenanceHash := fmt.Sprintf("%x", maintenanceHasher.Sum(nil))
+
+	sort.Strings(outsidePaths)
+	h := sha256.New()
+	for _, path := range outsidePaths {
+		fileHash := historicalOverrides[path]
+		if fileHash == "" {
+			content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if readErr != nil {
+				return m0CandidateManifestV1{}, fmt.Errorf("candidate path %s: %w", path, readErr)
+			}
+			fileHash = fmt.Sprintf("%x", sha256.Sum256(content))
+		}
 		_, _ = h.Write([]byte(path))
 		_, _ = h.Write([]byte{0})
 		_, _ = h.Write([]byte(fileHash))
 		_, _ = h.Write([]byte{'\n'})
 	}
-	return fmt.Sprintf("%x", h.Sum(nil)), len(paths), nil
+	return m0CandidateManifestV1{
+		OutsideScopeSHA256:    fmt.Sprintf("%x", h.Sum(nil)),
+		OutsideScopeFileCount: len(outsidePaths),
+		MaintenancePaths:      maintenancePaths,
+		MaintenanceFileCount:  len(maintenancePaths),
+		MaintenanceSHA256:     maintenanceHash,
+		MaintenanceUnionPaths: maintenanceUnion,
+		MaintenanceUnionCount: len(maintenanceUnion),
+	}, nil
+}
+
+func m0MaintenanceUnionV1() ([]string, error) {
+	if len(m0HistoricalWO014TouchesV1) != 5 || len(m0WO058MaintenanceHashesV1) != 9 || len(m0WO058HistoricalOutsideScopeHashesV1) != 7 {
+		return nil, fmt.Errorf("maintenance group sizes historical-WO-014=%d WO-058=%d historical-substitutions=%d", len(m0HistoricalWO014TouchesV1), len(m0WO058MaintenanceHashesV1), len(m0WO058HistoricalOutsideScopeHashesV1))
+	}
+	for path := range m0WO058HistoricalOutsideScopeHashesV1 {
+		if _, ok := m0WO058MaintenanceHashesV1[path]; !ok {
+			return nil, fmt.Errorf("historical substitution is not a WO-058 path: %s", path)
+		}
+	}
+	seen := map[string]string{}
+	for path := range m0HistoricalWO014TouchesV1 {
+		seen[path] = "historical WO-014"
+	}
+	for path := range m0WO058MaintenanceHashesV1 {
+		if group, exists := seen[path]; exists {
+			return nil, fmt.Errorf("maintenance path overlap %s: %s and WO-058", path, group)
+		}
+		seen[path] = "WO-058"
+	}
+	if len(seen) != 14 {
+		return nil, fmt.Errorf("maintenance union paths=%d want 14", len(seen))
+	}
+	paths := make([]string, 0, len(seen))
+	for path := range seen {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths, nil
 }
 
 func SecurityM0IntegratedEvidenceGate() GateResult {
@@ -127,11 +256,16 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		return gate("security_m0_g1_g13_integration", false, "required", err.Error(), nil, []string{err.Error()})
 	}
 	failures := []string{}
-	outsideScopeHash, outsideScopeFiles, bindingErr := m0CandidateOutsideScopeManifestV1(root)
+	manifest, bindingErr := m0CandidateOutsideScopeManifestV1(root)
 	if bindingErr != nil {
 		failures = append(failures, bindingErr.Error())
-	} else if outsideScopeHash != m0OutsideScopeHashV1 || outsideScopeFiles != m0OutsideScopeFileCount {
-		failures = append(failures, fmt.Sprintf("pre-WO-014 candidate binding drift hash=%s files=%d", outsideScopeHash, outsideScopeFiles))
+	} else {
+		if manifest.OutsideScopeSHA256 != m0OutsideScopeHashV1 || manifest.OutsideScopeFileCount != m0OutsideScopeFileCount {
+			failures = append(failures, fmt.Sprintf("pre-WO-014 candidate binding drift hash=%s files=%d", manifest.OutsideScopeSHA256, manifest.OutsideScopeFileCount))
+		}
+		if manifest.MaintenanceSHA256 != m0WO058MaintenanceHashV1 || manifest.MaintenanceFileCount != m0WO058MaintenanceCount {
+			failures = append(failures, fmt.Sprintf("WO-058 maintenance binding drift hash=%s files=%d", manifest.MaintenanceSHA256, manifest.MaintenanceFileCount))
+		}
 	}
 	seedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(m0PolicySeedCSVV1)))
 	if seedHash != m0PolicySeedCSVHashV1 || len(strings.Split(m0PolicySeedCSVV1, ",")) != 29 || strings.HasPrefix(m0PolicySeedCSVV1, "1,2,3,4,5,6,7,8") {
@@ -193,8 +327,13 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		"global_product_status":         "open",
 		"authorized_repo_state_hash":    m0AuthorizedRepoStateV1,
 		"lifecycle_evidence_sha256":     m0LifecycleEvidenceV1,
-		"outside_scope_manifest_sha256": outsideScopeHash,
-		"outside_scope_file_count":      outsideScopeFiles,
+		"outside_scope_manifest_sha256": manifest.OutsideScopeSHA256,
+		"outside_scope_file_count":      manifest.OutsideScopeFileCount,
+		"wo058_maintenance_paths":       manifest.MaintenancePaths,
+		"wo058_maintenance_file_count":  manifest.MaintenanceFileCount,
+		"wo058_maintenance_sha256":      manifest.MaintenanceSHA256,
+		"maintenance_union_paths":       manifest.MaintenanceUnionPaths,
+		"maintenance_union_file_count":  manifest.MaintenanceUnionCount,
 		"wo014_allowed_touches":         []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"},
 		"wo014_completion_hash":         "not-created-no-commit-authority",
 		"policy_seed_csv_sha256":        seedHash,
