@@ -8,13 +8,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"kurdistan/internal/transport/adaptivepath"
-	"kurdistan/internal/lab/concretelocaladapter"
 	"kurdistan/internal/contracts/android/androidcarrier"
 	"kurdistan/internal/contracts/android/androidreview"
 	"kurdistan/internal/contracts/android/androidruntime"
@@ -39,16 +38,18 @@ import (
 	"kurdistan/internal/contracts/readiness/productionreadiness"
 	"kurdistan/internal/contracts/vpn/localvpnadapter"
 	"kurdistan/internal/contracts/vpn/vpnsemantics"
+	"kurdistan/internal/lab/concretelocaladapter"
 	"kurdistan/internal/lab/localprotocoladapter"
 	"kurdistan/internal/lab/localproxyadapter"
 	"kurdistan/internal/lab/localproxyingressadversary"
+	"kurdistan/internal/lab/proxyegress"
 	"kurdistan/internal/operator/relayauthplan"
 	"kurdistan/internal/operator/relaybridge"
 	"kurdistan/internal/operator/relayprocess"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/transport/adaptivepath"
 	"kurdistan/internal/transport/pathhealth"
 	"kurdistan/internal/transport/pathrace"
-	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/lab/proxyegress"
 	"kurdistan/internal/transport/transportbundle"
 )
 
@@ -66,6 +67,33 @@ type Result struct {
 }
 
 func Generate(p *ir.Profile, out string, opts Options) (Result, error) {
+	return generateV1(p, out, opts, AuthorizationCatalogV1{}, false)
+}
+
+func GenerateStrict(p *ir.Profile, out string, opts Options, catalog AuthorizationCatalogV1) (Result, error) {
+	if p == nil || p.Seed > math.MaxInt64-7 {
+		return Result{}, ErrStrictSeedRange
+	}
+	if err := catalog.validate(); err != nil {
+		return Result{}, ErrAuthorizationCatalogInvalid
+	}
+	client, relay, ok := findCatalogPinV1(catalog, p.Seed)
+	if !ok {
+		return Result{}, ErrAuthorizationMismatch
+	}
+	want, err := expectedPinV1(p)
+	if err != nil || client != want || relay != want {
+		return Result{}, ErrAuthorizationMismatch
+	}
+	expectedModule := strictModulePathV1(p.ID)
+	if opts.ModulePath != "" && opts.ModulePath != expectedModule {
+		return Result{}, ErrStrictModulePath
+	}
+	opts.ModulePath = expectedModule
+	return generateV1(p, out, opts, catalog, true)
+}
+
+func generateV1(p *ir.Profile, out string, opts Options, catalog AuthorizationCatalogV1, strict bool) (Result, error) {
 	if err := ir.Validate(p); err != nil {
 		return Result{}, err
 	}
@@ -100,7 +128,15 @@ func Generate(p *ir.Profile, out string, opts Options) (Result, error) {
 
 	generatedAt := opts.GeneratedAt.UTC().Format(time.RFC3339)
 	manifest := NewManifest(p, generatedAt)
-	files, err := renderFiles(p, modulePath, repoRoot, manifest)
+	if catalog.version != "" {
+		if catalog.digest == ([32]byte{}) || catalog.scope == "" {
+			return Result{}, ErrAuthorizationCatalogInvalid
+		}
+		manifest.AuthorizationCatalogVersion = catalog.version
+		manifest.AuthorizationCatalogScope = catalog.scope
+		manifest.AuthorizationCatalogSHA256 = hex.EncodeToString(catalog.digest[:])
+	}
+	files, err := renderFiles(p, modulePath, repoRoot, manifest, strict)
 	if err != nil {
 		return Result{}, err
 	}
@@ -159,6 +195,7 @@ func cleanGeneratedOutput(out string) error {
 		filepath.Join("cmd", "generated-server"),
 		filepath.Join("cmd", "generated-echo"),
 		filepath.Join("cmd", "generated-trace"),
+		"strictv1",
 	} {
 		if err := os.RemoveAll(filepath.Join(out, rel)); err != nil {
 			return err
@@ -167,7 +204,7 @@ func cleanGeneratedOutput(out string) error {
 	return nil
 }
 
-func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest) ([]generatedFile, error) {
+func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest, strict bool) ([]generatedFile, error) {
 	manifestRaw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return nil, err
@@ -183,7 +220,35 @@ func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest) 
 		{RelPath: "manifest.json", Content: string(manifestRaw)},
 	}
 	files = append(files, goFiles...)
+	if strict {
+		strictSource := strictRuntimeTemplateV1()
+		files = append(files, generatedFile{RelPath: "strictv1/runtime.go", Content: strictSource, Go: true})
+	}
 	return files, nil
+}
+
+func strictModulePathV1(id string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range id {
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			b.WriteRune(r)
+			dash = false
+		} else if b.Len() > 0 {
+			dash = true
+		}
+	}
+	suffix := strings.Trim(b.String(), "-")
+	if suffix == "" {
+		suffix = "generated"
+	}
+	return "kurdistan/generated/" + suffix
 }
 
 func renderGoFiles(p *ir.Profile, modulePath string) ([]generatedFile, error) {
@@ -1517,15 +1582,17 @@ func IsGeneratedWrapperOnly(source string) bool {
 
 func relayFleetAssignmentMode(seed int64) string {
 	modes := []string{"one_profile_per_relay", "profile_rotation", "family_rotation", "wire_policy_rotation", "risk_aware_profile_refresh"}
-	return modes[int(seed)%len(modes)]
+	return modes[signedSafeModeIndex(seed, len(modes))]
 }
 
 func relayFleetChurnMode(seed int64) string {
 	modes := []string{"fixed_interval_churn", "risk_threshold_churn", "observation_count_churn", "profile_reuse_churn", "mixed_policy_churn"}
-	return modes[int(seed)%len(modes)]
+	return modes[signedSafeModeIndex(seed, len(modes))]
 }
 
 func relayFleetMigrationMode(seed int64) string {
 	modes := []string{"graceful_profile_migration", "relay_to_relay_migration", "risk_triggered_migration", "session_boundary_migration"}
-	return modes[int(seed)%len(modes)]
+	return modes[signedSafeModeIndex(seed, len(modes))]
 }
+
+func signedSafeModeIndex(seed int64, n int) int { return int(uint64(seed) % uint64(n)) }

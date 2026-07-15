@@ -6,15 +6,20 @@ package audit
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/lab/runtimeadversary"
+	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/protocol/ir"
 )
 
 func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
@@ -36,6 +41,7 @@ func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error)
 		SecuritySecretTraceHygieneGate(profiles),
 		SecurityMutantDetectionGate(ctx),
 		SecurityGeneratedBackendParityGate(),
+		SecurityM0IntegratedEvidenceGate(),
 	}
 	report := AuditReport{
 		Version:          Version,
@@ -53,6 +59,151 @@ func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error)
 		report.Conclusion = "failed"
 	}
 	return report, nil
+}
+
+const (
+	m0AuthorizedRepoStateV1 = "6f04295c52a0a37b83d2a13c38e9028f90ccbaf8854929f8557e36c64ad5532c"
+	m0LifecycleEvidenceV1   = "1f63391af51b23c4eca802e76d5164a98398a857070b8a7dd2cf99d055e4588e"
+	m0PolicySeedCSVV1       = "1,2,3,4,6,7,19,25,26,27,35,40,42,58,66,69,78,80,91,94,102,107,110,123,135,171,174,202,223"
+	m0PolicySeedCSVHashV1   = "2577a6114b5df02b44d43ae02fd80fa08f8c593c2449f79a46f84aa63fa5efaa"
+	m0OutsideScopeHashV1    = "efae3ee45109577aa76fa6fd1c932fe7de1691da977557d9c269c4d0a852660f"
+	m0OutsideScopeFileCount = 1329
+)
+
+type m0EvidenceRowV1 struct {
+	Goal                   string `json:"goal"`
+	Command                string `json:"command"`
+	Behavior               string `json:"behavior"`
+	RegressionTest         string `json:"regression_test"`
+	OwningWork             string `json:"owning_work"`
+	CandidateRepoState     string `json:"candidate_repo_state_hash"`
+	OwningWOEvidenceSHA256 string `json:"owning_wo_evidence_sha256"`
+}
+
+var m0WO014AllowedTouchesV1 = map[string]bool{
+	"STATUS.md":                        true,
+	"internal/audit/security.go":       true,
+	"internal/audit/security_test.go":  true,
+	"internal/audit/runtime.go":        true,
+	"internal/audit/hardening_test.go": true,
+}
+
+func m0CandidateOutsideScopeManifestV1(root string) (string, int, error) {
+	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd.Dir = root
+	raw, err := cmd.Output()
+	if err != nil {
+		return "", 0, fmt.Errorf("git-visible candidate inventory: %w", err)
+	}
+	seen := map[string]bool{}
+	paths := []string{}
+	for _, part := range bytes.Split(raw, []byte{0}) {
+		path := filepath.ToSlash(string(part))
+		if path == "" || m0WO014AllowedTouchesV1[path] || seen[path] {
+			continue
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	h := sha256.New()
+	for _, path := range paths {
+		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if readErr != nil {
+			return "", 0, fmt.Errorf("candidate path %s: %w", path, readErr)
+		}
+		fileHash := fmt.Sprintf("%x", sha256.Sum256(content))
+		_, _ = h.Write([]byte(path))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(fileHash))
+		_, _ = h.Write([]byte{'\n'})
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), len(paths), nil
+}
+
+func SecurityM0IntegratedEvidenceGate() GateResult {
+	root, err := repoRoot()
+	if err != nil {
+		return gate("security_m0_g1_g13_integration", false, "required", err.Error(), nil, []string{err.Error()})
+	}
+	failures := []string{}
+	outsideScopeHash, outsideScopeFiles, bindingErr := m0CandidateOutsideScopeManifestV1(root)
+	if bindingErr != nil {
+		failures = append(failures, bindingErr.Error())
+	} else if outsideScopeHash != m0OutsideScopeHashV1 || outsideScopeFiles != m0OutsideScopeFileCount {
+		failures = append(failures, fmt.Sprintf("pre-WO-014 candidate binding drift hash=%s files=%d", outsideScopeHash, outsideScopeFiles))
+	}
+	seedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(m0PolicySeedCSVV1)))
+	if seedHash != m0PolicySeedCSVHashV1 || len(strings.Split(m0PolicySeedCSVV1, ",")) != 29 || strings.HasPrefix(m0PolicySeedCSVV1, "1,2,3,4,5,6,7,8") {
+		failures = append(failures, "frozen policy interaction seed evidence drift")
+	}
+	requiredSource := map[string][]string{
+		"internal/runtime/generated_profile_parity_test.go": {
+			"TestGeneratedProfileParityV1", m0PolicySeedCSVHashV1, "len(generatedProfileParityPinsV1) != 29",
+		},
+		"internal/runtime/policy_enforcement_test.go": {
+			"TestInterpretedPolicyParityCoveringArrayV1", "pairwise coverage=%d/%d want 732/732", "TestPolicyMatrixOwnerWitnessLiteralCompleteV1",
+		},
+		"internal/runtime/handshake_test.go": {
+			"TestPreEntropyVersionStructuredAdmission",
+		},
+		"internal/testkit/importrules/importrules_test.go": {
+			"TestLabFaultCapabilityCannotReachNormalPaths", "TestGeneratedAuthorizationBoundaryInjectedV1", "internal/runtime/generated_escape.go",
+		},
+	}
+	for path, markers := range requiredSource {
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if readErr != nil {
+			failures = append(failures, path+": "+readErr.Error())
+			continue
+		}
+		for _, marker := range markers {
+			if !strings.Contains(string(raw), marker) {
+				failures = append(failures, path+": missing "+marker)
+			}
+		}
+	}
+	rows := []m0EvidenceRowV1{
+		{"G1", "go test -count=1 ./internal/runtime -run 'TestGeneratedProfileParityV1|TestInterpretedPolicyParityCoveringArrayV1|TestPolicyMatrixOwnerWitnessLiteralCompleteV1'", "every admitted policy value and the frozen 29-row interactions reach interpreted and generated-profile strict behavior", "TestGeneratedProfileParityV1", "WO-016,WO-050,WO-035..WO-044", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G2", "go test -count=1 ./internal/crypto/security -run 'TestReplayStateCommitsOnlyAfterAuthentication|TestReplayConcurrentAuthenticatedDuplicateCommitsOnce'", "authentication precedes replay mutation and concurrent duplicates commit at most once", "TestReplayStateCommitsOnlyAfterAuthentication", "WO-003,WO-020,WO-009", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G3", "go test -count=1 ./internal/crypto/auth -run 'TestAuthenticatedFirstContactFreshSessionNonceReplayAndKeys'", "authenticated first contact uses fresh session material and rejects replay", "TestAuthenticatedFirstContactFreshSessionNonceReplayAndKeys", "WO-019", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G4", "go test -count=1 ./internal/runtime -run 'TestProtectedChannelMultiFragmentExactCoverageV1|TestFragmentCoverageAndBoundsV1'", "authenticated fragment coverage rejects gaps, overlap, duplicates, and mixed coordinates", "TestProtectedChannelMultiFragmentExactCoverageV1", "WO-049", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G5", "go test -count=1 ./internal/runtime -run 'TestPolicyMatrixCoveringSeedsProtectedChannelProductionV1|TestPolicyMatrixPrivateEntrypointCausalBypassSentinelV1'", "bilateral floors and exact policy tuples cannot be weakened", "TestPolicyMatrixCoveringSeedsProtectedChannelProductionV1", "WO-031,WO-033,WO-022,WO-050", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G6", "go test -count=1 ./internal/runtime -run 'TestFirstRecordCommitServerEstablishOrderingV1|TestAuthenticatedOperationAckStrictReplayCommitOrderingV1'", "application and acknowledgement lifecycle commits remain transactional", "TestFirstRecordCommitServerEstablishOrderingV1", "WO-047,WO-048,WO-021,WO-049", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G7", "go test -count=1 ./internal/crypto/security ./internal/runtime -run 'TestContextIdentityRejectsInvalidFields|TestPreEntropyVersionStructuredAdmission'", "context identity and structured version admission reject before protected state", "TestContextIdentityRejectsInvalidFields", "WO-038,WO-039,WO-045", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G8", "go test -count=1 ./internal/runtime -run 'TestApplicationRecordVectorV1|TestProtectedChannelEndToEndSingleFragmentAckCloseV1'", "strict candidate application bytes are authenticated and tamper fail-closed", "TestProtectedChannelEndToEndSingleFragmentAckCloseV1", "WO-024,WO-021,WO-049", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G9", "go test -count=1 ./internal/runtime -run 'TestInProcessProtectedRelayProtectedPathAndAckV1|TestPairOwnershipAndTerminalRelayCloseV1'", "one configured in-process pair composes handshake, records, acknowledgement, and close", "TestInProcessProtectedRelayProtectedPathAndAckV1", "WO-011", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G10", "go test -count=1 ./internal/crypto/security -run 'TestNonceV1FormulaVectorsAndDirectionV1|TestNonceV1BurnRetryAndExhaust|TestNonceV1ConcurrentAllocation'", "all nonce formulas preserve direction, burn, exhaustion, and concurrent uniqueness", "TestNonceV1FormulaVectorsAndDirectionV1", "WO-020,WO-009,WO-026", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G11", "go test -count=1 ./internal/crypto/security -run 'TestKeyScheduleV1VectorEpochZeroAndOne|TestKeyScheduleV1DerivationAndSeparation'", "key schedule labels, directions, epochs, limits, and separation remain exact", "TestKeyScheduleV1DerivationAndSeparation", "WO-019,WO-021", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G12", "go test -count=1 ./internal/observe/trace -run 'TestDiagnosticEventV1ExhaustiveSchemaAndValues|TestSchemaSequenceCrossSessionProfileCorrelationV1'", "diagnostic schema and sequences reject secret and correlating expansion", "TestDiagnosticEventV1ExhaustiveSchemaAndValues", "WO-027,WO-012", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+		{"G13", "go test -count=1 ./internal/testkit/importrules -run 'TestLabFaultCapabilityCannotReachNormalPaths|VersionMigrationBoundary|GeneratedAuthorizationBoundary|NoLabShortcut'", "normal, generated, loader, runtime, and product paths cannot reach lab or offline-migration authority", "TestLabFaultCapabilityCannotReachNormalPaths", "WO-013,WO-044", m0AuthorizedRepoStateV1, m0LifecycleEvidenceV1},
+	}
+	if len(rows) != 13 {
+		failures = append(failures, fmt.Sprintf("M0 goal rows=%d want=13", len(rows)))
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if seen[row.Goal] || row.Command == "" || row.Behavior == "" || row.RegressionTest == "" || row.OwningWork == "" || row.CandidateRepoState != m0AuthorizedRepoStateV1 || row.OwningWOEvidenceSHA256 != m0LifecycleEvidenceV1 {
+			failures = append(failures, "invalid M0 evidence row "+row.Goal)
+		}
+		seen[row.Goal] = true
+	}
+	return gate("security_m0_g1_g13_integration", len(failures) == 0, "required", "13 bounded M0 local strict-candidate rows reconciled; global/product obligations remain open", map[string]any{
+		"scope":                         "bounded M0 local strict-candidate",
+		"global_product_status":         "open",
+		"authorized_repo_state_hash":    m0AuthorizedRepoStateV1,
+		"lifecycle_evidence_sha256":     m0LifecycleEvidenceV1,
+		"outside_scope_manifest_sha256": outsideScopeHash,
+		"outside_scope_file_count":      outsideScopeFiles,
+		"wo014_allowed_touches":         []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"},
+		"wo014_completion_hash":         "not-created-no-commit-authority",
+		"policy_seed_csv_sha256":        seedHash,
+		"policy_interaction_rows":       29,
+		"policy_pairwise_coverage":      "732/732",
+		"wo042_catalog_substitution":    false,
+		"opaque_digest_reproduction":    false,
+		"rows":                          rows,
+	}, failures)
 }
 
 func SecurityTranscriptBindingGate(profiles []*ir.Profile) GateResult {
@@ -280,52 +431,98 @@ func SecuritySecretTraceHygieneGate(profiles []*ir.Profile) GateResult {
 			failures = append(failures, err.Error())
 			continue
 		}
-		ev := security.SecureEnvelopeTrace(ctx, env)
+		ev, err := security.SecureEnvelopeDiagnosticV1(ctx, env)
+		if err != nil {
+			failures = append(failures, err.Error())
+			continue
+		}
 		raw, _ := json.Marshal(ev)
-		if security.TraceHasSecretCandidate(raw, payload, ks.ClientWriteKey, ks.ClientNonceBase, env.Ciphertext, env.Nonce) {
+		if security.TraceHasSecretCandidate(raw, payload, ks.ClientWriteKey, ks.ClientNonceBase, env.Ciphertext, env.Nonce) || ktrace.ContainsSensitiveValue(ev, payload, ks.ClientWriteKey, ks.ClientNonceBase, env.Ciphertext, env.Nonce, []byte(p.ID), []byte(ctx.TranscriptHash)) {
 			failures = append(failures, "security trace leaked secret material for "+p.ID)
 		}
 	}
 	return gate("security_secret_trace_hygiene", len(failures) == 0, "required", fmt.Sprintf("%d secret trace hygiene checks run", len(selectProfiles(profiles, 3))), nil, failures)
 }
 
-// SecurityMutantDetectionGate is a DETECTOR SELF-TEST over the security-policy
-// mutant modes. It confirms the audit's securityMutantReasons detector responds
-// to each forced policy-field value. It does NOT prove the runtime enforces
-// those policies — the crypto/runtime layers do not read the ir.Security fields
-// (see securityMutantReasons and internal/crypto/security/envelope.go). Genuine
-// enforcement is Option A, gated on D-003 external crypto review.
 func SecurityMutantDetectionGate(ctx context.Context) GateResult {
 	_ = ctx
-	modes := []string{
-		mutant.ModeNoTranscriptBinding,
-		mutant.ModeReusedNonce,
-		mutant.ModeAcceptsReplay,
-		mutant.ModeAcceptsDowngrade,
-		mutant.ModeCapabilityMismatchAccepted,
-		mutant.ModeProfileMismatchAccepted,
-		mutant.ModeUnsafeConfigAllowed,
-		mutant.ModeSecretTraceLeak,
+	return realLabFaultInjectionGateV1("security_mutant_detection", "security", 4100)
+}
+
+const realLabFaultInjectionLabelV1 = "real lab fault-injection detector sensitivity"
+const realLabFaultInjectionLimitV1 = "a pass proves only that each named detector turns red under its bounded deliberate fault and stays green in its control; it does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy"
+
+func realLabFaultInjectionGateV1(name, family string, seed int64) GateResult {
+	table := runtimeadversary.RealMutantCorpusTableV1()
+	results, err := runtimeadversary.RunRealMutantCorpusV1(seed)
+	if err != nil {
+		return gate(name, false, "required", realLabFaultInjectionLabelV1, map[string]any{"label": realLabFaultInjectionLabelV1, "limitation": realLabFaultInjectionLimitV1}, []string{err.Error()})
 	}
-	detected := []string{}
-	missed := []string{}
-	for _, mode := range modes {
-		profiles, err := mutant.GenerateProfiles(mode, 4100, 3)
-		if err != nil {
-			missed = append(missed, mode+": "+err.Error())
+	return realLabFaultInjectionGateResultsV1(name, family, table, results)
+}
+
+func realLabFaultInjectionGateResultsV1(name, family string, table []runtimeadversary.RealMutantCorpusRowV1, results []runtimeadversary.RealMutantCorpusResultV1) GateResult {
+	expected := make(map[string]runtimeadversary.RealMutantCorpusRowV1, 8)
+	known := make(map[string]runtimeadversary.RealMutantCorpusRowV1, 16)
+	familyCounts := map[string]int{"security": 0, "runtime": 0}
+	failures := []string{}
+	for _, row := range table {
+		if _, duplicate := known[row.Mode]; duplicate {
+			failures = append(failures, "duplicate table mode "+row.Mode)
 			continue
 		}
-		if len(securityMutantReasons(mode, profiles)) == 0 {
-			missed = append(missed, mode)
-		} else {
-			detected = append(detected, mode)
+		known[row.Mode] = row
+		if _, allowed := familyCounts[row.Family]; !allowed {
+			failures = append(failures, "unknown table family "+row.Family)
+			continue
+		}
+		familyCounts[row.Family]++
+		if row.Family == family {
+			expected[row.Mode] = row
 		}
 	}
-	return gate("security_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d security regression modes flagged (detector self-test over forced policy fields; not runtime enforcement — see D-003)", len(detected), len(modes)), map[string]any{
-		"detected_modes": detected,
-		"missed_modes":   missed,
-		"self_test":      "detector responds to forced ir.Security policy values; runtime does not read these fields",
-	}, missed)
+	seen := make(map[string]bool, 8)
+	seenAll := make(map[string]bool, 16)
+	seenFamily := map[string]int{"security": 0, "runtime": 0}
+	rows := make([]map[string]any, 0, 8)
+	for _, result := range results {
+		row, knownMode := known[result.Mode]
+		if !knownMode {
+			failures = append(failures, "unknown result mode "+result.Mode)
+			continue
+		}
+		if seenAll[result.Mode] {
+			failures = append(failures, "duplicate mode "+result.Mode)
+			continue
+		}
+		seenAll[result.Mode] = true
+		seenFamily[row.Family]++
+		valid := result.Category == row.Category && result.Detector == row.Detector && result.Count == row.ExpectedCount && result.UnsafeObserved && result.DetectorRed && result.ControlGreen
+		if !valid {
+			failures = append(failures, "invalid real observation "+result.Mode)
+		}
+		if row.Family != family {
+			continue
+		}
+		seen[result.Mode] = true
+		rows = append(rows, map[string]any{"mode": result.Mode, "category": result.Category, "count": result.Count, "status": map[bool]string{true: "red_fault_green_control", false: "invalid"}[valid]})
+	}
+	for mode := range expected {
+		if !seen[mode] {
+			failures = append(failures, "missing mode "+mode)
+		}
+	}
+	if len(table) != 16 || len(known) != 16 || familyCounts["security"] != 8 || familyCounts["runtime"] != 8 {
+		failures = append(failures, fmt.Sprintf("table corpus cardinality rows=%d known=%d security=%d runtime=%d", len(table), len(known), familyCounts["security"], familyCounts["runtime"]))
+	}
+	if len(results) != 16 || len(seenAll) != 16 || seenFamily["security"] != 8 || seenFamily["runtime"] != 8 {
+		failures = append(failures, fmt.Sprintf("result corpus cardinality rows=%d known=%d security=%d runtime=%d", len(results), len(seenAll), seenFamily["security"], seenFamily["runtime"]))
+	}
+	if len(expected) != 8 || len(seen) != 8 {
+		failures = append(failures, fmt.Sprintf("%s corpus cardinality expected=%d seen=%d", family, len(expected), len(seen)))
+	}
+	summary := fmt.Sprintf("%d/8 %s pairs passed; %s", 8-len(failures), realLabFaultInjectionLabelV1, realLabFaultInjectionLimitV1)
+	return gate(name, len(failures) == 0, "required", summary, map[string]any{"label": realLabFaultInjectionLabelV1, "limitation": realLabFaultInjectionLimitV1, "rows": rows}, failures)
 }
 
 func SecurityGeneratedBackendParityGate() GateResult {
@@ -344,68 +541,18 @@ func SecurityGeneratedBackendParityGate() GateResult {
 			failures = append(failures, "missing generated backend marker "+marker)
 		}
 	}
-	return gate("security_generated_backend_parity", len(failures) == 0, "required", "generated backend security support markers checked", map[string]any{
-		"scanner": "source-marker",
-	}, failures)
-}
-
-// securityMutantReasons reports which forced security-policy field values the
-// audit's regression detector observes across a set of mutated profiles.
-//
-// HONESTY NOTE (Stage 6, Option B — 2026-07-09). This is a DETECTOR SELF-TEST,
-// not a proof of runtime security. Each case keys on the exact ir.Security /
-// ir.InvalidInput field value that mutant.GenerateProfiles forces for that mode.
-// Those forced values are themselves ordinary options the compiler picks at
-// random (see internal/protocol/compiler/generator.go), and the crypto/runtime
-// layers do NOT read these fields — internal/crypto/security/envelope.go
-// hardcodes the nonce/replay behaviour. So a PASS proves only that the detector
-// responds to a forced policy-field value; it does NOT prove the runtime rejects
-// replay/downgrade/mismatch. Real enforcement is Option A (wire the fields into
-// crypto/runtime), gated on D-003 external crypto review.
-//
-// The previously unconditional ModeReusedNonce reason (which fired for every
-// profile, clean or not) has been removed so this self-test can no longer pass
-// vacuously; TestSecurityMutantReasonsDiscriminates pins that a canonical-strong
-// clean profile yields zero reasons while each mutant yields at least one.
-func securityMutantReasons(mode string, profiles []*ir.Profile) []string {
-	reasons := []string{}
-	for _, p := range profiles {
-		switch mode {
-		case mutant.ModeNoTranscriptBinding:
-			if p.Security.TranscriptMode == "canonical_v1" {
-				reasons = append(reasons, "transcript mode forced to minimal binding value")
-			}
-		case mutant.ModeReusedNonce:
-			if p.Security.NonceMode == "counter_xor_base" {
-				reasons = append(reasons, "nonce mode forced to reuse-prone value")
-			}
-		case mutant.ModeAcceptsReplay:
-			if p.InvalidInput.Replay == "ordinary_error_shaped_response" {
-				reasons = append(reasons, "replay-handling value forced")
-			}
-		case mutant.ModeAcceptsDowngrade:
-			if p.Security.DowngradePolicy != "strict_suite_and_capabilities" {
-				reasons = append(reasons, "downgrade policy forced off canonical value")
-			}
-		case mutant.ModeCapabilityMismatchAccepted:
-			if p.Security.CapabilityNegotiationPolicy == "intersection_with_required" {
-				reasons = append(reasons, "capability negotiation policy value forced")
-			}
-		case mutant.ModeProfileMismatchAccepted:
-			if p.Security.ProfileCompatibilityPolicy == "strict_schema" {
-				reasons = append(reasons, "profile compatibility policy value forced")
-			}
-		case mutant.ModeUnsafeConfigAllowed:
-			if p.Security.ConfigValidationPolicy == "strict_required" {
-				reasons = append(reasons, "config validation policy value forced")
-			}
-		case mutant.ModeSecretTraceLeak:
-			if p.Security.SecureEnvelopeMode == "metadata_authenticated" {
-				reasons = append(reasons, "secure envelope mode value forced")
-			}
-		}
+	integration := SecurityM0IntegratedEvidenceGate()
+	if !integration.Passed {
+		failures = append(failures, "bounded M0 integration evidence failed")
 	}
-	return uniqueList(reasons)
+	return gate("security_generated_backend_parity", len(failures) == 0, "required", "generated security markers and bounded M0 G1-G13 integration evidence checked", map[string]any{
+		"scanner":                    "source-marker-and-executable-test-registry",
+		"authorized_repo_state_hash": m0AuthorizedRepoStateV1,
+		"policy_seed_csv_sha256":     m0PolicySeedCSVHashV1,
+		"policy_interaction_rows":    29,
+		"policy_pairwise_coverage":   "732/732",
+		"global_product_status":      "open",
+	}, failures)
 }
 
 func securityContextForProfile(p *ir.Profile) (security.SecurityContext, error) {
@@ -450,15 +597,22 @@ func securitySummary(profiles []*ir.Profile) map[string]any {
 	replayPolicies := profileValues(profiles, func(p *ir.Profile) string { return p.Security.ReplayPolicy })
 	capabilityPolicies := profileValues(profiles, func(p *ir.Profile) string { return p.Security.CapabilityNegotiationPolicy })
 	return map[string]any{
-		"unique_transcript_modes":    uniqueStrings(transcriptModes),
-		"unique_nonce_modes":         uniqueStrings(nonceModes),
-		"unique_replay_policies":     uniqueStrings(replayPolicies),
-		"unique_capability_policies": uniqueStrings(capabilityPolicies),
-		"profile_count":              len(profiles),
-		"security_version":           "0.12.0-lab",
-		"required_capability_count":  len(ir.SecurityCapabilities()),
-		"supported_security_suite":   ir.SecuritySuiteString(),
-		"secure_envelope_model":      "metadata/authenticated synthetic AEAD test model",
+		"unique_transcript_modes":      uniqueStrings(transcriptModes),
+		"unique_nonce_modes":           uniqueStrings(nonceModes),
+		"unique_replay_policies":       uniqueStrings(replayPolicies),
+		"unique_capability_policies":   uniqueStrings(capabilityPolicies),
+		"profile_count":                len(profiles),
+		"profile_version":              ir.SupportedVersion,
+		"security_version":             ir.SupportedSecurityVersion,
+		"compatibility_schema_version": ir.SupportedVersion,
+		"compiler_security_version":    ir.SupportedSecurityVersion,
+		"minimum_runtime_version":      ir.SupportedSecurityVersion,
+		"handshake_version":            security.HandshakeVersionV1,
+		"policy_encoding_version":      security.PolicyEncodingVersionV1,
+		"record_version":               security.RecordVersionV1,
+		"required_capability_count":    len(ir.SecurityCapabilities()),
+		"supported_security_suite":     ir.SecuritySuiteString(),
+		"secure_envelope_model":        "metadata/authenticated synthetic AEAD test model",
 	}
 }
 

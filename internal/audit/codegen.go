@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,22 +15,314 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/testkit/adversary"
 	"kurdistan/internal/codegen"
-	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
 	"kurdistan/internal/observe/labtrace"
-	"kurdistan/internal/testkit/mutant"
-	"kurdistan/internal/relay"
 	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/protocol/compiler"
+	"kurdistan/internal/relay"
+	"kurdistan/internal/testkit/adversary"
+	"kurdistan/internal/testkit/mutant"
 )
 
 type CodegenAuditConfig struct {
-	Mode         string `json:"mode"`
-	StartSeed    int64  `json:"start_seed"`
-	ProfileCount int    `json:"profile_count"`
-	OutputPath   string `json:"output_path,omitempty"`
+	Mode       string `json:"mode"`
+	OutputPath string `json:"output_path,omitempty"`
+
+	startSeed    int64
+	profileCount int
+	catalog      codegen.AuthorizationCatalogV1
+	provenance   codegenAuditConfigProvenance
 }
+
+type codegenAuditConfigProvenance uint8
+
+const (
+	codegenAuditConfigProvenanceInvalid codegenAuditConfigProvenance = iota
+	codegenAuditConfigProvenanceDefaultV1
+	codegenAuditConfigProvenanceExplicitV1
+)
+
+// defaultAuthorizationCatalogJSONV1 is the reviewed default_audit_v1 catalog.
+// It is compiled into kcheck so the default audit never depends on its cwd or
+// on source-tree file discovery.
+const (
+	defaultAuthorizationCatalogCanonicalBytesV1    = 5250
+	defaultAuthorizationCatalogPreCutoverSHA256V1  = "7b96f78a40f64e8736a9b90d727bf2fce755071b87dd9cf86f22b6b425ff0378"
+	defaultAuthorizationCatalogPostCutoverSHA256V1 = "92a254bda99d99927bccbb7585cc36f639871132808307b030984f76bca84117"
+)
+
+const defaultAuthorizationCatalogJSONV1 = `{
+  "version": "profile-authorization-catalog-v1",
+  "scope": "default_audit_v1",
+  "entries": [
+    {
+      "seed": 1,
+      "client": {
+        "profile_hash": "445fb59a74793cb5f864060ed9c3ddb5e557f4f81c55b1e4e7e730c6735ae9a1",
+        "effective_policy_hash": "b387522a5e93aa6a0896ddc25181931dd3b7f6db038b2e36acba5af5c768492a",
+        "framing_hash": "0ae66add32f46bc5bd7e5ebf713da2bc6e0235d499a1a614b95b52d07c329e32",
+        "state_machine_hash": "8d06c12ac250e8ebe2bc285c04d50213e8150f4cb4df63833382311a3ef8b9cf",
+        "scheduler_hash": "07153ca5b0e22206e9b45071d304bf611264c2887bea72547452f283cd1734fb",
+        "padding_hash": "deccf79ce7692c4a4c1bc26d92202f5f32a2aa280f78fc9c30a1cbf5b8900d71",
+        "stream_hash": "51c9145db54640e50ff9ac20748d68594dfa4fc096733d35fb69a6672ccbe466",
+        "proxy_hash": "98884a0f1123713765929aada96812c9c2ede81df24f2c524a3db2945ecb2b8f",
+        "carrier_context_hash": "0dd7b5e3574b5b96a74b2b04ed75bec5e7e855ac64a42f92afbe7f47fbbad9f8",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 4096
+      },
+      "relay": {
+        "profile_hash": "445fb59a74793cb5f864060ed9c3ddb5e557f4f81c55b1e4e7e730c6735ae9a1",
+        "effective_policy_hash": "b387522a5e93aa6a0896ddc25181931dd3b7f6db038b2e36acba5af5c768492a",
+        "framing_hash": "0ae66add32f46bc5bd7e5ebf713da2bc6e0235d499a1a614b95b52d07c329e32",
+        "state_machine_hash": "8d06c12ac250e8ebe2bc285c04d50213e8150f4cb4df63833382311a3ef8b9cf",
+        "scheduler_hash": "07153ca5b0e22206e9b45071d304bf611264c2887bea72547452f283cd1734fb",
+        "padding_hash": "deccf79ce7692c4a4c1bc26d92202f5f32a2aa280f78fc9c30a1cbf5b8900d71",
+        "stream_hash": "51c9145db54640e50ff9ac20748d68594dfa4fc096733d35fb69a6672ccbe466",
+        "proxy_hash": "98884a0f1123713765929aada96812c9c2ede81df24f2c524a3db2945ecb2b8f",
+        "carrier_context_hash": "0dd7b5e3574b5b96a74b2b04ed75bec5e7e855ac64a42f92afbe7f47fbbad9f8",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 4096
+      }
+    },
+    {
+      "seed": 2,
+      "client": {
+        "profile_hash": "0ff32f626dcbb105239861caefaf38598004667e5e6993924bd5306fff1a658f",
+        "effective_policy_hash": "42a179825dd4ec762fde37dc840f916435e668c3045664ede06c9b5895996087",
+        "framing_hash": "ebb01d096febe88778c3b3e5fc237fa0ddbecff8b7bfaf17629594a437b2a7f3",
+        "state_machine_hash": "f723a4763d9d1c0e066918b888ec6f270d9693378ba29ebe8d15313c3e3a4f87",
+        "scheduler_hash": "1c8137bd52d7db265014821c080d6127336e03ef00704556370db5c8bb9bea80",
+        "padding_hash": "3557be6a20ba457aa6b9479d4251cc734a6d160d6fb093d1fbb8e139fef70ffb",
+        "stream_hash": "4472ab794385b138666e9c502aea7f30ec15e1ce7f00d55b0b4ab75fc7fcc602",
+        "proxy_hash": "1cf883c619cf2888eee47844046887a5569631fc966ea1a77d5c1d553e9055da",
+        "carrier_context_hash": "84c8ed71927f31132949943b61a80bc5700c8ae36b20746c18a3b945b01782a6",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 4,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 8192
+      },
+      "relay": {
+        "profile_hash": "0ff32f626dcbb105239861caefaf38598004667e5e6993924bd5306fff1a658f",
+        "effective_policy_hash": "42a179825dd4ec762fde37dc840f916435e668c3045664ede06c9b5895996087",
+        "framing_hash": "ebb01d096febe88778c3b3e5fc237fa0ddbecff8b7bfaf17629594a437b2a7f3",
+        "state_machine_hash": "f723a4763d9d1c0e066918b888ec6f270d9693378ba29ebe8d15313c3e3a4f87",
+        "scheduler_hash": "1c8137bd52d7db265014821c080d6127336e03ef00704556370db5c8bb9bea80",
+        "padding_hash": "3557be6a20ba457aa6b9479d4251cc734a6d160d6fb093d1fbb8e139fef70ffb",
+        "stream_hash": "4472ab794385b138666e9c502aea7f30ec15e1ce7f00d55b0b4ab75fc7fcc602",
+        "proxy_hash": "1cf883c619cf2888eee47844046887a5569631fc966ea1a77d5c1d553e9055da",
+        "carrier_context_hash": "84c8ed71927f31132949943b61a80bc5700c8ae36b20746c18a3b945b01782a6",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 4,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 8192
+      }
+    },
+    {
+      "seed": 3,
+      "client": {
+        "profile_hash": "84f477c9c18e4898bfa3b82d1a2918bb18b4d8f88754a743cfef37983c2d50cb",
+        "effective_policy_hash": "b66bc2ca56d613beca4eb3e2ed70d0f7cf9eba56b7dbc17f09492d3489444dd5",
+        "framing_hash": "e5101002212eec89e8fd408500b1b81c02533e99f05064fe3614118ff3fb9435",
+        "state_machine_hash": "66fe8953a74553ee5da8474bc356f06f1aeaee14e3f763e38037a0efe9b6ee40",
+        "scheduler_hash": "705fd122ba5db3d30da598786c2c9b46fc2a544ff2c97ce83e7d73c216d815a1",
+        "padding_hash": "ea3b7b093bb10a81d7a10cb21a465f022070ca1d0438683dd7b7843a4437db36",
+        "stream_hash": "42c7570fa3748c02c50c4f06d877f1ec54cd308de0f7678e0a390c18346f9108",
+        "proxy_hash": "7c3b5c2cae07f18855deaa592baa9c16f7b3964f38013c57ae4a2e620486ebf2",
+        "carrier_context_hash": "631cc5e9350dc5da496086ae71a9e7464e308b6058de977b4c14ce77cda38b37",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 16384
+      },
+      "relay": {
+        "profile_hash": "84f477c9c18e4898bfa3b82d1a2918bb18b4d8f88754a743cfef37983c2d50cb",
+        "effective_policy_hash": "b66bc2ca56d613beca4eb3e2ed70d0f7cf9eba56b7dbc17f09492d3489444dd5",
+        "framing_hash": "e5101002212eec89e8fd408500b1b81c02533e99f05064fe3614118ff3fb9435",
+        "state_machine_hash": "66fe8953a74553ee5da8474bc356f06f1aeaee14e3f763e38037a0efe9b6ee40",
+        "scheduler_hash": "705fd122ba5db3d30da598786c2c9b46fc2a544ff2c97ce83e7d73c216d815a1",
+        "padding_hash": "ea3b7b093bb10a81d7a10cb21a465f022070ca1d0438683dd7b7843a4437db36",
+        "stream_hash": "42c7570fa3748c02c50c4f06d877f1ec54cd308de0f7678e0a390c18346f9108",
+        "proxy_hash": "7c3b5c2cae07f18855deaa592baa9c16f7b3964f38013c57ae4a2e620486ebf2",
+        "carrier_context_hash": "631cc5e9350dc5da496086ae71a9e7464e308b6058de977b4c14ce77cda38b37",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 16384
+      }
+    },
+    {
+      "seed": 4,
+      "client": {
+        "profile_hash": "6bb5a39a97828f8e097d2a5dcb244a252bf49e325de8c793ea39fe55e94df980",
+        "effective_policy_hash": "3d3ef057e66ff5ad987b58fc74a9b52567f3186a9b179119bddbe940bf13c4fa",
+        "framing_hash": "a404d7d81b493e9e0ddbafc9dd07c895c9bae818ddb968eeb5a2ccff0c65114f",
+        "state_machine_hash": "88c3af31edfa765f6aebbf8fe175dc3123942717168deb2b57d85c301dafec07",
+        "scheduler_hash": "e15120dff28f5737aab3ee3f4a1364ad169c70bb9e9575cc9f824ab41860c4f3",
+        "padding_hash": "c7b513c2ed5bc56ec3c606564f60b8a0499de02a79b157123834ad227a8d1fb5",
+        "stream_hash": "4bc9313a861fc783ef303d7c35db343cd58bffa0cfe078ce212bce76bc4ba392",
+        "proxy_hash": "634aed170481afedd2ca39bdbbaf64fdfb61e2369126195c3d85dc9559e23eb9",
+        "carrier_context_hash": "a873072eaaf9d2b34c6d1dd4e996c73dd75f4dca2afe7c33d4fe9cc45fc76634",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 1024
+      },
+      "relay": {
+        "profile_hash": "6bb5a39a97828f8e097d2a5dcb244a252bf49e325de8c793ea39fe55e94df980",
+        "effective_policy_hash": "3d3ef057e66ff5ad987b58fc74a9b52567f3186a9b179119bddbe940bf13c4fa",
+        "framing_hash": "a404d7d81b493e9e0ddbafc9dd07c895c9bae818ddb968eeb5a2ccff0c65114f",
+        "state_machine_hash": "88c3af31edfa765f6aebbf8fe175dc3123942717168deb2b57d85c301dafec07",
+        "scheduler_hash": "e15120dff28f5737aab3ee3f4a1364ad169c70bb9e9575cc9f824ab41860c4f3",
+        "padding_hash": "c7b513c2ed5bc56ec3c606564f60b8a0499de02a79b157123834ad227a8d1fb5",
+        "stream_hash": "4bc9313a861fc783ef303d7c35db343cd58bffa0cfe078ce212bce76bc4ba392",
+        "proxy_hash": "634aed170481afedd2ca39bdbbaf64fdfb61e2369126195c3d85dc9559e23eb9",
+        "carrier_context_hash": "a873072eaaf9d2b34c6d1dd4e996c73dd75f4dca2afe7c33d4fe9cc45fc76634",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 8,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 1024
+      }
+    },
+    {
+      "seed": 5,
+      "client": {
+        "profile_hash": "8ad255f0573af59d010d6873f5d357de1532cc55db2c5be75bb0607b23810e7f",
+        "effective_policy_hash": "9caf18ee76b28cc949c1a73951d3a8df14e0a32c73f2a919f9e6a54fde49f05c",
+        "framing_hash": "5d291b836b5581951766c9a391e358aaa9071339b4efd3cc2b8ecad125703ea2",
+        "state_machine_hash": "4295a75b5767a4b453a3cee715006065afe7bc2a779bf3348e7ff1bbf2942975",
+        "scheduler_hash": "2e2e244351808654020f86ea4052d6e7e26939756f2690d77cb1ef6163f78f8a",
+        "padding_hash": "b1e465202ecac129b48731f39441e7ac294ccc8097e52d03abacfb27e1f8ad22",
+        "stream_hash": "d901cdaf9c2b0ce2751063283c4cd1f9476bddb67750fbf5a183a8a342d80cd2",
+        "proxy_hash": "d3620ea9a3421c472cc393d70045b518a0a119ec585d4a50cbb881e8005a4e04",
+        "carrier_context_hash": "a97ecc282b30560ce61e4351d42e4b1ab7ba710a0d4408ed278fd13cee588b21",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 2,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 8192
+      },
+      "relay": {
+        "profile_hash": "8ad255f0573af59d010d6873f5d357de1532cc55db2c5be75bb0607b23810e7f",
+        "effective_policy_hash": "9caf18ee76b28cc949c1a73951d3a8df14e0a32c73f2a919f9e6a54fde49f05c",
+        "framing_hash": "5d291b836b5581951766c9a391e358aaa9071339b4efd3cc2b8ecad125703ea2",
+        "state_machine_hash": "4295a75b5767a4b453a3cee715006065afe7bc2a779bf3348e7ff1bbf2942975",
+        "scheduler_hash": "2e2e244351808654020f86ea4052d6e7e26939756f2690d77cb1ef6163f78f8a",
+        "padding_hash": "b1e465202ecac129b48731f39441e7ac294ccc8097e52d03abacfb27e1f8ad22",
+        "stream_hash": "d901cdaf9c2b0ce2751063283c4cd1f9476bddb67750fbf5a183a8a342d80cd2",
+        "proxy_hash": "d3620ea9a3421c472cc393d70045b518a0a119ec585d4a50cbb881e8005a4e04",
+        "carrier_context_hash": "a97ecc282b30560ce61e4351d42e4b1ab7ba710a0d4408ed278fd13cee588b21",
+        "effective_replay_window": 256,
+        "effective_max_concurrent_streams": 2,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 8192
+      }
+    },
+    {
+      "seed": 6,
+      "client": {
+        "profile_hash": "f84ba1cf9104dc28ef5d42c4661805a31e146772a88eb454b44fd9184b47b071",
+        "effective_policy_hash": "8c73808f506cda6fad07714b0cebcf8b4eb661e3de679d776489f341a0e56bae",
+        "framing_hash": "de89d310204a95faf52bc7b2e367ebb75c1861ad8aaea14a5adacdb5a4bd0ab8",
+        "state_machine_hash": "1b263804934f8e9f4e4f0d0ca9d099ef3ec5db1cc442c67910213155b5a7bbae",
+        "scheduler_hash": "a804c36f77da40a078a5431ea751ce88d96c95f58f51755e1b77e39c6c3b36fc",
+        "padding_hash": "85d958e5cf2fc9fe3018aaa3f52729aaf183d63b27cbad907288a3fbf96db27e",
+        "stream_hash": "2eb2204a62244eead363ec74e055e3b055582d7570b221d38ede10d98fead3fc",
+        "proxy_hash": "d94c698a6c0149d0de43263a3953a236beab62da4d5423f2d384ae7caff5b2d5",
+        "carrier_context_hash": "4811c14fcd09171b26b280646d2f62cd6812e102cc10aa04b274b9b8948abd85",
+        "effective_replay_window": 32,
+        "effective_max_concurrent_streams": 16,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 1024
+      },
+      "relay": {
+        "profile_hash": "f84ba1cf9104dc28ef5d42c4661805a31e146772a88eb454b44fd9184b47b071",
+        "effective_policy_hash": "8c73808f506cda6fad07714b0cebcf8b4eb661e3de679d776489f341a0e56bae",
+        "framing_hash": "de89d310204a95faf52bc7b2e367ebb75c1861ad8aaea14a5adacdb5a4bd0ab8",
+        "state_machine_hash": "1b263804934f8e9f4e4f0d0ca9d099ef3ec5db1cc442c67910213155b5a7bbae",
+        "scheduler_hash": "a804c36f77da40a078a5431ea751ce88d96c95f58f51755e1b77e39c6c3b36fc",
+        "padding_hash": "85d958e5cf2fc9fe3018aaa3f52729aaf183d63b27cbad907288a3fbf96db27e",
+        "stream_hash": "2eb2204a62244eead363ec74e055e3b055582d7570b221d38ede10d98fead3fc",
+        "proxy_hash": "d94c698a6c0149d0de43263a3953a236beab62da4d5423f2d384ae7caff5b2d5",
+        "carrier_context_hash": "4811c14fcd09171b26b280646d2f62cd6812e102cc10aa04b274b9b8948abd85",
+        "effective_replay_window": 32,
+        "effective_max_concurrent_streams": 16,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 1024
+      }
+    },
+    {
+      "seed": 7,
+      "client": {
+        "profile_hash": "d61bd97c1d3d4eefe3f93e64c7132750dc96ec566373f4a7906bcce8bbe4d21b",
+        "effective_policy_hash": "caaacf48e81a01f6fa195d5c6e49d0a390066a16fa3a6ee48f8672765a6ef8f9",
+        "framing_hash": "13892230a03796b7b501bd8c3c61115764627faf34972a5f0eb2472439146a49",
+        "state_machine_hash": "e7e8a0f04b82a4f0457d88d9b0739092f9913a6c41ffc5e92289d10b38c5e757",
+        "scheduler_hash": "578e1b56dfafb0c0464b04fe8e0621a3a37a005ab1bdce35a1cfae111fefe0f5",
+        "padding_hash": "e30b6cbfcc447dfed9098a59f79fa442d52db5242da925ff4ec814234435ada8",
+        "stream_hash": "a7cf1c53a2660c28c913f5b4d9021c0848fd1389c45eb0798f09bc62a88a98e8",
+        "proxy_hash": "7d3318e127022dae6d4bdfbaf34586ec8f7ae6f820ea8c8477ced9541266c998",
+        "carrier_context_hash": "579e25c59bffbb99b006a9158b0b6691a04731f239fce28ff8103a3cbfdb4723",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 4,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 4096
+      },
+      "relay": {
+        "profile_hash": "d61bd97c1d3d4eefe3f93e64c7132750dc96ec566373f4a7906bcce8bbe4d21b",
+        "effective_policy_hash": "caaacf48e81a01f6fa195d5c6e49d0a390066a16fa3a6ee48f8672765a6ef8f9",
+        "framing_hash": "13892230a03796b7b501bd8c3c61115764627faf34972a5f0eb2472439146a49",
+        "state_machine_hash": "e7e8a0f04b82a4f0457d88d9b0739092f9913a6c41ffc5e92289d10b38c5e757",
+        "scheduler_hash": "578e1b56dfafb0c0464b04fe8e0621a3a37a005ab1bdce35a1cfae111fefe0f5",
+        "padding_hash": "e30b6cbfcc447dfed9098a59f79fa442d52db5242da925ff4ec814234435ada8",
+        "stream_hash": "a7cf1c53a2660c28c913f5b4d9021c0848fd1389c45eb0798f09bc62a88a98e8",
+        "proxy_hash": "7d3318e127022dae6d4bdfbaf34586ec8f7ae6f820ea8c8477ced9541266c998",
+        "carrier_context_hash": "579e25c59bffbb99b006a9158b0b6691a04731f239fce28ff8103a3cbfdb4723",
+        "effective_replay_window": 128,
+        "effective_max_concurrent_streams": 4,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 4096
+      }
+    },
+    {
+      "seed": 8,
+      "client": {
+        "profile_hash": "b516ccbb737785f3e136a490f735ca72b229071d43763649c4e23af71b70bfe4",
+        "effective_policy_hash": "647c10cfa102c6efb1e1f0cddd5f71ddd4481d6248bd67ede4bf411b3b8016bc",
+        "framing_hash": "0e7d3e803f9a17ccd60e06bd1c4b76d3a2ef460f515a910693e2be044d003392",
+        "state_machine_hash": "4db3f33d7cdd7d79038bfc7efac0320f2aa2a2b713e606c6655c41f20053259c",
+        "scheduler_hash": "b6de36b9ce63c1d40236018fb777942fcf4e949d8f157bff0901ca8bfff5062e",
+        "padding_hash": "0c7a1d259d28d6d9dc2d04473df34866f5441cd5f8c30750419b433dd79cd783",
+        "stream_hash": "10afc6c96d2f1105a0ce085fa0234079eccbd0432f74b296ca9ff8a11cd6eaa7",
+        "proxy_hash": "617c226cf14fd71e4c2e149ad27459b30979f16f653985fe8f3449fcfa0ed15b",
+        "carrier_context_hash": "42e27da93791f2725b50d7f5422dd0a2b7f36715cf5740aad27ab0fa4826dca6",
+        "effective_replay_window": 64,
+        "effective_max_concurrent_streams": 16,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 2048
+      },
+      "relay": {
+        "profile_hash": "b516ccbb737785f3e136a490f735ca72b229071d43763649c4e23af71b70bfe4",
+        "effective_policy_hash": "647c10cfa102c6efb1e1f0cddd5f71ddd4481d6248bd67ede4bf411b3b8016bc",
+        "framing_hash": "0e7d3e803f9a17ccd60e06bd1c4b76d3a2ef460f515a910693e2be044d003392",
+        "state_machine_hash": "4db3f33d7cdd7d79038bfc7efac0320f2aa2a2b713e606c6655c41f20053259c",
+        "scheduler_hash": "b6de36b9ce63c1d40236018fb777942fcf4e949d8f157bff0901ca8bfff5062e",
+        "padding_hash": "0c7a1d259d28d6d9dc2d04473df34866f5441cd5f8c30750419b433dd79cd783",
+        "stream_hash": "10afc6c96d2f1105a0ce085fa0234079eccbd0432f74b296ca9ff8a11cd6eaa7",
+        "proxy_hash": "617c226cf14fd71e4c2e149ad27459b30979f16f653985fe8f3449fcfa0ed15b",
+        "carrier_context_hash": "42e27da93791f2725b50d7f5422dd0a2b7f36715cf5740aad27ab0fa4826dca6",
+        "effective_replay_window": 64,
+        "effective_max_concurrent_streams": 16,
+        "effective_max_frame_bytes": 65536,
+        "effective_max_envelope_bytes": 2048
+      }
+    }
+  ]
+}
+`
 
 type GeneratedBackendTraceCorpus struct {
 	ProfileCount                 int                       `json:"profile_count"`
@@ -140,6 +433,7 @@ type CodegenAuditSummary struct {
 	SourceScanner                    string                         `json:"source_scanner"`
 	InterpretedVsGenerated           InterpretedGeneratedDivergence `json:"interpreted_vs_generated"`
 	SourceScan                       codegen.SourceScanReport       `json:"source_scan"`
+	LegacyEvidenceClass              string                         `json:"legacy_evidence_class"`
 }
 
 type InterpretedGeneratedDivergence struct {
@@ -154,33 +448,70 @@ func DefaultCodegenAuditConfig(mode string) CodegenAuditConfig {
 	if mode == "" {
 		mode = "quick"
 	}
-	cfg := CodegenAuditConfig{
-		Mode:         mode,
-		StartSeed:    1,
-		ProfileCount: 3,
+	catalog, err := codegen.ParseAuthorizationCatalogV1([]byte(defaultAuthorizationCatalogJSONV1))
+	if err != nil || catalog.ValidateExactSeedRangeV1(codegen.AuthorizationCatalogScopeDefaultAuditV1, 1, 8) != nil {
+		return CodegenAuditConfig{Mode: mode}
 	}
+	cfg := CodegenAuditConfig{Mode: mode, startSeed: 1, profileCount: 3, catalog: catalog, provenance: codegenAuditConfigProvenanceDefaultV1}
 	if mode == "full" {
-		cfg.ProfileCount = 8
+		cfg.profileCount = 8
 	}
 	return cfg
 }
 
-func NormalizeCodegenAuditConfig(cfg CodegenAuditConfig) CodegenAuditConfig {
-	defaults := DefaultCodegenAuditConfig(cfg.Mode)
-	if cfg.Mode == "" {
-		cfg.Mode = defaults.Mode
+func NewExplicitCodegenAuditConfig(mode string, startSeed int64, profileCount int, catalog codegen.AuthorizationCatalogV1) (CodegenAuditConfig, error) {
+	if mode == "" {
+		mode = "quick"
 	}
-	if cfg.StartSeed == 0 {
-		cfg.StartSeed = defaults.StartSeed
+	if strictCodegenRangeValid(startSeed, profileCount) != nil {
+		return CodegenAuditConfig{}, codegen.ErrStrictSeedRange
 	}
-	if cfg.ProfileCount == 0 {
-		cfg.ProfileCount = defaults.ProfileCount
+	if err := catalog.ValidateExactSeedRangeV1(codegen.AuthorizationCatalogScopeExplicitV1, startSeed, profileCount); err != nil {
+		return CodegenAuditConfig{}, codegen.ErrAuthorizationCatalogInvalid
 	}
-	return cfg
+	return CodegenAuditConfig{Mode: mode, startSeed: startSeed, profileCount: profileCount, catalog: catalog, provenance: codegenAuditConfigProvenanceExplicitV1}, nil
+
+}
+
+func NormalizeCodegenAuditConfig(cfg CodegenAuditConfig) (CodegenAuditConfig, error) {
+	if cfg.Mode == "" || cfg.profileCount <= 0 || strictCodegenRangeValid(cfg.startSeed, cfg.profileCount) != nil {
+		return CodegenAuditConfig{}, codegen.ErrStrictSeedRange
+	}
+	scope := ""
+	switch cfg.provenance {
+	case codegenAuditConfigProvenanceDefaultV1:
+		scope = codegen.AuthorizationCatalogScopeDefaultAuditV1
+		if cfg.startSeed != 1 || cfg.profileCount != 3 && cfg.profileCount != 8 {
+			return CodegenAuditConfig{}, codegen.ErrAuthorizationCatalogInvalid
+		}
+		if err := cfg.catalog.ValidateExactSeedRangeV1(scope, 1, 8); err != nil {
+			return CodegenAuditConfig{}, codegen.ErrAuthorizationCatalogInvalid
+		}
+		return cfg, nil
+	case codegenAuditConfigProvenanceExplicitV1:
+		scope = codegen.AuthorizationCatalogScopeExplicitV1
+	default:
+		return CodegenAuditConfig{}, codegen.ErrAuthorizationCatalogInvalid
+	}
+	if err := cfg.catalog.ValidateExactSeedRangeV1(scope, cfg.startSeed, cfg.profileCount); err != nil {
+		return CodegenAuditConfig{}, codegen.ErrAuthorizationCatalogInvalid
+	}
+	return cfg, nil
+}
+
+func strictCodegenRangeValid(startSeed int64, profileCount int) error {
+	if profileCount <= 0 || profileCount > 512 || startSeed > math.MaxInt64-7-int64(profileCount-1) {
+		return codegen.ErrStrictSeedRange
+	}
+	return nil
 }
 
 func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, error) {
-	cfg = NormalizeCodegenAuditConfig(cfg)
+	var err error
+	cfg, err = NormalizeCodegenAuditConfig(cfg)
+	if err != nil {
+		return AuditReport{}, err
+	}
 	start := time.Now()
 	root, err := os.MkdirTemp("", "kurdistan-codegen-audit-*")
 	if err != nil {
@@ -268,7 +599,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		mutant.ModeFixedFrameGrammar,
 		mutant.ModeFixedFirstContact,
 		mutant.ModePaddingNoiseOnly,
-	}, max(4, min(8, cfg.ProfileCount)))
+	}, max(4, min(8, cfg.profileCount)))
 	scannerGate := GeneratedSourceScannerGate(corpus.SourceScan)
 
 	gates := []GateResult{
@@ -336,7 +667,7 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 		Version:          codegen.Version,
 		Mode:             "codegen-" + cfg.Mode,
 		GeneratedAt:      time.Now().UTC().Format(time.RFC3339),
-		ProfileCount:     cfg.ProfileCount,
+		ProfileCount:     cfg.profileCount,
 		TraceCount:       len(corpus.GeneratedTraces),
 		Gates:            gates,
 		BenchmarkSummary: BenchmarkSummary{TotalMillis: time.Since(start).Milliseconds()},
@@ -351,7 +682,11 @@ func RunCodegenAudit(ctx context.Context, cfg CodegenAuditConfig) (AuditReport, 
 }
 
 func RunGeneratedBackendTraceCorpus(ctx context.Context, cfg CodegenAuditConfig) (GeneratedBackendTraceCorpus, error) {
-	cfg = NormalizeCodegenAuditConfig(cfg)
+	var err error
+	cfg, err = NormalizeCodegenAuditConfig(cfg)
+	if err != nil {
+		return GeneratedBackendTraceCorpus{}, err
+	}
 	root, err := os.MkdirTemp("", "kurdistan-codegen-corpus-*")
 	if err != nil {
 		return GeneratedBackendTraceCorpus{}, err
@@ -362,16 +697,16 @@ func RunGeneratedBackendTraceCorpus(ctx context.Context, cfg CodegenAuditConfig)
 
 func runGeneratedBackendTraceCorpusAt(ctx context.Context, cfg CodegenAuditConfig, root string) (GeneratedBackendTraceCorpus, error) {
 	payload := codegenAuditPayload()
-	corpus := GeneratedBackendTraceCorpus{ProfileCount: cfg.ProfileCount}
-	profilesForScan := make([]string, 0, cfg.ProfileCount)
-	for i := 0; i < cfg.ProfileCount; i++ {
-		seed := cfg.StartSeed + int64(i)
+	corpus := GeneratedBackendTraceCorpus{ProfileCount: cfg.profileCount}
+	profilesForScan := make([]string, 0, cfg.profileCount)
+	for i := 0; i < cfg.profileCount; i++ {
+		seed := cfg.startSeed + int64(i)
 		p, err := compiler.Generate(seed)
 		if err != nil {
 			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d profile generation: %w", seed, err)
 		}
 		out := filepath.Join(root, codegen.SanitizeIdentifier(p.ID))
-		if _, err := codegen.Generate(p, out, codegen.Options{}); err != nil {
+		if _, err := codegen.GenerateStrict(p, out, codegen.Options{}, cfg.catalog); err != nil {
 			return GeneratedBackendTraceCorpus{}, fmt.Errorf("seed %d codegen: %w", seed, err)
 		}
 		interpreted, err := labtrace.CaptureTrace(ctx, p, payload)
@@ -1421,6 +1756,7 @@ func buildCodegenSummary(corpus GeneratedBackendTraceCorpus, gates []GateResult)
 		SourceScanner:                    status("generated_source_scanner"),
 		InterpretedVsGenerated:           divergenceSummary(corpus),
 		SourceScan:                       corpus.SourceScan,
+		LegacyEvidenceClass:              "legacy_non_evidentiary_parity",
 	}
 }
 

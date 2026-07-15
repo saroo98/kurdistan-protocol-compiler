@@ -5,40 +5,39 @@
 
 > Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
-> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates are detector self-tests over forced/simulated regressions, not proofs that the runtime enforces those policies (see docs/safety.md and the D-003 crypto review).
+> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.
 
-- Latest audit mode: `quick`
-- Generated at: `2026-07-09T13:10:07Z`
-- Profile count: `100`
-- Trace count: `20`
+- Latest audit mode: `full`
+- Profile count: `1000`
+- Trace count: `100`
 - Conclusion: `passed`
 
 ## Gate Results
 
 | Gate | Result | Severity | Summary |
 | --- | --- | --- | --- |
-| `profile_corpus_diversity` | PASS | `required` | 100 profiles checked; 0 failures |
-| `black_box_trace_diversity` | PASS | `required` | 20 traces scanned; 0 suspicious metrics |
-| `adversarial_black_box_clustering` | PASS | `required` | 20 traces clustered into 4 groups; 0 failures |
+| `profile_corpus_diversity` | PASS | `required` | 1000 profiles checked; 0 failures |
+| `black_box_trace_diversity` | PASS | `required` | 100 traces scanned; 0 suspicious metrics |
+| `adversarial_black_box_clustering` | PASS | `required` | 100 traces clustered into 3 groups; 0 failures |
 | `fixed_signature` | PASS | `required` | 7 fixed-signature metrics checked; 0 failures |
 | `cosmetic_difference` | PASS | `required` | cosmetic profile and timestamp-only trace controls evaluated |
 | `same_profile_consistency` | PASS | `required` | suspiciously similar |
-| `different_profile_separation` | PASS | `required` | 190/190 trace pairs separated |
+| `different_profile_separation` | PASS | `required` | 4950/4950 trace pairs separated |
 | `malformed_probe_behavior` | PASS | `required` | invalid-input behavior distribution checked |
 | `multi_stream_semantics` | PASS | `required` | 4 profiles exercised with local multi-stream echo |
-| `multi_stream_diversity` | PASS | `required` | 100 stream policy combinations across 100 profiles |
+| `multi_stream_diversity` | PASS | `required` | 980 stream policy combinations across 1000 profiles |
 | `multi_stream_backpressure` | PASS | `required` | 1 profile backpressure scenarios exercised |
 | `multi_stream_adversarial_scenarios` | PASS | `required` | 9 scenario runs checked; 0 correctness failures |
 | `multi_stream_collapse_resistance` | PASS | `required` | 2 scenarios scanned; 0 suspicious metrics |
 | `multi_stream_mutant_detection` | PASS | `required` | 6/6 stream mutant modes detected |
 | `proxy_semantics_correctness` | PASS | `required` | 9 proxy scenario runs checked; 0 failures |
-| `proxy_semantics_diversity` | PASS | `required` | 100 proxy policy combinations across 100 profiles |
+| `proxy_semantics_diversity` | PASS | `required` | 999 proxy policy combinations across 1000 profiles |
 | `proxy_target_backpressure` | PASS | `required` | 11 target-induced backpressure events observed |
 | `proxy_error_reset_isolation` | PASS | `required` | 2 target errors and 2 target resets observed |
 | `proxy_mutant_detection` | PASS | `required` | 7/7 proxy mutant modes detected |
 | `proxy_generated_backend_parity` | PASS | `required` | generated backend proxysem support markers checked |
 | `carrier_semantics_correctness` | PASS | `required` | 9 carrier scenario runs checked; 0 failures |
-| `carrier_diversity` | PASS | `required` | 100 carrier policy combinations across 100 profiles |
+| `carrier_diversity` | PASS | `required` | 999 carrier policy combinations across 1000 profiles |
 | `carrier_backpressure_preservation` | PASS | `required` | 23 carrier/target backpressure events observed |
 | `carrier_loss_reorder_recovery` | PASS | `required` | 40 reorder and 12 retry events observed |
 | `carrier_proxysem_parity` | PASS | `required` | 2 proxysem carrier parity runs checked |
@@ -53,8 +52,8 @@
 | `security_profile_compatibility` | PASS | `required` | 6 compatibility checks run |
 | `security_config_hygiene` | PASS | `required` | 6 config hygiene checks run |
 | `security_secret_trace_hygiene` | PASS | `required` | 3 secret trace hygiene checks run |
-| `security_mutant_detection` | PASS | `required` | 8/8 security regression modes flagged (detector self-test over forced policy fields; not runtime enforcement — see D-003) |
-| `security_generated_backend_parity` | PASS | `required` | generated backend security support markers checked |
+| `security_mutant_detection` | PASS | `required` | 8/8 real lab fault-injection detector sensitivity pairs passed; a pass proves only that each named detector turns red under its bounded deliberate fault and stays green in its control; it does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy |
+| `security_generated_backend_parity` | PASS | `required` | generated security markers and bounded M0 G1-G13 integration evidence checked |
 | `runtime_session_lifecycle` | PASS | `required` | 9 runtime sessions checked |
 | `runtime_capability_negotiation` | PASS | `required` | 3 capability downgrade attempts rejected |
 | `runtime_profile_compatibility` | PASS | `required` | 3 profile mismatch attempts rejected |
@@ -64,8 +63,8 @@
 | `runtime_backpressure` | PASS | `required` | 137 runtime backpressure events observed |
 | `runtime_error_reset_isolation` | PASS | `required` | 6 target errors and 6 target resets isolated |
 | `runtime_trace_hygiene` | PASS | `required` | 3 runtime traces checked for payload/secret hygiene |
-| `runtime_mutant_detection` | PASS | `required` | 8/8 runtime regression modes flagged (detector self-test over simulated regressions; not runtime enforcement — see D-003) |
-| `runtime_generated_backend_parity` | PASS | `required` | generated backend runtime support markers checked |
+| `runtime_mutant_detection` | PASS | `required` | 8/8 real lab fault-injection detector sensitivity pairs passed; a pass proves only that each named detector turns red under its bounded deliberate fault and stays green in its control; it does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy |
+| `runtime_generated_backend_parity` | PASS | `required` | generated runtime markers plus exact 29-row generated/interpreted policy evidence registry checked |
 | `adapter_interface_contracts` | PASS | `required` | adapter ingress/egress contract inputs validated |
 | `adapter_config_validation` | PASS | `required` | adapter config validation and redaction checks run |
 | `adapter_flow_lifecycle` | PASS | `required` | adapter flow lifecycle transitions checked |
@@ -115,18 +114,18 @@
 | `wirefeatures_generated_backend_parity` | PASS | `required` | generated backend protocol corpus and wirefeature markers checked |
 | `wirefeatures_mutant_detection` | PASS | `required` | 8/8 wirefeature mutant modes detected |
 | `wirefeatures_baseline_fixtures` | PASS | `required` | 21 wirefeature baseline entries checked |
-| `wiregen_policy_generation` | PASS | `required` | 100 policies and 100 unique hashes |
-| `wiregen_policy_validation` | PASS | `required` | 100 policies validated |
+| `wiregen_policy_generation` | PASS | `required` | 1000 policies and 1000 unique hashes |
+| `wiregen_policy_validation` | PASS | `required` | 1000 policies validated |
 | `wiregen_corpus_selection` | PASS | `required` | 12 entries across 9 families selected from 12 corpus entries |
-| `wiregen_profile_integration` | PASS | `required` | 100 profiles include wire-shape policy sections |
-| `wiregen_bytepath_application` | PASS | `required` | 700 bytepath feature vectors carry wire-shape metadata |
-| `wiregen_feature_expectation_match` | PASS | `required` | 700 policy-feature pairs compared |
-| `wiregen_firstn_diversity` | PASS | `required` | 17 unique first-n policy shapes |
+| `wiregen_profile_integration` | PASS | `required` | 1000 profiles include wire-shape policy sections |
+| `wiregen_bytepath_application` | PASS | `required` | 7000 bytepath feature vectors carry wire-shape metadata |
+| `wiregen_feature_expectation_match` | PASS | `required` | 7000 policy-feature pairs compared |
+| `wiregen_firstn_diversity` | PASS | `required` | 18 unique first-n policy shapes |
 | `wiregen_metadata_exposure_diversity` | PASS | `required` | 5 metadata exposure classes |
-| `wiregen_collapse_resistance` | PASS | `required` | 100 policy hashes, 9 families, 2 fragment rhythms |
+| `wiregen_collapse_resistance` | PASS | `required` | 1000 policy hashes, 9 families, 2 fragment rhythms |
 | `wiregen_mutant_detection` | PASS | `required` | 8/8 wiregen mutant modes detected |
 | `wiregen_generated_backend_parity` | PASS | `required` | generated backend wire-shape markers checked |
-| `wiregen_trace_hygiene` | PASS | `required` | 100 policies and 700 feature vectors scanned |
+| `wiregen_trace_hygiene` | PASS | `required` | 1000 policies and 7000 feature vectors scanned |
 | `wiregen_baseline_fixtures` | PASS | `required` | 35 wiregen baseline entries checked |
 | `wireeval_dataset_build` | PASS | `required` | 72 records across 8 profiles |
 | `wireeval_dataset_schema` | PASS | `required` | 72 records validated against wireeval-v1 |
@@ -653,23 +652,21 @@
 
 ## Benchmark Highlights
 
-- Profile generation: `88 ms`
-- Trace generation: `19 ms`
-- Total audit runtime: `2249 ms`
+- Volatile wall-clock timings are omitted from the committed status snapshot. Use the audit JSON or command output for local performance diagnostics.
 
 ## Corpus Diversity Summary
 
-- `number_of_profiles`: `100`
+- `number_of_profiles`: `1000`
 - `unique_first_contact_patterns`: `4`
-- `unique_frame_grammar_combinations`: `99`
-- `unique_scheduler_combinations`: `94`
-- `unique_stream_policy_combinations`: `100`
-- `unique_proxy_policy_combinations`: `100`
-- `unique_carrier_policy_combinations`: `100`
-- `unique_security_policy_combinations`: `100`
-- `unique_padding_combinations`: `67`
-- `unique_invalid_input_policy_combinations`: `100`
-- `structurally_different_pairs`: `4950`
+- `unique_frame_grammar_combinations`: `828`
+- `unique_scheduler_combinations`: `562`
+- `unique_stream_policy_combinations`: `980`
+- `unique_proxy_policy_combinations`: `1000`
+- `unique_carrier_policy_combinations`: `1000`
+- `unique_security_policy_combinations`: `1000`
+- `unique_padding_combinations`: `551`
+- `unique_invalid_input_policy_combinations`: `997`
+- `structurally_different_pairs`: `499500`
 
 ## Trace Diversity Summary
 
@@ -678,10 +675,8 @@
 ## Adversarial Black-Box Summary
 
 - Gate result: `true`
-- `cluster_count`: `4`
-- `largest_cluster_ratio`: `0.55`
-- `different_profile_average_distance`: `0.319851011498045`
-- `same_profile_distance`: `0`
+- `cluster_count`: `3`
+- `largest_cluster_ratio`: `0.53`
 - `generated_cluster_conclusion`: `multiple clusters`
 
 ## Baseline Comparison

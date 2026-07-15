@@ -1,25 +1,36 @@
 package audit
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"math"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"kurdistan/internal/codegen"
 )
 
 func TestCodegenAuditConfigDefaults(t *testing.T) {
 	quick := DefaultCodegenAuditConfig("quick")
-	if quick.ProfileCount != 3 || quick.StartSeed != 1 {
+	if quick.profileCount != 3 || quick.startSeed != 1 {
 		t.Fatalf("quick codegen defaults = %+v", quick)
 	}
 	full := DefaultCodegenAuditConfig("full")
-	if full.ProfileCount <= quick.ProfileCount {
+	if full.profileCount <= quick.profileCount {
 		t.Fatalf("full codegen defaults should be larger than quick: %+v", full)
 	}
 }
 
 func TestCodegenAuditRunsOneProfile(t *testing.T) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 1
+	cfg := explicitCodegenConfig(t, 1, 1)
 	report, err := RunCodegenAudit(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -33,8 +44,7 @@ func TestCodegenAuditRunsOneProfile(t *testing.T) {
 }
 
 func TestGeneratedTraceCorpusSemanticEquivalence(t *testing.T) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 1
+	cfg := explicitCodegenConfig(t, 1, 1)
 	corpus, err := RunGeneratedBackendTraceCorpus(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -61,8 +71,7 @@ func TestGeneratedTraceCorpusSemanticEquivalence(t *testing.T) {
 }
 
 func TestCodegenAuditQuickIncludesM7GatesAndJSON(t *testing.T) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 2
+	cfg := explicitCodegenConfig(t, 1, 2)
 	report, err := RunCodegenAudit(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -163,9 +172,227 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 	}
 }
 
+func TestCodegenAuthorizationCatalogCompiledFixtureAndDefaultSeedPins(t *testing.T) {
+	raw, err := os.ReadFile("../../testdata/codegen/profile-authorization-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, []byte(defaultAuthorizationCatalogJSONV1)) {
+		t.Fatal("compiled default authorization catalog differs from reviewed fixture")
+	}
+	for _, mode := range []string{"", "quick", "full"} {
+		cfg := DefaultCodegenAuditConfig(mode)
+		normalized, err := NormalizeCodegenAuditConfig(cfg)
+		if err != nil {
+			t.Fatalf("mode %q: %v", mode, err)
+		}
+		wantCount := 3
+		if mode == "full" {
+			wantCount = 8
+		}
+		if normalized.startSeed != 1 || normalized.profileCount != wantCount || normalized.provenance != codegenAuditConfigProvenanceDefaultV1 {
+			t.Fatalf("mode %q normalized config = %+v", mode, normalized)
+		}
+		if err := normalized.catalog.ValidateExactSeedRangeV1(codegen.AuthorizationCatalogScopeDefaultAuditV1, 1, 8); err != nil {
+			t.Fatalf("mode %q full default catalog: %v", mode, err)
+		}
+	}
+}
+
+func TestCodegenAuthorizationCatalogFrozenCanonicalDigestAndInventory(t *testing.T) {
+	raw := []byte(defaultAuthorizationCatalogJSONV1)
+	var wire struct {
+		Version, Scope string
+		Entries        []struct {
+			Seed          int64
+			Client, Relay map[string]any
+		}
+	}
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if wire.Version != codegen.AuthorizationCatalogVersionV1 || wire.Scope != codegen.AuthorizationCatalogScopeDefaultAuditV1 || len(wire.Entries) != 8 {
+		t.Fatalf("catalog inventory %+v", wire)
+	}
+	var canonical bytes.Buffer
+	lpAuditV1(&canonical, []byte("kurdistan/codegen/authorization-catalog/v1"))
+	lpAuditV1(&canonical, []byte(wire.Version))
+	lpAuditV1(&canonical, []byte(wire.Scope))
+	var u32 [4]byte
+	binary.BigEndian.PutUint32(u32[:], uint32(len(wire.Entries)))
+	canonical.Write(u32[:])
+	for i, entry := range wire.Entries {
+		if entry.Seed != int64(i+1) || entry.Client == nil || entry.Relay == nil {
+			t.Fatalf("entry %d", i)
+		}
+		var seed [8]byte
+		binary.BigEndian.PutUint64(seed[:], uint64(entry.Seed))
+		canonical.Write(seed[:])
+		lpAuditV1(&canonical, []byte("client"))
+		lpAuditV1(&canonical, auditPinBytesV1(t, entry.Client))
+		lpAuditV1(&canonical, []byte("relay"))
+		lpAuditV1(&canonical, auditPinBytesV1(t, entry.Relay))
+	}
+	if canonical.Len() != defaultAuthorizationCatalogCanonicalBytesV1 {
+		t.Fatalf("canonical length=%d", canonical.Len())
+	}
+	sum := sha256.Sum256(canonical.Bytes())
+	if got := hex.EncodeToString(sum[:]); got != defaultAuthorizationCatalogPostCutoverSHA256V1 {
+		t.Fatalf("post digest=%s; frozen pre=%s", got, defaultAuthorizationCatalogPreCutoverSHA256V1)
+	}
+	for _, forbidden := range []string{"digest", "secret", "credential", "payload", "destination", "identity_key"} {
+		if bytes.Contains(raw, []byte(`"`+forbidden+`"`)) {
+			t.Fatalf("fixture contains %q", forbidden)
+		}
+	}
+}
+
+func lpAuditV1(out *bytes.Buffer, value []byte) {
+	var n [4]byte
+	binary.BigEndian.PutUint32(n[:], uint32(len(value)))
+	out.Write(n[:])
+	out.Write(value)
+}
+func auditPinBytesV1(t *testing.T, pin map[string]any) []byte {
+	t.Helper()
+	var out bytes.Buffer
+	for _, key := range []string{"profile_hash", "effective_policy_hash", "framing_hash", "state_machine_hash", "scheduler_hash", "padding_hash", "stream_hash", "proxy_hash", "carrier_context_hash"} {
+		s, ok := pin[key].(string)
+		if !ok {
+			t.Fatal(key)
+		}
+		b, err := hex.DecodeString(s)
+		if err != nil || len(b) != 32 {
+			t.Fatal(key)
+		}
+		out.Write(b)
+	}
+	for _, key := range []string{"effective_replay_window", "effective_max_concurrent_streams", "effective_max_frame_bytes", "effective_max_envelope_bytes"} {
+		v, ok := pin[key].(float64)
+		if !ok || v <= 0 || v > math.MaxUint32 {
+			t.Fatal(key)
+		}
+		var n [4]byte
+		binary.BigEndian.PutUint32(n[:], uint32(v))
+		out.Write(n[:])
+	}
+	return out.Bytes()
+}
+
+func TestCodegenAuthorizationCatalogSixPathSHA256AndTestdataInventory(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	paths := []string{"internal/audit/codegen.go", "internal/audit/codegen_test.go", "testdata/codegen/profile-authorization-v1.json", "cmd/kcheck/main.go", "cmd/kcheck/registry_test.go", "internal/runtime/policy_enforcement_test.go"}
+	for _, path := range paths {
+		cmd := exec.Command("git", "show", "HEAD:"+path)
+		cmd.Dir = root
+		before, err := cmd.Output()
+		pre := "ABSENT"
+		if err == nil {
+			sum := sha256.Sum256(before)
+			pre = hex.EncodeToString(sum[:])
+		}
+		after, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(after)
+		post := hex.EncodeToString(sum[:])
+		if pre == post || post == strings.Repeat("0", 64) {
+			t.Fatalf("%s invalid SHA evidence", path)
+		}
+		t.Logf("WO-042-SHA256 %s pre=%s post=%s", path, pre, post)
+	}
+	cmd := exec.Command("git", "status", "--porcelain", "--untracked-files=all", "--", "testdata")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Fields(strings.ReplaceAll(string(out), "\\", "/"))
+	if len(lines) != 2 || lines[1] != "testdata/codegen/profile-authorization-v1.json" {
+		t.Fatalf("testdata inventory=%q", out)
+	}
+}
+
+func TestArbitrarySeedCatalogRequiresExplicitProvenanceAndExactRange(t *testing.T) {
+	cfg := explicitCodegenConfig(t, 1, 2)
+	if cfg.provenance != codegenAuditConfigProvenanceExplicitV1 {
+		t.Fatalf("explicit provenance = %d", cfg.provenance)
+	}
+	if _, err := NewExplicitCodegenAuditConfig("quick", 1, 3, cfg.catalog); !errors.Is(err, codegen.ErrAuthorizationCatalogInvalid) {
+		t.Fatalf("non-exact explicit range error = %v", err)
+	}
+	zero := CodegenAuditConfig{Mode: "quick"}
+	if _, err := NormalizeCodegenAuditConfig(zero); !errors.Is(err, codegen.ErrStrictSeedRange) && !errors.Is(err, codegen.ErrAuthorizationCatalogInvalid) {
+		t.Fatalf("zero provenance error = %v", err)
+	}
+}
+
+func TestCodegenAuthorizationCatalogStrictSignedBoundsFailClosed(t *testing.T) {
+	base := DefaultCodegenAuditConfig("quick")
+	for _, seed := range []int64{math.MaxInt64 - 6, math.MaxInt64} {
+		cfg := base
+		cfg.startSeed = seed
+		if _, err := NormalizeCodegenAuditConfig(cfg); !errors.Is(err, codegen.ErrStrictSeedRange) {
+			t.Fatalf("seed %d error = %v", seed, err)
+		}
+	}
+	if err := strictCodegenRangeValid(math.MaxInt64-7, 2); !errors.Is(err, codegen.ErrStrictSeedRange) {
+		t.Fatalf("range crossing strict render bound error = %v", err)
+	}
+	for _, seed := range []int64{math.MaxInt64 - 7, -1, math.MinInt64} {
+		if err := strictCodegenRangeValid(seed, 1); err != nil {
+			t.Fatalf("render-safe seed %d rejected: %v", seed, err)
+		}
+	}
+}
+
+func TestCodegenAuthorizationCatalogLegacyEvidenceClassification(t *testing.T) {
+	summary := buildCodegenSummary(GeneratedBackendTraceCorpus{}, nil)
+	if summary.LegacyEvidenceClass != "legacy_non_evidentiary_parity" {
+		t.Fatalf("legacy evidence class = %q", summary.LegacyEvidenceClass)
+	}
+	raw, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"legacy_evidence_class":"legacy_non_evidentiary_parity"`)) {
+		t.Fatalf("summary JSON lacks legacy classification: %s", raw)
+	}
+}
+
+func explicitCodegenConfig(tb testing.TB, startSeed int64, profileCount int) CodegenAuditConfig {
+	tb.Helper()
+	var wire struct {
+		Version string            `json:"version"`
+		Scope   string            `json:"scope"`
+		Entries []json.RawMessage `json:"entries"`
+	}
+	if err := json.Unmarshal([]byte(defaultAuthorizationCatalogJSONV1), &wire); err != nil {
+		tb.Fatal(err)
+	}
+	if startSeed < 1 || startSeed+int64(profileCount) > 9 {
+		tb.Fatalf("test helper range %d/%d is outside reviewed constants", startSeed, profileCount)
+	}
+	wire.Scope = codegen.AuthorizationCatalogScopeExplicitV1
+	wire.Entries = wire.Entries[int(startSeed-1) : int(startSeed-1)+profileCount]
+	raw, err := json.Marshal(wire)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	catalog, err := codegen.ParseAuthorizationCatalogV1(raw)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	cfg, err := NewExplicitCodegenAuditConfig("quick", startSeed, profileCount, catalog)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return cfg
+}
+
 func BenchmarkGeneratedBackendTraceCorpusQuick(b *testing.B) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 3
+	cfg := explicitCodegenConfig(b, 1, 3)
 	for i := 0; i < b.N; i++ {
 		if _, err := RunGeneratedBackendTraceCorpus(context.Background(), cfg); err != nil {
 			b.Fatal(err)
@@ -174,8 +401,7 @@ func BenchmarkGeneratedBackendTraceCorpusQuick(b *testing.B) {
 }
 
 func BenchmarkGeneratedSemanticEquivalenceComparison(b *testing.B) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 2
+	cfg := explicitCodegenConfig(b, 1, 2)
 	corpus, err := RunGeneratedBackendTraceCorpus(context.Background(), cfg)
 	if err != nil {
 		b.Fatal(err)
@@ -190,8 +416,7 @@ func BenchmarkGeneratedSemanticEquivalenceComparison(b *testing.B) {
 }
 
 func BenchmarkCodegenAuditQuick(b *testing.B) {
-	cfg := DefaultCodegenAuditConfig("quick")
-	cfg.ProfileCount = 3
+	cfg := explicitCodegenConfig(b, 1, 3)
 	for i := 0; i < b.N; i++ {
 		report, err := RunCodegenAudit(context.Background(), cfg)
 		if err != nil {

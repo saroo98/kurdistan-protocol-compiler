@@ -22,22 +22,25 @@ type Manager struct {
 }
 
 func NewRuntime(cfg RuntimeConfig, p *ir.Profile) (*Runtime, error) {
+	if err := ir.Validate(p); err != nil {
+		return nil, newProfileLoadFailureV1(ir.ErrProfileInvalid)
+	}
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
-	if err := ValidateLoadedProfile(p); err != nil {
-		return nil, err
-	}
 	if cfg.ProfileID != "" && cfg.ProfileID != p.ID {
-		return nil, fmt.Errorf("%w: runtime profile id mismatch", ErrCompatibility)
+		return nil, newProfileLoadFailureV1(ir.ErrProfileMismatch)
+	}
+	if cfg.ProfileHash != "" && cfg.ProfileHash != p.GenerationHash {
+		return nil, newProfileLoadFailureV1(ir.ErrProfileMismatch)
+	}
+	if err := checkProfileCompatibilityV1(p); err != nil {
+		return nil, err
 	}
 	return &Runtime{Config: cfg, Profile: p}, nil
 }
 
 func NewRuntimeFromPath(cfg RuntimeConfig) (*Runtime, error) {
-	if err := ValidateConfig(cfg); err != nil {
-		return nil, err
-	}
 	p, err := LoadProfile(cfg.ProfilePath, cfg.ProfileID)
 	if err != nil {
 		return nil, err

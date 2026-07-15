@@ -48,6 +48,14 @@ Do not claim undetectability, guaranteed bypass, or real-world censorship
 resistance. The audit detects local regressions only; it cannot prove
 undetectability or field robustness.
 
+The security and runtime `*_mutant_detection` gates report bounded real lab
+fault-injection detector sensitivity with paired controls. A pass shows only
+that each named detector turns red for its deliberate lab fault while its
+paired control stays green. It does not prove defect absence, production
+security, product integration, release readiness, or authorization to merge or
+deploy. Other mutant gates retain the meanings documented for their own model
+or test harnesses.
+
 ## Review gate
 
 Before any future milestone expands scope — especially any move from a

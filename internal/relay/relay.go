@@ -12,18 +12,23 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"kurdistan/internal/crypto/auth"
+	ktrace "kurdistan/internal/observe/trace"
 	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/protocol/fsm"
 	"kurdistan/internal/protocol/ir"
-	ktrace "kurdistan/internal/observe/trace"
 )
 
 const streamID uint32 = 1
+
+var legacyDialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+	return (&net.Dialer{}).DialContext(ctx, network, address)
+}
 
 func ServeEcho(ctx context.Context, ln net.Listener, logger *log.Logger) error {
 	var wg sync.WaitGroup
@@ -56,11 +61,11 @@ func ServeEcho(ctx context.Context, ln net.Listener, logger *log.Logger) error {
 }
 
 func Serve(ctx context.Context, ln net.Listener, target string, p *ir.Profile, rec *ktrace.Recorder, logger *log.Logger) error {
+	if ln == nil || ln.Addr() == nil || !IsLoopbackAddress(ln.Addr().String()) || !IsLoopbackAddress(target) {
+		return fmt.Errorf("server listen and target must be literal loopback addresses")
+	}
 	if err := ir.Validate(p); err != nil {
 		return err
-	}
-	if !IsLoopbackAddress(ln.Addr().String()) || !IsLoopbackAddress(target) {
-		return fmt.Errorf("server listen and target must be loopback addresses")
 	}
 	var wg sync.WaitGroup
 	go func() {
@@ -91,6 +96,9 @@ func Serve(ctx context.Context, ln net.Listener, target string, p *ir.Profile, r
 }
 
 func HandleServerConn(ctx context.Context, conn net.Conn, target string, p *ir.Profile, rec *ktrace.Recorder) error {
+	if !IsLoopbackAddress(target) {
+		return fmt.Errorf("target must be a literal loopback address")
+	}
 	deadline := time.Now().Add(time.Duration(p.Limits.MaxSessionMillis) * time.Millisecond)
 	_ = conn.SetDeadline(deadline)
 	reader := bufio.NewReader(conn)
@@ -107,8 +115,7 @@ func HandleServerConn(ctx context.Context, conn net.Conn, target string, p *ir.P
 	if op.Semantic != ir.SemanticData {
 		return fmt.Errorf("expected data operation, got %q", op.Semantic)
 	}
-	dialer := net.Dialer{}
-	targetConn, err := dialer.DialContext(ctx, "tcp", target)
+	targetConn, err := legacyDialContext(ctx, "tcp", target)
 	if err != nil {
 		return fmt.Errorf("target unavailable: %w", err)
 	}
@@ -138,8 +145,7 @@ func ClientRoundTrip(ctx context.Context, p *ir.Profile, server string, payload 
 	if !IsLoopbackAddress(server) {
 		return nil, fmt.Errorf("client server address must be loopback")
 	}
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "tcp", server)
+	conn, err := legacyDialContext(ctx, "tcp", server)
 	if err != nil {
 		return nil, err
 	}
@@ -352,15 +358,25 @@ func deterministicNonce(p *ir.Profile) []byte {
 }
 
 func IsLoopbackAddress(addr string) bool {
-	host, _, err := net.SplitHostPort(addr)
+	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return false
 	}
-	if strings.EqualFold(host, "localhost") {
-		return true
+	if host == "" || strings.Contains(host, "%") {
+		return false
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || portNumber == 0 || portNumber > 65535 {
+		return false
 	}
 	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	if ip == nil {
+		return false
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return !strings.Contains(host, ":") && ipv4[0] == 127
+	}
+	return ip.Equal(net.IPv6loopback)
 }
 
 func isLoopbackConn(addr net.Addr) bool {

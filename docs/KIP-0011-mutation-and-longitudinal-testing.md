@@ -30,6 +30,14 @@ The mutation suite checks that:
 - `padding_noise_only` fails adversarial clustering, demonstrating that padding noise alone is not enough.
 - The normal generator still passes the same reduced test thresholds.
 
+The security and runtime `*_mutant_detection` gates are narrower evidence than
+the generator-shape checks above. They measure bounded real lab fault-injection
+detector sensitivity with paired controls: each named detector must turn red for its
+deliberate lab fault while its paired control stays green. Passing those gates
+does not prove defect absence, production security, product integration,
+release readiness, or authorization to merge or deploy. This wording does not
+change the historical meaning of the other mutant gates.
+
 ## Longitudinal Audit Comparison
 
 `kcheck compare` compares two audit JSON reports:

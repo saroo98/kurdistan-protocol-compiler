@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/runtime/labfault"
 )
 
 type LinkFrame struct {
@@ -25,6 +26,15 @@ type MemoryLink struct {
 	failNext      bool
 	clientServer  []LinkFrame
 	serverClient  []LinkFrame
+	labExtraDepth bool
+}
+
+func newMemoryLinkWithLabFaultV1(maxQueueDepth int, token labfault.Token) *MemoryLink {
+	want, _ := labfault.NewTokenV1("runtime_ignores_backpressure")
+	if maxQueueDepth != 1 || token != want {
+		return nil
+	}
+	return &MemoryLink{MaxQueueDepth: maxQueueDepth, labExtraDepth: true}
 }
 
 func NewMemoryLink(maxQueueDepth int) *MemoryLink {
@@ -52,7 +62,11 @@ func (l *MemoryLink) Send(frame LinkFrame) error {
 	if frame.Direction == "server_to_client" {
 		q = &l.serverClient
 	}
-	if len(*q) >= l.MaxQueueDepth {
+	limit := l.MaxQueueDepth
+	if l.labExtraDepth {
+		limit++
+	}
+	if len(*q) >= limit {
 		return ErrLinkQueueFull
 	}
 	*q = append(*q, frame)

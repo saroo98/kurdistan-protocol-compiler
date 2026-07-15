@@ -13,6 +13,21 @@ Milestone 6 proved that Kurdistan can emit profile-specific Go source that compi
 
 This audit remains lab-only. It does not add deployment, external targets, VPN mode, SOCKS mode, HTTP carriers, TLS mimicry, CDN behavior, mobile apps, or live-network testing.
 
+## Strict authorization audit boundary
+
+The default codegen audit uses a compiled, reviewed role-separated catalog for
+seeds 1 through 8. Quick mode consumes seeds 1 through 3 and full mode consumes
+all eight without weakening the frozen catalog. Arbitrary ranges require an
+explicit local catalog with exact coverage. The audit calls `GenerateStrict`;
+catalog pins appear only in authorization processing and manifest metadata.
+
+The scanner treats only `strictv1/runtime.go` as strict evidence. It validates
+the exact two imports, six identifiers, caller-supplied typed client/relay
+registries, direct-return factory, and absence of extra files, declarations,
+defaults, secrets, or lab/testkit authority. Root `protocol/**` and `cmd/**`
+outputs retain the explicit `legacy_non_evidentiary_parity` classification and
+are excluded from strict/product evidence rather than relabeled as clean.
+
 ## Why Generated Source Needs Its Own Audit
 
 Profile diversity and interpreted-runtime diversity do not automatically prove generated-source diversity. A source generator can accidentally:

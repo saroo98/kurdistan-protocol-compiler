@@ -7,31 +7,31 @@ import ktrace "kurdistan/internal/observe/trace"
 
 func SecureEnvelopeTrace(ctx SecurityContext, env SecureEnvelope) ktrace.Event {
 	return ktrace.Event{
-		EventType:                 "security_envelope",
-		ProfileID:                 ctx.ProfileID,
-		StreamLabel:               streamBucket(env.StreamID),
-		Semantic:                  env.Semantic,
-		CarrierFamilyBucket:       env.CarrierFamily,
-		SecuritySuiteBucket:       ctx.Suite.KDF + "/" + ctx.Suite.AEAD,
-		TranscriptModeBucket:      ctx.Suite.Transcript,
-		NonceModeBucket:           "directional_counter",
-		ReplayPolicyBucket:        "windowed_replay",
-		CapabilityPolicyBucket:    "strict_required",
-		CompatibilityPolicyBucket: "full_policy_binding",
-		SecureEnvelopeModeBucket:  "synthetic_aead_test",
-		SecretHygieneResult:       "redacted",
-		FrameBytes:                env.CiphertextBytes,
-		Note:                      "transcript=" + ctx.TranscriptHash[:min(12, len(ctx.TranscriptHash))] + " capability=" + ctx.CapabilityHash[:min(12, len(ctx.CapabilityHash))],
+		EventType:           "security_envelope",
+		Semantic:            env.Semantic,
+		SecuritySuiteBucket: ctx.Suite.KDF + "/" + ctx.Suite.AEAD,
+		SecretHygieneResult: "redacted",
+		RuntimeFrameBucket:  frameSizeBucket(env.CiphertextBytes),
 	}
 }
 
-func streamBucket(id uint64) string {
-	return "stream_bucket_" + string(rune('0'+(id%8)))
+func SecureEnvelopeDiagnosticV1(_ SecurityContext, env SecureEnvelope) (ktrace.DiagnosticEventV1, error) {
+	event := ktrace.DiagnosticEventV1{SchemaVersion: ktrace.DiagnosticSchemaV1, EventClass: "security_envelope", OutcomeBucket: "accepted", SizeBucket: frameSizeBucket(env.CiphertextBytes), CountBucket: "one", HygieneResult: "redacted"}
+	if err := ktrace.ValidateDiagnosticEventV1(event); err != nil {
+		return ktrace.DiagnosticEventV1{}, err
+	}
+	return event, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func frameSizeBucket(size int) string {
+	switch {
+	case size <= 0:
+		return "none"
+	case size <= 256:
+		return "small"
+	case size <= 4096:
+		return "medium"
+	default:
+		return "large"
 	}
-	return b
 }

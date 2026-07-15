@@ -72,6 +72,27 @@ func CheckProfileCompatibility(p *ir.Profile, runtime RuntimeCompatibility) erro
 	return nil
 }
 
+func validateBilateralDowngrade(input BilateralCapabilityInput) error {
+	if !SuiteSupported(input.LocalSuite) || !SuiteSupported(input.PeerSuite) {
+		return fmt.Errorf("%w: unsupported suite", ErrDowngrade)
+	}
+	switch input.DowngradePolicy {
+	case "strict_suite_and_capabilities":
+		if input.LocalSuite != input.PeerSuite {
+			return fmt.Errorf("%w: suite mismatch", ErrDowngrade)
+		}
+	case "strict_capabilities":
+		// Capability floors govern selection; both suites still must be registered.
+	case "suite_bound_transcript":
+		if input.LocalSuite != input.PeerSuite || input.LocalTranscriptMode == "" || input.LocalTranscriptMode != input.PeerTranscriptMode {
+			return fmt.Errorf("%w: suite or transcript mismatch", ErrDowngrade)
+		}
+	default:
+		return fmt.Errorf("%w: unknown downgrade policy", ErrDowngrade)
+	}
+	return nil
+}
+
 func suiteString(s Suite) string {
 	return s.KDF + "/" + s.AEAD + "/" + s.MAC + "/" + s.Transcript
 }

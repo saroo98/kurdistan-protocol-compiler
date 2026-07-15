@@ -13,6 +13,23 @@ Kurdistan originally executed generated profiles through a shared interpreter. T
 
 This is not deployment support. Generated modules remain loopback-only and use the same safety limits as the interpreted runtime.
 
+## Strict generated evidence
+
+Authorized `GenerateStrict` output adds exactly one evidentiary Go file,
+`strictv1/runtime.go`. It declares the six current schema, security, runtime,
+handshake, policy-encoding, and record identifiers and exposes only
+`NewStrictRuntimeV1`. That factory takes caller-supplied typed
+`ClientProfileAuthorizationRegistryV1` and
+`RelayProfileAuthorizationRegistryV1` values and directly delegates to the
+strict handshake runtime. It contains no catalog entry, authorization pin,
+derived/default registry, secret, lab authority, or executable global state.
+
+The existing generated `protocol/**` and `cmd/**` trees are compatibility
+artifacts classified as `legacy_non_evidentiary_parity`. They may retain their
+observed lab/testkit imports and deterministic demo material. They cannot
+satisfy, be imported by, or be reached through strict/product runtime evidence.
+Legacy `Generate` does not emit `strictv1/runtime.go`.
+
 ## Research Question
 
 Can Kurdistan generate not only different profile documents, but also profile-specific protocol implementations that compile and interoperate locally?

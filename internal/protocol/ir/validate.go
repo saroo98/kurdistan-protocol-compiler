@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 )
 
@@ -22,6 +24,9 @@ func Validate(p *Profile) error {
 	}
 	if p.Version != SupportedVersion {
 		return fmt.Errorf("unsupported version %q", p.Version)
+	}
+	if err := validateSupportedVersionTupleV1(p); err != nil {
+		return err
 	}
 	if p.ID == "" {
 		return fmt.Errorf("profile id is required")
@@ -85,6 +90,16 @@ func Validate(p *Profile) error {
 	}
 	if p.Auth.TestKeyHex == "" || p.Auth.NonceBytes < 8 || p.Auth.ProofMessage == "" {
 		return fmt.Errorf("auth key, nonce size, and proof message are required")
+	}
+	return nil
+}
+
+func validateSupportedVersionTupleV1(p *Profile) error {
+	if p.Version != SupportedVersion || p.Security.SecurityVersion != SupportedSecurityVersion ||
+		p.Compatibility.SchemaVersion != SupportedVersion ||
+		p.Compatibility.CompilerSecurityVersion != SupportedSecurityVersion ||
+		p.Compatibility.MinimumRuntimeVersion != SupportedSecurityVersion {
+		return fmt.Errorf("unsupported profile version tuple")
 	}
 	return nil
 }
@@ -643,6 +658,161 @@ func validateSecurityPolicy(p SecurityPolicy) error {
 		return fmt.Errorf("invalid max key lifetime messages")
 	}
 	return nil
+}
+
+func BuildEffectiveSecurityPolicy(profile *Profile, clientFloor, serverFloor, selected []string) (EffectiveSecurityPolicy, error) {
+	if err := Validate(profile); err != nil {
+		return EffectiveSecurityPolicy{}, fmt.Errorf("effective security policy: %w", err)
+	}
+	client, err := canonicalEffectiveCapabilities(clientFloor)
+	if err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	server, err := canonicalEffectiveCapabilities(serverFloor)
+	if err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	selection, err := canonicalEffectiveCapabilities(selected)
+	if err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	if len(client) == 0 || len(server) == 0 || len(selection) == 0 {
+		return EffectiveSecurityPolicy{}, fmt.Errorf("effective security policy: empty mandatory floor or selection")
+	}
+	selectedSet := make(map[string]bool, len(selection))
+	for _, capability := range selection {
+		selectedSet[capability] = true
+	}
+	for _, floor := range [][]string{client, server} {
+		for _, capability := range floor {
+			if !selectedSet[capability] {
+				return EffectiveSecurityPolicy{}, fmt.Errorf("effective security policy: selection below mandatory floor")
+			}
+		}
+	}
+	profileHash, err := CanonicalHash(profile)
+	if err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	policy := EffectiveSecurityPolicy{
+		ProfileID:                   profile.ID,
+		ProfileHash:                 profileHash,
+		SchemaVersion:               profile.Compatibility.SchemaVersion,
+		CompilerSecurityVersion:     profile.Compatibility.CompilerSecurityVersion,
+		MinimumRuntimeVersion:       profile.Compatibility.MinimumRuntimeVersion,
+		SecurityVersion:             profile.Security.SecurityVersion,
+		TranscriptMode:              profile.Security.TranscriptMode,
+		KDFSuite:                    profile.Security.KDFSuite,
+		AEADSuite:                   profile.Security.AEADSuite,
+		MACSuite:                    profile.Security.MACSuite,
+		NonceMode:                   profile.Security.NonceMode,
+		ReplayPolicy:                profile.Security.ReplayPolicy,
+		ReplayWindowSize:            profile.Security.ReplayWindowSize,
+		DowngradePolicy:             profile.Security.DowngradePolicy,
+		CapabilityNegotiationPolicy: profile.Security.CapabilityNegotiationPolicy,
+		ProfileCompatibilityPolicy:  profile.Security.ProfileCompatibilityPolicy,
+		KeyRotationPolicy:           profile.Security.KeyRotationPolicy,
+		ConfigValidationPolicy:      profile.Security.ConfigValidationPolicy,
+		SecureEnvelopeMode:          profile.Security.SecureEnvelopeMode,
+		MaxSessionMessages:          profile.Security.MaxSessionMessages,
+		MaxKeyLifetimeMessages:      profile.Security.MaxKeyLifetimeMessages,
+		ClientMandatoryCapabilities: client,
+		ServerMandatoryCapabilities: server,
+		SelectedCapabilities:        selection,
+	}
+	policy.validationHash, err = effectivePolicyHash(policy)
+	if err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	if err := ValidateEffectiveSecurityPolicy(policy); err != nil {
+		return EffectiveSecurityPolicy{}, err
+	}
+	return policy, nil
+}
+
+func ValidateEffectiveSecurityPolicy(policy EffectiveSecurityPolicy) error {
+	if policy.ProfileID == "" || policy.SchemaVersion != SupportedVersion || policy.CompilerSecurityVersion == "" || policy.MinimumRuntimeVersion == "" {
+		return fmt.Errorf("invalid effective security policy identity")
+	}
+	profileHash, err := hex.DecodeString(policy.ProfileHash)
+	if err != nil || len(profileHash) != sha256.Size {
+		return fmt.Errorf("invalid effective security policy profile hash")
+	}
+	var nonzero byte
+	for _, value := range profileHash {
+		nonzero |= value
+	}
+	if nonzero == 0 {
+		return fmt.Errorf("invalid effective security policy profile hash")
+	}
+	if err := validateSecurityPolicy(SecurityPolicy{
+		SecurityVersion:             policy.SecurityVersion,
+		TranscriptMode:              policy.TranscriptMode,
+		KDFSuite:                    policy.KDFSuite,
+		AEADSuite:                   policy.AEADSuite,
+		MACSuite:                    policy.MACSuite,
+		NonceMode:                   policy.NonceMode,
+		ReplayPolicy:                policy.ReplayPolicy,
+		ReplayWindowSize:            policy.ReplayWindowSize,
+		DowngradePolicy:             policy.DowngradePolicy,
+		CapabilityNegotiationPolicy: policy.CapabilityNegotiationPolicy,
+		ProfileCompatibilityPolicy:  policy.ProfileCompatibilityPolicy,
+		KeyRotationPolicy:           policy.KeyRotationPolicy,
+		ConfigValidationPolicy:      policy.ConfigValidationPolicy,
+		SecureEnvelopeMode:          policy.SecureEnvelopeMode,
+		MaxSessionMessages:          policy.MaxSessionMessages,
+		MaxKeyLifetimeMessages:      policy.MaxKeyLifetimeMessages,
+	}); err != nil {
+		return fmt.Errorf("invalid effective security policy: %w", err)
+	}
+	for _, values := range [][]string{policy.ClientMandatoryCapabilities, policy.ServerMandatoryCapabilities, policy.SelectedCapabilities} {
+		canonical, err := canonicalEffectiveCapabilities(values)
+		if err != nil || len(canonical) == 0 || !slices.Equal(values, canonical) {
+			return fmt.Errorf("invalid effective security policy capabilities")
+		}
+	}
+	selected := make(map[string]bool, len(policy.SelectedCapabilities))
+	for _, capability := range policy.SelectedCapabilities {
+		selected[capability] = true
+	}
+	for _, floor := range [][]string{policy.ClientMandatoryCapabilities, policy.ServerMandatoryCapabilities} {
+		for _, capability := range floor {
+			if !selected[capability] {
+				return fmt.Errorf("invalid effective security policy floor")
+			}
+		}
+	}
+	want, err := effectivePolicyHash(policy)
+	if err != nil || policy.validationHash != want {
+		return fmt.Errorf("invalid or mutated effective security policy")
+	}
+	return nil
+}
+
+func canonicalEffectiveCapabilities(values []string) ([]string, error) {
+	known := map[string]bool{}
+	for _, capability := range SecurityCapabilities() {
+		known[capability] = true
+	}
+	out := append([]string(nil), values...)
+	sort.Strings(out)
+	for i, capability := range out {
+		if capability == "" || !known[capability] {
+			return nil, fmt.Errorf("effective security policy: unknown capability")
+		}
+		if i > 0 && capability == out[i-1] {
+			return nil, fmt.Errorf("effective security policy: duplicate capability")
+		}
+	}
+	return out, nil
+}
+
+func effectivePolicyHash(policy EffectiveSecurityPolicy) ([32]byte, error) {
+	raw, err := json.Marshal(policy)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(raw), nil
 }
 
 func validateCompatibility(c CompatibilityMetadata, sec SecurityPolicy, stream StreamPolicy, carrier CarrierPolicy, limits SafetyLimits) error {

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"sort"
 
-	"kurdistan/internal/transport/carrierrelay"
-	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/transport/proxyadversary"
 	"kurdistan/internal/crypto/security"
 	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/transport/carrierrelay"
+	"kurdistan/internal/transport/proxyadversary"
 )
 
 type HarnessOptions struct {
@@ -48,6 +48,45 @@ type HarnessSummary struct {
 	TargetResets          int      `json:"target_resets"`
 	PayloadLogged         bool     `json:"payload_logged"`
 	SecretLogged          bool     `json:"secret_logged"`
+}
+
+// strictCandidateHarnessSummaryV1 is intentionally local and aggregate-only.
+// It reports no plaintext, key identity, nonce, profile secret, or endpoint.
+type strictCandidateHarnessSummaryV1 struct {
+	ApplicationRecords int
+	ControlRecords     int
+	Deliveries         int
+	NonceDomains       int
+	NonceAllocations   int
+	NonceCollisions    uint64
+}
+
+func runStrictCandidateHarnessV1(client *ClientAuthenticatedEndpointV1, relay *RelayAuthenticatedEndpointV1, payload []byte) (strictCandidateHarnessSummaryV1, error) {
+	channel, err := newStrictProtectedChannelV1(client, relay)
+	if err != nil {
+		return strictCandidateHarnessSummaryV1{}, err
+	}
+	record, operationID, err := channel.sealClientApplicationV1(1, payload)
+	if err != nil {
+		return strictCandidateHarnessSummaryV1{}, err
+	}
+	delivered, _, err := channel.openClientApplicationV1(record)
+	if err != nil {
+		return strictCandidateHarnessSummaryV1{}, err
+	}
+	defer clear(delivered)
+	ack, err := channel.sealRelayAckV1(operationID, false)
+	if err != nil {
+		return strictCandidateHarnessSummaryV1{}, err
+	}
+	if err := channel.openRelayAckV1(ack); err != nil {
+		return strictCandidateHarnessSummaryV1{}, err
+	}
+	nonces := channel.nonceSummaryV1()
+	return strictCandidateHarnessSummaryV1{
+		ApplicationRecords: 1, ControlRecords: 1, Deliveries: 1,
+		NonceDomains: nonces.Domains, NonceAllocations: nonces.Allocations, NonceCollisions: nonces.Collisions,
+	}, nil
 }
 
 func RunLocalHarness(ctx context.Context, p *ir.Profile, opts HarnessOptions) (HarnessSummary, []ktrace.Event, error) {

@@ -12,7 +12,15 @@ import (
 )
 
 const (
-	SupportedVersion = "0.1.0-lab"
+	// Version authority is owned by the cycle-free IR layer. Next values are
+	// dormant until the reviewed schema, codegen, wire, and golden migration.
+	LegacySchemaVersionV1   = "0.1.0-lab"
+	NextSchemaVersionV1     = "0.2.0-lab"
+	LegacySecurityVersionV1 = "0.12.0-lab"
+	NextSecurityVersionV1   = "0.13.0-lab"
+
+	SupportedVersion         = NextSchemaVersionV1
+	SupportedSecurityVersion = NextSecurityVersionV1
 
 	RoleClient = "client"
 	RoleServer = "server"
@@ -301,6 +309,47 @@ type SecurityPolicy struct {
 	SecureEnvelopeMode          string `json:"secure_envelope_mode"`
 	MaxSessionMessages          int    `json:"max_session_messages"`
 	MaxKeyLifetimeMessages      int    `json:"max_key_lifetime_messages"`
+}
+
+// EffectiveSecurityPolicy is the validated, runtime-owned policy carrier. It
+// is derived from a validated profile and peer floors; it is never decoded from
+// the profile itself. The private validation hash detects raw or mutated values.
+type EffectiveSecurityPolicy struct {
+	ProfileID               string `json:"profile_id"`
+	ProfileHash             string `json:"profile_hash"`
+	SchemaVersion           string `json:"schema_version"`
+	CompilerSecurityVersion string `json:"compiler_security_version"`
+	MinimumRuntimeVersion   string `json:"minimum_runtime_version"`
+
+	SecurityVersion             string `json:"security_version"`
+	TranscriptMode              string `json:"transcript_mode"`
+	KDFSuite                    string `json:"kdf_suite"`
+	AEADSuite                   string `json:"aead_suite"`
+	MACSuite                    string `json:"mac_suite"`
+	NonceMode                   string `json:"nonce_mode"`
+	ReplayPolicy                string `json:"replay_policy"`
+	ReplayWindowSize            int    `json:"replay_window_size"`
+	DowngradePolicy             string `json:"downgrade_policy"`
+	CapabilityNegotiationPolicy string `json:"capability_negotiation_policy"`
+	ProfileCompatibilityPolicy  string `json:"profile_compatibility_policy"`
+	KeyRotationPolicy           string `json:"key_rotation_policy"`
+	ConfigValidationPolicy      string `json:"config_validation_policy"`
+	SecureEnvelopeMode          string `json:"secure_envelope_mode"`
+	MaxSessionMessages          int    `json:"max_session_messages"`
+	MaxKeyLifetimeMessages      int    `json:"max_key_lifetime_messages"`
+
+	ClientMandatoryCapabilities []string `json:"client_mandatory_capabilities"`
+	ServerMandatoryCapabilities []string `json:"server_mandatory_capabilities"`
+	SelectedCapabilities        []string `json:"selected_capabilities"`
+
+	validationHash [32]byte
+}
+
+func (p EffectiveSecurityPolicy) Clone() EffectiveSecurityPolicy {
+	p.ClientMandatoryCapabilities = append([]string(nil), p.ClientMandatoryCapabilities...)
+	p.ServerMandatoryCapabilities = append([]string(nil), p.ServerMandatoryCapabilities...)
+	p.SelectedCapabilities = append([]string(nil), p.SelectedCapabilities...)
+	return p
 }
 
 type CompatibilityMetadata struct {

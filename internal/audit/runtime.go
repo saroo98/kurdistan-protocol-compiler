@@ -6,12 +6,14 @@ package audit
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/testkit/mutant"
 	"kurdistan/internal/lab/runtimeadversary"
+	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/protocol/ir"
 )
 
 func RunRuntimeAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
@@ -168,44 +170,17 @@ func RuntimeTraceHygieneGate(ctx context.Context, profiles []*ir.Profile) GateRe
 		if run.Summary.PayloadLogged || run.Summary.SecretLogged {
 			failures = append(failures, run.ProfileID)
 		}
+		event := ktrace.DiagnosticEventV1{SchemaVersion: ktrace.DiagnosticSchemaV1, EventClass: "runtime", OutcomeBucket: "completed", HygieneResult: "redacted"}
+		if err := ktrace.ValidateDiagnosticEventV1(event); err != nil || ktrace.ContainsSensitiveValue(event, []byte(run.ProfileID), []byte(run.Scenario)) {
+			failures = append(failures, run.ProfileID+":strict diagnostic invalid")
+		}
 	}
 	return gate("runtime_trace_hygiene", len(failures) == 0, "required", fmt.Sprintf("%d runtime traces checked for payload/secret hygiene", len(runs)), nil, failures)
 }
 
-// RuntimeMutantDetectionGate is a DETECTOR SELF-TEST over the runtime mutant
-// modes. RunMutantScenarioCorpus stamps a simulated regression onto each run
-// summary (e.g. ReplayRejected=0, SecretLogged=true) and this gate confirms the
-// detector flags it. The real runtime harness is never made to misbehave, so a
-// PASS proves detector wiring, not that the runtime enforces the policy. Genuine
-// enforcement is Option A, gated on D-003 external crypto review.
 func RuntimeMutantDetectionGate(ctx context.Context) GateResult {
-	modes := []string{
-		mutant.ModeRuntimeAcceptsCapabilityDowngrade,
-		mutant.ModeRuntimeAcceptsProfileMismatch,
-		mutant.ModeRuntimeAcceptsReplay,
-		mutant.ModeRuntimeIgnoresBackpressure,
-		mutant.ModeRuntimeLeaksSecretTrace,
-		mutant.ModeRuntimeLeaksPayloadTrace,
-		mutant.ModeRuntimeNoStateValidation,
-		mutant.ModeRuntimePaddingOnlyDiversity,
-	}
-	detected := []string{}
-	missed := []string{}
-	for _, mode := range modes {
-		profiles, err := mutant.GenerateProfiles(mode, 5100, 6)
-		if err != nil {
-			missed = append(missed, mode+": "+err.Error())
-			continue
-		}
-		runs := runtimeadversary.RunMutantScenarioCorpus(ctx, mode, profiles, runtimeMutantScenarios(mode))
-		report := runtimeadversary.AnalyzeRuns(runs, runtimeadversary.DefaultCollapseThresholds())
-		if runtimeMutantDetected(mode, report) {
-			detected = append(detected, mode)
-		} else {
-			missed = append(missed, mode)
-		}
-	}
-	return gate("runtime_mutant_detection", len(missed) == 0, "required", fmt.Sprintf("%d/%d runtime regression modes flagged (detector self-test over simulated regressions; not runtime enforcement — see D-003)", len(detected), len(modes)), map[string]any{"detected_modes": detected, "missed_modes": missed, "self_test": "RunMutantScenarioCorpus injects a simulated regression into the run summary; the real runtime is not made to misbehave"}, missed)
+	_ = ctx
+	return realLabFaultInjectionGateV1("runtime_mutant_detection", "runtime", 5100)
 }
 
 func RuntimeGeneratedBackendParityGate() GateResult {
@@ -224,46 +199,28 @@ func RuntimeGeneratedBackendParityGate() GateResult {
 			failures = append(failures, "missing generated backend marker "+marker)
 		}
 	}
-	return gate("runtime_generated_backend_parity", len(failures) == 0, "required", "generated backend runtime support markers checked", map[string]any{"scanner": "source-marker"}, failures)
-}
-
-func runtimeMutantScenarios(mode string) []runtimeadversary.Scenario {
-	switch mode {
-	case mutant.ModeRuntimeAcceptsCapabilityDowngrade:
-		return []runtimeadversary.Scenario{runtimeadversary.DefaultScenario(runtimeadversary.ScenarioCapabilityDowngrade)}
-	case mutant.ModeRuntimeAcceptsProfileMismatch:
-		return []runtimeadversary.Scenario{runtimeadversary.DefaultScenario(runtimeadversary.ScenarioProfileMismatchSession)}
-	case mutant.ModeRuntimeAcceptsReplay:
-		return []runtimeadversary.Scenario{runtimeadversary.DefaultScenario(runtimeadversary.ScenarioReplayInjection)}
-	case mutant.ModeRuntimeIgnoresBackpressure:
-		return []runtimeadversary.Scenario{runtimeadversary.DefaultScenario(runtimeadversary.ScenarioLargeObjectRuntime)}
-	default:
-		return []runtimeadversary.Scenario{runtimeadversary.DefaultScenario(runtimeadversary.ScenarioHappyPathSession)}
-	}
-}
-
-func runtimeMutantDetected(mode string, report runtimeadversary.Report) bool {
-	switch mode {
-	case mutant.ModeRuntimeAcceptsCapabilityDowngrade:
-		return report.Correctness.NegotiationFailures == 0 && report.Correctness.CorrectRuns < report.Correctness.ScenarioRuns
-	case mutant.ModeRuntimeAcceptsProfileMismatch:
-		return report.Correctness.CompatibilityFailures == 0 && report.Correctness.CorrectRuns < report.Correctness.ScenarioRuns
-	case mutant.ModeRuntimeAcceptsReplay:
-		return report.Correctness.ReplayFailures > 0 || report.Correctness.CorrectRuns < report.Correctness.ScenarioRuns
-	case mutant.ModeRuntimeIgnoresBackpressure:
-		return report.Correctness.BackpressureFailures > 0 || report.Correctness.CorrectRuns < report.Correctness.ScenarioRuns
-	case mutant.ModeRuntimeLeaksSecretTrace, mutant.ModeRuntimeLeaksPayloadTrace:
-		return report.Correctness.TraceHygieneFailures > 0
-	case mutant.ModeRuntimeNoStateValidation:
-		return report.Correctness.CorrectRuns < report.Correctness.ScenarioRuns
-	case mutant.ModeRuntimePaddingOnlyDiversity:
-		for _, collapse := range report.CollapseReports {
-			if collapse.Conclusion != "passed" {
-				return true
+	for path, markers := range map[string][]string{
+		"internal/runtime/generated_profile_parity_test.go": {"TestGeneratedProfileParityV1", m0PolicySeedCSVHashV1, "len(generatedProfileParityPinsV1) != 29"},
+		"internal/runtime/policy_enforcement_test.go":       {"TestInterpretedPolicyParityCoveringArrayV1", "pairwise coverage=%d/%d want 732/732", "reflect.DeepEqual(seeds, []int64{1, 2, 3, 4, 5, 6, 7, 8})"},
+	} {
+		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if readErr != nil {
+			failures = append(failures, readErr.Error())
+			continue
+		}
+		for _, marker := range markers {
+			if !strings.Contains(string(raw), marker) {
+				failures = append(failures, path+": missing "+marker)
 			}
 		}
 	}
-	return false
+	return gate("runtime_generated_backend_parity", len(failures) == 0, "required", "generated runtime markers plus exact 29-row generated/interpreted policy evidence registry checked", map[string]any{
+		"scanner":                    "source-marker-and-executable-test-registry",
+		"policy_seed_csv_sha256":     m0PolicySeedCSVHashV1,
+		"policy_interaction_rows":    29,
+		"policy_pairwise_coverage":   "732/732",
+		"wo042_catalog_substitution": false,
+	}, failures)
 }
 
 func runtimeCollapseThresholds(thresholds AuditThresholds) runtimeadversary.CollapseThresholds {

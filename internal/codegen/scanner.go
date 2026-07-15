@@ -5,9 +5,13 @@ package codegen
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -24,6 +28,8 @@ type SourceScanReport struct {
 	ModuleReports                     []ModuleScan   `json:"module_reports"`
 	Failures                          []string       `json:"failures,omitempty"`
 	Passed                            bool           `json:"passed"`
+	StrictSurfaceValidated            bool           `json:"strict_surface_validated"`
+	LegacyEvidenceClass               string         `json:"legacy_evidence_class"`
 }
 
 type ModuleScan struct {
@@ -36,6 +42,8 @@ type ModuleScan struct {
 	PayloadLogging                  bool     `json:"payload_logging"`
 	ForbiddenMagicStrings           []string `json:"forbidden_magic_strings,omitempty"`
 	Failures                        []string `json:"failures,omitempty"`
+	StrictSurfaceValidated          bool     `json:"strict_surface_validated"`
+	LegacyEvidenceClass             string   `json:"legacy_evidence_class"`
 }
 
 func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
@@ -44,6 +52,8 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		ProfileSpecificConstantsPresent:   true,
 		SpecializedFileUniqueFingerprints: map[string]int{},
 		Passed:                            true,
+		StrictSurfaceValidated:            true,
+		LegacyEvidenceClass:               "legacy_non_evidentiary_parity",
 	}
 	if len(dirs) == 0 {
 		report.Passed = false
@@ -127,6 +137,7 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 		report.PayloadLogging = report.PayloadLogging || module.PayloadLogging
 		report.ForbiddenMagicStrings = appendUnique(report.ForbiddenMagicStrings, module.ForbiddenMagicStrings...)
 		report.Failures = append(report.Failures, module.Failures...)
+		report.StrictSurfaceValidated = report.StrictSurfaceValidated && module.StrictSurfaceValidated
 		for _, rel := range specialized {
 			if content, ok := sources[rel]; ok {
 				fingerprints[rel][sourceHash(content)] = true
@@ -169,6 +180,9 @@ func ScanGeneratedOutputs(dirs []string) (SourceScanReport, error) {
 func scanModule(dir string) (ModuleScan, map[string]string, error) {
 	label := filepath.Base(dir)
 	module := ModuleScan{Directory: label}
+	manifestRaw, _ := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	strictExpected := strings.Contains(string(manifestRaw), `"authorization_catalog_version"`)
+	module.LegacyEvidenceClass = "legacy_non_evidentiary_parity"
 	sources := map[string]string{}
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -194,6 +208,9 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		return ModuleScan{}, nil, err
 	}
 	joined := strings.Join(mapValues(sources), "\n")
+	strictFailures := validateStrictGeneratedSurfaceV1(sources, strictExpected)
+	module.StrictSurfaceValidated = strictExpected && len(strictFailures) == 0
+	module.Failures = append(module.Failures, strictFailures...)
 	module.ProfileSpecificConstantsPresent = strings.Contains(joined, "const ProfileID") &&
 		strings.Contains(joined, "var transitionTable") &&
 		strings.Contains(joined, "var semanticWireSymbols") &&
@@ -274,6 +291,156 @@ func scanModule(dir string) (ModuleScan, map[string]string, error) {
 		module.Failures = append(module.Failures, fmt.Sprintf("%s: forbidden magic %s", label, value))
 	}
 	return module, sources, nil
+}
+
+func validateStrictGeneratedSurfaceV1(sources map[string]string, required ...bool) []string {
+	strict, present := sources["strictv1/runtime.go"]
+	expect := len(required) > 0 && required[0]
+	strictFiles := 0
+	for path, source := range sources {
+		if strings.HasPrefix(path, "strictv1/") && strings.HasSuffix(path, ".go") {
+			strictFiles++
+		}
+		if path != "strictv1/runtime.go" && strictDeclarationsOutsideV1(path, source) {
+			return []string{"strict declarations outside strictv1/runtime.go"}
+		}
+	}
+	if expect && (!present || strictFiles != 1) {
+		return []string{"strictv1 inventory must contain only runtime.go"}
+	}
+	if !present {
+		return nil
+	}
+	if strictFiles != 1 {
+		return []string{"strictv1 inventory must contain only runtime.go"}
+	}
+	formatted := strictRuntimeTemplateV1()
+	if strict != formatted {
+		return []string{"strictv1/runtime.go template drift"}
+	}
+	f, err := parser.ParseFile(token.NewFileSet(), "strictv1/runtime.go", strict, parser.ParseComments)
+	if err != nil || f.Name.Name != "strictv1" || len(f.Imports) != 2 {
+		return []string{"strictv1/runtime.go AST invalid"}
+	}
+	funcs, consts := 0, 0
+	for _, d := range f.Decls {
+		switch x := d.(type) {
+		case *ast.FuncDecl:
+			funcs++
+			if x.Name.Name != "NewStrictRuntimeV1" || x.Recv != nil {
+				return []string{"strict factory drift"}
+			}
+		case *ast.GenDecl:
+			if x.Tok == token.IMPORT {
+				continue
+			}
+			if x.Tok != token.CONST {
+				return []string{"strict global declaration forbidden"}
+			}
+			for _, s := range x.Specs {
+				consts += len(s.(*ast.ValueSpec).Names)
+			}
+		default:
+			return []string{"strict declaration forbidden"}
+		}
+	}
+	if funcs != 1 || consts != 6 {
+		return []string{"strict declaration inventory drift"}
+	}
+	return nil
+}
+
+var strictGeneratedSymbolsV1 = map[string]bool{
+	"ProtocolSchemaVersion": true, "SecurityVersion": true, "RuntimeSecurityVersion": true,
+	"HandshakeVersion": true, "PolicyEncodingVersion": true, "RecordVersion": true,
+	"NewStrictRuntimeV1": true, "NewStrictHandshakeRuntimeV1": true,
+	"ClientProfileAuthorization" + "RegistryV1": true, "RelayProfileAuthorization" + "RegistryV1": true,
+}
+
+func strictDeclarationsOutsideV1(path, source string) bool {
+	f, err := parser.ParseFile(token.NewFileSet(), path, source, parser.ParseComments)
+	if err != nil {
+		return strings.Contains(source, "package strictv1")
+	}
+	for _, decl := range f.Decls {
+		switch x := decl.(type) {
+		case *ast.FuncDecl:
+			if strictGeneratedSymbolsV1[x.Name.Name] {
+				return true
+			}
+		case *ast.GenDecl:
+			for _, spec := range x.Specs {
+				switch s := spec.(type) {
+				case *ast.ValueSpec:
+					for _, name := range s.Names {
+						if strictGeneratedSymbolsV1[name.Name] && !legacyStrictNameExceptionV1(path, name.Name) {
+							return true
+						}
+					}
+				case *ast.TypeSpec:
+					if strictGeneratedSymbolsV1[s.Name.Name] {
+						return true
+					}
+				}
+			}
+		}
+	}
+	hidden := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		value, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		if strings.Contains(value, "package strictv1") {
+			hidden = true
+			return false
+		}
+		for symbol := range strictGeneratedSymbolsV1 {
+			if strings.Contains(value, "const "+symbol) || strings.Contains(value, "func "+symbol) || strings.Contains(value, "type "+symbol) {
+				hidden = true
+				return false
+			}
+		}
+		return true
+	})
+	return hidden
+}
+
+func legacyStrictNameExceptionV1(path, name string) bool {
+	return path == "protocol/security_generated.go" && name == "SecurityVersion" || path == "protocol/runtime_generated.go" && name == "RuntimeSecurityVersion"
+}
+
+func validateStrictTemplateRepositorySourceV1(source string) []string {
+	f, err := parser.ParseFile(token.NewFileSet(), "generator_templates.go", source, parser.ParseComments)
+	if err != nil {
+		return []string{"strict template repository source invalid"}
+	}
+	owners := 0
+	templateLiterals := 0
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if ok && fn.Name.Name == "strictRuntimeTemplateV1" {
+			owners++
+		}
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		lit, ok := n.(*ast.BasicLit)
+		if ok && lit.Kind == token.STRING {
+			value, _ := strconv.Unquote(lit.Value)
+			if strings.Contains(value, "package strictv1") {
+				templateLiterals++
+			}
+		}
+		return true
+	})
+	if owners != 1 || templateLiterals != 1 {
+		return []string{"strict template owner inventory drift"}
+	}
+	return nil
 }
 
 func looksLikePayloadLogging(source string) bool {

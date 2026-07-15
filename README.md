@@ -39,7 +39,7 @@ capabilities fall into three classes:
 - `[model]` — a deterministic, in-memory, payload-free contract or simulation. It validates shapes and semantics but performs no real networking.
 - `[plan]` — a design spec or review contract only; no implementation yet.
 
-Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The audit gates prove local regressions and detector wiring; several security regression gates are detector self-tests, not proofs of runtime enforcement (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
+Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The security and runtime `*_mutant_detection` gates measure bounded real lab fault-injection detector sensitivity with paired controls: they show that named detectors turn red for deliberate lab faults while their paired controls stay green. They do not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
 
 ## Why This Project Exists
 
@@ -193,6 +193,27 @@ internal/characterization + internal/testkit/{adversary,bench,importrules,mutant
 ```
 
 The interpreted runtime supports fast research iteration. The generated source backend exists because a shared interpreter can introduce common implementation artifacts. `kgen` emits profile-specific Go constants and tables so generated modules can compile and interoperate locally.
+
+### Stage 6A local migration boundary
+
+The active local profile tuple is schema `0.2.0-lab` and security/runtime
+`0.13.0-lab`. Old `0.1.0-lab`/`0.12.0-lab` profiles are rejected by live
+loading and can be transformed only through the explicit offline migration
+leaf described in [KIP-0067](docs/KIP-0067-stage6a-version-migration.md).
+There is no live dual-read fallback.
+
+For authorized strict generation, only `strictv1/runtime.go` is evidentiary. It
+exposes the six frozen protocol/security/runtime/handshake/policy/record
+identifiers and `NewStrictRuntimeV1`, whose client and relay authorization
+registries are supplied by the caller as distinct typed values. It embeds no
+catalog pins or default registry. Generated `protocol/**` and `cmd/**` remain
+legacy parity-only/non-evidentiary and unreachable from strict/product runtime
+evidence.
+
+These are bounded compiler, audit, and local-loopback claims. The repository
+still does not contain a production Android VPN, a live relay fleet, production
+key management, deployment authorization, external-network validation, or
+evidence supporting undetectability or production-readiness claims.
 
 ## Quickstart
 

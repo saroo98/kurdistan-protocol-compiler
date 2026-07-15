@@ -5,11 +5,42 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
-	"kurdistan/internal/testkit/mutant"
+	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/lab/runtimeadversary"
 	"kurdistan/internal/protocol/ir"
 )
+
+func expectedSecurityVersionAuditV1() map[string]string {
+	return map[string]string{
+		"profile_version":              ir.SupportedVersion,
+		"security_version":             ir.SupportedSecurityVersion,
+		"compatibility_schema_version": ir.SupportedVersion,
+		"compiler_security_version":    ir.SupportedSecurityVersion,
+		"minimum_runtime_version":      ir.SupportedSecurityVersion,
+		"handshake_version":            security.HandshakeVersionV1,
+		"policy_encoding_version":      security.PolicyEncodingVersionV1,
+		"record_version":               security.RecordVersionV1,
+	}
+}
+
+func validateSecurityVersionAuditV1(summary map[string]any) error {
+	for field, want := range expectedSecurityVersionAuditV1() {
+		got, ok := summary[field].(string)
+		if !ok || got == "" || got != want {
+			return fmt.Errorf("%s=%v want=%q", field, summary[field], want)
+		}
+	}
+	return nil
+}
 
 func TestSecurityAuditQuickGates(t *testing.T) {
 	cfg := DefaultConfig("quick")
@@ -30,6 +61,7 @@ func TestSecurityAuditQuickGates(t *testing.T) {
 		"security_secret_trace_hygiene",
 		"security_mutant_detection",
 		"security_generated_backend_parity",
+		"security_m0_g1_g13_integration",
 	}
 	seen := map[string]bool{}
 	for _, gate := range report.Gates {
@@ -46,44 +78,265 @@ func TestSecurityAuditQuickGates(t *testing.T) {
 	if report.Conclusion != "passed" {
 		t.Fatalf("unexpected conclusion %q", report.Conclusion)
 	}
+	summary, ok := report.TraceScanSummary.(map[string]any)
+	if !ok {
+		t.Fatalf("security trace summary type=%T", report.TraceScanSummary)
+	}
+	if err := validateSecurityVersionAuditV1(summary); err != nil {
+		t.Fatal(err)
+	}
 }
 
-// TestSecurityMutantReasonsDiscriminates is the de-hollowing regression guard for
-// Stage 6 (Option B). The security mutant gate is a detector self-test, so its
-// only honest guarantee is that the detector DISCRIMINATES: a canonical-strong
-// profile (declared policy fields set to values no mutant forces) must yield zero
-// reasons, and every mutant must yield at least one. This pins the removal of the
-// previously unconditional ModeReusedNonce reason, which fired for any profile.
-func TestSecurityMutantReasonsDiscriminates(t *testing.T) {
-	modes := []string{
-		mutant.ModeNoTranscriptBinding,
-		mutant.ModeReusedNonce,
-		mutant.ModeAcceptsReplay,
-		mutant.ModeAcceptsDowngrade,
-		mutant.ModeCapabilityMismatchAccepted,
-		mutant.ModeProfileMismatchAccepted,
-		mutant.ModeUnsafeConfigAllowed,
-		mutant.ModeSecretTraceLeak,
+func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
+	result := SecurityM0IntegratedEvidenceGate()
+	if !result.Passed {
+		t.Fatalf("integration gate failed: %+v", result)
 	}
-	clean := &ir.Profile{}
-	clean.Security.TranscriptMode = "canonical_full_binding_v1"
-	clean.Security.NonceMode = "directional_counter"
-	clean.Security.DowngradePolicy = "strict_suite_and_capabilities"
-	clean.Security.CapabilityNegotiationPolicy = "strict_required"
-	clean.Security.ProfileCompatibilityPolicy = "full_policy_binding"
-	clean.Security.ConfigValidationPolicy = "strict_profile_bound"
-	clean.Security.SecureEnvelopeMode = "full_context_bound_envelope"
-	clean.InvalidInput.Replay = "reject_nonce"
-	for _, mode := range modes {
-		if reasons := securityMutantReasons(mode, []*ir.Profile{clean}); len(reasons) != 0 {
-			t.Fatalf("canonical-strong clean profile flagged for %s: %v", mode, reasons)
+	if got := result.Details["scope"]; got != "bounded M0 local strict-candidate" {
+		t.Fatalf("scope=%v", got)
+	}
+	if got := result.Details["global_product_status"]; got != "open" {
+		t.Fatalf("global/product status=%v", got)
+	}
+	if got := result.Details["authorized_repo_state_hash"]; got != m0AuthorizedRepoStateV1 {
+		t.Fatalf("repo state=%v", got)
+	}
+	if got := result.Details["lifecycle_evidence_sha256"]; got != m0LifecycleEvidenceV1 {
+		t.Fatalf("lifecycle evidence=%v", got)
+	}
+	if got := result.Details["outside_scope_manifest_sha256"]; got != m0OutsideScopeHashV1 {
+		t.Fatalf("outside-scope manifest=%v", got)
+	}
+	if got := result.Details["outside_scope_file_count"]; got != m0OutsideScopeFileCount {
+		t.Fatalf("outside-scope files=%v", got)
+	}
+	wantTouches := []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"}
+	if got := result.Details["wo014_allowed_touches"]; !reflect.DeepEqual(got, wantTouches) {
+		t.Fatalf("allowed touches=%v", got)
+	}
+	if got := result.Details["wo014_completion_hash"]; got != "not-created-no-commit-authority" {
+		t.Fatalf("completion boundary=%v", got)
+	}
+	if got := result.Details["policy_seed_csv_sha256"]; got != m0PolicySeedCSVHashV1 {
+		t.Fatalf("seed hash=%v", got)
+	}
+	if got := result.Details["policy_interaction_rows"]; got != 29 {
+		t.Fatalf("interaction rows=%v", got)
+	}
+	if got := result.Details["policy_pairwise_coverage"]; got != "732/732" {
+		t.Fatalf("pair coverage=%v", got)
+	}
+	if got := result.Details["wo042_catalog_substitution"]; got != false {
+		t.Fatalf("WO-042 substitution=%v", got)
+	}
+	rows, ok := result.Details["rows"].([]m0EvidenceRowV1)
+	if !ok || len(rows) != 13 {
+		t.Fatalf("rows=%T/%d", result.Details["rows"], len(rows))
+	}
+	commands := []string{
+		"go test -count=1 ./internal/runtime -run 'TestGeneratedProfileParityV1|TestInterpretedPolicyParityCoveringArrayV1|TestPolicyMatrixOwnerWitnessLiteralCompleteV1'",
+		"go test -count=1 ./internal/crypto/security -run 'TestReplayStateCommitsOnlyAfterAuthentication|TestReplayConcurrentAuthenticatedDuplicateCommitsOnce'",
+		"go test -count=1 ./internal/crypto/auth -run 'TestAuthenticatedFirstContactFreshSessionNonceReplayAndKeys'",
+		"go test -count=1 ./internal/runtime -run 'TestProtectedChannelMultiFragmentExactCoverageV1|TestFragmentCoverageAndBoundsV1'",
+		"go test -count=1 ./internal/runtime -run 'TestPolicyMatrixCoveringSeedsProtectedChannelProductionV1|TestPolicyMatrixPrivateEntrypointCausalBypassSentinelV1'",
+		"go test -count=1 ./internal/runtime -run 'TestFirstRecordCommitServerEstablishOrderingV1|TestAuthenticatedOperationAckStrictReplayCommitOrderingV1'",
+		"go test -count=1 ./internal/crypto/security ./internal/runtime -run 'TestContextIdentityRejectsInvalidFields|TestPreEntropyVersionStructuredAdmission'",
+		"go test -count=1 ./internal/runtime -run 'TestApplicationRecordVectorV1|TestProtectedChannelEndToEndSingleFragmentAckCloseV1'",
+		"go test -count=1 ./internal/runtime -run 'TestInProcessProtectedRelayProtectedPathAndAckV1|TestPairOwnershipAndTerminalRelayCloseV1'",
+		"go test -count=1 ./internal/crypto/security -run 'TestNonceV1FormulaVectorsAndDirectionV1|TestNonceV1BurnRetryAndExhaust|TestNonceV1ConcurrentAllocation'",
+		"go test -count=1 ./internal/crypto/security -run 'TestKeyScheduleV1VectorEpochZeroAndOne|TestKeyScheduleV1DerivationAndSeparation'",
+		"go test -count=1 ./internal/observe/trace -run 'TestDiagnosticEventV1ExhaustiveSchemaAndValues|TestSchemaSequenceCrossSessionProfileCorrelationV1'",
+		"go test -count=1 ./internal/testkit/importrules -run 'TestLabFaultCapabilityCannotReachNormalPaths|VersionMigrationBoundary|GeneratedAuthorizationBoundary|NoLabShortcut'",
+	}
+	behaviors := []string{
+		"every admitted policy value and the frozen 29-row interactions reach interpreted and generated-profile strict behavior",
+		"authentication precedes replay mutation and concurrent duplicates commit at most once",
+		"authenticated first contact uses fresh session material and rejects replay",
+		"authenticated fragment coverage rejects gaps, overlap, duplicates, and mixed coordinates",
+		"bilateral floors and exact policy tuples cannot be weakened",
+		"application and acknowledgement lifecycle commits remain transactional",
+		"context identity and structured version admission reject before protected state",
+		"strict candidate application bytes are authenticated and tamper fail-closed",
+		"one configured in-process pair composes handshake, records, acknowledgement, and close",
+		"all nonce formulas preserve direction, burn, exhaustion, and concurrent uniqueness",
+		"key schedule labels, directions, epochs, limits, and separation remain exact",
+		"diagnostic schema and sequences reject secret and correlating expansion",
+		"normal, generated, loader, runtime, and product paths cannot reach lab or offline-migration authority",
+	}
+	regressions := []string{
+		"TestGeneratedProfileParityV1", "TestReplayStateCommitsOnlyAfterAuthentication", "TestAuthenticatedFirstContactFreshSessionNonceReplayAndKeys",
+		"TestProtectedChannelMultiFragmentExactCoverageV1", "TestPolicyMatrixCoveringSeedsProtectedChannelProductionV1", "TestFirstRecordCommitServerEstablishOrderingV1",
+		"TestContextIdentityRejectsInvalidFields", "TestProtectedChannelEndToEndSingleFragmentAckCloseV1", "TestInProcessProtectedRelayProtectedPathAndAckV1",
+		"TestNonceV1FormulaVectorsAndDirectionV1", "TestKeyScheduleV1DerivationAndSeparation", "TestDiagnosticEventV1ExhaustiveSchemaAndValues",
+		"TestLabFaultCapabilityCannotReachNormalPaths",
+	}
+	owners := []string{
+		"WO-016,WO-050,WO-035..WO-044", "WO-003,WO-020,WO-009", "WO-019", "WO-049", "WO-031,WO-033,WO-022,WO-050",
+		"WO-047,WO-048,WO-021,WO-049", "WO-038,WO-039,WO-045", "WO-024,WO-021,WO-049", "WO-011", "WO-020,WO-009,WO-026",
+		"WO-019,WO-021", "WO-027,WO-012", "WO-013,WO-044",
+	}
+	for i, row := range rows {
+		want := m0EvidenceRowV1{
+			Goal: fmt.Sprintf("G%d", i+1), Command: commands[i], Behavior: behaviors[i], RegressionTest: regressions[i], OwningWork: owners[i],
+			CandidateRepoState: m0AuthorizedRepoStateV1, OwningWOEvidenceSHA256: m0LifecycleEvidenceV1,
 		}
-		profiles, err := mutant.GenerateProfiles(mode, 4100, 3)
+		if row != want {
+			t.Fatalf("row %d=%+v want=%+v", i, row, want)
+		}
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ToLower(string(raw))
+	for _, forbidden := range []string{"production ready", "production-ready", "undetectable", "unblockable", "completion_hash\":\"6"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("integration evidence overclaim %q: %s", forbidden, raw)
+		}
+	}
+}
+
+func TestIntegratedM0NamedFaultMatrixV1(t *testing.T) {
+	table := runtimeadversary.RealMutantCorpusTableV1()
+	results, err := runtimeadversary.RunRealMutantCorpusV1(6100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(table) != 16 || len(results) != 16 {
+		t.Fatalf("fault matrix table=%d results=%d want 16/16", len(table), len(results))
+	}
+	want := map[string]runtimeadversary.RealMutantCorpusRowV1{}
+	for _, row := range table {
+		if _, duplicate := want[row.Mode]; duplicate {
+			t.Fatalf("duplicate named fault %s", row.Mode)
+		}
+		want[row.Mode] = row
+	}
+	seen := map[string]bool{}
+	for _, result := range results {
+		row, ok := want[result.Mode]
+		if !ok || seen[result.Mode] || result.Detector != row.Detector || result.Category != row.Category || result.Count != row.ExpectedCount || !result.UnsafeObserved || !result.DetectorRed || !result.ControlGreen {
+			t.Fatalf("invalid named fault result: %+v owner=%+v", result, row)
+		}
+		seen[result.Mode] = true
+	}
+	if len(seen) != 16 {
+		t.Fatalf("named faults seen=%d want=16", len(seen))
+	}
+}
+
+func TestWO014ExecutableEvidenceMatrixV1(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := [][]string{
+		{"test", "-timeout", "120s", "-count=1", "./internal/runtime", "-run", "TestGeneratedProfileParityV1|TestInterpretedPolicyParityCoveringArrayV1|TestPolicyMatrixOwnerWitnessLiteralCompleteV1|TestPolicyMatrixAdmissionOnlyExecutedLedgerV1|TestPolicyMatrixCausalOwnerRegistryCompleteV1"},
+		{"test", "-timeout", "120s", "-count=1", "./internal/codegen", "-run", "TestStrictGeneratedIdentifiersAndRoleSeparatedAuthorization|TestGenerateCreatesBuildableProfileSpecificModule|TestStrictGenerateSignedBoundaryMultiSeedAndPreOutput"},
+		{"test", "-timeout", "120s", "-count=1", "./internal/testkit/importrules", "-run", "TestLabFaultCapabilityCannotReachNormalPaths|VersionMigrationBoundary|OfflineMigrationReachability|GeneratedAuthorizationBoundary|NoLabShortcut"},
+		{"test", "-timeout", "120s", "-count=1", "./internal/crypto/...", "./internal/runtime/...", "./internal/protocol/framing/..."},
+	}
+	for _, args := range commands {
+		cmd := exec.Command("go", args...)
+		cmd.Dir = root
+		output, runErr := cmd.CombinedOutput()
+		if runErr != nil {
+			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), runErr, output)
+		}
+	}
+}
+
+func TestSecurityVersionAuditObservabilityV1(t *testing.T) {
+	if ir.LegacySchemaVersionV1 != "0.1.0-lab" || ir.NextSchemaVersionV1 != "0.2.0-lab" ||
+		ir.LegacySecurityVersionV1 != "0.12.0-lab" || ir.NextSecurityVersionV1 != "0.13.0-lab" ||
+		ir.SupportedVersion != ir.NextSchemaVersionV1 || ir.SupportedSecurityVersion != ir.NextSecurityVersionV1 ||
+		ir.SupportedVersion == ir.LegacySchemaVersionV1 || ir.SupportedSecurityVersion == ir.LegacySecurityVersionV1 {
+		t.Fatal("dormant-versus-active version authority drifted")
+	}
+	base := map[string]any{}
+	for field, value := range expectedSecurityVersionAuditV1() {
+		base[field] = value
+	}
+	if err := validateSecurityVersionAuditV1(base); err != nil {
+		t.Fatal(err)
+	}
+	for field := range expectedSecurityVersionAuditV1() {
+		for _, mutation := range []struct {
+			name  string
+			value any
+		}{{"omitted", nil}, {"altered", "altered"}} {
+			changed := map[string]any{}
+			for key, value := range base {
+				changed[key] = value
+			}
+			if mutation.name == "omitted" {
+				delete(changed, field)
+			} else {
+				changed[field] = mutation.value
+			}
+			if err := validateSecurityVersionAuditV1(changed); err == nil {
+				t.Fatalf("%s accepted %s mutation", field, mutation.name)
+			}
+		}
+	}
+}
+
+func TestRealLabFaultInjectionSecurityMutantGateV1(t *testing.T) {
+	for _, result := range []GateResult{SecurityMutantDetectionGate(context.Background()), RuntimeMutantDetectionGate(context.Background())} {
+		if !result.Passed || !strings.Contains(result.Summary, realLabFaultInjectionLabelV1) || !strings.Contains(result.Summary, "does not prove defect absence") || !strings.Contains(result.Summary, "merge or deploy") {
+			t.Fatalf("gate=%+v", result)
+		}
+		raw, err := json.Marshal(result)
 		if err != nil {
-			t.Fatalf("GenerateProfiles(%s): %v", mode, err)
+			t.Fatal(err)
 		}
-		if reasons := securityMutantReasons(mode, profiles); len(reasons) == 0 {
-			t.Fatalf("mutant %s produced no detector reasons (self-test would pass vacuously)", mode)
+		text := strings.ToLower(string(raw))
+		for _, forbidden := range []string{"channel_secret", "write_key", "ciphertext", "raw_frame", "destination", "profile_id", "transcript_hash", "synthetic-runtime", "canary"} {
+			if strings.Contains(text, forbidden) {
+				t.Fatalf("audit mutant result leaks forbidden field %q: %s", forbidden, raw)
+			}
 		}
+	}
+}
+
+func TestRealLabFaultInjectionGateRejectsUnknownAndExtraModesV1(t *testing.T) {
+	table := runtimeadversary.RealMutantCorpusTableV1()
+	results, err := runtimeadversary.RunRealMutantCorpusV1(4100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results = append(results, runtimeadversary.RealMutantCorpusResultV1{Mode: "unknown-extra-mode"})
+	result := realLabFaultInjectionGateResultsV1("security_mutant_detection", "security", table, results)
+	if result.Passed {
+		t.Fatal("unknown extra mode passed")
+	}
+	failures, ok := result.Details["failures"].([]string)
+	if !ok {
+		t.Fatalf("failures=%T", result.Details["failures"])
+	}
+	joined := strings.Join(failures, "\n")
+	if !strings.Contains(joined, "unknown result mode unknown-extra-mode") || !strings.Contains(joined, "result corpus cardinality") {
+		t.Fatalf("failures=%q", joined)
+	}
+}
+
+func TestCompatibilitySimulationRemovedNoSelfTestStampV1(t *testing.T) {
+	root := filepath.Join("..", "..")
+	paths := []string{"internal/audit/security.go", "internal/audit/runtime.go", "internal/lab/runtimeadversary/runner.go"}
+	for _, path := range paths {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		for _, forbidden := range []string{"RunMutantScenarioCorpus", "securityMutantReasons", "runtimeMutantDetected", "runtimeMutantScenarios", "detector self-test", "simulated regression", "self_test"} {
+			if strings.Contains(text, forbidden) {
+				t.Fatalf("%s retains %q", path, forbidden)
+			}
+		}
+	}
+	status := RenderStatus(AuditReport{})
+	if !strings.Contains(status, realLabFaultInjectionLabelV1) || !strings.Contains(status, "does not prove defect absence") || !strings.Contains(status, "merge or deploy") {
+		t.Fatal("status lacks exact mutant label/limitations")
 	}
 }

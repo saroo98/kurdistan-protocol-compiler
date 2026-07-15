@@ -6,8 +6,8 @@ package runtime
 import (
 	"fmt"
 
-	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/protocol/ir"
 )
 
 type SecureChannel struct {
@@ -17,7 +17,18 @@ type SecureChannel struct {
 	In      *security.EnvelopeCodec
 }
 
+// strictCandidateCompatibilityAllowlistV1 names pre-existing model and
+// compatibility surfaces that are intentionally outside the local strict
+// protected-channel evidence. Product traffic must not infer a cutover from
+// the candidate while any of these remain independently callable.
+var strictCandidateCompatibilityAllowlistV1 = [...]string{
+	"BuildSecurityContext", "NewSecureChannel", "Runtime", "Manager", "Session",
+	"StreamManager", "RunAdapterBoundary", "TCP relay", "commands", "generated templates",
+}
+
 func BuildSecurityContext(p *ir.Profile, caps security.CapabilitySet, secret []byte) (security.SecurityContext, security.KeySchedule, error) {
+	// Legacy/model compatibility path. TranscriptInputForProfile below uses a
+	// profile-derived lab nonce and must never become a strict/product entry.
 	input, err := TranscriptInputForProfile(p, caps)
 	if err != nil {
 		return security.SecurityContext{}, security.KeySchedule{}, err
@@ -34,6 +45,10 @@ func BuildSecurityContext(p *ir.Profile, caps security.CapabilitySet, secret []b
 }
 
 func NewSecureChannel(ctx security.SecurityContext, keys security.KeySchedule, role Role) (*SecureChannel, error) {
+	return newSecureChannel(ctx, keys, role)
+}
+
+func newSecureChannel(ctx security.SecurityContext, keys security.KeySchedule, role Role) (*SecureChannel, error) {
 	out, err := security.NewEnvelopeCodec(ctx, keys, string(role))
 	if err != nil {
 		return nil, err
@@ -80,7 +95,7 @@ func TranscriptInputForProfile(p *ir.Profile, caps security.CapabilitySet) (secu
 		ProxyPolicy:         p.ProxySemantics.TargetDescriptorEncoding + "/" + p.ProxySemantics.ResponseModeEncoding,
 		CarrierPolicy:       p.CarrierPolicy.CarrierFamily + "/" + p.CarrierPolicy.EnvelopeEncoding + "/" + p.CarrierPolicy.FlushPolicy,
 		Capabilities:        caps.Features,
-		SessionNonce:        []byte("runtime-session:" + p.ID),
+		SessionNonce:        []byte("runtime-session:" + p.ID), // model-only profile-derived nonce; strict paths use authenticated entropy
 		Suite:               security.DefaultSuite(),
 		OrderedStatePath:    []string{p.FirstContact.StartState, p.FirstContact.RelayReadyState},
 	}, nil

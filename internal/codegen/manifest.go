@@ -11,24 +11,27 @@ const (
 )
 
 type Manifest struct {
-	ProfileID        string         `json:"profile_id"`
-	ProfileSeed      int64          `json:"profile_seed"`
-	GeneratorVersion string         `json:"generator_version"`
-	GeneratedAt      string         `json:"generated_at"`
-	SourceBackend    string         `json:"source_backend"`
-	States           int            `json:"states"`
-	Transitions      int            `json:"transitions"`
-	FrameGrammar     string         `json:"frame_grammar"`
-	Scheduler        string         `json:"scheduler"`
-	Stream           string         `json:"stream"`
-	ProxySemantics   string         `json:"proxy_semantics"`
-	Carrier          string         `json:"carrier_model"`
-	WireShape        string         `json:"wire_shape"`
-	Adapter          string         `json:"adapter"`
-	Security         string         `json:"security"`
-	Padding          string         `json:"padding"`
-	InvalidInput     string         `json:"invalid_input"`
-	Safety           ManifestSafety `json:"safety"`
+	ProfileID                   string         `json:"profile_id"`
+	ProfileSeed                 int64          `json:"profile_seed"`
+	GeneratorVersion            string         `json:"generator_version"`
+	GeneratedAt                 string         `json:"generated_at"`
+	SourceBackend               string         `json:"source_backend"`
+	States                      int            `json:"states"`
+	Transitions                 int            `json:"transitions"`
+	FrameGrammar                string         `json:"frame_grammar"`
+	Scheduler                   string         `json:"scheduler"`
+	Stream                      string         `json:"stream"`
+	ProxySemantics              string         `json:"proxy_semantics"`
+	Carrier                     string         `json:"carrier_model"`
+	WireShape                   string         `json:"wire_shape"`
+	Adapter                     string         `json:"adapter"`
+	Security                    string         `json:"security"`
+	Padding                     string         `json:"padding"`
+	InvalidInput                string         `json:"invalid_input"`
+	Safety                      ManifestSafety `json:"safety"`
+	AuthorizationCatalogVersion string         `json:"authorization_catalog_version,omitempty"`
+	AuthorizationCatalogScope   string         `json:"authorization_catalog_scope,omitempty"`
+	AuthorizationCatalogSHA256  string         `json:"authorization_catalog_sha256,omitempty"`
 }
 
 type ManifestSafety struct {
