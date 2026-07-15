@@ -336,5 +336,106 @@
         }
       ]
     }
+  },
+  "phase2_complete_overlays": {
+    "m2-governance-foundation-phase2-complete-v1": {
+      "version": "m2-governance-foundation-phase2-complete-v1",
+      "predecessor_manifest_sha256": "c89a6be543ec35e68bef3cd6d5a91b685b1a05e523aca264faabc6d4933c398b",
+      "paths": [
+        "README.md",
+        "ROADMAP.md",
+        "cmd/kgen/main_test.go",
+        "docs/GOVERNANCE.md",
+        "docs/KIP-0001-threat-model.md",
+        "docs/KIP-0066-product-layer-scaffold.md",
+        "docs/KIP-0068-product-governance-foundation.md",
+        "docs/KIP-0069-product-contracts-v1.md",
+        "docs/safety.md",
+        "internal/audit/codegen_test.go",
+        "internal/audit/security.go",
+        "internal/audit/security_test.go",
+        "internal/codegen/authorization_v1_test.go",
+        "internal/runtime/policy_enforcement_test.go",
+        "internal/testkit/importrules/importrules_test.go",
+        "testdata/evidence/phase1-m0-committed-sha256.json"
+      ],
+      "entries": [
+        {
+          "path": "README.md",
+          "pre_evidence": "2014b1d01767cd945f1a8196f90c327ceeadbf50da69eb5185cdd215d85f29d2",
+          "post_sha256": "2014b1d01767cd945f1a8196f90c327ceeadbf50da69eb5185cdd215d85f29d2"
+        },
+        {
+          "path": "ROADMAP.md",
+          "pre_evidence": "77e6ded9aebca49b2d57138860c4b9131ae2e93683b6d59c858506862a47cc85",
+          "post_sha256": "77e6ded9aebca49b2d57138860c4b9131ae2e93683b6d59c858506862a47cc85"
+        },
+        {
+          "path": "cmd/kgen/main_test.go",
+          "pre_evidence": "145b6178b15e2643e19088aa13b8bb165f8daab334fb24a2d997f17ac48c89eb",
+          "post_sha256": "ae9aa12696953180707486acee0831b82c2d8038020732dddff834d49cf3e403"
+        },
+        {
+          "path": "docs/GOVERNANCE.md",
+          "pre_evidence": "3d12024c334399629bed5f9f4e41b21b3639aeab96448770e49609268010b3b6",
+          "post_sha256": "3d12024c334399629bed5f9f4e41b21b3639aeab96448770e49609268010b3b6"
+        },
+        {
+          "path": "docs/KIP-0001-threat-model.md",
+          "pre_evidence": "4c5abc563111dc27a402d9142a85a5d53cf39242fe2c165853252059271c4a5c",
+          "post_sha256": "806f08d827ca2611f7d3ec299d9d5d45e3cc2c2cde4bdef3a6f5a9b76e39fb3c"
+        },
+        {
+          "path": "docs/KIP-0066-product-layer-scaffold.md",
+          "pre_evidence": "8f09b9cae12000520e5590a18c717e2642e86286dd074df01f5765d694db6dd1",
+          "post_sha256": "da732ed5abdf6700c08b6934e4bcbb907e41a8e7651986ee59b554ae04b3e55c"
+        },
+        {
+          "path": "docs/KIP-0068-product-governance-foundation.md",
+          "pre_evidence": "ABSENT",
+          "post_sha256": "22b6ad081d4d73c9b724e85f5fb017fad3944532d7c5b694a905144de591c405"
+        },
+        {
+          "path": "docs/KIP-0069-product-contracts-v1.md",
+          "pre_evidence": "ABSENT",
+          "post_sha256": "e062f1ee9a46c9b0bf8ecad3291aa8cbcabcace9a394b34872b8b71753f99728"
+        },
+        {
+          "path": "docs/safety.md",
+          "pre_evidence": "2fd18a43301b48f2f0cc43c542de044989173e0cae756bd417751ce0599454b8",
+          "post_sha256": "2fd18a43301b48f2f0cc43c542de044989173e0cae756bd417751ce0599454b8"
+        },
+        {
+          "path": "internal/audit/codegen_test.go",
+          "pre_evidence": "5199cc064f1f82dfde17038d5b3992c97899326bd4c784652fc5a3cb9c4fe178",
+          "post_sha256": "4d513c79a7ecc86c4c05add8ff884af3e781183152c9f2d9691aece0b2b894c1"
+        },
+        {
+          "path": "internal/audit/security.go",
+          "pre_evidence": "1618099829b998592f37c0af03ff735d20addf275268280ec2f300ee3eef8f4b",
+          "post_sha256": "e0c8828412ef51a0aff23f323451c3338f6d5f057138bbd8dfe6e5ee50518935"
+        },
+        {
+          "path": "internal/audit/security_test.go",
+          "pre_evidence": "1d5e106e7e48852a1372f52309327a608f9ab2a1c2a1603e8417b8e25a0d0d95",
+          "post_sha256": "4ba2ced78ccb50081c39a66dc6e0a99c0bfae64876065e89be650039e9710dd2"
+        },
+        {
+          "path": "internal/codegen/authorization_v1_test.go",
+          "pre_evidence": "89f0ee4f6932212c642d7c200ce13bdcfd2d9db9f341aca198d774fee4a68198",
+          "post_sha256": "5d32bfb081fc1cd3f47e5a46791550c9e848e4c6e40b2fb121ee61c42173e266"
+        },
+        {
+          "path": "internal/runtime/policy_enforcement_test.go",
+          "pre_evidence": "be0188227f3aba3024b0ef789933d37371f059dfc742d6a9e787ecf685d22a64",
+          "post_sha256": "326ab316b9687e96348f47163b7e5be5a8f605fdf6b0a8610900d241727e5feb"
+        },
+        {
+          "path": "internal/testkit/importrules/importrules_test.go",
+          "pre_evidence": "164b35bee5ce9c38a01f88118436aa9235729b31c323f75453ccff0537f66c23",
+          "post_sha256": "817e1c4e67a53e4ede878772052f085aac1e8919c484cbcabe316b473cd3d157"
+        }
+      ]
+    }
   }
 }

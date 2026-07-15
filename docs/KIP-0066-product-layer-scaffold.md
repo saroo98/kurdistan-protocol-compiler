@@ -3,8 +3,8 @@
 
 # KIP-0066: Product Layer Scaffold (contracts-only)
 
-- status: design-lock
-- last_verified: 2026-07-09
+- status: requirements-lock
+- last_verified: 2026-07-15
 - Work orders: Stage 8 (WO-801 design-lock, WO-802 envelope, WO-803 strategy, WO-804 android); gated by D-002 (build = yes) and D-003 (crypto path).
 
 Milestone 60 lays honest, contract-only homes for a future product layer without
@@ -16,6 +16,22 @@ production cryptography are introduced.
 
 This milestone is a scaffold and on-ramp. It does not claim undetectability,
 guaranteed bypass, or censorship resistance, and it does not ship a product.
+
+## M2 contract-catalog relationship
+
+- **[evidence]** The Go packages described below remain contracts and models. They
+  do not provide an Android application, device VPN integration, live transport,
+  relay service, profile authority, operator service, or deployment system.
+- **[requirement]** KIP-0069 freezes six implementation-neutral product contracts
+  that any later executable design must satisfy: verified profile, fallback,
+  relay descriptor, revocation and update, diagnostic export, and app runtime.
+- **[future gate]** Each contract remains non-executable until a later milestone
+  explicitly opens its trust boundary, supplies biting tests, and proves safe
+  failure, privacy, compatibility, recovery, and rollback behavior.
+
+The catalog does not define a wire schema, service API, storage format, network
+endpoint, cryptographic construction, or application implementation. M3 and
+later product behavior remains closed.
 
 ## Scope limits (hard)
 
@@ -74,5 +90,5 @@ wires no Android build.
 
 - `kcheck product` subcommand and a STATUS section (the safety checks currently
   run via `go test ./...`, which `go run ./cmd/gate` invokes).
-- Real sealing, live Android sources, and live carrier transport — each gated on
-  its own review (D-002 execution, D-003 crypto).
+- Real sealing, live Android sources, and live carrier transport. Each remains
+  behind its own later authorization and validation gate.
