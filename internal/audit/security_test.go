@@ -263,7 +263,11 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	if err := json.Unmarshal(raw, &ledger); err != nil {
 		t.Fatal(err)
 	}
-	currentAtM3, err := validateM4FallbackOverlayV1(root, ledger.Phase4FallbackOverlays)
+	currentAtM4, err := validateM5RelayDescriptorOverlayV1(root, ledger.Phase5RelayDescriptorOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtM3, err := validateM4FallbackOverlayV1(root, currentAtM4, ledger.Phase4FallbackOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,6 +283,54 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	}
 	if manifest.OutsideScopeFileCount != m0OutsideScopeFileCount || manifest.OutsideScopeSHA256 != m0OutsideScopeHashV1 {
 		t.Fatalf("historical candidate binding=%s/%d want %s/%d", manifest.OutsideScopeSHA256, manifest.OutsideScopeFileCount, m0OutsideScopeHashV1, m0OutsideScopeFileCount)
+	}
+}
+
+func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	wantPaths := []string{
+		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
+		"docs/KIP-0072-offline-relay-descriptor-admission-contract.md", "internal/product/relaydescriptor/relaydescriptor.go", "internal/product/relaydescriptor/relaydescriptor_test.go",
+		"testdata/consumer/m5-relay-descriptor-sdk/go.mod", "testdata/consumer/m5-relay-descriptor-sdk/relay_descriptor_sdk_test.go", "cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
+	}
+	overlay := ledger.Phase5RelayDescriptorOverlays["m5-offline-relay-descriptor-admission-v1"]
+	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
+		t.Fatalf("M5 ledger mismatch: %+v", overlay)
+	}
+	pre, err := validateM5RelayDescriptorOverlayV1(root, ledger.Phase5RelayDescriptorOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, entry := range overlay.Entries {
+		if entry.PreEvidence == "ABSENT" {
+			if _, ok := pre[entry.Path]; ok {
+				t.Fatalf("ABSENT M5 path retained at %d: %s", i, entry.Path)
+			}
+		}
+	}
+	bad := ledger.Phase5RelayDescriptorOverlays
+	mutated := bad["m5-offline-relay-descriptor-admission-v1"]
+	mutated.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+	bad = map[string]m2Phase2CompleteOverlayV1{"m5-offline-relay-descriptor-admission-v1": mutated}
+	if _, err := validateM5RelayDescriptorOverlayV1(root, bad); err == nil {
+		t.Fatal("accepted M5 predecessor drift")
+	}
+	mutated = overlay
+	mutated.Paths = append([]string(nil), overlay.Paths...)
+	mutated.Paths[0], mutated.Paths[1] = mutated.Paths[1], mutated.Paths[0]
+	bad = map[string]m2Phase2CompleteOverlayV1{"m5-offline-relay-descriptor-admission-v1": mutated}
+	if _, err := validateM5RelayDescriptorOverlayV1(root, bad); err == nil {
+		t.Fatal("accepted reordered M5 ledger")
 	}
 }
 
@@ -393,12 +445,22 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.Phase4FallbackOverlays) != 1 || len(m4Overlay.Paths) != 17 || len(m4Overlay.Entries) != 16 || m4Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid M4 fixture overlay identity/cardinality: %+v", m4Overlay)
 	}
+	m5Overlay, ok := ledger.Phase5RelayDescriptorOverlays["m5-offline-relay-descriptor-admission-v1"]
+	if !ok || len(ledger.Phase5RelayDescriptorOverlays) != 1 || len(m5Overlay.Paths) != 17 || len(m5Overlay.Entries) != 16 || m5Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid M5 fixture overlay identity/cardinality: %+v", m5Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries)+len(m5Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
 	for _, path := range m4Overlay.Paths[:len(m4Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range m5Overlay.Paths[:len(m5Overlay.Paths)-1] {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true
