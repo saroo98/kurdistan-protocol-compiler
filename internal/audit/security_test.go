@@ -250,6 +250,34 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 	}
 }
 
+func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	if _, err := loadM2MaintenancePreHashesV1(root); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	overlay := ledger.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"]
+	overlay.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+	ledger.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"] = overlay
+	if _, err := validateM3ContractOverlayV1(root, ledger.Phase3ContractOverlays); err == nil {
+		t.Fatal("accepted M3 overlay with mutated predecessor manifest hash")
+	}
+	manifest, err := m0CandidateOutsideScopeManifestV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.OutsideScopeFileCount != m0OutsideScopeFileCount || manifest.OutsideScopeSHA256 != m0OutsideScopeHashV1 {
+		t.Fatalf("historical candidate binding=%s/%d want %s/%d", manifest.OutsideScopeSHA256, manifest.OutsideScopeFileCount, m0OutsideScopeHashV1, m0OutsideScopeFileCount)
+	}
+}
+
 func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	root, err := repoRoot()
 	if err != nil {
@@ -361,20 +389,20 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err != nil {
+	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err != nil {
 		t.Fatal(err)
 	}
 	drift := filepath.Join(fixture, "README.md")
 	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
 		t.Fatalf("changed listed content error=%v", err)
 	}
 	if err := os.Remove(drift); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
 		t.Fatalf("missing listed path error=%v", err)
 	}
 
@@ -437,7 +465,7 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 		if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+		if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil {
 			t.Fatalf("validator overlay mutation %d accepted", i)
 		}
 	}
@@ -453,7 +481,7 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil {
 		t.Fatal("validator-consumer mutation accepted")
 	}
 	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
@@ -463,7 +491,7 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(driftPath, []byte("validator drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "hash drift") {
+	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "hash drift") {
 		t.Fatalf("validator content drift error=%v", err)
 	}
 }
@@ -519,7 +547,7 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 		if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+		if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil {
 			t.Fatalf("convergence mutation %d accepted", i)
 		}
 	}
@@ -578,7 +606,7 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 		if err := os.WriteFile(manifestPath, encoded, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil {
+		if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil {
 			t.Fatalf("phase2-complete mutation %d accepted", i)
 		}
 	}

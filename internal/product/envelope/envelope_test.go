@@ -72,3 +72,13 @@ func TestExpired(t *testing.T) {
 		t.Fatal("past-dated envelope should be expired")
 	}
 }
+
+func TestNeutralMetadataContainsNoProfileMaterial(t *testing.T) {
+	m, err := NeutralMetadata(validEnvelope())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Issuer != "lab-issuer" || m.ProfileRef != "profile-ref-abc123" || m.RevocationID != "rev-001" {
+		t.Fatalf("unexpected metadata: %+v", m)
+	}
+}

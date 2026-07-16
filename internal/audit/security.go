@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,6 +97,7 @@ type m2MaintenanceManifestV1 struct {
 	ValidatorConsumerOverlays   map[string]m2LayeredOverlayV1           `json:"validator_consumer_overlays"`
 	EvidenceConvergenceOverlays map[string]m2LayeredOverlayV1           `json:"evidence_convergence_overlays"`
 	Phase2CompleteOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase3_contract_overlays"`
 }
 
 type m2LayeredOverlayV1 struct {
@@ -155,6 +157,14 @@ func validSHA256V1(value string) bool {
 }
 
 func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
+	return loadM2MaintenancePreHashesWithSuccessorV1(root, true)
+}
+
+func loadHistoricalM2MaintenancePreHashesV1(root string) (map[string]string, error) {
+	return loadM2MaintenancePreHashesWithSuccessorV1(root, false)
+}
+
+func loadM2MaintenancePreHashesWithSuccessorV1(root string, validateSuccessor bool) (map[string]string, error) {
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
 	if err != nil {
 		return nil, fmt.Errorf("M2 maintenance manifest: %w", err)
@@ -163,7 +173,19 @@ func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return nil, fmt.Errorf("M2 maintenance manifest: %w", err)
 	}
-	phase2Pre, err := validateM2Phase2CompleteV1(root, manifest.Phase2CompleteOverlays)
+	currentAtM2 := map[string]string{}
+	if validateSuccessor {
+		currentAtM2, err = validateM3ContractOverlayV1(root, manifest.Phase3ContractOverlays)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		currentAtM2, err = validateHistoricalM3ContractOverlayV1(root, manifest.Phase3ContractOverlays)
+		if err != nil {
+			return nil, err
+		}
+	}
+	phase2Pre, err := validateM2Phase2CompleteV1(root, currentAtM2, manifest.Phase2CompleteOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +307,7 @@ func loadM2MaintenancePreHashesV1(root string) (map[string]string, error) {
 	return pre, nil
 }
 
-func validateM2Phase2CompleteV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+func validateM2Phase2CompleteV1(root string, currentAtPost map[string]string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
 	overlay, ok := overlays[m2Phase2CompleteOverlayNameV1]
 	if len(overlays) != 1 || !ok || overlay.Version != m2Phase2CompleteOverlayNameV1 || overlay.PredecessorManifestSHA256 != m2Phase2PredecessorManifestV1 || len(overlay.Paths) != len(m2Phase2CompletePathsV1) || len(overlay.Entries) != len(m2Phase2CompletePathsV1)-1 {
 		return nil, fmt.Errorf("invalid M2 phase2-complete identity/cardinality")
@@ -295,14 +317,79 @@ func validateM2Phase2CompleteV1(root string, overlays map[string]m2Phase2Complet
 			return nil, fmt.Errorf("M2 phase2-complete path[%d]=%q want %q", i, overlay.Paths[i], path)
 		}
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if entry.Path != m2Phase2CompletePathsV1[i] || entry.Path == m2MaintenanceSelfPathV1 || !validSHA256V1(entry.PostSHA256) || (entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" && !validSHA256V1(entry.PreEvidence)) {
 			return nil, fmt.Errorf("invalid M2 phase2-complete entry %d", i)
 		}
-		actual, err := m2FileSHA256V1(root, entry.Path)
+		actual, ok := currentAtPost[entry.Path]
+		var err error
+		if !ok {
+			actual, err = m2FileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("M2 phase2-complete hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validateM3ContractOverlayV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m3-profile-lifecycle-contract-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "50fde6a39c0b5d987a16e370f2d10f0526759c03c0d5f73a316cffcc207e4d90" || len(overlay.Paths) != len(overlay.Entries)+1 || overlay.Paths[len(overlay.Paths)-1] != m2MaintenanceSelfPathV1 {
+		return nil, fmt.Errorf("invalid M3 contract overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid M3 contract entry %d", i)
+		}
+		actual, err := m2FileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M3 contract hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid M3 pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validateHistoricalM3ContractOverlayV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m3-profile-lifecycle-contract-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "50fde6a39c0b5d987a16e370f2d10f0526759c03c0d5f73a316cffcc207e4d90" || len(overlay.Paths) != len(overlay.Entries)+1 || overlay.Paths[len(overlay.Paths)-1] != m2MaintenanceSelfPathV1 {
+		return nil, fmt.Errorf("invalid M3 contract overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid M3 contract entry %d", i)
+		}
+		if entry.PreEvidence == "ABSENT" {
+			continue
+		}
+		if entry.PreEvidence == "UNRECORDED" || !validSHA256V1(entry.PreEvidence) {
+			return nil, fmt.Errorf("invalid M3 pre evidence %s", entry.Path)
+		}
+		actual, err := m2FileSHA256V1(root, entry.Path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M3 contract hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
 		pre[entry.Path] = entry.PreEvidence
 	}
@@ -314,7 +401,10 @@ func validateM2ConvergenceV1(currentAtPost map[string]string, overlays map[strin
 	if len(overlays) != 1 || !ok || convergence.Version != m2EvidenceConvergenceOverlayV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != len(m2ConvergencePathsV1) {
 		return nil, fmt.Errorf("invalid M2 convergence identity/cardinality")
 	}
-	currentAtPre := map[string]string{}
+	currentAtPre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		currentAtPre[path] = hash
+	}
 	for i, entry := range convergence.Entries {
 		if entry.Path != m2ConvergencePathsV1[i] || entry.PreSHA256 != m2ConvergencePreV1[i] || !validSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
 			return nil, fmt.Errorf("invalid M2 convergence entry %d", i)
@@ -400,6 +490,26 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes, err := loadM2MaintenancePreHashesV1(root)
 	if err != nil {
 		return m0CandidateManifestV1{}, err
+	}
+	rawManifest, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		return m0CandidateManifestV1{}, err
+	}
+	var evidence m2MaintenanceManifestV1
+	if err := json.Unmarshal(rawManifest, &evidence); err != nil {
+		return m0CandidateManifestV1{}, err
+	}
+	for _, overlay := range evidence.Phase2CompleteOverlays {
+		for _, entry := range overlay.Entries {
+			if entry.PreEvidence == "ABSENT" {
+				preHashes[entry.Path] = "ABSENT"
+			}
+		}
+	}
+	for _, entry := range evidence.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"].Entries {
+		if entry.PreEvidence == "ABSENT" {
+			preHashes[entry.Path] = "ABSENT"
+		}
 	}
 	return m0CandidateManifestFromPathsWithPreHashesV1(root, parts, preHashes)
 }

@@ -907,6 +907,7 @@ type committedEvidenceManifestV1 struct {
 	ValidatorConsumerOverlays   map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
 	EvidenceConvergenceOverlays map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
 	Phase2CompleteOverlays      map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays      map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1038,7 +1039,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtPre, err := validatePhase2CompleteOverlayV1(root, manifest.Phase2CompleteOverlays)
+	currentAtM2, err := validatePhase3ContractOverlayV1(root, manifest.Phase3ContractOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtPre, err := validatePhase2CompleteOverlayV1(root, currentAtM2, manifest.Phase2CompleteOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1119,7 +1124,7 @@ func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV
 	return historical, nil
 }
 
-func validatePhase2CompleteOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	overlay, ok := overlays[phase2CompleteOverlayNameV1]
 	if len(overlays) != 1 || !ok || overlay.Version != phase2CompleteOverlayNameV1 || overlay.PredecessorManifestSHA256 != phase2PredecessorManifestSHA256V1 || len(overlay.Paths) != len(phase2CompletePathsV1) || len(overlay.Entries) != len(phase2CompletePathsV1)-1 {
 		return nil, fmt.Errorf("invalid phase2-complete overlay identity/cardinality")
@@ -1129,16 +1134,50 @@ func validatePhase2CompleteOverlayV1(root string, overlays map[string]phase2Comp
 			return nil, fmt.Errorf("phase2-complete path[%d]=%q want %q", i, overlay.Paths[i], path)
 		}
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if entry.Path != phase2CompletePathsV1[i] || entry.Path == committedEvidenceManifestPathV1 || !validHelperOwnerSHA256V1(entry.PostSHA256) || (entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" && !validHelperOwnerSHA256V1(entry.PreEvidence)) {
 			return nil, fmt.Errorf("invalid phase2-complete entry %d", i)
 		}
-		actual, err := fileSHA256V1(root, entry.Path)
+		actual, ok := currentAtPost[entry.Path]
+		var err error
+		if !ok {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase2-complete hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase3ContractOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m3-profile-lifecycle-contract-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "50fde6a39c0b5d987a16e370f2d10f0526759c03c0d5f73a316cffcc207e4d90" || len(overlay.Paths) != len(overlay.Entries)+1 || overlay.Paths[len(overlay.Paths)-1] != committedEvidenceManifestPathV1 {
+		return nil, fmt.Errorf("invalid phase3 contract overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase3 contract entry %d", i)
+		}
+		actual, err := fileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase3 contract hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
 		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validHelperOwnerSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase3 pre evidence %s", entry.Path)
+			}
 			pre[entry.Path] = entry.PreEvidence
 		}
 	}
@@ -1150,7 +1189,10 @@ func validateConvergenceOverlayV1(currentAtPost map[string]string, overlays map[
 	if len(overlays) != 1 || !ok || convergence.Version != evidenceConvergenceOverlayNameV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != 7 {
 		return nil, fmt.Errorf("invalid convergence overlay identity/cardinality")
 	}
-	result := map[string]string{}
+	result := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		result[path] = hash
+	}
 	for i, entry := range convergence.Entries {
 		if entry.Path != convergencePathsV1[i] || entry.PreSHA256 != convergencePreHashesV1[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
 			return nil, fmt.Errorf("invalid convergence entry %d", i)
