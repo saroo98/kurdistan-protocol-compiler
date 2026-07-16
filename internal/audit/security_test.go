@@ -263,10 +263,14 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	if err := json.Unmarshal(raw, &ledger); err != nil {
 		t.Fatal(err)
 	}
+	currentAtM3, err := validateM4FallbackOverlayV1(root, ledger.Phase4FallbackOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
 	overlay := ledger.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"]
 	overlay.PredecessorManifestSHA256 = strings.Repeat("1", 64)
 	ledger.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"] = overlay
-	if _, err := validateM3ContractOverlayV1(root, ledger.Phase3ContractOverlays); err == nil {
+	if _, err := validateM3ContractOverlayV1(root, currentAtM3, ledger.Phase3ContractOverlays); err == nil {
 		t.Fatal("accepted M3 overlay with mutated predecessor manifest hash")
 	}
 	manifest, err := m0CandidateOutsideScopeManifestV1(root)
@@ -360,14 +364,16 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(pre) != 16 || pre[m2MaintenanceSelfPathV1] != m0WO058MaintenanceHashesV1[m2MaintenanceSelfPathV1] {
+	if len(pre) != 18 || pre[m2MaintenanceSelfPathV1] != m0WO058MaintenanceHashesV1[m2MaintenanceSelfPathV1] {
 		t.Fatalf("M2 pre-hash overlay=%v", pre)
 	}
 	for path, want := range map[string]string{
-		"README.md":          "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
-		"ROADMAP.md":         "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
-		"docs/GOVERNANCE.md": "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
-		"docs/safety.md":     "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
+		"README.md":                             "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
+		"ROADMAP.md":                            "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
+		"docs/GOVERNANCE.md":                    "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
+		"docs/safety.md":                        "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
+		"internal/product/strategy/strategy.go": "ac03d6928cd00b208060bbe3c8a63e38c4e0e673322e5d918e975b97ce9563ea",
+		"internal/product/strategy/strategy_test.go": "8f554de4bf1be16e83ec1ba9269884a79b46803393e1e396e1d47e4660a6805c",
 	} {
 		if pre[path] != want {
 			t.Fatalf("M2 pre-hash %s=%s want %s", path, pre[path], want)
@@ -375,7 +381,29 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	}
 
 	fixture := t.TempDir()
+	manifestRaw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(manifestRaw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	m4Overlay, ok := ledger.Phase4FallbackOverlays["m4-permitted-fallback-contract-v1"]
+	if !ok || len(ledger.Phase4FallbackOverlays) != 1 || len(m4Overlay.Paths) != 17 || len(m4Overlay.Entries) != 16 || m4Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid M4 fixture overlay identity/cardinality: %+v", m4Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
+	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries))
+	for _, path := range fixturePaths {
+		seen[path] = true
+	}
+	for _, path := range m4Overlay.Paths[:len(m4Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if readErr != nil {
