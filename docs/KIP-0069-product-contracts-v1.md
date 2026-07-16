@@ -50,4 +50,6 @@ The six catalog entries are:
 The milestone labels in the catalog are sequencing markers, not authorization.
 Opening any one of them requires a separate approved work order that names the
 exact files, executable boundary, allowed environment, tests, reviews, rollback,
-and stop conditions. This KIP does not open M3 or any later product milestone.
+and stop conditions. KIP-0070 separately opened only the verified-profile and
+revocation/update entries as offline metadata and state-machine contracts. The
+other four entries and all live product behavior remain closed.

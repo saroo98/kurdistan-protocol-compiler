@@ -736,6 +736,65 @@ import _ "kurdistan/generated/example/protocol"`,
 	}
 }
 
+func TestM3ProfileLifecycleBoundaryV1(t *testing.T) {
+	root := repoRoot(t)
+	allowed := map[string]map[string]bool{
+		"internal/product/envelope":  {"errors": true, "fmt": true, "net/url": true, "sort": true, "strings": true, "time": true},
+		"internal/product/profile":   {"errors": true, "fmt": true, "strings": true, "time": true, modulePath + "/internal/product/envelope": true},
+		"internal/product/lifecycle": {"errors": true},
+	}
+	for pkg, imports := range allowed {
+		err := filepath.WalkDir(filepath.Join(root, filepath.FromSlash(pkg)), func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return walkErr
+			}
+			file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+			if err != nil {
+				return err
+			}
+			for _, imported := range file.Imports {
+				name := strings.Trim(imported.Path.Value, `"`)
+				if !imports[name] {
+					t.Errorf("M3 contract %s imports forbidden dependency %s", pkg, name)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	envelopeRaw, err := os.ReadFile(filepath.Join(root, "internal", "product", "envelope", "envelope.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(envelopeRaw), modulePath+"/internal/product/profile") || strings.Contains(string(envelopeRaw), modulePath+"/internal/product/lifecycle") {
+		t.Fatal("envelope depends on profile lifecycle")
+	}
+	for name, source := range map[string]string{
+		"network": `package profile; import "net/http"`,
+		"storage": `package lifecycle; import "os"`,
+		"runtime": `package profile; import "kurdistan/internal/runtime"`,
+		"crypto":  `package profile; import "crypto/ed25519"`,
+		"reverse": `package envelope; import "kurdistan/internal/product/profile"`,
+	} {
+		file, err := parser.ParseFile(token.NewFileSet(), name+".go", source, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		blocked := false
+		for _, imported := range file.Imports {
+			path := strings.Trim(imported.Path.Value, `"`)
+			if path == "net/http" || path == "os" || path == "crypto/ed25519" || path == modulePath+"/internal/runtime" || path == modulePath+"/internal/product/profile" {
+				blocked = true
+			}
+		}
+		if !blocked {
+			t.Fatalf("M3 boundary mutant %s accepted", name)
+		}
+	}
+}
+
 func TestNoLabShortcutStrictSurfaceAndInjectedV1(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator_templates.go"))
@@ -943,6 +1002,7 @@ type committedEvidenceManifestV1 struct {
 	ValidatorConsumerOverlays   map[string]committedLayeredOverlayV1     `json:"validator_consumer_overlays"`
 	EvidenceConvergenceOverlays map[string]committedLayeredOverlayV1     `json:"evidence_convergence_overlays"`
 	Phase2CompleteOverlays      map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays      map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1080,7 +1140,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtPre, err := validatePhase2CompleteOverlayV1(root, manifest.Phase2CompleteOverlays)
+	currentAtM2, err := validatePhase3ContractOverlayV1(root, manifest.Phase3ContractOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtPre, err := validatePhase2CompleteOverlayV1(root, currentAtM2, manifest.Phase2CompleteOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1181,7 +1245,7 @@ func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidence
 	return historical, nil
 }
 
-func validatePhase2CompleteOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	overlay, ok := overlays[phase2CompleteOverlayNameV1]
 	if len(overlays) != 1 || !ok || overlay.Version != phase2CompleteOverlayNameV1 || overlay.PredecessorManifestSHA256 != phase2PredecessorManifestSHA256V1 || len(overlay.Paths) != len(phase2CompletePathsV1) || len(overlay.Entries) != len(phase2CompletePathsV1)-1 {
 		return nil, fmt.Errorf("invalid phase2-complete overlay identity/cardinality")
@@ -1191,16 +1255,50 @@ func validatePhase2CompleteOverlayV1(root string, overlays map[string]phase2Comp
 			return nil, fmt.Errorf("phase2-complete path[%d]=%q want %q", i, overlay.Paths[i], path)
 		}
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if entry.Path != phase2CompletePathsV1[i] || entry.Path == committedEvidenceManifestPathV1 || !validCommittedSHA256V1(entry.PostSHA256) || (entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" && !validCommittedSHA256V1(entry.PreEvidence)) {
 			return nil, fmt.Errorf("invalid phase2-complete entry %d", i)
 		}
-		actual, err := committedFileSHA256V1(root, entry.Path)
+		actual, ok := currentAtPost[entry.Path]
+		var err error
+		if !ok {
+			actual, err = committedFileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase2-complete hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase3ContractOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m3-profile-lifecycle-contract-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "50fde6a39c0b5d987a16e370f2d10f0526759c03c0d5f73a316cffcc207e4d90" || len(overlay.Paths) != len(overlay.Entries)+1 || overlay.Paths[len(overlay.Paths)-1] != committedEvidenceManifestPathV1 {
+		return nil, fmt.Errorf("invalid phase3 contract overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validCommittedSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase3 contract entry %d", i)
+		}
+		actual, err := committedFileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase3 contract hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
 		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validCommittedSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase3 pre evidence %s", entry.Path)
+			}
 			pre[entry.Path] = entry.PreEvidence
 		}
 	}
@@ -1212,7 +1310,10 @@ func validateCommittedConvergenceV1(currentAtPost map[string]string, overlays ma
 	if len(overlays) != 1 || !ok || convergence.Version != m2EvidenceConvergenceOverlayNameV1 || convergence.PredecessorManifestSHA != "1502ae4db6d151839f554e6becde9e81994286cbff378945282739015492bf1e" || len(convergence.Entries) != 7 {
 		return nil, fmt.Errorf("invalid convergence overlay identity/cardinality")
 	}
-	result := map[string]string{}
+	result := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		result[path] = hash
+	}
 	for i, entry := range convergence.Entries {
 		if entry.Path != m2ConvergencePathsV1[i] || entry.PreSHA256 != m2ConvergencePreV1[i] || !validCommittedSHA256V1(entry.PostSHA256) || entry.PostSHA256 == entry.PreSHA256 {
 			return nil, fmt.Errorf("invalid convergence entry %d", i)

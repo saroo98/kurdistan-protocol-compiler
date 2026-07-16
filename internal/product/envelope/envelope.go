@@ -54,6 +54,26 @@ type Envelope struct {
 	PayloadEmbedded bool `json:"payload_embedded"`
 }
 
+// Metadata is the neutral, profile-material-free subset consumed by offline
+// admission contracts. It deliberately contains no proof, key, payload, or
+// transport data.
+type Metadata struct {
+	Issuer        string
+	ProfileRef    string
+	Expiry        int64
+	RevocationID  string
+	CompatVersion string
+}
+
+// NeutralMetadata validates e and returns its neutral metadata projection.
+// Consumers must perform their own policy and authority-evidence checks.
+func NeutralMetadata(e Envelope) (Metadata, error) {
+	if err := Validate(e); err != nil {
+		return Metadata{}, err
+	}
+	return Metadata{Issuer: e.Issuer, ProfileRef: e.ProfileRef, Expiry: e.Expiry, RevocationID: e.RevocationID, CompatVersion: e.CompatVersion}, nil
+}
+
 // Sealer seals and opens the profile material referenced by an Envelope. There
 // is deliberately NO implementation: real sealing is production cryptography,
 // gated on external review (D-003). UnavailableSealer is the only provided

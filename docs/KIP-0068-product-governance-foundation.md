@@ -96,4 +96,7 @@ The following gates remain future work:
 6. validate end-to-end behavior within that boundary; and
 7. separately approve any broader pilot, deployment, or release.
 
-M3 and later milestones remain closed. This KIP creates requirements only and does not change runtime, protocol, cryptography, networking, Android, relay, operator, deployment, or release behavior.
+KIP-0070 opened only deterministic offline profile admission and lifecycle
+contracts under these requirements. All network, runtime, cryptographic,
+Android, relay, operator, deployment, release, and remaining catalog gates stay
+closed.

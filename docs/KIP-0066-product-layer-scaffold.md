@@ -29,6 +29,11 @@ guaranteed bypass, or censorship resistance, and it does not ship a product.
   explicitly opens its trust boundary, supplies biting tests, and proves safe
   failure, privacy, compatibility, recovery, and rollback behavior.
 
+KIP-0070 later opened the verified-profile and lifecycle contracts as offline,
+deterministic Go contracts in `internal/product/{profile,lifecycle}`. They do not
+authenticate metadata or open runtime behavior. The other four catalog entries
+remain closed.
+
 The catalog does not define a wire schema, service API, storage format, network
 endpoint, cryptographic construction, or application implementation. M3 and
 later product behavior remains closed.
