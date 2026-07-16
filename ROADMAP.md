@@ -7,7 +7,7 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: M3 offline profile contract foundation
+## Current phase: M4 offline permitted-fallback contract
 
 The runtime remains a lab-only research prototype. The compiler generates
 deterministic protocol profiles and validates them through an in-repo audit;
@@ -19,9 +19,12 @@ services, non-loopback networking, telemetry, deployment, or production
 cryptography. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
 `STATUS.md` for what is real versus modelled.
 
-M3 implements only deterministic offline authority-metadata admission and a
-pure monotonic profile lifecycle. Authority metadata is not cryptographic proof,
-and no product runtime capability is opened. See KIP-0070.
+M3 implements deterministic offline authority-metadata admission and a pure
+monotonic profile lifecycle. M4 adds only deterministic offline selection among
+profile-ordered, permitted carrier-family metadata after mandatory client,
+safety, privacy, compatibility, and lifecycle checks. It does not probe or
+execute a fallback and opens no product runtime capability. See KIP-0070 and
+KIP-0071.
 
 Every further implementation milestone requires a separate scoped review
 and fresh authorization before work begins.

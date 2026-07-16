@@ -411,6 +411,7 @@ type committedEvidenceManifestV1 struct {
 	EvidenceConvergenceOverlays map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
 	Phase2CompleteOverlays      map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
 	Phase3ContractOverlays      map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
+	Phase4FallbackOverlays      map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -542,7 +543,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtM2, err := validatePhase3ContractOverlayV1(root, manifest.Phase3ContractOverlays)
+	currentAtM3, err := validatePhase4FallbackOverlayV1(root, manifest.Phase4FallbackOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtM2, err := validatePhase3ContractOverlayV1(root, currentAtM3, manifest.Phase3ContractOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -662,18 +667,50 @@ func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]strin
 	return pre, nil
 }
 
-func validatePhase3ContractOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+func validatePhase4FallbackOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m4-permitted-fallback-contract-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "772ae344c99edb21a4d04fadd77f51978a6e81aa4d555ec30190cb64e7a7c2d9" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != committedEvidenceManifestPathV1 {
+		return nil, fmt.Errorf("invalid phase4 fallback overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase4 fallback entry %d", i)
+		}
+		actual, err := fileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase4 fallback hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validHelperOwnerSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase4 pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase3ContractOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "m3-profile-lifecycle-contract-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "50fde6a39c0b5d987a16e370f2d10f0526759c03c0d5f73a316cffcc207e4d90" || len(overlay.Paths) != len(overlay.Entries)+1 || overlay.Paths[len(overlay.Paths)-1] != committedEvidenceManifestPathV1 {
 		return nil, fmt.Errorf("invalid phase3 contract overlay identity/cardinality")
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if overlay.Paths[i] != entry.Path || !validHelperOwnerSHA256V1(entry.PostSHA256) {
 			return nil, fmt.Errorf("invalid phase3 contract entry %d", i)
 		}
-		actual, err := fileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase3 contract hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
@@ -682,6 +719,8 @@ func validatePhase3ContractOverlayV1(root string, overlays map[string]phase2Comp
 				return nil, fmt.Errorf("invalid phase3 pre evidence %s", entry.Path)
 			}
 			pre[entry.Path] = entry.PreEvidence
+		} else {
+			delete(pre, entry.Path)
 		}
 	}
 	return pre, nil

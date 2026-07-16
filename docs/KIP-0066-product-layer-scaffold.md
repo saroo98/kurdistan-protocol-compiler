@@ -30,9 +30,10 @@ guaranteed bypass, or censorship resistance, and it does not ship a product.
   failure, privacy, compatibility, recovery, and rollback behavior.
 
 KIP-0070 later opened the verified-profile and lifecycle contracts as offline,
-deterministic Go contracts in `internal/product/{profile,lifecycle}`. They do not
-authenticate metadata or open runtime behavior. The other four catalog entries
-remain closed.
+deterministic Go contracts in `internal/product/{profile,lifecycle}`. KIP-0071
+opens the permitted-fallback entry only as an offline metadata selector. These
+contracts do not authenticate metadata, probe paths, execute fallbacks, or open
+runtime behavior. The other three catalog entries remain closed.
 
 The catalog does not define a wire schema, service API, storage format, network
 endpoint, cryptographic construction, or application implementation. M3 and
@@ -67,12 +68,15 @@ production cryptography gated on external review (D-003).
 
 ## Strategy selection surface (`internal/product/strategy`)
 
-A profile-scoped, modelled selection contract that **reuses** the existing
-carrier design-review taxonomy (`carrierreview.DefaultDescriptors`) rather than
-defining a fourth family list (Stage 5b WO-503 rejected unifying the three
-distinct taxonomies). `Select` ranks reviewed, default-eligible families under a
-risk tolerance, excludes the unsafe control and risk-blocked families, and marks
-its result synthetic. It performs no probing, dialing, resolving, or network I/O.
+A profile-scoped, deterministic selector that **reuses** the existing carrier
+design-review taxonomy (`carrierreview.DefaultDescriptors`) as a strict safety
+ceiling: descriptors must validate and be default-eligible, synthetic-only,
+not manual-review-required, and not blocked by risk. Permission always comes
+from the admitted profile's ordered
+policy. `Select` intersects that policy with client support, capabilities, and
+mandatory safety/privacy floors, then returns one bounded selected result or an
+explicit blocked result. Manual preference may promote only an already-eligible
+family. It performs no probing, dialing, resolving, execution, or network I/O.
 
 ## Android source contract (`internal/product/android`)
 

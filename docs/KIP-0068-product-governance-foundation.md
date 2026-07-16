@@ -96,7 +96,8 @@ The following gates remain future work:
 6. validate end-to-end behavior within that boundary; and
 7. separately approve any broader pilot, deployment, or release.
 
-KIP-0070 opened only deterministic offline profile admission and lifecycle
-contracts under these requirements. All network, runtime, cryptographic,
-Android, relay, operator, deployment, release, and remaining catalog gates stay
-closed.
+KIP-0070 opened deterministic offline profile admission and lifecycle contracts.
+KIP-0071 opens only deterministic offline permitted-fallback selection over
+bounded metadata. It does not execute or probe a path. All network, runtime,
+cryptographic, Android, relay, operator, deployment, release, and remaining
+catalog gates stay closed.
