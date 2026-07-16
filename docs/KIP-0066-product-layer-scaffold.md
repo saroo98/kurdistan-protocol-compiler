@@ -35,8 +35,11 @@ opens the permitted-fallback entry only as an offline metadata selector.
 KIP-0072 opens relay-descriptor admission only as deterministic structural
 validation in `internal/product/relaydescriptor`. These contracts do not
 authenticate relay descriptors, probe paths, execute fallbacks, establish relay
-sessions, or open runtime behavior. Diagnostic export and app runtime remain
-closed.
+sessions, or open runtime behavior. KIP-0073 opens diagnostic export only as a
+fixed-vocabulary, deterministic in-memory bundle after explicit preview and
+confirmation. It writes, shares, uploads, logs, retains, and transmits nothing.
+KIP-0074 opens only the offline app-runtime eligibility entry; live runtime
+remains closed.
 
 The catalog does not define a wire schema, service API, storage format, network
 endpoint, cryptographic construction, or application implementation. M3 and
@@ -97,14 +100,33 @@ family, capabilities, bounded client identity, caller-supplied time, and a
 complete revocation snapshot. Endpoint references remain opaque. The package
 does not authenticate, resolve, dial, probe, operate, or deploy a relay.
 
+## Diagnostic export (`internal/product/diagnosticexport`)
+
+M6 validates a fixed redacted vocabulary, bounds and canonicalizes its entries,
+and enforces sealed prepare, preview, confirmation, build, and cancellation
+states. It produces only an in-memory JSON value. It does not collect data,
+write a file, invoke platform sharing, emit telemetry, or influence connection,
+recovery, lifecycle, fallback, relay, or runtime decisions.
+
+## App-runtime eligibility (`internal/product/appruntime`)
+
+M7 opens the app-runtime catalog entry only as a pure offline eligibility state
+machine. It recomputes exact fallback selection and relay admission, validates
+caller-supplied platform-readiness booleans, and returns only categorical state
+and disposition metadata. `ready_to_start` is not a live-start claim, and
+`shutdown_required` is not a shutdown acknowledgment. The separate disconnect
+API has no platform or predecessor prerequisites. The package performs no
+Android, VpnService, TUN, storage, routing, DNS, network, process, telemetry, or
+cryptographic action.
+
 ## Verification
 
 - `go build ./...` and `go run ./cmd/gate` are green.
 - The `internal/testkit/importrules` boundary test confirms no live/real package
   imports `internal/product/**`.
-- The package tests bite: each contract's `Validate` rejects unsafe or incomplete
-  input (payload embedding, missing expiry, unbounded fallback, not fail-closed,
-  secret-looking references), and sealing is proven unavailable.
+- The package tests bite: public validators and evaluators reject unsafe or
+  incomplete input (payload embedding, missing expiry, unbounded fallback, not
+  fail-closed, secret-looking references), and sealing is proven unavailable.
 
 ## Out of scope / follow-ups
 

@@ -102,5 +102,13 @@ bounded metadata. KIP-0072 opens only deterministic offline structural admission
 of exact profile-authorized relay descriptors after M4 recomputation, client
 binding, caller-supplied time, and complete revocation checks. Neither contract
 executes or probes a path, authenticates a relay, or establishes a session. All
-network, runtime, cryptographic, Android, live-relay, operator, deployment,
-release, and remaining catalog gates stay closed.
+network, live-runtime, cryptographic, Android, live-relay, operator, deployment,
+release, and remaining catalog gates stay closed. KIP-0073 opens only the
+user-initiated, fixed-vocabulary, previewed diagnostic export as a deterministic
+in-memory value. It performs no collection, file operation, sharing, upload,
+retention, logging, telemetry, transmission, or control action.
+KIP-0074 opens only deterministic offline app-runtime eligibility. It accepts
+caller-supplied platform metadata and exact predecessor evidence, recomputes M4
+and M5 results, and returns bounded categorical dispositions. It neither starts
+nor stops a service, and every Android, VPN/TUN, storage, routing, DNS, network,
+operator, deployment, and release boundary remains closed.

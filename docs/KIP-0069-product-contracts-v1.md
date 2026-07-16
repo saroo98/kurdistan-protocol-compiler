@@ -55,4 +55,8 @@ revocation/update entries as offline metadata and state-machine contracts.
 KIP-0071 opens permitted fallback only as a deterministic offline selector. The
 relay-descriptor entry is opened by KIP-0072 only as deterministic offline
 structural admission with no authenticity, reachability, or session claim.
-Diagnostic export, app runtime, and all live product behavior remain closed.
+KIP-0073 opens diagnostic export only as deterministic construction of a
+fixed-vocabulary in-memory bundle after explicit preview and confirmation.
+KIP-0074 opens app runtime only as a pure offline eligibility contract with
+exact predecessor recomputation, fail-closed platform metadata, and an
+always-available shutdown request. All live product behavior remains closed.

@@ -263,7 +263,15 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	if err := json.Unmarshal(raw, &ledger); err != nil {
 		t.Fatal(err)
 	}
-	currentAtM4, err := validateM5RelayDescriptorOverlayV1(root, ledger.Phase5RelayDescriptorOverlays)
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtM5, err := validateM6DiagnosticExportOverlayV1(root, currentAtM6, ledger.Phase6DiagnosticExportOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtM4, err := validateM5RelayDescriptorOverlayV1(root, currentAtM5, ledger.Phase5RelayDescriptorOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +315,15 @@ func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
 		t.Fatalf("M5 ledger mismatch: %+v", overlay)
 	}
-	pre, err := validateM5RelayDescriptorOverlayV1(root, ledger.Phase5RelayDescriptorOverlays)
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtM5, err := validateM6DiagnosticExportOverlayV1(root, currentAtM6, ledger.Phase6DiagnosticExportOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := validateM5RelayDescriptorOverlayV1(root, currentAtM5, ledger.Phase5RelayDescriptorOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,15 +338,113 @@ func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 	mutated := bad["m5-offline-relay-descriptor-admission-v1"]
 	mutated.PredecessorManifestSHA256 = strings.Repeat("1", 64)
 	bad = map[string]m2Phase2CompleteOverlayV1{"m5-offline-relay-descriptor-admission-v1": mutated}
-	if _, err := validateM5RelayDescriptorOverlayV1(root, bad); err == nil {
+	if _, err := validateM5RelayDescriptorOverlayV1(root, currentAtM5, bad); err == nil {
 		t.Fatal("accepted M5 predecessor drift")
 	}
 	mutated = overlay
 	mutated.Paths = append([]string(nil), overlay.Paths...)
 	mutated.Paths[0], mutated.Paths[1] = mutated.Paths[1], mutated.Paths[0]
 	bad = map[string]m2Phase2CompleteOverlayV1{"m5-offline-relay-descriptor-admission-v1": mutated}
-	if _, err := validateM5RelayDescriptorOverlayV1(root, bad); err == nil {
+	if _, err := validateM5RelayDescriptorOverlayV1(root, currentAtM5, bad); err == nil {
 		t.Fatal("accepted reordered M5 ledger")
+	}
+}
+
+func TestM6DiagnosticExportEvidenceOverlayV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	wantPaths := []string{
+		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
+		"docs/KIP-0073-offline-diagnostic-export-contract.md", "internal/product/diagnosticexport/diagnosticexport.go", "internal/product/diagnosticexport/diagnosticexport_test.go",
+		"testdata/consumer/m6-diagnostic-export-sdk/go.mod", "testdata/consumer/m6-diagnostic-export-sdk/diagnostic_export_sdk_test.go", "cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
+	}
+	overlay := ledger.Phase6DiagnosticExportOverlays["m6-offline-diagnostic-export-contract-v1"]
+	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
+		t.Fatalf("M6 ledger mismatch: %+v", overlay)
+	}
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := validateM6DiagnosticExportOverlayV1(root, currentAtM6, ledger.Phase6DiagnosticExportOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, entry := range overlay.Entries {
+		if entry.PreEvidence == "ABSENT" {
+			if _, ok := pre[entry.Path]; ok {
+				t.Fatalf("ABSENT M6 path retained at %d: %s", i, entry.Path)
+			}
+		}
+	}
+	mutated := overlay
+	mutated.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+	bad := map[string]m2Phase2CompleteOverlayV1{"m6-offline-diagnostic-export-contract-v1": mutated}
+	if _, err := validateM6DiagnosticExportOverlayV1(root, currentAtM6, bad); err == nil {
+		t.Fatal("accepted M6 predecessor drift")
+	}
+	mutated = overlay
+	mutated.Paths = append([]string(nil), overlay.Paths...)
+	mutated.Paths[0], mutated.Paths[1] = mutated.Paths[1], mutated.Paths[0]
+	bad = map[string]m2Phase2CompleteOverlayV1{"m6-offline-diagnostic-export-contract-v1": mutated}
+	if _, err := validateM6DiagnosticExportOverlayV1(root, currentAtM6, bad); err == nil {
+		t.Fatal("accepted reordered M6 ledger")
+	}
+}
+
+func TestM7AppRuntimeEvidenceOverlayV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	wantPaths := []string{
+		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
+		"docs/KIP-0074-offline-app-runtime-contract.md", "internal/product/appruntime/appruntime.go", "internal/product/appruntime/appruntime_test.go",
+		"testdata/consumer/m7-app-runtime-sdk/go.mod", "testdata/consumer/m7-app-runtime-sdk/app_runtime_sdk_test.go", "cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
+	}
+	overlay := ledger.Phase7AppRuntimeOverlays["m7-offline-app-runtime-contract-v1"]
+	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
+		t.Fatalf("M7 ledger mismatch: %+v", overlay)
+	}
+	pre, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, entry := range overlay.Entries {
+		if entry.PreEvidence == "ABSENT" {
+			if _, ok := pre[entry.Path]; ok {
+				t.Fatalf("ABSENT M7 path retained at %d: %s", i, entry.Path)
+			}
+		}
+	}
+	mutated := overlay
+	mutated.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+	bad := map[string]m2Phase2CompleteOverlayV1{"m7-offline-app-runtime-contract-v1": mutated}
+	if _, err := validateM7AppRuntimeOverlayV1(root, bad); err == nil {
+		t.Fatal("accepted M7 predecessor drift")
+	}
+	mutated = overlay
+	mutated.Paths = append([]string(nil), overlay.Paths...)
+	mutated.Paths[0], mutated.Paths[1] = mutated.Paths[1], mutated.Paths[0]
+	bad = map[string]m2Phase2CompleteOverlayV1{"m7-offline-app-runtime-contract-v1": mutated}
+	if _, err := validateM7AppRuntimeOverlayV1(root, bad); err == nil {
+		t.Fatal("accepted reordered M7 ledger")
 	}
 }
 
@@ -449,8 +563,16 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.Phase5RelayDescriptorOverlays) != 1 || len(m5Overlay.Paths) != 17 || len(m5Overlay.Entries) != 16 || m5Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid M5 fixture overlay identity/cardinality: %+v", m5Overlay)
 	}
+	m6Overlay, ok := ledger.Phase6DiagnosticExportOverlays["m6-offline-diagnostic-export-contract-v1"]
+	if !ok || len(ledger.Phase6DiagnosticExportOverlays) != 1 || len(m6Overlay.Paths) != 17 || len(m6Overlay.Entries) != 16 || m6Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid M6 fixture overlay identity/cardinality: %+v", m6Overlay)
+	}
+	m7Overlay, ok := ledger.Phase7AppRuntimeOverlays["m7-offline-app-runtime-contract-v1"]
+	if !ok || len(ledger.Phase7AppRuntimeOverlays) != 1 || len(m7Overlay.Paths) != 17 || len(m7Overlay.Entries) != 16 || m7Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid M7 fixture overlay identity/cardinality: %+v", m7Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries)+len(m5Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -461,6 +583,18 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	for _, path := range m5Overlay.Paths[:len(m5Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range m6Overlay.Paths[:len(m6Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range m7Overlay.Paths[:len(m7Overlay.Paths)-1] {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true

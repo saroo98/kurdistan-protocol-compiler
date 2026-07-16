@@ -897,19 +897,21 @@ func TestAuthorizationV1SixPathSHA256Evidence(t *testing.T) {
 const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
 
 type committedEvidenceManifestV1 struct {
-	Schema                        string                                   `json:"schema"`
-	HashAlgorithm                 string                                   `json:"hash_algorithm"`
-	SourceCandidate               string                                   `json:"source_candidate"`
-	Sets                          map[string][]committedEvidenceEntryV1    `json:"sets"`
-	MaintenanceOverlays           map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
-	HelperOwnerOverlays           map[string]helperOwnerOverlayV1          `json:"helper_owner_overlays"`
-	ValidatorOverlays             map[string]helperOwnerOverlayV1          `json:"validator_overlays"`
-	ValidatorConsumerOverlays     map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
-	EvidenceConvergenceOverlays   map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
-	Phase2CompleteOverlays        map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
-	Phase3ContractOverlays        map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
-	Phase4FallbackOverlays        map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
-	Phase5RelayDescriptorOverlays map[string]phase2CompleteOverlayV1       `json:"phase5_relay_descriptor_overlays"`
+	Schema                         string                                   `json:"schema"`
+	HashAlgorithm                  string                                   `json:"hash_algorithm"`
+	SourceCandidate                string                                   `json:"source_candidate"`
+	Sets                           map[string][]committedEvidenceEntryV1    `json:"sets"`
+	MaintenanceOverlays            map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
+	HelperOwnerOverlays            map[string]helperOwnerOverlayV1          `json:"helper_owner_overlays"`
+	ValidatorOverlays              map[string]helperOwnerOverlayV1          `json:"validator_overlays"`
+	ValidatorConsumerOverlays      map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
+	EvidenceConvergenceOverlays    map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays         map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays         map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
+	Phase4FallbackOverlays         map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
+	Phase5RelayDescriptorOverlays  map[string]phase2CompleteOverlayV1       `json:"phase5_relay_descriptor_overlays"`
+	Phase6DiagnosticExportOverlays map[string]phase2CompleteOverlayV1       `json:"phase6_diagnostic_export_overlays"`
+	Phase7AppRuntimeOverlays       map[string]phase2CompleteOverlayV1       `json:"phase7_app_runtime_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1041,7 +1043,15 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtM4, err := validatePhase5RelayDescriptorOverlayV1(root, manifest.Phase5RelayDescriptorOverlays)
+	currentAtM6, err := validatePhase7AppRuntimeOverlayV1(root, manifest.Phase7AppRuntimeOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtM5, err := validatePhase6DiagnosticExportOverlayV1(root, currentAtM6, manifest.Phase6DiagnosticExportOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtM4, err := validatePhase5RelayDescriptorOverlayV1(root, currentAtM5, manifest.Phase5RelayDescriptorOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1169,7 +1179,85 @@ func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]strin
 	return pre, nil
 }
 
-func validatePhase5RelayDescriptorOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+func validatePhase7AppRuntimeOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m7-offline-app-runtime-contract-v1"
+	wantPaths := []string{
+		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
+		"docs/KIP-0074-offline-app-runtime-contract.md", "internal/product/appruntime/appruntime.go", "internal/product/appruntime/appruntime_test.go",
+		"testdata/consumer/m7-app-runtime-sdk/go.mod", "testdata/consumer/m7-app-runtime-sdk/app_runtime_sdk_test.go", "cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go", "internal/" + "testkit/importrules/importrules_test.go", committedEvidenceManifestPathV1,
+	}
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "34f5d8d2048faf1de49c2ccd2ebb4a5c507ad3bf0b2d75b5db1e7e6d5c13a0a7" || len(overlay.Paths) != len(wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
+		return nil, fmt.Errorf("invalid phase7 app runtime overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, path := range wantPaths {
+		if overlay.Paths[i] != path {
+			return nil, fmt.Errorf("invalid phase7 app runtime path %d", i)
+		}
+	}
+	for i, entry := range overlay.Entries {
+		if entry.Path != wantPaths[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase7 app runtime entry %d", i)
+		}
+		actual, err := fileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase7 app runtime hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validHelperOwnerSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase7 app runtime pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase6DiagnosticExportOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m6-offline-diagnostic-export-contract-v1"
+	wantPaths := []string{
+		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
+		"docs/KIP-0073-offline-diagnostic-export-contract.md", "internal/product/diagnosticexport/diagnosticexport.go", "internal/product/diagnosticexport/diagnosticexport_test.go",
+		"testdata/consumer/m6-diagnostic-export-sdk/go.mod", "testdata/consumer/m6-diagnostic-export-sdk/diagnostic_export_sdk_test.go", "cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go", "internal/" + "testkit/importrules/importrules_test.go", committedEvidenceManifestPathV1,
+	}
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "77fcaaa94436a401f071fbfbade94baeb0cd770574c7309ae5c427a76c030977" || len(overlay.Paths) != len(wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
+		return nil, fmt.Errorf("invalid phase6 diagnostic export overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, path := range wantPaths {
+		if overlay.Paths[i] != path {
+			return nil, fmt.Errorf("invalid phase6 diagnostic export path %d", i)
+		}
+	}
+	for i, entry := range overlay.Entries {
+		if entry.Path != wantPaths[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase6 diagnostic export entry %d", i)
+		}
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase6 diagnostic export hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validHelperOwnerSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase6 diagnostic export pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase5RelayDescriptorOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "m5-offline-relay-descriptor-admission-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "709e4a5a7412ee115fc71c2d825ebe9ac4f167439b4861a1649dd63fcf0c150f" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != committedEvidenceManifestPathV1 {
@@ -1180,7 +1268,11 @@ func validatePhase5RelayDescriptorOverlayV1(root string, overlays map[string]pha
 		if overlay.Paths[i] != entry.Path || !validHelperOwnerSHA256V1(entry.PostSHA256) {
 			return nil, fmt.Errorf("invalid phase5 relay descriptor entry %d", i)
 		}
-		actual, err := fileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase5 relay descriptor hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}

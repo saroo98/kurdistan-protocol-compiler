@@ -7,14 +7,14 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: M5 offline relay-descriptor admission contract
+## Current phase: M7 offline app-runtime contract
 
 The runtime remains a lab-only research prototype. The compiler generates
 deterministic protocol profiles and validates them through an in-repo audit;
 carrier, relay, proxy, and Android/VPN surfaces exist as **models and design
 contracts only**, never as live transport. M2 permits documentation and
-design-contract work only. It does not authorize source/runtime product
-behavior, an Android application, VPN/TUN or proxy operation, relay or operator
+design-contract work only. It does not authorize product behavior beyond the
+later deterministic offline contracts, an Android application, VPN/TUN or proxy operation, relay or operator
 services, non-loopback networking, telemetry, deployment, or production
 cryptography. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
 `STATUS.md` for what is real versus modelled.
@@ -27,7 +27,15 @@ offline structural admission of exact profile-authorized relay descriptors. It
 recomputes the M4 result, binds profile, family, capabilities, client identity,
 time, and complete revocation metadata, and treats relay references as opaque.
 It authenticates no descriptor, probes or executes no path, and opens no product
-runtime or network capability. See KIP-0070, KIP-0071, and KIP-0072.
+runtime or network capability. M6 adds only deterministic construction of a
+redacted in-memory diagnostic bundle after explicit prepare, preview, and
+confirmation. It collects nothing, writes nothing, transmits nothing, and
+grants no control authority. M7 adds only a pure offline eligibility state
+machine. It recomputes exact M4 selection and M5 relay admission, validates
+caller-supplied platform-readiness metadata, and returns bounded dispositions.
+`ready_to_start` does not start anything, and `shutdown_required` does not prove
+shutdown. No Android, VPN, service, storage, routing, DNS, or network capability
+is opened. See KIP-0070 through KIP-0074.
 
 Every further implementation milestone requires a separate scoped review
 and fresh authorization before work begins.
