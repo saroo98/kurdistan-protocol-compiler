@@ -7,7 +7,7 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: M4 offline permitted-fallback contract
+## Current phase: M5 offline relay-descriptor admission contract
 
 The runtime remains a lab-only research prototype. The compiler generates
 deterministic protocol profiles and validates them through an in-repo audit;
@@ -22,9 +22,12 @@ cryptography. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
 M3 implements deterministic offline authority-metadata admission and a pure
 monotonic profile lifecycle. M4 adds only deterministic offline selection among
 profile-ordered, permitted carrier-family metadata after mandatory client,
-safety, privacy, compatibility, and lifecycle checks. It does not probe or
-execute a fallback and opens no product runtime capability. See KIP-0070 and
-KIP-0071.
+safety, privacy, compatibility, and lifecycle checks. M5 adds only deterministic
+offline structural admission of exact profile-authorized relay descriptors. It
+recomputes the M4 result, binds profile, family, capabilities, client identity,
+time, and complete revocation metadata, and treats relay references as opaque.
+It authenticates no descriptor, probes or executes no path, and opens no product
+runtime or network capability. See KIP-0070, KIP-0071, and KIP-0072.
 
 Every further implementation milestone requires a separate scoped review
 and fresh authorization before work begins.

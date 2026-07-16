@@ -1397,14 +1397,15 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 		return err
 	}
 	var manifest struct {
-		MaintenanceOverlays         map[string]policyMaintenanceOverlayV1    `json:"maintenance_overlays"`
-		HelperOwnerOverlays         map[string]policyLayeredOverlayV1        `json:"helper_owner_overlays"`
-		ValidatorOverlays           map[string]policyLayeredOverlayV1        `json:"validator_overlays"`
-		ValidatorConsumerOverlays   map[string]policyLayeredOverlayV1        `json:"validator_consumer_overlays"`
-		EvidenceConvergenceOverlays map[string]policyLayeredOverlayV1        `json:"evidence_convergence_overlays"`
-		Phase2CompleteOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase2_complete_overlays"`
-		Phase3ContractOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase3_contract_overlays"`
-		Phase4FallbackOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase4_fallback_overlays"`
+		MaintenanceOverlays           map[string]policyMaintenanceOverlayV1    `json:"maintenance_overlays"`
+		HelperOwnerOverlays           map[string]policyLayeredOverlayV1        `json:"helper_owner_overlays"`
+		ValidatorOverlays             map[string]policyLayeredOverlayV1        `json:"validator_overlays"`
+		ValidatorConsumerOverlays     map[string]policyLayeredOverlayV1        `json:"validator_consumer_overlays"`
+		EvidenceConvergenceOverlays   map[string]policyLayeredOverlayV1        `json:"evidence_convergence_overlays"`
+		Phase2CompleteOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase2_complete_overlays"`
+		Phase3ContractOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase3_contract_overlays"`
+		Phase4FallbackOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase4_fallback_overlays"`
+		Phase5RelayDescriptorOverlays map[string]policyPhase2CompleteOverlayV1 `json:"phase5_relay_descriptor_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return err
@@ -1416,11 +1417,15 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	if len(candidate) == 0 {
 		return nil
 	}
-	return validatePolicyM2ComposedStateV1(root, candidate, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
+	return validatePolicyM2ComposedStateV1(root, candidate, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
 }
 
-func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maintenanceOverlays map[string]policyMaintenanceOverlayV1, helperOverlays, validatorOverlays, consumerOverlays, convergenceOverlays map[string]policyLayeredOverlayV1, phase4Overlays, phase3Overlays, phase2Overlays map[string]policyPhase2CompleteOverlayV1) error {
-	currentAtM3, err := validatePolicyPhase4FallbackV1(root, phase4Overlays)
+func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maintenanceOverlays map[string]policyMaintenanceOverlayV1, helperOverlays, validatorOverlays, consumerOverlays, convergenceOverlays map[string]policyLayeredOverlayV1, phase5Overlays, phase4Overlays, phase3Overlays, phase2Overlays map[string]policyPhase2CompleteOverlayV1) error {
+	currentAtM4, err := validatePolicyPhase5RelayDescriptorV1(root, phase5Overlays)
+	if err != nil {
+		return err
+	}
+	currentAtM3, err := validatePolicyPhase4FallbackV1(root, currentAtM4, phase4Overlays)
 	if err != nil {
 		return err
 	}
@@ -1448,6 +1453,9 @@ func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maint
 		want[path] = true
 	}
 	for _, path := range phase4Overlays["m4-permitted-fallback-contract-v1"].Paths {
+		want[path] = true
+	}
+	for _, path := range phase5Overlays["m5-offline-relay-descriptor-admission-v1"].Paths {
 		want[path] = true
 	}
 	for i, path := range policyMaintenancePathsV1 {
@@ -1568,22 +1576,56 @@ func validatePolicyPhase2CompleteV1(root string, currentAtPost map[string]string
 	return pre, nil
 }
 
-func validatePolicyPhase4FallbackV1(root string, overlays map[string]policyPhase2CompleteOverlayV1) (map[string]string, error) {
+func validatePolicyPhase5RelayDescriptorV1(root string, overlays map[string]policyPhase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m5-offline-relay-descriptor-admission-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "709e4a5a7412ee115fc71c2d825ebe9ac4f167439b4861a1649dd63fcf0c150f" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != policyMaintenanceManifestPathV1 {
+		return nil, fmt.Errorf("invalid phase5 relay descriptor overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validPolicySHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase5 relay descriptor entry %d", i)
+		}
+		actual, err := policyFileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase5 relay descriptor hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validPolicySHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase5 relay descriptor pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePolicyPhase4FallbackV1(root string, currentAtPost map[string]string, overlays map[string]policyPhase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "m4-permitted-fallback-contract-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "772ae344c99edb21a4d04fadd77f51978a6e81aa4d555ec30190cb64e7a7c2d9" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != policyMaintenanceManifestPathV1 {
 		return nil, fmt.Errorf("invalid phase4 fallback overlay identity/cardinality")
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if overlay.Paths[i] != entry.Path || !validPolicySHA256V1(entry.PostSHA256) {
 			return nil, fmt.Errorf("invalid phase4 fallback entry %d", i)
 		}
-		actual, err := policyFileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = policyFileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase4 fallback hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
-		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
 			if !validPolicySHA256V1(entry.PreEvidence) {
 				return nil, fmt.Errorf("invalid phase4 pre evidence %s", entry.Path)
 			}
@@ -1781,14 +1823,15 @@ func TestPolicyMatrixComposedM2ExactStatesV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		MaintenanceOverlays         map[string]policyMaintenanceOverlayV1    `json:"maintenance_overlays"`
-		HelperOwnerOverlays         map[string]policyLayeredOverlayV1        `json:"helper_owner_overlays"`
-		ValidatorOverlays           map[string]policyLayeredOverlayV1        `json:"validator_overlays"`
-		ValidatorConsumerOverlays   map[string]policyLayeredOverlayV1        `json:"validator_consumer_overlays"`
-		EvidenceConvergenceOverlays map[string]policyLayeredOverlayV1        `json:"evidence_convergence_overlays"`
-		Phase2CompleteOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase2_complete_overlays"`
-		Phase3ContractOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase3_contract_overlays"`
-		Phase4FallbackOverlays      map[string]policyPhase2CompleteOverlayV1 `json:"phase4_fallback_overlays"`
+		MaintenanceOverlays           map[string]policyMaintenanceOverlayV1    `json:"maintenance_overlays"`
+		HelperOwnerOverlays           map[string]policyLayeredOverlayV1        `json:"helper_owner_overlays"`
+		ValidatorOverlays             map[string]policyLayeredOverlayV1        `json:"validator_overlays"`
+		ValidatorConsumerOverlays     map[string]policyLayeredOverlayV1        `json:"validator_consumer_overlays"`
+		EvidenceConvergenceOverlays   map[string]policyLayeredOverlayV1        `json:"evidence_convergence_overlays"`
+		Phase2CompleteOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase2_complete_overlays"`
+		Phase3ContractOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase3_contract_overlays"`
+		Phase4FallbackOverlays        map[string]policyPhase2CompleteOverlayV1 `json:"phase4_fallback_overlays"`
+		Phase5RelayDescriptorOverlays map[string]policyPhase2CompleteOverlayV1 `json:"phase5_relay_descriptor_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatal(err)
@@ -1803,39 +1846,49 @@ func TestPolicyMatrixComposedM2ExactStatesV1(t *testing.T) {
 	for _, path := range manifest.Phase4FallbackOverlays["m4-permitted-fallback-contract-v1"].Paths {
 		changed[path] = true
 	}
-	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err != nil {
+	for _, path := range manifest.Phase5RelayDescriptorOverlays["m5-offline-relay-descriptor-admission-v1"].Paths {
+		changed[path] = true
+	}
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err != nil {
 		t.Fatal(err)
 	}
 	partial := clonePathSetV1(changed)
 	delete(partial, policyHelperPathsV1[0])
-	if err := validatePolicyM2ComposedStateV1(root, partial, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+	if err := validatePolicyM2ComposedStateV1(root, partial, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
 		t.Fatal("composed M2 subset accepted")
 	}
 	superset := clonePathSetV1(changed)
 	superset["extra"] = true
-	if err := validatePolicyM2ComposedStateV1(root, superset, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+	if err := validatePolicyM2ComposedStateV1(root, superset, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
 		t.Fatal("composed M2 superset accepted")
 	}
 	badHelpers := clonePolicyLayeredOverlaysV1(manifest.HelperOwnerOverlays)
 	v2 := badHelpers[policyHelperOverlayNameV2]
 	v2.Entries[0], v2.Entries[1] = v2.Entries[1], v2.Entries[0]
 	badHelpers[policyHelperOverlayNameV2] = v2
-	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, badHelpers, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, badHelpers, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
 		t.Fatal("reordered helper overlay accepted")
 	}
 	badValidators := clonePolicyLayeredOverlaysV1(manifest.ValidatorOverlays)
 	validator := badValidators[policyValidatorOverlayNameV1]
 	validator.Entries[0].PostSHA256 = strings.Repeat("3", 64)
 	badValidators[policyValidatorOverlayNameV1] = validator
-	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, badValidators, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, badValidators, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
 		t.Fatal("drifted validator overlay accepted")
 	}
 	badConsumers := clonePolicyLayeredOverlaysV1(manifest.ValidatorConsumerOverlays)
 	consumer := badConsumers[policyValidatorConsumerOverlayNameV1]
 	consumer.Entries[0].PreSHA256 = strings.Repeat("4", 64)
 	badConsumers[policyValidatorConsumerOverlayNameV1] = consumer
-	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, badConsumers, manifest.EvidenceConvergenceOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, badConsumers, manifest.EvidenceConvergenceOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
 		t.Fatal("drifted validator-consumer overlay accepted")
+	}
+	badM5 := map[string]policyPhase2CompleteOverlayV1{}
+	m5 := manifest.Phase5RelayDescriptorOverlays["m5-offline-relay-descriptor-admission-v1"]
+	m5.PredecessorManifestSHA256 = strings.Repeat("5", 64)
+	badM5["m5-offline-relay-descriptor-admission-v1"] = m5
+	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, badM5, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err == nil {
+		t.Fatal("drifted M5 predecessor accepted")
 	}
 }
 

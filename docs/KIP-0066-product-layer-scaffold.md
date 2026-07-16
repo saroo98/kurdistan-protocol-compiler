@@ -31,9 +31,12 @@ guaranteed bypass, or censorship resistance, and it does not ship a product.
 
 KIP-0070 later opened the verified-profile and lifecycle contracts as offline,
 deterministic Go contracts in `internal/product/{profile,lifecycle}`. KIP-0071
-opens the permitted-fallback entry only as an offline metadata selector. These
-contracts do not authenticate metadata, probe paths, execute fallbacks, or open
-runtime behavior. The other three catalog entries remain closed.
+opens the permitted-fallback entry only as an offline metadata selector.
+KIP-0072 opens relay-descriptor admission only as deterministic structural
+validation in `internal/product/relaydescriptor`. These contracts do not
+authenticate relay descriptors, probe paths, execute fallbacks, establish relay
+sessions, or open runtime behavior. Diagnostic export and app runtime remain
+closed.
 
 The catalog does not define a wire schema, service API, storage format, network
 endpoint, cryptographic construction, or application implementation. M3 and
@@ -85,6 +88,14 @@ from the Go runtime models in `internal/contracts/android/**`. `Validate`
 enforces the safety invariants: permission-first, fail-closed kill switch,
 bounded fallback, redacted diagnostics, and no payload or destination logging. It
 wires no Android build.
+
+## Relay-descriptor admission (`internal/product/relaydescriptor`)
+
+M5 recomputes an exact selected Phase 4 request/result before structurally
+admitting exact profile-authorized relay metadata. It binds lifecycle, policy,
+family, capabilities, bounded client identity, caller-supplied time, and a
+complete revocation snapshot. Endpoint references remain opaque. The package
+does not authenticate, resolve, dial, probe, operate, or deploy a relay.
 
 ## Verification
 

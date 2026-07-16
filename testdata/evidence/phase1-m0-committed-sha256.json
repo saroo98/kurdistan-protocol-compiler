@@ -531,5 +531,48 @@
         {"path":"internal/testkit/importrules/importrules_test.go","pre_evidence":"fe601279f254be86af02d805309b011a2d84966b9ebef18e70b1a96cdd5e6825","post_sha256":"e1944db7976a13a3da3135782f5b073588f68a6d3f3add0f4f1dc15c73cc04a9"}
       ]
     }
+  },
+  "phase5_relay_descriptor_overlays": {
+    "m5-offline-relay-descriptor-admission-v1": {
+      "version": "m5-offline-relay-descriptor-admission-v1",
+      "predecessor_manifest_sha256": "709e4a5a7412ee115fc71c2d825ebe9ac4f167439b4861a1649dd63fcf0c150f",
+      "paths": [
+        "ROADMAP.md",
+        "docs/KIP-0066-product-layer-scaffold.md",
+        "docs/KIP-0068-product-governance-foundation.md",
+        "docs/KIP-0069-product-contracts-v1.md",
+        "docs/KIP-0072-offline-relay-descriptor-admission-contract.md",
+        "internal/product/relaydescriptor/relaydescriptor.go",
+        "internal/product/relaydescriptor/relaydescriptor_test.go",
+        "testdata/consumer/m5-relay-descriptor-sdk/go.mod",
+        "testdata/consumer/m5-relay-descriptor-sdk/relay_descriptor_sdk_test.go",
+        "cmd/kgen/main_test.go",
+        "internal/audit/codegen_test.go",
+        "internal/audit/security.go",
+        "internal/audit/security_test.go",
+        "internal/codegen/authorization_v1_test.go",
+        "internal/runtime/policy_enforcement_test.go",
+        "internal/testkit/importrules/importrules_test.go",
+        "testdata/evidence/phase1-m0-committed-sha256.json"
+      ],
+      "entries": [
+        {"path":"ROADMAP.md","pre_evidence":"0a7716de788a4b78c02b56e6ba12bcb80222d7eaff4ee4e42f251c35bb7a3898","post_sha256":"d970ae7461b9cfedeb35ab977bb38e58b8948da96c485a38c6da1c27d36611e0"},
+        {"path":"docs/KIP-0066-product-layer-scaffold.md","pre_evidence":"738891b98ad491cea7a4c64526e2852d2004d8975335e9486d0605b870342696","post_sha256":"1ecc729a538c575464a81c47f2486d0b4d9d4edce93bc824a80097fdab9febec"},
+        {"path":"docs/KIP-0068-product-governance-foundation.md","pre_evidence":"78602344aaa62a85e2b3687bfb8895ac0faf529c5ac4aa5320e7d24bd3c35f76","post_sha256":"b9e967849d7682811612bc2dd42ae743612a9f3c4094e2af9f0f93cb373f5bc2"},
+        {"path":"docs/KIP-0069-product-contracts-v1.md","pre_evidence":"8e2b544fb167bd6dd13f609ef587af71a7ed557c2498f73f6f7ab4ba766d1299","post_sha256":"a38a96b5cfde77d1051e88010ba99bb5edad1166d88c04c7f5a3a10ca54eb061"},
+        {"path":"docs/KIP-0072-offline-relay-descriptor-admission-contract.md","pre_evidence":"ABSENT","post_sha256":"b8bacfde70a2253f9f3fbfc8b21953d8571261edf909555293788106e5be1ad7"},
+        {"path":"internal/product/relaydescriptor/relaydescriptor.go","pre_evidence":"ABSENT","post_sha256":"0c7e9cb23822f6e7f63caf0e8a1a9845f163fb020a7ca157285f8ab1d3b57fce"},
+        {"path":"internal/product/relaydescriptor/relaydescriptor_test.go","pre_evidence":"ABSENT","post_sha256":"64c772126eefc1c68ec7f0e1ea5eee45204e7a624508e69bb12046a2ce9a02b3"},
+        {"path":"testdata/consumer/m5-relay-descriptor-sdk/go.mod","pre_evidence":"ABSENT","post_sha256":"08428514aab0458ab28b1a372771abb130fad422b6aa77acc2f527fdc9da40c5"},
+        {"path":"testdata/consumer/m5-relay-descriptor-sdk/relay_descriptor_sdk_test.go","pre_evidence":"ABSENT","post_sha256":"ba2aa92fe5757ecf45bb77b69c0c0fca2dc7cc840eb77ab2151ac9af999f83af"},
+        {"path":"cmd/kgen/main_test.go","pre_evidence":"f8175f54921cb7ed603776fa54754c3d9fb2b4ae2c7b2c3062ed4d10f8cfb8b7","post_sha256":"a0cf9f4881c8bd16c094cd815be8f684d1aa3294e4c338b84ede6ffd8095905b"},
+        {"path":"internal/audit/codegen_test.go","pre_evidence":"13bb4514eeef46c0a436c76366dd6f875bf60bd69a99d7400ea890ef3b63735c","post_sha256":"c8d2d35d6984976c649cb811536d243a29c6c85c3bda191f2b80996a4c480539"},
+        {"path":"internal/audit/security.go","pre_evidence":"8a9128001e9def0b660c858e11ebaa8ef316280fb059d49e81f20979304bcf02","post_sha256":"5cbb8c85962037331e5af6d28f8fe3a5f937ce246d14dfd032423f9047c4513a"},
+        {"path":"internal/audit/security_test.go","pre_evidence":"35bb12e3ef376530b44aaf13f31567e043efb1e9ded8a1b5255d41e1b5054538","post_sha256":"1f6ce4c9cd34f320a2e0adf2c9dadcaa0bae8262b0e3bf5b3487bdb9ce1c5c68"},
+        {"path":"internal/codegen/authorization_v1_test.go","pre_evidence":"68321551ded14a97061025fbb39df93104c409ad05601786c0074c0ae27e18ba","post_sha256":"54a7d10ad39bd2dcc754373d0fd7ca8e72b3ab613aa20826c93ed98ceb5b7aea"},
+        {"path":"internal/runtime/policy_enforcement_test.go","pre_evidence":"f5492962ccf8eba2499e49b144540e63c60974e9786231c5a1c2ea26d2d1e56e","post_sha256":"96ea700a5ae51add68519e957bfe1704ff818e601ff7fca82089ad517a500960"},
+        {"path":"internal/testkit/importrules/importrules_test.go","pre_evidence":"e1944db7976a13a3da3135782f5b073588f68a6d3f3add0f4f1dc15c73cc04a9","post_sha256":"0819095a9933e65b4179213784c2a85fc95c30dcbf495e4f4af83711488b0f66"}
+      ]
+    }
   }
 }

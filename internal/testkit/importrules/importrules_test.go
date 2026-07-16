@@ -830,6 +830,40 @@ func TestM4FallbackBoundaryV1(t *testing.T) {
 	}
 }
 
+func TestM5RelayDescriptorBoundaryV1(t *testing.T) {
+	root := repoRoot(t)
+	want := map[string]bool{"errors": true, "reflect": true, "strings": true, modulePath + "/internal/product/strategy": true}
+	dir := filepath.Join(root, "internal", "product", "relaydescriptor")
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return walkErr
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imported := range file.Imports {
+			name := strings.Trim(imported.Path.Value, `"`)
+			if !want[name] {
+				t.Errorf("M5 relaydescriptor imports forbidden dependency %s", name)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "relaydescriptor.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{"net/", "time", "os/", "internal/runtime", "internal/relay", "internal/operator", "internal/crypto", "internal/product/android"} {
+		if strings.Contains(string(raw), marker) {
+			t.Fatalf("M5 relaydescriptor contains forbidden capability %q", marker)
+		}
+	}
+}
+
 func TestNoLabShortcutStrictSurfaceAndInjectedV1(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "internal", "codegen", "generator_templates.go"))
@@ -1027,18 +1061,19 @@ func TestVersionMigrationBoundaryDeterministicPostScopeManifestV1(t *testing.T) 
 const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
 
 type committedEvidenceManifestV1 struct {
-	Schema                      string                                   `json:"schema"`
-	HashAlgorithm               string                                   `json:"hash_algorithm"`
-	SourceCandidate             string                                   `json:"source_candidate"`
-	Sets                        map[string][]committedEvidenceEntryV1    `json:"sets"`
-	MaintenanceOverlays         map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
-	HelperOwnerOverlays         map[string]committedLayeredOverlayV1     `json:"helper_owner_overlays"`
-	ValidatorOverlays           map[string]committedLayeredOverlayV1     `json:"validator_overlays"`
-	ValidatorConsumerOverlays   map[string]committedLayeredOverlayV1     `json:"validator_consumer_overlays"`
-	EvidenceConvergenceOverlays map[string]committedLayeredOverlayV1     `json:"evidence_convergence_overlays"`
-	Phase2CompleteOverlays      map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
-	Phase3ContractOverlays      map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
-	Phase4FallbackOverlays      map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
+	Schema                        string                                   `json:"schema"`
+	HashAlgorithm                 string                                   `json:"hash_algorithm"`
+	SourceCandidate               string                                   `json:"source_candidate"`
+	Sets                          map[string][]committedEvidenceEntryV1    `json:"sets"`
+	MaintenanceOverlays           map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
+	HelperOwnerOverlays           map[string]committedLayeredOverlayV1     `json:"helper_owner_overlays"`
+	ValidatorOverlays             map[string]committedLayeredOverlayV1     `json:"validator_overlays"`
+	ValidatorConsumerOverlays     map[string]committedLayeredOverlayV1     `json:"validator_consumer_overlays"`
+	EvidenceConvergenceOverlays   map[string]committedLayeredOverlayV1     `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays        map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays        map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
+	Phase4FallbackOverlays        map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
+	Phase5RelayDescriptorOverlays map[string]phase2CompleteOverlayV1       `json:"phase5_relay_descriptor_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1176,7 +1211,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtM3, err := validatePhase4FallbackOverlayV1(root, manifest.Phase4FallbackOverlays)
+	currentAtM4, err := validatePhase5RelayDescriptorOverlayV1(root, manifest.Phase5RelayDescriptorOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtM3, err := validatePhase4FallbackOverlayV1(root, currentAtM4, manifest.Phase4FallbackOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1320,22 +1359,56 @@ func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]strin
 	return pre, nil
 }
 
-func validatePhase4FallbackOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+func validatePhase5RelayDescriptorOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m5-offline-relay-descriptor-admission-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "709e4a5a7412ee115fc71c2d825ebe9ac4f167439b4861a1649dd63fcf0c150f" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != committedEvidenceManifestPathV1 {
+		return nil, fmt.Errorf("invalid phase5 relay descriptor overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validCommittedSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase5 relay descriptor entry %d", i)
+		}
+		actual, err := committedFileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase5 relay descriptor hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validCommittedSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid phase5 relay descriptor pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validatePhase4FallbackOverlayV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "m4-permitted-fallback-contract-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "772ae344c99edb21a4d04fadd77f51978a6e81aa4d555ec30190cb64e7a7c2d9" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != committedEvidenceManifestPathV1 {
 		return nil, fmt.Errorf("invalid phase4 fallback overlay identity/cardinality")
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if overlay.Paths[i] != entry.Path || !validCommittedSHA256V1(entry.PostSHA256) {
 			return nil, fmt.Errorf("invalid phase4 fallback entry %d", i)
 		}
-		actual, err := committedFileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = committedFileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase4 fallback hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
-		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
 			if !validCommittedSHA256V1(entry.PreEvidence) {
 				return nil, fmt.Errorf("invalid phase4 pre evidence %s", entry.Path)
 			}

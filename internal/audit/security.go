@@ -91,14 +91,15 @@ type m2MaintenanceOverlayRecordV1 struct {
 }
 
 type m2MaintenanceManifestV1 struct {
-	MaintenanceOverlays         map[string]m2MaintenanceOverlayRecordV1 `json:"maintenance_overlays"`
-	HelperOwnerOverlays         map[string]m2LayeredOverlayV1           `json:"helper_owner_overlays"`
-	ValidatorOverlays           map[string]m2LayeredOverlayV1           `json:"validator_overlays"`
-	ValidatorConsumerOverlays   map[string]m2LayeredOverlayV1           `json:"validator_consumer_overlays"`
-	EvidenceConvergenceOverlays map[string]m2LayeredOverlayV1           `json:"evidence_convergence_overlays"`
-	Phase2CompleteOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase2_complete_overlays"`
-	Phase3ContractOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase3_contract_overlays"`
-	Phase4FallbackOverlays      map[string]m2Phase2CompleteOverlayV1    `json:"phase4_fallback_overlays"`
+	MaintenanceOverlays           map[string]m2MaintenanceOverlayRecordV1 `json:"maintenance_overlays"`
+	HelperOwnerOverlays           map[string]m2LayeredOverlayV1           `json:"helper_owner_overlays"`
+	ValidatorOverlays             map[string]m2LayeredOverlayV1           `json:"validator_overlays"`
+	ValidatorConsumerOverlays     map[string]m2LayeredOverlayV1           `json:"validator_consumer_overlays"`
+	EvidenceConvergenceOverlays   map[string]m2LayeredOverlayV1           `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays        map[string]m2Phase2CompleteOverlayV1    `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays        map[string]m2Phase2CompleteOverlayV1    `json:"phase3_contract_overlays"`
+	Phase4FallbackOverlays        map[string]m2Phase2CompleteOverlayV1    `json:"phase4_fallback_overlays"`
+	Phase5RelayDescriptorOverlays map[string]m2Phase2CompleteOverlayV1    `json:"phase5_relay_descriptor_overlays"`
 }
 
 type m2LayeredOverlayV1 struct {
@@ -174,7 +175,11 @@ func loadM2MaintenancePreHashesWithSuccessorV1(root string, validateSuccessor bo
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return nil, fmt.Errorf("M2 maintenance manifest: %w", err)
 	}
-	currentAtM3, err := validateM4FallbackOverlayV1(root, manifest.Phase4FallbackOverlays)
+	currentAtM4, err := validateM5RelayDescriptorOverlayV1(root, manifest.Phase5RelayDescriptorOverlays)
+	if err != nil {
+		return nil, err
+	}
+	currentAtM3, err := validateM4FallbackOverlayV1(root, currentAtM4, manifest.Phase4FallbackOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -347,22 +352,56 @@ func validateM2Phase2CompleteV1(root string, currentAtPost map[string]string, ov
 	return pre, nil
 }
 
-func validateM4FallbackOverlayV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+func validateM5RelayDescriptorOverlayV1(root string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
+	const name = "m5-offline-relay-descriptor-admission-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "709e4a5a7412ee115fc71c2d825ebe9ac4f167439b4861a1649dd63fcf0c150f" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		return nil, fmt.Errorf("invalid M5 relay descriptor overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, entry := range overlay.Entries {
+		if overlay.Paths[i] != entry.Path || !validSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid M5 relay descriptor entry %d", i)
+		}
+		actual, err := m2FileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("M5 relay descriptor hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+			if !validSHA256V1(entry.PreEvidence) {
+				return nil, fmt.Errorf("invalid M5 relay descriptor pre evidence %s", entry.Path)
+			}
+			pre[entry.Path] = entry.PreEvidence
+		}
+	}
+	return pre, nil
+}
+
+func validateM4FallbackOverlayV1(root string, currentAtPost map[string]string, overlays map[string]m2Phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "m4-permitted-fallback-contract-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.PredecessorManifestSHA256 != "772ae344c99edb21a4d04fadd77f51978a6e81aa4d555ec30190cb64e7a7c2d9" || len(overlay.Paths) != 17 || len(overlay.Entries) != 16 || overlay.Paths[16] != m2MaintenanceSelfPathV1 {
 		return nil, fmt.Errorf("invalid M4 fallback overlay identity/cardinality")
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, entry := range overlay.Entries {
 		if overlay.Paths[i] != entry.Path || !validSHA256V1(entry.PostSHA256) {
 			return nil, fmt.Errorf("invalid M4 fallback entry %d", i)
 		}
-		actual, err := m2FileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = m2FileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("M4 fallback hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
-		if entry.PreEvidence != "ABSENT" && entry.PreEvidence != "UNRECORDED" {
+		if entry.PreEvidence == "ABSENT" || entry.PreEvidence == "UNRECORDED" {
+			delete(pre, entry.Path)
+		} else {
 			if !validSHA256V1(entry.PreEvidence) {
 				return nil, fmt.Errorf("invalid M4 pre evidence %s", entry.Path)
 			}
@@ -559,6 +598,11 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 		}
 	}
 	for _, entry := range evidence.Phase4FallbackOverlays["m4-permitted-fallback-contract-v1"].Entries {
+		if entry.PreEvidence == "ABSENT" {
+			preHashes[entry.Path] = "ABSENT"
+		}
+	}
+	for _, entry := range evidence.Phase5RelayDescriptorOverlays["m5-offline-relay-descriptor-admission-v1"].Entries {
 		if entry.PreEvidence == "ABSENT" {
 			preHashes[entry.Path] = "ABSENT"
 		}

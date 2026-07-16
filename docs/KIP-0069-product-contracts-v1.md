@@ -53,4 +53,6 @@ exact files, executable boundary, allowed environment, tests, reviews, rollback,
 and stop conditions. KIP-0070 separately opened the verified-profile and
 revocation/update entries as offline metadata and state-machine contracts.
 KIP-0071 opens permitted fallback only as a deterministic offline selector. The
-remaining three entries and all live product behavior remain closed.
+relay-descriptor entry is opened by KIP-0072 only as deterministic offline
+structural admission with no authenticity, reachability, or session claim.
+Diagnostic export, app runtime, and all live product behavior remain closed.

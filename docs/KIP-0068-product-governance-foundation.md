@@ -98,6 +98,9 @@ The following gates remain future work:
 
 KIP-0070 opened deterministic offline profile admission and lifecycle contracts.
 KIP-0071 opens only deterministic offline permitted-fallback selection over
-bounded metadata. It does not execute or probe a path. All network, runtime,
-cryptographic, Android, relay, operator, deployment, release, and remaining
-catalog gates stay closed.
+bounded metadata. KIP-0072 opens only deterministic offline structural admission
+of exact profile-authorized relay descriptors after M4 recomputation, client
+binding, caller-supplied time, and complete revocation checks. Neither contract
+executes or probes a path, authenticates a relay, or establishes a session. All
+network, runtime, cryptographic, Android, live-relay, operator, deployment,
+release, and remaining catalog gates stay closed.
