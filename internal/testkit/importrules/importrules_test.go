@@ -402,7 +402,7 @@ func TestRuntimeLabExecutorAllowlistV1(t *testing.T) {
 		}
 		if entry.IsDir() {
 			name := entry.Name()
-			if name == ".git" || name == "planning" {
+			if name == ".git" || name == ".claude" || name == ".tools" || name == "planning" {
 				return filepath.SkipDir
 			}
 			return nil

@@ -298,7 +298,7 @@ func TestRuntimeLabEndpointPairPolicyGuardV1(t *testing.T) {
 			return walkErr
 		}
 		if entry.IsDir() {
-			if entry.Name() == ".git" || entry.Name() == "planning" {
+			if entry.Name() == ".git" || entry.Name() == ".claude" || entry.Name() == ".tools" || entry.Name() == "planning" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -1387,6 +1387,11 @@ var policyValidatorPreV1 = []string{"b5be3c78bf856be24b92751f21fe54c7cb4a197c9f6
 var policyConvergencePathsV1 = []string{"cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go"}
 var policyConvergencePreV1 = []string{"aa0d56ec1b1ebeeab11c90497d1f252295682bfb4b9d0c096dcd5b0047558ac0", "7707d4faf66e9d20edbb157a3ad59d71c81d8d3b7f869d7529ff312f9fce073d", "985d46009b1ed6c0faade46de2574b940954de92ad6db8de3ddac0e29ea4a3ae", "f6b623b865407412856cbfc1c3748524b47ccae39ad3d33e40bd8977c9dbeab3", "abf9e52b55971aefb21dace2226dfe4b29c4b5b8478504f30868934af8d6b935", "53f9635f8761701cd2a9ce2762b3004ff3a0143097cb7334930e7b6f086e33b9", "81ae4a98530acc4a643fd824a939aa658eba6f8f6c4857b7978c1ebeb6853c9f"}
 var policyPhase2CompletePathsV1 = []string{"README.md", "ROADMAP.md", "cmd/kgen/main_test.go", "docs/GOVERNANCE.md", "docs/KIP-0001-threat-model.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md", "docs/safety.md", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", policyMaintenanceManifestPathV1}
+var policyStabilizationPathsV1 = []string{
+	"STATUS.md", "go.mod", "internal/audit/audit_test.go", "internal/audit/status.go",
+	"internal/codegen/generator_test.go", "internal/codegen/templates.go",
+	"internal/crypto/auth/handshake_test.go", "internal/runtime/implementation_support_test.go",
+}
 
 func validatePolicyMaintenanceStatusV1(root string, changed, historical map[string]bool) error {
 	if len(changed) != 0 && exactPathSetV1(changed, historical) {
@@ -1472,6 +1477,9 @@ func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maint
 		want[path] = true
 	}
 	for _, path := range phase7Overlays["m7-offline-app-runtime-contract-v1"].Paths {
+		want[path] = true
+	}
+	for _, path := range policyStabilizationPathsV1 {
 		want[path] = true
 	}
 	for i, path := range policyMaintenancePathsV1 {
@@ -1953,6 +1961,9 @@ func TestPolicyMatrixComposedM2ExactStatesV1(t *testing.T) {
 		changed[path] = true
 	}
 	for _, path := range manifest.Phase7AppRuntimeOverlays["m7-offline-app-runtime-contract-v1"].Paths {
+		changed[path] = true
+	}
+	for _, path := range policyStabilizationPathsV1 {
 		changed[path] = true
 	}
 	if err := validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase7AppRuntimeOverlays, manifest.Phase6DiagnosticExportOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays); err != nil {

@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -1709,6 +1710,7 @@ func TestHandshakeVectorContextBlocksStayOutOfFrozenModeShape(t *testing.T) {
 }
 
 func TestHandshakeVectorFrozenWireTranscriptConfirmationAndKeySchedule(t *testing.T) {
+	t.Setenv("GODEBUG", "cryptocustomrand=1")
 	input := deterministicVectorFirstContactInput(t)
 	clientEntropy := bytes.Repeat([]byte{0x31}, 1024)
 	serverEntropy := bytes.Repeat([]byte{0x92}, 1024)
@@ -1783,10 +1785,19 @@ func TestHandshakeVectorFrozenWireTranscriptConfirmationAndKeySchedule(t *testin
 		"th3":                            "66dc8b3dfc6280a56d799eee74bcb0de718e3a3f05b9813cac88d3182b28fb85",
 		"th4":                            "7ed9f951914f0a1bd9d91f660c51272d5e736404cc34006355dba51a049bfbf9",
 	}
-	for name, expected := range want {
-		if got[name] != expected {
-			t.Fatalf("%s = %s, want %s", name, got[name], expected)
+	names := make([]string, 0, len(want))
+	for name := range want {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var mismatches []string
+	for _, name := range names {
+		if got[name] != want[name] {
+			mismatches = append(mismatches, fmt.Sprintf("%s=%s want %s", name, got[name], want[name]))
 		}
+	}
+	if len(mismatches) != 0 {
+		t.Fatalf("frozen handshake vector drift:\n%s", strings.Join(mismatches, "\n"))
 	}
 }
 

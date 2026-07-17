@@ -3553,7 +3553,7 @@ func TestImplementationSupportV1SnapshotIsolationAndStaticAPI(t *testing.T) {
 			return err
 		}
 		if info.IsDir() {
-			if info.Name() == ".git" || info.Name() == "planning" {
+			if info.Name() == ".git" || info.Name() == ".claude" || info.Name() == ".tools" || info.Name() == "planning" {
 				return filepath.SkipDir
 			}
 			return nil

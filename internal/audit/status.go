@@ -18,7 +18,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "# Kurdistan Protocol Compiler Status")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "> Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.")
+	fmt.Fprintln(&b, "> Staged product-development program. Current gate evidence still covers the compiler, local harnesses, and offline contracts; it does not yet prove real-world censorship resistance, undetectability, production safety, or deployment readiness.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "> Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.")
 	fmt.Fprintln(&b)
@@ -681,10 +681,10 @@ func RenderStatus(report AuditReport) string {
 // points at the KIP docs and the safety boundary.
 func milestoneFrontierNote(report AuditReport) string {
 	if _, ok := gateByName(report.Gates, "androidcarrier_report"); ok {
-		return "The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It is a model/contract, not live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md)."
+		return "The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It remains a model/contract today. The program has graduated from a blanket lab-only restriction; later phase gates may implement live behavior without changing what this report currently proves."
 	}
 	if _, ok := gateByName(report.Gates, "androidvpnservice_report"); ok {
-		return "The latest modelled surface evaluated in this report is the Android VpnService prototype (`androidvpnservice_*` gates), a fail-closed model rather than live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md)."
+		return "The latest modelled surface evaluated in this report is the Android VpnService prototype (`androidvpnservice_*` gates), a fail-closed model rather than live transport today. The program has graduated from a blanket lab-only restriction; later phase gates may implement live behavior without changing what this report currently proves."
 	}
 	return "Per-milestone tracking lives in the `docs/KIP-*.md` documents and the gate table above. Live transport remains out of scope (see docs/safety.md)."
 }
