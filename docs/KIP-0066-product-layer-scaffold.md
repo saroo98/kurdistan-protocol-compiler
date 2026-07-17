@@ -40,6 +40,12 @@ fixed-vocabulary, deterministic in-memory bundle after explicit preview and
 confirmation. It writes, shares, uploads, logs, retains, and transmits nothing.
 KIP-0074 opens only the offline app-runtime eligibility entry; live runtime
 remains closed.
+KIP-0075 opens the profile-artifact entry only as a staged Phase 8 offline
+production-candidate program. It may replace the unavailable sealer and
+metadata-only trust seam only after threat, suite, schema, key-role, state, and
+review work orders freeze their contracts. It does not open Android key storage,
+production keys or signers, HSM/KMS operation, live delivery, networking,
+deployment, pilot, or release.
 
 The catalog does not define a wire schema, service API, storage format, network
 endpoint, cryptographic construction, or application implementation. M3 and
@@ -48,8 +54,9 @@ later product behavior remains closed.
 ## Scope limits (hard)
 
 - No live VpnService, TUN, packet capture, or non-loopback networking.
-- No real profile encryption or production cryptography. Sealing is an interface
-  only; real sealing is gated on external cryptographic review (D-003).
+- No production profile encryption, key material, or signing service. Phase 8
+  may implement only the KIP-0075 offline production-candidate boundary with
+  deterministic non-production keys and its mandatory review gates.
 - No public relays, operator provisioning, or field-test tooling.
 - No Kotlin/Java or Gradle build wired.
 - The product runtime must not import the model/contract trees (enforced by
@@ -132,5 +139,6 @@ cryptographic action.
 
 - `kcheck product` subcommand and a STATUS section (the safety checks currently
   run via `go test ./...`, which `go run ./cmd/gate` invokes).
-- Real sealing, live Android sources, and live carrier transport. Each remains
-  behind its own later authorization and validation gate.
+- Production sealing and key operation, live Android sources, and live carrier
+  transport. Each remains behind its own later authorization and validation
+  gate.

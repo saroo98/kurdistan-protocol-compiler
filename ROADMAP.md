@@ -31,13 +31,25 @@ is opened. See KIP-0070 through KIP-0074.
 
 Every further implementation milestone requires its scoped authorization and evidence before work begins; no blanket lab-only prohibition applies.
 
+Phase 8 is now authorized only for an offline production-candidate profile
+artifact boundary. WO-800 records the stabilized predecessor and reconciles
+policy; WO-801 through WO-807 may then define and implement authenticated
+profile artifacts, optional recipient confidentiality, portable key-provider
+interfaces, deterministic fixtures, and offline issuance and verification.
+Only deterministic non-production keys and local evidence are permitted.
+Android key storage, production signers, HSM/KMS operation, live update
+delivery, networking, deployment, pilot, and release remain closed. Exact
+design review and implementation security review remain mandatory before
+merge. See KIP-0075.
+
 ## Future phase gates
 
 Live implementation — as opposed to a loopback-only, payload-free model — of any
 of the following requires a dedicated review before work begins:
 
 - multiplexing over real transports
-- production key management and any real or post-quantum cryptography (external review)
+- production key management, production cryptography, and any mandatory
+  post-quantum suite
 - non-loopback carriers (HTTP/TLS/DNS/QUIC) as live transport
 - UI, mobile, and VPN as shipped products (beyond contract models)
 - SOCKS / HTTP proxy as live transport

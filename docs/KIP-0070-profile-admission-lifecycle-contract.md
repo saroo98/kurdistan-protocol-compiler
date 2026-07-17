@@ -54,3 +54,11 @@ Fallback execution, relay admission, diagnostic export, app runtime, routing,
 storage, Android/Gradle, VpnService/TUN, deployment, signing, sealing, keys,
 production cryptography, live networking, telemetry, and product-readiness or
 bypass claims remain closed.
+
+KIP-0075 supersedes only the blanket closure of offline signing, sealing, and
+key-provider implementation for Phase 8. The metadata contract remains the
+admission and lifecycle predecessor: authenticated candidate bytes must still
+fail closed before activation, and rejection must preserve the last known-good
+state. Production keys, production signers, Android storage, HSM/KMS operation,
+live delivery, networking, deployment, pilot, release, telemetry, and
+product-readiness claims remain closed.

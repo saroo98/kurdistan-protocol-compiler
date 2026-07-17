@@ -39,10 +39,17 @@ keys, or external destinations — in live code, models, or fixtures.
 
 ## Cryptography
 
-Do not implement custom or production cryptography. The v0 proof uses standard
-Go HMAC-SHA256 and test-only key material. Any future real crypto suite is gated
-on external review (decision D-003). Generated profiles are safe to commit only
-when they contain no real secrets and are clearly labelled as lab artifacts.
+Do not invent cryptographic constructions or use production keys in this
+repository. The v0 proof uses standard Go HMAC-SHA256 and test-only key
+material. KIP-0075 authorizes Phase 8 to develop an offline
+production-candidate profile-artifact design and implementation using reviewed
+standards, bounded parsing, deterministic non-production keys, and portable
+key-provider interfaces. It does not authorize production signing, production
+key management, Android Keystore integration, HSM/KMS operation, live profile
+delivery, deployment, pilot, or release. The exact design and candidate
+implementation remain behind their named review gates. Fixtures are safe to
+commit only when deterministic, non-production, secret-free, and explicitly
+identified as test material.
 
 ## Claims
 

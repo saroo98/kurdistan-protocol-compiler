@@ -60,3 +60,9 @@ fixed-vocabulary in-memory bundle after explicit preview and confirmation.
 KIP-0074 opens app runtime only as a pure offline eligibility contract with
 exact predecessor recomputation, fail-closed platform metadata, and an
 always-available shutdown request. All live product behavior remains closed.
+KIP-0075 stages the verified-profile and revocation/update entries toward an
+offline production-candidate cryptographic artifact. It authorizes no
+particular algorithm before the standards gate, no production key, no live
+delivery, and no activation outside the existing last-known-good lifecycle.
+The other catalog entries and every Android, network, relay, operator,
+deployment, pilot, and release boundary remain closed.

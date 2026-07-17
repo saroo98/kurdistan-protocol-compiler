@@ -112,3 +112,10 @@ caller-supplied platform metadata and exact predecessor evidence, recomputes M4
 and M5 results, and returns bounded categorical dispositions. It neither starts
 nor stops a service, and every Android, VPN/TUN, storage, routing, DNS, network,
 operator, deployment, and release boundary remains closed.
+KIP-0075 authorizes the Phase 8 profile-authority plane only for an offline
+production-candidate artifact system with deterministic non-production keys,
+portable key-provider boundaries, fail-closed verification, and last-known-good
+state preservation. Threat, suite, schema, trust, issuance, conformance, and
+review gates remain sequential. Production keys and signers, Android protected
+storage, HSM/KMS operations, live delivery, networking, deployment, pilot, and
+release remain closed.
