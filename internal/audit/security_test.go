@@ -5,6 +5,7 @@ package audit
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -250,6 +251,203 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 	}
 }
 
+func TestM0LineEndingHistoricalOverlayAcceptsEquivalentCheckoutsAndRejectsDrift(t *testing.T) {
+	root := t.TempDir()
+	path := "legacy.txt"
+	canonical := []byte("alpha\nbeta\n")
+	historical := []byte("alpha\r\nbeta\r\n")
+	overlays := map[string]m0LineEndingOverlayV1{
+		path: {
+			CanonicalSHA256:  fmt.Sprintf("%x", sha256.Sum256(canonical)),
+			HistoricalSHA256: fmt.Sprintf("%x", sha256.Sum256(historical)),
+		},
+	}
+	write := func(content []byte) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, path), content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, content := range [][]byte{canonical, historical} {
+		write(content)
+		got, err := m0LineEndingHistoricalHashesV1(root, overlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got[path] != overlays[path].HistoricalSHA256 {
+			t.Fatalf("historical hash=%q want %q", got[path], overlays[path].HistoricalSHA256)
+		}
+	}
+
+	write([]byte("alpha\nchanged\n"))
+	if _, err := m0LineEndingHistoricalHashesV1(root, overlays); err == nil {
+		t.Fatal("semantic drift accepted as a line-ending-only overlay")
+	}
+}
+
+func TestSecurityPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadM2MaintenancePreHashesV1(root); err != nil {
+		t.Fatal(err)
+	}
+	base := ledger.Phase8ProfileCryptographyOverlays["phase8-profile-cryptography-authorization-v1"]
+	mutations := map[string]func(*m2Phase2CompleteOverlayV1){
+		"missing-path":   func(v *m2Phase2CompleteOverlayV1) { v.Paths = v.Paths[:len(v.Paths)-1] },
+		"extra-path":     func(v *m2Phase2CompleteOverlayV1) { v.Paths = append(v.Paths, "extra") },
+		"missing":        func(v *m2Phase2CompleteOverlayV1) { v.Entries = v.Entries[:len(v.Entries)-1] },
+		"extra":          func(v *m2Phase2CompleteOverlayV1) { v.Entries = append(v.Entries, m2Phase2CompleteOverlayEntryV1{}) },
+		"swapped":        func(v *m2Phase2CompleteOverlayV1) { v.Paths[0], v.Paths[1] = v.Paths[1], v.Paths[0] },
+		"predecessor":    func(v *m2Phase2CompleteOverlayV1) { v.PredecessorManifestSHA256 = strings.Repeat("1", 64) },
+		"entry-hash":     func(v *m2Phase2CompleteOverlayV1) { v.Entries[0].PostSHA256 = strings.Repeat("2", 64) },
+		"invalid-absent": func(v *m2Phase2CompleteOverlayV1) { v.Entries[7].PreEvidence = strings.Repeat("3", 64) },
+		"reconstruction": func(v *m2Phase2CompleteOverlayV1) { v.Entries[9].PreEvidence = strings.Repeat("4", 64) },
+	}
+	for name, mutate := range mutations {
+		copyOverlay := base
+		copyOverlay.Paths = append([]string(nil), base.Paths...)
+		copyOverlay.Entries = append([]m2Phase2CompleteOverlayEntryV1(nil), base.Entries...)
+		mutate(&copyOverlay)
+		if _, err := validateM8ProfileCryptographyOverlayV1(root, map[string]m2Phase2CompleteOverlayV1{"phase8-profile-cryptography-authorization-v1": copyOverlay}); err == nil {
+			t.Fatalf("accepted phase8 profile cryptography %s mutation", name)
+		}
+	}
+}
+
+func TestSecurityPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	base := manifest.Phase8WO801ThreatModelOverlays["phase8-wo801-threat-model-v1"]
+	mutations := map[string]func(*m2Phase2CompleteOverlayV1){
+		"missing-path":   func(v *m2Phase2CompleteOverlayV1) { v.Paths = v.Paths[:len(v.Paths)-1] },
+		"extra-path":     func(v *m2Phase2CompleteOverlayV1) { v.Paths = append(v.Paths, "extra") },
+		"missing-entry":  func(v *m2Phase2CompleteOverlayV1) { v.Entries = v.Entries[:len(v.Entries)-1] },
+		"extra-entry":    func(v *m2Phase2CompleteOverlayV1) { v.Entries = append(v.Entries, m2Phase2CompleteOverlayEntryV1{}) },
+		"swapped":        func(v *m2Phase2CompleteOverlayV1) { v.Paths[0], v.Paths[1] = v.Paths[1], v.Paths[0] },
+		"tampered":       func(v *m2Phase2CompleteOverlayV1) { v.Entries[0].PostSHA256 = strings.Repeat("2", 64) },
+		"predecessor":    func(v *m2Phase2CompleteOverlayV1) { v.PredecessorManifestSHA256 = strings.Repeat("3", 64) },
+		"reconstruction": func(v *m2Phase2CompleteOverlayV1) { v.Entries[5].PreEvidence = strings.Repeat("4", 64) },
+	}
+	for name, mutate := range mutations {
+		copyOverlay := base
+		copyOverlay.Paths = append([]string(nil), base.Paths...)
+		copyOverlay.Entries = append([]m2Phase2CompleteOverlayEntryV1(nil), base.Entries...)
+		mutate(&copyOverlay)
+		if _, err := validateM8WO801ThreatModelOverlayV1(root, map[string]m2Phase2CompleteOverlayV1{"phase8-wo801-threat-model-v1": copyOverlay}); err == nil {
+			t.Fatalf("accepted phase8 WO-801 %s mutation", name)
+		}
+	}
+}
+
+func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &ledger); err != nil {
+		t.Fatal(err)
+	}
+	overlay := ledger.BaselineStabilizationOverlays[baselineStabilizationOverlayNameV1]
+	wantPaths := []string{
+		"cmd/kgen/main_test.go",
+		"internal/audit/codegen_test.go",
+		"internal/audit/security.go",
+		"internal/audit/security_test.go",
+		"internal/codegen/authorization_v1_test.go",
+		"internal/runtime/policy_enforcement_test.go",
+		"internal/testkit/importrules/importrules_test.go",
+		m2MaintenanceSelfPathV1,
+	}
+	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
+		t.Fatalf("baseline stabilization ledger mismatch: %+v", overlay)
+	}
+	currentAtWO801, err := validateM8WO801AdoptionOverlayV1(root, ledger.Phase8WO801AdoptionOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtWO800, err := validateM8WO801ThreatModelOverlayAtPostV1(root, currentAtWO801, ledger.Phase8WO801ThreatModelOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtPhase8, err := validateM8ProfileCryptographyOverlayAtPostV1(root, currentAtWO800, ledger.Phase8ProfileCryptographyOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := validateBaselineStabilizationOverlayV1(root, currentAtPhase8, ledger.BaselineStabilizationOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range overlay.Entries {
+		if pre[entry.Path] != entry.PreEvidence {
+			t.Fatalf("baseline stabilization pre hash %s=%q want %q", entry.Path, pre[entry.Path], entry.PreEvidence)
+		}
+	}
+
+	mutateAndReject := func(name string, mutate func(*m2Phase2CompleteOverlayV1)) {
+		t.Helper()
+		encoded, err := json.Marshal(overlay)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var mutated m2Phase2CompleteOverlayV1
+		if err := json.Unmarshal(encoded, &mutated); err != nil {
+			t.Fatal(err)
+		}
+		mutate(&mutated)
+		bad := map[string]m2Phase2CompleteOverlayV1{baselineStabilizationOverlayNameV1: mutated}
+		if _, err := validateBaselineStabilizationOverlayV1(root, currentAtPhase8, bad); err == nil {
+			t.Fatalf("accepted baseline stabilization %s drift", name)
+		}
+	}
+	mutateAndReject("predecessor", func(overlay *m2Phase2CompleteOverlayV1) {
+		overlay.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+	})
+	mutateAndReject("path order", func(overlay *m2Phase2CompleteOverlayV1) {
+		overlay.Paths[0], overlay.Paths[1] = overlay.Paths[1], overlay.Paths[0]
+	})
+	mutateAndReject("post hash", func(overlay *m2Phase2CompleteOverlayV1) {
+		overlay.Entries[0].PostSHA256 = strings.Repeat("2", 64)
+	})
+}
+
+func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
+	t.Helper()
+	currentAtWO801, err := validateM8WO801AdoptionOverlayV1(root, ledger.Phase8WO801AdoptionOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtWO800, err := validateM8WO801ThreatModelOverlayAtPostV1(root, currentAtWO801, ledger.Phase8WO801ThreatModelOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentAtPhase8, err := validateM8ProfileCryptographyOverlayAtPostV1(root, currentAtWO800, ledger.Phase8ProfileCryptographyOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := validateBaselineStabilizationOverlayV1(root, currentAtPhase8, ledger.BaselineStabilizationOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pre
+}
+
 func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	if _, err := loadM2MaintenancePreHashesV1(root); err != nil {
@@ -263,7 +461,8 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	if err := json.Unmarshal(raw, &ledger); err != nil {
 		t.Fatal(err)
 	}
-	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	currentAtM7 := baselineStabilizationPreForTestV1(t, root, ledger)
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, ledger.Phase7AppRuntimeOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +514,8 @@ func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
 		t.Fatalf("M5 ledger mismatch: %+v", overlay)
 	}
-	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	currentAtM7 := baselineStabilizationPreForTestV1(t, root, ledger)
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, ledger.Phase7AppRuntimeOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +571,8 @@ func TestM6DiagnosticExportEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
 		t.Fatalf("M6 ledger mismatch: %+v", overlay)
 	}
-	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	currentAtM7 := baselineStabilizationPreForTestV1(t, root, ledger)
+	currentAtM6, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, ledger.Phase7AppRuntimeOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +623,8 @@ func TestM7AppRuntimeEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != 16 {
 		t.Fatalf("M7 ledger mismatch: %+v", overlay)
 	}
-	pre, err := validateM7AppRuntimeOverlayV1(root, ledger.Phase7AppRuntimeOverlays)
+	currentAtM7 := baselineStabilizationPreForTestV1(t, root, ledger)
+	pre, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, ledger.Phase7AppRuntimeOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,14 +638,14 @@ func TestM7AppRuntimeEvidenceOverlayV1(t *testing.T) {
 	mutated := overlay
 	mutated.PredecessorManifestSHA256 = strings.Repeat("1", 64)
 	bad := map[string]m2Phase2CompleteOverlayV1{"m7-offline-app-runtime-contract-v1": mutated}
-	if _, err := validateM7AppRuntimeOverlayV1(root, bad); err == nil {
+	if _, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, bad); err == nil {
 		t.Fatal("accepted M7 predecessor drift")
 	}
 	mutated = overlay
 	mutated.Paths = append([]string(nil), overlay.Paths...)
 	mutated.Paths[0], mutated.Paths[1] = mutated.Paths[1], mutated.Paths[0]
 	bad = map[string]m2Phase2CompleteOverlayV1{"m7-offline-app-runtime-contract-v1": mutated}
-	if _, err := validateM7AppRuntimeOverlayV1(root, bad); err == nil {
+	if _, err := validateM7AppRuntimeOverlayV1(root, currentAtM7, bad); err == nil {
 		t.Fatal("accepted reordered M7 ledger")
 	}
 }
@@ -555,6 +757,10 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := json.Unmarshal(manifestRaw, &ledger); err != nil {
 		t.Fatal(err)
 	}
+	m3Overlay, ok := ledger.Phase3ContractOverlays["m3-profile-lifecycle-contract-v1"]
+	if !ok || len(ledger.Phase3ContractOverlays) != 1 || len(m3Overlay.Paths) != 21 || len(m3Overlay.Entries) != 20 || m3Overlay.Paths[20] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid M3 fixture overlay identity/cardinality: %+v", m3Overlay)
+	}
 	m4Overlay, ok := ledger.Phase4FallbackOverlays["m4-permitted-fallback-contract-v1"]
 	if !ok || len(ledger.Phase4FallbackOverlays) != 1 || len(m4Overlay.Paths) != 17 || len(m4Overlay.Entries) != 16 || m4Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid M4 fixture overlay identity/cardinality: %+v", m4Overlay)
@@ -571,10 +777,32 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.Phase7AppRuntimeOverlays) != 1 || len(m7Overlay.Paths) != 17 || len(m7Overlay.Entries) != 16 || m7Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid M7 fixture overlay identity/cardinality: %+v", m7Overlay)
 	}
+	m8Overlay, ok := ledger.Phase8ProfileCryptographyOverlays["phase8-profile-cryptography-authorization-v1"]
+	if !ok || len(ledger.Phase8ProfileCryptographyOverlays) != 1 || len(m8Overlay.Paths) != 17 || len(m8Overlay.Entries) != 16 || m8Overlay.Paths[16] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid Phase 8 fixture overlay identity/cardinality: %+v", m8Overlay)
+	}
+	wo801Overlay, ok := ledger.Phase8WO801ThreatModelOverlays["phase8-wo801-threat-model-v1"]
+	if !ok || len(ledger.Phase8WO801ThreatModelOverlays) != 1 || len(wo801Overlay.Paths) != 13 || len(wo801Overlay.Entries) != 12 || wo801Overlay.Paths[12] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid WO-801 fixture overlay identity/cardinality: %+v", wo801Overlay)
+	}
+	adoptionOverlay, ok := ledger.Phase8WO801AdoptionOverlays["phase8-wo801-adoption-v1"]
+	if !ok || len(ledger.Phase8WO801AdoptionOverlays) != 1 || len(adoptionOverlay.Paths) != 9 || len(adoptionOverlay.Entries) != 8 || adoptionOverlay.Paths[8] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid WO-801 adoption fixture overlay identity/cardinality: %+v", adoptionOverlay)
+	}
+	stabilizationOverlay, ok := ledger.BaselineStabilizationOverlays["go126-clean-worktree-stabilization-v1"]
+	if !ok || len(ledger.BaselineStabilizationOverlays) != 1 || len(stabilizationOverlay.Paths) != 8 || len(stabilizationOverlay.Entries) != 7 || stabilizationOverlay.Paths[7] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid stabilization fixture overlay identity/cardinality: %+v", stabilizationOverlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
+	}
+	for _, path := range m3Overlay.Paths[:len(m3Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
 	}
 	for _, path := range m4Overlay.Paths[:len(m4Overlay.Paths)-1] {
 		if !seen[path] {
@@ -600,6 +828,30 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	for _, path := range m8Overlay.Paths[:len(m8Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range wo801Overlay.Paths[:len(wo801Overlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range adoptionOverlay.Paths[:len(adoptionOverlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range stabilizationOverlay.Paths[:len(stabilizationOverlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if readErr != nil {
@@ -613,20 +865,20 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err != nil {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err != nil {
 		t.Fatal(err)
 	}
 	drift := filepath.Join(fixture, "README.md")
 	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
 		t.Fatalf("changed listed content error=%v", err)
 	}
 	if err := os.Remove(drift); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
 		t.Fatalf("missing listed path error=%v", err)
 	}
 
@@ -978,5 +1230,89 @@ func TestCompatibilitySimulationRemovedNoSelfTestStampV1(t *testing.T) {
 	status := RenderStatus(AuditReport{})
 	if !strings.Contains(status, realLabFaultInjectionLabelV1) || !strings.Contains(status, "does not prove defect absence") || !strings.Contains(status, "merge or deploy") {
 		t.Fatal("status lacks exact mutant label/limitations")
+	}
+}
+func TestSecurityPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	base := m.Phase8WO801AdoptionOverlays["phase8-wo801-adoption-v1"]
+	muts := map[string]func(map[string]m2Phase2CompleteOverlayV1){"missing-map": func(v map[string]m2Phase2CompleteOverlayV1) { delete(v, "phase8-wo801-adoption-v1") }, "extra-map": func(v map[string]m2Phase2CompleteOverlayV1) { v["extra"] = base }, "wrong-version": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Version = "wrong"
+		v["phase8-wo801-adoption-v1"] = x
+	}, "wrong-predecessor": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.PredecessorManifestSHA256 = strings.Repeat("1", 64)
+		v["phase8-wo801-adoption-v1"] = x
+	}, "missing-path": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Paths = x.Paths[:8]
+		v["phase8-wo801-adoption-v1"] = x
+	}, "extra-path": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Paths = append(x.Paths, "x")
+		v["phase8-wo801-adoption-v1"] = x
+	}, "reordered": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Paths[0], x.Paths[1] = x.Paths[1], x.Paths[0]
+		v["phase8-wo801-adoption-v1"] = x
+	}, "self-not-last": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Paths[7], x.Paths[8] = x.Paths[8], x.Paths[7]
+		v["phase8-wo801-adoption-v1"] = x
+	}, "missing-entry": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries = x.Entries[:7]
+		v["phase8-wo801-adoption-v1"] = x
+	}, "self-entry": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries = append(x.Entries, m2Phase2CompleteOverlayEntryV1{})
+		v["phase8-wo801-adoption-v1"] = x
+	}, "entry-path": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[1].Path = "wrong"
+		v["phase8-wo801-adoption-v1"] = x
+	}, "malformed": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[0].PostSHA256 = "bad"
+		v["phase8-wo801-adoption-v1"] = x
+	}, "evidence-pre": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[0].PreEvidence = strings.Repeat("2", 64)
+		v["phase8-wo801-adoption-v1"] = x
+	}, "consumer-absent": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[1].PreEvidence = "ABSENT"
+		v["phase8-wo801-adoption-v1"] = x
+	}, "wrong-pre": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[1].PreEvidence = strings.Repeat("3", 64)
+		v["phase8-wo801-adoption-v1"] = x
+	}, "current-drift": func(v map[string]m2Phase2CompleteOverlayV1) {
+		x := v["phase8-wo801-adoption-v1"]
+		x.Entries[1].PostSHA256 = strings.Repeat("4", 64)
+		v["phase8-wo801-adoption-v1"] = x
+	}}
+	for name, mut := range muts {
+		t.Run(name, func(t *testing.T) {
+			x := base
+			x.Paths = append([]string(nil), base.Paths...)
+			x.Entries = append([]m2Phase2CompleteOverlayEntryV1(nil), base.Entries...)
+			v := map[string]m2Phase2CompleteOverlayV1{"phase8-wo801-adoption-v1": x}
+			mut(v)
+			if _, err := validateM8WO801AdoptionOverlayV1(root, v); err == nil {
+				t.Fatalf("accepted %s", name)
+			}
+		})
 	}
 }
