@@ -1,6 +1,6 @@
 module kurdistan/testdata/consumer/m6-diagnostic-export-sdk
 
-go 1.24
+go 1.26.5
 
 require kurdistan v0.0.0
 

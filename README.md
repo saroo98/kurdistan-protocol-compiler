@@ -28,7 +28,7 @@ Current profile generation covers:
 - adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, implementation hardening gates, and adapter contract gates
 - adaptive path candidates and generated transport bundles for future path-selection research
 
-The current codebase is a research compiler, runtime session harness, source generator, and audit system. Production transport integration is future work.
+The current codebase provides the compiler, runtime session harness, source generator, audit system, and offline product contracts. The project is now in staged product development; production transport integration remains future work until its phase is implemented and validated.
 
 ## Legend: `[live]`, `[model]`, `[plan]`
 
@@ -41,16 +41,9 @@ capabilities fall into three classes:
 
 Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The security and runtime `*_mutant_detection` gates measure bounded real lab fault-injection detector sensitivity with paired controls: they show that named detectors turn red for deliberate lab faults while their paired controls stay green. They do not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
 
-## Current governed milestone: M2
+## Current governed milestone: Phase 8 preparation
 
-M2 is a governance foundation for documentation and design contracts only. It
-may clarify product boundaries and evolve deterministic, local-only
-`[model]`/`[plan]` contracts, but it does not authorize source/runtime product
-behavior, an Android application, VPN/TUN or proxy operation, relay or operator
-services, non-loopback networking, telemetry, deployment, or production
-cryptography. The running system remains the lab-only compiler, runtime harness,
-generator, and audit surface described here. Any M3-or-later implementation
-requires its own scoped review and fresh authorization.
+M2-M7 completed the governance and offline contract foundation. Kurdistan has now graduated from a blanket lab-only scope. Phases 8-13 may add real product behavior one authorized, reviewed, tested, and reversible phase at a time. Capability labels remain evidence statements and must not be confused with permanent prohibitions.
 
 ## Why This Project Exists
 

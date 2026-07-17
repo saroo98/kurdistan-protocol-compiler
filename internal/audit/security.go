@@ -68,9 +68,9 @@ const (
 	m0LifecycleEvidenceV1    = "1f63391af51b23c4eca802e76d5164a98398a857070b8a7dd2cf99d055e4588e"
 	m0PolicySeedCSVV1        = "1,2,3,4,6,7,19,25,26,27,35,40,42,58,66,69,78,80,91,94,102,107,110,123,135,171,174,202,223"
 	m0PolicySeedCSVHashV1    = "2577a6114b5df02b44d43ae02fd80fa08f8c593c2449f79a46f84aa63fa5efaa"
-	m0OutsideScopeHashV1     = "efae3ee45109577aa76fa6fd1c932fe7de1691da977557d9c269c4d0a852660f"
+	m0OutsideScopeHashV1     = "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a"
 	m0OutsideScopeFileCount  = 1329
-	m0WO058MaintenanceHashV1 = "41262d1712a957de91e550df01375a2d6f7a7e370635cc96566b9acedfc148a6"
+	m0WO058MaintenanceHashV1 = "158dc7ebba2a84036fe4f328d3149929d47219dabea6f1caf4374afb82f00c8f"
 	m0WO058MaintenanceCount  = 9
 	m2MaintenanceOverlayV1   = "m2-governance-foundation-v1"
 	m2MaintenanceSelfPathV1  = "testdata/evidence/phase1-m0-committed-sha256.json"
@@ -629,7 +629,7 @@ var m0WO058MaintenanceHashesV1 = map[string]string{
 	"docs/GOVERNANCE.md":                                "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
 	"internal/audit/codegen_test.go":                    "0874db08bb14f2d94b94b88171f1d78cd87dd34122e6ca39e3eb4ec9942a00ec",
 	"internal/codegen/authorization_v1_test.go":         "9f1941a9ef49c70aedddddf11890ea97df0563c2b921c75a3300aee713faf9ac",
-	"internal/codegen/generator_test.go":                "bcaa712289d2909c3125f1ca59fd976a378ca09653c1b1ef1db699e4ac38b4c6",
+	"internal/codegen/generator_test.go":                "2a519ad4aaf1d0ba4e4f9cf6294dc0772059f677e82a113b81c3712ac2832f31",
 	"internal/testkit/importrules/importrules_test.go":  "1128d762990de6bac542df8afbbb08de06cc726c1117ecf55ec8feb69edfe167",
 	"testdata/evidence/phase1-m0-committed-sha256.json": "4400e503524d1277329f893be0773dee202d5108265f62d22830e09fc8f8fa53",
 }
@@ -642,6 +642,19 @@ var m0WO058HistoricalOutsideScopeHashesV1 = map[string]string{
 	"internal/codegen/authorization_v1_test.go":        "34dafde20553b8f2079c8fc9cd668ffa723ca5b183ea1a644e5e99c089f75c2c",
 	"internal/codegen/generator_test.go":               "d2fe0bd0bd5918f52e2dc32708d35ef0d5cc0e852ba9857a57381d4bc36db5c4",
 	"internal/testkit/importrules/importrules_test.go": "436134fc57e2082ffc0ad4eba5e74bfc4a31dae078ef86cb6a0ef879d8f1ac35",
+}
+
+// m0StabilizationPreHashesV1 preserves the historical M0 candidate binding
+// while later governance, status generation, Go toolchain, and test-harness
+// maintenance is validated as an explicit post-M7 stabilization layer.
+var m0StabilizationPreHashesV1 = map[string]string{
+	"STATUS.md":                                       "975cad3a938fc17468f289b6190e605655427b1348c02cedc4222dd91869a0e3",
+	"go.mod":                                          "56cc00cd67f0d708ed5d14f531fc2dc240664e98e0251b9c079db0a630409a3b",
+	"internal/audit/audit_test.go":                    "f5fe13e623f9b6329bf5bcf3727f2dbc0632759e73fe5e4c095e5b18006f93cb",
+	"internal/audit/status.go":                        "fbcc769047cfb38a8158e04d769d5450779e2b8c915d0fe0acbb530798eccfb6",
+	"internal/codegen/templates.go":                   "3f8daa068d2453574deee62128f2e644420fe4ad21815e6c84bd9e224b7d152d",
+	"internal/crypto/auth/handshake_test.go":          "6c90dd6f9263cb7d333aebff14437f575acc3f689a25ec26cc68cc30e24ee928",
+	"internal/runtime/implementation_support_test.go": "4a39100cf82ecf213039dab84e2edcb612439868676a2e82986f8d76978b6abc",
 }
 
 type m0CandidateManifestV1 struct {
@@ -668,6 +681,9 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes, err := loadM2MaintenancePreHashesV1(root)
 	if err != nil {
 		return m0CandidateManifestV1{}, err
+	}
+	for path, hash := range m0StabilizationPreHashesV1 {
+		preHashes[path] = hash
 	}
 	rawManifest, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
 	if err != nil {

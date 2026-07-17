@@ -121,7 +121,7 @@ func messageBounds(messages []ir.MessageSymbol) string {
 }
 
 func goMod(modulePath, repoRoot string) string {
-	return fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire kurdistan v0.0.0\n\nreplace kurdistan => %s\n", modulePath, filepathSlash(repoRoot))
+	return fmt.Sprintf("module %s\n\ngo 1.26.5\n\nrequire kurdistan v0.0.0\n\nreplace kurdistan => %s\n", modulePath, filepathSlash(repoRoot))
 }
 
 func filepathSlash(path string) string {

@@ -7,17 +7,9 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: M7 offline app-runtime contract
+## Current phase: Phase 8 profile cryptography preparation
 
-The runtime remains a lab-only research prototype. The compiler generates
-deterministic protocol profiles and validates them through an in-repo audit;
-carrier, relay, proxy, and Android/VPN surfaces exist as **models and design
-contracts only**, never as live transport. M2 permits documentation and
-design-contract work only. It does not authorize product behavior beyond the
-later deterministic offline contracts, an Android application, VPN/TUN or proxy operation, relay or operator
-services, non-loopback networking, telemetry, deployment, or production
-cryptography. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
-`STATUS.md` for what is real versus modelled.
+The project has graduated from its lab-only phase. The compiler, audit system, and M2-M7 offline contracts remain the validated starting point, while Phases 8-13 progressively open profile cryptography, Android, VPN/TUN, live Kurd transport and relays, operator infrastructure, and controlled release. Current labels remain factual capability markers, not permanent scope blockers.
 
 M3 implements deterministic offline authority-metadata admission and a pure
 monotonic profile lifecycle. M4 adds only deterministic offline selection among
@@ -37,10 +29,9 @@ caller-supplied platform-readiness metadata, and returns bounded dispositions.
 shutdown. No Android, VPN, service, storage, routing, DNS, or network capability
 is opened. See KIP-0070 through KIP-0074.
 
-Every further implementation milestone requires a separate scoped review
-and fresh authorization before work begins.
+Every further implementation milestone requires its scoped authorization and evidence before work begins; no blanket lab-only prohibition applies.
 
-## Future review gates (still out of scope until separately reviewed)
+## Future phase gates
 
 Live implementation — as opposed to a loopback-only, payload-free model — of any
 of the following requires a dedicated review before work begins:

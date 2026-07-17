@@ -3,7 +3,7 @@
 
 # Kurdistan Protocol Compiler Status
 
-> Lab-only research prototype. This status does not claim real-world censorship resistance, undetectability, production safety, or deployment readiness.
+> Staged product-development program. Current gate evidence still covers the compiler, local harnesses, and offline contracts; it does not yet prove real-world censorship resistance, undetectability, production safety, or deployment readiness.
 
 > Legend: `[live]` runs real work (loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.
 
@@ -966,4 +966,4 @@
 
 ## Milestone Frontier
 
-The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It is a model/contract, not live transport. Per-milestone detail lives in the `docs/KIP-*.md` documents; live transport remains out of scope (see docs/safety.md).
+The latest modelled surface evaluated in this report is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. It remains a model/contract today. The program has graduated from a blanket lab-only restriction; later phase gates may implement live behavior without changing what this report currently proves.

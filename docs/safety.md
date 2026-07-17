@@ -3,7 +3,7 @@
 
 # Safety
 
-Kurdistan is a local-only research prototype.
+Kurdistan has graduated from a lab-only research scope into a staged product-development program. Existing `[live]`, `[model]`, and `[plan]` labels still describe current evidence; they are not permanent prohibitions on later authorized implementation.
 
 This repository may contain **deterministic models and design contracts** for
 behaviour that is **not implemented live** — including mobile/VPN, carrier,
@@ -12,20 +12,13 @@ and payload-free (see the `[live]` / `[model]` / `[plan]` legend in `README.md`
 and `STATUS.md`). Modelling such behaviour as a contract is in scope; wiring it
 to real I/O is not.
 
-## Current authorization: M2 governance foundation
+## Current authorization: staged product program
 
-M2 permits documentation and deterministic, local-only design-contract work
-only. It does not authorize source/runtime product behavior, an Android
-application, VPN/TUN or proxy operation, relay or operator services,
-non-loopback networking, telemetry, deployment, credentials, production key
-management, or production cryptography. The runtime remains lab-only, and every
-M3-or-later implementation requires a separate scoped review and fresh
-authorization. Nothing in M2 relaxes the hard boundary below.
+The completed M2-M7 contracts remain the foundation. Subsequent phases may implement real product behavior through phase-specific authorization, threat boundaries, tests, review, rollback, and deployment controls. “Lab-only” or “offline-only” must not be used by itself to reject an otherwise authorized phase.
 
-## Hard boundary — do NOT implement live
+## Controlled live-development boundary
 
-Live implementation of any of the following remains out of scope pending a
-separate, explicit review:
+The following are permitted only inside their explicitly authorized phase and may not be activated, deployed, or represented as complete before their phase gates pass:
 
 - production deployment or operational deployment guidance
 - external or non-loopback network targets
@@ -37,8 +30,7 @@ separate, explicit review:
 - cloud scripts
 - live DNS, CDN, TLS mimicry, or domain-fronting transport
 
-A deterministic, loopback-only, payload-free **model** of any item above (as the
-KIPs carry) is permitted; a **live** version of it is not.
+Deterministic local models remain the default test substrate. Live implementations advance one reviewed phase at a time and use only owned or explicitly authorized systems.
 
 ## Data handling
 

@@ -487,7 +487,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(manifest.MaintenancePaths, paths) || manifest.MaintenanceFileCount != 9 || manifest.MaintenanceSHA256 != "41262d1712a957de91e550df01375a2d6f7a7e370635cc96566b9acedfc148a6" {
+	if !reflect.DeepEqual(manifest.MaintenancePaths, paths) || manifest.MaintenanceFileCount != 9 || manifest.MaintenanceSHA256 != "158dc7ebba2a84036fe4f328d3149929d47219dabea6f1caf4374afb82f00c8f" {
 		t.Fatalf("maintenance manifest=%+v", manifest)
 	}
 	if manifest.MaintenanceUnionCount != 14 {
