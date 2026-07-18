@@ -286,6 +286,28 @@ func TestM0LineEndingHistoricalOverlayAcceptsEquivalentCheckoutsAndRejectsDrift(
 	}
 }
 
+func TestValidationWorkflowProvidesHistoryForEvidenceGuards(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(workflow)
+	for _, required := range []string{
+		"actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+		"persist-credentials: false",
+		"fetch-depth: 0",
+		"go run ./cmd/gate",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("validation workflow missing %q", required)
+		}
+	}
+}
+
 func TestSecurityPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
