@@ -1,0 +1,52 @@
+{
+  "Profile": {
+    "ContentID": "content.0001",
+    "ProfileID": "profiles.one",
+    "LineageID": "lineage.0001",
+    "ProviderID": "provider.0001",
+    "ContractVersion": "product-profile-admission-v1",
+    "RevocationScope": "revocation.0001",
+    "SnapshotMode": "full-snapshot",
+    "UpdateKind": "initial",
+    "Generation": 7,
+    "RequiredSafetyFloor": 2,
+    "ValidFrom": 100,
+    "ValidUntil": 1000,
+    "RootEpoch": 3,
+    "RevocationEpoch": 4,
+    "PreviousContentID": "",
+    "PreviousProviderID": "",
+    "RelayIDs": [
+      "relay.0001"
+    ],
+    "StrategyIDs": [
+      "strategy.0001"
+    ],
+    "Policy": "oQEB"
+  },
+  "Class": "device-recipient",
+  "Audience": "provisioned-device",
+  "Suite": 1,
+  "IssuerRole": "issuer",
+  "IssuerScope": {
+    "ProviderID": "provider.0001",
+    "LineageID": "lineage.0001",
+    "ProfileNamespace": "profiles."
+  },
+  "IssuerKey": {
+    "KeyID": "issuer-key-0001",
+    "SuiteID": 1
+  },
+  "Recipient": {
+    "Class": "device-recipient",
+    "ProviderID": "provider.0001",
+    "LineageID": "lineage.0001",
+    "ProfileNamespace": "profiles.",
+    "Hint": "recipient-hint-0001",
+    "KeyID": "recipient-key-0001",
+    "Epoch": 2,
+    "Revoked": false
+  },
+  "MinimumGeneration": 8,
+  "Now": 500
+}

@@ -1,0 +1,61 @@
+{
+  "captured_at_utc": "2026-07-17T18:33:32Z",
+  "command": "go run ./internal/testkit/phase8resourcecapture -out internal/product/envelope/testdata/phase8-codec",
+  "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+  "go_version": "go1.26.5",
+  "goarch": "amd64",
+  "goos": "windows",
+  "host_alias": "reference-windows-amd64",
+  "iterations": 1000,
+  "privacy": {
+    "absolute_path_recorded": false,
+    "key_material_recorded": false,
+    "machine_name_recorded": false,
+    "payload_recorded": false,
+    "username_recorded": false
+  },
+  "schema": "kurdistan.phase8.reference-host-resource-raw.v1",
+  "source_sha256": "2fe597bb94ccbeba26b28f83c66425ac4411db39a35ce72cdfbd61f4a448a49c",
+  "stages": [
+    {
+      "name": "profile",
+      "observed_wall_us": 19,
+      "observed_allocations": 168,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 509,
+      "completed_before_timeout": true
+    },
+    {
+      "name": "signed",
+      "observed_wall_us": 6,
+      "observed_allocations": 95,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 1,
+      "completed_before_timeout": true
+    },
+    {
+      "name": "sealed",
+      "observed_wall_us": 3,
+      "observed_allocations": 62,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 1,
+      "completed_before_timeout": true
+    },
+    {
+      "name": "uri",
+      "observed_wall_us": 2,
+      "observed_allocations": 5,
+      "observed_error_bytes": 67,
+      "observed_timeout_wall_us": 1,
+      "completed_before_timeout": true
+    },
+    {
+      "name": "qr",
+      "observed_wall_us": 1,
+      "observed_allocations": 15,
+      "observed_error_bytes": 59,
+      "observed_timeout_wall_us": 1,
+      "completed_before_timeout": true
+    }
+  ]
+}

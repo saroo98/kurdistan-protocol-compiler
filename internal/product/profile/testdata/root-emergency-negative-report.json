@@ -1,0 +1,13 @@
+{
+  "schema": "kurdistan.phase8.root-emergency-negative-report.v1",
+  "cases": [
+    {"name":"root rollback","result":"rejected"},
+    {"name":"unauthorized root update","result":"rejected"},
+    {"name":"equal epoch root conflict","result":"rejected"},
+    {"name":"conflicting observed root view","result":"rejected"},
+    {"name":"same root view id with different keys","result":"rejected"},
+    {"name":"same root view id with different validity","result":"rejected"},
+    {"name":"stale emergency action","result":"rejected"}
+  ],
+  "summary": {"accepted":0,"rejected":7}
+}

@@ -1,0 +1,210 @@
+{
+  "schema": "kurdistan.phase8.fuzz-campaign-report.v1",
+  "status": "passed",
+  "executed_on": "2026-07-18",
+  "toolchain": {
+    "go_version": "go1.26.5",
+    "os_arch": "windows/amd64"
+  },
+  "claim_scope": "Seven exact final-source fuzz targets completed their required ten-minute local campaigns with exit code zero and no persisted failure corpus beyond the retained activation regression.",
+  "corpus_tree_hash_method": "SHA-256 over each cache entry in bytewise filename order: UTF-8 filename, LF byte, then raw file bytes.",
+  "limitations": [
+    "Go fuzz reports interesting-input growth, not percentage code coverage, for these commands.",
+    "Peak memory is the sampled process-tree working set and is a conservative operational proxy, not a Go allocation profile.",
+    "These local campaigns do not establish Android, HSM/KMS, live-network, side-channel, field, or production-readiness claims."
+  ],
+  "campaigns": [
+    {
+      "target": "FuzzPhase8ProfileCodec",
+      "boundary": "canonical-profile-cbor",
+      "exact_command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8ProfileCodec$ -fuzztime=10m",
+      "wall_seconds": 617.133,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 193587911,
+      "new_interesting_inputs": 768,
+      "total_interesting_inputs": 770,
+      "coverage_signal": "Go fuzz reported 768 new interesting inputs and 770 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 6409523200,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 768,
+      "corpus_cache_tree_sha256": "17eed5f17cf8edf4cfc65573d13a1ed02913e41923d62c2ae74c399197567569",
+      "source_inputs": [
+        {
+          "path": "internal/product/envelope/phase8_profile_codec_fuzz_test.go",
+          "sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f"
+        }
+      ],
+      "stdout_sha256": "d1a9f6c8a2d39c707b424a65add3b37cfc2242d9346a46c2341f7211b7596a23",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzPhase8SignedParser",
+      "boundary": "cose-sign1-framing",
+      "exact_command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8SignedParser$ -fuzztime=10m",
+      "wall_seconds": 637.769,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 173184269,
+      "new_interesting_inputs": 717,
+      "total_interesting_inputs": 719,
+      "coverage_signal": "Go fuzz reported 717 new interesting inputs and 719 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 6395912192,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 717,
+      "corpus_cache_tree_sha256": "e5f2344c8df721c6be7b58fc5c89526e959f080a5b12ee44045442b99cdea0cc",
+      "source_inputs": [
+        {
+          "path": "internal/product/envelope/phase8_profile_codec_fuzz_test.go",
+          "sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f"
+        }
+      ],
+      "stdout_sha256": "2b6b80598c9049e6be8bc5259653214529dfb11f40c019e5c6bdba415764bf77",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzPhase8SealedParser",
+      "boundary": "sealed-hpke-framing",
+      "exact_command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8SealedParser$ -fuzztime=10m",
+      "wall_seconds": 626.298,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 151125759,
+      "new_interesting_inputs": 734,
+      "total_interesting_inputs": 736,
+      "coverage_signal": "Go fuzz reported 734 new interesting inputs and 736 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 6062960640,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 734,
+      "corpus_cache_tree_sha256": "760f5ad611db27aaa6d783b9e38866ad0f68c57f367101eb13ebe4bc10c9883b",
+      "source_inputs": [
+        {
+          "path": "internal/product/envelope/phase8_profile_codec_fuzz_test.go",
+          "sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f"
+        }
+      ],
+      "stdout_sha256": "b4f624b9f624b70e79c788c84bdf26a0addc0ece2a528bf83e62370acb7636e1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzPhase8URIIngress",
+      "boundary": "uri-ingress",
+      "exact_command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8URIIngress$ -fuzztime=10m",
+      "wall_seconds": 644.319,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 245408929,
+      "new_interesting_inputs": 128,
+      "total_interesting_inputs": 130,
+      "coverage_signal": "Go fuzz reported 128 new interesting inputs and 130 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 6406094848,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 128,
+      "corpus_cache_tree_sha256": "7ca579cc5367a2569659714c5e2a1200a266fd72e75765c22cb31ab921957fa8",
+      "source_inputs": [
+        {
+          "path": "internal/product/envelope/phase8_profile_codec_fuzz_test.go",
+          "sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f"
+        }
+      ],
+      "stdout_sha256": "2bc16c3da1e821392810a7d171157ebcaf9d07cf1d5712156acefbe843d1388c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzPhase8QRIngress",
+      "boundary": "qr-ingress",
+      "exact_command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8QRIngress$ -fuzztime=10m",
+      "wall_seconds": 648.662,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 121300048,
+      "new_interesting_inputs": 56,
+      "total_interesting_inputs": 58,
+      "coverage_signal": "Go fuzz reported 56 new interesting inputs and 58 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 8157085696,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 56,
+      "corpus_cache_tree_sha256": "97dad515db5cb6903e24923d0c33eb38d633803464c428accbec523359b6481b",
+      "source_inputs": [
+        {
+          "path": "internal/product/envelope/phase8_profile_codec_fuzz_test.go",
+          "sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f"
+        }
+      ],
+      "stdout_sha256": "c0e98be039195e381ddd7d1b5c17789b4f24c90aee637876cbf9718c917bac23",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzActivateVerifiedProfileStateMachine",
+      "boundary": "authority-revocation-activation",
+      "exact_command": "go test -count=1 ./internal/product/profile -run=^$ -fuzz=^FuzzActivateVerifiedProfileStateMachine$ -fuzztime=10m",
+      "wall_seconds": 637.682,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 66313688,
+      "new_interesting_inputs": 682,
+      "total_interesting_inputs": 686,
+      "coverage_signal": "Go fuzz reported 682 new interesting inputs and 686 total; the total includes embedded and persisted regression seeds, and this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 8045772800,
+      "peak_measurement": "Sampled sum of WorkingSet64 for the go process tree.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 682,
+      "corpus_cache_tree_sha256": "7413a1c9fad5de487d73876834cacaaabfeeba3449952a2a154cd8f34db4b511",
+      "source_inputs": [
+        {
+          "path": "internal/product/profile/phase8_activation_fuzz_test.go",
+          "sha256": "c07ba8c7b48dd44830e912fa56f84833fd322a7ea7dc75b066c0f71e9f9426ff"
+        },
+        {
+          "path": "internal/product/profile/testdata/fuzz/FuzzActivateVerifiedProfileStateMachine/5c3e9efa06c432c0",
+          "sha256": "5c3e9efa06c432c0560200ad16d64332ef37ddb94c227dcb2d7e4d95a9c46187"
+        }
+      ],
+      "stdout_sha256": "483fe6bff704237de83dd2d6f0b7f5cac3f65dfdbd412c3dab72448cbcfec519",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "target": "FuzzApplyVerifiedStateMachine",
+      "boundary": "verified-lifecycle",
+      "exact_command": "go test -count=1 ./internal/product/lifecycle -run=^$ -fuzz=^FuzzApplyVerifiedStateMachine$ -fuzztime=10m",
+      "wall_seconds": 637.168,
+      "requested_fuzz_seconds": 600,
+      "exit_code": 0,
+      "result": "PASS",
+      "executions": 235240742,
+      "new_interesting_inputs": 8,
+      "total_interesting_inputs": 11,
+      "coverage_signal": "Go fuzz reported 8 new interesting inputs and 11 total; this command emits no percentage coverage metric.",
+      "peak_process_tree_working_set_bytes": 1191591936,
+      "peak_measurement": "736 samples at 500 millisecond intervals, summing WorkingSet64 for the direct go process and recursively discovered child processes.",
+      "timeout_threshold": "-fuzztime=10m",
+      "corpus_cache_entry_count": 8,
+      "corpus_cache_tree_sha256": "372c9fc07231afaab36efbcf248d99e627e88cf8d492a7dc910bf043f0ddd479",
+      "source_inputs": [
+        {
+          "path": "internal/product/lifecycle/phase8_verified_fuzz_test.go",
+          "sha256": "370abacb829f77b65639381115b8c6cbf7f74849e9530812f8a31debc80d8532"
+        }
+      ],
+      "stdout_sha256": "1bec7456c6c3160755980d0be1cb2035c7cbb871bc6277a7f6b71ef317368ab3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "summary": {
+    "required_targets": 7,
+    "passed_targets": 7,
+    "failed_targets": 0,
+    "total_executions": 1186161346
+  }
+}

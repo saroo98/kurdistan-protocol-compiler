@@ -1,0 +1,22 @@
+{
+  "case_set_sha256": "16a22dbed648f17b5c82e307eee133b2f3088d7e290f95e5b214b3909924cdd6",
+  "cases": [
+    "no-testkit-import",
+    "no-deterministic-selector",
+    "no-private-key-material",
+    "no-environment-key-selector"
+  ],
+  "execution_sha256": "fdb649238cf7ec4346dc6ce0b6819385345fd9a92b2dad3bda885614395b25c9",
+  "observation_sha256": "fdb649238cf7ec4346dc6ce0b6819385345fd9a92b2dad3bda885614395b25c9",
+  "observations": [
+    "production-deps=go-list-checked",
+    "production-imports=ast-checked",
+    "production-selectors=ast-checked",
+    "production-environment=ast-checked"
+  ],
+  "result_sha256": "2a23fc35abfbf7506d120ed40871b1b99fa3032557ad86410ff53aaa26008988",
+  "schema": "phase8-issuance-evidence-v1",
+  "source_sha256": "3f3b87137f9d23aa4c9fa76878784bb0d6d770b2b07ea6651b5a1747adec59e6",
+  "test": "TestWO806ProductionWiringIsolation",
+  "test_source_sha256": "0632fe57346d31bfe3caad31deb7b37ac2cfb9940d0a93c63ea3e4370f6d7dd5"
+}

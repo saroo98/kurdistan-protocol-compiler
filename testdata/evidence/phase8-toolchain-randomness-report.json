@@ -1,0 +1,139 @@
+{
+  "schema": "kurdistan.phase8.toolchain-randomness-report.v1",
+  "toolchain": {
+    "go_version": "go1.26.5",
+    "goos": "windows",
+    "goarch": "amd64",
+    "goroot": "C:/Program Files/Go",
+    "gofips140": "off",
+    "gotoolchain": "auto"
+  },
+  "standard_library_evidence": [
+    {
+      "package": "crypto/hpke",
+      "go_files": 8,
+      "source_aggregate_sha256": "48292de1e0d95713f4cb696a71cf92c2d4357133c8145381e8f3dccbacb83903",
+      "observed_api": "DHKEM(P-256), HKDFSHA256, AES256GCM, NewSender/NewRecipient, stateful Seal/Open with AAD; MLKEM functions explicitly reference draft-ietf-hpke-pq",
+      "relevant_limit": "sequence number is uint64 without an explicit overflow error; Phase 8 imposes one operation per fresh context"
+    },
+    {
+      "package": "crypto/mlkem",
+      "go_files": 3,
+      "source_aggregate_sha256": "e847e6c5e19e6280963a0880eae7010b46e3b25bc10acf105991ca8586e628a1",
+      "observed_api": "FIPS 203 ML-KEM-768 and ML-KEM-1024 primitives",
+      "relevant_limit": "primitive availability does not stabilize draft HPKE identifiers or composition"
+    },
+    {
+      "package": "crypto/ecdsa",
+      "go_files": 7,
+      "source_aggregate_sha256": "18d46a725283119eda2e1c57145acef0ea73eba1923448f4de6d26cc0dcb22f5",
+      "observed_api": "P-256 Sign/Verify; randomized hedged signatures; secure random source used by default",
+      "relevant_limit": "Go returns ASN.1 DER from SignASN1; COSE adapter must convert to fixed-width raw low-S R||S"
+    },
+    {
+      "package": "crypto/ed25519",
+      "go_files": 3,
+      "source_aggregate_sha256": "b99172f053e7d9376f54987455fc6d7882e1c8f8f51c3cfc9fbc4d1c9548b33a",
+      "observed_api": "deterministic Ed25519 Sign/Verify",
+      "relevant_limit": "not selected because later hardware-backed and FIPS-only portability is less consistent than P-256"
+    },
+    {
+      "package": "crypto/fips140",
+      "go_files": 4,
+      "source_aggregate_sha256": "97774e063f75966518661889a54ec3321cab372fb40528204fbaa01a2c9ca3bc",
+      "observed_api": "Version, Enabled, Enforced",
+      "relevant_limit": "API status is not a CMVP certificate or product compliance claim"
+    },
+    {
+      "package": "testing/cryptotest",
+      "go_files": 2,
+      "source_aggregate_sha256": "eb9ada340724fff354e5232e196966f3e2d111e37444ae65b243f14d4cfd0493",
+      "observed_api": "SetGlobalRandom(test, seed) installs process-global deterministic cryptographic randomness for a test",
+      "relevant_limit": "must never be imported by non-test production files and cannot be used by parallel tests"
+    }
+  ],
+  "fips_observation": {
+    "command": "go run a temporary program calling crypto/fips140.Version, Enabled, and Enforced; go env GOFIPS140",
+    "version": "latest",
+    "enabled": false,
+    "enforced": false,
+    "gofips140": "off",
+    "wording": "The selected algorithm families support FIPS-oriented deployment designs, but this repository, build, invocation, suite decision, and evidence are not CMVP validation and do not claim FIPS compliance."
+  },
+  "clean_build_evidence": {
+    "command": "go clean -cache; go test -count=1 ./internal/product/envelope",
+    "exit_code": 0,
+    "result": "passed",
+    "cache_state": "Go build cache cleared before the package test"
+  },
+  "reference_host": {
+    "alias": "phase8-reference-windows-amd64-01",
+    "os": "Microsoft Windows 11 Pro",
+    "os_version": "10.0.26200",
+    "os_build": "26200",
+    "cpu_model": "Intel(R) Core(TM) i9-14900K",
+    "ram_bytes": 34028146688,
+    "ram_gib": 31.69,
+    "privacy_exclusions": [
+      "hostname",
+      "user name",
+      "device serial",
+      "account identifier"
+    ],
+    "probe_commands": [
+      "Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber,TotalVisibleMemorySize",
+      "Get-CimInstance Win32_Processor | Select-Object -First 1 Name",
+      "powershell -NoProfile -ExecutionPolicy Bypass -File .\\testdata\\evidence\\independent\\regenerate_phase8_interop.ps1"
+    ]
+  },
+  "executable_cases": [
+    {
+      "case": "signer-entropy-failure",
+      "test": "TestPhase8SignerEntropyFailureFailsClosed",
+      "method": "subprocess with GODEBUG=cryptocustomrand=1 and a failing crypto/rand.Reader",
+      "result": "passed; ECDSA signing returned an error and emitted no signature",
+      "unexpected_accepts": 0
+    },
+    {
+      "case": "hpke-repeated-encapsulation",
+      "test": "TestHPKEFreshEncapsulationIsUnique",
+      "method": "64 fresh Go crypto/hpke P-256 sender contexts for one recipient",
+      "result": "passed; 64 unique enc values",
+      "unexpected_accepts": 0
+    },
+    {
+      "case": "hpke-context-exhaustion",
+      "test": "TestHPKEContextBudgetExhaustsAfterOneMessage and independent fixture open checks",
+      "method": "one-operation application budget around each fresh RFC 9180 context",
+      "result": "passed; first operation admitted and second operation rejected",
+      "unexpected_accepts": 0
+    },
+    {
+      "case": "deterministic-test-isolation",
+      "test": "TestGo126DeterministicRandomnessIsTestScoped",
+      "method": "testing/cryptotest same-seed reproduction plus scan of every non-test Go file in internal/product/envelope",
+      "result": "passed; deterministic stream reproduced only in test and zero production imports observed",
+      "unexpected_accepts": 0
+    },
+    {
+      "case": "es256-randomized-signing",
+      "test": "TestES256ProductionModeIsRandomizedAndVerifiable",
+      "method": "two crypto/rand-backed signatures over one digest, low-S conversion, and verification",
+      "result": "passed; signatures differed and both verified",
+      "unexpected_accepts": 0
+    }
+  ],
+  "hpke_entropy_source": {
+    "behavior": "Go 1.26.5 crypto/hpke uses the standard library internal secure random reader for ephemeral encapsulation keys and exposes no supported entropy-injection parameter.",
+    "failure_semantics": "NewSender returns an error if ephemeral key generation returns an error; the default platform random source is documented to fail irrecoverably if the operating-system source fails.",
+    "test_limit": "WO-802 does not use unsupported go:linkname hooks to inject an HPKE internal-reader failure. It instead tests actual repeated encapsulation uniqueness, deterministic-test isolation, one-use context exhaustion, and the supported ECDSA entropy-error path.",
+    "claim": "HPKE operating-system entropy failure was not induced in this test run."
+  },
+  "rollback_ci_contributor_impact": {
+    "rollback": "Do not roll back below Go 1.26.5 after suite activation. Any toolchain change reruns independent fixtures, randomness cases, parser negatives, full uncached gate, and exact implementation review.",
+    "ci": "Pin Go 1.26.5 for Phase 8 candidate CI; use -count=1 for security evidence and retain a clean-cache run in the final work order.",
+    "contributors": "Use Go 1.26.5, do not import testing/cryptotest outside _test.go, do not reuse HPKE contexts, and do not add suite negotiation or custom entropy sources.",
+    "compatibility": "The new direct CBOR dependency requires module download but no C toolchain or platform-specific library."
+  },
+  "total_unexpected_accepts": 0
+}

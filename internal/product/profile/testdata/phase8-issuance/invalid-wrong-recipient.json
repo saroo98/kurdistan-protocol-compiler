@@ -1,0 +1,24 @@
+{
+  "request": {
+    "Artifact": "g1hvpAEBAgEDeCZhcHBsaWNhdGlvbi92bmQua3VyZGlzdGFuLnByb2ZpbGUrY29zZQRYPqQBcGRldmljZS1yZWNpcGllbnQCcnByb3Zpc2lvbmVkLWRldmljZQNTcmVjaXBpZW50LWhpbnQtMDAwMQQCWEEEu0nruMoY0vEm9ZAxpQ0l0+vi3QaPN3JO37HsX3LsTRQ3MCK1U2+P8cshuMC8pP++SvY5ljZBajggF2Nt0Z+5F1kBsUeUGzl1z2DolQikCUoAenlZr811u6TlYpULDzri7eO9Sh4gqj4IOPMAxTl8Pf+uvGavax0rUqBlD5JiYQLqOihw2ypWC4yKIspJDq48kVpHrpsxup1x0K+fjqgKt5ZJFvky1I9HHqO6J81cZl3+Hsi0pMht4Arg361Q1my5H2EKObbKqRVyLeoSysWbSK4aOYHsmVOT1sBoZf+moCEoK4Kj0ziN9MqmvFPCBLpJLqRmDFd4/UVbEihWK3OReftzGYZK5G5WPAHRd/Ys9/w534iv2oZCBEu/KqhzlAzoR1KtsG8j+oW+MFHLfc5MAU72/uS2C1S7RSeL/BaLHIs0sL2yA8fBC7hAPX1FVA78n/nGAMtwZewzGv1gg/etXb5aT/ExvHlWjkjhJnCy+qI+Pp73r1e/xi3eJb1I0165/G4e3YQmYU0BFqAYbfdT1XJnnsay02V/q0eujifGS11sI9L4LPU9QV4OGbjB7weOw9rT4MJwMjggAn+K6OWgDTWkCBEbXhd2erF3av24ODtdD3KpjIn9GrmrclqcAUCHCMYXUxM7pHNmBuPtb0KsOWBrcPg=",
+    "Class": "device-recipient",
+    "Audience": "provisioned-device",
+    "Suite": 1,
+    "IssuerRole": "issuer",
+    "IssuerScope": {
+      "ProviderID": "provider.0001",
+      "LineageID": "lineage.0001",
+      "ProfileNamespace": "profiles."
+    },
+    "IssuerKey": {
+      "KeyID": "issuer-key-0001",
+      "SuiteID": 1
+    },
+    "Now": 500,
+    "MinimumGeneration": 7,
+    "MinimumSafetyFloor": 2,
+    "MinimumRootEpoch": 3,
+    "MinimumRevocationEpoch": 4
+  },
+  "resolver": "wrong-recipient"
+}

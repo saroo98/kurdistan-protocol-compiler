@@ -1,0 +1,83 @@
+{
+  "case_owner_sha256": "8ab32f4dc0d227976ee4cbc3ad00bcdd3a929463303a05f61f70f027c45089a6",
+  "case_owners": [
+    {
+      "case": "wrong-role",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "unsupported-suite",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "missing-audience",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "stale-generation",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "expired",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "scope",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "recipient",
+      "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse"
+    },
+    {
+      "case": "truncation",
+      "test": "TestOfflineVerifierRejectsTamperHeadersRecipientsAndTruncation"
+    },
+    {
+      "case": "ciphertext-tamper",
+      "test": "TestOfflineVerifierRejectsTamperHeadersRecipientsAndTruncation"
+    },
+    {
+      "case": "wrong-header-class",
+      "test": "TestOfflineVerifierRejectsTamperHeadersRecipientsAndTruncation"
+    },
+    {
+      "case": "wrong-recipient",
+      "test": "TestOfflineVerifierRejectsTamperHeadersRecipientsAndTruncation"
+    }
+  ],
+  "case_set_sha256": "034e87aa0f35e6549155b07cf126a9814cc2642f9f6726feb600c21c51484a27",
+  "cases": [
+    "wrong-role",
+    "unsupported-suite",
+    "missing-audience",
+    "stale-generation",
+    "expired",
+    "scope",
+    "recipient",
+    "truncation",
+    "ciphertext-tamper",
+    "wrong-header-class",
+    "wrong-recipient"
+  ],
+  "execution_sha256": "f9f80d57a4d0a381741d8fb345d5db724302cbe752d4cd01b2c4d8d43b34454e",
+  "observation_sha256": "f9f80d57a4d0a381741d8fb345d5db724302cbe752d4cd01b2c4d8d43b34454e",
+  "observations": [
+    "wrong-role:error=profile: offline issuance rejected",
+    "unsupported-suite:error=profile: offline issuance rejected",
+    "missing-audience:error=profile: offline issuance rejected",
+    "stale-generation:error=profile: offline issuance rejected",
+    "expired:error=profile: offline issuance rejected",
+    "scope:error=profile: offline issuance rejected",
+    "recipient:error=profile: offline issuance rejected",
+    "truncation:artifact=a21253fd340c7ad6094f9c11a84eb8dcf7c2bfe6ec0cab52ed77e266dcc90d57",
+    "ciphertext-tamper:artifact=66b3ba3b0805f602b8100fc1407bf57cad53cebb45d5f5a9919c7d1c75f680e1",
+    "wrong-header-class:error=profile: offline verification rejected",
+    "wrong-recipient:error=profile: offline verification rejected"
+  ],
+  "result_sha256": "cfbcb90fc47de762157992ea1d3e972bb52df0b3df9bed37752a4fa9a2636100",
+  "schema": "phase8-issuance-evidence-v1",
+  "source_sha256": "3f3b87137f9d23aa4c9fa76878784bb0d6d770b2b07ea6651b5a1747adec59e6",
+  "test": "TestOfflineIssuanceRejectsUnsafeInputsBeforeProviderUse",
+  "test_source_sha256": "f846202d6f53e100a8b602971b7f6d3497bd957459b2873876fb45fafde5d64a"
+}

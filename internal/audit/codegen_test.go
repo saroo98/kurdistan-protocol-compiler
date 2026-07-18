@@ -301,25 +301,27 @@ func TestCodegenAuthorizationCatalogSixPathSHA256AndTestdataInventory(t *testing
 const committedEvidenceManifestPathV1 = "testdata/evidence/phase1-m0-committed-sha256.json"
 
 type committedEvidenceManifestV1 struct {
-	Schema                            string                                   `json:"schema"`
-	HashAlgorithm                     string                                   `json:"hash_algorithm"`
-	SourceCandidate                   string                                   `json:"source_candidate"`
-	Sets                              map[string][]committedEvidenceEntryV1    `json:"sets"`
-	MaintenanceOverlays               map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
-	HelperOwnerOverlays               map[string]helperOwnerOverlayV1          `json:"helper_owner_overlays"`
-	ValidatorOverlays                 map[string]helperOwnerOverlayV1          `json:"validator_overlays"`
-	ValidatorConsumerOverlays         map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
-	EvidenceConvergenceOverlays       map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
-	Phase2CompleteOverlays            map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
-	Phase3ContractOverlays            map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
-	Phase4FallbackOverlays            map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
-	Phase5RelayDescriptorOverlays     map[string]phase2CompleteOverlayV1       `json:"phase5_relay_descriptor_overlays"`
-	Phase6DiagnosticExportOverlays    map[string]phase2CompleteOverlayV1       `json:"phase6_diagnostic_export_overlays"`
-	Phase7AppRuntimeOverlays          map[string]phase2CompleteOverlayV1       `json:"phase7_app_runtime_overlays"`
-	BaselineStabilizationOverlays     map[string]phase2CompleteOverlayV1       `json:"baseline_stabilization_overlays"`
-	Phase8ProfileCryptographyOverlays map[string]phase2CompleteOverlayV1       `json:"phase8_profile_cryptography_overlays"`
-	Phase8WO801ThreatModelOverlays    map[string]phase2CompleteOverlayV1       `json:"phase8_wo801_threat_model_overlays"`
-	Phase8WO801AdoptionOverlays       map[string]phase2CompleteOverlayV1       `json:"phase8_wo801_adoption_overlays"`
+	Schema                              string                                   `json:"schema"`
+	HashAlgorithm                       string                                   `json:"hash_algorithm"`
+	SourceCandidate                     string                                   `json:"source_candidate"`
+	Sets                                map[string][]committedEvidenceEntryV1    `json:"sets"`
+	MaintenanceOverlays                 map[string]committedMaintenanceOverlayV1 `json:"maintenance_overlays"`
+	HelperOwnerOverlays                 map[string]helperOwnerOverlayV1          `json:"helper_owner_overlays"`
+	ValidatorOverlays                   map[string]helperOwnerOverlayV1          `json:"validator_overlays"`
+	ValidatorConsumerOverlays           map[string]helperOwnerOverlayV1          `json:"validator_consumer_overlays"`
+	EvidenceConvergenceOverlays         map[string]helperOwnerOverlayV1          `json:"evidence_convergence_overlays"`
+	Phase2CompleteOverlays              map[string]phase2CompleteOverlayV1       `json:"phase2_complete_overlays"`
+	Phase3ContractOverlays              map[string]phase2CompleteOverlayV1       `json:"phase3_contract_overlays"`
+	Phase4FallbackOverlays              map[string]phase2CompleteOverlayV1       `json:"phase4_fallback_overlays"`
+	Phase5RelayDescriptorOverlays       map[string]phase2CompleteOverlayV1       `json:"phase5_relay_descriptor_overlays"`
+	Phase6DiagnosticExportOverlays      map[string]phase2CompleteOverlayV1       `json:"phase6_diagnostic_export_overlays"`
+	Phase7AppRuntimeOverlays            map[string]phase2CompleteOverlayV1       `json:"phase7_app_runtime_overlays"`
+	BaselineStabilizationOverlays       map[string]phase2CompleteOverlayV1       `json:"baseline_stabilization_overlays"`
+	Phase8ProfileCryptographyOverlays   map[string]phase2CompleteOverlayV1       `json:"phase8_profile_cryptography_overlays"`
+	Phase8WO801ThreatModelOverlays      map[string]phase2CompleteOverlayV1       `json:"phase8_wo801_threat_model_overlays"`
+	Phase8WO801AdoptionOverlays         map[string]phase2CompleteOverlayV1       `json:"phase8_wo801_adoption_overlays"`
+	Phase8GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase8_guard_maintenance_overlays"`
+	Phase8FinalGuardMaintenanceOverlays map[string]committedMaintenanceOverlayV1 `json:"phase8_final_guard_maintenance_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -337,9 +339,10 @@ type helperOwnerOverlayV1 struct {
 }
 
 type helperOwnerOverlayEntryV1 struct {
-	Path       string `json:"path"`
-	PreSHA256  string `json:"pre_sha256"`
-	PostSHA256 string `json:"post_sha256"`
+	Path        string `json:"path"`
+	PreEvidence string `json:"pre_evidence"`
+	PreSHA256   string `json:"pre_sha256"`
+	PostSHA256  string `json:"post_sha256"`
 }
 
 type phase2CompleteOverlayV1 struct {
@@ -453,17 +456,55 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	currentAtWO801, err := validatePhase8WO801AdoptionOverlayV1(root, manifest.Phase8WO801AdoptionOverlays)
+	finalGuardPre, err := validatePhase8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		return nil, err
+	}
+	guardPre, err := validatePhase8GuardMaintenanceOverlayAtPostV1(root, finalGuardPre, manifest.Phase8GuardMaintenanceOverlays)
+	if err != nil {
+		return nil, err
+	}
+	for path, hash := range guardPre {
+		if hash == "ABSENT" {
+			continue
+		}
+		finalGuardPre[path] = hash
+	}
+	currentAtWO801, err := validatePhase8WO801AdoptionOverlayAtPostV1(root, finalGuardPre, manifest.Phase8WO801AdoptionOverlays)
+	if err != nil {
+		return nil, err
+	}
+	for path, hash := range finalGuardPre {
+		if hash == "ABSENT" {
+			continue
+		}
+		if _, replaced := currentAtWO801[path]; !replaced {
+			currentAtWO801[path] = hash
+		}
 	}
 	currentAtWO800, err := validatePhase8WO801ThreatModelOverlayAtPostV1(root, currentAtWO801, manifest.Phase8WO801ThreatModelOverlays)
 	if err != nil {
 		return nil, err
 	}
+	for path, hash := range currentAtWO801 {
+		if hash == "ABSENT" {
+			continue
+		}
+		if _, replaced := currentAtWO800[path]; !replaced {
+			currentAtWO800[path] = hash
+		}
+	}
 	currentAtPhase8, err := validatePhase8ProfileCryptographyOverlayAtPostV1(root, currentAtWO800, manifest.Phase8ProfileCryptographyOverlays)
 	if err != nil {
 		return nil, err
+	}
+	for path, hash := range currentAtWO800 {
+		if hash == "ABSENT" {
+			continue
+		}
+		if _, replaced := currentAtPhase8[path]; !replaced {
+			currentAtPhase8[path] = hash
+		}
 	}
 	currentAtM7, err := validateBaselineStabilizationEvidenceOverlayV1(root, currentAtPhase8, manifest.BaselineStabilizationOverlays)
 	if err != nil {
@@ -749,7 +790,122 @@ func validatePhase8WO801ThreatModelOverlayAtPostV1(root string, currentAtPost ma
 	return pre, nil
 }
 
+func validatePhase8GuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePhase8GuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePhase8GuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase8-wo806-guard-convergence-v1"
+	paths := []string{"internal/audit/security.go", "internal/audit/security_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", "cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/codegen/authorization_v1_test.go", committedEvidenceManifestPathV1}
+	preHashes := []string{"10f4a412739c3896e88fb7b649774e0243ccfcfab2c77335b2e7ecaa8948f3ae", "8ed3f3c023baa71d60dbe81c94bb0e4254e8fcaf35b5c4b75d027b2c2290b15b", "1333f376b7ff19580719c40ec831a61ff6c66dd2ea90721a1d257370d698e45e", "4420c4c6582124b04c9330329bfedf213f2976f3c536cb2fa815ab28a28a1fb5", "c3fb2ce202af327107885f8a5866908cbd984aa74b09ee702514d6ed2442901d", "a7e40a30f7a30122bf23e538f8714890f3bba945799466cf378c3566160c4041", "a4664fe1fb3b6a6050af2c8e04eab51263ce32989e5d673c1ae35b97f7b8b79e"}
+	o, ok := overlays[name]
+	if len(overlays) != 1 || !ok || o.Version != name || o.SelfPath != committedEvidenceManifestPathV1 || o.SelfPreSHA256 != "37ece675df4e2f17bb253a3a5d648c3a7b6e62d9319fd27a138be00cedb3e77a" || len(o.Paths) != 8 || len(o.Entries) != 7 {
+		return nil, fmt.Errorf("invalid phase8 guard-maintenance overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, path := range paths {
+		if o.Paths[i] != path {
+			return nil, fmt.Errorf("invalid phase8 guard-maintenance path %d", i)
+		}
+	}
+	for i, entry := range o.Entries {
+		if entry.Path != paths[i] || entry.PreSHA256 != preHashes[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase8 guard-maintenance entry %d", i)
+		}
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase8 guard-maintenance hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		pre[entry.Path] = entry.PreSHA256
+	}
+	return pre, nil
+}
+
+func validatePhase8FinalGuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase8-wo808-final-guard-convergence-v1"
+	paths := []string{
+		"README.md", "ROADMAP.md", "docs/GOVERNANCE.md",
+		"docs/safety.md", "cmd/gate/main.go", ".github/workflows/ci.yml",
+		"internal/product/envelope/phase8_suite_test.go", "testdata/evidence/independent/phase8_interop.py", "testdata/evidence/phase8-independent-interop-report.json",
+		"internal/product/envelope/phase8_profile_codec.go", "internal/product/envelope/phase8_profile_codec_test.go", "cmd/kprofile/main.go",
+		"cmd/kprofile/main_test.go", "internal/product/profile/testdata/phase8-issuance/offline-boundary-report.json", "internal/product/profile/testdata/phase8-issuance/redacted-inspect-report.json",
+		"internal/audit/security.go", "internal/audit/security_test.go", "internal/runtime/policy_enforcement_test.go",
+		"internal/testkit/importrules/importrules_test.go", "cmd/kgen/main_test.go", "internal/audit/codegen_test.go",
+		"internal/codegen/authorization_v1_test.go", ".gitignore", "internal/audit/status.go",
+		"cmd/kprofile/path_other.go", "cmd/kprofile/path_unsupported.go", "cmd/kprofile/path_windows_test.go",
+		"cmd/kprofile/path_windows.go", "cmd/kprofile/path.go", "docs/KIP-0082-phase8-integrated-assurance.md",
+		"docs/PHASE8_EVIDENCE_INDEX.md", "docs/PHASE8_RECOVERY_RUNBOOK.md", "internal/product/envelope/phase8_evidence_test.go",
+		"internal/product/envelope/phase8_suite.go", "internal/product/profile/phase8_activation_test.go", "internal/product/profile/phase8_activation.go",
+		"internal/product/profile/phase8_providers.go", "internal/product/profile/phase8_tooling_evidence_test.go", "internal/product/profile/phase8_tooling_external_test.go",
+		"internal/product/profile/phase8_tooling.go", "internal/product/profile/testdata/phase8-activation/activation-crash-report.json", "internal/product/profile/testdata/phase8-activation/authenticated-hint-mismatch-report.json",
+		"internal/product/profile/testdata/phase8-activation/last-known-good-negative-report.json", "internal/product/profile/testdata/phase8-activation/policy-bypass-report.json", "internal/product/profile/testdata/phase8-activation/revocation-generation-report.json",
+		"internal/product/profile/testdata/phase8-activation/verify-before-semantics-report.json", "internal/product/profile/testdata/phase8-issuance/fixture-manifest.json", "internal/product/profile/testdata/phase8-issuance/fixture-reproduction-report.json",
+		"internal/product/profile/testdata/phase8-issuance/issuance-negative-report.json", "internal/product/profile/testdata/phase8-issuance/issuance-roundtrip-report.json", "internal/product/profile/testdata/phase8-issuance/production-wiring-negative-report.json",
+		"internal/testkit/phase8fixturegen/main_test.go", "internal/testkit/phase8fixturegen/main.go", "internal/testkit/phase8issuancefixture/generate.go",
+		"STATUS.md", "testdata/evidence/phase8-release-corpus-manifest.json", "testdata/evidence/phase8-wo807-recovery-report.json",
+		"testdata/evidence/phase1-m0-committed-sha256.json",
+	}
+
+	preHashes := []string{
+		"65b6fe472d0b3bf59704e3793a6337ba8ebd8602bd92e9d70b34e30f445bbed5", "4c4b327d58efabe3569b7a525cf9bc18298b3027d5993ebc9a5f36b9520cb6d2", "483ac28d0d371e10784d83721b7e2efac5e46bffe031dc18fcfb253012781e4d",
+		"62fabcee4d7451804f2c7f7df32e9b2e4457c8a8a16687677d20097cca616769", "c7d9d7127fec76e135fe0ea7bebd86285764025c735d8e733c12b9a0e662663f", "ABSENT",
+		"f8608b81c1c0b7b2e499a1217e258ba7a9fe842ee61f68cf6728f06506204cb3", "8a312973d42f25c127827db419b0b07355a1b779d2cd243b45a77492bf55288a", "b6424fd088cc2c437175adccafff1c94b3afc6bcf0750491a1c05e72ceaf3cb5",
+		"197304bba879d092cf0b37c96f2d260ccc3137ca35378c562ab17f43f7ed92f2", "12dcdff0b67c56c55b3cc29ed5ef10a3d3bfb273b1da02d6012a03940c056a3b", "d3bd61e8094ba10253cde22306b6dde0ca1c4ffe28d34616d5471a34864caa09",
+		"82915c199c88ab52bdca5a74c56eab99fc61b095420064f1f3e2d51a3d9818a9", "1cc9b6f1af5157e468870e3cfc849a9e83e2513d7e06ea54f2c8388b1acc437c", "6c4e0ff29540248a2c919eaf4444ab8ee33cdb8a4ac6c8407fcbbd37deb155b4",
+		"d7f33f3194065c6b4900a92843da772b74396090ae311532d82118037b2b7b3d", "251c31fcf024a5bebb11a742a0ba03ffca8ae98f146b9c5242e7c82d30cc929a", "9bc732efbf56adcbec93722f206227a43d3f0946cbc8acd0a03b96b66439d1d7",
+		"3a46df826b5c108818723af77ff2e7de6530bf2e66e993d2cda364e05eb51fa9", "372f479b0c541f61e2cad4869f62ae8cce895db00ffcc3b19e03bd6925677c14", "e87df0637cdc5c93129a73855e641a98f80b750b2e27a6343e7f37072c816201",
+		"9e0feb195c40a435f3d3baf80ef8a2a91d8f38f0b5134fb6bbf50f7760b767bc", "5b183df65d579d6956f2fee4771afc35f32fa0eeb87d1cfa8bb1729e19e92f20", "94dc5eb6ba2ff56fd46820592ecb01e7e5705c2200350ad9d4534221fee0f954",
+		"4de767d8872d04668c0077d45be834b3397ca723e6bd9b1d66de85bee32e3d0b", "ABSENT", "ABSENT",
+		"a0ada14afde8b72fb1e66513208fc020e9d674f73238896bed3f876dff83674b", "ABSENT", "9514b51d5b3320e11c875b0224e6dc9e6cf4b99b6c88d0f516441086d366daa3",
+		"20a6e8732887d76ef49c957369a1132d8bdf3d10df20b3f2abcae5903bbf2cd1", "7ca541e419a2de0f4ef2f1987e21277ec78aba38c8b5acac7b74a31a6d3ca2fd", "e1b66f934f62efdc947c3ac15480e36ae4986f14042bb4a38e92dd6313c41645",
+		"71c67b4e27d4f8708115030dd9469f3b133a7b4fdc09a3732e2efb6c2d67944f", "03ef0f0d758f220be50d3b517aebb8e1b2d8cace59836a2c991422c3d5162331", "0747653f3b1efb3783535572bf68843cf0e1a494bd2098a82ccfc7d224dfe1bd",
+		"db08f48f7305f9543c2a6e3094218c0b31ed8185298149af05d0a4a671b19bae", "6d894e73ad19bdd05afc504212e93ef18f18e8962db06c9629be4d3bc7cd5d91", "60b60d1932bffb4b6597fb0659b9153c0531a51bab944e4263b620fdfd3af028",
+		"154178a1b0bd6da95a1327a32b11c3d5c5a2023a4d323c7dbb999f89e0f807b7", "5eba165b5ea9317b51f609ab4b34ef57d3dc0a42c85ab7d4aae78b1c4b7b15ba", "fd393e178e02ab8f5c96b2502dcb7b2ad411758eb55c7ef4f8144536e47db069",
+		"5eba165b5ea9317b51f609ab4b34ef57d3dc0a42c85ab7d4aae78b1c4b7b15ba", "7ce8dc7e7ddb93454c24fad8c9a8c7f375d5bba25d07673e60a757335a13aecc", "e83737cbb6ef895748045a1af296e82a6ee0bfeff72c1615bd003c1cd375b1d1",
+		"0c6ca80025d973546aa2d44442f739f94b4e0b1ec9132dafc08ca72bb2f88afc", "993739b3577ab5418bec2c3790e26495c16b9bbb423ef08fce8d96d36d601b36", "19685e69c2e8b9d66b5116d74b7e75cf3e6c61abb8ae4803ab4f782debfb6688",
+		"766b6b14fffc20436ad5b0ff5d623582e41dbf7907396a1599bf484639214ac7", "58f43dc6b85ae04dcd682ee7e58a506463fb6118e9eae080d57c1d7618af465b", "8007954c8ec687664fe70841982172c717e11a2933c16a373259b28a001feb55",
+		"ABSENT", "00b45845fd49a2d39e1489b61e117dd91c83aa715925f82ae8cb931664230e3a", "05de9cb9f0cd0f40721c7aa6465c619e400f0e19911451629737741bc4f489df",
+		"8ed8a14111d09e948879d5cebe3979cf20ce1eb048e996c9bf39e6e409f1bbf1", "7ccec20947e3733149efbf2a38d161a017d698587360353836f52811fda0b6e0", "8db7027e428d1fd09498202f33eacb7285ae56c9b28f061297f60b8642a37583",
+	}
+	o, ok := overlays[name]
+	if len(overlays) != 1 || !ok || o.Version != name || o.SelfPath != committedEvidenceManifestPathV1 || o.SelfPreSHA256 != "afcef52b1302379c2172815138219421e2dcf2b4e7280724f7c9ae4829d5f76a" || len(o.Paths) != len(paths) || len(o.Entries) != len(preHashes) {
+		return nil, fmt.Errorf("invalid phase8 final guard-maintenance overlay identity/cardinality")
+	}
+	pre := map[string]string{}
+	for i, path := range paths {
+		if o.Paths[i] != path {
+			return nil, fmt.Errorf("invalid phase8 final guard-maintenance path %d", i)
+		}
+	}
+	for i, entry := range o.Entries {
+		expectedPre := preHashes[i]
+		if entry.Path != paths[i] || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase8 final guard-maintenance entry %d", i)
+		}
+		if expectedPre == "ABSENT" {
+			if entry.PreEvidence != "ABSENT" || entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase8 final guard-maintenance absent predecessor %d", i)
+			}
+		} else if entry.PreEvidence != "" || entry.PreSHA256 != expectedPre || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase8 final guard-maintenance predecessor %d", i)
+		}
+		actual, err := fileSHA256V1(root, entry.Path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase8 final guard-maintenance hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
+		}
+		pre[entry.Path] = expectedPre
+	}
+	return pre, nil
+}
+
 func validatePhase8WO801AdoptionOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
+	return validatePhase8WO801AdoptionOverlayAtPostV1(root, nil, overlays)
+}
+func validatePhase8WO801AdoptionOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "phase8-wo801-adoption-v1"
 	wantPaths := []string{"testdata/evidence/phase8-wo801-adoption-2026-07-17.json", "cmd/kgen/main_test.go", "internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go", "internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", committedEvidenceManifestPathV1}
 	wantPre := map[string]string{"cmd/kgen/main_test.go": "f3756c80bd358535e929a8bffa4ef79129f346318fb6304fdd01abd6c915a846", "internal/audit/codegen_test.go": "00ac00353fda287944ba5fd1965a130830514b2807c5df1ea46eccbcc1299791", "internal/audit/security.go": "d71fc4a337b995790ee397b944e3d7cf47ba675dc9204eeb8b5f2c513250b73d", "internal/audit/security_test.go": "dba0df11ef69fa6364a262d2f3fdf4bb8046f089fa314148ed5a7ae13c4cf7d8", "internal/codegen/authorization_v1_test.go": "c9b8f29d924a37e1b2fbba5b6a69ef04fc6043e4c2e0f77aafd162edf66d5adc", "internal/runtime/policy_enforcement_test.go": "ab7ab4f454448750a82e5a50a8acfba96b08ca5c4c492539c371f4a6f9f49241", "internal/testkit/importrules/importrules_test.go": "1c465b2026c31246a3685f96849604d0879e0025e892fc6a4b3875bf0ef09a17"}
@@ -774,7 +930,11 @@ func validatePhase8WO801AdoptionOverlayV1(root string, overlays map[string]phase
 		} else if !validHelperOwnerSHA256V1(entry.PreEvidence) || entry.PreEvidence != wantPre[entry.Path] {
 			return nil, fmt.Errorf("phase8 WO-801 adoption reconstruction drift %s", entry.Path)
 		}
-		actual, err := fileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase8 WO-801 adoption current hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}

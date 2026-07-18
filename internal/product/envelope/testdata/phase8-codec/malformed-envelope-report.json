@@ -1,0 +1,185 @@
+{
+  "cases": [
+    {
+      "name": "empty input",
+      "category": "size-limit"
+    },
+    {
+      "name": "payload one over",
+      "category": "size-limit"
+    },
+    {
+      "name": "trailing data",
+      "category": "non-canonical"
+    },
+    {
+      "name": "duplicate map key",
+      "category": "non-canonical"
+    },
+    {
+      "name": "indefinite map",
+      "category": "non-canonical"
+    },
+    {
+      "name": "floating value",
+      "category": "non-canonical"
+    },
+    {
+      "name": "nonminimal integer",
+      "category": "non-canonical"
+    },
+    {
+      "name": "wrong top type",
+      "category": "schema"
+    },
+    {
+      "name": "missing field",
+      "category": "schema"
+    },
+    {
+      "name": "extra field",
+      "category": "schema"
+    },
+    {
+      "name": "unsupported version",
+      "category": "unsupported-version"
+    },
+    {
+      "name": "content id wrong type",
+      "category": "schema"
+    },
+    {
+      "name": "empty content id",
+      "category": "invalid-value"
+    },
+    {
+      "name": "content id whitespace",
+      "category": "invalid-value"
+    },
+    {
+      "name": "content id oversized",
+      "category": "invalid-value"
+    },
+    {
+      "name": "generation zero",
+      "category": "invalid-value"
+    },
+    {
+      "name": "safety floor zero",
+      "category": "invalid-value"
+    },
+    {
+      "name": "valid from zero",
+      "category": "invalid-value"
+    },
+    {
+      "name": "validity reversed",
+      "category": "invalid-value"
+    },
+    {
+      "name": "root epoch zero",
+      "category": "invalid-value"
+    },
+    {
+      "name": "revocation epoch zero",
+      "category": "invalid-value"
+    },
+    {
+      "name": "relay list empty",
+      "category": "size-limit"
+    },
+    {
+      "name": "relay list oversized",
+      "category": "size-limit"
+    },
+    {
+      "name": "relay duplicate",
+      "category": "member-order"
+    },
+    {
+      "name": "relay order",
+      "category": "member-order"
+    },
+    {
+      "name": "strategy list empty",
+      "category": "size-limit"
+    },
+    {
+      "name": "strategy duplicate",
+      "category": "member-order"
+    },
+    {
+      "name": "policy oversized",
+      "category": "size-limit"
+    },
+    {
+      "name": "profile id invalid character",
+      "category": "invalid-value"
+    },
+    {
+      "name": "previous content invalid",
+      "category": "invalid-value"
+    },
+    {
+      "name": "signed empty",
+      "category": "size-limit"
+    },
+    {
+      "name": "signed wrong tag",
+      "category": "non-canonical"
+    },
+    {
+      "name": "signed wrong arity",
+      "category": "signed-object"
+    },
+    {
+      "name": "signed unprotected nonempty",
+      "category": "signed-object"
+    },
+    {
+      "name": "signed payload empty",
+      "category": "size-limit"
+    },
+    {
+      "name": "signed signature short",
+      "category": "signed-object"
+    },
+    {
+      "name": "signed protected invalid",
+      "category": "signed-object"
+    },
+    {
+      "name": "signed trailing data",
+      "category": "non-canonical"
+    },
+    {
+      "name": "sealed empty",
+      "category": "size-limit"
+    },
+    {
+      "name": "sealed wrong arity",
+      "category": "sealed-frame"
+    },
+    {
+      "name": "sealed protected invalid",
+      "category": "sealed-frame"
+    },
+    {
+      "name": "sealed encapsulation short",
+      "category": "sealed-frame"
+    },
+    {
+      "name": "sealed ciphertext short",
+      "category": "size-limit"
+    },
+    {
+      "name": "sealed trailing data",
+      "category": "non-canonical"
+    }
+  ],
+  "schema": "kurdistan.phase8.malformed-envelope-report.v1",
+  "summary": {
+    "accepted": 0,
+    "rejected": 44
+  }
+}

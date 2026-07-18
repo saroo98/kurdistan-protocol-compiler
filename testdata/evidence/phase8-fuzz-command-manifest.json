@@ -1,0 +1,92 @@
+{
+  "limitations": "Campaign status is supported by the separate hash-bound Phase 8 fuzz campaign report; the command manifest does not by itself prove execution.",
+  "required_run_observations": [
+    "exact command",
+    "wall duration",
+    "executions",
+    "coverage signal",
+    "peak allocation",
+    "timeout threshold",
+    "resulting corpus hash"
+  ],
+  "schema": "kurdistan.phase8.fuzz-command-manifest.v1",
+  "targets": [
+    {
+      "target": "FuzzPhase8ProfileCodec",
+      "package": "./internal/product/envelope",
+      "boundary": "canonical-profile-cbor",
+      "command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8ProfileCodec$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/envelope/phase8_profile_codec_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzPhase8SignedParser",
+      "package": "./internal/product/envelope",
+      "boundary": "cose-sign1-framing",
+      "command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8SignedParser$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/envelope/phase8_profile_codec_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzPhase8SealedParser",
+      "package": "./internal/product/envelope",
+      "boundary": "sealed-hpke-framing",
+      "command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8SealedParser$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/envelope/phase8_profile_codec_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzPhase8URIIngress",
+      "package": "./internal/product/envelope",
+      "boundary": "uri-ingress",
+      "command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8URIIngress$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/envelope/phase8_profile_codec_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzPhase8QRIngress",
+      "package": "./internal/product/envelope",
+      "boundary": "qr-ingress",
+      "command": "go test -count=1 ./internal/product/envelope -run=^$ -fuzz=^FuzzPhase8QRIngress$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/envelope/phase8_profile_codec_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzActivateVerifiedProfileStateMachine",
+      "package": "./internal/product/profile",
+      "boundary": "authority-revocation-activation",
+      "command": "go test -count=1 ./internal/product/profile -run=^$ -fuzz=^FuzzActivateVerifiedProfileStateMachine$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/profile/phase8_activation_fuzz_test.go embedded f.Add corpus plus internal/product/profile/testdata/fuzz/FuzzActivateVerifiedProfileStateMachine/5c3e9efa06c432c0 persisted regression corpus",
+      "seed_corpus_sha256": "c07ba8c7b48dd44830e912fa56f84833fd322a7ea7dc75b066c0f71e9f9426ff",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    },
+    {
+      "target": "FuzzApplyVerifiedStateMachine",
+      "package": "./internal/product/lifecycle",
+      "boundary": "verified-lifecycle",
+      "command": "go test -count=1 ./internal/product/lifecycle -run=^$ -fuzz=^FuzzApplyVerifiedStateMachine$ -fuzztime=10m",
+      "duration_seconds": 600,
+      "seed_source": "internal/product/lifecycle/phase8_verified_fuzz_test.go embedded f.Add corpus",
+      "seed_corpus_sha256": "370abacb829f77b65639381115b8c6cbf7f74849e9530812f8a31debc80d8532",
+      "status": "passed",
+      "campaign_report": "testdata/evidence/phase8-fuzz-campaign-report.json"
+    }
+  ]
+}

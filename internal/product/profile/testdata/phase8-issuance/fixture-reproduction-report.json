@@ -1,0 +1,34 @@
+{
+  "case_set_sha256": "a1187f178babc701cfd5cd5b3fcf7f22a4f92f988b813d9f8d473dd39b5c5e37",
+  "cases": [
+    "device-recipient.bin",
+    "encrypted-backup.bin",
+    "invalid-generation.json",
+    "invalid-tamper.bin",
+    "invalid-truncation.bin",
+    "invalid-wrong-header.json",
+    "invalid-wrong-recipient.json",
+    "invalid-wrong-role.json",
+    "provider-group-recipient.bin",
+    "signed-public.bin"
+  ],
+  "execution_sha256": "a53bfa79c4f38b3c426cf74023dc40bb0fabf4a508ea41fd27ef4e177b625019",
+  "observation_sha256": "a53bfa79c4f38b3c426cf74023dc40bb0fabf4a508ea41fd27ef4e177b625019",
+  "observations": [
+    "device-recipient.bin:399f8c65e3d080e2215e7e8e0f2a6f6a06a4016c2a5ca3a7fa8c732f9f72b4b7",
+    "encrypted-backup.bin:8bd8d6fbb51cb95218ce17893b7911dae0351ecb8bd3ac9d988c07b3c6c362e4",
+    "invalid-generation.json:393952fcb3013b6cb5a7843833d44bfbc51e9ecb7f8e3e9f919419c93b763cbf",
+    "invalid-tamper.bin:66b3ba3b0805f602b8100fc1407bf57cad53cebb45d5f5a9919c7d1c75f680e1",
+    "invalid-truncation.bin:a21253fd340c7ad6094f9c11a84eb8dcf7c2bfe6ec0cab52ed77e266dcc90d57",
+    "invalid-wrong-header.json:1e79bc476783b5fdaf44e52f07f14cf862bf66d18d05efd921bf26331ee9ba9b",
+    "invalid-wrong-recipient.json:35e85518a180af1448d04da6d530d7b42efd32f2d81b6636d9daeae29a46343f",
+    "invalid-wrong-role.json:eb04dd301d966c0d5eacc3b98e77ed7fb11125406848eba9cff9093dc28afb73",
+    "provider-group-recipient.bin:28b2b508d93bf5b61cf6cd2f0bc858413d90fb433f2b54861678bcbe257c8961",
+    "signed-public.bin:6e9f0808271cf7297d6b39ee32b46e52b8de0f5a1c0b262e0b1c4fbc1850e0e3"
+  ],
+  "result_sha256": "e83b673379a0cdd59a8bd8763689588391d4283cb77989ede3871b75563fc75d",
+  "schema": "phase8-issuance-evidence-v1",
+  "source_sha256": "3f3b87137f9d23aa4c9fa76878784bb0d6d770b2b07ea6651b5a1747adec59e6",
+  "test": "TestWO806FixtureReproduction",
+  "test_source_sha256": "7805ee9f04fc04ac04877d19375cbb51c190e9c47081b82493daf42a66dc6d50"
+}

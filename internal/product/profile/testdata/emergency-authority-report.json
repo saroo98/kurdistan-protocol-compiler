@@ -1,0 +1,26 @@
+{
+  "schema": "kurdistan.phase8.emergency-authority-report.v1",
+  "cases": [
+    {"name":"deny scoped profile","result":"permitted"},
+    {"name":"narrow provider namespace","result":"permitted"},
+    {"name":"sign profile","result":"rejected"},
+    {"name":"enable service","result":"rejected"},
+    {"name":"downgrade policy","result":"rejected"},
+    {"name":"erase state","result":"rejected"},
+    {"name":"expand scope","result":"rejected"},
+    {"name":"malformed child scope","result":"rejected"},
+    {"name":"non-terminated child scope","result":"rejected"},
+    {"name":"oversized child scope","result":"rejected"}
+  ],
+  "summary": {
+    "permitted": 2,
+    "rejected": 8,
+    "prohibited_successes": 0,
+    "sign_successes": 0,
+    "enable_successes": 0,
+    "downgrade_successes": 0,
+    "erase_successes": 0,
+    "scope_expansion_successes": 0,
+    "invalid_scope_successes": 0
+  }
+}

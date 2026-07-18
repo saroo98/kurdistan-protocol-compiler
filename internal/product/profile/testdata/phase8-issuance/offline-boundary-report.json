@@ -1,0 +1,24 @@
+{
+  "case_set_sha256": "5ac8e443002fc3790bb476cc2899b09151812db1334425aaf6e72f9f437ae0a8",
+  "cases": [
+    "offline-only",
+    "no-service",
+    "no-network",
+    "no-overwrite",
+    "no-real-endpoint"
+  ],
+  "execution_sha256": "e3888a7c96e07a0798f1e121d81d08d0ddfbba6de4e6c92e3e95ed6dad54bb8b",
+  "observation_sha256": "e3888a7c96e07a0798f1e121d81d08d0ddfbba6de4e6c92e3e95ed6dad54bb8b",
+  "observations": [
+    "commands=compile,inspect",
+    "service-listeners=0",
+    "network-clients=0",
+    "outputs=o_excl",
+    "fixture-endpoints=0"
+  ],
+  "result_sha256": "06aac01e27fdc9d7fa71d7624b197546212e7b3f1d5a62b6297b959642f3dc81",
+  "schema": "phase8-issuance-evidence-v1",
+  "source_sha256": "3f3b87137f9d23aa4c9fa76878784bb0d6d770b2b07ea6651b5a1747adec59e6",
+  "test": "TestCompileInspectAreSecretSafeAndNeverOverwrite",
+  "test_source_sha256": "0c9c44b52f1746584b92f42f63d291a6b94e7b71f98897a42311fdcbb5b97495"
+}

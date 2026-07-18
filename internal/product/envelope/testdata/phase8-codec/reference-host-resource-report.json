@@ -1,0 +1,68 @@
+{
+  "host_alias": "reference-windows-amd64",
+  "raw_evidence": "reference-host-resource-raw.json",
+  "raw_sha256": "ec568f0131c06e00d62bd952f29289295ee871678b5855a712afc1983cf36d12",
+  "schema": "kurdistan.phase8.reference-host-resource-report.v3",
+  "stages": [
+    {
+      "allocation_ceiling": 500,
+      "completed_before_timeout": true,
+      "error_output_ceiling_bytes": 512,
+      "name": "profile",
+      "observed_allocations": 168,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 509,
+      "observed_wall_us": 19,
+      "timeout_ceiling_ms": 5000,
+      "wall_time_ceiling_ms": 2000
+    },
+    {
+      "allocation_ceiling": 500,
+      "completed_before_timeout": true,
+      "error_output_ceiling_bytes": 512,
+      "name": "signed",
+      "observed_allocations": 95,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 1,
+      "observed_wall_us": 6,
+      "timeout_ceiling_ms": 5000,
+      "wall_time_ceiling_ms": 2000
+    },
+    {
+      "allocation_ceiling": 500,
+      "completed_before_timeout": true,
+      "error_output_ceiling_bytes": 512,
+      "name": "sealed",
+      "observed_allocations": 62,
+      "observed_error_bytes": 83,
+      "observed_timeout_wall_us": 1,
+      "observed_wall_us": 3,
+      "timeout_ceiling_ms": 5000,
+      "wall_time_ceiling_ms": 2000
+    },
+    {
+      "allocation_ceiling": 500,
+      "completed_before_timeout": true,
+      "error_output_ceiling_bytes": 512,
+      "name": "uri",
+      "observed_allocations": 5,
+      "observed_error_bytes": 67,
+      "observed_timeout_wall_us": 1,
+      "observed_wall_us": 2,
+      "timeout_ceiling_ms": 5000,
+      "wall_time_ceiling_ms": 2000
+    },
+    {
+      "allocation_ceiling": 500,
+      "completed_before_timeout": true,
+      "error_output_ceiling_bytes": 512,
+      "name": "qr",
+      "observed_allocations": 15,
+      "observed_error_bytes": 59,
+      "observed_timeout_wall_us": 1,
+      "observed_wall_us": 1,
+      "timeout_ceiling_ms": 5000,
+      "wall_time_ceiling_ms": 2000
+    }
+  ]
+}

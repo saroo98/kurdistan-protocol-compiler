@@ -1,0 +1,61 @@
+{
+  "rejections": [
+    {
+      "category": "ambiguous-base-encoding",
+      "name": "padded URI"
+    },
+    {
+      "category": "legacy-untrusted",
+      "name": "legacy metadata"
+    },
+    {
+      "category": "malformed-qr-chunks",
+      "name": "duplicate QR"
+    },
+    {
+      "category": "malformed-qr-chunks",
+      "name": "leading-zero QR index"
+    },
+    {
+      "category": "malformed-qr-chunks",
+      "name": "plus-sign QR index"
+    },
+    {
+      "category": "size-limit",
+      "name": "oversized URI encoding"
+    }
+  ],
+  "representations": [
+    {
+      "name": "file",
+      "result": "accepted",
+      "sequence_sha256": "193f4f305b47c331e2f7bf52bcdc84f6a6987789e8a41344f8421e2ac3f6edf1"
+    },
+    {
+      "name": "uri",
+      "result": "accepted",
+      "sequence_sha256": "193f4f305b47c331e2f7bf52bcdc84f6a6987789e8a41344f8421e2ac3f6edf1"
+    },
+    {
+      "name": "qr-chunks",
+      "result": "accepted",
+      "sequence_sha256": "193f4f305b47c331e2f7bf52bcdc84f6a6987789e8a41344f8421e2ac3f6edf1"
+    },
+    {
+      "name": "clipboard",
+      "result": "accepted",
+      "sequence_sha256": "193f4f305b47c331e2f7bf52bcdc84f6a6987789e8a41344f8421e2ac3f6edf1"
+    },
+    {
+      "name": "subscription",
+      "result": "accepted",
+      "sequence_sha256": "193f4f305b47c331e2f7bf52bcdc84f6a6987789e8a41344f8421e2ac3f6edf1"
+    }
+  ],
+  "schema": "kurdistan.phase8.ingress-normalization-report.v2",
+  "summary": {
+    "accepted": 5,
+    "normalized_sequences": 1,
+    "rejected": 6
+  }
+}

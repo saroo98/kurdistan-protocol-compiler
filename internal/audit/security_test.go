@@ -378,17 +378,43 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
 		t.Fatalf("baseline stabilization ledger mismatch: %+v", overlay)
 	}
-	currentAtWO801, err := validateM8WO801AdoptionOverlayV1(root, ledger.Phase8WO801AdoptionOverlays)
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
+	}
+	guardPre, err := validateM8GuardMaintenanceOverlayAtPostV1(root, finalGuardPre, ledger.Phase8GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, hash := range guardPre {
+		finalGuardPre[path] = hash
+	}
+	currentAtWO801, err := validateM8WO801AdoptionOverlayAtPostV1(root, finalGuardPre, ledger.Phase8WO801AdoptionOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, hash := range finalGuardPre {
+		if _, replaced := currentAtWO801[path]; !replaced {
+			currentAtWO801[path] = hash
+		}
 	}
 	currentAtWO800, err := validateM8WO801ThreatModelOverlayAtPostV1(root, currentAtWO801, ledger.Phase8WO801ThreatModelOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
+	for path, hash := range currentAtWO801 {
+		if _, replaced := currentAtWO800[path]; !replaced {
+			currentAtWO800[path] = hash
+		}
+	}
 	currentAtPhase8, err := validateM8ProfileCryptographyOverlayAtPostV1(root, currentAtWO800, ledger.Phase8ProfileCryptographyOverlays)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for path, hash := range currentAtWO800 {
+		if _, replaced := currentAtPhase8[path]; !replaced {
+			currentAtPhase8[path] = hash
+		}
 	}
 	pre, err := validateBaselineStabilizationOverlayV1(root, currentAtPhase8, ledger.BaselineStabilizationOverlays)
 	if err != nil {
@@ -429,13 +455,34 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 
 func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
 	t.Helper()
-	currentAtWO801, err := validateM8WO801AdoptionOverlayV1(root, ledger.Phase8WO801AdoptionOverlays)
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
+	}
+	guardPre, err := validateM8GuardMaintenanceOverlayAtPostV1(root, finalGuardPre, ledger.Phase8GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, hash := range guardPre {
+		finalGuardPre[path] = hash
+	}
+	currentAtWO801, err := validateM8WO801AdoptionOverlayAtPostV1(root, finalGuardPre, ledger.Phase8WO801AdoptionOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, hash := range finalGuardPre {
+		if _, replaced := currentAtWO801[path]; !replaced {
+			currentAtWO801[path] = hash
+		}
 	}
 	currentAtWO800, err := validateM8WO801ThreatModelOverlayAtPostV1(root, currentAtWO801, ledger.Phase8WO801ThreatModelOverlays)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for path, hash := range currentAtWO801 {
+		if _, replaced := currentAtWO800[path]; !replaced {
+			currentAtWO800[path] = hash
+		}
 	}
 	currentAtPhase8, err := validateM8ProfileCryptographyOverlayAtPostV1(root, currentAtWO800, ledger.Phase8ProfileCryptographyOverlays)
 	if err != nil {
@@ -449,6 +496,11 @@ func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2Maint
 }
 
 func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
+	const phase8WO806OutsideScopeHash = "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a"
+	const phase8WO806OutsideScopeFileCount = 1329
+	if m0OutsideScopeHashV1 != phase8WO806OutsideScopeHash || m0OutsideScopeFileCount != phase8WO806OutsideScopeFileCount {
+		t.Fatalf("phase8 WO-806 guard binding=%s/%d want %s/%d", m0OutsideScopeHashV1, m0OutsideScopeFileCount, phase8WO806OutsideScopeHash, phase8WO806OutsideScopeFileCount)
+	}
 	root := filepath.Clean(filepath.Join("..", ".."))
 	if _, err := loadM2MaintenancePreHashesV1(root); err != nil {
 		t.Fatal(err)
@@ -685,6 +737,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	preHashes = m0CandidateMaintenancePreHashesV1(preHashes)
 	manifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, paths, preHashes)
 	if err != nil {
 		t.Fatal(err)
@@ -793,8 +846,16 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.BaselineStabilizationOverlays) != 1 || len(stabilizationOverlay.Paths) != 8 || len(stabilizationOverlay.Entries) != 7 || stabilizationOverlay.Paths[7] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid stabilization fixture overlay identity/cardinality: %+v", stabilizationOverlay)
 	}
+	guardOverlay, ok := ledger.Phase8GuardMaintenanceOverlays["phase8-wo806-guard-convergence-v1"]
+	if !ok || len(ledger.Phase8GuardMaintenanceOverlays) != 1 || len(guardOverlay.Paths) != 8 || len(guardOverlay.Entries) != 7 || guardOverlay.Paths[7] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid Phase 8 guard fixture overlay identity/cardinality: %+v", guardOverlay)
+	}
+	finalGuardOverlay, ok := ledger.Phase8FinalGuardMaintenanceOverlays["phase8-wo808-final-guard-convergence-v1"]
+	if !ok || len(ledger.Phase8FinalGuardMaintenanceOverlays) != 1 || len(finalGuardOverlay.Paths) != 58 || len(finalGuardOverlay.Entries) != 57 || finalGuardOverlay.Paths[57] != m2MaintenanceSelfPathV1 {
+		t.Fatalf("invalid Phase 8 final guard fixture overlay identity/cardinality: %+v", finalGuardOverlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -846,7 +907,27 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	for _, workOrderOverlay := range ledger.Phase8WorkOrderOverlays {
+		for _, path := range workOrderOverlay.Paths {
+			if !seen[path] {
+				fixturePaths = append(fixturePaths, path)
+				seen[path] = true
+			}
+		}
+	}
 	for _, path := range stabilizationOverlay.Paths[:len(stabilizationOverlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range guardOverlay.Paths[:len(guardOverlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range finalGuardOverlay.Paths[:len(finalGuardOverlay.Paths)-1] {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true
@@ -872,13 +953,13 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase8 final guard-maintenance hash drift README.md") {
 		t.Fatalf("changed listed content error=%v", err)
 	}
 	if err := os.Remove(drift); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "M2 phase2-complete hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase8 final guard-maintenance hash drift README.md") {
 		t.Fatalf("missing listed path error=%v", err)
 	}
 
@@ -1314,5 +1395,176 @@ func TestSecurityPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
 				t.Fatalf("accepted %s", name)
 			}
 		})
+	}
+}
+
+func TestSecurityPhase8WorkOrderOverlayChainMutationsV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	clone := func() map[string]m2Phase8WorkOrderOverlayV1 {
+		encoded, err := json.Marshal(manifest.Phase8WorkOrderOverlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]m2Phase8WorkOrderOverlayV1
+		if err := json.Unmarshal(encoded, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateM8WorkOrderOverlayChainAtPostV1(root, finalGuardPre, clone()); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]func(map[string]m2Phase8WorkOrderOverlayV1){
+		"missing": func(v map[string]m2Phase8WorkOrderOverlayV1) { delete(v, "phase8-wo803-canonical-profile-codec-v1") },
+		"extra":   func(v map[string]m2Phase8WorkOrderOverlayV1) { v["extra"] = v["phase8-wo802-standards-suite-v1"] },
+		"reordered": func(v map[string]m2Phase8WorkOrderOverlayV1) {
+			v["phase8-wo803-canonical-profile-codec-v1"], v["phase8-wo804-trust-provider-boundaries-v1"] = v["phase8-wo804-trust-provider-boundaries-v1"], v["phase8-wo803-canonical-profile-codec-v1"]
+		},
+		"path-substitution": func(v map[string]m2Phase8WorkOrderOverlayV1) {
+			o := v["phase8-wo805-verified-profile-activation-v1"]
+			o.Paths[0], o.Entries[0].Path = "README.md", "README.md"
+			v[o.Version] = o
+		},
+		"predecessor": func(v map[string]m2Phase8WorkOrderOverlayV1) {
+			o := v["phase8-wo807-integrated-assurance-v1"]
+			o.PredecessorOverlaySHA256 = strings.Repeat("1", 64)
+			v[o.Version] = o
+		},
+		"content-drift": func(v map[string]m2Phase8WorkOrderOverlayV1) {
+			o := v["phase8-wo802-standards-suite-v1"]
+			o.Entries[0].PostSHA256 = strings.Repeat("2", 64)
+			v[o.Version] = o
+		},
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			v := clone()
+			mutate(v)
+			if _, err := validateM8WorkOrderOverlayChainAtPostV1(root, finalGuardPre, v); err == nil {
+				t.Fatal("mutation accepted")
+			}
+		})
+	}
+}
+
+func TestSecurityPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	clone := func() map[string]m2MaintenanceOverlayRecordV1 {
+		encoded, err := json.Marshal(manifest.Phase8GuardMaintenanceOverlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]m2MaintenanceOverlayRecordV1
+		if err := json.Unmarshal(encoded, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateM8GuardMaintenanceOverlayAtPostV1(root, finalGuardPre, clone()); err != nil {
+		t.Fatal(err)
+	}
+	mutations := map[string]func(map[string]m2MaintenanceOverlayRecordV1){
+		"missing-overlay": func(v map[string]m2MaintenanceOverlayRecordV1) { delete(v, "phase8-wo806-guard-convergence-v1") },
+		"extra-overlay":   func(v map[string]m2MaintenanceOverlayRecordV1) { v["extra"] = v["phase8-wo806-guard-convergence-v1"] },
+		"missing-path": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Paths = o.Paths[:len(o.Paths)-1]
+			v[o.Version] = o
+		},
+		"extra-path": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Paths = append(o.Paths, "README.md")
+			v[o.Version] = o
+		},
+		"reordered-path": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Paths[0], o.Paths[1] = o.Paths[1], o.Paths[0]
+			v[o.Version] = o
+		},
+		"self-pre": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.SelfPreSHA256 = strings.Repeat("1", 64)
+			v[o.Version] = o
+		},
+		"pre-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Entries[0].PreSHA256 = strings.Repeat("2", 64)
+			v[o.Version] = o
+		},
+		"post-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Entries[0].PostSHA256 = strings.Repeat("3", 64)
+			v[o.Version] = o
+		},
+		"path-substitution": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase8-wo806-guard-convergence-v1"]
+			o.Paths[0], o.Entries[0].Path = "README.md", "README.md"
+			v[o.Version] = o
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			v := clone()
+			mutate(v)
+			if _, err := validateM8GuardMaintenanceOverlayAtPostV1(root, finalGuardPre, v); err == nil {
+				t.Fatal("mutation accepted")
+			}
+		})
+	}
+}
+
+func TestPhase8ExistingFileOverlayPreservesHistoricalCandidateBindingV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	entry := manifest.Phase8WorkOrderOverlays["phase8-wo802-standards-suite-v1"].Entries[2]
+	if entry.Path != "go.mod" || entry.PreEvidence == "ABSENT" || entry.PreEvidence == m0StabilizationPreHashesV1["go.mod"] {
+		t.Fatalf("invalid existing-file overlay regression fixture: %+v", entry)
+	}
+	candidate, err := m0CandidateOutsideScopeManifestV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.OutsideScopeSHA256 != "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a" || candidate.OutsideScopeFileCount != 1329 {
+		t.Fatalf("existing-file overlay replaced historical candidate binding: %s/%d", candidate.OutsideScopeSHA256, candidate.OutsideScopeFileCount)
 	}
 }

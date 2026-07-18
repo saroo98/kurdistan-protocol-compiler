@@ -1,0 +1,14 @@
+{
+  "schema": "kurdistan.phase8.delegation-negative-report.v1",
+  "cases": [
+    {"name":"issuer provider scope mismatch","result":"rejected"},
+    {"name":"issuer delegation expired","result":"rejected"},
+    {"name":"issuer key id collides with root","result":"rejected"},
+    {"name":"issuer delegation names unknown root","result":"rejected"},
+    {"name":"revoked issuer delegation","result":"rejected"},
+    {"name":"unauthorized root set update","result":"rejected"},
+    {"name":"issuer delegation expired root","result":"rejected"},
+    {"name":"issuer delegation future root","result":"rejected"}
+  ],
+  "summary": {"accepted":0,"rejected":8}
+}
