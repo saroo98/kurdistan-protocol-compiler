@@ -907,7 +907,7 @@ func TestReferenceHostResourceReport(t *testing.T) {
 		} `json:"stages"`
 	}
 	loadJSON(t, filepath.Join("testdata", "phase8-codec", "reference-host-resource-report.json"), &report)
-	if report.Schema != "kurdistan.phase8.reference-host-resource-report.v3" || report.HostAlias != "reference-windows-amd64" || report.RawEvidence != "reference-host-resource-raw.json" || len(report.Stages) != len(operations) || strings.Contains(strings.ToLower(report.HostAlias), strings.ToLower(os.Getenv("USERNAME"))) {
+	if report.Schema != "kurdistan.phase8.reference-host-resource-report.v3" || report.HostAlias != "reference-windows-amd64" || report.RawEvidence != "reference-host-resource-raw.json" || len(report.Stages) != len(operations) || hostAliasContainsLocalIdentity(report.HostAlias) {
 		t.Fatalf("unsafe report identity: %+v", report)
 	}
 	rawPath := filepath.Join("testdata", "phase8-codec", report.RawEvidence)
@@ -936,7 +936,7 @@ func TestReferenceHostResourceReport(t *testing.T) {
 		}
 	}
 	loadJSON(t, rawPath, &raw)
-	if raw.Schema != "kurdistan.phase8.reference-host-resource-raw.v1" || raw.HostAlias != report.HostAlias || raw.Command != "go run ./internal/testkit/phase8resourcecapture -out internal/product/envelope/testdata/phase8-codec" || raw.GoVersion != runtime.Version() || raw.GOOS != runtime.GOOS || raw.GOARCH != runtime.GOARCH || raw.Iterations != 1000 || len(raw.Stages) != len(report.Stages) {
+	if raw.Schema != "kurdistan.phase8.reference-host-resource-raw.v1" || raw.HostAlias != report.HostAlias || raw.Command != "go run ./internal/testkit/phase8resourcecapture -out internal/product/envelope/testdata/phase8-codec" || raw.GoVersion != runtime.Version() || raw.GOOS != "windows" || raw.GOARCH != "amd64" || raw.Iterations != 1000 || len(raw.Stages) != len(report.Stages) {
 		t.Fatalf("invalid raw resource provenance: %+v", raw)
 	}
 	if _, err := time.Parse(time.RFC3339, raw.CapturedAtUTC); err != nil {
@@ -1021,7 +1021,12 @@ func TestWO803FuzzTranscript(t *testing.T) {
 		if boundary.SourceSHA256 != sourceHash || boundary.FixtureSHA256 != fixtureHash {
 			t.Fatalf("fuzz source/fixture binding drift for %s", boundary.Name)
 		}
-		if boundary.RawTranscript == "" || boundary.RawSHA256 != fileSHA256(t, filepath.Join("testdata", "phase8-codec", boundary.RawTranscript)) {
+		rawPath := filepath.Join("testdata", "phase8-codec", boundary.RawTranscript)
+		raw, err := os.ReadFile(rawPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if boundary.RawTranscript == "" || bytes.Contains(raw, []byte{'\r'}) || boundary.RawSHA256 != fmt.Sprintf("%x", sha256.Sum256(raw)) {
 			t.Fatalf("raw fuzz transcript binding drift for %s", boundary.Name)
 		}
 	}
@@ -1030,6 +1035,29 @@ func TestWO803FuzzTranscript(t *testing.T) {
 			t.Fatalf("fuzz transcript recorded private field %s", field)
 		}
 	}
+}
+
+func TestReferenceHostAliasPrivacyCheckIgnoresEmptyEnvironmentValues(t *testing.T) {
+	t.Setenv("USERNAME", "")
+	t.Setenv("USER", "")
+	if hostAliasContainsLocalIdentity("reference-windows-amd64") {
+		t.Fatal("empty identity environment values matched every host alias")
+	}
+	t.Setenv("USER", "reference-windows")
+	if !hostAliasContainsLocalIdentity("reference-windows-amd64") {
+		t.Fatal("non-empty local identity was not detected in host alias")
+	}
+}
+
+func hostAliasContainsLocalIdentity(alias string) bool {
+	alias = strings.ToLower(alias)
+	for _, name := range []string{"USERNAME", "USER"} {
+		identity := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+		if identity != "" && strings.Contains(alias, identity) {
+			return true
+		}
+	}
+	return false
 }
 
 func fileSHA256(t *testing.T, path string) string {

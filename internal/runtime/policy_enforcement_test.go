@@ -2101,11 +2101,11 @@ func validatePolicyPhase8WorkOrderOverlayChainAtPostV1(root string, currentAtPos
 	}
 	want := []expected{
 		{"phase8-wo802-standards-suite-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-802.md", "2a086c7cc686f4ff27e040684d9e5c33c7d0fc0cb6f9746bc0d637e41ccec6cf", "49c670581cf947c1823a3f52827c83aba151b228a568b9fc80b5d7771e0379dd", 14},
-		{"phase8-wo803-canonical-profile-codec-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-803.md", "49c670581cf947c1823a3f52827c83aba151b228a568b9fc80b5d7771e0379dd", "c45e9c2418ccef2509bc8f7a787fcdc7ca3dddf8ba0318f724e161cb16e6d266", 18},
-		{"phase8-wo804-trust-provider-boundaries-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-804.md", "c45e9c2418ccef2509bc8f7a787fcdc7ca3dddf8ba0318f724e161cb16e6d266", "961d4f598c0dcbc6c9937adf2d2540d0586748e7de71f38bea961b2dbad6d1ee", 9},
-		{"phase8-wo805-verified-profile-activation-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-805.md", "961d4f598c0dcbc6c9937adf2d2540d0586748e7de71f38bea961b2dbad6d1ee", "b9b531eb5733202243ac96fff9f97d15d540ff032a82afd6d0d4ac4c7b74f7ba", 16},
-		{"phase8-wo806-offline-issuance-tooling-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-806.md", "b9b531eb5733202243ac96fff9f97d15d540ff032a82afd6d0d4ac4c7b74f7ba", "65a34d5e536c2a46d8431022682420a0d5a4c4f27a82678225b94f907ea146d0", 29},
-		{"phase8-wo807-integrated-assurance-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-807.md", "65a34d5e536c2a46d8431022682420a0d5a4c4f27a82678225b94f907ea146d0", "c3332f84cddc922c5f213c726bda83d05b0171fc5b81f35c40c660ed2c804524", 13},
+		{"phase8-wo803-canonical-profile-codec-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-803.md", "49c670581cf947c1823a3f52827c83aba151b228a568b9fc80b5d7771e0379dd", "455aeb9783c9faa7fd28d570e41a5e5eaa0248ec3bbc07242accfd4e16b083f3", 18},
+		{"phase8-wo804-trust-provider-boundaries-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-804.md", "455aeb9783c9faa7fd28d570e41a5e5eaa0248ec3bbc07242accfd4e16b083f3", "327ef644aba5a4a758181191206743de4649918f0f5575904b868ef926b6e76d", 9},
+		{"phase8-wo805-verified-profile-activation-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-805.md", "327ef644aba5a4a758181191206743de4649918f0f5575904b868ef926b6e76d", "501788854706061ca905de360b4b6adc1388b3802de999d45c75193db9f1434c", 16},
+		{"phase8-wo806-offline-issuance-tooling-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-806.md", "501788854706061ca905de360b4b6adc1388b3802de999d45c75193db9f1434c", "0990536ee30b8c72c066da532d568cde22ea035780b365352283646e08968825", 29},
+		{"phase8-wo807-integrated-assurance-v1", "planning/product-program-phase8-plan-2026-07-17/plans/work-orders/WO-807.md", "0990536ee30b8c72c066da532d568cde22ea035780b365352283646e08968825", "ec506b5ff24b7571f07c0067ad310034a2a074e27945bf448abe364a679a4d11", 13},
 	}
 	if len(overlays) != len(want) {
 		return nil, fmt.Errorf("invalid phase8 work-order overlay cardinality")
