@@ -1,0 +1,67 @@
+{
+  "schema": "kurdistan.phase8.wo807-recovery-report.v2",
+  "scope": "deterministic recovery drills through production profile activation boundaries",
+  "activation_source_sha256": "62688cc599a00b89d021668a0044f470c9adc6179894981ce16a12191218b36c",
+  "local_activation_source_sha256": "8021cee9fa41131005159a0a97bf92fd826897afc24678f0b397688ab775ad97",
+  "test_source_sha256": "42f9a89777c8c87dc5d1a24749d3e45399e231d18a38c154a52f507197cd0ec5",
+  "scenarios": [
+    {
+      "name": "issuer-replacement",
+      "observed_by": "TestWO807IssuerReplacementRecoveryDrill",
+      "state_before": "generation 1 active under predecessor issuer",
+      "state_after": "generation 2 active under replacement issuer; revoked predecessor issuer rejected without persistence changes",
+      "rejection_atomicity": true,
+      "observations": [
+        "generation-1-predecessor-active",
+        "generation-2-replacement-issuer-committed",
+        "revoked-predecessor-rejected",
+        "rejection-left-active-and-transaction-state-unchanged"
+      ],
+      "observed_execution_sha256": "d773bbb04b266576dfdbca72a9938e399dfb2998bd9efbdb6675dcf54fea9ab9"
+    },
+    {
+      "name": "revoked-profile-new-generation",
+      "observed_by": "TestWO807NewGenerationReplacesRevokedActiveProfile",
+      "state_before": "revoked content generation 1 remains active while a revoked replacement attempt is rejected atomically",
+      "state_after": "a subsequently valid generation 2 replacement is active; generation 1 is retained as last-known-good",
+      "rejection_atomicity": true,
+      "observations": [
+        "generation-1-active-and-revoked",
+        "revoked-generation-2-candidate-rejected",
+        "rejection-left-active-and-transaction-state-unchanged",
+        "valid-generation-2-committed",
+        "generation-1-retained-as-last-known-good"
+      ],
+      "observed_execution_sha256": "857bdba6b789d0e26b7e60cdbd30a87b50a78eb892d31ad1796b33ed9358db43"
+    },
+    {
+      "name": "local-wrap-key-loss",
+      "observed_by": "TestWO807LocalWrapKeyLossLeavesActiveStateAtomic",
+      "state_before": "generation 1 activated through the production local-wrap activation boundary",
+      "state_after": "generation 2 activation fails before transaction storage after device-key loss; active and transaction state remain unchanged",
+      "rejection_atomicity": true,
+      "observations": [
+        "generation-1-activated-through-local-wrap-boundary",
+        "device-wrap-key-removed",
+        "wrapped-generation-2-activation-failed-closed",
+        "active-and-transaction-state-unchanged"
+      ],
+      "observed_execution_sha256": "a743bfb34f1a01cb05ce8d42a51537e37d3922937f0b010eb2f9b9e5ccbfcdf8"
+    },
+    {
+      "name": "interrupted-activation",
+      "observed_by": "TestWO807InterruptedActivationRecoveryDrill",
+      "state_before": "generation 1 active before replacement transaction",
+      "state_after": "precommit interruption restores generation 1; postcommit interruption retains fully verified generation 2; transaction markers are cleared",
+      "rejection_atomicity": true,
+      "observations": [
+        "precommit-interruption-restored-generation-1",
+        "precommit-transaction-markers-cleared",
+        "postcommit-interruption-retained-verified-generation-2",
+        "postcommit-transaction-markers-cleared"
+      ],
+      "observed_execution_sha256": "681741da6c452bea7774eaab59f24b56d8eb3a7b81cff9bfa9d9e01a48837bb2"
+    }
+  ],
+  "limitations": "These deterministic local drills do not claim production keystore durability, operating-system crash consistency, or deployed infrastructure recovery."
+}

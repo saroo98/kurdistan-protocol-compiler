@@ -1,0 +1,84 @@
+{
+  "schema": "kurdistan.phase8.prohibited-composition-report.v1",
+  "scope": "WO-802 production Go module, Phase 8 envelope contract, and committed interoperability evidence",
+  "module_inventory": {
+    "command": "go list -m all",
+    "modules": [
+      {
+        "path": "kurdistan",
+        "classification": "repository module"
+      },
+      {
+        "path": "github.com/fxamacker/cbor/v2",
+        "version": "v2.9.2",
+        "classification": "reviewed direct deterministic-CBOR dependency",
+        "license": "MIT",
+        "commit": "45589abe5c63bea2db4d311e0d0fcc551cd772ae"
+      },
+      {
+        "path": "github.com/x448/float16",
+        "version": "v0.8.4",
+        "classification": "reviewed indirect dependency of fxamacker/cbor",
+        "license": "MIT"
+      }
+    ],
+    "unreviewed_dependencies": 0
+  },
+  "prohibitions": [
+    {
+      "name": "draft-only-mandatory-format",
+      "observed": 0,
+      "evidence": "mandatory suite uses final RFC 8949, RFC 9052, RFC 9053, and RFC 9180 classical components; COSE-HPKE and draft-ietf-hpke-pq candidates are rejected/reserved-disabled"
+    },
+    {
+      "name": "automatic-suite-downgrade",
+      "observed": 0,
+      "evidence": "ValidateSuiteID admits only 0x0001; reserved and unknown IDs return ErrUnsupportedSuite; no negotiation or fallback API exists"
+    },
+    {
+      "name": "production-key-material",
+      "observed": 0,
+      "evidence": "no production private key, recipient key, credential, endpoint, or service configuration was added; independent fixture IKM and signing values are deterministic, labeled test-only, and unusable as production authority"
+    },
+    {
+      "name": "universal-or-shared-recipient-key",
+      "observed": 0,
+      "evidence": "outer seal requires an admitted provisioned recipient class; signed-public is rejected by BuildSealProtected and no class fallback exists"
+    },
+    {
+      "name": "passphrase-backup-in-phase8",
+      "observed": 0,
+      "evidence": "no passphrase, password KDF, Argon2, scrypt, PBKDF, or recovery phrase production path exists; encrypted-backup is recipient-key-only"
+    },
+    {
+      "name": "hpke-context-reuse",
+      "observed": 0,
+      "evidence": "MaxHPKEMessagesPerContext is 1 and the second budget consumption is an ErrHPKEContextExhausted failure"
+    },
+    {
+      "name": "deterministic-test-rng-in-production",
+      "observed": 0,
+      "evidence": "source guard scans all non-test Go files in internal/product/envelope and finds no testing/cryptotest import"
+    },
+    {
+      "name": "network-service-or-android-change",
+      "observed": 0,
+      "evidence": "WO-802 changes only dependency metadata, docs, internal/product/envelope, and testdata; no service, endpoint, socket, Android, deployment, release, or production signing path was added"
+    }
+  ],
+  "scan_results": {
+    "go_module_count_including_root": 3,
+    "draft_or_downgrade_matches_in_production_envelope": 0,
+    "passphrase_kdf_matches_in_production_envelope": 0,
+    "production_key_matches": 0,
+    "known_negative-test_private_key_marker_matches": 1,
+    "known_negative_test_location": "internal/product/envelope/envelope_test.go",
+    "unexpected_accepts": 0
+  },
+  "summary": {
+    "unreviewed_dependencies": 0,
+    "draft_only_mandatory_formats": 0,
+    "automatic_downgrade_paths": 0,
+    "production_keys": 0
+  }
+}

@@ -1,0 +1,25 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/2 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 2/2 completed, now fuzzing with 32 workers
+fuzz: elapsed: 3s, execs: 502307 (167398/sec), new interesting: 247 (total: 249)
+fuzz: elapsed: 6s, execs: 2490417 (661949/sec), new interesting: 356 (total: 358)
+fuzz: elapsed: 9s, execs: 4457462 (655739/sec), new interesting: 401 (total: 403)
+fuzz: elapsed: 12s, execs: 6092985 (545636/sec), new interesting: 437 (total: 439)
+fuzz: elapsed: 15s, execs: 7755617 (554390/sec), new interesting: 469 (total: 471)
+fuzz: elapsed: 18s, execs: 9593478 (612469/sec), new interesting: 495 (total: 497)
+fuzz: elapsed: 21s, execs: 11163112 (523304/sec), new interesting: 526 (total: 528)
+fuzz: elapsed: 24s, execs: 12820532 (552524/sec), new interesting: 543 (total: 545)
+fuzz: elapsed: 27s, execs: 14266395 (481661/sec), new interesting: 552 (total: 554)
+fuzz: elapsed: 30s, execs: 15613080 (448782/sec), new interesting: 559 (total: 561)
+fuzz: elapsed: 33s, execs: 16917046 (434955/sec), new interesting: 565 (total: 567)
+fuzz: elapsed: 36s, execs: 18546327 (543091/sec), new interesting: 572 (total: 574)
+fuzz: elapsed: 39s, execs: 19835959 (429941/sec), new interesting: 578 (total: 580)
+fuzz: elapsed: 42s, execs: 21102264 (422042/sec), new interesting: 587 (total: 589)
+fuzz: elapsed: 45s, execs: 22368940 (421370/sec), new interesting: 595 (total: 597)
+fuzz: elapsed: 48s, execs: 23466336 (366259/sec), new interesting: 600 (total: 602)
+fuzz: elapsed: 51s, execs: 24519519 (351401/sec), new interesting: 607 (total: 609)
+fuzz: elapsed: 54s, execs: 25700940 (393143/sec), new interesting: 612 (total: 614)
+fuzz: elapsed: 57s, execs: 26862182 (387750/sec), new interesting: 614 (total: 616)
+fuzz: elapsed: 1m0s, execs: 28011799 (382917/sec), new interesting: 615 (total: 617)
+fuzz: elapsed: 1m1s, execs: 28011799 (0/sec), new interesting: 615 (total: 617)
+PASS
+ok  	kurdistan/internal/product/envelope	61.890s

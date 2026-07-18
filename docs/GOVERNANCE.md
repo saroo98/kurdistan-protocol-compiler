@@ -27,7 +27,7 @@ subset was spot-checked.
 | Generated backend | `kgen --profile <p.json> --out <dir> && (cd <dir> && go test ./...)` | the emitted profile module builds and tests |
 
 A single command runs the whole bar (build, vet, test, and the audit), for use
-as a pre-merge check in the absence of external CI:
+locally and in CI:
 
 ```
 go run ./cmd/gate          # build + vet + test + full audit
@@ -35,6 +35,10 @@ go run ./cmd/gate -quick   # build + vet + test + quick audit (faster)
 ```
 
 It exits non-zero if any step fails.
+
+The repository CI workflow runs this command without the Go test cache on both
+Ubuntu and Windows. CI is a reproducibility control, not evidence of production
+readiness or authorization to merge a security-sensitive milestone.
 
 The gate's canonical test step includes `-count=1`. Evidence checks must be
 valid in a clean checkout and may not depend on `HEAD` representing an earlier
@@ -137,9 +141,9 @@ artifact and does not affect the committed content or a fresh checkout.
 Changes to cryptographic behaviour (`internal/crypto/**`), to what the runtime
 enforces, or to the meaning of a security gate are held to a higher bar: they
 require explicit review and, for production cryptography, external cryptographic
-review before merge. KIP-0075 opens only the Phase 8 offline
-production-candidate profile-artifact program with deterministic non-production
-keys. Its exact design and candidate implementation remain separately reviewed,
-and it does not authorize production keys, production signers, Android key
-storage, HSM/KMS operation, live delivery, deployment, pilot, or release. See
+review before merge. KIP-0075 through KIP-0082 implement only the Phase 8 local
+production-candidate profile-artifact boundary with deterministic non-production
+keys. Its external merge-eligibility evidence remains **[UNVERIFIED]**, and it
+does not authorize production keys, production signers, Android key storage,
+HSM/KMS operation, live delivery, deployment, pilot, or release. See
 `docs/safety.md` and the relevant KIPs.

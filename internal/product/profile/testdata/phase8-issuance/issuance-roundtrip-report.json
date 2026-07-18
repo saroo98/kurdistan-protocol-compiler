@@ -1,0 +1,22 @@
+{
+  "case_set_sha256": "25072105c13421cf28fbe86b506a09953d183e8bd0a2c472c59f586e13d067d7",
+  "cases": [
+    "signed-public",
+    "provider-group",
+    "device-recipient",
+    "encrypted-backup"
+  ],
+  "execution_sha256": "8f902cec0330a7557c49042eafffcc7143bb13358a1fb14649f46310b4d91aed",
+  "observation_sha256": "8f902cec0330a7557c49042eafffcc7143bb13358a1fb14649f46310b4d91aed",
+  "observations": [
+    "signed-public:artifact=6e9f0808271cf7297d6b39ee32b46e52b8de0f5a1c0b262e0b1c4fbc1850e0e3:content=content.0001",
+    "provider-group-recipient:artifact=28b2b508d93bf5b61cf6cd2f0bc858413d90fb433f2b54861678bcbe257c8961:content=content.0001",
+    "device-recipient:artifact=399f8c65e3d080e2215e7e8e0f2a6f6a06a4016c2a5ca3a7fa8c732f9f72b4b7:content=content.0001",
+    "encrypted-backup:artifact=8bd8d6fbb51cb95218ce17893b7911dae0351ecb8bd3ac9d988c07b3c6c362e4:content=content.0001"
+  ],
+  "result_sha256": "6190dc6a08267e8e1cd7a0ab05de63578a1959991afcc9b120c7a540d9cb4010",
+  "schema": "phase8-issuance-evidence-v1",
+  "source_sha256": "3f3b87137f9d23aa4c9fa76878784bb0d6d770b2b07ea6651b5a1747adec59e6",
+  "test": "TestOfflineIssuanceRoundTripsAllArtifactClasses",
+  "test_source_sha256": "f846202d6f53e100a8b602971b7f6d3497bd957459b2873876fb45fafde5d64a"
+}

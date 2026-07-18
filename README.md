@@ -28,22 +28,22 @@ Current profile generation covers:
 - adversarial diversity, mutation, black-box trace audits, security invariant gates, runtime session audits, implementation hardening gates, and adapter contract gates
 - adaptive path candidates and generated transport bundles for future path-selection research
 
-The current codebase provides the compiler, runtime session harness, source generator, audit system, and offline product contracts. The project is now in staged product development; production transport integration remains future work until its phase is implemented and validated.
+The current codebase provides the compiler, runtime session harness, source generator, audit system, offline product contracts, and a bounded Phase 8 profile-artifact implementation. The project is now in staged product development; production transport integration remains future work until its phase is implemented and validated.
 
 ## Legend: `[live]`, `[model]`, `[plan]`
 
 To keep this document honest about what runs versus what is only designed,
 capabilities fall into three classes:
 
-- `[live]` — runs and does real work in the lab. Real network I/O is loopback-only and limited to the `relay`, `labtrace`, and `concretelocaladapter` packages.
+- `[live]` — executes real behavior locally. Real network I/O is loopback-only and limited to the `relay`, `labtrace`, and `concretelocaladapter` packages.
 - `[model]` — a deterministic, in-memory, payload-free contract or simulation. It validates shapes and semantics but performs no real networking.
 - `[plan]` — a design spec or review contract only; no implementation yet.
 
-Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The security and runtime `*_mutant_detection` gates measure bounded real lab fault-injection detector sensitivity with paired controls: they show that named detectors turn red for deliberate lab faults while their paired controls stay green. They do not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, or production cryptography.
+Unless a feature is explicitly marked `[live]`, treat the carrier, path, relay, proxy, Android, and VPN features described below as `[model]` or `[plan]`. The Phase 8 profile-artifact boundary is local and uses deterministic, non-production fixtures only. The security and runtime `*_mutant_detection` gates measure bounded real lab fault-injection detector sensitivity with paired controls: they show that named detectors turn red for deliberate lab faults while their paired controls stay green. They do not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy (see `STATUS.md`). This repository does not implement live VPN, SOCKS, or HTTP-proxy transport, real packet capture, non-loopback networking, public relays, production key custody, or a deployed cryptographic service.
 
-## Current governed milestone: Phase 8 preparation
+## Current governed milestone: Phase 8 profile artifacts
 
-M2-M7 completed the governance and offline contract foundation. Kurdistan has now graduated from a blanket lab-only scope. Phases 8-13 may add real product behavior one authorized, reviewed, tested, and reversible phase at a time. Capability labels remain evidence statements and must not be confused with permanent prohibitions.
+M2-M7 completed the governance and offline contract foundation. Phase 8 now implements the bounded local profile-artifact boundary described by KIP-0075 through KIP-0082: deterministic CBOR framing, signed-profile verification, optional recipient sealing, strict admission, lifecycle activation, local issuance tooling, and evidence fixtures. It does not possess production keys or perform Android keystore operations, HSM/KMS operations, live update delivery, networking, deployment, pilot, or release. The external merge-eligibility evidence remains **[UNVERIFIED]**. Phase 9 is the separately gated Android application foundation. Capability labels remain evidence statements and must not be confused with permanent prohibitions.
 
 ## Why This Project Exists
 
@@ -106,6 +106,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 - Carrier adversary scenarios for batching pressure, chunked large responses, queue backpressure, reorder/retry recovery, and proxysem parity.
 - Security prerequisite layer for transcript binding, key schedule interfaces, nonce management, replay rejection, downgrade resistance, capability negotiation, compatibility, config hygiene, secure envelope metadata, and security mutation tests.
 - Production-oriented key exchange design contract for transcript binding, identity binding, nonce/replay policy, downgrade resistance, key separation, rotation readiness, generated transport compatibility, and independent review package requirements.
+- Phase 8 local profile-artifact implementation: deterministic CBOR framing; signed-profile verification; optional recipient sealing; strict URI/QR/file admission; provider, revocation, and lifecycle checks; and local issue/inspect tooling using non-production fixtures.
 - Relay authentication, rotation, and compatibility design contract for relay identity, profile/version negotiation, rotation windows, expiry/revocation, fail-closed behavior, and stale-profile handling.
 - Operational hardening for relay/runtime resource limits, strict config validation, deterministic shutdown/restart, safe diagnostics, rollback boundaries, health summaries, misuse controls, and generated parity.
 - Android architecture review for profile import and verification, Android permission boundaries, UI state, lifecycle, reconnect behavior, kill-switch semantics, diagnostics, privacy boundaries, and M57/M58 implementation contracts.
@@ -140,7 +141,7 @@ Current work is concentrated on the generated transport/compiler layer, determin
 
 ## Current Boundary
 
-The repository currently contains compiler, runtime, generator, and audit work. It does not contain deployment code, external targets, production key exchange, payload logging, SOCKS mode, VPN mode, HTTP carriers, TLS mimicry, CDN behavior, mobile clients, or live-network testing.
+The repository currently contains compiler, runtime, generator, audit work, and a bounded local profile-artifact implementation. It does not contain deployment code, external targets, production key custody or signing operations, payload logging, SOCKS mode, VPN mode, HTTP carriers, TLS mimicry, CDN behavior, a mobile client, or live-network testing.
 
 That boundary is intentional while the protocol model, audit gates, and generated backend are still being built.
 
@@ -189,8 +190,8 @@ internal/contracts/{android,carrier,lab,proxy,readiness,vpn}
 internal/operator/{relayauthplan,relaybridge,relayfleet,relayprocess}
   [model]/[plan] relay bridge, fleet, process, authentication, rotation, and compatibility contracts
 
-internal/product/{android,envelope,strategy}
-  contracts-only [model]/[plan] product scaffold; no Android build, sealing, packet capture, live carrier, or non-loopback networking
+internal/product/{android,envelope,strategy,profile,lifecycle}
+  product contracts plus the local Phase 8 profile-artifact boundary: canonical framing, verified profile admission, lifecycle activation, and local tooling; no Android build, production key custody, packet capture, live carrier, or non-loopback networking
 
 internal/characterization + internal/testkit/{adversary,bench,importrules,mutant}
   observable-behavior goldens, reusable test support, mutation controls, benchmarks, and enforced import-boundary checks

@@ -7,7 +7,7 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: Phase 8 profile cryptography preparation
+## Current phase: Phase 8 profile cryptography implementation
 
 The project has graduated from its lab-only phase. The compiler, audit system, and M2-M7 offline contracts remain the validated starting point, while Phases 8-13 progressively open profile cryptography, Android, VPN/TUN, live Kurd transport and relays, operator infrastructure, and controlled release. Current labels remain factual capability markers, not permanent scope blockers.
 
@@ -31,16 +31,17 @@ is opened. See KIP-0070 through KIP-0074.
 
 Every further implementation milestone requires its scoped authorization and evidence before work begins; no blanket lab-only prohibition applies.
 
-Phase 8 is now authorized only for an offline production-candidate profile
-artifact boundary. WO-800 records the stabilized predecessor and reconciles
-policy; WO-801 through WO-807 may then define and implement authenticated
+Phase 8 implements the bounded local production-candidate profile-artifact
+boundary. WO-800 through WO-807 reconcile policy and implement authenticated
 profile artifacts, optional recipient confidentiality, portable key-provider
-interfaces, deterministic fixtures, and offline issuance and verification.
-Only deterministic non-production keys and local evidence are permitted.
-Android key storage, production signers, HSM/KMS operation, live update
-delivery, networking, deployment, pilot, and release remain closed. Exact
-design review and implementation security review remain mandatory before
-merge. See KIP-0075.
+interfaces, deterministic fixtures, local issuance, verification, recovery, and
+assurance evidence. Only deterministic non-production keys and local evidence
+are permitted. Android key storage, production signers, HSM/KMS operation, live
+update delivery, networking, deployment, pilot, and release remain closed.
+The external merge-eligibility evidence is **[UNVERIFIED]**; it must not be
+substituted by local tests. Phase 9, Android application foundation and encrypted
+local storage, is the next separately authorized phase. See KIP-0075 through
+KIP-0082.
 
 ## Future phase gates
 

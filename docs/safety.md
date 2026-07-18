@@ -41,14 +41,14 @@ keys, or external destinations — in live code, models, or fixtures.
 
 Do not invent cryptographic constructions or use production keys in this
 repository. The v0 proof uses standard Go HMAC-SHA256 and test-only key
-material. KIP-0075 authorizes Phase 8 to develop an offline
-production-candidate profile-artifact design and implementation using reviewed
-standards, bounded parsing, deterministic non-production keys, and portable
-key-provider interfaces. It does not authorize production signing, production
-key management, Android Keystore integration, HSM/KMS operation, live profile
-delivery, deployment, pilot, or release. The exact design and candidate
-implementation remain behind their named review gates. Fixtures are safe to
-commit only when deterministic, non-production, secret-free, and explicitly
+material. KIP-0075 through KIP-0082 authorize and implement Phase 8's local
+production-candidate profile-artifact boundary using reviewed standards, bounded
+parsing, deterministic non-production keys, and portable key-provider
+interfaces. It does not authorize production signing, production key management,
+Android Keystore integration, HSM/KMS operation, live profile delivery,
+deployment, pilot, or release. The external merge-eligibility evidence is
+**[UNVERIFIED]** and local tests are not a substitute for it. Fixtures are safe
+to commit only when deterministic, non-production, secret-free, and explicitly
 identified as test material.
 
 ## Claims

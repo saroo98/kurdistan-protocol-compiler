@@ -3,7 +3,7 @@
 
 // Command gate runs the repository's full validation bar in one step: the same
 // gates documented in docs/GOVERNANCE.md. It exists to give a single
-// reproducible pre-merge check in a repository that has no external CI.
+// reproducible pre-merge check locally and in the repository CI workflow.
 //
 // Usage:
 //

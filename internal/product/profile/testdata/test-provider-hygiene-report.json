@@ -1,0 +1,17 @@
+{
+  "schema": "kurdistan.phase8.test-provider-hygiene-report.v1",
+  "classification": "deterministic non-production providers only",
+  "providers": [
+    {"name":"signer","classification":"deterministic test-only","secret_exposure":"opaque key handle only"},
+    {"name":"verifier","classification":"deterministic test-only","secret_exposure":"opaque key handle only"},
+    {"name":"recipient sealer/opener","classification":"deterministic test-only","secret_exposure":"opaque recipient binding only"},
+    {"name":"local wrapper","classification":"deterministic test-only","secret_exposure":"opaque key handle only"},
+    {"name":"monotonic state","classification":"deterministic test-only","secret_exposure":"epoch and digest only"}
+  ],
+  "secret_scan": {
+    "scope":"internal/product/profile test provider diagnostics and event records",
+    "key_byte_findings":0,
+    "profile_byte_log_findings":0
+  },
+  "limitations":"No Android Keystore, HSM, KMS, PKCS#11, KMIP, cloud SDK, attestation, service, or production key is implemented or tested."
+}

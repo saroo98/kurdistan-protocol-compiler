@@ -2,6 +2,8 @@
 *.test
 *.out
 *.log
+__pycache__/
+*.py[cod]
 AGENTS.md
 .tools/
 .generated/
