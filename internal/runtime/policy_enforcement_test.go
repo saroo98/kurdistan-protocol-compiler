@@ -1606,6 +1606,11 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	if _, err := validatePolicyPhase9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays); err != nil {
 		return err
 	}
+	// A clean checkout is the committed Phase 9 state only after its complete
+	// path and content overlay has validated above.
+	if len(changed) == 0 {
+		return nil
+	}
 	phase9Changed := map[string]bool{policyMaintenanceManifestPathV1: true}
 	for _, overlay := range manifest.Phase9GuardMaintenanceOverlays {
 		for _, path := range overlay.Paths {

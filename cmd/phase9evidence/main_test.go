@@ -5,6 +5,9 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +91,31 @@ func TestBuildSPDXExcludesProjectModulesAndIsSerializable(t *testing.T) {
 	}
 	if _, err := json.Marshal(document); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestVerifyCanonicalAndroidTextRejectsCRLFAndIgnoresBuildOutputs(t *testing.T) {
+	root := t.TempDir()
+	write := func(relative, content string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("android/app/src/main/example.kt", "line one\nline two\n")
+	write("android/gradlew.bat", "@echo off\r\n")
+	write("android/app/build/generated.xml", "<generated>\r\n")
+	if err := verifyCanonicalAndroidText(root); err != nil {
+		t.Fatalf("canonical tree rejected: %v", err)
+	}
+
+	write("android/app/gradle.lockfile", "entry=locked\r\n")
+	err := verifyCanonicalAndroidText(root)
+	if err == nil || !strings.Contains(err.Error(), "android/app/gradle.lockfile contains CR bytes") {
+		t.Fatalf("CRLF lockfile error=%v", err)
 	}
 }
