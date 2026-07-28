@@ -4,9 +4,12 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -117,5 +120,40 @@ func TestVerifyCanonicalAndroidTextRejectsCRLFAndIgnoresBuildOutputs(t *testing.
 	err := verifyCanonicalAndroidText(root)
 	if err == nil || !strings.Contains(err.Error(), "android/app/gradle.lockfile contains CR bytes") {
 		t.Fatalf("CRLF lockfile error=%v", err)
+	}
+}
+
+func TestVerifyReproducibilityArtifactSeparatesSameHostAndCrossHostClaims(t *testing.T) {
+	root := t.TempDir()
+	artifact := filepath.Join(root, "release.apk")
+	contents := []byte("platform-specific unsigned artifact")
+	if err := os.WriteFile(artifact, contents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(contents)
+	report := reproducibilityReport{
+		Artifact:      "release.apk",
+		BuildASHA256:  hex.EncodeToString(sum[:]),
+		ArtifactSize:  int64(len(contents)),
+		ByteIdentical: true,
+	}
+	report.Environment.OperatingSystem = runtime.GOOS
+	if _, err := verifyReproducibilityArtifact(root, report); err != nil {
+		t.Fatalf("same-host artifact rejected: %v", err)
+	}
+
+	report.BuildASHA256 = strings.Repeat("0", 64)
+	report.ArtifactSize++
+	if _, err := verifyReproducibilityArtifact(root, report); err == nil {
+		t.Fatal("same-host mismatch was accepted")
+	}
+
+	if runtime.GOOS == "windows" {
+		report.Environment.OperatingSystem = "linux"
+	} else {
+		report.Environment.OperatingSystem = "windows"
+	}
+	if got, err := verifyReproducibilityArtifact(root, report); err != nil || got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("cross-host unverified artifact should remain measurable without claiming equality: hash=%q err=%v", got, err)
 	}
 }
