@@ -21,6 +21,8 @@ import (
 
 const maxReleaseAPKBytes = 40 * 1024 * 1024
 
+const versionControlInfoEntry = "META-INF/version-control-info.textproto"
+
 var bridgeSymbols = []string{
 	"kvpn_abi_info",
 	"kvpn_activation_next",
@@ -82,6 +84,7 @@ type apkContents struct {
 	dex     [][]byte
 	natives map[string][]byte
 	all     [][]byte
+	entries map[string]struct{}
 }
 
 func main() {
@@ -118,6 +121,9 @@ func verify(releasePath, internalPath, manifestPath string) error {
 
 	release, err := readAPK(releasePath)
 	if err != nil {
+		return fmt.Errorf("release APK: %w", err)
+	}
+	if err := rejectCommitSensitiveEntries(release); err != nil {
 		return fmt.Errorf("release APK: %w", err)
 	}
 	internal, err := readAPK(internalPath)
@@ -163,8 +169,12 @@ func readAPK(path string) (apkContents, error) {
 		return apkContents{}, err
 	}
 	defer reader.Close()
-	result := apkContents{natives: make(map[string][]byte)}
+	result := apkContents{
+		natives: make(map[string][]byte),
+		entries: make(map[string]struct{}),
+	}
 	for _, entry := range reader.File {
+		result.entries[entry.Name] = struct{}{}
 		if entry.UncompressedSize64 > 64*1024*1024 {
 			return apkContents{}, fmt.Errorf("entry %q exceeds inspection bound", entry.Name)
 		}
@@ -205,6 +215,13 @@ func rejectMarkers(values [][]byte, forbidden []string) error {
 		if containsAny(values, marker) {
 			return fmt.Errorf("contains forbidden %q", marker)
 		}
+	}
+	return nil
+}
+
+func rejectCommitSensitiveEntries(contents apkContents) error {
+	if _, ok := contents.entries[versionControlInfoEntry]; ok {
+		return fmt.Errorf("contains commit-sensitive %q", versionControlInfoEntry)
 	}
 	return nil
 }
