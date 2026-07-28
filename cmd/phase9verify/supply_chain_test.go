@@ -63,6 +63,8 @@ func TestGradleWrapperAndDependencyVerificationArePinned(t *testing.T) {
 		t.Fatal("Gradle dependency verification metadata is not checksum-enforcing")
 	}
 	for _, required := range []string{
+		`<artifact name="aapt2-9.2.1-15009934-linux.jar">`,
+		`<sha256 value="755f6727fb3f4cce5e319eac0f3618ed4b36b49a46d4bb2cbb6fa8e9175a54d6"`,
 		`<component group="org.jetbrains.kotlin" name="kotlin-gradle-plugins-bom" version="2.2.10">`,
 		`<sha256 value="e4b7dd0b5570aa7ae6597d1f479bcea94e78e12735fa86f80afa95e7014efed6"`,
 		`<sha256 value="c0a5a21a4e6eec4d8bb6a2c491fac42f35ab9f08dd2af6bedb085715ac805296"`,
