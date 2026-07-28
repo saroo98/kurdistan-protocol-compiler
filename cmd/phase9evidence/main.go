@@ -165,6 +165,9 @@ func fileExists(path string) bool {
 }
 
 func generate(root string) ([]artifact, error) {
+	if err := verifyCanonicalAndroidText(root); err != nil {
+		return nil, err
+	}
 	if err := verifyFixedEvidence(root); err != nil {
 		return nil, err
 	}
@@ -205,6 +208,51 @@ func generate(root string) ([]artifact, error) {
 		{path: filepath.Join(evidenceDir, "android-licenses.spdx.json"), data: spdxBytes},
 		{path: filepath.Join(evidenceDir, "toolchain-manifest.json"), data: toolchainBytes},
 	}, nil
+}
+
+func verifyCanonicalAndroidText(root string) error {
+	androidRoot := filepath.Join(root, "android")
+	return filepath.WalkDir(androidRoot, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".cxx", ".gradle", "build":
+				if path != androidRoot {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !isCanonicalAndroidText(entry.Name()) {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if bytes.Contains(raw, []byte{'\r'}) {
+			relative, relErr := filepath.Rel(root, path)
+			if relErr != nil {
+				return relErr
+			}
+			return fmt.Errorf("%s contains CR bytes; Android source and configuration files must use canonical LF", filepath.ToSlash(relative))
+		}
+		return nil
+	})
+}
+
+func isCanonicalAndroidText(name string) bool {
+	if name == "gradlew" || strings.HasSuffix(name, ".lockfile") {
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".c", ".h", ".json", ".kt", ".kts", ".pro", ".properties", ".toml", ".xml":
+		return true
+	default:
+		return false
+	}
 }
 
 func verifyFixedEvidence(root string) error {
