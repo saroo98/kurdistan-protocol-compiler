@@ -132,10 +132,11 @@ func main() {
 		}
 		if !bytes.Equal(existing, item.data) {
 			fail(fmt.Errorf(
-				"%s is stale: existing_sha256=%s generated_sha256=%s; run go run ./cmd/phase9evidence -write and review the diff",
+				"%s is stale: existing_sha256=%s generated_sha256=%s first_difference=%s; run go run ./cmd/phase9evidence -write and review the diff",
 				item.path,
 				bytesSHA256(existing),
 				bytesSHA256(item.data),
+				firstJSONDifference(existing, item.data),
 			))
 		}
 	}
@@ -418,6 +419,90 @@ func canonicalJSONKey(value any) string {
 		return fmt.Sprint(value)
 	}
 	return string(data)
+}
+
+func firstJSONDifference(left, right []byte) string {
+	var leftValue any
+	var rightValue any
+	if err := json.Unmarshal(left, &leftValue); err != nil {
+		return "existing JSON cannot be decoded: " + err.Error()
+	}
+	if err := json.Unmarshal(right, &rightValue); err != nil {
+		return "generated JSON cannot be decoded: " + err.Error()
+	}
+	if difference := compareJSON("$", leftValue, rightValue); difference != "" {
+		return difference
+	}
+	return "JSON values are equal but serialized bytes differ"
+}
+
+func compareJSON(path string, left, right any) string {
+	switch leftValue := left.(type) {
+	case map[string]any:
+		rightValue, ok := right.(map[string]any)
+		if !ok {
+			return formatJSONDifference(path, left, right)
+		}
+		keys := make([]string, 0, len(leftValue)+len(rightValue))
+		seen := make(map[string]bool, len(leftValue)+len(rightValue))
+		for key := range leftValue {
+			keys = append(keys, key)
+			seen[key] = true
+		}
+		for key := range rightValue {
+			if !seen[key] {
+				keys = append(keys, key)
+			}
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			leftChild, leftOK := leftValue[key]
+			rightChild, rightOK := rightValue[key]
+			childPath := path + "." + key
+			if !leftOK || !rightOK {
+				return fmt.Sprintf("%s presence differs: existing=%t generated=%t", childPath, leftOK, rightOK)
+			}
+			if difference := compareJSON(childPath, leftChild, rightChild); difference != "" {
+				return difference
+			}
+		}
+	case []any:
+		rightValue, ok := right.([]any)
+		if !ok || len(leftValue) != len(rightValue) {
+			return formatJSONDifference(path, left, right)
+		}
+		for index := range leftValue {
+			if difference := compareJSON(fmt.Sprintf("%s[%d]", path, index), leftValue[index], rightValue[index]); difference != "" {
+				return difference
+			}
+		}
+	default:
+		if canonicalJSONKey(left) != canonicalJSONKey(right) {
+			return formatJSONDifference(path, left, right)
+		}
+	}
+	return ""
+}
+
+func formatJSONDifference(path string, left, right any) string {
+	return fmt.Sprintf(
+		"%s existing=%s generated=%s",
+		path,
+		boundedJSONValue(left),
+		boundedJSONValue(right),
+	)
+}
+
+func boundedJSONValue(value any) string {
+	const maximum = 256
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%T", value)
+	}
+	if len(data) <= maximum {
+		return string(data)
+	}
+	return string(data[:maximum]) + "..."
 }
 
 func buildSPDX(bom map[string]any) (spdxDocument, error) {

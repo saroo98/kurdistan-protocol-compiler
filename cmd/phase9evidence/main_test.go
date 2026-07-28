@@ -130,6 +130,24 @@ func TestCanonicalizeBOMProducesEqualBytesAcrossDiscoveryOrder(t *testing.T) {
 	}
 }
 
+func TestFirstJSONDifferenceReportsStablePathAndValues(t *testing.T) {
+	left := []byte(`{"components":[{"name":"a"},{"name":"b","version":"1"}]}`)
+	right := []byte(`{"components":[{"name":"a"},{"name":"b","version":"2"}]}`)
+	got := firstJSONDifference(left, right)
+	want := `$.components[1].version existing="1" generated="2"`
+	if got != want {
+		t.Fatalf("firstJSONDifference()=%q want=%q", got, want)
+	}
+
+	left = []byte(`{"metadata":{"component":{"name":"app"}}}`)
+	right = []byte(`{"metadata":{"component":{"name":"app","version":"1"}}}`)
+	got = firstJSONDifference(left, right)
+	want = "$.metadata.component.version presence differs: existing=false generated=true"
+	if got != want {
+		t.Fatalf("presence difference=%q want=%q", got, want)
+	}
+}
+
 func TestBuildSPDXRejectsUnlicensedExternalDependency(t *testing.T) {
 	_, err := buildSPDX(map[string]any{
 		"components": []any{
