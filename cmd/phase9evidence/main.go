@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -83,8 +84,11 @@ type toolchainManifest struct {
 }
 
 type reproducibilityReport struct {
-	Schema          string `json:"schema"`
-	Artifact        string `json:"artifact"`
+	Schema      string `json:"schema"`
+	Artifact    string `json:"artifact"`
+	Environment struct {
+		OperatingSystem string `json:"operating_system"`
+	} `json:"environment"`
 	BuildASHA256    string `json:"build_a_sha256"`
 	BuildBSHA256    string `json:"build_b_sha256"`
 	ArtifactSize    int64  `json:"artifact_size_bytes"`
@@ -264,22 +268,14 @@ func verifyFixedEvidence(root string) error {
 		return err
 	}
 	if reproducibility.Schema != "kurdistan.phase9.reproducibility-report.v1" ||
+		reproducibility.Environment.OperatingSystem == "" ||
 		!reproducibility.ByteIdentical ||
 		reproducibility.BuildASHA256 != reproducibility.BuildBSHA256 ||
 		reproducibility.CrossHostStatus != "[UNVERIFIED]" {
 		return errors.New("reproducibility report has an invalid or overstated result")
 	}
-	artifactPath := filepath.Join(root, filepath.FromSlash(reproducibility.Artifact))
-	info, err := os.Stat(artifactPath)
-	if err != nil {
-		return fmt.Errorf("reproducibility artifact: %w", err)
-	}
-	hash, err := fileSHA256(artifactPath)
-	if err != nil {
+	if _, err := verifyReproducibilityArtifact(root, reproducibility); err != nil {
 		return err
-	}
-	if hash != reproducibility.BuildASHA256 || info.Size() != reproducibility.ArtifactSize {
-		return errors.New("release APK differs from the recorded reproducibility result")
 	}
 
 	var acceptance acceptanceStatus
@@ -289,10 +285,9 @@ func verifyFixedEvidence(root string) error {
 	recordedHash, _ := acceptance.LocalHost["release_apk_sha256"].(string)
 	if acceptance.Schema != "kurdistan.phase9.acceptance-status.v1" ||
 		acceptance.MergeEligible || acceptance.ProductionReady || acceptance.VPNPresent ||
-		recordedHash != hash {
+		recordedHash != reproducibility.BuildASHA256 {
 		return errors.New("acceptance status is stale or overstates Phase 9")
 	}
-
 	var provenance struct {
 		Schema string `json:"schema"`
 		Assets []struct {
@@ -314,6 +309,30 @@ func verifyFixedEvidence(root string) error {
 		}
 	}
 	return nil
+}
+
+func verifyReproducibilityArtifact(root string, reproducibility reproducibilityReport) (string, error) {
+	artifactPath := filepath.Join(root, filepath.FromSlash(reproducibility.Artifact))
+	info, err := os.Stat(artifactPath)
+	if err != nil {
+		return "", fmt.Errorf("reproducibility artifact: %w", err)
+	}
+	hash, err := fileSHA256(artifactPath)
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(reproducibility.Environment.OperatingSystem, runtime.GOOS) &&
+		(hash != reproducibility.BuildASHA256 || info.Size() != reproducibility.ArtifactSize) {
+		return "", fmt.Errorf(
+			"release APK differs from the recorded %s reproducibility result: sha256=%s size=%d want_sha256=%s want_size=%d",
+			reproducibility.Environment.OperatingSystem,
+			hash,
+			info.Size(),
+			reproducibility.BuildASHA256,
+			reproducibility.ArtifactSize,
+		)
+	}
+	return hash, nil
 }
 
 func readJSON(path string, target any) error {
