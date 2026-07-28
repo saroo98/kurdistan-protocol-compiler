@@ -23,8 +23,10 @@ import (
 )
 
 const (
-	sourceBOMPath = "android/build/reports/cyclonedx/bom.json"
-	evidenceDir   = "testdata/evidence/phase9"
+	sourceBOMPath        = "android/build/reports/cyclonedx/bom.json"
+	evidenceDir          = "testdata/evidence/phase9"
+	projectRepository    = "https://github.com/saroo98/kurdistan-protocol-compiler"
+	projectRepositoryGit = projectRepository + ".git"
 )
 
 type artifact struct {
@@ -366,6 +368,7 @@ func canonicalizeBOM(bom map[string]any) {
 func canonicalizeBOMValue(value any) {
 	switch current := value.(type) {
 	case map[string]any:
+		canonicalizeProjectVCSReference(current)
 		for key, child := range current {
 			canonicalizeBOMValue(child)
 			values, ok := child.([]any)
@@ -380,6 +383,12 @@ func canonicalizeBOMValue(value any) {
 		for _, child := range current {
 			canonicalizeBOMValue(child)
 		}
+	}
+}
+
+func canonicalizeProjectVCSReference(value map[string]any) {
+	if stringValue(value["type"]) == "vcs" && stringValue(value["url"]) == projectRepositoryGit {
+		value["url"] = projectRepository
 	}
 }
 

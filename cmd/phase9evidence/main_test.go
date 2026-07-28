@@ -130,6 +130,41 @@ func TestCanonicalizeBOMProducesEqualBytesAcrossDiscoveryOrder(t *testing.T) {
 	}
 }
 
+func TestCanonicalizeBOMNormalizesProjectVCSCheckoutURL(t *testing.T) {
+	bom := map[string]any{
+		"components": []any{
+			map[string]any{
+				"bom-ref": "project",
+				"externalReferences": []any{
+					map[string]any{
+						"type": "vcs",
+						"url":  projectRepositoryGit,
+					},
+				},
+			},
+			map[string]any{
+				"bom-ref": "external",
+				"externalReferences": []any{
+					map[string]any{
+						"type": "vcs",
+						"url":  "https://example.com/external.git",
+					},
+				},
+			},
+		},
+	}
+	canonicalizeBOM(bom)
+	components := bom["components"].([]any)
+	external := components[0].(map[string]any)["externalReferences"].([]any)[0].(map[string]any)
+	project := components[1].(map[string]any)["externalReferences"].([]any)[0].(map[string]any)
+	if external["url"] != "https://example.com/external.git" {
+		t.Fatalf("external repository URL was changed: %v", external["url"])
+	}
+	if project["url"] != projectRepository {
+		t.Fatalf("project repository URL was not normalized: %v", project["url"])
+	}
+}
+
 func TestFirstJSONDifferenceReportsStablePathAndValues(t *testing.T) {
 	left := []byte(`{"components":[{"name":"a"},{"name":"b","version":"1"}]}`)
 	right := []byte(`{"components":[{"name":"a"},{"name":"b","version":"2"}]}`)
