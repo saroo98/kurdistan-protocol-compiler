@@ -4,6 +4,7 @@
 package main
 
 import (
+	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -287,5 +288,40 @@ func TestVerifyReproducibilityArtifactSeparatesSameHostAndCrossHostClaims(t *tes
 	}
 	if got, err := verifyReproducibilityArtifact(root, report); err != nil || got != hex.EncodeToString(sum[:]) {
 		t.Fatalf("cross-host unverified artifact should remain measurable without claiming equality: hash=%q err=%v", got, err)
+	}
+}
+
+func TestAPKEntrySummaryIncludesRawAndContentFingerprints(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "release.apk")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	entry, err := writer.Create("classes.dex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write([]byte("deterministic dex payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := apkEntrySummary(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"0000|classes.dex|",
+		"raw=",
+		"content=",
+	} {
+		if !strings.Contains(summary, required) {
+			t.Fatalf("summary %q does not contain %q", summary, required)
+		}
 	}
 }
