@@ -109,6 +109,7 @@ fun registerGoBridge(buildType: String, internalTrust: Boolean) =
             "build",
             "-trimpath",
             "-buildvcs=false",
+            "-ldflags=-buildid= -B=none -extldflags=-Wl,--build-id=none,-soname,libkurdistan_bridge.so",
             "-buildmode=c-shared",
         )
         if (internalTrust) {

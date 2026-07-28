@@ -157,8 +157,14 @@ func verify(releasePath, internalPath, manifestPath string) error {
 	if err := requireSymbols(bridge, "kvpn_", bridgeSymbols); err != nil {
 		return fmt.Errorf("Go bridge symbols: %w", err)
 	}
+	if err := requireELFIdentity(bridge, "libkurdistan_bridge.so", ""); err != nil {
+		return fmt.Errorf("Go bridge identity: %w", err)
+	}
 	if err := requireJNISymbols(jni, jniSymbols); err != nil {
 		return fmt.Errorf("JNI symbols: %w", err)
+	}
+	if err := requireELFIdentity(jni, "libkurdistan_jni.so", "libkurdistan_bridge.so"); err != nil {
+		return fmt.Errorf("JNI identity: %w", err)
 	}
 	return nil
 }
@@ -266,6 +272,39 @@ func requireJNISymbols(data []byte, expected []string) error {
 		}
 	}
 	return compareSymbols(actual, expected)
+}
+
+func requireELFIdentity(data []byte, expectedSONAME, requiredDependency string) error {
+	file, err := elf.NewFile(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	for _, section := range []string{".note.go.buildid", ".note.gnu.build-id"} {
+		if file.Section(section) != nil {
+			return fmt.Errorf("contains host-sensitive build identity section %q", section)
+		}
+	}
+	sonames, err := file.DynString(elf.DT_SONAME)
+	if err != nil {
+		return err
+	}
+	if len(sonames) != 1 || sonames[0] != expectedSONAME {
+		return fmt.Errorf("SONAME=%v, want [%s]", sonames, expectedSONAME)
+	}
+	if requiredDependency == "" {
+		return nil
+	}
+	dependencies, err := file.ImportedLibraries()
+	if err != nil {
+		return err
+	}
+	for _, dependency := range dependencies {
+		if dependency == requiredDependency {
+			return nil
+		}
+	}
+	return fmt.Errorf("dependencies=%v, missing %q", dependencies, requiredDependency)
 }
 
 func compareSymbols(actual, expected []string) error {
