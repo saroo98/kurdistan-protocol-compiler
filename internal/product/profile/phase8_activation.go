@@ -127,50 +127,37 @@ func ActivateVerifiedProfile(request ActivationRequest) (ActivationRecord, error
 	if request.Storage == nil {
 		return ActivationRecord{}, activationFailure(ActivationStorageFailure)
 	}
-	active, lastKnownGood, err := request.Storage.Snapshot()
-	if err != nil {
-		return ActivationRecord{}, activationFailure(ActivationStorageFailure)
-	}
-	active, lastKnownGood = cloneActivationRecord(active), cloneActivationRecord(lastKnownGood)
-	if active.State.Status == "" {
-		if request.Current.Status != "" && request.Current.Status != lifecycle.Absent {
+	session := NewActivationSession(request)
+	for {
+		command, ok := session.Next()
+		if !ok {
+			return session.Result()
+		}
+		result := ActivationCommandResult{}
+		switch command.Kind {
+		case ActivationCommandSnapshot:
+			result.Active, result.LastKnownGood, result.Err = request.Storage.Snapshot()
+		case ActivationCommandStageCandidate:
+			result.Err = request.Storage.StageCandidate(cloneActivationRecord(command.Record))
+		case ActivationCommandReopenCandidate:
+			result.Record, result.Err = request.Storage.ReopenCandidate()
+		case ActivationCommandMarkActivation:
+			result.Err = request.Storage.MarkActivation()
+		case ActivationCommandCommitMarked:
+			result.Err = request.Storage.CommitMarked()
+		case ActivationCommandFinalizeActivation:
+			result.Err = request.Storage.FinalizeActivation()
+		case ActivationCommandRecover:
+			result.Err = request.Storage.Recover()
+		case ActivationCommandQuarantine:
+			result.Err = request.Storage.Quarantine()
+		default:
 			return ActivationRecord{}, activationFailure(ActivationPolicyRejected)
 		}
-	} else if active.State != request.Current {
-		return ActivationRecord{}, activationFailure(ActivationPolicyRejected)
+		if err := session.Submit(command, result); err != nil {
+			return ActivationRecord{}, err
+		}
 	}
-	candidate, err := verifyActivationCandidate(request, request.Artifact)
-	if err != nil {
-		return ActivationRecord{}, err
-	}
-	pinnedCandidate := cloneActivationRecord(candidate.record)
-	if err := request.Storage.StageCandidate(cloneActivationRecord(pinnedCandidate)); err != nil {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, pinnedCandidate, false)
-	}
-	observe(request, StageCandidateStored)
-	reopened, err := request.Storage.ReopenCandidate()
-	reopened = cloneActivationRecord(reopened)
-	if err != nil || !bytes.Equal(reopened.Artifact, pinnedCandidate.Artifact) || !bytes.Equal(reopened.SignedObject, pinnedCandidate.SignedObject) {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, pinnedCandidate, false)
-	}
-	observe(request, StageCandidateReopened)
-	reverified, err := verifyActivationCandidate(request, reopened.Artifact)
-	if err != nil || !activationRecordEqual(reverified.record, reopened) {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, pinnedCandidate, false)
-	}
-	if err := request.Storage.MarkActivation(); err != nil {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, candidate.record, false)
-	}
-	observe(request, StageActivationMarked)
-	if err := request.Storage.CommitMarked(); err != nil {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, reverified.record, true)
-	}
-	observe(request, StageActivationCommitted)
-	if err := request.Storage.FinalizeActivation(); err != nil {
-		return ActivationRecord{}, recoverAfterStorageFailure(request.Storage, active, lastKnownGood, reverified.record, true)
-	}
-	observe(request, StageActivationFinalized)
-	return reverified.record, nil
 }
 
 func verifyActivationCandidate(request ActivationRequest, artifact []byte) (verifiedCandidate, error) {

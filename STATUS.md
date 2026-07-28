@@ -3,9 +3,11 @@
 
 # Kurdistan Protocol Compiler Status
 
-> Staged product-development program. Phase 8 adds a bounded local profile-artifact implementation using deterministic non-production fixtures; gate evidence still does not prove real-world censorship resistance, undetectability, production safety, deployment readiness, or external merge eligibility (**[UNVERIFIED]**).
+> Staged product-development program. Phase 9 adds an offline Android foundation around the real Phase 8 verifier, protected local state, diagnostics, and encrypted backup/restore on `product/phase9-android-foundation`. It adds no VPN or network runtime. Physical-device, packet-capture, measured accessibility/performance, reviewed translation, cross-host CI, production signing, deployment, and release evidence remain **[UNVERIFIED]**.
 
 > Legend: `[live]` executes real behavior locally (network I/O remains loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.
+
+> The generated compiler audit table below does not validate the separate Android Phase 9 build. Use `go run ./cmd/gate -android` and `docs/PHASE9_EVIDENCE_INDEX.md` for the combined boundary.
 
 - Latest audit mode: `full`
 - Profile count: `1000`

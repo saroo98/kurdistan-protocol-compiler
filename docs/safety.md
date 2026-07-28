@@ -16,6 +16,14 @@ to real I/O is not.
 
 The completed M2-M7 contracts remain the foundation. Subsequent phases may implement real product behavior through phase-specific authorization, threat boundaries, tests, review, rollback, and deployment controls. “Lab-only” or “offline-only” must not be used by itself to reject an otherwise authorized phase.
 
+KIP-0083 authorizes Phase 9 only: a native Android application foundation,
+bounded JNI access to the Phase 8 verifier, encrypted local profile storage,
+offline import, local diagnostics, and passphrase-encrypted backup/restore.
+Phase 9 release manifests and bytecode must contain no Internet, VPN, TUN,
+foreground-service, or live-network capability. It does not authorize live
+traffic handling, production authorities, production signing keys, deployment,
+pilot operation, or public release.
+
 ## Controlled live-development boundary
 
 The following are permitted only inside their explicitly authorized phase and may not be activated, deployed, or represented as complete before their phase gates pass:
@@ -31,6 +39,10 @@ The following are permitted only inside their explicitly authorized phase and ma
 - live DNS, CDN, TLS mimicry, or domain-fronting transport
 
 Deterministic local models remain the default test substrate. Live implementations advance one reviewed phase at a time and use only owned or explicitly authorized systems.
+
+The Phase 9 app is an authorized shipped-code foundation but is not a VPN and
+must not present a connection control or connected state. The `shipped mobile
+apps` restriction above continues to apply to capabilities outside KIP-0083.
 
 ## Data handling
 

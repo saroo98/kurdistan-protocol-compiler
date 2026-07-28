@@ -1,0 +1,55 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "88cb0bd1592d903e0719fa47150fa87a",
+    "entities": [
+      {
+        "tableName": "profile_catalog",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`localRecordId` TEXT NOT NULL, `transactionState` TEXT NOT NULL, `envelopeVersion` INTEGER NOT NULL, `keyGeneration` INTEGER NOT NULL, `health` TEXT NOT NULL, PRIMARY KEY(`localRecordId`))",
+        "fields": [
+          {
+            "fieldPath": "localRecordId",
+            "columnName": "localRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionState",
+            "columnName": "transactionState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "envelopeVersion",
+            "columnName": "envelopeVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyGeneration",
+            "columnName": "keyGeneration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "health",
+            "columnName": "health",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "localRecordId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '88cb0bd1592d903e0719fa47150fa87a')"
+    ]
+  }
+}

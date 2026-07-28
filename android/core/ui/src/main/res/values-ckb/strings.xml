@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="product_name">VPNی کوردستان</string>
+    <string name="foundation_label">بناغەی پارێزراوی پرۆفایل</string>
+    <string name="runtime_unavailable">ڕانتایمی VPN بەردەست نییە</string>
+    <string name="phase9_offline_notice">ئەم وەشانی قۆناغی ٩ پرۆفایلەکان بەبێ هێڵ پشتڕاست و پارێزراو دەکات. ناتوانێت پەیوەندی بکات یان هاتووچۆ ئاراستە بکات.</string>
+    <string name="application_state">دۆخی بەرنامە: %1$s</string>
+    <string name="unknown">نەناسراو</string>
+    <string name="import_rejected">هاوردە ڕەتکرایەوە: %1$s</string>
+    <string name="dismiss">داخستن</string>
+    <string name="profiles">پرۆفایلەکان</string>
+    <string name="privacy_recovery">تایبەتمەندی و گەڕاندنەوە</string>
+    <string name="diagnostics_about">پشکنین و دەربارە</string>
+    <string name="kurd_profiles">پرۆفایلە کوردییەکان</string>
+    <plurals name="verified_profile_count"><item quantity="one">%1$d پرۆفایلی پشتڕاستکراو</item><item quantity="other">%1$d پرۆفایلی پشتڕاستکراو</item></plurals>
+    <string name="profile_generation">%1$s · نەوەی %2$s</string>
+    <string name="import_profile_file">هاوردەکردنی فایلی پرۆفایل</string>
+    <string name="import_clipboard">هاوردەکردن لە کلیپبۆرد</string>
+    <string name="scan_offline_qr">پشکنینی QR بەبێ هێڵ</string>
+    <string name="profile_link_label">بەستەری پرۆفایلی kurd://</string>
+    <string name="preview_link">پێشبینینی بەستەر</string>
+    <string name="back">گەڕانەوە</string>
+    <string name="verify_profile">پشتڕاستکردنەوەی پرۆفایل</string>
+    <string name="artifact_class">پۆل: %1$s</string><string name="audience">ئامانج: %1$s</string><string name="generation">نەوە: %1$s</string><string name="fingerprint">پەنجەمۆر: %1$s…</string>
+    <string name="encrypted_profile">پرۆفایلی نهێنیکراو</string><string name="signed_public_profile">پرۆفایلی گشتی واژۆکراو</string>
+    <string name="confirm_encrypted_storage">پشتڕاستکردنەوەی هەڵگرتنی نهێنیکراو</string><string name="cancel">هەڵوەشاندنەوە</string>
+    <string name="telemetry_off">تەلەمەتری: کوژاوە</string><string name="crash_reporting_off">ڕاپۆرتی دوورەوەی هەڵە: کوژاوە</string><string name="profiles_encrypted">پرۆفایلەکان: ناوخۆیی نهێنیکراون</string><string name="cloud_backup_disabled">پاڵپشتی هەور: ناچالاکە</string>
+    <string name="backup_passphrase">وشەی نهێنی پاڵپشت</string><string name="backup_passphrase_help">لانیکەم ١٢ خاڵی کۆد. هەرگیز بارناکرێت یان هەڵناگیرێت.</string>
+    <string name="create_encrypted_backup">دروستکردنی پاڵپشتی نهێنیکراو</string><string name="open_backup_restore">کردنەوەی پاڵپشت بۆ گەڕاندنەوە</string><string name="working_locally">کارکردن بە ناوخۆ…</string>
+    <string name="restore_preview">پێشبینینی گەڕاندنەوە: %1$d تۆمار، %2$d پرۆفایلی کورد.</string><string name="restore_safety">دووبارەکان ناگۆڕدرێن. نەوە کۆنەکان ڕەتدەکرێنەوە.</string>
+    <string name="confirm_restore">پشتڕاستکردنەوەی گەڕاندنەوە</string><string name="cancel_restore">هەڵوەشاندنەوەی گەڕاندنەوە</string><string name="restore_complete">گەڕاندنەوە تەواو بوو: %1$d پرۆفایل زیادکرا.</string><string name="backup_failed">کرداری پاڵپشت بە سەلامەتی شکستی هێنا: %1$s.</string>
+    <string name="reset_limits">ڕێکخستنەوە داتای ناوخۆ و بلۆبی نهێنیکراو دەسڕێتەوە. سڕینەوەی فلاش بانگەشە ناکرێت.</string><string name="prepare_reset">ئامادەکردنی ڕێکخستنەوە</string><string name="confirm_reset">پشتڕاستکردنەوەی ڕێکخستنەوە</string><string name="cancel_reset">هەڵوەشاندنەوەی ڕێکخستنەوە</string>
+    <string name="bridge_check">پردی ئەندرۆیدی کورد: لە دەستپێکدا پشکنرا</string><string name="phase9_no_runtime">ڕانتایمی VPN: لە قۆناغی ٩دا نییە</string><string name="diagnostic_confirmation">هەناردەی پشکنین پێشبینین و پشتڕاستکردنەوە دەوێت.</string>
+    <string name="prepare_diagnostics">ئامادەکردنی پشکنینی سانسۆرکراو</string><string name="preparing_locally">ئامادەکردن بە ناوخۆ…</string><string name="diagnostic_preview">پێشبینین: %1$d پۆل، %2$s تۆمار، کۆمەڵەی %3$s.</string><string name="diagnostic_privacy">هیچ ناوەڕۆک، ناسنامەی پرۆفایل، مەبەست یان ناسنامەی ئامێرێک نییە.</string><string name="confirm_export">پشتڕاستکردنەوە و هەناردە</string><string name="diagnostic_exported">کۆمەڵەی پشکنین هەناردەکرا.</string><string name="diagnostic_failed">هەناردەی پشکنین بە سەلامەتی شکستی هێنا: %1$s.</string>
+    <string name="scan_notice">QRی پرۆفایلی کورد بپشکنە. پرۆسەکردن لەم ئامێرە دەمێنێتەوە.</string><string name="cancel_scan">هەڵوەشاندنەوەی پشکنین</string>
+    <string name="authorize_backup_title">دروستکردنی پاڵپشتی نهێنیکراو</string><string name="authorize_backup_subtitle">ڕێگەدان بە هەناردەی داتای نهێنیکراوی پرۆفایل</string>
+    <string name="appearance">ڕووکار و دەستگەیشتن</string><string name="theme_value">ڕووکار: %1$s</string><string name="high_contrast">کۆنتراستی بەرز</string><string name="reduced_motion">جوڵەی کەمکراو</string>
+    <string name="profile_trust">متمانە: %1$s</string><string name="delete_profile">سڕینەوەی پرۆفایل</string><string name="delete_profile_warning">ئەمە پرۆفایلی نهێنیکراوی ناوخۆ و داتاکانی دەسڕێتەوە.</string><string name="confirm_delete_profile">پشتڕاستکردنەوەی سڕینەوەی پرۆفایل</string>
+    <string name="app_version">وەشانی بەرنامە: %1$s</string><string name="core_version">کۆری کورد: %1$s</string><string name="profile_schema_version">سکیمای پرۆفایل: %1$s</string><string name="strategy_registry_version">تۆماری ستراتیژی: %1$s</string><string name="relay_schema_version">سکیمای ڕیلەی: %1$s</string><string name="diagnostic_schema_version">سکیمای پشکنین: %1$s</string><string name="crypto_suite_version">کۆمەڵەی کریپتۆگرافی: %1$d</string>
+    <string name="export_encrypted_profile">هەناردەی پرۆفایلی نهێنیکراو</string><string name="profile_export_passphrase">وشەی نهێنی هەناردەی پرۆفایل</string><string name="confirm_profile_export">پشتڕاستکردنەوەی هەناردەی نهێنیکراو</string><string name="authorize_profile_export_title">هەناردەی پرۆفایلی نهێنیکراو</string><string name="authorize_profile_export_subtitle">ڕێگەدان بە هەناردەی پارێزراوی ئەم پرۆفایلە</string>
+</resources>

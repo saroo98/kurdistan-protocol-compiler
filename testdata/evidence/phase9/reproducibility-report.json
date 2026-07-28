@@ -1,0 +1,30 @@
+{
+  "schema": "kurdistan.phase9.reproducibility-report.v1",
+  "artifact": "android/app/build/outputs/apk/release/app-release-unsigned.apk",
+  "artifact_kind": "unsigned nonproduction Android APK",
+  "environment": {
+    "operating_system": "windows",
+    "jdk": "17.0.19+10",
+    "gradle": "9.4.1",
+    "agp": "9.2.1",
+    "go": "1.26.5",
+    "ndk": "28.2.13676358"
+  },
+  "procedure": [
+    "android/gradlew --no-daemon clean :app:assembleRelease",
+    "sha256 app-release-unsigned.apk",
+    "android/gradlew --no-daemon clean :app:assembleRelease",
+    "sha256 app-release-unsigned.apk",
+    "compare complete APK bytes"
+  ],
+  "build_a_sha256": "dcbc0db7d2d068a3ca62cb220521e892129340d187ba6eec24d109906cf6ec22",
+  "build_b_sha256": "dcbc0db7d2d068a3ca62cb220521e892129340d187ba6eec24d109906cf6ec22",
+  "artifact_size_bytes": 5827561,
+  "byte_identical": true,
+  "cross_host_windows_linux": "[UNVERIFIED]",
+  "limitations": [
+    "Both clean builds used the same Windows host and pinned local toolchain.",
+    "The artifact is unsigned and nonproduction.",
+    "Cross-host equality requires clean Windows and Linux CI artifact comparison."
+  ]
+}

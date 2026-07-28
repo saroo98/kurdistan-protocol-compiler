@@ -1,0 +1,38 @@
+{
+  "schema": "kurdistan.phase9.toolchain-manifest.v1",
+  "evidence_version": "phase9-wo908-v1",
+  "source_date": "2026-07-28",
+  "android": {
+    "agp": "9.2.1",
+    "build_tools": "36.0.0",
+    "compile_sdk": "36",
+    "jdk": "17",
+    "kotlin": "2.3.10",
+    "min_sdk": "26",
+    "ndk": "28.2.13676358",
+    "target_sdk": "36",
+    "version_catalog": "android/gradle/libs.versions.toml"
+  },
+  "go": {
+    "module": "kurdistan",
+    "version": "1.26.5"
+  },
+  "gradle_wrapper": {
+    "distribution_sha256": "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+    "distribution_url": "https://services.gradle.org/distributions/gradle-9.4.1-bin.zip",
+    "jar_sha256": "55243ef57851f12b070ad14f7f5bb8302daceeebc5bce5ece5fa6edb23e1145c",
+    "version": "9.4.1"
+  },
+  "ci_action_pins": {
+    "actions/checkout@v6.0.2": "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+    "actions/setup-go@v6.4.0": "4a3601121dd01d1626a1e23e37211e3254c1c06c",
+    "actions/setup-java@v5.1.0": "f2beeb24e141e01a676f977032f5a29d81c9e27e"
+  },
+  "release_boundaries": [
+    "arm64-v8a only",
+    "no INTERNET permission",
+    "no VPN service or foreground service",
+    "empty production profile-authority trust store",
+    "unsigned nonproduction release artifact"
+  ]
+}

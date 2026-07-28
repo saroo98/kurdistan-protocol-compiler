@@ -746,7 +746,7 @@ func TestM3ProfileLifecycleBoundaryV1(t *testing.T) {
 	}
 	allowedTests := map[string]map[string]bool{
 		"internal/product/envelope":  {"bytes": true, "crypto/ecdh": true, "crypto/ecdsa": true, "crypto/elliptic": true, "crypto/hpke": true, "crypto/rand": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "github.com/fxamacker/cbor/v2": true, "io": true, "math/big": true, "os": true, "os/exec": true, "path/filepath": true, "runtime": true, "strings": true, "sync": true, "testing": true, "testing/cryptotest": true, "time": true, modulePath + "/internal/testkit/phase8assurance": true},
-		"internal/product/profile":   {"bytes": true, "crypto/ecdh": true, "crypto/elliptic": true, "crypto/hmac": true, "crypto/hpke": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "math/big": true, "os": true, "path/filepath": true, "sort": true, "strings": true, "testing": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true, modulePath + "/internal/product/profile": true, modulePath + "/internal/testkit/phase8issuance": true, modulePath + "/internal/testkit/phase8issuancefixture": true},
+		"internal/product/profile":   {"bytes": true, "crypto/ecdh": true, "crypto/elliptic": true, "crypto/hmac": true, "crypto/hpke": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "math/big": true, "os": true, "path/filepath": true, "reflect": true, "sort": true, "strings": true, "testing": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true, modulePath + "/internal/product/profile": true, modulePath + "/internal/testkit/phase8issuance": true, modulePath + "/internal/testkit/phase8issuancefixture": true},
 		"internal/product/lifecycle": {"testing": true},
 	}
 	for pkg, imports := range allowed {
@@ -1176,6 +1176,7 @@ type committedEvidenceManifestV1 struct {
 	Phase8WO801AdoptionOverlays         map[string]phase2CompleteOverlayV1       `json:"phase8_wo801_adoption_overlays"`
 	Phase8GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase8_guard_maintenance_overlays"`
 	Phase8FinalGuardMaintenanceOverlays map[string]committedMaintenanceOverlayV1 `json:"phase8_final_guard_maintenance_overlays"`
+	Phase9GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase9_guard_maintenance_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1314,7 +1315,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	finalGuardPre, err := validatePhase8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validatePhase9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		return nil, err
+	}
+	finalGuardPre, err := validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1697,6 +1702,10 @@ func validatePhase8GuardMaintenanceOverlayAtPostV1(root string, currentAtPost ma
 }
 
 func validatePhase8FinalGuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase8-wo808-final-guard-convergence-v1"
 	paths := []string{
 		"README.md", "ROADMAP.md", "docs/GOVERNANCE.md",
@@ -1746,7 +1755,10 @@ func validatePhase8FinalGuardMaintenanceOverlayV1(root string, overlays map[stri
 	if len(overlays) != 1 || !ok || o.Version != name || o.SelfPath != committedEvidenceManifestPathV1 || o.SelfPreSHA256 != "afcef52b1302379c2172815138219421e2dcf2b4e7280724f7c9ae4829d5f76a" || len(o.Paths) != len(paths) || len(o.Entries) != len(preHashes) {
 		return nil, fmt.Errorf("invalid phase8 final guard-maintenance overlay identity/cardinality")
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost)+len(paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, path := range paths {
 		if o.Paths[i] != path {
 			return nil, fmt.Errorf("invalid phase8 final guard-maintenance path %d", i)
@@ -1764,11 +1776,58 @@ func validatePhase8FinalGuardMaintenanceOverlayV1(root string, overlays map[stri
 		} else if entry.PreEvidence != "" || entry.PreSHA256 != expectedPre || entry.PreSHA256 == entry.PostSHA256 {
 			return nil, fmt.Errorf("invalid phase8 final guard-maintenance predecessor %d", i)
 		}
-		actual, err := committedFileSHA256V1(root, entry.Path)
+		actual, present := currentAtPost[entry.Path]
+		var err error
+		if !present {
+			actual, err = committedFileSHA256V1(root, entry.Path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase8 final guard-maintenance hash drift %s=%s want %s: %v", entry.Path, actual, entry.PostSHA256, err)
 		}
 		pre[entry.Path] = expectedPre
+	}
+	return pre, nil
+}
+
+func validatePhase9GuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase9-wo909-final-guard-convergence-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != committedEvidenceManifestPathV1 ||
+		overlay.SelfPreSHA256 != "1f8149bb5ff5057e6b25dcad186c07303d57af4073f940708f257a17c9656623" ||
+		len(overlay.Paths) != 157 || len(overlay.Entries) != len(overlay.Paths) {
+		return nil, fmt.Errorf("invalid phase9 guard-maintenance overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(overlay.Paths))
+	scope := sha256.New()
+	lastPath := ""
+	for i, path := range overlay.Paths {
+		entry := overlay.Entries[i]
+		if entry.Path != path || path <= lastPath || !validCommittedSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase9 guard-maintenance entry %d", i)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase9 absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validCommittedSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase9 existing predecessor %d", i)
+		}
+		scope.Write([]byte(path))
+		scope.Write([]byte{0})
+		scope.Write([]byte(predecessor))
+		scope.Write([]byte{'\n'})
+		actual, err := committedFileSHA256V1(root, path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase9 guard-maintenance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		lastPath = path
+	}
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "e0e123bcb1b6e64e7986b85b3ba8e3ce23884c9e7dba13b23f0054218756f9fb" {
+		return nil, fmt.Errorf("phase9 guard-maintenance scope drift %s", got)
 	}
 	return pre, nil
 }
@@ -2213,6 +2272,8 @@ var allowedImporterPrefixes = []string{
 
 func phase8ProductConsumerV1(pkgPath string) bool {
 	return pkgPath == modulePath+"/cmd/kprofile" ||
+		pkgPath == modulePath+"/cmd/kandroidbridge" ||
+		pkgPath == modulePath+"/internal/androidbridge" ||
 		pkgPath == modulePath+"/internal/testkit/phase8issuance" ||
 		pkgPath == modulePath+"/internal/testkit/phase8issuancefixture" ||
 		strings.HasPrefix(pkgPath, modulePath+"/cmd/kprofile/") ||
@@ -2268,7 +2329,11 @@ func TestPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	finalGuardPre, err := validatePhase8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validatePhase9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalGuardPre, err := validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}

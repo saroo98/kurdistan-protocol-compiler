@@ -7,7 +7,7 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: Phase 8 profile cryptography implementation
+## Current phase: Phase 9 Android foundation and protected local state
 
 The project has graduated from its lab-only phase. The compiler, audit system, and M2-M7 offline contracts remain the validated starting point, while Phases 8-13 progressively open profile cryptography, Android, VPN/TUN, live Kurd transport and relays, operator infrastructure, and controlled release. Current labels remain factual capability markers, not permanent scope blockers.
 
@@ -39,9 +39,21 @@ assurance evidence. Only deterministic non-production keys and local evidence
 are permitted. Android key storage, production signers, HSM/KMS operation, live
 update delivery, networking, deployment, pilot, and release remain closed.
 The external merge-eligibility evidence is **[UNVERIFIED]**; it must not be
-substituted by local tests. Phase 9, Android application foundation and encrypted
-local storage, is the next separately authorized phase. See KIP-0075 through
-KIP-0082.
+substituted by local tests. See KIP-0075 through KIP-0082.
+
+Phase 9 is now authorized by KIP-0083. It builds a native Android application
+foundation, calls the real Phase 8 verifier through a bounded native bridge,
+stores exact artifacts under application-layer envelope encryption, and proves
+offline import, recovery, diagnostics, and backup/restore workflows. Phase 9
+does not add `VpnService`, TUN, packet routing, network permissions, provider
+networking, live relays, production authorities, production signing, or public
+release. Those capabilities remain closed until their later named phases.
+
+The Phase 9 implementation exists on `product/phase9-android-foundation`.
+Host-side Go/Android gates and artifact checks are required before it is pushed.
+Physical-device workflow, packet-capture, measured accessibility/performance,
+reviewed translation, and cross-host CI evidence remain merge-blocking when
+marked **[UNVERIFIED]**. Phase 10 must not begin or be merged through Phase 9.
 
 ## Future phase gates
 
