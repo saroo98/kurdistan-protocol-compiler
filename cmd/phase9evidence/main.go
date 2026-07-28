@@ -8,6 +8,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -108,10 +110,23 @@ type acceptanceStatus struct {
 
 func main() {
 	write := flag.Bool("write", false, "write canonical evidence instead of checking it")
+	apkSummary := flag.String("apk-summary", "", "print a deterministic ZIP-entry fingerprint for an APK and exit")
 	flag.Parse()
 	root, err := repositoryRoot()
 	if err != nil {
 		fail(err)
+	}
+	if *apkSummary != "" {
+		path := *apkSummary
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(root, filepath.FromSlash(path))
+		}
+		summary, err := apkEntrySummary(path)
+		if err != nil {
+			fail(err)
+		}
+		fmt.Print(summary)
+		return
 	}
 	artifacts, err := generate(root)
 	if err != nil {
@@ -331,16 +346,77 @@ func verifyReproducibilityArtifact(root string, reproducibility reproducibilityR
 	}
 	if strings.EqualFold(reproducibility.Environment.OperatingSystem, runtime.GOOS) &&
 		(hash != reproducibility.BuildASHA256 || info.Size() != reproducibility.ArtifactSize) {
+		summary, summaryErr := apkEntrySummary(artifactPath)
+		if summaryErr != nil {
+			summary = "unavailable: " + summaryErr.Error()
+		}
 		return "", fmt.Errorf(
-			"release APK differs from the recorded %s reproducibility result: sha256=%s size=%d want_sha256=%s want_size=%d",
+			"release APK differs from the recorded %s reproducibility result: sha256=%s size=%d want_sha256=%s want_size=%d\napk_entry_summary:\n%s",
 			reproducibility.Environment.OperatingSystem,
 			hash,
 			info.Size(),
 			reproducibility.BuildASHA256,
 			reproducibility.ArtifactSize,
+			summary,
 		)
 	}
 	return hash, nil
+}
+
+func apkEntrySummary(path string) (string, error) {
+	reader, err := zip.OpenReader(path)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+	var summary strings.Builder
+	for index, entry := range reader.File {
+		raw, err := entry.OpenRaw()
+		if err != nil {
+			return "", fmt.Errorf("open raw APK entry %q: %w", entry.Name, err)
+		}
+		rawHash, err := readerSHA256(raw)
+		if err != nil {
+			return "", fmt.Errorf("hash raw APK entry %q: %w", entry.Name, err)
+		}
+		content, err := entry.Open()
+		if err != nil {
+			return "", fmt.Errorf("open APK entry %q: %w", entry.Name, err)
+		}
+		contentHash, hashErr := readerSHA256(content)
+		closeErr := content.Close()
+		if hashErr != nil {
+			return "", fmt.Errorf("hash APK entry %q: %w", entry.Name, hashErr)
+		}
+		if closeErr != nil {
+			return "", fmt.Errorf("close APK entry %q: %w", entry.Name, closeErr)
+		}
+		fmt.Fprintf(
+			&summary,
+			"%04d|%s|method=%d|flags=%d|crc32=%08x|compressed=%d|uncompressed=%d|modified=%s|external=%08x|extra=%s|raw=%s|content=%s\n",
+			index,
+			entry.Name,
+			entry.Method,
+			entry.Flags,
+			entry.CRC32,
+			entry.CompressedSize64,
+			entry.UncompressedSize64,
+			entry.Modified.UTC().Format("2006-01-02T15:04:05Z"),
+			entry.ExternalAttrs,
+			bytesSHA256(entry.Extra),
+			rawHash,
+			contentHash,
+		)
+	}
+	return summary.String(), nil
+}
+
+func readerSHA256(reader io.Reader) (string, error) {
+	hash := sha256.New()
+	if _, err := io.Copy(hash, reader); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func readJSON(path string, target any) error {
