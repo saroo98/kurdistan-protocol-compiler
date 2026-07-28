@@ -33,3 +33,17 @@ func TestForbiddenBoundaryMutationTurnsGateRed(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionControlInfoEntryIsForbidden(t *testing.T) {
+	contents := apkContents{
+		entries: map[string]struct{}{
+			versionControlInfoEntry: {},
+		},
+	}
+	if err := rejectCommitSensitiveEntries(contents); err == nil {
+		t.Fatal("commit-sensitive VCS metadata entry was accepted")
+	}
+	if err := rejectCommitSensitiveEntries(apkContents{entries: map[string]struct{}{}}); err != nil {
+		t.Fatalf("clean APK entry set was rejected: %v", err)
+	}
+}

@@ -17,9 +17,9 @@
     "sha256 app-release-unsigned.apk",
     "compare complete APK bytes"
   ],
-  "build_a_sha256": "dcbc0db7d2d068a3ca62cb220521e892129340d187ba6eec24d109906cf6ec22",
-  "build_b_sha256": "dcbc0db7d2d068a3ca62cb220521e892129340d187ba6eec24d109906cf6ec22",
-  "artifact_size_bytes": 5827561,
+  "build_a_sha256": "e1945238d4695a16eca98d213321e21f775f73d02860554d5a401ec5c139dea8",
+  "build_b_sha256": "e1945238d4695a16eca98d213321e21f775f73d02860554d5a401ec5c139dea8",
+  "artifact_size_bytes": 5827476,
   "byte_identical": true,
   "cross_host_windows_linux": "[UNVERIFIED]",
   "limitations": [
