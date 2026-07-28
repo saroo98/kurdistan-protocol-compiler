@@ -1,0 +1,25 @@
+{
+  "schema": "kurdistan.phase9.acceptance-status.v1",
+  "scope": "offline Android foundation only",
+  "local_host": {
+    "go_gate": "passed",
+    "android_phase9_gate": "passed",
+    "combined_gate": "passed",
+    "release_manifest_bytecode_native_boundary": "verified-by-artifact-gate",
+    "two_clean_release_builds": "verified-byte-identical",
+    "release_apk_sha256": "dcbc0db7d2d068a3ca62cb220521e892129340d187ba6eec24d109906cf6ec22"
+  },
+  "external_or_device": {
+    "windows_ci": "[UNVERIFIED]",
+    "linux_ci": "[UNVERIFIED]",
+    "physical_device_workflow": "[UNVERIFIED]",
+    "offline_packet_capture": "[UNVERIFIED]",
+    "performance_budgets": "[UNVERIFIED]",
+    "physical_accessibility_matrix": "[UNVERIFIED]",
+    "human_translation_review": "[UNVERIFIED]"
+  },
+  "merge_eligible": false,
+  "production_ready": false,
+  "vpn_runtime_present": false,
+  "reason": "Mandatory physical-device and cross-host evidence is unavailable."
+}

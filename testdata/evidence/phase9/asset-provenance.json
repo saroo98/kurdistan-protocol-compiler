@@ -1,0 +1,16 @@
+{
+  "schema": "kurdistan.phase9.asset-provenance.v1",
+  "assets": [
+    {
+      "path": "android/app/src/main/res/drawable/ic_kurdistan_vpn.xml",
+      "kind": "android-vector",
+      "origin": "original project-authored geometric K mark",
+      "license": "AGPL-3.0-or-later",
+      "external_source": false
+    }
+  ],
+  "fonts": [],
+  "illustrations": [],
+  "third_party_brand_assets": [],
+  "statement": "Phase 9 uses platform Material symbols and one original project vector. No third-party app branding, iconography, imagery, or fonts are included."
+}

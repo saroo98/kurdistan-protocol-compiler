@@ -42,3 +42,56 @@ jobs:
 
       - name: Run cache-proof validation gate
         run: go run ./cmd/gate
+
+  android-phase9:
+    name: Android Phase 9 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install pinned Android SDK components (Linux)
+        if: runner.os == 'Linux'
+        run: >-
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "platforms;android-36"
+          "build-tools;36.0.0"
+          "ndk;28.2.13676358"
+          "cmake;3.22.1"
+
+      - name: Install pinned Android SDK components (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat" `
+            "platforms;android-36" `
+            "build-tools;36.0.0" `
+            "ndk;28.2.13676358" `
+            "cmake;3.22.1"
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Run combined cache-proof gate
+        run: go run ./cmd/gate -android

@@ -400,7 +400,11 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
 		t.Fatalf("baseline stabilization ledger mismatch: %+v", overlay)
 	}
-	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, ledger.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, ledger.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +481,11 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 
 func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
 	t.Helper()
-	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, ledger.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, ledger.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -876,8 +884,12 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.Phase8FinalGuardMaintenanceOverlays) != 1 || len(finalGuardOverlay.Paths) != 58 || len(finalGuardOverlay.Entries) != 57 || finalGuardOverlay.Paths[57] != m2MaintenanceSelfPathV1 {
 		t.Fatalf("invalid Phase 8 final guard fixture overlay identity/cardinality: %+v", finalGuardOverlay)
 	}
+	phase9Overlay, ok := ledger.Phase9GuardMaintenanceOverlays["phase9-wo909-final-guard-convergence-v1"]
+	if !ok || len(ledger.Phase9GuardMaintenanceOverlays) != 1 || len(phase9Overlay.Paths) != 157 || len(phase9Overlay.Entries) != 157 {
+		t.Fatalf("invalid Phase 9 guard fixture overlay identity/cardinality: %+v", phase9Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -950,6 +962,12 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	for _, path := range finalGuardOverlay.Paths[:len(finalGuardOverlay.Paths)-1] {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range phase9Overlay.Paths {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true
@@ -1444,7 +1462,11 @@ func TestSecurityPhase8WorkOrderOverlayChainMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1508,7 +1530,11 @@ func TestSecurityPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayV1(root, manifest.Phase8FinalGuardMaintenanceOverlays)
+	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}

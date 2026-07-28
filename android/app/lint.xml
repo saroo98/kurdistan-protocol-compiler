@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+      KIP-0083 deliberately pins the patched AGP 9.2 line, Gradle 9.4.1,
+      compile/target SDK 36, built-in Kotlin 2.3.10, and its reviewed Jetpack
+      compatibility set. Version movement is a separately reviewed toolchain
+      change, not an automatic lint fix.
+    -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="OldTargetApi" severity="ignore" />
+</lint>

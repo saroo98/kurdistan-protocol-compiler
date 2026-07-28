@@ -3,22 +3,33 @@
 
 package main
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
-func TestGateUsesUncachedFullTestCommand(t *testing.T) {
+func TestGateStepsRemainCacheProof(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
-	for _, step := range steps {
-		if step.name != "test" {
-			continue
-		}
-		want := []string{"test", "-count=1", "./..."}
-		if !reflect.DeepEqual(step.args, want) {
-			t.Fatalf("test gate args=%v want %v", step.args, want)
-		}
-		return
+	if len(steps) != 4 {
+		t.Fatalf("got %d Go gate steps", len(steps))
 	}
-	t.Fatal("test gate step missing")
+	if got := steps[2].args; len(got) < 2 || got[0] != "test" || got[1] != "-count=1" {
+		t.Fatalf("test gate is not cache-proof: %v", got)
+	}
+	for _, value := range steps {
+		if value.program != "go" {
+			t.Fatalf("unexpected Go gate program %q", value.program)
+		}
+	}
+}
+
+func TestAndroidStepUsesRepositoryWrapper(t *testing.T) {
+	value := androidStep()
+	if value.dir != "android" {
+		t.Fatalf("Android gate directory = %q", value.dir)
+	}
+	found := value.program == "./gradlew"
+	for _, argument := range value.args {
+		found = found || argument == "gradlew.bat"
+	}
+	if !found {
+		t.Fatalf("Android gate does not use the repository wrapper: %#v", value)
+	}
 }

@@ -9,6 +9,7 @@
 //
 //	go run ./cmd/gate           # build + vet + test + full audit
 //	go run ./cmd/gate -quick    # build + vet + test + quick audit (faster)
+//	go run ./cmd/gate -android  # Go gate plus the Android Phase 9 gate
 //
 // It exits non-zero if any step fails.
 package main
@@ -18,12 +19,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
 type step struct {
-	name string
-	args []string
+	name    string
+	program string
+	args    []string
+	dir     string
 }
 
 func gateSteps(quick bool, jsonOut, statusOut string) []step {
@@ -32,30 +36,38 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		auditMode = "--quick"
 	}
 	return []step{
-		{"build", []string{"build", "./..."}},
-		{"vet", []string{"vet", "./..."}},
-		{"test", []string{"test", "-count=1", "./..."}},
-		{"audit", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}},
+		{"build", "go", []string{"build", "./..."}, ""},
+		{"vet", "go", []string{"vet", "./..."}, ""},
+		{"test", "go", []string{"test", "-count=1", "./..."}, ""},
+		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
 	}
 }
 
 func main() {
 	quick := false
+	android := false
 	for _, a := range os.Args[1:] {
 		if a == "-quick" || a == "--quick" {
 			quick = true
+		}
+		if a == "-android" || a == "--android" {
+			android = true
 		}
 	}
 
 	statusOut := filepath.Join(os.TempDir(), "kcheck-gate-status.md")
 	jsonOut := filepath.Join(os.TempDir(), "kcheck-gate-report.json")
 	steps := gateSteps(quick, jsonOut, statusOut)
+	if android {
+		steps = append(steps, androidStep())
+	}
 
 	failed := []string{}
 	for _, s := range steps {
-		fmt.Printf("== gate: %s (go %v) ==\n", s.name, s.args)
+		fmt.Printf("== gate: %s (%s %v) ==\n", s.name, s.program, s.args)
 		start := time.Now()
-		cmd := exec.Command("go", s.args...)
+		cmd := exec.Command(s.program, s.args...)
+		cmd.Dir = s.dir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err := cmd.Run()
@@ -73,5 +85,26 @@ func main() {
 		fmt.Printf("GATE FAILED: %v\n", failed)
 		os.Exit(1)
 	}
-	fmt.Println("GATE PASSED: build, vet, test, audit all green")
+	if android {
+		fmt.Println("GATE PASSED: build, vet, test, audit, and Android Phase 9 all green")
+	} else {
+		fmt.Println("GATE PASSED: build, vet, test, audit all green")
+	}
+}
+
+func androidStep() step {
+	if runtime.GOOS == "windows" {
+		return step{
+			name:    "android-phase9",
+			program: "cmd",
+			args:    []string{"/c", "gradlew.bat", "phase9Gate", "--no-build-cache"},
+			dir:     "android",
+		}
+	}
+	return step{
+		name:    "android-phase9",
+		program: "./gradlew",
+		args:    []string{"phase9Gate", "--no-build-cache"},
+		dir:     "android",
+	}
 }
