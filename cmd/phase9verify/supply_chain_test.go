@@ -62,6 +62,15 @@ func TestGradleWrapperAndDependencyVerificationArePinned(t *testing.T) {
 		!strings.Contains(verification, "<sha256 value=") {
 		t.Fatal("Gradle dependency verification metadata is not checksum-enforcing")
 	}
+	for _, required := range []string{
+		`<component group="org.jetbrains.kotlin" name="kotlin-gradle-plugins-bom" version="2.2.10">`,
+		`<sha256 value="e4b7dd0b5570aa7ae6597d1f479bcea94e78e12735fa86f80afa95e7014efed6"`,
+		`<sha256 value="c0a5a21a4e6eec4d8bb6a2c491fac42f35ab9f08dd2af6bedb085715ac805296"`,
+	} {
+		if !strings.Contains(verification, required) {
+			t.Errorf("Gradle dependency verification metadata is missing %q", required)
+		}
+	}
 	build := string(readRepositoryFile(t, "android", "build.gradle.kts"))
 	if !strings.Contains(build, "lockMode.set(LockMode.STRICT)") {
 		t.Fatal("Gradle dependency locking is not strict")
