@@ -11,6 +11,7 @@ set_target_properties(
     kurdistan_bridge
     PROPERTIES
     IMPORTED_LOCATION "${KVPN_GO_BRIDGE_SO}"
+    IMPORTED_SONAME "libkurdistan_bridge.so"
 )
 
 add_library(kurdistan_jni SHARED kvpn_jni.c)
@@ -24,10 +25,17 @@ target_compile_options(
     -Werror
     -fvisibility=hidden
     -fstack-protector-strong
+    "-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=."
+    "-fdebug-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=."
+    "-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=."
+    "-ffile-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=."
+    "-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=."
+    "-fmacro-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=."
 )
 target_link_options(
     kurdistan_jni
     PRIVATE
+    -Wl,--build-id=none
     -Wl,--no-undefined
     -Wl,-z,relro
     -Wl,-z,now

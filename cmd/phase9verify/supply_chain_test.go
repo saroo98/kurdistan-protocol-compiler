@@ -99,6 +99,34 @@ func TestVersionCatalogContainsNoDynamicVersions(t *testing.T) {
 	}
 }
 
+func TestNativeBuildRemovesHostIdentityAndUsesStableSONAME(t *testing.T) {
+	gradle := string(readRepositoryFile(t, "android", "core", "native-jni", "build.gradle.kts"))
+	for _, required := range []string{
+		"-trimpath",
+		"-buildvcs=false",
+		"-buildid=",
+		"-B=none",
+		"--build-id=none",
+		"-soname,libkurdistan_bridge.so",
+	} {
+		if !strings.Contains(gradle, required) {
+			t.Errorf("Go bridge build is missing %q", required)
+		}
+	}
+	cmake := string(readRepositoryFile(t, "android", "core", "native-jni", "src", "main", "cpp", "CMakeLists.txt"))
+	for _, required := range []string{
+		`IMPORTED_SONAME "libkurdistan_bridge.so"`,
+		"-ffile-prefix-map=",
+		"-fdebug-prefix-map=",
+		"-fmacro-prefix-map=",
+		"-Wl,--build-id=none",
+	} {
+		if !strings.Contains(cmake, required) {
+			t.Errorf("JNI build is missing %q", required)
+		}
+	}
+}
+
 func readRepositoryFile(t *testing.T, parts ...string) []byte {
 	t.Helper()
 	path := filepath.Join(append([]string{"..", ".."}, parts...)...)
