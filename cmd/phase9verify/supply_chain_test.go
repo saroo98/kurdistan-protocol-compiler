@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -64,6 +65,18 @@ func TestGradleWrapperAndDependencyVerificationArePinned(t *testing.T) {
 	build := string(readRepositoryFile(t, "android", "build.gradle.kts"))
 	if !strings.Contains(build, "lockMode.set(LockMode.STRICT)") {
 		t.Fatal("Gradle dependency locking is not strict")
+	}
+}
+
+func TestGradleWrapperIsExecutableInGit(t *testing.T) {
+	command := exec.Command("git", "ls-files", "--stage", "--", "android/gradlew")
+	command.Dir = filepath.Join("..", "..")
+	output, err := command.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(output), "100755 ") {
+		t.Fatalf("android/gradlew Git mode must be 100755, got %q", strings.TrimSpace(string(output)))
 	}
 }
 
