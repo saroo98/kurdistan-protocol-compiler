@@ -19,9 +19,33 @@ func TestCanonicalizeBOMRemovesVolatileIdentityAndSorts(t *testing.T) {
 		"serialNumber": "urn:uuid:random",
 		"metadata": map[string]any{
 			"timestamp": "now",
+			"tools": map[string]any{
+				"components": []any{
+					map[string]any{"name": "z"},
+					map[string]any{"name": "a"},
+				},
+			},
 		},
 		"components": []any{
-			map[string]any{"bom-ref": "z"},
+			map[string]any{
+				"bom-ref": "z",
+				"hashes": []any{
+					map[string]any{"alg": "SHA-512", "content": "z"},
+					map[string]any{"alg": "SHA-256", "content": "a"},
+				},
+				"licenses": []any{
+					map[string]any{"license": map[string]any{"id": "MIT"}},
+					map[string]any{"license": map[string]any{"id": "Apache-2.0"}},
+				},
+				"externalReferences": []any{
+					map[string]any{"type": "website", "url": "https://z.example"},
+					map[string]any{"type": "vcs", "url": "https://a.example"},
+				},
+				"properties": []any{
+					map[string]any{"name": "z", "value": "z"},
+					map[string]any{"name": "a", "value": "a"},
+				},
+			},
 			map[string]any{"bom-ref": "a"},
 		},
 		"dependencies": []any{
@@ -48,6 +72,61 @@ func TestCanonicalizeBOMRemovesVolatileIdentityAndSorts(t *testing.T) {
 	dependsOn := dependencies[1].(map[string]any)["dependsOn"].([]any)
 	if dependsOn[0] != "a" {
 		t.Fatalf("dependency targets were not sorted: %#v", dependsOn)
+	}
+	component := components[1].(map[string]any)
+	for _, key := range []string{"hashes", "licenses", "externalReferences", "properties"} {
+		values := component[key].([]any)
+		if canonicalJSONKey(values[0]) > canonicalJSONKey(values[1]) {
+			t.Fatalf("%s were not sorted: %#v", key, values)
+		}
+	}
+	tools := metadata["tools"].(map[string]any)["components"].([]any)
+	if tools[0].(map[string]any)["name"] != "a" {
+		t.Fatalf("tool components were not sorted: %#v", tools)
+	}
+}
+
+func TestCanonicalizeBOMProducesEqualBytesAcrossDiscoveryOrder(t *testing.T) {
+	left := map[string]any{
+		"bomFormat":   "CycloneDX",
+		"specVersion": "1.6",
+		"components": []any{
+			map[string]any{
+				"bom-ref": "b",
+				"hashes": []any{
+					map[string]any{"alg": "SHA-512", "content": "b"},
+					map[string]any{"alg": "SHA-256", "content": "a"},
+				},
+			},
+			map[string]any{"bom-ref": "a"},
+		},
+	}
+	right := map[string]any{
+		"specVersion": "1.6",
+		"bomFormat":   "CycloneDX",
+		"components": []any{
+			map[string]any{"bom-ref": "a"},
+			map[string]any{
+				"hashes": []any{
+					map[string]any{"content": "a", "alg": "SHA-256"},
+					map[string]any{"content": "b", "alg": "SHA-512"},
+				},
+				"bom-ref": "b",
+			},
+		},
+	}
+	canonicalizeBOM(left)
+	canonicalizeBOM(right)
+	leftBytes, err := marshalStable(left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rightBytes, err := marshalStable(right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(leftBytes) != string(rightBytes) {
+		t.Fatalf("canonical BOMs differ:\nleft=%s\nright=%s", leftBytes, rightBytes)
 	}
 }
 

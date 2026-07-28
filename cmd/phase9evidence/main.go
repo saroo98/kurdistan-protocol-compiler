@@ -131,7 +131,12 @@ func main() {
 			fail(fmt.Errorf("%s: %w; run go run ./cmd/phase9evidence -write", item.path, err))
 		}
 		if !bytes.Equal(existing, item.data) {
-			fail(fmt.Errorf("%s is stale; run go run ./cmd/phase9evidence -write and review the diff", item.path))
+			fail(fmt.Errorf(
+				"%s is stale: existing_sha256=%s generated_sha256=%s; run go run ./cmd/phase9evidence -write and review the diff",
+				item.path,
+				bytesSHA256(existing),
+				bytesSHA256(item.data),
+			))
 		}
 	}
 	if *write {
@@ -351,33 +356,68 @@ func canonicalizeBOM(bom map[string]any) {
 	if metadata, ok := bom["metadata"].(map[string]any); ok {
 		delete(metadata, "timestamp")
 	}
-	sortObjectArray(bom, "components", "bom-ref")
-	sortObjectArray(bom, "dependencies", "ref")
-	if dependencies, ok := bom["dependencies"].([]any); ok {
-		for _, value := range dependencies {
-			dependency, ok := value.(map[string]any)
-			if !ok {
+	canonicalizeBOMValue(bom)
+}
+
+// canonicalizeBOMValue sorts only CycloneDX collections whose ordering carries
+// no meaning. Gradle can discover these values in a different order on Windows
+// and Linux even when the resolved dependency graph is identical.
+func canonicalizeBOMValue(value any) {
+	switch current := value.(type) {
+	case map[string]any:
+		for key, child := range current {
+			canonicalizeBOMValue(child)
+			values, ok := child.([]any)
+			if !ok || !isUnorderedBOMCollection(key) {
 				continue
 			}
-			if values, ok := dependency["dependsOn"].([]any); ok {
-				sort.Slice(values, func(i, j int) bool {
-					return fmt.Sprint(values[i]) < fmt.Sprint(values[j])
-				})
-			}
+			sort.SliceStable(values, func(i, j int) bool {
+				return bomCollectionSortKey(key, values[i]) < bomCollectionSortKey(key, values[j])
+			})
+		}
+	case []any:
+		for _, child := range current {
+			canonicalizeBOMValue(child)
 		}
 	}
 }
 
-func sortObjectArray(parent map[string]any, key, field string) {
-	values, ok := parent[key].([]any)
-	if !ok {
-		return
+func isUnorderedBOMCollection(key string) bool {
+	switch key {
+	case "components", "dependencies", "dependsOn", "externalReferences", "hashes", "licenses", "properties":
+		return true
+	default:
+		return false
 	}
-	sort.SliceStable(values, func(i, j int) bool {
-		left, _ := values[i].(map[string]any)
-		right, _ := values[j].(map[string]any)
-		return fmt.Sprint(left[field]) < fmt.Sprint(right[field])
-	})
+}
+
+func bomCollectionSortKey(collection string, value any) string {
+	object, _ := value.(map[string]any)
+	switch collection {
+	case "components":
+		if ref := stringValue(object["bom-ref"]); ref != "" {
+			return ref
+		}
+	case "dependencies":
+		if ref := stringValue(object["ref"]); ref != "" {
+			return ref
+		}
+	case "hashes":
+		return stringValue(object["alg"]) + "\x00" + stringValue(object["content"])
+	case "externalReferences":
+		return stringValue(object["type"]) + "\x00" + stringValue(object["url"])
+	case "properties":
+		return stringValue(object["name"]) + "\x00" + stringValue(object["value"])
+	}
+	return canonicalJSONKey(value)
+}
+
+func canonicalJSONKey(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprint(value)
+	}
+	return string(data)
 }
 
 func buildSPDX(bom map[string]any) (spdxDocument, error) {
@@ -528,8 +568,12 @@ func fileSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return bytesSHA256(data), nil
+}
+
+func bytesSHA256(data []byte) string {
 	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
+	return hex.EncodeToString(sum[:])
 }
 
 func shortHash(value string) string {
