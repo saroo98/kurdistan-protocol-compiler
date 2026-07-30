@@ -47,7 +47,7 @@ type inProcessProtectedRelayV1 struct {
 	labPadding bool
 }
 
-var consumedInProcessPairsV1 sync.Map
+var consumedProtectedPairsV1 sync.Map
 
 // NewInProcessProtectedRelay consumes one configured authenticated pair once.
 // It is strictly in-process: it accepts no address, listener, dialer, secret,
@@ -69,18 +69,18 @@ func newInProcessProtectedRelayCoreV1(client *ClientAuthenticatedEndpointV1, rel
 		return nil, nil, ErrSecureChannel
 	}
 	coordinator := client.state.coordinator
-	if _, loaded := consumedInProcessPairsV1.LoadOrStore(coordinator, struct{}{}); loaded {
+	if _, loaded := consumedProtectedPairsV1.LoadOrStore(coordinator, struct{}{}); loaded {
 		return nil, nil, ErrSecureChannel
 	}
 	channel, err := newStrictProtectedChannelV1(client, relay)
 	if err != nil {
-		consumedInProcessPairsV1.Delete(coordinator)
+		consumedProtectedPairsV1.Delete(coordinator)
 		return nil, nil, err
 	}
 	coordinator.mu.Lock()
 	previousDestroy := coordinator.destroy
 	coordinator.destroy = func() {
-		consumedInProcessPairsV1.Delete(coordinator)
+		consumedProtectedPairsV1.Delete(coordinator)
 		if previousDestroy != nil {
 			previousDestroy()
 		}

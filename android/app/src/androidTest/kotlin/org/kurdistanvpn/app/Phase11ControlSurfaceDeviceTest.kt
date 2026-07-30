@@ -1,0 +1,391 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Saro
+
+package org.kurdistanvpn.app
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.kurdistanvpn.core.model.AppState
+import org.kurdistanvpn.core.model.BackupWorkflowState
+import org.kurdistanvpn.core.model.DiagnosticWorkflowState
+import org.kurdistanvpn.core.model.OperationError
+import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProfileSummary
+import org.kurdistanvpn.core.model.ProfileTrust
+import org.kurdistanvpn.core.model.ThemePreference
+import org.kurdistanvpn.core.ui.R as UiR
+import org.kurdistanvpn.feature.diagnosticsabout.DiagnosticsAboutScreen
+import org.kurdistanvpn.feature.home.HomeScreen
+import org.kurdistanvpn.feature.profiles.ProfilesScreen
+import org.kurdistanvpn.feature.settingsrecovery.SettingsRecoveryScreen
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
+import org.kurdistanvpn.runtime.api.VpnRuntimeState
+
+class Phase11ControlSurfaceDeviceTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    private val context
+        get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun homeInvokesEveryExposedControl() {
+        var appState by mutableStateOf<AppState>(AppState.Ready(emptyList()))
+        var runtime by mutableStateOf(VpnRuntimeSnapshot())
+        val invoked = linkedMapOf<String, Int>()
+        fun record(name: String) {
+            invoked[name] = invoked.getOrDefault(name, 0) + 1
+        }
+
+        compose.setContent {
+            HomeScreen(
+                state = appState,
+                vpnRuntime = runtime,
+                onStartVpn = {
+                    record("start")
+                    runtime = VpnRuntimeSnapshot(VpnRuntimeState.ACTIVE_KURD_LOOPBACK)
+                },
+                onStopVpn = {
+                    record("stop")
+                    runtime = VpnRuntimeSnapshot()
+                },
+                onOpenProfiles = { record("profiles") },
+                onOpenSettings = { record("settings") },
+                onOpenDiagnostics = { record("diagnostics") },
+                onClearError = {
+                    record("dismiss")
+                    appState = AppState.Ready(emptyList())
+                },
+            )
+        }
+
+        compose.onNodeWithText(context.getString(UiR.string.start_local_vpn))
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.stop_local_vpn))
+            .assertIsDisplayed()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.profiles))
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.privacy_recovery))
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.diagnostics_about))
+            .performClick()
+        compose.runOnIdle {
+            appState = AppState.ImportRejected(OperationError.TRUST_REJECTED)
+        }
+        compose.onNodeWithText(context.getString(UiR.string.dismiss))
+            .performScrollTo()
+            .performClick()
+
+        compose.runOnIdle {
+            assertEquals(
+                mapOf(
+                    "start" to 1,
+                    "stop" to 1,
+                    "profiles" to 1,
+                    "settings" to 1,
+                    "diagnostics" to 1,
+                    "dismiss" to 1,
+                ),
+                invoked,
+            )
+        }
+    }
+
+    @Test
+    fun profilesInvokesEveryExposedControlAndConfirmationBranch() {
+        val profile = ProfileSummary(
+            localRecordId = "phase11-control-profile",
+            displayAlias = "Phase 11 control profile",
+            trust = ProfileTrust.VERIFIED_NONPRODUCTION,
+            generation = 7u,
+            expiresAtEpochSeconds = 2_000_000_000,
+        )
+        val invoked = linkedMapOf<String, Int>()
+        var importedLink = ""
+        var exportedID = ""
+        var exportedPassphrase = ""
+        var deletedID = ""
+        fun record(name: String) {
+            invoked[name] = invoked.getOrDefault(name, 0) + 1
+        }
+
+        compose.setContent {
+            ProfilesScreen(
+                profiles = listOf(profile),
+                onImportFile = { record("file") },
+                onImportClipboard = { record("clipboard") },
+                onImportLink = {
+                    record("link")
+                    importedLink = it
+                },
+                onScanQr = { record("qr") },
+                onExportProfile = { id, passphrase ->
+                    record("export")
+                    exportedID = id
+                    exportedPassphrase = passphrase
+                },
+                onDeleteProfile = {
+                    record("delete")
+                    deletedID = it
+                },
+                onBack = { record("back") },
+            )
+        }
+
+        compose.onNodeWithText(context.getString(UiR.string.import_profile_file))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.import_clipboard))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.scan_offline_qr))
+            .performScrollTo()
+            .performClick()
+        val link = "kurd://artifact/phase11-control"
+        compose.onNodeWithText(context.getString(UiR.string.profile_link_label))
+            .performScrollTo()
+            .performTextInput(link)
+        compose.onNodeWithText(context.getString(UiR.string.preview_link))
+            .performScrollTo()
+            .performClick()
+
+        compose.onNodeWithText(context.getString(UiR.string.export_encrypted_profile))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.export_encrypted_profile))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.profile_export_passphrase))
+            .performScrollTo()
+            .performTextInput("phase11-passphrase")
+        compose.onNodeWithText(context.getString(UiR.string.confirm_profile_export))
+            .performScrollTo()
+            .performClick()
+
+        compose.onNodeWithText(context.getString(UiR.string.delete_profile))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.delete_profile))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.confirm_delete_profile))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.back))
+            .performScrollTo()
+            .performClick()
+
+        compose.runOnIdle {
+            assertEquals(link, importedLink)
+            assertEquals(profile.localRecordId, exportedID)
+            assertEquals("phase11-passphrase", exportedPassphrase)
+            assertEquals(profile.localRecordId, deletedID)
+            assertEquals(
+                mapOf(
+                    "file" to 1,
+                    "clipboard" to 1,
+                    "qr" to 1,
+                    "link" to 1,
+                    "export" to 1,
+                    "delete" to 1,
+                    "back" to 1,
+                ),
+                invoked,
+            )
+        }
+    }
+
+    @Test
+    fun settingsAndRecoveryInvokeEveryExposedControlAndBranch() {
+        var backupState by mutableStateOf<BackupWorkflowState>(BackupWorkflowState.Idle)
+        var settings by mutableStateOf(Phase9Settings())
+        val invoked = linkedMapOf<String, Int>()
+        fun record(name: String) {
+            invoked[name] = invoked.getOrDefault(name, 0) + 1
+        }
+
+        compose.setContent {
+            SettingsRecoveryScreen(
+                backupState = backupState,
+                settings = settings,
+                onTheme = {
+                    record("theme")
+                    settings = settings.copy(theme = it)
+                },
+                onHighContrast = {
+                    record("contrast")
+                    settings = settings.copy(highContrast = it)
+                },
+                onReducedMotion = {
+                    record("motion")
+                    settings = settings.copy(reducedMotion = it)
+                },
+                onCreateBackup = { record("create-backup") },
+                onOpenBackup = {
+                    record("open-backup")
+                    backupState = BackupWorkflowState.RestorePreview(1, 1)
+                },
+                onConfirmRestore = {
+                    record("confirm-restore")
+                    backupState = BackupWorkflowState.Completed(1)
+                },
+                onCancelRestore = {
+                    record("cancel-restore")
+                    backupState = BackupWorkflowState.Idle
+                },
+                onResetAll = { record("reset") },
+                onBack = { record("back") },
+            )
+        }
+
+        compose.onNodeWithText(
+            context.getString(UiR.string.theme_value, ThemePreference.SYSTEM.name),
+        ).performClick()
+        val highContrast = context.getString(UiR.string.high_contrast)
+        compose.onNodeWithContentDescription(highContrast)
+            .performScrollTo()
+            .performClick()
+        val reducedMotion = context.getString(UiR.string.reduced_motion)
+        compose.onNodeWithContentDescription(reducedMotion)
+            .performScrollTo()
+            .performClick()
+
+        compose.onNodeWithText(context.getString(UiR.string.backup_passphrase))
+            .performScrollTo()
+            .performTextInput("phase11-passphrase")
+        compose.onNodeWithText(context.getString(UiR.string.create_encrypted_backup))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.backup_passphrase))
+            .performScrollTo()
+            .performTextInput("phase11-passphrase")
+        compose.onNodeWithText(context.getString(UiR.string.open_backup_restore))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel_restore))
+            .performScrollTo()
+            .performClick()
+
+        compose.runOnIdle {
+            backupState = BackupWorkflowState.RestorePreview(1, 1)
+        }
+        compose.onNodeWithText(context.getString(UiR.string.confirm_restore))
+            .performScrollTo()
+            .performClick()
+
+        compose.onNodeWithText(context.getString(UiR.string.prepare_reset))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel_reset))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.prepare_reset))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.confirm_reset))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.back))
+            .performScrollTo()
+            .performClick()
+
+        compose.runOnIdle {
+            assertEquals(ThemePreference.LIGHT, settings.theme)
+            assertTrue(settings.highContrast)
+            assertTrue(settings.reducedMotion)
+            assertEquals(
+                mapOf(
+                    "theme" to 1,
+                    "contrast" to 1,
+                    "motion" to 1,
+                    "create-backup" to 1,
+                    "open-backup" to 1,
+                    "cancel-restore" to 1,
+                    "confirm-restore" to 1,
+                    "reset" to 1,
+                    "back" to 1,
+                ),
+                invoked,
+            )
+        }
+    }
+
+    @Test
+    fun diagnosticsInvokePrepareCancelConfirmAndBack() {
+        var state by mutableStateOf<DiagnosticWorkflowState>(DiagnosticWorkflowState.Idle)
+        val invoked = linkedMapOf<String, Int>()
+        fun record(name: String) {
+            invoked[name] = invoked.getOrDefault(name, 0) + 1
+        }
+
+        compose.setContent {
+            DiagnosticsAboutScreen(
+                state = state,
+                appVersion = "phase11-control",
+                compatibility = null,
+                onPrepare = {
+                    record("prepare")
+                    state = DiagnosticWorkflowState.Preview(1, "1", "1")
+                },
+                onConfirm = {
+                    record("confirm")
+                    state = DiagnosticWorkflowState.Completed
+                },
+                onCancel = {
+                    record("cancel")
+                    state = DiagnosticWorkflowState.Idle
+                },
+                onBack = { record("back") },
+            )
+        }
+
+        compose.onNodeWithText(context.getString(UiR.string.prepare_diagnostics))
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.prepare_diagnostics))
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.confirm_export))
+            .performScrollTo()
+            .performClick()
+        compose.runOnIdle {
+            state = DiagnosticWorkflowState.Idle
+        }
+        compose.onNodeWithText(context.getString(UiR.string.back))
+            .performScrollTo()
+            .performClick()
+
+        compose.runOnIdle {
+            assertEquals(
+                mapOf(
+                    "prepare" to 2,
+                    "cancel" to 1,
+                    "confirm" to 1,
+                    "back" to 1,
+                ),
+                invoked,
+            )
+        }
+    }
+}

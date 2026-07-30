@@ -412,3 +412,25 @@ func kvpn_free(handle C.uint64_t) (result C.int32_t) {
 	defer recoverCode(&result)
 	return C.int32_t(registry.Free(androidbridge.Handle(handle)))
 }
+
+//export kvpn_phase11_roundtrip
+func kvpn_phase11_roundtrip(
+	input *C.uint8_t,
+	inputLength C.uint32_t,
+	output *C.uint8_t,
+	capacity C.uint32_t,
+	outputLength *C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	encoded, code := inputBytes(input, inputLength, phase11MaximumPayloadBytes)
+	if code != androidbridge.CodeOK || len(encoded) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(encoded)
+	roundTripped, code := phase11RoundTrip(encoded)
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	defer clear(roundTripped)
+	return C.int32_t(writeBytes(roundTripped, output, capacity, outputLength))
+}

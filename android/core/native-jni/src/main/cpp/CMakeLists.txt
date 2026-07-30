@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(kurdistan_jni LANGUAGES C)
 
-if(NOT DEFINED KVPN_GO_BRIDGE_SO OR NOT EXISTS "${KVPN_GO_BRIDGE_SO}")
+if(NOT DEFINED KVPN_GO_BRIDGE_ROOT)
+    message(FATAL_ERROR "The generated Go bridge root was not provided")
+endif()
+
+set(KVPN_GO_BRIDGE_SO "${KVPN_GO_BRIDGE_ROOT}/${ANDROID_ABI}/libkurdistan_bridge.so")
+if(NOT EXISTS "${KVPN_GO_BRIDGE_SO}")
     message(FATAL_ERROR "The generated Go bridge is missing: ${KVPN_GO_BRIDGE_SO}")
 endif()
 

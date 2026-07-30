@@ -245,6 +245,7 @@ func TestVerifyCanonicalAndroidTextRejectsCRLFAndIgnoresBuildOutputs(t *testing.
 	write("android/app/src/main/example.kt", "line one\nline two\n")
 	write("android/gradlew.bat", "@echo off\r\n")
 	write("android/app/build/generated.xml", "<generated>\r\n")
+	write("android/.idea/AndroidProjectSystem.xml", "<workspace>\r\n")
 	if err := verifyCanonicalAndroidText(root); err != nil {
 		t.Fatalf("canonical tree rejected: %v", err)
 	}

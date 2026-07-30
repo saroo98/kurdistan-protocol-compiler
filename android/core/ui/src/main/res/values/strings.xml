@@ -4,6 +4,16 @@
     <string name="foundation_label">Secure profile foundation</string>
     <string name="runtime_unavailable">VPN runtime unavailable</string>
     <string name="phase9_offline_notice">This Phase 9 build verifies and protects profiles offline. It cannot connect or route traffic.</string>
+    <string name="runtime_local_title">Local VPN runtime</string>
+    <string name="phase11_local_notice">This Phase 11 conformance runtime carries the reserved test range through the authenticated Kurd transport to an owned loopback relay. It does not connect to a public relay or provide Internet access.</string>
+    <string name="runtime_state">VPN state: %1$s</string>
+    <string name="runtime_packets">Captured test packets: %1$d</string>
+    <string name="runtime_replies">Returned local test packets: %1$d</string>
+    <string name="runtime_protection">Always-on: %1$b · lockdown: %2$b</string>
+    <string name="runtime_failure">VPN stopped safely: %1$s</string>
+    <string name="start_local_vpn">Start local VPN test</string>
+    <string name="stop_local_vpn">Stop local VPN test</string>
+    <string name="profile_required_for_vpn">Import and verify a profile before starting the local VPN test.</string>
     <string name="application_state">Application state: %1$s</string>
     <string name="unknown">Unknown</string>
     <string name="import_rejected">Import rejected: %1$s</string>
@@ -65,7 +75,7 @@
     <string name="confirm_reset">Confirm local reset</string>
     <string name="cancel_reset">Cancel reset</string>
     <string name="bridge_check">Kurd Android bridge: checked at startup</string>
-    <string name="phase9_no_runtime">VPN runtime: not present in Phase 9</string>
+    <string name="phase11_runtime_scope">VPN runtime: authenticated Kurd transport to an owned loopback relay only. Public relay and Internet egress are not enabled.</string>
     <string name="app_version">App version: %1$s</string>
     <string name="core_version">Kurd core: %1$s</string>
     <string name="profile_schema_version">Profile schema: %1$s</string>

@@ -3,11 +3,9 @@
 
 # Kurdistan Protocol Compiler Status
 
-> Staged product-development program. Phase 9 adds an offline Android foundation around the real Phase 8 verifier, protected local state, diagnostics, and encrypted backup/restore on `product/phase9-android-foundation`. It adds no VPN or network runtime. Physical-device, packet-capture, measured accessibility/performance, reviewed translation, cross-host CI, production signing, deployment, and release evidence remain **[UNVERIFIED]**.
+> Staged product-development program. Phases 8-11 add bounded profile cryptography, protected Android state, a reserved-range `VpnService`/TUN runtime, and authenticated Kurd-over-TLS/TCP owned-loopback conformance. Owned-network, public-relay, field-resilience, production-safety, deployment, and release evidence remains **[UNVERIFIED]**.
 
-> Legend: `[live]` executes real behavior locally (network I/O remains loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.
-
-> The generated compiler audit table below does not validate the separate Android Phase 9 build. Use `go run ./cmd/gate -android` and `docs/PHASE9_EVIDENCE_INDEX.md` for the combined boundary.
+> Legend: `[live]` executes real behavior locally (current network I/O remains owned-loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The audit table includes many historical `[model]`/`[plan]` gates; the separate Phase 9-11 Android and transport boundary is enforced by `go run ./cmd/gate -android` and `docs/PHASE11_EVIDENCE_INDEX.md`. The security and runtime mutant gates report real lab fault-injection detector sensitivity with paired controls. A pass does not prove defect absence, production security, field resilience, release readiness, or authorization to merge or deploy.
 
 - Latest audit mode: `full`
 - Profile count: `1000`
@@ -959,13 +957,13 @@
 - Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.
 - Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts.
 - Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown.
-- Android VpnService prototype checks permission/lifecycle states, packet-flow mapping, fail-closed behavior, diagnostics, reconnect hooks, and generated parity; it does not connect Android traffic to carriers.
+- The historical Android VpnService audit gates are models; the separately gated Phase 10/11 Android implementation carries only reserved-range test traffic through the authenticated owned-loopback Kurd transport.
 - Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.
 - Phase 8 locally implements deterministic profile framing, signed admission, optional recipient sealing, lifecycle activation, and local tooling with non-production fixtures. It has no production key custody, production signer, Android keystore, HSM/KMS, live delivery, deployment, pilot, or release evidence.
 - Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.
-- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.
+- There is no unrestricted Internet egress, public relay, SOCKS or HTTP proxy service, TLS mimicry, CDN behavior, deployment automation, or non-loopback field evidence.
 - The audit detects local regressions; it cannot prove undetectability or real-world robustness.
 
 ## Milestone Frontier
 
-Phase 8 profile artifacts are implemented as a bounded local surface (see KIP-0075 through KIP-0082), but its external merge-eligibility evidence remains **[UNVERIFIED]**. The latest modelled surface evaluated by these audit gates is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. Phase 9 Android application foundation is separately gated.
+The latest modelled surface in this audit table is the Android carrier integration path (`androidcarrier_*`). Separately, Phases 8-11 implement and gate profile cryptography, protected Android state, reserved-range TUN behavior, and authenticated owned-loopback Kurd transport. Owned-LAN, owned-relay, physical-device matrix, capacity, handover, field-resilience, deployment, and release evidence remains **[UNVERIFIED]**.

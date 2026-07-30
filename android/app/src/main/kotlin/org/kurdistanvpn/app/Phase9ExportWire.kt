@@ -8,25 +8,19 @@ import java.nio.ByteOrder
 
 internal object Phase9ExportWire {
     fun diagnosticRequest(profileCount: Int): ByteArray {
-        val profileBucket = when {
-            profileCount <= 0 -> 1
-            profileCount == 1 -> 2
-            profileCount <= 8 -> 3
-            else -> 4
-        }
         return ByteBuffer.allocate(22).order(ByteOrder.BIG_ENDIAN).apply {
             put("KDR1".encodeToByteArray())
             putLong(1)
             put(3.toByte())
             put(1.toByte()) // contract versions
             put(1.toByte()) // supported
-            put(2.toByte()) // one
+            put(0.toByte()) // counts are forbidden for this category
             put(2.toByte()) // profile lifecycle
             put((if (profileCount == 0) 4 else 5).toByte()) // absent or admitted
-            put(profileBucket.toByte())
+            put(0.toByte()) // counts are forbidden for this category
             put(5.toByte()) // runtime disposition
             put(14.toByte()) // unavailable
-            put(2.toByte()) // one
+            put(0.toByte()) // counts are forbidden for this category
         }.array()
     }
 

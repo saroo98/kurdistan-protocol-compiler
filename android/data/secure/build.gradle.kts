@@ -18,6 +18,9 @@ dependencies {
     implementation(project(":core:native-api"))
     implementation(project(":data:metadata"))
     implementation(libs.androidx.biometric)
+    // Biometric 1.1.0 declares a 2020 Fragment version. Pin the current stable
+    // Fragment runtime so its FragmentActivity interoperates with Activity 1.12.
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit4)

@@ -130,6 +130,20 @@ class NativeBridge : KurdNativeCore {
         }
     }
 
+    override fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray> {
+        if (payload.isEmpty() || payload.size > MAX_PHASE11_PAYLOAD_BYTES) {
+            return NativeResult.Failure(OperationError.SIZE_LIMIT)
+        }
+        val output = ByteBuffer.allocateDirect(MAX_PHASE11_PAYLOAD_BYTES)
+        val length = IntArray(1)
+        val code = nativePhase11RoundTrip(payload, output, length)
+        return if (code == CODE_OK) {
+            NativeResult.Success(readBytes(output, length[0]))
+        } else {
+            NativeResult.Failure(mapError(code))
+        }
+    }
+
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =
         unitResult(nativeFree(preview.handle))
 
@@ -233,6 +247,11 @@ class NativeBridge : KurdNativeCore {
         output: ByteBuffer,
         outputLength: IntArray,
     ): Int
+    private external fun nativePhase11RoundTrip(
+        input: ByteArray,
+        output: ByteBuffer,
+        outputLength: IntArray,
+    ): Int
 
     companion object {
         private const val CODE_OK = 0
@@ -242,6 +261,7 @@ class NativeBridge : KurdNativeCore {
         private const val MAX_RESULT_BYTES = 1_200_000
         private const val MAX_DIAGNOSTIC_BYTES = 4096
         private const val MAX_BACKUP_BYTES = 8 * 1024 * 1024 + 128
+        private const val MAX_PHASE11_PAYLOAD_BYTES = 32 * 1024
 
         init {
             System.loadLibrary("kurdistan_bridge")

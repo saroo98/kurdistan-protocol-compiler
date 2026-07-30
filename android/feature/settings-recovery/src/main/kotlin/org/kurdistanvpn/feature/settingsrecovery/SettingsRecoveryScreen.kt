@@ -6,8 +6,10 @@ package org.kurdistanvpn.feature.settingsrecovery
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -22,6 +24,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -46,6 +51,8 @@ fun SettingsRecoveryScreen(
 ) {
     var passphrase by remember { mutableStateOf("") }
     var resetArmed by remember { mutableStateOf(false) }
+    val highContrastLabel = stringResource(UiR.string.high_contrast)
+    val reducedMotionLabel = stringResource(UiR.string.reduced_motion)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,19 +80,45 @@ fun SettingsRecoveryScreen(
         ) {
             Text(stringResource(UiR.string.theme_value, settings.theme.name))
         }
-        androidx.compose.foundation.layout.Row {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = highContrastLabel }
+                .toggleable(
+                    value = settings.highContrast,
+                    role = Role.Switch,
+                    onValueChange = onHighContrast,
+                )
+                .padding(vertical = 8.dp),
+        ) {
             Text(
-                stringResource(UiR.string.high_contrast),
+                highContrastLabel,
                 modifier = Modifier.weight(1f),
             )
-            Switch(checked = settings.highContrast, onCheckedChange = onHighContrast)
+            Switch(
+                checked = settings.highContrast,
+                onCheckedChange = null,
+            )
         }
-        androidx.compose.foundation.layout.Row {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = reducedMotionLabel }
+                .toggleable(
+                    value = settings.reducedMotion,
+                    role = Role.Switch,
+                    onValueChange = onReducedMotion,
+                )
+                .padding(vertical = 8.dp),
+        ) {
             Text(
-                stringResource(UiR.string.reduced_motion),
+                reducedMotionLabel,
                 modifier = Modifier.weight(1f),
             )
-            Switch(checked = settings.reducedMotion, onCheckedChange = onReducedMotion)
+            Switch(
+                checked = settings.reducedMotion,
+                onCheckedChange = null,
+            )
         }
         OutlinedTextField(
             value = passphrase,

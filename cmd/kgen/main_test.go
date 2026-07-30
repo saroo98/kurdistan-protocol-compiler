@@ -422,6 +422,8 @@ type committedEvidenceManifestV1 struct {
 	Phase8GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase8_guard_maintenance_overlays"`
 	Phase8FinalGuardMaintenanceOverlays map[string]committedMaintenanceOverlayV1 `json:"phase8_final_guard_maintenance_overlays"`
 	Phase9GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase9_guard_maintenance_overlays"`
+	Phase10VPNRuntimeOverlays           map[string]committedMaintenanceOverlayV1 `json:"phase10_vpn_runtime_overlays"`
+	Phase11LocalTransportOverlays       map[string]committedMaintenanceOverlayV1 `json:"phase11_local_transport_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -554,7 +556,15 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	phase9Pre, err := validatePhase9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
+	phase11Pre, err := validatePhase11LocalTransportOverlayV1(root, manifest.Phase11LocalTransportOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase10Pre, err := validatePhase10VPNRuntimeOverlayAtPostV1(root, phase11Pre, manifest.Phase10VPNRuntimeOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase9Pre, err := validatePhase9GuardMaintenanceOverlayAtPostV1(root, phase10Pre, manifest.Phase9GuardMaintenanceOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1015,16 +1025,115 @@ func validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root string, currentAtPo
 	return pre, nil
 }
 
+func validatePhase11LocalTransportOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase11-local-transport-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != committedEvidenceManifestPathV1 ||
+		!validHelperOwnerSHA256V1(overlay.SelfPreSHA256) ||
+		len(overlay.Paths) == 0 || len(overlay.Paths) > 128 ||
+		len(overlay.Entries) != len(overlay.Paths) {
+		return nil, fmt.Errorf("invalid phase11 local transport overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(overlay.Paths))
+	lastPath := ""
+	for i, path := range overlay.Paths {
+		entry := overlay.Entries[i]
+		if entry.Path != path || path <= lastPath || path == committedEvidenceManifestPathV1 ||
+			strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") ||
+			!validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase11 local transport entry %d", i)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase11 absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validHelperOwnerSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase11 existing predecessor %d", i)
+		}
+		actual, err := fileSHA256V1(root, path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase11 local transport hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		lastPath = path
+	}
+	return pre, nil
+}
+
+func validatePhase10VPNRuntimeOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePhase10VPNRuntimeOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase10-local-vpn-runtime-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != committedEvidenceManifestPathV1 ||
+		overlay.SelfPreSHA256 != "45559ed3772b777924c8ef5e2a24980b8ddfccab89e67613ff379f5b48824d76" ||
+		len(overlay.Paths) != 70 || len(overlay.Entries) != len(overlay.Paths) {
+		return nil, fmt.Errorf("invalid phase10 VPN runtime overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
+	scope := sha256.New()
+	lastPath := ""
+	for i, path := range overlay.Paths {
+		entry := overlay.Entries[i]
+		if entry.Path != path || path <= lastPath || !validHelperOwnerSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase10 VPN runtime entry %d", i)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase10 absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validHelperOwnerSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase10 existing predecessor %d", i)
+		}
+		scope.Write([]byte(path))
+		scope.Write([]byte{0})
+		scope.Write([]byte(predecessor))
+		scope.Write([]byte{'\n'})
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, path)
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase10 VPN runtime hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		lastPath = path
+	}
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "0553f52772fa72f8851a90db50d7566abafb6f375830b6f375e8082ec49255d9" {
+		return nil, fmt.Errorf("phase10 VPN runtime scope drift %s", got)
+	}
+	return pre, nil
+}
+
 func validatePhase9GuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePhase9GuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePhase9GuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase9-wo909-final-guard-convergence-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name ||
 		overlay.SelfPath != committedEvidenceManifestPathV1 ||
 		overlay.SelfPreSHA256 != "1f8149bb5ff5057e6b25dcad186c07303d57af4073f940708f257a17c9656623" ||
-		len(overlay.Paths) != 157 || len(overlay.Entries) != len(overlay.Paths) {
+		len(overlay.Paths) != 159 || len(overlay.Entries) != len(overlay.Paths) {
 		return nil, fmt.Errorf("invalid phase9 guard-maintenance overlay identity/cardinality")
 	}
-	pre := make(map[string]string, len(overlay.Paths))
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	scope := sha256.New()
 	lastPath := ""
 	for i, path := range overlay.Paths {
@@ -1045,14 +1154,18 @@ func validatePhase9GuardMaintenanceOverlayV1(root string, overlays map[string]co
 		scope.Write([]byte{0})
 		scope.Write([]byte(predecessor))
 		scope.Write([]byte{'\n'})
-		actual, err := fileSHA256V1(root, path)
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = fileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase9 guard-maintenance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}
 		pre[path] = predecessor
 		lastPath = path
 	}
-	if got := hex.EncodeToString(scope.Sum(nil)); got != "e0e123bcb1b6e64e7986b85b3ba8e3ce23884c9e7dba13b23f0054218756f9fb" {
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "f079c69d9c8b9f4649198ca5d948907d4ed44dc989bd5420a8e703ee37c2fb54" {
 		return nil, fmt.Errorf("phase9 guard-maintenance scope drift %s", got)
 	}
 	return pre, nil

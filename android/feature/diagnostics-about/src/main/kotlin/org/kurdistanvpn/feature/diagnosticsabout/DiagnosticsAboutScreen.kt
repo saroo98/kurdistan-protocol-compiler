@@ -38,7 +38,7 @@ fun DiagnosticsAboutScreen(
     ) {
         Text(stringResource(UiR.string.diagnostics_about), style = MaterialTheme.typography.headlineMedium)
         Text(stringResource(UiR.string.bridge_check))
-        Text(stringResource(UiR.string.phase9_no_runtime))
+        Text(stringResource(UiR.string.phase11_runtime_scope))
         Text(stringResource(UiR.string.app_version, appVersion))
         compatibility?.let { value ->
             Text(stringResource(UiR.string.core_version, value.goCoreVersion))

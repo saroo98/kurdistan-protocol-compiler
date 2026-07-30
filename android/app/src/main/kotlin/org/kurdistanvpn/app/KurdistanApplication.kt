@@ -6,11 +6,7 @@ package org.kurdistanvpn.app
 import android.app.Application
 
 class KurdistanApplication : Application() {
-    lateinit var compositionRoot: Phase9CompositionRoot
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        compositionRoot = Phase9CompositionRoot.create(this)
+    val compositionRoot: Phase9CompositionRoot by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        Phase9CompositionRoot.create(this)
     }
 }
