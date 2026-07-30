@@ -258,69 +258,6 @@
       "version": "1.8.2"
     },
     {
-      "bom-ref": "pkg:maven/androidx.activity/activity@1.1.0?type=aar",
-      "description": "Provides the base Activity subclass and the relevant hooks to build a composable structure on top.",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "http://source.android.com"
-        }
-      ],
-      "group": "androidx.activity",
-      "hashes": [
-        {
-          "alg": "MD5",
-          "content": "dbd8d083af05bd3d9d7f29978fd1b20a"
-        },
-        {
-          "alg": "SHA-1",
-          "content": "67c7a207d26ea46621e261ca2295ed2e2d311f8f"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "4f2b35916768032f7d0c20e250e28b29037ed4ce9ebf3da4fcd51bcb0c6067ef"
-        },
-        {
-          "alg": "SHA-384",
-          "content": "510b52e366642492f7a44527fe15dca85ebf36336fe3c91ea70840a5b6e10ba2fe7c4cb06fd0b13b08393767c64a9e8e"
-        },
-        {
-          "alg": "SHA-512",
-          "content": "2ac33a29f8739d32d1880dbd1b5f87a5a8e18105b55da9afd714c0ab1d666aad6621322291388b938bb56e15e3f5066cff255dc4026baa46111d93ca9ce2ee12"
-        },
-        {
-          "alg": "SHA3-256",
-          "content": "e50f38f486faf731bc118baadc40b1134e8d930f91f2ffa905bc1e6b42fc7292"
-        },
-        {
-          "alg": "SHA3-384",
-          "content": "508afdf95e989c2403bf633748624eba8009374d8a1ac4ad6b27eb27741451f596d5b27b5e40a4820aca413d2c8a48fe"
-        },
-        {
-          "alg": "SHA3-512",
-          "content": "9e28e67ac326536a87b13f36a2a3fe3e5ae596dd11af40b0a4d3e6ec5ebdcc42881cf19628e577ccd553e10ca8d67790d98199c8ddd744a6c390a5620a43ac72"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "modified": false,
-      "name": "activity",
-      "properties": [
-        {
-          "name": "cdx:maven:package:test",
-          "value": "false"
-        }
-      ],
-      "purl": "pkg:maven/androidx.activity/activity@1.1.0?type=aar",
-      "type": "library",
-      "version": "1.1.0"
-    },
-    {
       "bom-ref": "pkg:maven/androidx.activity/activity@1.12.4?type=aar",
       "description": "Provides the base Activity subclass and the relevant hooks to build a composable structure on top.",
       "externalReferences": [
@@ -383,6 +320,70 @@
       "purl": "pkg:maven/androidx.activity/activity@1.12.4?type=aar",
       "type": "library",
       "version": "1.12.4"
+    },
+    {
+      "bom-ref": "pkg:maven/androidx.activity/activity@1.8.1?type=aar",
+      "description": "Provides the base Activity subclass and the relevant hooks to build a composable structure on top.",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
+        }
+      ],
+      "group": "androidx.activity",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "92a1970f1ec7bc54e43ac77d546c7a90"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "144ff894c8c32584ca9e99ebae0a2a28b294d371"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "66bc2c13bd91fb8ea09e445b21f784d3e5d3a9ec9b180cd07e0e9208c2f939c6"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "cfbda13a578eb9c18b361d205efc85106aa166617347c43f7db03786db06c96045f299fac55903ec12abf59c95beed0d"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "41cfea862e594a1fd1a79a03b4d2f455fa0fe7cbffb1b92c7d26edacd8b83f18393731db037484196516b14c0e42e76615e9bebe179b5e687a1e1f1cdc3e9e1d"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "c4e4e336ed0c9a492b1e8a7f0bd4e7d0156190597bb4eec4a0f397f65962de69"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "1daa31fc5ee6c964dcb0f9b75098d825c32f12bab67fb8f17012916e47a58ea731179d0322a2420bdc07ea148b003c78"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "89b31c366367e5c9d3d754506c6deb89f4ac56da1bb9a057bde064c2d681c85066b6cf2f143a2bdbf750d3301cdd92e0e0cc68dc1362d02337c13319fd1ca5a5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modified": false,
+      "name": "activity",
+      "properties": [
+        {
+          "name": "cdx:maven:package:test",
+          "value": "false"
+        }
+      ],
+      "publisher": "The Android Open Source Project",
+      "purl": "pkg:maven/androidx.activity/activity@1.8.1?type=aar",
+      "type": "library",
+      "version": "1.8.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.activity/activity@1.8.2?type=aar",
@@ -4143,6 +4144,69 @@
       "version": "1.17.0"
     },
     {
+      "bom-ref": "pkg:maven/androidx.core/core-ktx@1.2.0?type=aar",
+      "description": "Kotlin extensions for 'core' artifact",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://source.android.com"
+        }
+      ],
+      "group": "androidx.core",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "e84582e39116ee6da327a53c259a62d3"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "6756534f262c845d4d06b55aaf8b751db0e48822"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "dcb74d510d552b35eff73b0dd27b829649535f3902e5b5a1f26040383c10a940"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "502f2d60f60dda0c62ea1b3c4aad04e142687f94f968b19e5a6bcbd0fc22de26194ad0874b356462115606cc456e1d36"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "ebd67135811cc4e1f74a2178122cb5ce3802f5a2485c206d7f19e29fbc77c860201b7df80a0b10c724ed1a8b64494a3335b77b37234524256b48f9d68648af0a"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "e347c24dfce9b11f85cc0b6a605a32b60691b0435fb27605582af93c61d88237"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "a55c657010d3be6a38dee5c1ab76f0035a269324db4954c01f9f8e0a0bc210e4fde6533713f7b87bfff2a3e95af5215e"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "7ca7337c444fcf796bbaaec8436e34377afd8c973495c9b0203ead7823fa5512650a471cda694cb348bcfd08b91de61521bb3096935dda9d5107932b0a13296d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modified": false,
+      "name": "core-ktx",
+      "properties": [
+        {
+          "name": "cdx:maven:package:test",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:maven/androidx.core/core-ktx@1.2.0?type=aar",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
       "bom-ref": "pkg:maven/androidx.core/core-viewtree@1.0.0?type=aar",
       "description": "Provides ViewTree extensions packaged for use by other core androidx libraries",
       "externalReferences": [
@@ -4335,47 +4399,47 @@
       "version": "1.17.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.core/core@1.3.2?type=aar",
+      "bom-ref": "pkg:maven/androidx.core/core@1.8.0?type=aar",
       "description": "The Support Library is a static library that you can add to your Android application in order to use APIs that are either not available for older platform versions or utility APIs that aren't a part of the framework APIs. Compatible on devices running API 14 or later.",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.core",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "8483597eb25dbc11219394c5683b41f7"
+          "content": "6ea59b5e365d03f7f18e8625c01eb984"
         },
         {
           "alg": "SHA-1",
-          "content": "18a4755efb834c487bac7062e508465f0c853218"
+          "content": "56215072292d2db400ba7bfec758a980c0ecc9a4"
         },
         {
           "alg": "SHA-256",
-          "content": "94de196cd67950cff6ef3e1ac59015f8eaaf61840bdc238f2cf54ddef8dd0be9"
+          "content": "48c64a15ec3eb11bfb33339e5ceb70ec7f821bd2dfa2eb8675ebd5353317e792"
         },
         {
           "alg": "SHA-384",
-          "content": "0df848221368679aca68132dd266f89457575c2f0a12f530a63728b471ca554b6e5d82e1a39542703fd27acd1bf2fa8e"
+          "content": "e4e53772a07b9d18b74c7aa2558836854194c533b60379ab88be532a8ede24dc518b6294a3870dcf8d697218ecd045e0"
         },
         {
           "alg": "SHA-512",
-          "content": "16bb189ba26a5d8d48fefc62981ec04656ef376bf6f90df318724ebc84542cc5198b39ba17ecf13ac1a87180df81b4bb125cde995ac85dc652c4902e1c38afb4"
+          "content": "1142916335ff40d46e1db1205422cf4d7535d7a72f3e12c36c10017a0bdb05fe424dd0fe6748b4afa9b8ba27a191717e67d76f5c28f265b2a7568145de4b6faf"
         },
         {
           "alg": "SHA3-256",
-          "content": "55193f9cd62809df069ca96df83acae2361df9cd8dbc3720de650e2e8406d614"
+          "content": "7ffeff2ba430cd8b012c634011d397350eadfb55c3db854f45b47be0bd7d19c3"
         },
         {
           "alg": "SHA3-384",
-          "content": "ed828409214e5da3de4891de51ae6e7e959848032021bd52190234d1c56eca1c2710f19bdba87bb4422dd6679206c462"
+          "content": "f3c9694f5158d760587432cbea022bf0ff100a896c3406d2974a42037ab8d8baf455b4948a946897bf7cd5fc0702f114"
         },
         {
           "alg": "SHA3-512",
-          "content": "230dc99e490523a95416273c886aafbf5fd69499c72062ef3365758b7167c549bbbaa1abbc45629dba71c39e608a6d28107a1a0c33fb2f1acbd4c1bdd0b02173"
+          "content": "c18150e55a52116eb857a0f86e3b4687cd02b44906b0e30d7d0417becd523ee6ea79599dc1be28e1b2ba5950d6955248f8e5290b08bcf534154f21511cdbed97"
         }
       ],
       "licenses": [
@@ -4393,9 +4457,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.core/core@1.3.2?type=aar",
+      "purl": "pkg:maven/androidx.core/core@1.8.0?type=aar",
       "type": "library",
-      "version": "1.3.2"
+      "version": "1.8.0"
     },
     {
       "bom-ref": "pkg:maven/androidx.cursoradapter/cursoradapter@1.0.0?type=aar",
@@ -5565,47 +5629,47 @@
       "version": "1.1.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar",
+      "bom-ref": "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar",
       "description": "The Support Library is a static library that you can add to your Android application in order to use APIs that are either not available for older platform versions or utility APIs that aren't a part of the framework APIs. Compatible on devices running API 14 or later.",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.fragment",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "209dbc6d8aa197581acc1c564170a09c"
+          "content": "1477d7090f0ec07c857d5d9d5b924eb5"
         },
         {
           "alg": "SHA-1",
-          "content": "9517ddcc4f298876b8af1ed4bc8cab94ee40d2e4"
+          "content": "4e56c58068ca1c53f37e2081cc0b7ff0f1aa1ca9"
         },
         {
           "alg": "SHA-256",
-          "content": "d19e82d142def6c4e136da70bf92f194c0ecc61d14ab4e84567b2ced0920fa93"
+          "content": "12de5b89ab6641c1d8da82b63dc816652622b06d2781b949b6fbd2dff9fac492"
         },
         {
           "alg": "SHA-384",
-          "content": "38ca5ff33bd5f891d9f1220529e8afd49e6b7417d5536c1850a38e788b7c5d4c519fc9d70ad9d7ca2d6c2a45179e45a8"
+          "content": "615df9f7945dc9f43e733746a9570ad8e536d110a33571c1390c92cf30cca3efef8d4a7441e01108c6bf483ffc918188"
         },
         {
           "alg": "SHA-512",
-          "content": "bf06255666cfc951e9c2041c4359e7f80a834c0d9a3fed3c679c6941ab9a6d26e99a7695668788bd33c0c2c74786c02d2e39352f101bc3fd2b8734bb9f7d2ad8"
+          "content": "9235cf456530f5f139d8159462941cae34a2f76b107b287ebba225407a73e63540d57bd02d4601c7299939e040f60cdbcd8268c2036bc36199ea10ab4c24ee24"
         },
         {
           "alg": "SHA3-256",
-          "content": "52a0305386ec48eaa400adfa564467b2e6b2a08a43fc188b7c65dc32fbe0fda0"
+          "content": "13d8d03488581f988a1e70a4aed21f6558d6a0e81791ba9602ddf7cf9b8119a2"
         },
         {
           "alg": "SHA3-384",
-          "content": "4732d7281c8cc5a53b4477397e4bd3e7f9d70a778424173febcaa8f81eaff55621b137450a450506e6922bf4b29ec267"
+          "content": "e564013bd6eae8f0cb25427112fe316cfccca0a816ffa0f2acf22a6edd51593280f0169d083d9713a8a8f845b00f2aa7"
         },
         {
           "alg": "SHA3-512",
-          "content": "0f319323c763de70fdba9087907eda122ed266ebfc92c2666baf4cf2349c3b8e63ddfa2b79fed8188a7f315d2554e0dd21d710e08ae1ad3b9557f7e4e19b5d42"
+          "content": "3d4c17dcd8cc34040ae2d46e7062bfa636b6a25d036ebc40a76ee848f9c82461a05e836be4ddaa02d3b56f5af085d6eaaad59cbfdccc4c164a96bb08b7c8ea84"
         }
       ],
       "licenses": [
@@ -5623,9 +5687,10 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar",
+      "publisher": "The Android Open Source Project",
+      "purl": "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar",
       "type": "library",
-      "version": "1.2.5"
+      "version": "1.8.9"
     },
     {
       "bom-ref": "pkg:maven/androidx.graphics/graphics-path@1.0.1?type=aar",
@@ -6104,47 +6169,47 @@
       "version": "2.10.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar",
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar",
       "description": "Android Lifecycle-Common",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.lifecycle",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "0640a7331c6c4c5fcf5fe45ccf8f1900"
+          "content": "2d1b4c15f17d8c1b5fef67713253b140"
         },
         {
           "alg": "SHA-1",
-          "content": "4ef09a745007778eef83b92f8f23987a8ea59496"
+          "content": "10f354fdb64868baecd67128560c5a0d6312c495"
         },
         {
           "alg": "SHA-256",
-          "content": "63898dabf7cfe5ec5d7ed8b8c2564c1427be876e1496ead95c2703cf59d3734b"
+          "content": "f34831b6c71cd844e1d35d1be49d5e79447c5ab856346531b1e8676fda7374b1"
         },
         {
           "alg": "SHA-384",
-          "content": "2412235d73908d3bda002c55690fcb7253f3cca48f45cc9defb656ad340f423fac389a4769f37ba6536e6bdf06a1202b"
+          "content": "f9564cd93356504f1a0fc41363048ab7d556e7e1e54733bf5aec5f2c8ad04667a4419056cc9ab430840fb629104135c9"
         },
         {
           "alg": "SHA-512",
-          "content": "c69eda78be9aeb0c3a91a736eb2fc9ac3f51382bcac769284728a2102b25cdc3a36ee30b342937c81f837cd8059b5d1458ab8eb616f8fa7a70ad9aba6444533b"
+          "content": "0a14c05591e2f13ce875edb53e1d06c492183eedfcd762f512ed6e16f386bfde534009276eab35e260d0b2e47389f8c1fb41e9d389f6472b4b6fe2b270c8729c"
         },
         {
           "alg": "SHA3-256",
-          "content": "31130cc40265495fc0f577b4615987a414b1502dd05355855a723b4199adccf6"
+          "content": "6c4897894543a9556fa5cb74cb0d7b7de39354f5cd682fb9db6c244b98ef51fa"
         },
         {
           "alg": "SHA3-384",
-          "content": "cb9e174ff2fc5c4e2b16c9986c7e7a161bcc1f8956545844650e4560249f867baede13f646c648216ca64c9cc966d0d1"
+          "content": "e6aa3eb3d0d6661cd51b3ad0cd975c0833de15f321f16172570562979093b834d4a3c3edfbc2b7dec7e98e07cf6c6380"
         },
         {
           "alg": "SHA3-512",
-          "content": "499a6d7ae443fa3bcf243818221f71dcad197078e478d2c504b4eb47e8f87653c76e1934b84160eca402c541fcec4795f79da1cda25387bcf6c1d43516b78985"
+          "content": "5d7e55c6de95a35577725c9bc135e8b8dc2260f8cabdb2110e1dc8b31dfe66b0a15b766664b3cfffaedfc979177b692355355a26cbfffdc4180b072f67cc536a"
         }
       ],
       "licenses": [
@@ -6162,9 +6227,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar",
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar",
       "type": "library",
-      "version": "2.2.0"
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-common@2.9.4?type=pom",
@@ -6389,47 +6454,47 @@
       "version": "2.10.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar",
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
       "description": "Android Lifecycle LiveData Core",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.lifecycle",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "255611d9037725acd2916204ccbe31d9"
+          "content": "1e5c954ed476e2d2edabf3120aa5b156"
         },
         {
           "alg": "SHA-1",
-          "content": "4bcd5721a6358c312b86d219ff57d4a4a841fc50"
+          "content": "23f66885a260f0a2cd6540927ea8795484afd2da"
         },
         {
           "alg": "SHA-256",
-          "content": "556c1f3af90aa9d7d0d330565adbf6da71b2429148bac91e07c485f4f9abf614"
+          "content": "2256780a3cff4a1e57fbb3d442557c17dc363ab8af105bcaf5261d8e2d5db949"
         },
         {
           "alg": "SHA-384",
-          "content": "cb1d9b56a3044a9d4c446240513b5dbbea31e531ddd24f5a0df1b13bf550b7d32b2779b2744d849f47dee69872ab42a0"
+          "content": "19a4781937a18c724f9907abe6e824d6953df28fc98588a04f3d1b2799a22b59ee340377caf8f2f9979565d16fd156ea"
         },
         {
           "alg": "SHA-512",
-          "content": "97e98574ae01de21481c7dd3062edcf456ee4ba71bbe432740d31a4431afe4fcef8336f4f54ca4271bfdf624245094ad82c59d7ddb321a10f4dbacaee8392271"
+          "content": "8f22135d674f653374da4324be539b7911c72fb63fbd797b08c22aea940c8a780765db639130cc47703dd49e4509c7fa11687dd26a320dc350c633d12fb88f27"
         },
         {
           "alg": "SHA3-256",
-          "content": "90de81fc769f4720e0e73c081f8ea574709f5515d2326e9e57fd6a6d86b4cc5b"
+          "content": "93e938d25b0c830ec34529a3ffc19be3f36e2a0049086c454cb0cb0a715e9462"
         },
         {
           "alg": "SHA3-384",
-          "content": "5fa3b4b6e5038b3085f9b427dbb343411b3f81c9ad2cb44437dabd58cae69b4fc1f23f871306ecbdce0e39366355b68e"
+          "content": "f46698cfeee92e1f8bb4361c5f06681fb62182d1f5e344109b43dae38d9a652fe9d4536ddf64064519059dca116f9347"
         },
         {
           "alg": "SHA3-512",
-          "content": "53223b63401035cd02fd515e6db871f87eea2da4071823049b1b41ed5a25039c4bb06b40ce0778b54048a6571148ee7e1f7d025592ef9222113f480f8111ebd6"
+          "content": "e6c5196e318ae1c3818fb5ae8f01fa159fe3fb3f1c15355e09c86fd26fdc98105cbdee1e96ddd0e6efb571ea4ab68f02789a10dee7a6912622c09d1bd0a57005"
         }
       ],
       "licenses": [
@@ -6447,9 +6512,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar",
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
       "type": "library",
-      "version": "2.2.0"
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.9.4?type=aar",
@@ -6516,69 +6581,6 @@
       "version": "2.9.4"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.0.0?type=aar",
-      "description": "Android Lifecycle LiveData",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "http://source.android.com"
-        }
-      ],
-      "group": "androidx.lifecycle",
-      "hashes": [
-        {
-          "alg": "MD5",
-          "content": "c6a762327c8d69fe89d45bd1b422d2f4"
-        },
-        {
-          "alg": "SHA-1",
-          "content": "c17007cd0b21d6401910b0becdd16c438c68a9af"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "c82609ced8c498f0a701a30fb6771bb7480860daee84d82e0a81ee86edf7ba39"
-        },
-        {
-          "alg": "SHA-384",
-          "content": "33004f5b0fae9a2b811048c589b9d1ae54483ef805b3534f59e78e6867d77b7bc3010d6ea8f7c0de6fb64e96bf77ef49"
-        },
-        {
-          "alg": "SHA-512",
-          "content": "233b93711639737b48d585eae9d1f6c3ae02cf5c5ab0a41e7aba259281376ef7e3d634301c8872516217797211e6407a5b85292ffca23089a43800cf8429e093"
-        },
-        {
-          "alg": "SHA3-256",
-          "content": "6df03abffacbd1c70048d46748df7096d921ffd44b6a7d3cf8649f43b991e084"
-        },
-        {
-          "alg": "SHA3-384",
-          "content": "8a9b3871b85341248b49631b8deef1c11d05cad8e0477977bdc0ab9c552e4c618e07e7f235adc8b9ccfbde49e952dfd1"
-        },
-        {
-          "alg": "SHA3-512",
-          "content": "bfc4db9d35b2948a27bc1cccb3b6f930b36f4f437bb0310bc34f9f0f3a1f679bd67bf4ae9471ef9bbd9b5d0baaaa92f43de8fb1b1f58ab30cbcbf3f6f8713dde"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "modified": false,
-      "name": "lifecycle-livedata",
-      "properties": [
-        {
-          "name": "cdx:maven:package:test",
-          "value": "false"
-        }
-      ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.0.0?type=aar",
-      "type": "library",
-      "version": "2.0.0"
-    },
-    {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.10.0?type=aar",
       "description": "Android Lifecycle LiveData",
       "externalReferences": [
@@ -6641,6 +6643,69 @@
       "purl": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.10.0?type=aar",
       "type": "library",
       "version": "2.10.0"
+    },
+    {
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.6.1?type=aar",
+      "description": "Android Lifecycle LiveData",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
+        }
+      ],
+      "group": "androidx.lifecycle",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "3127162f3df469e62aa872acc0c8fd1a"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "e7f6d9e232bf035af69c030917c1ccda8e840b57"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "67359f609dfc2bf65da1270b23033f856064ec279f058e0a70c715f7c9003031"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "e9a52035098d86887d7d8451c74e6dfec379ac0d142fdcd483103e1d7b0681478ea7a3045e95b8713e226714a82cf9c2"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "fd7d9f2f1dc80383b1b24b600543f5cf4fa9ab6db3ba5c1253bb8aa4551aad99448247299aa8f2eb7335a73321c752986a90acc25b761f96b7a6a6e4fc22f96a"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "db835e8e60c31499dd471c8622d04f7f3b16e8db842076c65a2e01ca021d21af"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "643a3f4bfa502ec808f19e3e22d147338402499a47da3da632daa14f0445abe284b7e49291a3bec610371a5272886f31"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "ef701f7d8218ac22aa2151b65ebf9b061214796feab0365deae2e9b6764c0a54bbec359d34fac224ed9026ce608f68a28b5543d1f55409aed904b39e2a1064e7"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modified": false,
+      "name": "lifecycle-livedata",
+      "properties": [
+        {
+          "name": "cdx:maven:package:test",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.6.1?type=aar",
+      "type": "library",
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.9.4?type=aar",
@@ -7369,47 +7434,47 @@
       "version": "2.10.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.2.0?type=aar",
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar",
       "description": "Android Lifecycle Runtime",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.lifecycle",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "76ee6422bdca3b5ccb13dd7e4bc6597e"
+          "content": "231fd27c0a7df38ed90ad1779ccc8bd0"
         },
         {
           "alg": "SHA-1",
-          "content": "62fab579508713b8bbb6d251b0abff6e538e8f46"
+          "content": "f0ef27053faa89b3ec06c4f118cea0a15edde35b"
         },
         {
           "alg": "SHA-256",
-          "content": "2f866c07a1f33a8c9bb69a9545d4f20b4f0628cd0a155432386d7cb081e1e0bc"
+          "content": "4867fd5279742fba8388821930cb2affe06d81a52814e7e41e70392ea0ef887c"
         },
         {
           "alg": "SHA-384",
-          "content": "41a47a30beed159b25252b97fb547593d143bc0552a6a9637f79761c86ef3baf08ffbed215891067b92d2020d218cbaf"
+          "content": "05a83a78596c9c98d26bdd7a401ee33caf578bffab0169e58217402e3437020f29660047fb3d33f5c5100c527c3f87ab"
         },
         {
           "alg": "SHA-512",
-          "content": "8ec98981af2cc9ee91b1f744ecabff9bc44100f3dbc184895d9e43c10a1f3a9b193adfa309d977e0069da5e6644c02efec9ecbdb040d0d81b09cec0e16809f61"
+          "content": "83988db4cf1e107e0afe021fd09b74dd8918364d4ee61c3a526a001aab9fb9b795e230b836e3dab44706135f5072f94da73f1fa1a4441a6f261300fb033ba398"
         },
         {
           "alg": "SHA3-256",
-          "content": "662ecb108acb0ace1121cab88f0f26a8513c44930ba21c0ef1ef4d5b66d4cbac"
+          "content": "b5bdc4e268a6aac29940dcd7aeefd5c3007fbc7d6bcc3eb494103c1939c2fb5d"
         },
         {
           "alg": "SHA3-384",
-          "content": "d5aad935bdae79372d184ea7d126ff431980dada1ff4c57662a6a10b9265d8e4ea953d9fe13d17ce5c65279f6a764a8d"
+          "content": "c8b8eeda1c842ec8d984a81d5345361a4481453a413d1e60d23c7757ee80c28c44e2e9cf41ad39e86da077c99d6375c1"
         },
         {
           "alg": "SHA3-512",
-          "content": "407fbbc3042b40847c8b03252621cb2232ab15830973fd6884f4fb297bf14e358a555a749a8721e9d48dc3461521df146543ab4ab9626872addb2217c9e5567e"
+          "content": "8abdfe90c583d5763f6e19d6758faea21643d762d77ad3f7c3bf1830469679383d7d20d5302c7784df61edde8f22969e7125a068a5fa2aabe648391dd301ebfc"
         }
       ],
       "licenses": [
@@ -7427,9 +7492,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.2.0?type=aar",
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar",
       "type": "library",
-      "version": "2.2.0"
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.9.4?type=pom",
@@ -7940,70 +8005,6 @@
       "version": "2.9.4"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar",
-      "description": "Android Lifecycle ViewModel",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://cs.android.com/androidx/platform/frameworks/support"
-        }
-      ],
-      "group": "androidx.lifecycle",
-      "hashes": [
-        {
-          "alg": "MD5",
-          "content": "fd442b031ab83bb0c48492d6d08a53e7"
-        },
-        {
-          "alg": "SHA-1",
-          "content": "79410c0d23150fdb118094b35a274fa148f3328b"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "1fa22720c87b0fb3c1224f8580cf69369f3cfc4d9921708bb9449f878c7cb3e9"
-        },
-        {
-          "alg": "SHA-384",
-          "content": "a46b7b5bb352a8d645372150b52e124ac04935ed8215edfa20500701f2cd041b811557fa91925fb59015a72855de1403"
-        },
-        {
-          "alg": "SHA-512",
-          "content": "32471e95e9a7f42262330e376f1a0012e7d2d05ba00911d56d3fb20eb48f69ad8f9f437c7a7cd142290d03d518b415c91b76145a9c38f35e0adf2f809183dd4e"
-        },
-        {
-          "alg": "SHA3-256",
-          "content": "fddda3601f504e782aa9f3c8f88fcc45de73c383999b0b68398eb6ef35e47d2e"
-        },
-        {
-          "alg": "SHA3-384",
-          "content": "aaf2c2b25a66c05de42fd8d42b7fac7e0b16dfb3d3e99c1e110da08c3da3cd04694231d23d42df6930cf17968968a7f1"
-        },
-        {
-          "alg": "SHA3-512",
-          "content": "4edcc85401012228bd7a6c3d6f80fcca216565b1eb126bf08169b06b89e70be140508f91cb63f9377822b07a4e7c25a79ea3324e205983ecf6f8637aac2d8ea1"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "modified": false,
-      "name": "lifecycle-viewmodel-savedstate",
-      "properties": [
-        {
-          "name": "cdx:maven:package:test",
-          "value": "false"
-        }
-      ],
-      "publisher": "The Android Open Source Project",
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar",
-      "type": "library",
-      "version": "2.10.0"
-    },
-    {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=pom",
       "description": "Android Lifecycle ViewModel",
       "externalReferences": [
@@ -8034,47 +8035,47 @@
       "version": "2.10.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.2.0?type=aar",
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.1?type=aar",
       "description": "Android Lifecycle ViewModel",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.lifecycle",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "b08841a133eec547c8a993c0e6196294"
+          "content": "2ec5a2c5c6114f5882fc80bc7b8cfbea"
         },
         {
           "alg": "SHA-1",
-          "content": "50d7a240847eb488a740939a6c19f689ee1a4a04"
+          "content": "7cac77a315e1c8235a1f0c7d041c3c5e565f0f4b"
         },
         {
           "alg": "SHA-256",
-          "content": "3ce866fb822b20fe2f188f974992869a0a6233fe40acbefcff090d6def5e7f33"
+          "content": "c82f89221adbe19df7c7adbab63f4ecc857fc746e3c9494256ab8fa5c20491b2"
         },
         {
           "alg": "SHA-384",
-          "content": "1a999d1aec9f9a43e0553d1c41f178a0beb205acbef7a0de39feac328a28df05b9c194e98760e50c9fae473d30b6dc56"
+          "content": "ddafe534d6ab4a5999aedc3b99c1fb49cbcdae5db612f13ae4b7386d4fd183e63c908e21962b92fffc50613ad1651069"
         },
         {
           "alg": "SHA-512",
-          "content": "682b4f5691f6d25c834159b679748a2167ed0a1711715821d0b9dd630e9e74cc9e5aa126d07efe511a4cc178d816af4e5d3d7c450866f9ace190b88fb21b9346"
+          "content": "6cefe9ad510a5d43412fe9a9ce5c0e6ebffa3086e31094675e389aeea285053a98f3516244ea92509c2724b848e3041ffa0c5d7cff4fc67e906165d417744195"
         },
         {
           "alg": "SHA3-256",
-          "content": "1648d3092005e9bf0c288c284cea7ad61fe9d3b0e94d21df919c907e30aaff7a"
+          "content": "bfe3549d92edb1706a13a99e1cdcf2163b8be1896266ec9dae6256d499bd825a"
         },
         {
           "alg": "SHA3-384",
-          "content": "76ceebe4262940616b6278f219005c76735c2352c117ab059a327180516b65c0967fef9e0e45aabb778758b21f95e664"
+          "content": "5ee3bf9f69a5adbf9d99c7a05fd8d0ea754c97cbdb0dc91036d47e034eada29a26b322b0ba207f92c7a8d0c785e7248b"
         },
         {
           "alg": "SHA3-512",
-          "content": "086b2197596526f1f502163d3f4b32bf27f6d409d600303c844c0228397a7fb49b6b00711d8499b319540eb85965ad3e547867c46c4c804f73e0b31e0839460f"
+          "content": "3c0044a7524879a3a449827f2c48077edd8c6e965a194aeb65bf08dc5de18249e218be5ab935a8aa43036606f2b375582c8eadbdd873be5a6d3135f06c759857"
         }
       ],
       "licenses": [
@@ -8092,9 +8093,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.2.0?type=aar",
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.1?type=aar",
       "type": "library",
-      "version": "2.2.0"
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.9.4?type=pom",
@@ -8191,47 +8192,47 @@
       "version": "2.10.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
+      "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
       "description": "Android Lifecycle ViewModel",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.lifecycle",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "6a91b8703b152aee6e21358c0236a8c5"
+          "content": "ca7006a38d89dbf4791160763bc88505"
         },
         {
           "alg": "SHA-1",
-          "content": "695c5e9ee89ee73d69d0981303f138d7680acc01"
+          "content": "fa35bfdbbe0e7df1573e377cbdd15de35176141d"
         },
         {
           "alg": "SHA-256",
-          "content": "967efab24d6c49dd414a8c0ac4a1cd09b018f0b8bb43b739ad360c4158ebde27"
+          "content": "e4ff4338999e1c6c9c724719f5d4aa7dd61bf6f545d5256a27a9d375df9f2330"
         },
         {
           "alg": "SHA-384",
-          "content": "168a910241effd3db231aee41c8ea2d08fb950ea48c5b0f601fb233d76c19574fdfaa655e26baaedaa7abe55113b8288"
+          "content": "4ba4bdbc6154d041c056d64019de5794a7e5af2b20dc14a275553a5463bcb1f08a6b76781d40fd1a4634be1e0f813aa6"
         },
         {
           "alg": "SHA-512",
-          "content": "27ad2afd40d3e89e1191315cec1d35dd7e15d35b30d1140eadff5d76f504d0569714f883a6b765e914ee568bed17082ecb538de923b25dd3090f3a35a622956d"
+          "content": "c43bff5e79fa146f2cfe0f71719113b7a0a19896128aecf9aec94a5d1186de4c77896c5c61dc3e6f3ba3ee297a1f72ecd6b4f2e58a42867724253f33f968d072"
         },
         {
           "alg": "SHA3-256",
-          "content": "95088079809090202a268ba2cf4f4836bdeccc21709abc6f4131ec919fd2f751"
+          "content": "72ab51090338abf23e7ed6d7fdc5cec21348a36ca9c754c8c0a8f2cc6137ff01"
         },
         {
           "alg": "SHA3-384",
-          "content": "17c813fd9349ea707a8300f744567831c341a5625606cf2fd9ac2d84635714ac026d39972d11b0157ae91354bc0d92e3"
+          "content": "11f2f0f6f09fde1ab02dd78b2f660fb82dc4b50759e82e5ae16420fbfd28fdd2de53e3df34e9e7ec06388031c1bf82a1"
         },
         {
           "alg": "SHA3-512",
-          "content": "25ad580ac9d98e40b50514f3a4aa31df7a7d56f9f2face27be2910661df2bca66ff5c11b3c372a43ec179b8ef087277ad13aae46a561b7f86adcd48554e79008"
+          "content": "e4f05132a4ab2664169cbe2fae9c476dcc7cc49e4a2cf4752e35a4b0a3a7d6b3488c84a2ae6266c09262b1c80b11ff34de5649e7802de0bb975f2261b191e554"
         }
       ],
       "licenses": [
@@ -8249,9 +8250,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
+      "purl": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
       "type": "library",
-      "version": "2.2.0"
+      "version": "2.6.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.9.4?type=aar",
@@ -9072,6 +9073,69 @@
       "version": "1.0.0"
     },
     {
+      "bom-ref": "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar",
+      "description": "Allows libraries to prepopulate ahead of time compilation traces to be read by ART",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
+        }
+      ],
+      "group": "androidx.profileinstaller",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5d6c8ef0c1333476fb35b4486a2f5250"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "c0bac819b4f88a648011542273373d1e5093e3a7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d0e402ec31f24028a1dc7eb6a0a3f9d9635c1459392cd734396343b73d673948"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "cb70d218c4750b95c48ca92e62e7aee0735ee8e2a53f776ae358d93a07dcf869ffd65aa3a0bb52351e6f7f119f9e2176"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "5cef9df97d0b614b5ef4c2fea2ce72941b40a4d371aab2225d4807ffd482b468d0ccae3ef008332dae18aedace819d0430ba59369e2a18de1259b2270e300f08"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "b026766e365b1c71a8a62982c0984419b127bedf79b1f01d244c2aade6e5ed17"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "9b51fd7ef91ab0458771c635863e9192e1e02e1c38da89096877df1d1533b985f23d63437196a06d6244f6360a21b5ad"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "411365ae8a5759baa08a7c04570745d85d71574639213660dd5e3ed8ebd96f4d555c1a868b679e3c9a7fcfa06ac85cd702bfb7c94ad5a5a554518a486c5c7c31"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modified": false,
+      "name": "profileinstaller",
+      "properties": [
+        {
+          "name": "cdx:maven:package:test",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar",
+      "type": "library",
+      "version": "1.3.1"
+    },
+    {
       "bom-ref": "pkg:maven/androidx.profileinstaller/profileinstaller@1.4.0?type=aar",
       "description": "Allows libraries to prepopulate ahead of time compilation traces to be read by ART",
       "externalReferences": [
@@ -9832,47 +9896,47 @@
       "version": "1.4.0"
     },
     {
-      "bom-ref": "pkg:maven/androidx.savedstate/savedstate@1.0.0?type=aar",
-      "description": "Provides the base Activity subclass and the relevant hooks to build a composable structure on top.",
+      "bom-ref": "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar",
+      "description": "Android Lifecycle Saved State",
       "externalReferences": [
         {
           "type": "vcs",
-          "url": "http://source.android.com"
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
         }
       ],
       "group": "androidx.savedstate",
       "hashes": [
         {
           "alg": "MD5",
-          "content": "0ad3a953249dc818c621d141b3ec38b2"
+          "content": "86008fd3502c84e4343f040ea929c52a"
         },
         {
           "alg": "SHA-1",
-          "content": "6d39721808cd67e3d3d0d60f194907615fcaa69c"
+          "content": "e364fc9dec32aa569d855f85864e50250318a093"
         },
         {
           "alg": "SHA-256",
-          "content": "2510a5619c37579c9ce1a04574faaf323cd0ffe2fc4e20fa8f8f01e5bb402e83"
+          "content": "21a7d4bcf6bdb94ad7b9283801529300b4fbb8808ca4f191e0cdce6fd8e4705a"
         },
         {
           "alg": "SHA-384",
-          "content": "518177fee01655559a5991b9f8fa53332a8959bacb30ef7555fe9ed0713b79b502bf1efd587f24c9a3df473a13c37957"
+          "content": "d3e40c9e11942becbe2ed04e7bc8ae9e0be0ce50eedf1c7c3d200192bdb1f6202b953be27f83fe5f2d9f179ac1d51eba"
         },
         {
           "alg": "SHA-512",
-          "content": "63d88c1640b49308016f49777d9620cdf7f5fd810ac95b0d55b9a1ff8cb155f706d26dec381e7c2ef2c3b9fc2f3b86725ad981b446b6e264925501eac0811819"
+          "content": "847b0d39c56189b5ce459ac9408c9b24671917c2fe1529fc3e4e6b152d905d46fab39f98f4bc8cc654f162565b156895b8aae85442f0165418f236e3fb856b02"
         },
         {
           "alg": "SHA3-256",
-          "content": "62d33dca6684efcb83ee7f5f3978f5805a01ce071dea9d0d5b8336073363860b"
+          "content": "8955992564f53c8f92617e53ddb60e04cff746d9befa6891d0d1f2cc0a24b74f"
         },
         {
           "alg": "SHA3-384",
-          "content": "45273b655d6c7b32c253f7b167bd5dc13d39575cf464a08a227cb67421861e6665f1182999e409f6a9653a57e3e7df16"
+          "content": "f9471d5060baf1cff32789445a188ea2657c4062c5ca5b9eb03c6a7f23394f86ebd9d7a8fda1f6fb2bb6d5f343a7eac5"
         },
         {
           "alg": "SHA3-512",
-          "content": "bea95ee2b70c3ed4e527b7b57f1087976d46f818af14f121d9a447e733fd97a936943417ab2a24098457c91e8bf2e4e688d68d294fbdf6f3db774fe3c4781065"
+          "content": "840b6c55da9c7d22ab9bf76bbf6991e2bb6976c54bac39bc3d15a889c5e2461b3baa41a46b9175416f5281e5536b52fae7287b9b30718430bc1393126c0ecc94"
         }
       ],
       "licenses": [
@@ -9890,9 +9954,9 @@
           "value": "false"
         }
       ],
-      "purl": "pkg:maven/androidx.savedstate/savedstate@1.0.0?type=aar",
+      "purl": "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar",
       "type": "library",
-      "version": "1.0.0"
+      "version": "1.2.1"
     },
     {
       "bom-ref": "pkg:maven/androidx.savedstate/savedstate@1.3.2?type=pom",
@@ -10334,6 +10398,69 @@
       "version": "1.3.0"
     },
     {
+      "bom-ref": "pkg:maven/androidx.tracing/tracing@1.0.0?type=aar",
+      "description": "Android Tracing",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://cs.android.com/androidx/platform/frameworks/support"
+        }
+      ],
+      "group": "androidx.tracing",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "8081a5dae7393cade5e6801814292665"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "69cef34711dffbc517e7a0a419ec4a98f84f496a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "07b8b6139665b884a162eccf97891ca50f7f56831233bf25168ae04f7b568612"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "48f8cc199a79b884c7ae2cccdb29698f05f40306d7f502065a8d2eca1c49fb0ec13d6b4bd52558c5b34728ad5c2de71a"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "d154f32553d2cae7d7e5b33a85e81c4c851dee461c900d1fac8277ef4becd047b2d08bec790759ba333f26be4b7a3de9ebfbc7521642cc2b1d539516eb347b4f"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "afd44614b5889e8eadee14bf3efbd6f7468520a2df110d997ef8b5be269ac9aa"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "a2d682f0c2d3e195e5ee1714aeca1f7e93f1b47813ea4b096bc0926316a2b2ea91c0ce84c465f70943f42a359c22b27e"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "d9a504f26e5d9c8b3d3acf694d44aadfc9725a2030b18f5db650b32298c8123a1ee5b0dbac068444c2b1a80452db8abc701ee2c72816f853eb1ecaf9cb1e1454"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modified": false,
+      "name": "tracing",
+      "properties": [
+        {
+          "name": "cdx:maven:package:test",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:maven/androidx.tracing/tracing@1.0.0?type=aar",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
       "bom-ref": "pkg:maven/androidx.tracing/tracing@1.2.0?type=aar",
       "description": "Android Tracing",
       "externalReferences": [
@@ -10613,69 +10740,6 @@
         }
       ],
       "purl": "pkg:maven/androidx.vectordrawable/vectordrawable@1.1.0?type=aar",
-      "type": "library",
-      "version": "1.1.0"
-    },
-    {
-      "bom-ref": "pkg:maven/androidx.versionedparcelable/versionedparcelable@1.1.0?type=aar",
-      "description": "Provides a stable but relatively compact binary serialization format that can be passed across processes or persisted safely.",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "http://source.android.com"
-        }
-      ],
-      "group": "androidx.versionedparcelable",
-      "hashes": [
-        {
-          "alg": "MD5",
-          "content": "a1649e0bd50280c0bc4d15ec37b547a3"
-        },
-        {
-          "alg": "SHA-1",
-          "content": "91acce73e00a17b524f6697f6c3893efb8ea349f"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "9a1d77140ac222b7866b5054ee7d159bc1800987ed2d46dd6afdd145abb710c1"
-        },
-        {
-          "alg": "SHA-384",
-          "content": "1dfc6eece19b298e368a14a3a35b330b27ed90c16850f2b2eda0825bb2367fb00392e5e22838dd3f919ec2da7f6b6c2b"
-        },
-        {
-          "alg": "SHA-512",
-          "content": "8053dd3559f2eed1bb3c4fb8fa2bfb3e0c450eadb6daa858c1f0398e77e1ed1a1ad083f7d46a17e07e78b58abbe2aaa0b08436d6171686355ebc2f82e30193a8"
-        },
-        {
-          "alg": "SHA3-256",
-          "content": "becdf67ddbc5a9b7be29541c9be3cb66516c73f9015b58f583b3cee7e42a5fb8"
-        },
-        {
-          "alg": "SHA3-384",
-          "content": "175606a586a3d715e78184263c681deb426b6e2f2bca51c7424e67593425f53230c7c5a642611efd122135fcd0b83bbc"
-        },
-        {
-          "alg": "SHA3-512",
-          "content": "84009cabec59a11c43d011a67c9f4ded80fe28d780b44802e6e0338c02731803cdc9cf0b5091fb423d82aadc52457af82493ca219226dab62f0539b2aa9f6e3c"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "modified": false,
-      "name": "versionedparcelable",
-      "properties": [
-        {
-          "name": "cdx:maven:package:test",
-          "value": "false"
-        }
-      ],
-      "purl": "pkg:maven/androidx.versionedparcelable/versionedparcelable@1.1.0?type=aar",
       "type": "library",
       "version": "1.1.0"
     },
@@ -13404,22 +13468,11 @@
     {
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
-        "pkg:maven/androidx.savedstate/savedstate@1.0.0?type=aar"
-      ],
-      "ref": "pkg:maven/androidx.activity/activity@1.1.0?type=aar"
-    },
-    {
-      "dependsOn": [
-        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.core/core-ktx@1.17.0?type=aar",
         "pkg:maven/androidx.core/core-viewtree@1.0.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-common@2.10.0?type=pom",
         "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.10.0?type=pom",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=pom",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.10.0?type=aar",
         "pkg:maven/androidx.navigationevent/navigationevent@1.1.2?type=pom",
         "pkg:maven/androidx.profileinstaller/profileinstaller@1.4.0?type=aar",
@@ -13429,6 +13482,21 @@
         "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core@1.10.2?type=pom"
       ],
       "ref": "pkg:maven/androidx.activity/activity@1.12.4?type=aar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.1?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
+        "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar",
+        "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar",
+        "pkg:maven/androidx.tracing/tracing@1.0.0?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
+      ],
+      "ref": "pkg:maven/androidx.activity/activity@1.8.1?type=aar"
     },
     {
       "dependsOn": [
@@ -13490,7 +13558,7 @@
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
         "pkg:maven/androidx.vectordrawable/vectordrawable-animated@1.1.0?type=aar",
         "pkg:maven/androidx.vectordrawable/vectordrawable@1.1.0?type=aar"
       ],
@@ -13514,10 +13582,10 @@
         "pkg:maven/androidx.appcompat/appcompat-resources@1.2.0?type=aar",
         "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
         "pkg:maven/androidx.cursoradapter/cursoradapter@1.0.0?type=aar",
         "pkg:maven/androidx.drawerlayout/drawerlayout@1.0.0?type=aar",
-        "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar"
+        "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar"
       ],
       "ref": "pkg:maven/androidx.appcompat/appcompat@1.2.0?type=aar"
     },
@@ -13543,17 +13611,17 @@
     },
     {
       "dependsOn": [
-        "pkg:maven/androidx.activity/activity@1.1.0?type=aar",
         "pkg:maven/androidx.activity/activity@1.12.4?type=aar",
+        "pkg:maven/androidx.activity/activity@1.8.1?type=aar",
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.appcompat/appcompat@1.2.0?type=aar",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
-        "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
+        "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar"
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar"
       ],
       "ref": "pkg:maven/androidx.biometric/biometric@1.1.0?type=aar"
     },
@@ -13689,7 +13757,7 @@
         "pkg:maven/androidx.concurrent/concurrent-futures@1.1.0?type=jar",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
         "pkg:maven/androidx.fragment/fragment@1.1.0?type=aar",
-        "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar",
+        "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-common@2.10.0?type=pom",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.10.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.10.0?type=aar",
@@ -14214,6 +14282,14 @@
     },
     {
       "dependsOn": [
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
+      ],
+      "ref": "pkg:maven/androidx.core/core-ktx@1.2.0?type=aar"
+    },
+    {
+      "dependsOn": [
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
       "ref": "pkg:maven/androidx.core/core-viewtree@1.0.0?type=aar"
@@ -14256,12 +14332,14 @@
     },
     {
       "dependsOn": [
+        "pkg:maven/androidx.annotation/annotation-experimental@1.5.0?type=aar",
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
-        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.2.0?type=aar",
-        "pkg:maven/androidx.versionedparcelable/versionedparcelable@1.1.0?type=aar"
+        "pkg:maven/androidx.concurrent/concurrent-futures@1.1.0?type=jar",
+        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar",
+        "pkg:maven/androidx.versionedparcelable/versionedparcelable@1.1.1?type=aar"
       ],
-      "ref": "pkg:maven/androidx.core/core@1.3.2?type=aar"
+      "ref": "pkg:maven/androidx.core/core@1.8.0?type=aar"
     },
     {
       "dependsOn": [
@@ -14281,7 +14359,7 @@
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar"
+        "pkg:maven/androidx.core/core@1.8.0?type=aar"
       ],
       "ref": "pkg:maven/androidx.customview/customview@1.0.0?type=aar"
     },
@@ -14384,7 +14462,7 @@
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
         "pkg:maven/androidx.customview/customview@1.0.0?type=aar"
       ],
       "ref": "pkg:maven/androidx.drawerlayout/drawerlayout@1.0.0?type=aar"
@@ -14431,22 +14509,30 @@
     },
     {
       "dependsOn": [
-        "pkg:maven/androidx.activity/activity@1.1.0?type=aar",
         "pkg:maven/androidx.activity/activity@1.12.4?type=aar",
+        "pkg:maven/androidx.activity/activity@1.8.1?type=aar",
+        "pkg:maven/androidx.annotation/annotation-experimental@1.5.0?type=aar",
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
-        "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
+        "pkg:maven/androidx.core/core-ktx@1.17.0?type=aar",
+        "pkg:maven/androidx.core/core-ktx@1.2.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.10.0?type=pom",
+        "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=pom",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.1?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
         "pkg:maven/androidx.loader/loader@1.0.0?type=aar",
-        "pkg:maven/androidx.viewpager/viewpager@1.0.0?type=aar"
+        "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar",
+        "pkg:maven/androidx.profileinstaller/profileinstaller@1.4.0?type=aar",
+        "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar",
+        "pkg:maven/androidx.savedstate/savedstate@1.4.0?type=pom",
+        "pkg:maven/androidx.viewpager/viewpager@1.0.0?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
-      "ref": "pkg:maven/androidx.fragment/fragment@1.2.5?type=aar"
+      "ref": "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar"
     },
     {
       "dependsOn": [
@@ -14515,9 +14601,11 @@
     },
     {
       "dependsOn": [
-        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom"
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar",
+        "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.10.2?type=jar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar"
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar"
     },
     {
       "dependsOn": [
@@ -14553,9 +14641,10 @@
       "dependsOn": [
         "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
         "pkg:maven/androidx.arch.core/core-runtime@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar"
+        "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar"
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar"
     },
     {
       "dependsOn": [
@@ -14571,14 +14660,6 @@
       "dependsOn": [
         "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
         "pkg:maven/androidx.arch.core/core-runtime@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar"
-      ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.0.0?type=aar"
-    },
-    {
-      "dependsOn": [
-        "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
-        "pkg:maven/androidx.arch.core/core-runtime@2.2.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata-core-ktx@2.10.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.10.0?type=aar",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar",
@@ -14586,6 +14667,15 @@
         "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
       ],
       "ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.10.0?type=aar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
+        "pkg:maven/androidx.arch.core/core-runtime@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
+      ],
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.6.1?type=aar"
     },
     {
       "dependsOn": [
@@ -14719,9 +14809,12 @@
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
-        "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar"
+        "pkg:maven/androidx.arch.core/core-runtime@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar",
+        "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.2.0?type=aar"
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.1?type=aar"
     },
     {
       "dependsOn": [
@@ -14757,7 +14850,7 @@
         "pkg:maven/androidx.compose.runtime/runtime@1.11.4?type=pom",
         "pkg:maven/androidx.compose.ui/ui@1.11.4?type=pom",
         "pkg:maven/androidx.lifecycle/lifecycle-common@2.10.0?type=pom",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=pom",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.10.0?type=aar",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar",
         "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core@1.7.3?type=pom"
@@ -14823,22 +14916,19 @@
       "dependsOn": [
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate-android@2.10.0?type=aar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=aar"
-    },
-    {
-      "dependsOn": [
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate-android@2.10.0?type=aar"
-      ],
       "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.10.0?type=pom"
     },
     {
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
-        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.2.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
-        "pkg:maven/androidx.savedstate/savedstate@1.0.0?type=aar"
+        "pkg:maven/androidx.core/core-ktx@1.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.1?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
+        "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar",
+        "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.10.2?type=jar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.2.0?type=aar"
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.1?type=aar"
     },
     {
       "dependsOn": [
@@ -14854,9 +14944,10 @@
     },
     {
       "dependsOn": [
-        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom"
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
-      "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar"
+      "ref": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar"
     },
     {
       "dependsOn": [
@@ -14869,12 +14960,12 @@
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.core/core@1.16.0?type=aar",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.0.0?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.10.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.6.1?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.9.4?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.10.0?type=aar",
-        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.2.0?type=aar",
+        "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.1?type=aar",
         "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.9.4?type=aar"
       ],
       "ref": "pkg:maven/androidx.loader/loader@1.0.0?type=aar"
@@ -14994,6 +15085,15 @@
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom"
       ],
       "ref": "pkg:maven/androidx.print/print@1.0.0?type=aar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/androidx.concurrent/concurrent-futures@1.1.0?type=jar",
+        "pkg:maven/androidx.startup/startup-runtime@1.1.1?type=aar",
+        "pkg:maven/com.google.guava/listenablefuture@1.0?type=jar"
+      ],
+      "ref": "pkg:maven/androidx.profileinstaller/profileinstaller@1.3.1?type=aar"
     },
     {
       "dependsOn": [
@@ -15125,9 +15225,10 @@
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.arch.core/core-common@2.2.0?type=jar",
-        "pkg:maven/androidx.lifecycle/lifecycle-common@2.2.0?type=jar"
+        "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar"
       ],
-      "ref": "pkg:maven/androidx.savedstate/savedstate@1.0.0?type=aar"
+      "ref": "pkg:maven/androidx.savedstate/savedstate@1.2.1?type=aar"
     },
     {
       "dependsOn": [
@@ -15171,6 +15272,7 @@
     {
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
+        "pkg:maven/androidx.tracing/tracing@1.0.0?type=aar",
         "pkg:maven/androidx.tracing/tracing@1.2.0?type=aar",
         "pkg:maven/androidx.tracing/tracing@1.3.0?type=pom"
       ],
@@ -15188,6 +15290,12 @@
         "pkg:maven/androidx.tracing/tracing@1.3.0?type=pom"
       ],
       "ref": "pkg:maven/androidx.tracing/tracing-ktx@1.3.0?type=aar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom"
+      ],
+      "ref": "pkg:maven/androidx.tracing/tracing@1.0.0?type=aar"
     },
     {
       "dependsOn": [
@@ -15225,16 +15333,9 @@
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.collection/collection@1.5.0?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar"
+        "pkg:maven/androidx.core/core@1.8.0?type=aar"
       ],
       "ref": "pkg:maven/androidx.vectordrawable/vectordrawable@1.1.0?type=aar"
-    },
-    {
-      "dependsOn": [
-        "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
-        "pkg:maven/androidx.collection/collection@1.5.0?type=pom"
-      ],
-      "ref": "pkg:maven/androidx.versionedparcelable/versionedparcelable@1.1.0?type=aar"
     },
     {
       "dependsOn": [
@@ -15247,7 +15348,7 @@
       "dependsOn": [
         "pkg:maven/androidx.annotation/annotation@1.9.1?type=pom",
         "pkg:maven/androidx.core/core@1.17.0?type=aar",
-        "pkg:maven/androidx.core/core@1.3.2?type=aar",
+        "pkg:maven/androidx.core/core@1.8.0?type=aar",
         "pkg:maven/androidx.customview/customview@1.0.0?type=aar"
       ],
       "ref": "pkg:maven/androidx.viewpager/viewpager@1.0.0?type=aar"
@@ -15631,6 +15732,7 @@
     {
       "dependsOn": [
         "pkg:maven/androidx.biometric/biometric@1.1.0?type=aar",
+        "pkg:maven/androidx.fragment/fragment@1.8.9?type=aar",
         "pkg:maven/androidx.room/room-ktx@2.8.4?type=aar",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.10?type=jar",
         "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core@1.10.2?type=pom",

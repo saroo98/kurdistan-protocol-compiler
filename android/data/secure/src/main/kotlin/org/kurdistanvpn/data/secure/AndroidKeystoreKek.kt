@@ -9,7 +9,6 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -27,20 +26,18 @@ class AndroidKeystoreKek private constructor(
     override val generation: Int,
     private val key: SecretKey,
     override val hardwareSecurityLevel: String,
-    private val random: SecureRandom = SecureRandom(),
 ) : KeyEncryptionKey {
 
     override fun wrap(recordId: String, dataClass: SecureDataClass, key: ByteArray): WrappedKey {
-        val nonce = ByteArray(12).also(random::nextBytes)
         return try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, this.key)
+            val nonce = cipher.iv.clone()
+            require(nonce.size == 12) { "Android Keystore returned an invalid GCM nonce" }
+            cipher.updateAAD(wrapAAD(recordId, dataClass))
             WrappedKey(
                 nonce = nonce,
-                ciphertext = aesGcmEncrypt(
-                    this.key,
-                    nonce,
-                    wrapAAD(recordId, dataClass),
-                    key,
-                ),
+                ciphertext = cipher.doFinal(key),
             )
         } catch (error: KeyPermanentlyInvalidatedException) {
             throw KeyInvalidatedException(error)

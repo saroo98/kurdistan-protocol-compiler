@@ -37,6 +37,7 @@ var bridgeSymbols = []string{
 	"kvpn_diagnostic_prepare",
 	"kvpn_diagnostic_preview",
 	"kvpn_free",
+	"kvpn_phase11_roundtrip",
 	"kvpn_verify_preview",
 }
 
@@ -55,6 +56,7 @@ var jniSymbols = []string{
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticPrepare",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticPreview",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeFree",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePhase11RoundTrip",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeVerifyPreview",
 }
 
@@ -74,10 +76,49 @@ var forbiddenDEXValues = []string{
 	"Lokhttp3/",
 }
 
+var requiredPhase10ManifestValues = []string{
+	"android.permission.BIND_VPN_SERVICE",
+	"android.permission.FOREGROUND_SERVICE",
+	"android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+	"android.permission.POST_NOTIFICATIONS",
+	"android.net.VpnService",
+	"android:exported=\"false\"",
+	"android:foregroundServiceType=\"specialUse\"",
+	"android:process=\":vpn\"",
+	"android.net.VpnService.SUPPORTS_ALWAYS_ON",
+	"android:value=\"false\"",
+}
+
+var forbiddenPhase10ManifestValues = []string{
+	"android.permission.INTERNET",
+	"android.permission.ACCESS_NETWORK_STATE",
+	"android:usesCleartextTraffic=\"true\"",
+	"android:allowBackup=\"true\"",
+}
+
+var forbiddenPhase10DEXValues = []string{
+	"allowBypass",
+	"Lcom/google/firebase/analytics/",
+	"Lcom/google/firebase/crashlytics/",
+	"Lio/sentry/",
+	"Lokhttp3/",
+	"Lretrofit2/",
+}
+
 var internalOnlyMarkers = []string{
 	"phase9 internal activation",
 	"phase9 internal restore",
 	"phase9-internal-root",
+}
+
+var phase11InternalOnlyMarkers = []string{
+	"phase11.android.internal",
+	"kurdistan-phase11-android-internal-conformance-v1",
+}
+
+var requiredPhase11APKMarkers = []string{
+	"ACTIVE_KURD_LOOPBACK",
+	"Kurd loopback transport active",
 }
 
 type apkContents struct {
@@ -91,19 +132,31 @@ func main() {
 	releaseAPK := flag.String("release-apk", "", "path to the unsigned release APK")
 	internalAPK := flag.String("internal-apk", "", "path to the internal demonstration APK")
 	manifest := flag.String("manifest", "", "path to the merged release manifest")
+	phase10 := flag.Bool("phase10", false, "verify the bounded Phase 10 local VPN boundary")
+	phase11 := flag.Bool("phase11", false, "verify the bounded Phase 11 Kurd loopback transport boundary")
 	flag.Parse()
 	if *releaseAPK == "" || *internalAPK == "" || *manifest == "" {
 		fmt.Fprintln(os.Stderr, "phase9verify: release-apk, internal-apk, and manifest are required")
 		os.Exit(2)
 	}
-	if err := verify(*releaseAPK, *internalAPK, *manifest); err != nil {
-		fmt.Fprintf(os.Stderr, "PHASE 9 ARTIFACT VERIFICATION FAILED: %v\n", err)
+	if *phase10 && *phase11 {
+		fmt.Fprintln(os.Stderr, "phase9verify: phase10 and phase11 are mutually exclusive")
+		os.Exit(2)
+	}
+	if err := verify(*releaseAPK, *internalAPK, *manifest, *phase10 || *phase11, *phase11); err != nil {
+		fmt.Fprintf(os.Stderr, "ANDROID ARTIFACT VERIFICATION FAILED: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("PHASE 9 ARTIFACT VERIFICATION PASSED")
+	if *phase11 {
+		fmt.Println("PHASE 11 ARTIFACT VERIFICATION PASSED")
+	} else if *phase10 {
+		fmt.Println("PHASE 10 ARTIFACT VERIFICATION PASSED")
+	} else {
+		fmt.Println("PHASE 9 ARTIFACT VERIFICATION PASSED")
+	}
 }
 
-func verify(releasePath, internalPath, manifestPath string) error {
+func verify(releasePath, internalPath, manifestPath string, vpnRuntime, phase11 bool) error {
 	info, err := os.Stat(releasePath)
 	if err != nil {
 		return fmt.Errorf("release APK: %w", err)
@@ -115,8 +168,17 @@ func verify(releasePath, internalPath, manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("merged manifest: %w", err)
 	}
-	if err := rejectMarkers([][]byte{manifest}, forbiddenManifestValues); err != nil {
-		return fmt.Errorf("merged release manifest: %w", err)
+	if vpnRuntime {
+		if err := requireMarkers(manifest, requiredPhase10ManifestValues); err != nil {
+			return fmt.Errorf("merged release manifest: %w", err)
+		}
+		if err := rejectMarkers([][]byte{manifest}, forbiddenPhase10ManifestValues); err != nil {
+			return fmt.Errorf("merged release manifest: %w", err)
+		}
+	} else {
+		if err := rejectMarkers([][]byte{manifest}, forbiddenManifestValues); err != nil {
+			return fmt.Errorf("merged release manifest: %w", err)
+		}
 	}
 
 	release, err := readAPK(releasePath)
@@ -130,8 +192,32 @@ func verify(releasePath, internalPath, manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("internal APK: %w", err)
 	}
-	if err := rejectMarkers(release.dex, forbiddenDEXValues); err != nil {
-		return fmt.Errorf("release DEX: %w", err)
+	if vpnRuntime {
+		if err := rejectMarkers(release.dex, forbiddenPhase10DEXValues); err != nil {
+			return fmt.Errorf("release DEX: %w", err)
+		}
+		for _, required := range []string{
+			"198.18.0.0",
+			"198.18.0.53",
+			"phase10",
+			"DNS_REPLIED",
+			"org.kurdistanvpn.runtime.action.QUERY_STATUS",
+		} {
+			if !containsAny(release.all, required) {
+				return fmt.Errorf("release APK is missing Phase 10 boundary marker %q", required)
+			}
+		}
+		if phase11 {
+			for _, required := range requiredPhase11APKMarkers {
+				if !containsAny(release.all, required) {
+					return fmt.Errorf("release APK is missing Phase 11 boundary marker %q", required)
+				}
+			}
+		}
+	} else {
+		if err := rejectMarkers(release.dex, forbiddenDEXValues); err != nil {
+			return fmt.Errorf("release DEX: %w", err)
+		}
 	}
 	for _, marker := range internalOnlyMarkers {
 		if containsAny(release.all, marker) {
@@ -140,6 +226,22 @@ func verify(releasePath, internalPath, manifestPath string) error {
 	}
 	if !containsAny(internal.all, internalOnlyMarkers[0]) {
 		return errors.New("internal APK does not contain its explicit nonproduction trust marker")
+	}
+	for _, marker := range phase11InternalOnlyMarkers {
+		if containsAny(release.all, marker) {
+			return fmt.Errorf("release APK contains Phase 11 internal-only marker %q", marker)
+		}
+		if phase11 && !containsAny(internal.all, marker) {
+			return fmt.Errorf("internal APK is missing Phase 11 conformance marker %q", marker)
+		}
+	}
+	for _, abi := range []string{"arm64-v8a", "x86_64"} {
+		for _, library := range []string{"libkurdistan_bridge.so", "libkurdistan_jni.so"} {
+			name := fmt.Sprintf("lib/%s/%s", abi, library)
+			if _, ok := internal.natives[name]; !ok {
+				return fmt.Errorf("internal APK is missing %s native support: %q", abi, name)
+			}
+		}
 	}
 	for name := range release.natives {
 		if strings.HasPrefix(name, "lib/") && !strings.HasPrefix(name, "lib/arm64-v8a/") {
@@ -165,6 +267,15 @@ func verify(releasePath, internalPath, manifestPath string) error {
 	}
 	if err := requireELFIdentity(jni, "libkurdistan_jni.so", "libkurdistan_bridge.so"); err != nil {
 		return fmt.Errorf("JNI identity: %w", err)
+	}
+	return nil
+}
+
+func requireMarkers(value []byte, required []string) error {
+	for _, marker := range required {
+		if !bytes.Contains(value, []byte(marker)) {
+			return fmt.Errorf("missing required %q", marker)
+		}
 	}
 	return nil
 }

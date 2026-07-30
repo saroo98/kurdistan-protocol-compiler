@@ -18,4 +18,5 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
+    implementation(project(":runtime:api"))
 }

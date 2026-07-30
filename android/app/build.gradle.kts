@@ -5,6 +5,7 @@ plugins {
 
 android {
     namespace = "org.kurdistanvpn.app"
+    testBuildType = "internal"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     ndkVersion = "28.2.13676358"
@@ -17,13 +18,13 @@ android {
         versionName = "0.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
     }
 
     buildTypes {
         debug {
+            ndk {
+                abiFilters += setOf("arm64-v8a", "x86_64")
+            }
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             isPseudoLocalesEnabled = true
@@ -36,6 +37,10 @@ android {
             isPseudoLocalesEnabled = true
         }
         release {
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             vcsInfo.include = false
@@ -79,6 +84,7 @@ dependencies {
     implementation(project(":data:settings"))
     implementation(project(":platform:import"))
     implementation(project(":runtime:api"))
+    implementation(project(":runtime:android"))
     implementation(project(":feature:home"))
     implementation(project(":feature:profiles"))
     implementation(project(":feature:settings-recovery"))
@@ -101,6 +107,7 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    "internalImplementation"(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

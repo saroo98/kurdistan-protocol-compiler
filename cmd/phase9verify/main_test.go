@@ -3,7 +3,10 @@
 
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCompareSymbolsIsOrderIndependentAndExact(t *testing.T) {
 	if err := compareSymbols([]string{"b", "a"}, []string{"a", "b"}); err != nil {
@@ -30,6 +33,21 @@ func TestForbiddenBoundaryMutationTurnsGateRed(t *testing.T) {
 	for _, forbidden := range append(append([]string(nil), forbiddenManifestValues...), forbiddenDEXValues...) {
 		if err := rejectMarkers([][]byte{[]byte("prefix " + forbidden + " suffix")}, []string{forbidden}); err == nil {
 			t.Fatalf("forbidden marker %q was accepted", forbidden)
+		}
+	}
+}
+
+func TestPhase10ManifestContractRejectsMissingAndForbiddenMarkers(t *testing.T) {
+	manifest := []byte(strings.Join(requiredPhase10ManifestValues, "\n"))
+	if err := requireMarkers(manifest, requiredPhase10ManifestValues); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireMarkers([]byte("incomplete"), requiredPhase10ManifestValues); err == nil {
+		t.Fatal("incomplete Phase 10 manifest was accepted")
+	}
+	for _, forbidden := range forbiddenPhase10ManifestValues {
+		if err := rejectMarkers([][]byte{[]byte(forbidden)}, forbiddenPhase10ManifestValues); err == nil {
+			t.Fatalf("forbidden Phase 10 manifest marker %q was accepted", forbidden)
 		}
 	}
 }

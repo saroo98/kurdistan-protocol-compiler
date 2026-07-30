@@ -7,7 +7,7 @@
     "combined_gate": "passed",
     "release_manifest_bytecode_native_boundary": "verified-by-artifact-gate",
     "two_clean_release_builds": "verified-byte-identical",
-    "release_apk_sha256": "2f1a7ff3c6b461cb0f4f53aa10a111811f3e0aa86c6dae14c5070c67cbf3324a"
+    "release_apk_sha256": "b6124b375cd0f8d48f8a6e5b0d05a33dd162314e308d90257a9539a4b88c9929"
   },
   "external_or_device": {
     "windows_ci": "[UNVERIFIED]",

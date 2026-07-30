@@ -400,10 +400,7 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 	if !reflect.DeepEqual(overlay.Paths, wantPaths) || len(overlay.Entries) != len(wantPaths)-1 {
 		t.Fatalf("baseline stabilization ledger mismatch: %+v", overlay)
 	}
-	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, ledger.Phase9GuardMaintenanceOverlays)
-	if err != nil {
-		t.Fatal(err)
-	}
+	phase9Pre := phase10Phase9PreForTestV1(t, root, ledger)
 	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
@@ -479,12 +476,26 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 	})
 }
 
-func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
+func phase10Phase9PreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
 	t.Helper()
-	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, ledger.Phase9GuardMaintenanceOverlays)
+	phase11Pre, err := validateM11LocalTransportOverlayV1(root, ledger.Phase11LocalTransportOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
+	phase10Pre, err := validateM10VPNRuntimeOverlayAtPostV1(root, phase11Pre, ledger.Phase10VPNRuntimeOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase9Pre, err := validateM9GuardMaintenanceOverlayAtPostV1(root, phase10Pre, ledger.Phase9GuardMaintenanceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return phase9Pre
+}
+
+func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
+	t.Helper()
+	phase9Pre := phase10Phase9PreForTestV1(t, root, ledger)
 	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, ledger.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
@@ -885,11 +896,19 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatalf("invalid Phase 8 final guard fixture overlay identity/cardinality: %+v", finalGuardOverlay)
 	}
 	phase9Overlay, ok := ledger.Phase9GuardMaintenanceOverlays["phase9-wo909-final-guard-convergence-v1"]
-	if !ok || len(ledger.Phase9GuardMaintenanceOverlays) != 1 || len(phase9Overlay.Paths) != 157 || len(phase9Overlay.Entries) != 157 {
+	if !ok || len(ledger.Phase9GuardMaintenanceOverlays) != 1 || len(phase9Overlay.Paths) != 159 || len(phase9Overlay.Entries) != 159 {
 		t.Fatalf("invalid Phase 9 guard fixture overlay identity/cardinality: %+v", phase9Overlay)
 	}
+	phase10Overlay, ok := ledger.Phase10VPNRuntimeOverlays["phase10-local-vpn-runtime-v1"]
+	if !ok || len(ledger.Phase10VPNRuntimeOverlays) != 1 || len(phase10Overlay.Paths) != 70 || len(phase10Overlay.Entries) != 70 {
+		t.Fatalf("invalid Phase 10 VPN runtime fixture overlay identity/cardinality: %+v", phase10Overlay)
+	}
+	phase11Overlay, ok := ledger.Phase11LocalTransportOverlays["phase11-local-transport-v1"]
+	if !ok || len(ledger.Phase11LocalTransportOverlays) != 1 || len(phase11Overlay.Paths) == 0 || len(phase11Overlay.Entries) != len(phase11Overlay.Paths) {
+		t.Fatalf("invalid Phase 11 local transport fixture overlay identity/cardinality: %+v", phase11Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries)+len(phase10Overlay.Entries)+len(phase11Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -973,6 +992,18 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	for _, path := range phase10Overlay.Paths {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range phase11Overlay.Paths {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if readErr != nil {
@@ -993,13 +1024,13 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase8 final guard-maintenance hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase11 local transport hash drift README.md") {
 		t.Fatalf("changed listed content error=%v", err)
 	}
 	if err := os.Remove(drift); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase8 final guard-maintenance hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase11 local transport hash drift README.md") {
 		t.Fatalf("missing listed path error=%v", err)
 	}
 
@@ -1462,10 +1493,7 @@ func TestSecurityPhase8WorkOrderOverlayChainMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
-	if err != nil {
-		t.Fatal(err)
-	}
+	phase9Pre := phase10Phase9PreForTestV1(t, root, manifest)
 	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)
@@ -1530,10 +1558,7 @@ func TestSecurityPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	phase9Pre, err := validateM9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays)
-	if err != nil {
-		t.Fatal(err)
-	}
+	phase9Pre := phase10Phase9PreForTestV1(t, root, manifest)
 	finalGuardPre, err := validateM8FinalGuardMaintenanceOverlayAtPostV1(root, phase9Pre, manifest.Phase8FinalGuardMaintenanceOverlays)
 	if err != nil {
 		t.Fatal(err)

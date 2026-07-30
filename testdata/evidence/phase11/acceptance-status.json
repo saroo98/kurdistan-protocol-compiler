@@ -1,0 +1,30 @@
+{
+  "schema": "kurdistan.phase11.acceptance-status.v1",
+  "scope": "bounded-loopback-conformance",
+  "local": {
+    "go_gate": "passed",
+    "go_race": "passed",
+    "android_phase11_gate": "passed",
+    "emulator_phase11_device_gate": "passed",
+    "process_separation": "verified-by-local-test",
+    "tls13_tcp": "verified-by-local-test",
+    "authenticated_kurd_records": "verified-by-local-test",
+    "bounded_fallback": "verified-by-local-test",
+    "android_tun_integration": "verified-by-emulator-test"
+  },
+  "external": {
+    "owned_lan_two_host": "[UNVERIFIED]",
+    "owned_relay": "[UNVERIFIED]",
+    "physical_device_matrix": "[UNVERIFIED]",
+    "mobile_network_handover": "[UNVERIFIED]",
+    "capacity": "[UNVERIFIED]",
+    "field_censorship_resilience": "[UNVERIFIED]"
+  },
+  "claims": {
+    "production_ready": false,
+    "publicly_deployable": false,
+    "uncensorable": false,
+    "undetectable": false,
+    "anonymous": false
+  }
+}

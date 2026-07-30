@@ -125,6 +125,11 @@ class Phase9ViewModel(
         viewModelScope.launch { refreshProfiles() }
     }
 
+    fun rejectImport(error: OperationError = OperationError.INVALID_INPUT) {
+        clearPendingImport()
+        mutableState.value = AppState.ImportRejected(error)
+    }
+
     fun deleteProfile(localRecordId: String) {
         viewModelScope.launch {
             if (root.admissionJournal?.delete(localRecordId) == true) {
@@ -181,6 +186,12 @@ class Phase9ViewModel(
         }
     }
 
+    fun failBackup(error: OperationError) {
+        pendingBackup?.let(root.nativeCore::releaseBackup)
+        pendingBackup = null
+        mutableBackupState.value = BackupWorkflowState.Failed(error)
+    }
+
     fun openBackup(backup: ByteArray, passphrase: String) {
         mutableBackupState.value = BackupWorkflowState.Working
         viewModelScope.launch {
@@ -230,11 +241,17 @@ class Phase9ViewModel(
                 mutableBackupState.value = BackupWorkflowState.Failed(result.error)
                 return@launch
             }
-            val records = runCatching {
-                BackupPayloadCodec.decode((result as NativeResult.Success).value)
-            }.getOrElse {
-                mutableBackupState.value = BackupWorkflowState.Failed(OperationError.INVALID_INPUT)
-                return@launch
+            val restoredBytes = (result as NativeResult.Success).value
+            val records = try {
+                runCatching {
+                    BackupPayloadCodec.decode(restoredBytes)
+                }.getOrElse {
+                    mutableBackupState.value =
+                        BackupWorkflowState.Failed(OperationError.INVALID_INPUT)
+                    return@launch
+                }
+            } finally {
+                restoredBytes.fill(0)
             }
             val journal = root.admissionJournal
             if (journal == null) {
@@ -312,11 +329,22 @@ class Phase9ViewModel(
                     mutableDiagnosticState.value =
                         DiagnosticWorkflowState.Failed(result.error)
                 is NativeResult.Success -> {
-                    mutableDiagnosticState.value = DiagnosticWorkflowState.Completed
                     onReady(result.value)
                 }
             }
         }
+    }
+
+    fun diagnosticExportCompleted() {
+        mutableDiagnosticState.value = DiagnosticWorkflowState.Completed
+    }
+
+    fun diagnosticExportCancelled() {
+        mutableDiagnosticState.value = DiagnosticWorkflowState.Idle
+    }
+
+    fun diagnosticExportFailed(error: OperationError) {
+        mutableDiagnosticState.value = DiagnosticWorkflowState.Failed(error)
     }
 
     fun cancelDiagnostic() {
@@ -339,15 +367,24 @@ class Phase9ViewModel(
     }
 
     fun setTheme(theme: ThemePreference) {
-        viewModelScope.launch { root.settingsStore.setTheme(theme) }
+        viewModelScope.launch {
+            root.settingsStore.setTheme(theme)
+            mutableSettings.value = mutableSettings.value.copy(theme = theme)
+        }
     }
 
     fun setHighContrast(enabled: Boolean) {
-        viewModelScope.launch { root.settingsStore.setHighContrast(enabled) }
+        viewModelScope.launch {
+            root.settingsStore.setHighContrast(enabled)
+            mutableSettings.value = mutableSettings.value.copy(highContrast = enabled)
+        }
     }
 
     fun setReducedMotion(enabled: Boolean) {
-        viewModelScope.launch { root.settingsStore.setReducedMotion(enabled) }
+        viewModelScope.launch {
+            root.settingsStore.setReducedMotion(enabled)
+            mutableSettings.value = mutableSettings.value.copy(reducedMotion = enabled)
+        }
     }
 
     override fun onCleared() {

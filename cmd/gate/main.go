@@ -9,7 +9,7 @@
 //
 //	go run ./cmd/gate           # build + vet + test + full audit
 //	go run ./cmd/gate -quick    # build + vet + test + quick audit (faster)
-//	go run ./cmd/gate -android  # Go gate plus the Android Phase 9 gate
+//	go run ./cmd/gate -android  # Go gate plus the current Android Phase 11 gate
 //
 // It exits non-zero if any step fails.
 package main
@@ -86,7 +86,7 @@ func main() {
 		os.Exit(1)
 	}
 	if android {
-		fmt.Println("GATE PASSED: build, vet, test, audit, and Android Phase 9 all green")
+		fmt.Println("GATE PASSED: build, vet, test, audit, and Android Phase 11 all green")
 	} else {
 		fmt.Println("GATE PASSED: build, vet, test, audit all green")
 	}
@@ -95,16 +95,16 @@ func main() {
 func androidStep() step {
 	if runtime.GOOS == "windows" {
 		return step{
-			name:    "android-phase9",
+			name:    "android-phase11",
 			program: "cmd",
-			args:    []string{"/c", "gradlew.bat", "phase9Gate", "--no-build-cache"},
+			args:    []string{"/c", "gradlew.bat", "phase11Gate", "--no-build-cache"},
 			dir:     "android",
 		}
 	}
 	return step{
-		name:    "android-phase9",
+		name:    "android-phase11",
 		program: "./gradlew",
-		args:    []string{"phase9Gate", "--no-build-cache"},
+		args:    []string{"phase11Gate", "--no-build-cache"},
 		dir:     "android",
 	}
 }

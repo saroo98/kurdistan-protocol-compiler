@@ -18,9 +18,9 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "# Kurdistan Protocol Compiler Status")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "> Staged product-development program. Phase 8 adds a bounded local profile-artifact implementation using deterministic non-production fixtures; gate evidence still does not prove real-world censorship resistance, undetectability, production safety, deployment readiness, or external merge eligibility (**[UNVERIFIED]**).")
+	fmt.Fprintln(&b, "> Staged product-development program. Phases 8-11 add bounded profile cryptography, protected Android state, a reserved-range `VpnService`/TUN runtime, and authenticated Kurd-over-TLS/TCP owned-loopback conformance. Owned-network, public-relay, field-resilience, production-safety, deployment, and release evidence remains **[UNVERIFIED]**.")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "> Legend: `[live]` executes real behavior locally (network I/O remains loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The carrier, path, relay, proxy, Android, and VPN gates below are `[model]`/`[plan]`. The security and runtime `*_mutant_detection` gates report bounded real lab fault-injection detector sensitivity with paired controls: a pass proves only that each named detector turns red under its deliberate lab fault while its paired control stays green. It does not prove defect absence, production security, product integration, release readiness, or authorization to merge or deploy.")
+	fmt.Fprintln(&b, "> Legend: `[live]` executes real behavior locally (current network I/O remains owned-loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The audit table includes many historical `[model]`/`[plan]` gates; the separate Phase 9-11 Android and transport boundary is enforced by `go run ./cmd/gate -android` and `docs/PHASE11_EVIDENCE_INDEX.md`. The security and runtime mutant gates report real lab fault-injection detector sensitivity with paired controls. A pass does not prove defect absence, production security, field resilience, release readiness, or authorization to merge or deploy.")
 	fmt.Fprintln(&b)
 	fmt.Fprintf(&b, "- Latest audit mode: `%s`\n", report.Mode)
 	fmt.Fprintf(&b, "- Profile count: `%d`\n", report.ProfileCount)
@@ -662,11 +662,11 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b, "- Path racing uses local synthetic observations and short-lived scoring only; it does not probe, dial, resolve, or select a production active path.")
 	fmt.Fprintln(&b, "- Android architecture review defines user flows, permission boundaries, diagnostics, kill-switch behavior, and M57/M58 contracts.")
 	fmt.Fprintln(&b, "- Android local runtime port checks local initialization, lifecycle, profile loading, diagnostics, storage boundaries, compatibility, and safe shutdown.")
-	fmt.Fprintln(&b, "- Android VpnService prototype checks permission/lifecycle states, packet-flow mapping, fail-closed behavior, diagnostics, reconnect hooks, and generated parity; it does not connect Android traffic to carriers.")
+	fmt.Fprintln(&b, "- The historical Android VpnService audit gates are models; the separately gated Phase 10/11 Android implementation carries only reserved-range test traffic through the authenticated owned-loopback Kurd transport.")
 	fmt.Fprintln(&b, "- Hardening gates prove local invariants and misuse resistance only; concrete adapter work still needs separate review.")
 	fmt.Fprintln(&b, "- Phase 8 locally implements deterministic profile framing, signed admission, optional recipient sealing, lifecycle activation, and local tooling with non-production fixtures. It has no production key custody, production signer, Android keystore, HSM/KMS, live delivery, deployment, pilot, or release evidence.")
 	fmt.Fprintln(&b, "- Generated source still reuses shared lab helpers for IO, framing, stream session logic, scheduling, padding, auth, and traces.")
-	fmt.Fprintln(&b, "- No VPN, SOCKS, HTTP carrier, TLS mimicry, CDN behavior, deployment scripts, or live-network testing.")
+	fmt.Fprintln(&b, "- There is no unrestricted Internet egress, public relay, SOCKS or HTTP proxy service, TLS mimicry, CDN behavior, deployment automation, or non-loopback field evidence.")
 	fmt.Fprintln(&b, "- The audit detects local regressions; it cannot prove undetectability or real-world robustness.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "## Milestone Frontier")
@@ -681,12 +681,12 @@ func RenderStatus(report AuditReport) string {
 // points at the KIP docs and the safety boundary.
 func milestoneFrontierNote(report AuditReport) string {
 	if _, ok := gateByName(report.Gates, "androidcarrier_report"); ok {
-		return "Phase 8 profile artifacts are implemented as a bounded local surface (see KIP-0075 through KIP-0082), but its external merge-eligibility evidence remains **[UNVERIFIED]**. The latest modelled surface evaluated by these audit gates is the Android carrier integration path (`androidcarrier_*` gates), composed with the reviewed runtime/carrier gates. Phase 9 Android application foundation is separately gated."
+		return "The latest modelled surface in this audit table is the Android carrier integration path (`androidcarrier_*`). Separately, Phases 8-11 implement and gate profile cryptography, protected Android state, reserved-range TUN behavior, and authenticated owned-loopback Kurd transport. Owned-LAN, owned-relay, physical-device matrix, capacity, handover, field-resilience, deployment, and release evidence remains **[UNVERIFIED]**."
 	}
 	if _, ok := gateByName(report.Gates, "androidvpnservice_report"); ok {
-		return "Phase 8 profile artifacts are implemented as a bounded local surface (see KIP-0075 through KIP-0082), but its external merge-eligibility evidence remains **[UNVERIFIED]**. The latest modelled surface evaluated by these audit gates is the Android VpnService prototype (`androidvpnservice_*` gates), a fail-closed model rather than live transport today. Phase 9 Android application foundation is separately gated."
+		return "The latest modelled surface in this audit table is the Android VpnService prototype (`androidvpnservice_*`). Separately gated Phase 10/11 code implements reserved-range TUN behavior and authenticated owned-loopback Kurd transport. Non-loopback and production evidence remains **[UNVERIFIED]**."
 	}
-	return "Per-milestone tracking lives in the `docs/KIP-*.md` documents and the gate table above. Live transport remains out of scope (see docs/safety.md)."
+	return "Per-milestone tracking lives in the `docs/KIP-*.md` documents and the gate table above. Only the specifically authorized owned-loopback transport is live locally; non-loopback and production operation remains closed."
 }
 
 func WriteStatus(path string, report AuditReport) error {

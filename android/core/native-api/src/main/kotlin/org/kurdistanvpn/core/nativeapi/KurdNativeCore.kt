@@ -83,6 +83,7 @@ interface KurdNativeCore {
     fun createBackup(payload: ByteArray, passphrase: ByteArray): NativeResult<ByteArray>
     fun openBackup(backup: ByteArray, passphrase: ByteArray): NativeResult<BackupPreviewHandle>
     fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray>
+    fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray>
     fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit>
     fun releaseBackup(preview: BackupPreviewHandle): NativeResult<Unit>
 }

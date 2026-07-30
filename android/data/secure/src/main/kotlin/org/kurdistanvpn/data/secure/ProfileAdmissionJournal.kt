@@ -111,8 +111,16 @@ class ProfileAdmissionJournal(
                 return AdmissionResult.Failure(conflict.error)
             }
             val recordId = newRecordId()
-            blobs.stage(recordId, SecureDataClass.IMPORT_REQUEST, verifyRequest)
-            catalog.upsert(entity(recordId, TransactionState.PREPARED))
+            try {
+                blobs.stage(recordId, SecureDataClass.IMPORT_REQUEST, verifyRequest)
+                catalog.upsert(entity(recordId, TransactionState.PREPARED))
+            } catch (_: KeyInvalidatedException) {
+                cleanupFailedPreparation(recordId)
+                return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
+            } catch (_: Throwable) {
+                cleanupFailedPreparation(recordId)
+                return AdmissionResult.Failure(OperationError.STORAGE_FAILURE)
+            }
             val result = activate(recordId, verified, finalHealth)
             if (result is AdmissionResult.Success && publishSuperseded) {
                 conflict.superseded.forEach { row ->
@@ -587,6 +595,15 @@ class ProfileAdmissionJournal(
                 CatalogHealth.QUARANTINED,
             ),
         )
+    }
+
+    private suspend fun cleanupFailedPreparation(recordId: String) {
+        runCatching {
+            blobs.delete(recordId, SecureDataClass.IMPORT_REQUEST)
+        }
+        runCatching {
+            catalog.delete(recordId)
+        }
     }
 
     private fun entity(

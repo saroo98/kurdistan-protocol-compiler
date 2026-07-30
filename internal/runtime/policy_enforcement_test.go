@@ -142,7 +142,7 @@ func TestRuntimeLabExecutorClassifierPolicyGuardV1(t *testing.T) {
 		"loopback_pair.go":     {"newInProcessProtectedRelayWithLabFaultV1": {"runtime_padding_only_diversity": true}},
 	}
 	totalCalls := classifierCalls
-	ownerHashes := map[string]string{"protected_channel.go": "4523d20b60fb9df4533c284386d359073de9c2b5745166b842ae42424aabded0", "trace.go": "4d53711a2c0a9d834b7c5024bc9e076e6b70215e19c496c1a3b3a52ae1dc9844", "link.go": "dae7aeb583ae7ec13433a1dc4ead2c2d20ab3d1e6713e82f1465070f913e0e02", "loopback_pair.go": "7f924e9883b5607be2a6738c51938e0fbdefc3d285dfa67a25bf62cae351e3b6"}
+	ownerHashes := map[string]string{"protected_channel.go": "4523d20b60fb9df4533c284386d359073de9c2b5745166b842ae42424aabded0", "trace.go": "4d53711a2c0a9d834b7c5024bc9e076e6b70215e19c496c1a3b3a52ae1dc9844", "link.go": "dae7aeb583ae7ec13433a1dc4ead2c2d20ab3d1e6713e82f1465070f913e0e02", "loopback_pair.go": "955557e2aeac18b5df08a391679ccfff1f07097ec754816c94889f354da09013"}
 	for _, path := range files {
 		if path == "lab_executor.go" || strings.HasSuffix(path, "_test.go") {
 			continue
@@ -1599,25 +1599,65 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 		Phase8WO801ThreatModelOverlays    map[string]policyPhase2CompleteOverlayV1 `json:"phase8_wo801_threat_model_overlays"`
 		Phase8WO801AdoptionOverlays       map[string]policyPhase2CompleteOverlayV1 `json:"phase8_wo801_adoption_overlays"`
 		Phase9GuardMaintenanceOverlays    map[string]policyMaintenanceOverlayV1    `json:"phase9_guard_maintenance_overlays"`
+		Phase10VPNRuntimeOverlays         map[string]policyMaintenanceOverlayV1    `json:"phase10_vpn_runtime_overlays"`
+		Phase11LocalTransportOverlays     map[string]policyMaintenanceOverlayV1    `json:"phase11_local_transport_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return err
 	}
-	if _, err := validatePolicyPhase9GuardMaintenanceOverlayV1(root, manifest.Phase9GuardMaintenanceOverlays); err != nil {
+	phase11Pre, err := validatePolicyPhase11LocalTransportOverlayV1(root, manifest.Phase11LocalTransportOverlays)
+	if err != nil {
 		return err
 	}
-	// A clean checkout is the committed Phase 9 state only after its complete
+	phase10Pre, err := validatePolicyPhase10VPNRuntimeOverlayAtPostV1(root, phase11Pre, manifest.Phase10VPNRuntimeOverlays)
+	if err != nil {
+		return err
+	}
+	if _, err := validatePolicyPhase9GuardMaintenanceOverlayAtPostV1(root, phase10Pre, manifest.Phase9GuardMaintenanceOverlays); err != nil {
+		return err
+	}
+	phase11OverlayPaths := make(map[string]bool, len(phase11Pre))
+	for path := range phase11Pre {
+		phase11OverlayPaths[path] = true
+	}
+	// A clean checkout is the committed Phase 10 state only after its complete
 	// path and content overlay has validated above.
 	if len(changed) == 0 {
 		return nil
 	}
+	phase10Changed := map[string]bool{policyMaintenanceManifestPathV1: true}
+	phase10OverlayPaths := make(map[string]bool)
+	for _, overlay := range manifest.Phase10VPNRuntimeOverlays {
+		for _, path := range overlay.Paths {
+			phase10Changed[path] = true
+			phase10OverlayPaths[path] = true
+		}
+	}
+	if exactPathSetV1(changed, phase10Changed) || policyPhase9MaintenanceDirtyPathSetV1(changed, phase10OverlayPaths) {
+		return nil
+	}
 	phase9Changed := map[string]bool{policyMaintenanceManifestPathV1: true}
+	phase9OverlayPaths := make(map[string]bool)
 	for _, overlay := range manifest.Phase9GuardMaintenanceOverlays {
 		for _, path := range overlay.Paths {
 			phase9Changed[path] = true
+			phase9OverlayPaths[path] = true
 		}
 	}
-	if exactPathSetV1(changed, phase9Changed) {
+	combinedChanged := make(map[string]bool, len(phase9Changed)+len(phase10Changed))
+	for path := range phase9Changed {
+		combinedChanged[path] = true
+	}
+	for path := range phase10Changed {
+		combinedChanged[path] = true
+	}
+	for path := range phase11OverlayPaths {
+		combinedChanged[path] = true
+	}
+	if exactPathSetV1(changed, combinedChanged) || policyPhase9MaintenanceDirtyPathSetV1(changed, combinedChanged) {
+		return nil
+	}
+	if exactPathSetV1(changed, phase9Changed) || policyPhase9MaintenanceDirtyPathSetV1(changed, phase9OverlayPaths) {
 		return nil
 	}
 	candidate, err := policyPhase2CandidateInventoryV1(root)
@@ -1628,6 +1668,84 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 		return nil
 	}
 	return validatePolicyM2ComposedStateV1(root, candidate, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase8WO801ThreatModelOverlays, manifest.Phase8ProfileCryptographyOverlays, manifest.BaselineStabilizationOverlays, manifest.Phase7AppRuntimeOverlays, manifest.Phase6DiagnosticExportOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
+}
+
+func validatePolicyPhase11LocalTransportOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase11-local-transport-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != policyMaintenanceManifestPathV1 ||
+		!validPolicySHA256V1(overlay.SelfPreSHA256) ||
+		len(overlay.Paths) == 0 || len(overlay.Paths) > 128 ||
+		len(overlay.Entries) != len(overlay.Paths) {
+		return nil, fmt.Errorf("invalid phase11 local-transport overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(overlay.Paths))
+	lastPath := ""
+	for i, path := range overlay.Paths {
+		entry := overlay.Entries[i]
+		if entry.Path != path || path <= lastPath || path == policyMaintenanceManifestPathV1 ||
+			strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") ||
+			!validPolicySHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase11 local-transport entry %d", i)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase11 absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validPolicySHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase11 existing predecessor %d", i)
+		}
+		actual, err := policyFileSHA256V1(root, path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase11 local-transport hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		lastPath = path
+	}
+	return pre, nil
+}
+
+func policyPhase9MaintenanceDirtyPathSetV1(changed, overlayPaths map[string]bool) bool {
+	if len(changed) < 2 || !changed[policyMaintenanceManifestPathV1] {
+		return false
+	}
+	for path := range changed {
+		if path != policyMaintenanceManifestPathV1 && !overlayPaths[path] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestPolicyPhase9MaintenanceDirtyPathSetV1(t *testing.T) {
+	overlayPaths := map[string]bool{"authorized.txt": true}
+	for name, tc := range map[string]struct {
+		changed map[string]bool
+		want    bool
+	}{
+		"exact maintenance subset": {
+			changed: map[string]bool{policyMaintenanceManifestPathV1: true, "authorized.txt": true},
+			want:    true,
+		},
+		"manifest only": {
+			changed: map[string]bool{policyMaintenanceManifestPathV1: true},
+		},
+		"missing manifest": {
+			changed: map[string]bool{"authorized.txt": true},
+		},
+		"unauthorized path": {
+			changed: map[string]bool{policyMaintenanceManifestPathV1: true, "other.txt": true},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := policyPhase9MaintenanceDirtyPathSetV1(tc.changed, overlayPaths); got != tc.want {
+				t.Fatalf("policyPhase9MaintenanceDirtyPathSetV1()=%v want %v", got, tc.want)
+			}
+		})
+	}
 }
 
 func validatePolicyM2ComposedStateV1(root string, changed map[string]bool, maintenanceOverlays map[string]policyMaintenanceOverlayV1, helperOverlays, validatorOverlays, consumerOverlays, convergenceOverlays map[string]policyLayeredOverlayV1, wo801Overlays, phase8Overlays, baselineOverlays, phase7Overlays, phase6Overlays, phase5Overlays, phase4Overlays, phase3Overlays, phase2Overlays map[string]policyPhase2CompleteOverlayV1) error {
@@ -2045,6 +2163,7 @@ type policyWO812ManifestV1 struct {
 	Phase8GuardMaintenanceOverlays      map[string]policyMaintenanceOverlayV1     `json:"phase8_guard_maintenance_overlays"`
 	Phase8FinalGuardMaintenanceOverlays map[string]policyMaintenanceOverlayV1     `json:"phase8_final_guard_maintenance_overlays"`
 	Phase9GuardMaintenanceOverlays      map[string]policyMaintenanceOverlayV1     `json:"phase9_guard_maintenance_overlays"`
+	Phase10VPNRuntimeOverlays           map[string]policyMaintenanceOverlayV1     `json:"phase10_vpn_runtime_overlays"`
 }
 
 func loadPolicyWO801AdoptionV1(root string) (map[string]string, error) {
@@ -2280,16 +2399,96 @@ func validatePolicyPhase8FinalGuardMaintenanceOverlayAtPostV1(root string, curre
 	return pre, nil
 }
 
+func validatePolicyPhase10VPNRuntimeOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePolicyPhase10VPNRuntimeOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePolicyPhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase10-local-vpn-runtime-v1"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != policyMaintenanceManifestPathV1 ||
+		overlay.SelfPreSHA256 != "45559ed3772b777924c8ef5e2a24980b8ddfccab89e67613ff379f5b48824d76" ||
+		len(overlay.Paths) != 70 || len(overlay.Entries) != len(overlay.Paths) {
+		return nil, fmt.Errorf("invalid phase10 VPN runtime overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
+	scope := sha256.New()
+	lastPath := ""
+	for i, path := range overlay.Paths {
+		entry := overlay.Entries[i]
+		if entry.Path != path || path <= lastPath || !validPolicySHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase10 VPN runtime entry %d", i)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase10 absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validPolicySHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase10 existing predecessor %d", i)
+		}
+		scope.Write([]byte(path))
+		scope.Write([]byte{0})
+		scope.Write([]byte(predecessor))
+		scope.Write([]byte{'\n'})
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = policyFileSHA256V1(root, path)
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase10 VPN runtime hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		lastPath = path
+	}
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "0553f52772fa72f8851a90db50d7566abafb6f375830b6f375e8082ec49255d9" {
+		return nil, fmt.Errorf("phase10 VPN runtime scope drift %s", got)
+	}
+	return pre, nil
+}
+
 func validatePolicyPhase9GuardMaintenanceOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	if err != nil {
+		return nil, err
+	}
+	var manifest struct {
+		Phase10VPNRuntimeOverlays     map[string]policyMaintenanceOverlayV1 `json:"phase10_vpn_runtime_overlays"`
+		Phase11LocalTransportOverlays map[string]policyMaintenanceOverlayV1 `json:"phase11_local_transport_overlays"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return nil, err
+	}
+	phase11Pre, err := validatePolicyPhase11LocalTransportOverlayV1(root, manifest.Phase11LocalTransportOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase10Pre, err := validatePolicyPhase10VPNRuntimeOverlayAtPostV1(root, phase11Pre, manifest.Phase10VPNRuntimeOverlays)
+	if err != nil {
+		return nil, err
+	}
+	return validatePolicyPhase9GuardMaintenanceOverlayAtPostV1(root, phase10Pre, overlays)
+}
+
+func validatePolicyPhase9GuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase9-wo909-final-guard-convergence-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name ||
 		overlay.SelfPath != policyMaintenanceManifestPathV1 ||
 		overlay.SelfPreSHA256 != "1f8149bb5ff5057e6b25dcad186c07303d57af4073f940708f257a17c9656623" ||
-		len(overlay.Paths) != 157 || len(overlay.Entries) != len(overlay.Paths) {
+		len(overlay.Paths) != 159 || len(overlay.Entries) != len(overlay.Paths) {
 		return nil, fmt.Errorf("invalid phase9 guard-maintenance overlay identity/cardinality")
 	}
-	pre := make(map[string]string, len(overlay.Paths))
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	scope := sha256.New()
 	lastPath := ""
 	for i, path := range overlay.Paths {
@@ -2310,14 +2509,18 @@ func validatePolicyPhase9GuardMaintenanceOverlayV1(root string, overlays map[str
 		scope.Write([]byte{0})
 		scope.Write([]byte(predecessor))
 		scope.Write([]byte{'\n'})
-		actual, err := policyFileSHA256V1(root, path)
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = policyFileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase9 guard-maintenance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}
 		pre[path] = predecessor
 		lastPath = path
 	}
-	if got := hex.EncodeToString(scope.Sum(nil)); got != "e0e123bcb1b6e64e7986b85b3ba8e3ce23884c9e7dba13b23f0054218756f9fb" {
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "f079c69d9c8b9f4649198ca5d948907d4ed44dc989bd5420a8e703ee37c2fb54" {
 		return nil, fmt.Errorf("phase9 guard-maintenance scope drift %s", got)
 	}
 	return pre, nil

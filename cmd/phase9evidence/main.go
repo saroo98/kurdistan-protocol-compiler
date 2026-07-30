@@ -245,7 +245,7 @@ func verifyCanonicalAndroidText(root string) error {
 		}
 		if entry.IsDir() {
 			switch entry.Name() {
-			case ".cxx", ".gradle", "build":
+			case ".cxx", ".gradle", ".idea", "build":
 				if path != androidRoot {
 					return filepath.SkipDir
 				}

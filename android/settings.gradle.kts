@@ -51,6 +51,7 @@ include(
     ":data:settings",
     ":platform:import",
     ":runtime:api",
+    ":runtime:android",
     ":feature:home",
     ":feature:profiles",
     ":feature:settings-recovery",

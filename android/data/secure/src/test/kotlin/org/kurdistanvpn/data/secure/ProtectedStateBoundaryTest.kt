@@ -406,6 +406,9 @@ private class FakeNativeCore(
     override fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray> =
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
+    override fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray> =
+        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =
         NativeResult.Success(Unit)
 

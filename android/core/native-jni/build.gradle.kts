@@ -15,9 +15,6 @@ android {
     ndkVersion = "28.2.13676358"
     defaultConfig {
         minSdk = 26
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=c++_static"
@@ -26,18 +23,29 @@ android {
     }
     buildTypes {
         debug {
-            externalNativeBuild.cmake.arguments +=
-                "-DKVPN_GO_BRIDGE_SO=${generatedGoRoot.get().asFile.resolve("debug/arm64-v8a/libkurdistan_bridge.so")}"
+            ndk {
+                abiFilters += setOf("arm64-v8a", "x86_64")
+            }
+            externalNativeBuild.cmake {
+                abiFilters += setOf("arm64-v8a", "x86_64")
+                arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("debug")}"
+            }
         }
         create("internal") {
             initWith(getByName("debug"))
             matchingFallbacks += listOf("debug")
-            externalNativeBuild.cmake.arguments +=
-                "-DKVPN_GO_BRIDGE_SO=${generatedGoRoot.get().asFile.resolve("internal/arm64-v8a/libkurdistan_bridge.so")}"
+            externalNativeBuild.cmake {
+                arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("internal")}"
+            }
         }
         release {
-            externalNativeBuild.cmake.arguments +=
-                "-DKVPN_GO_BRIDGE_SO=${generatedGoRoot.get().asFile.resolve("release/arm64-v8a/libkurdistan_bridge.so")}"
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+            externalNativeBuild.cmake {
+                abiFilters += "arm64-v8a"
+                arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("release")}"
+            }
         }
     }
     externalNativeBuild {
@@ -63,7 +71,7 @@ fun ndkHostTag(): String =
         else -> "linux-x86_64"
     }
 
-fun clangExecutable(): File {
+fun clangExecutable(target: String): File {
     val suffix = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) ".cmd" else ""
     val localProperties = rootProject.file("local.properties")
     val configuredSdk = if (localProperties.isFile) {
@@ -79,14 +87,28 @@ fun clangExecutable(): File {
     )
     return sdkDirectory
         .resolve("ndk/${android.ndkVersion}")
-        .resolve("toolchains/llvm/prebuilt/${ndkHostTag()}/bin/aarch64-linux-android26-clang$suffix")
+        .resolve("toolchains/llvm/prebuilt/${ndkHostTag()}/bin/${target}-linux-android26-clang$suffix")
 }
 
-fun registerGoBridge(buildType: String, internalTrust: Boolean) =
-    tasks.register<Exec>("build${buildType.replaceFirstChar { it.titlecase(Locale.ROOT) }}GoBridge") {
+data class AndroidGoAbi(
+    val androidAbi: String,
+    val goArch: String,
+    val clangTarget: String,
+)
+
+val androidGoAbis = listOf(
+    AndroidGoAbi("arm64-v8a", "arm64", "aarch64"),
+    AndroidGoAbi("x86_64", "amd64", "x86_64"),
+)
+
+fun registerGoBridge(buildType: String, internalTrust: Boolean, abi: AndroidGoAbi) =
+    tasks.register<Exec>(
+        "build${buildType.replaceFirstChar { it.titlecase(Locale.ROOT) }}" +
+            "${abi.androidAbi.replace("_", "").replace("-", "").replaceFirstChar { it.titlecase(Locale.ROOT) }}GoBridge",
+    ) {
         group = "build"
-        description = "Builds the bounded Go c-shared bridge for $buildType."
-        val outputDirectory = generatedGoRoot.get().asFile.resolve("$buildType/arm64-v8a")
+        description = "Builds the bounded Go c-shared bridge for $buildType/${abi.androidAbi}."
+        val outputDirectory = generatedGoRoot.get().asFile.resolve("$buildType/${abi.androidAbi}")
         check(outputDirectory.exists() || outputDirectory.mkdirs())
         val output = outputDirectory.resolve("libkurdistan_bridge.so")
         val header = outputDirectory.resolve("libkurdistan_bridge.h")
@@ -100,9 +122,9 @@ fun registerGoBridge(buildType: String, internalTrust: Boolean) =
         workingDir(repositoryRoot)
         environment(
             "GOOS" to "android",
-            "GOARCH" to "arm64",
+            "GOARCH" to abi.goArch,
             "CGO_ENABLED" to "1",
-            "CC" to clangExecutable().absolutePath,
+            "CC" to clangExecutable(abi.clangTarget).absolutePath,
         )
         val command = mutableListOf(
             "go",
@@ -120,19 +142,21 @@ fun registerGoBridge(buildType: String, internalTrust: Boolean) =
     }
 
 val bridgeTasks = mapOf(
-    "debug" to registerGoBridge("debug", internalTrust = false),
-    "internal" to registerGoBridge("internal", internalTrust = true),
-    "release" to registerGoBridge("release", internalTrust = false),
+    "debug" to androidGoAbis.map { registerGoBridge("debug", internalTrust = false, it) },
+    "internal" to androidGoAbis.map { registerGoBridge("internal", internalTrust = true, it) },
+    "release" to androidGoAbis
+        .filter { it.androidAbi == "arm64-v8a" }
+        .map { registerGoBridge("release", internalTrust = false, it) },
 )
 
 tasks.configureEach {
     val lowerName = name.lowercase(Locale.ROOT)
-    bridgeTasks.forEach { (buildType, bridgeTask) ->
+    bridgeTasks.forEach { (buildType, buildTypeBridgeTasks) ->
         if (
             lowerName.contains(buildType) &&
             (lowerName.contains("configurecmake") || lowerName.contains("buildcmake") || lowerName.contains("pre${buildType}build"))
         ) {
-            dependsOn(bridgeTask)
+            dependsOn(buildTypeBridgeTasks)
         }
     }
 }

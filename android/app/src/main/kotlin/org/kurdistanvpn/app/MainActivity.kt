@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.core.content.IntentCompat
@@ -33,6 +35,7 @@ import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.CompatibilitySummary
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
 import org.kurdistanvpn.core.model.ImportSource
+import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.Phase9Settings
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.ui.KurdistanTheme
@@ -55,6 +58,11 @@ class MainActivity : FragmentActivity() {
     private val viewModel: Phase9ViewModel by viewModels {
         Phase9ViewModel.Factory((application as KurdistanApplication).compositionRoot)
     }
+    private val vpnController by lazy { VpnRuntimeController(applicationContext) }
+
+    internal fun appStateSnapshotForTesting(): AppState = viewModel.state.value
+    internal fun diagnosticStateSnapshotForTesting(): DiagnosticWorkflowState =
+        viewModel.diagnosticState.value
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +72,30 @@ class MainActivity : FragmentActivity() {
             val diagnosticState = viewModel.diagnosticState.collectAsStateWithLifecycle().value
             val settings = viewModel.settings.collectAsStateWithLifecycle().value
             val compatibility = viewModel.compatibility.collectAsStateWithLifecycle().value
+            val vpnRuntime = vpnController.snapshot.collectAsStateWithLifecycle().value
+            val vpnPermission = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    vpnController.start()
+                } else {
+                    vpnController.permissionRejected()
+                }
+            }
+            val notificationPermission = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted ->
+                if (granted) {
+                    val permission = vpnController.prepareIntent()
+                    if (permission == null) {
+                        vpnController.start()
+                    } else {
+                        vpnPermission.launch(permission)
+                    }
+                } else {
+                    vpnController.notificationPermissionRejected()
+                }
+            }
             var pendingBackupBytes by remember { mutableStateOf<ByteArray?>(null) }
             var pendingDiagnosticBytes by remember { mutableStateOf<ByteArray?>(null) }
             var restorePassphrase by remember { mutableStateOf("") }
@@ -72,7 +104,11 @@ class MainActivity : FragmentActivity() {
                 ActivityResultContracts.CreateDocument("application/vnd.kurdistan.backup"),
             ) { uri ->
                 pendingBackupBytes?.let { bytes ->
-                    if (uri != null) writeAndWipe(uri, bytes) else bytes.fill(0)
+                    if (uri == null) {
+                        bytes.fill(0)
+                    } else if (runCatching { writeAndWipe(uri, bytes) }.isFailure) {
+                        viewModel.failBackup(OperationError.STORAGE_FAILURE)
+                    }
                 }
                 pendingBackupBytes = null
             }
@@ -80,7 +116,15 @@ class MainActivity : FragmentActivity() {
                 ActivityResultContracts.CreateDocument("application/vnd.kurdistan.diagnostic"),
             ) { uri ->
                 pendingDiagnosticBytes?.let { bytes ->
-                    if (uri != null) writeAndWipe(uri, bytes) else bytes.fill(0)
+                    when {
+                        uri == null -> {
+                            bytes.fill(0)
+                            viewModel.diagnosticExportCancelled()
+                        }
+                        runCatching { writeAndWipe(uri, bytes) }.isFailure ->
+                            viewModel.diagnosticExportFailed(OperationError.STORAGE_FAILURE)
+                        else -> viewModel.diagnosticExportCompleted()
+                    }
                 }
                 pendingDiagnosticBytes = null
             }
@@ -91,7 +135,10 @@ class MainActivity : FragmentActivity() {
                 restorePassphrase = ""
                 if (uri == null) return@rememberLauncherForActivityResult
                 val bytes = runCatching { readBounded(uri, MAX_BACKUP_BYTES) }.getOrNull()
-                    ?: return@rememberLauncherForActivityResult
+                    ?: run {
+                        viewModel.failBackup(OperationError.INVALID_INPUT)
+                        return@rememberLauncherForActivityResult
+                    }
                 viewModel.openBackup(bytes, passphrase)
             }
             val darkTheme = when (settings.theme) {
@@ -110,6 +157,7 @@ class MainActivity : FragmentActivity() {
                     diagnosticState = diagnosticState,
                     settings = settings,
                     compatibility = compatibility,
+                    vpnRuntime = vpnRuntime,
                     onPreviewFile = ::previewFile,
                     onPreviewClipboard = ::previewClipboard,
                     onPreviewQr = viewModel::preview,
@@ -168,6 +216,27 @@ class MainActivity : FragmentActivity() {
                         }
                     },
                     onCancelDiagnostic = viewModel::cancelDiagnostic,
+                    onStartVpn = {
+                        if (
+                            Build.VERSION.SDK_INT >= 33 &&
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermission.launch(
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            )
+                        } else {
+                            val permission = vpnController.prepareIntent()
+                            if (permission == null) {
+                                vpnController.start()
+                            } else {
+                                vpnPermission.launch(permission)
+                            }
+                        }
+                    },
+                    onStopVpn = vpnController::stop,
                 )
             }
         }
@@ -180,6 +249,11 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleExternalIntent(intent)
+    }
+
+    override fun onDestroy() {
+        vpnController.close()
+        super.onDestroy()
     }
 
     private fun previewFile(
@@ -200,25 +274,41 @@ class MainActivity : FragmentActivity() {
                     ArtifactClass.SIGNED_PUBLIC,
                 )
             }
-        }.getOrNull() ?: return
+        }.getOrNull() ?: run {
+            viewModel.rejectImport()
+            return
+        }
         viewModel.preview(candidate, source)
     }
 
     private fun previewClipboard() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = clipboard.primaryClip ?: return
+        val clip = clipboard.primaryClip ?: run {
+            viewModel.rejectImport()
+            return
+        }
         val candidate = runCatching {
             AndroidImportSources.clipboard(clip, ArtifactClass.SIGNED_PUBLIC)
-        }.getOrNull() ?: return
+        }.getOrNull() ?: run {
+            viewModel.rejectImport()
+            return
+        }
         viewModel.preview(candidate, ImportSource.CLIPBOARD)
     }
 
     private fun handleExternalIntent(value: Intent) {
         when (value.action) {
-            Intent.ACTION_VIEW -> value.dataString?.let { link ->
+            Intent.ACTION_VIEW -> {
+                val link = value.dataString ?: run {
+                    viewModel.rejectImport()
+                    return
+                }
                 val candidate = runCatching {
                     AndroidImportSources.uri(link, ArtifactClass.SIGNED_PUBLIC)
-                }.getOrNull() ?: return
+                }.getOrNull() ?: run {
+                    viewModel.rejectImport()
+                    return
+                }
                 viewModel.preview(candidate, ImportSource.KURD_URI)
             }
             Intent.ACTION_SEND -> {
@@ -226,7 +316,10 @@ class MainActivity : FragmentActivity() {
                     value,
                     Intent.EXTRA_STREAM,
                     Uri::class.java,
-                ) ?: return
+                ) ?: run {
+                    viewModel.rejectImport()
+                    return
+                }
                 previewFile(uri, ImportSource.SHARE_INTENT)
             }
         }
@@ -269,6 +362,7 @@ private fun KurdistanApp(
     diagnosticState: DiagnosticWorkflowState,
     settings: Phase9Settings,
     compatibility: CompatibilitySummary?,
+    vpnRuntime: org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot,
     onPreviewFile: (Uri) -> Unit,
     onPreviewClipboard: () -> Unit,
     onPreviewQr: (ImportCandidate, ImportSource) -> Unit,
@@ -288,8 +382,16 @@ private fun KurdistanApp(
     onPrepareDiagnostic: () -> Unit,
     onConfirmDiagnostic: () -> Unit,
     onCancelDiagnostic: () -> Unit,
+    onStartVpn: () -> Unit,
+    onStopVpn: () -> Unit,
 ) {
     val backStack = remember { mutableStateListOf<NavKey>(AppDestination.HOME) }
+    val currentState by rememberUpdatedState(state)
+    val currentBackupState by rememberUpdatedState(backupState)
+    val currentDiagnosticState by rememberUpdatedState(diagnosticState)
+    val currentSettings by rememberUpdatedState(settings)
+    val currentCompatibility by rememberUpdatedState(compatibility)
+    val currentVpnRuntime by rememberUpdatedState(vpnRuntime)
     val documentPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -352,7 +454,10 @@ private fun KurdistanApp(
             when (key) {
                 AppDestination.HOME -> NavEntry(key) {
                     HomeScreen(
-                        state = state,
+                        state = currentState,
+                        vpnRuntime = currentVpnRuntime,
+                        onStartVpn = onStartVpn,
+                        onStopVpn = onStopVpn,
                         onOpenProfiles = { backStack.add(AppDestination.PROFILES) },
                         onOpenSettings = { backStack.add(AppDestination.SETTINGS_RECOVERY) },
                         onOpenDiagnostics = { backStack.add(AppDestination.DIAGNOSTICS_ABOUT) },
@@ -361,7 +466,7 @@ private fun KurdistanApp(
                 }
                 AppDestination.PROFILES -> NavEntry(key) {
                     ProfilesScreen(
-                        profiles = (state as? AppState.Ready)?.profiles.orEmpty(),
+                        profiles = (currentState as? AppState.Ready)?.profiles.orEmpty(),
                         onImportFile = {
                             documentPicker.launch(
                                 arrayOf(
@@ -396,8 +501,8 @@ private fun KurdistanApp(
                 }
                 AppDestination.SETTINGS_RECOVERY -> NavEntry(key) {
                     SettingsRecoveryScreen(
-                        backupState = backupState,
-                        settings = settings,
+                        backupState = currentBackupState,
+                        settings = currentSettings,
                         onTheme = onTheme,
                         onHighContrast = onHighContrast,
                         onReducedMotion = onReducedMotion,
@@ -411,9 +516,9 @@ private fun KurdistanApp(
                 }
                 AppDestination.DIAGNOSTICS_ABOUT -> NavEntry(key) {
                     DiagnosticsAboutScreen(
-                        state = diagnosticState,
+                        state = currentDiagnosticState,
                         appVersion = BuildConfig.VERSION_NAME,
-                        compatibility = compatibility,
+                        compatibility = currentCompatibility,
                         onPrepare = onPrepareDiagnostic,
                         onConfirm = onConfirmDiagnostic,
                         onCancel = onCancelDiagnostic,
