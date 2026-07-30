@@ -1847,7 +1847,7 @@ func validatePhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[str
 	if len(overlays) != 1 || !ok || overlay.Version != name ||
 		overlay.SelfPath != committedEvidenceManifestPathV1 ||
 		overlay.SelfPreSHA256 != "45559ed3772b777924c8ef5e2a24980b8ddfccab89e67613ff379f5b48824d76" ||
-		len(overlay.Paths) != 70 || len(overlay.Entries) != len(overlay.Paths) {
+		len(overlay.Paths) != 56 || len(overlay.Entries) != len(overlay.Paths) {
 		return nil, fmt.Errorf("invalid phase10 VPN runtime overlay identity/cardinality")
 	}
 	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
@@ -1885,7 +1885,7 @@ func validatePhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[str
 		pre[path] = predecessor
 		lastPath = path
 	}
-	if got := hex.EncodeToString(scope.Sum(nil)); got != "0553f52772fa72f8851a90db50d7566abafb6f375830b6f375e8082ec49255d9" {
+	if got := hex.EncodeToString(scope.Sum(nil)); got != "beab1c7016ca1eb01da57ccd4e0b46fb5d0ae07cfa98cfc084caebd001023f28" {
 		return nil, fmt.Errorf("phase10 VPN runtime scope drift %s", got)
 	}
 	return pre, nil
