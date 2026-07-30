@@ -900,7 +900,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatalf("invalid Phase 9 guard fixture overlay identity/cardinality: %+v", phase9Overlay)
 	}
 	phase10Overlay, ok := ledger.Phase10VPNRuntimeOverlays["phase10-local-vpn-runtime-v1"]
-	if !ok || len(ledger.Phase10VPNRuntimeOverlays) != 1 || len(phase10Overlay.Paths) != 70 || len(phase10Overlay.Entries) != 70 {
+	if !ok || len(ledger.Phase10VPNRuntimeOverlays) != 1 || len(phase10Overlay.Paths) != 56 || len(phase10Overlay.Entries) != 56 {
 		t.Fatalf("invalid Phase 10 VPN runtime fixture overlay identity/cardinality: %+v", phase10Overlay)
 	}
 	phase11Overlay, ok := ledger.Phase11LocalTransportOverlays["phase11-local-transport-v1"]
