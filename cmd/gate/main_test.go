@@ -7,7 +7,7 @@ import "testing"
 
 func TestGateStepsRemainCacheProof(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
-	if len(steps) != 4 {
+	if len(steps) != 5 {
 		t.Fatalf("got %d Go gate steps", len(steps))
 	}
 	if got := steps[2].args; len(got) < 2 || got[0] != "test" || got[1] != "-count=1" {
@@ -17,6 +17,9 @@ func TestGateStepsRemainCacheProof(t *testing.T) {
 		if value.program != "go" {
 			t.Fatalf("unexpected Go gate program %q", value.program)
 		}
+	}
+	if got := steps[4].args; len(got) != 3 || got[0] != "run" || got[1] != "./cmd/koperator" || got[2] != "verify" {
+		t.Fatalf("Phase 12 control-plane gate missing: %v", got)
 	}
 }
 

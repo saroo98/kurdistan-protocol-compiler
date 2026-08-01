@@ -40,7 +40,9 @@ func ApplyVerified(current VerifiedState, decision VerifiedDecision) (VerifiedSt
 		return original, errors.New("lifecycle: conflicting equal-generation authenticated content")
 	}
 	if decision.Action == Admit && current.Status == Admitted && decision.Generation > current.Generation {
-		if decision.ProfileID != current.ProfileID || decision.Scope != current.Scope || decision.EvidenceReference == "" {
+		if decision.ProfileID != current.ProfileID || decision.Scope != current.Scope ||
+			decision.Receipt.LineageID != current.Receipt.LineageID ||
+			decision.EvidenceReference == "" {
 			return original, errors.New("lifecycle: verified replacement binding mismatch")
 		}
 		return VerifiedState{State: State{Status: Admitted, ProfileID: decision.ProfileID, Scope: decision.Scope, EvidenceReference: decision.EvidenceReference, Generation: decision.Generation}, Receipt: decision.Receipt}, nil

@@ -43,6 +43,7 @@ const (
 	OperationDelegateIssuer      AuthorityOperation = "delegate-issuer"
 	OperationDelegateProvider    AuthorityOperation = "delegate-provider"
 	OperationDelegateRegistrar   AuthorityOperation = "delegate-recipient-registrar"
+	OperationDelegateEmergency   AuthorityOperation = "delegate-emergency"
 	OperationIssueProfile        AuthorityOperation = "issue-profile"
 	OperationAuthenticateProfile AuthorityOperation = "authenticate-profile"
 	OperationAuthorizeGroup      AuthorityOperation = "authorize-provider-group"
@@ -67,7 +68,7 @@ func AuthorizeRoleOperation(role AuthorityRole, operation AuthorityOperation) er
 	allowed := false
 	switch role {
 	case RoleRoot:
-		allowed = operation == OperationUpdateRoot || operation == OperationDelegateIssuer || operation == OperationDelegateProvider || operation == OperationDelegateRegistrar
+		allowed = operation == OperationUpdateRoot || operation == OperationDelegateIssuer || operation == OperationDelegateProvider || operation == OperationDelegateRegistrar || operation == OperationDelegateEmergency
 	case RoleIssuer:
 		allowed = operation == OperationIssueProfile || operation == OperationAuthenticateProfile
 	case RoleProvider:
@@ -606,11 +607,8 @@ type EmergencyAction struct {
 // ValidateEmergencyAction permits only expiring deny/narrow actions, exact
 // monotonic advancement, and scope reduction.
 func ValidateEmergencyAction(authority EmergencyAuthorityArtifact, currentEpoch uint64, action EmergencyAction, now int64) error {
-	if err := authority.Key.validate(); err != nil || authority.AuthorizationEpoch == 0 || authority.Revoked || now < authority.ValidFrom || now >= authority.ValidUntil || authority.ValidUntil <= authority.ValidFrom {
-		return fmt.Errorf("%w: authority is expired, revoked, or malformed", ErrEmergencyAuthority)
-	}
-	if err := authority.Scope.validate(); err != nil {
-		return fmt.Errorf("%w: %v", ErrEmergencyAuthority, err)
+	if err := validateEmergencyAuthority(authority, now); err != nil {
+		return err
 	}
 	if action.Kind != EmergencyDeny && action.Kind != EmergencyNarrow {
 		return fmt.Errorf("%w: operation is not deny-only", ErrEmergencyAuthority)
@@ -626,6 +624,16 @@ func ValidateEmergencyAction(authority EmergencyAuthorityArtifact, currentEpoch 
 	}
 	if action.Kind == EmergencyNarrow && action.Scope == authority.Scope {
 		return fmt.Errorf("%w: narrow action did not reduce scope", ErrEmergencyAuthority)
+	}
+	return nil
+}
+
+func validateEmergencyAuthority(authority EmergencyAuthorityArtifact, now int64) error {
+	if err := authority.Key.validate(); err != nil || authority.AuthorizationEpoch == 0 || authority.Revoked || now < authority.ValidFrom || now >= authority.ValidUntil || authority.ValidUntil <= authority.ValidFrom {
+		return fmt.Errorf("%w: authority is expired, revoked, or malformed", ErrEmergencyAuthority)
+	}
+	if err := authority.Scope.validate(); err != nil {
+		return fmt.Errorf("%w: %v", ErrEmergencyAuthority, err)
 	}
 	return nil
 }

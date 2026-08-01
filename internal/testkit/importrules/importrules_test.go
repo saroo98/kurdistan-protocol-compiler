@@ -20,6 +20,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -394,6 +395,15 @@ var forbiddenImportPrefixes = []string{
 	modulePath + "/internal/product/",
 }
 
+func hasForbiddenImportPrefixV1(importPath string) bool {
+	for _, prefix := range forbiddenImportPrefixes {
+		if importPath == strings.TrimSuffix(prefix, "/") || strings.HasPrefix(importPath, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRuntimeLabExecutorAllowlistV1(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	allowed := map[string]bool{"internal/runtime/lab_executor.go": true, "internal/runtime/lab_executor_test.go": true, "internal/runtime/lifecycle_test.go": true, "internal/runtime/policy_enforcement_test.go": true, "internal/testkit/importrules/importrules_test.go": true, "internal/lab/runtimeadversary/runner.go": true}
@@ -741,7 +751,7 @@ func TestM3ProfileLifecycleBoundaryV1(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]map[string]bool{
 		"internal/product/envelope":  {"bytes": true, "encoding/base64": true, "encoding/binary": true, "errors": true, "fmt": true, "github.com/fxamacker/cbor/v2": true, "math/big": true, "net/url": true, "sort": true, "strconv": true, "strings": true, "time": true},
-		"internal/product/profile":   {"bytes": true, "crypto/sha256": true, "encoding/hex": true, "errors": true, "fmt": true, "github.com/fxamacker/cbor/v2": true, "reflect": true, "sort": true, "strings": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true},
+		"internal/product/profile":   {"bytes": true, "crypto/sha256": true, "encoding/hex": true, "errors": true, "fmt": true, "github.com/fxamacker/cbor/v2": true, "reflect": true, "slices": true, "sort": true, "strings": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true},
 		"internal/product/lifecycle": {"errors": true, "strings": true},
 	}
 	allowedTests := map[string]map[string]bool{
@@ -1179,6 +1189,7 @@ type committedEvidenceManifestV1 struct {
 	Phase9GuardMaintenanceOverlays      map[string]committedMaintenanceOverlayV1 `json:"phase9_guard_maintenance_overlays"`
 	Phase10VPNRuntimeOverlays           map[string]committedMaintenanceOverlayV1 `json:"phase10_vpn_runtime_overlays"`
 	Phase11LocalTransportOverlays       map[string]committedMaintenanceOverlayV1 `json:"phase11_local_transport_overlays"`
+	Phase12OperatorControlPlaneOverlays map[string]committedMaintenanceOverlayV1 `json:"phase12_operator_control_plane_overlays"`
 }
 
 type committedMaintenanceOverlayV1 struct {
@@ -1317,7 +1328,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateCommittedEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	phase11Pre, err := validatePhase11LocalTransportOverlayV1(root, manifest.Phase11LocalTransportOverlays)
+	phase12Pre, err := validatePhase12OperatorControlPlaneOverlayV1(root, manifest.Phase12OperatorControlPlaneOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase11Pre, err := validatePhase11LocalTransportOverlayAtPostV1(root, phase12Pre, manifest.Phase11LocalTransportOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -1799,7 +1814,118 @@ func validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root string, currentAtPo
 	return pre, nil
 }
 
+func validatePhase12OperatorControlPlaneOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase12-operator-control-plane-v1"
+	paths := []string{
+		"ROADMAP.md",
+		"cmd/gate/main.go",
+		"cmd/gate/main_test.go",
+		"cmd/kgen/main_test.go",
+		"cmd/koperator/evidence_test.go",
+		"cmd/koperator/main.go",
+		"cmd/koperator/main_test.go",
+		"cmd/phase9verify/phase11_overlay_test.go",
+		"docs/KIP-0087-phase12-operator-provisioning-relay-fleet.md",
+		"docs/PHASE12_EVIDENCE_INDEX.md",
+		"docs/safety.md",
+		"internal/audit/codegen_test.go",
+		"internal/audit/security.go",
+		"internal/audit/security_test.go",
+		"internal/codegen/authorization_v1_test.go",
+		"internal/operator/controlplane/authority_state.go",
+		"internal/operator/controlplane/controlplane_test.go",
+		"internal/operator/controlplane/errors.go",
+		"internal/operator/controlplane/journal.go",
+		"internal/operator/controlplane/model.go",
+		"internal/operator/controlplane/phase_boundaries.go",
+		"internal/operator/controlplane/phase_boundaries_test.go",
+		"internal/operator/controlplane/reconcile.go",
+		"internal/operator/controlplane/reconcile_test.go",
+		"internal/operator/controlplane/service.go",
+		"internal/operator/controlplane/state.go",
+		"internal/product/lifecycle/phase8_verified.go",
+		"internal/product/lifecycle/phase8_verified_test.go",
+		"internal/product/profile/phase8_activation.go",
+		"internal/product/profile/phase8_admission.go",
+		"internal/product/profile/phase8_admission_test.go",
+		"internal/product/profile/phase8_emergency_signed.go",
+		"internal/product/profile/phase8_emergency_signed_test.go",
+		"internal/product/profile/phase8_providers.go",
+		"internal/product/profile/phase8_revocation_admission.go",
+		"internal/product/profile/testdata/phase8-activation/activation-crash-report.json",
+		"internal/product/profile/testdata/phase8-activation/authenticated-hint-mismatch-report.json",
+		"internal/product/profile/testdata/phase8-activation/last-known-good-negative-report.json",
+		"internal/product/profile/testdata/phase8-activation/policy-bypass-report.json",
+		"internal/product/profile/testdata/phase8-activation/revocation-generation-report.json",
+		"internal/product/profile/testdata/phase8-activation/verify-before-semantics-report.json",
+		"internal/runtime/policy_enforcement_test.go",
+		"internal/testkit/importrules/importrules_test.go",
+		"testdata/evidence/phase12/acceptance-status.json",
+		"testdata/evidence/phase8-wo807-recovery-report.json",
+	}
+	preHashes := map[string]string{
+		"ROADMAP.md":                                         "586a5e7f377c1809eb67cfe932d996ae81703bb562f52b539935e26ccdc93e8b",
+		"cmd/gate/main.go":                                   "8f0e4e86384ea012ac54f1c9f795c3a4f760b5ab6c7f4b24f3ab553cad3c96c1",
+		"cmd/gate/main_test.go":                              "c2b868ec7b155ed5ae95f667181284af9672722ceea8b3c018f4dd32df2d4fdd",
+		"cmd/kgen/main_test.go":                              "2fabad2630c546749cde3c0c67dd9885ffa855230c298dacb741c65ef497c846",
+		"cmd/phase9verify/phase11_overlay_test.go":           "95c7e090b93beab82e673513735e6725e1f636f10244a6b37b504adc91cb3a67",
+		"docs/safety.md":                                     "2846c0453c9a20d8fee0a355d339ba70f658d3f064e2dcd6ddef693d7bbb50b0",
+		"internal/audit/codegen_test.go":                     "c1896696926104de33e540f207c4cc3e7f477edfddc006cfc9f279dd34e5df94",
+		"internal/audit/security.go":                         "a180d1b42b37ac390a1bdf718a4c8172cafc8f14b8afd9c46c24831fe461cbe9",
+		"internal/audit/security_test.go":                    "b4674dd844d0f006fe83ced7fbd6855a309e1bbd76ac1cd2fb6c8a73711a5519",
+		"internal/codegen/authorization_v1_test.go":          "e2d8caf8757c35bc9e1aea7ba6c5a129d328f507d9aa54889223b83e536e4c51",
+		"internal/product/lifecycle/phase8_verified.go":      "e9fd50ec54dca326be6580815153a3983555f1b31ea028e4a3c052257e7e17c6",
+		"internal/product/lifecycle/phase8_verified_test.go": "7e3aad03d9af6dcec588c37225c4791cce3d38c7d0b3dfb7c69218b3ae5e5769",
+		"internal/product/profile/phase8_activation.go":      "3de078f241b4bd4da039891cf19db34f30eae083363cd23ea21b393d88a3a080",
+		"internal/product/profile/phase8_providers.go":       "9bf824c879fc0186de623f4c6a589a0ef2dce0cefb33b6168397363cd0a5f33c",
+		"internal/product/profile/testdata/phase8-activation/activation-crash-report.json":            "4e710e1683d0e68274d1403443c342dacbbb1e67033ced503bc0d389165609f0",
+		"internal/product/profile/testdata/phase8-activation/authenticated-hint-mismatch-report.json": "20b5867ab1fd0ff1aff509702021c2ccc0d529f5cd4434ad48cf74864d8b185b",
+		"internal/product/profile/testdata/phase8-activation/last-known-good-negative-report.json":    "4e710e1683d0e68274d1403443c342dacbbb1e67033ced503bc0d389165609f0",
+		"internal/product/profile/testdata/phase8-activation/policy-bypass-report.json":               "d4987c0461d703870dcfc2a53d107537fc529cacfff0cb7ceef55343cb3722fa",
+		"internal/product/profile/testdata/phase8-activation/revocation-generation-report.json":       "6f2c3e15819d1fd18954aa242f5283e89fa1cc6a3c3964ea9ed864ee7553f364",
+		"internal/product/profile/testdata/phase8-activation/verify-before-semantics-report.json":     "2fe3a7161549f9366a7d03e3724e9ec2d341659dec8af9e74e31778a908da2f0",
+		"internal/runtime/policy_enforcement_test.go":                                                 "24ee3246889bf9393bece92e0016b464c3bd252ab4cf4a10038a69c069a2af20",
+		"internal/testkit/importrules/importrules_test.go":                                            "f9f719b207174e13a2a1577c8fb450412fe0c2135b301c49311311fe84863221",
+		"testdata/evidence/phase8-wo807-recovery-report.json":                                         "9ab249ec04fc5c012c5ed052e6bc927bcf1ed058760e26b2bbf48c0948a81c66",
+	}
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != committedEvidenceManifestPathV1 ||
+		overlay.SelfPreSHA256 != "050dd24b449122dfd58a79df263c61a1e9cb8c83f4b038df82e7629e49d6dfc2" ||
+		len(overlay.Paths) != len(paths) || len(overlay.Entries) != len(paths) {
+		return nil, fmt.Errorf("invalid phase12 operator control-plane overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(paths))
+	for i, path := range paths {
+		entry := overlay.Entries[i]
+		if overlay.Paths[i] != path || entry.Path != path || !validCommittedSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase12 operator control-plane entry %d", i)
+		}
+		predecessor, existed := preHashes[path]
+		if existed {
+			if entry.PreEvidence != "" || entry.PreSHA256 != predecessor || entry.PostSHA256 == entry.PreSHA256 {
+				return nil, fmt.Errorf("invalid phase12 operator control-plane predecessor %d", i)
+			}
+		} else {
+			if entry.PreEvidence != "ABSENT" || entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase12 operator control-plane absent predecessor %d", i)
+			}
+			predecessor = "ABSENT"
+		}
+		actual, err := committedFileSHA256V1(root, path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase12 operator control-plane hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+	}
+	return pre, nil
+}
+
 func validatePhase11LocalTransportOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePhase11LocalTransportOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePhase11LocalTransportOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase11-local-transport-v1"
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name ||
@@ -1809,7 +1935,10 @@ func validatePhase11LocalTransportOverlayV1(root string, overlays map[string]com
 		len(overlay.Entries) != len(overlay.Paths) {
 		return nil, fmt.Errorf("invalid phase11 local transport overlay identity/cardinality")
 	}
-	pre := make(map[string]string, len(overlay.Paths))
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	lastPath := ""
 	for i, path := range overlay.Paths {
 		entry := overlay.Entries[i]
@@ -1827,7 +1956,11 @@ func validatePhase11LocalTransportOverlayV1(root string, overlays map[string]com
 		} else if entry.PreEvidence != "" || !validCommittedSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
 			return nil, fmt.Errorf("invalid phase11 existing predecessor %d", i)
 		}
-		actual, err := committedFileSHA256V1(root, path)
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = committedFileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase11 local transport hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}
@@ -2421,6 +2554,330 @@ func hasPrefixAny(s string, prefixes []string) bool {
 	return false
 }
 
+var phase12BoundaryImportAllowlistV1 = map[string]map[string]bool{
+	"internal/operator/controlplane/authority_state.go": {
+		modulePath + "/internal/product/profile": true,
+	},
+	"internal/operator/controlplane/controlplane_test.go": {
+		modulePath + "/internal/product/profile": true,
+	},
+	"internal/operator/controlplane/model.go": {
+		modulePath + "/internal/product/profile": true,
+	},
+	"internal/operator/controlplane/phase_boundaries.go": {
+		modulePath + "/internal/product/profile":     true,
+		modulePath + "/internal/product/sessionplan": true,
+	},
+	"internal/operator/controlplane/phase_boundaries_test.go": {
+		modulePath + "/internal/contracts/carrier/carrierreview": true,
+		modulePath + "/internal/product/envelope":                true,
+		modulePath + "/internal/product/lifecycle":               true,
+		modulePath + "/internal/product/profile":                 true,
+		modulePath + "/internal/product/relaydescriptor":         true,
+		modulePath + "/internal/product/sessionplan":             true,
+		modulePath + "/internal/product/strategy":                true,
+	},
+	"internal/operator/controlplane/reconcile_test.go": {
+		modulePath + "/internal/product/profile": true,
+	},
+	"internal/operator/controlplane/service.go": {
+		modulePath + "/internal/product/profile": true,
+	},
+	"internal/operator/controlplane/state.go": {
+		modulePath + "/internal/product/envelope": true,
+	},
+	"cmd/koperator/main.go": {
+		modulePath + "/internal/contracts/carrier/carrierreview": true,
+		modulePath + "/internal/operator/controlplane":           true,
+		modulePath + "/internal/product/envelope":                true,
+		modulePath + "/internal/product/lifecycle":               true,
+		modulePath + "/internal/product/profile":                 true,
+		modulePath + "/internal/product/relaydescriptor":         true,
+		modulePath + "/internal/product/sessionplan":             true,
+		modulePath + "/internal/product/strategy":                true,
+	},
+	"cmd/koperator/main_test.go": {
+		modulePath + "/internal/operator/controlplane": true,
+	},
+}
+
+func phase12BoundaryImportAllowedV1(file, importPath string) bool {
+	return phase12BoundaryImportAllowlistV1[file][importPath]
+}
+
+func TestPhase12BoundaryImportExceptionsV1(t *testing.T) {
+	allowed := map[string][]string{
+		"internal/operator/controlplane/authority_state.go": {
+			modulePath + "/internal/product/profile",
+		},
+		"internal/operator/controlplane/controlplane_test.go": {
+			modulePath + "/internal/product/profile",
+		},
+		"internal/operator/controlplane/model.go": {
+			modulePath + "/internal/product/profile",
+		},
+		"internal/operator/controlplane/phase_boundaries.go": {
+			modulePath + "/internal/product/profile",
+			modulePath + "/internal/product/sessionplan",
+		},
+		"internal/operator/controlplane/phase_boundaries_test.go": {
+			modulePath + "/internal/contracts/carrier/carrierreview",
+			modulePath + "/internal/product/envelope",
+			modulePath + "/internal/product/lifecycle",
+			modulePath + "/internal/product/profile",
+			modulePath + "/internal/product/relaydescriptor",
+			modulePath + "/internal/product/sessionplan",
+			modulePath + "/internal/product/strategy",
+		},
+		"internal/operator/controlplane/reconcile_test.go": {
+			modulePath + "/internal/product/profile",
+		},
+		"internal/operator/controlplane/service.go": {
+			modulePath + "/internal/product/profile",
+		},
+		"internal/operator/controlplane/state.go": {
+			modulePath + "/internal/product/envelope",
+		},
+		"cmd/koperator/main.go": {
+			modulePath + "/internal/contracts/carrier/carrierreview",
+			modulePath + "/internal/operator/controlplane",
+			modulePath + "/internal/product/envelope",
+			modulePath + "/internal/product/lifecycle",
+			modulePath + "/internal/product/profile",
+			modulePath + "/internal/product/relaydescriptor",
+			modulePath + "/internal/product/sessionplan",
+			modulePath + "/internal/product/strategy",
+		},
+		"cmd/koperator/main_test.go": {
+			modulePath + "/internal/operator/controlplane",
+		},
+	}
+	wantCount := 0
+	for file, imports := range allowed {
+		wantCount += len(imports)
+		for _, importPath := range imports {
+			if !phase12BoundaryImportAllowedV1(file, importPath) {
+				t.Fatalf("Phase 12 boundary rejected intended import %s -> %s", file, importPath)
+			}
+		}
+	}
+	gotCount := 0
+	for _, imports := range phase12BoundaryImportAllowlistV1 {
+		gotCount += len(imports)
+	}
+	if gotCount != wantCount {
+		t.Fatalf("Phase 12 boundary allowlist cardinality=%d want %d", gotCount, wantCount)
+	}
+	for name, mutant := range map[string]struct {
+		file       string
+		importPath string
+	}{
+		"extra operator file": {
+			file:       "internal/operator/controlplane/journal.go",
+			importPath: modulePath + "/internal/product/profile",
+		},
+		"operator dependency expansion": {
+			file:       "internal/operator/controlplane/service.go",
+			importPath: modulePath + "/internal/product/sessionplan",
+		},
+		"command dependency expansion": {
+			file:       "cmd/koperator/main.go",
+			importPath: modulePath + "/internal/product/diagnosticexport",
+		},
+		"sibling command": {
+			file:       "cmd/koperator-helper/main.go",
+			importPath: modulePath + "/internal/operator/controlplane",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if phase12BoundaryImportAllowedV1(mutant.file, mutant.importPath) {
+				t.Fatalf("Phase 12 boundary accepted mutant %s -> %s", mutant.file, mutant.importPath)
+			}
+		})
+	}
+}
+
+func TestPhase12ReviewedImportEdgeMutationsV1(t *testing.T) {
+	clone := func() map[string]map[string]bool {
+		result := make(map[string]map[string]bool, len(phase12BoundaryImportAllowlistV1))
+		for file, imports := range phase12BoundaryImportAllowlistV1 {
+			result[file] = make(map[string]bool, len(imports))
+			for importPath, allowed := range imports {
+				result[file][importPath] = allowed
+			}
+		}
+		return result
+	}
+	validate := func(candidate map[string]map[string]bool) error {
+		if len(candidate) != len(phase12BoundaryImportAllowlistV1) {
+			return fmt.Errorf("file cardinality mismatch")
+		}
+		for file, expectedImports := range phase12BoundaryImportAllowlistV1 {
+			actualImports, ok := candidate[file]
+			if !ok || len(actualImports) != len(expectedImports) {
+				return fmt.Errorf("edge cardinality mismatch for %s", file)
+			}
+			for importPath := range expectedImports {
+				if !actualImports[importPath] {
+					return fmt.Errorf("missing reviewed edge %s -> %s", file, importPath)
+				}
+			}
+		}
+		return nil
+	}
+	mutations := map[string]func(map[string]map[string]bool){
+		"delete-authority-edge": func(candidate map[string]map[string]bool) {
+			delete(candidate["internal/operator/controlplane/authority_state.go"], modulePath+"/internal/product/profile")
+		},
+		"substitute-authority-edge": func(candidate map[string]map[string]bool) {
+			imports := candidate["internal/operator/controlplane/authority_state.go"]
+			delete(imports, modulePath+"/internal/product/profile")
+			imports[modulePath+"/internal/product/sessionplan"] = true
+		},
+		"add-authority-edge": func(candidate map[string]map[string]bool) {
+			candidate["internal/operator/controlplane/authority_state.go"][modulePath+"/internal/product/sessionplan"] = true
+		},
+		"delete-state-edge": func(candidate map[string]map[string]bool) {
+			delete(candidate["internal/operator/controlplane/state.go"], modulePath+"/internal/product/envelope")
+		},
+		"substitute-state-edge": func(candidate map[string]map[string]bool) {
+			imports := candidate["internal/operator/controlplane/state.go"]
+			delete(imports, modulePath+"/internal/product/envelope")
+			imports[modulePath+"/internal/product/profile"] = true
+		},
+		"add-state-edge": func(candidate map[string]map[string]bool) {
+			candidate["internal/operator/controlplane/state.go"][modulePath+"/internal/product/profile"] = true
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			candidate := clone()
+			mutate(candidate)
+			if err := validate(candidate); err == nil {
+				t.Fatal("reviewed Phase 12 import edge mutation accepted")
+			}
+		})
+	}
+}
+
+func TestPhase12OperatorControlPlaneOverlayMutationsV1(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest committedEvidenceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	clone := func() map[string]committedMaintenanceOverlayV1 {
+		encoded, err := json.Marshal(manifest.Phase12OperatorControlPlaneOverlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var overlays map[string]committedMaintenanceOverlayV1
+		if err := json.Unmarshal(encoded, &overlays); err != nil {
+			t.Fatal(err)
+		}
+		return overlays
+	}
+	if _, err := validatePhase12OperatorControlPlaneOverlayV1(root, clone()); err != nil {
+		t.Fatal(err)
+	}
+	const name = "phase12-operator-control-plane-v1"
+	mutations := map[string]func(map[string]committedMaintenanceOverlayV1){
+		"missing-overlay": func(overlays map[string]committedMaintenanceOverlayV1) {
+			delete(overlays, name)
+		},
+		"extra-overlay": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlays["extra"] = overlays[name]
+		},
+		"missing-entry": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Entries = overlay.Entries[:len(overlay.Entries)-1]
+			overlays[name] = overlay
+		},
+		"extra-entry": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Paths = append(overlay.Paths, "zz-phase12-extra")
+			overlay.Entries = append(overlay.Entries, committedMaintenanceEntryV1{
+				Path: "zz-phase12-extra", PreEvidence: "ABSENT",
+				PostSHA256: strings.Repeat("1", 64),
+			})
+			overlays[name] = overlay
+		},
+		"reordered-entry": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Entries[0], overlay.Entries[1] = overlay.Entries[1], overlay.Entries[0]
+			overlays[name] = overlay
+		},
+		"substituted-entry": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Entries[0].Path = "README.md"
+			overlays[name] = overlay
+		},
+		"substituted-scope-with-self-authorized-absence": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			index := 4
+			overlay.Paths[index] = "zz-phase12-self-authorized"
+			overlay.Entries[index] = committedMaintenanceEntryV1{
+				Path:        "zz-phase12-self-authorized",
+				PreEvidence: "ABSENT",
+				PostSHA256:  strings.Repeat("3", 64),
+			}
+			overlays[name] = overlay
+		},
+		"existing-path-self-authorized-as-absent": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Entries[0].PreSHA256 = ""
+			overlay.Entries[0].PreEvidence = "ABSENT"
+			overlays[name] = overlay
+		},
+		"delete-authority-state-path": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			index := 15
+			overlay.Paths = append(overlay.Paths[:index], overlay.Paths[index+1:]...)
+			overlay.Entries = append(overlay.Entries[:index], overlay.Entries[index+1:]...)
+			overlays[name] = overlay
+		},
+		"substitute-authority-state-path": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			index := 15
+			overlay.Paths[index] = "internal/operator/controlplane/authority_substitute.go"
+			overlay.Entries[index] = committedMaintenanceEntryV1{
+				Path:        "internal/operator/controlplane/authority_substitute.go",
+				PreEvidence: "ABSENT",
+				PostSHA256:  strings.Repeat("4", 64),
+			}
+			overlays[name] = overlay
+		},
+		"add-authority-state-sibling": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Paths = append(overlay.Paths, "zz-authority-state-sibling.go")
+			overlay.Entries = append(overlay.Entries, committedMaintenanceEntryV1{
+				Path:        "zz-authority-state-sibling.go",
+				PreEvidence: "ABSENT",
+				PostSHA256:  strings.Repeat("5", 64),
+			})
+			overlays[name] = overlay
+		},
+		"post-hash-drift": func(overlays map[string]committedMaintenanceOverlayV1) {
+			overlay := overlays[name]
+			overlay.Entries[0].PostSHA256 = strings.Repeat("2", 64)
+			overlays[name] = overlay
+		},
+	}
+	for mutation, mutate := range mutations {
+		t.Run(mutation, func(t *testing.T) {
+			overlays := clone()
+			mutate(overlays)
+			if _, err := validatePhase12OperatorControlPlaneOverlayV1(root, overlays); err == nil {
+				t.Fatal("Phase 12 operator control-plane overlay mutation accepted")
+			}
+		})
+	}
+}
+
 func TestPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
@@ -2442,7 +2899,11 @@ func TestPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 		}
 		return out
 	}
-	phase11Pre, err := validatePhase11LocalTransportOverlayV1(root, manifest.Phase11LocalTransportOverlays)
+	phase12Pre, err := validatePhase12OperatorControlPlaneOverlayV1(root, manifest.Phase12OperatorControlPlaneOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase11Pre, err := validatePhase11LocalTransportOverlayAtPostV1(root, phase12Pre, manifest.Phase11LocalTransportOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2513,6 +2974,17 @@ func TestPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 
 func TestRuntimeDoesNotImportContracts(t *testing.T) {
 	root := repoRoot(t)
+	violations, err := contractImportViolationsV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(violations) > 0 {
+		t.Fatalf("runtime/real packages must not import contracts/product and product packages must not import operator authority (%d violation(s)):\n  %s",
+			len(violations), strings.Join(violations, "\n  "))
+	}
+}
+
+func contractImportViolationsV1(root string) ([]string, error) {
 	fset := token.NewFileSet()
 	var violations []string
 
@@ -2530,32 +3002,84 @@ func TestRuntimeDoesNotImportContracts(t *testing.T) {
 				return err
 			}
 			pkgPath := modulePath + "/" + filepath.ToSlash(rel)
-			if hasPrefixAny(pkgPath, allowedImporterPrefixes) {
-				return nil // this package is permitted to import the quarantined trees
-			}
 			f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 			if err != nil {
 				return err
 			}
+			relFile, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			file := filepath.ToSlash(relFile)
 			for _, imp := range f.Imports {
 				ip := strings.Trim(imp.Path.Value, `"`)
+				if strings.HasPrefix(pkgPath, modulePath+"/internal/product/") &&
+					(ip == modulePath+"/internal/operator" || strings.HasPrefix(ip, modulePath+"/internal/operator/")) {
+					if !phase12BoundaryImportAllowedV1(file, ip) {
+						violations = append(violations, file+": "+pkgPath+" imports "+ip)
+					}
+					continue
+				}
+				if hasPrefixAny(pkgPath, allowedImporterPrefixes) {
+					continue
+				}
 				if phase8ProductConsumerV1(pkgPath) && strings.HasPrefix(ip, modulePath+"/internal/product/") {
 					continue
 				}
-				if hasPrefixAny(ip, forbiddenImportPrefixes) {
-					violations = append(violations, pkgPath+" imports "+ip)
+				if hasForbiddenImportPrefixV1(ip) {
+					if phase12BoundaryImportAllowedV1(file, ip) {
+						continue
+					}
+					violations = append(violations, file+": "+pkgPath+" imports "+ip)
 				}
 			}
 			return nil
 		})
 		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func TestProductOperatorReverseDependencyMutationV1(t *testing.T) {
+	root := t.TempDir()
+	write := func(relative, source string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(source), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-
-	if len(violations) > 0 {
-		t.Fatalf("runtime/real packages must not import contracts/product (%d violation(s)):\n  %s",
-			len(violations), strings.Join(violations, "\n  "))
+	write("internal/product/backup/mutant.go", `package backup
+import _ "kurdistan/internal/operator/controlplane"
+`)
+	write("internal/product/backup/root_mutant.go", `package backup
+import _ "kurdistan/internal/operator"
+`)
+	write("internal/product/backup/legitimate.go", `package backup
+import _ "kurdistan/internal/product/profile"
+`)
+	write("internal/operator/controlplane/service.go", `package controlplane
+import _ "kurdistan/internal/product/profile"
+`)
+	if err := os.MkdirAll(filepath.Join(root, "cmd"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	violations, err := contractImportViolationsV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"internal/product/backup/mutant.go: " + modulePath + "/internal/product/backup imports " + modulePath + "/internal/operator/controlplane",
+		"internal/product/backup/root_mutant.go: " + modulePath + "/internal/product/backup imports " + modulePath + "/internal/operator",
+	}
+	if !slices.Equal(violations, want) {
+		t.Fatalf("product-to-operator mutations were not isolated: got=%v want=%v", violations, want)
 	}
 }
 
