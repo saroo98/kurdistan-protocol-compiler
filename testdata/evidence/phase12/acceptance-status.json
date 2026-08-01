@@ -1,0 +1,71 @@
+{
+  "schema": "kurdistan.phase12.acceptance-status.v1",
+  "scope": "local-disposable-control-plane",
+  "local": {
+    "local_actor_duty_separation": "verified-by-local-test",
+    "two_distinct_local_approval_ids": "verified-by-local-test",
+    "phase8_profile_boundary": "verified-by-local-test",
+    "phase11_relay_plan_boundary": "verified-by-local-test",
+    "profile_desired_state_lifecycle": "verified-by-local-test",
+    "relay_desired_state_lifecycle": "verified-by-local-test",
+    "deny_only_emergency": "verified-by-local-test",
+    "single_process_atomic_state_audit_outbox": "verified-by-local-test",
+    "journal_partial_tail_and_reopen_recovery": "verified-by-local-test",
+    "audit_hash_chain_validation": "verified-by-local-test",
+    "forbidden_text_canaries": "verified-by-local-test",
+    "publication_checks_against_supplied_trust_state": "verified-by-local-test",
+    "pre_effect_recover_authorization": "verified-by-local-test",
+    "root_bound_emergency_delegation": "verified-by-local-test",
+    "authoritative_time_binding": "verified-by-local-test",
+    "exact_profile_lifecycle_provenance": "verified-by-local-test",
+    "redacted_effect_dto": "verified-by-local-test",
+    "safety_priority_per_target_order_bounded_terminal_attempts": "verified-by-local-test",
+    "expired_effect_rejection_before_dispatch": "verified-by-local-test",
+    "publication_chronology_validation": "verified-by-local-test",
+    "journal_copy_revision_continuity": "verified-by-local-test",
+    "bounded_disposable_workflow": "verified-by-local-test"
+  },
+  "security_reviews": {
+    "second_adversarial_review": {
+      "finding_count": 9,
+      "scope": "local-disposable-control-plane",
+      "status": "remediated-by-local-test",
+      "findings": {
+        "pre_effect_recover_authorization": "verified-by-local-test",
+        "root_bound_emergency_delegation": "verified-by-local-test",
+        "authoritative_time_binding": "verified-by-local-test",
+        "exact_profile_lifecycle_provenance": "verified-by-local-test",
+        "redacted_effect_dto": "verified-by-local-test",
+        "safety_priority_per_target_order_bounded_terminal_attempts": "verified-by-local-test",
+        "expired_effect_rejection_before_dispatch": "verified-by-local-test",
+        "publication_chronology_validation": "verified-by-local-test",
+        "journal_copy_revision_continuity": "verified-by-local-test"
+      }
+    }
+  },
+  "external": {
+    "production_oidc_webauthn": "[UNVERIFIED]",
+    "production_trusted_time_source": "[UNVERIFIED]",
+    "hsm_kms_custody": "[UNVERIFIED]",
+    "postgresql_ha_pitr": "[UNVERIFIED]",
+    "immutable_update_distribution": "[UNVERIFIED]",
+    "infrastructure_provisioning": "[UNVERIFIED]",
+    "owned_non_loopback_relay": "[UNVERIFIED]",
+    "capacity_and_slo": "[UNVERIFIED]",
+    "incident_and_disaster_recovery": "[UNVERIFIED]",
+    "controlled_private_pilot": "[UNVERIFIED]",
+    "multiwriter_database_transactions": "[UNVERIFIED]",
+    "immutable_audit_and_rollback_anchor": "[UNVERIFIED]",
+    "audit_export_pseudonymization": "[UNVERIFIED]",
+    "authenticated_backup_restore": "[UNVERIFIED]",
+    "external_provider_idempotency": "[UNVERIFIED]"
+  },
+  "claims": {
+    "production_ready": false,
+    "publicly_deployed": false,
+    "uncensorable": false,
+    "undetectable": false,
+    "anonymous": false,
+    "fully_audited": false
+  }
+}

@@ -301,7 +301,7 @@ func validateActivationPolicy(request ActivationRequest, p envelope.CanonicalPro
 			return errors.New("invalid initial")
 		}
 	case "replacement":
-		if current.Status != lifecycle.Admitted || p.PreviousContentID != current.Receipt.ContentID || p.ProviderID != current.Receipt.ProviderID || p.PreviousProviderID != "" {
+		if current.Status != lifecycle.Admitted || p.PreviousContentID != current.Receipt.ContentID || p.ProviderID != current.Receipt.ProviderID || p.LineageID != current.Receipt.LineageID || p.PreviousProviderID != "" {
 			return errors.New("invalid replacement")
 		}
 	case "provider-migration":

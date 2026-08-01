@@ -478,7 +478,11 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 
 func phase10Phase9PreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
 	t.Helper()
-	phase11Pre, err := validateM11LocalTransportOverlayV1(root, ledger.Phase11LocalTransportOverlays)
+	phase12Pre, err := validateM12OperatorControlPlaneOverlayV1(root, ledger.Phase12OperatorControlPlaneOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase11Pre, err := validateM11LocalTransportOverlayAtPostV1(root, phase12Pre, ledger.Phase11LocalTransportOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,8 +911,14 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if !ok || len(ledger.Phase11LocalTransportOverlays) != 1 || len(phase11Overlay.Paths) == 0 || len(phase11Overlay.Entries) != len(phase11Overlay.Paths) {
 		t.Fatalf("invalid Phase 11 local transport fixture overlay identity/cardinality: %+v", phase11Overlay)
 	}
+	phase12Overlay, ok := ledger.Phase12OperatorControlPlaneOverlays["phase12-operator-control-plane-v1"]
+	if !ok || len(ledger.Phase12OperatorControlPlaneOverlays) != 1 ||
+		len(phase12Overlay.Paths) != 45 || len(phase12Overlay.Entries) != 45 ||
+		phase12Overlay.Paths[15] != "internal/operator/controlplane/authority_state.go" {
+		t.Fatalf("invalid Phase 12 operator control-plane fixture overlay identity/cardinality: %+v", phase12Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries)+len(phase10Overlay.Entries)+len(phase11Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries)+len(phase10Overlay.Entries)+len(phase11Overlay.Entries)+len(phase12Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -999,6 +1009,12 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	for _, path := range phase11Overlay.Paths {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range phase12Overlay.Paths {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true

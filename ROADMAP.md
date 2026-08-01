@@ -7,7 +7,7 @@ Detailed stage and milestone tracking lives in the per-milestone KIP documents
 (`docs/KIP-*.md`) and the generated gate status in `STATUS.md`. This file records
 only the current phase and the standing review gates.
 
-## Current phase: Phase 11 bounded Kurd loopback transport
+## Current phase: Phase 12 operator, provisioning, and relay-fleet authority
 
 The project has graduated from its lab-only phase. The compiler, audit system, and M2-M7 offline contracts remain the validated starting point, while Phases 8-13 progressively open profile cryptography, Android, VPN/TUN, live Kurd transport and relays, operator infrastructure, and controlled release. Current labels remain factual capability markers, not permanent scope blockers.
 
@@ -69,6 +69,22 @@ release variant has no deterministic test authority and fails closed until
 production authority provisioning exists. Owned-LAN, owned-relay,
 physical-device matrix, handover, capacity, and field censorship-resilience
 evidence remains **[UNVERIFIED]**. See `docs/PHASE11_EVIDENCE_INDEX.md`.
+
+Phase 12 is authorized by KIP-0087. It adds local production-candidate
+control-plane semantics for split-authority approvals, authoritative Phase 8
+profile admission with exact lifecycle provenance, publication chronology,
+authoritative Phase 11 relay desired state, single-process atomic journal/outbox
+processing, root-bound signed deny-only emergency action, redacted audit and
+effect boundaries, pre-dispatch recoverer authorization, lease-bounded
+safety-priority reconciliation with per-target order and terminal attempts,
+partial-tail repair, exact-continuity journal copy, and journal reopen. Two
+nine-finding security reviews are recorded as remediated within this local
+disposable scope. The implementation and its tests use only local or disposable
+state. Production identity and trusted-time operation, HSM/KMS custody,
+authenticated backup and restore, an external anti-rollback anchor, external
+databases and distribution, infrastructure deployment, public relays,
+owned-network pilots, capacity and SLO evidence, and release remain
+**[UNVERIFIED]** until their exact environments are authorized and observed.
 
 ## Future phase gates
 

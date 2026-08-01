@@ -8,7 +8,9 @@ Kurdistan has graduated from a lab-only research scope into a staged product-dev
 This repository contains deterministic models alongside explicitly authorized
 local implementations. Current live behavior is limited to the Android
 reserved-range TUN runtime and authenticated owned-loopback Kurd transport
-defined by KIP-0084 through KIP-0086. Non-loopback targets, public relays, and
+defined by KIP-0084 through KIP-0086. KIP-0087 additionally authorizes local and
+disposable Phase 12 control-plane semantics, but not deployed control-plane
+services. Non-loopback targets, public relays, production credentials, and
 production operation remain closed until their own phase authority and evidence
 exist. See the `[live]` / `[model]` / `[plan]` legend in `README.md` and
 `STATUS.md`.
@@ -27,6 +29,11 @@ Kurd wire, authenticated process-separated session, strict TLS 1.3/TCP carrier,
 owned-loopback relay conformance, and bounded permitted fallback. These phases
 do not authorize a public relay, unrestricted Internet egress, production
 authority or signing custody, deployment, pilot operation, or public release.
+KIP-0087 authorizes only local and disposable operator-control semantics,
+including split approval, durable recovery, publication metadata, relay desired
+state, and deny-only emergency behavior. It does not authorize external
+identity providers, production HSM/KMS use, cloud deployment, public relay
+operation, or a private pilot.
 
 ## Controlled live-development boundary
 

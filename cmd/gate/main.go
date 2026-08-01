@@ -40,6 +40,7 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"vet", "go", []string{"vet", "./..."}, ""},
 		{"test", "go", []string{"test", "-count=1", "./..."}, ""},
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
+		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
 	}
 }
 
@@ -86,9 +87,9 @@ func main() {
 		os.Exit(1)
 	}
 	if android {
-		fmt.Println("GATE PASSED: build, vet, test, audit, and Android Phase 11 all green")
+		fmt.Println("GATE PASSED: build, vet, test, audit, Phase 12 control plane, and Android Phase 11 all green")
 	} else {
-		fmt.Println("GATE PASSED: build, vet, test, audit all green")
+		fmt.Println("GATE PASSED: build, vet, test, audit, and Phase 12 control plane all green")
 	}
 }
 
