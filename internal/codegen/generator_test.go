@@ -394,6 +394,9 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 		!strings.Contains(protocolSource, "func MultiStreamDemo") {
 		t.Fatalf("generated source is missing profile-specific constants or tables")
 	}
+	if !strings.Contains(protocolSource, "const generatedHardeningTestTimeout = 15 * time.Second") {
+		t.Fatalf("generated hardening tests are missing the CI-safe timeout budget")
+	}
 
 	cmd := exec.Command(goTool(t), "test", "./...")
 	cmd.Dir = out

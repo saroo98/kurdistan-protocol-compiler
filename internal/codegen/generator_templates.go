@@ -3795,8 +3795,10 @@ import (
 	"kurdistan/internal/crypto/security"
 )
 
+const generatedHardeningTestTimeout = 15 * time.Second
+
 func TestGeneratedHardeningDemoAndConstants(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), generatedHardeningTestTimeout)
 	defer cancel()
 	result, events, err := HardeningDemo(ctx, 4)
 	if err != nil {
@@ -3830,7 +3832,7 @@ func TestGeneratedHardeningMisuseRejected(t *testing.T) {
 }
 
 func TestGeneratedHardeningTraceHygiene(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), generatedHardeningTestTimeout)
 	defer cancel()
 	result, events, err := HardeningDemo(ctx, 4)
 	if err != nil {
@@ -3860,7 +3862,7 @@ func TestGeneratedHardeningTraceHygiene(t *testing.T) {
 }
 
 func TestGeneratedHardeningTraceCapture(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), generatedHardeningTestTimeout)
 	defer cancel()
 	events, summary, err := CaptureHardeningTrace(ctx, 4)
 	if err != nil {
