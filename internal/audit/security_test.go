@@ -913,8 +913,8 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	}
 	phase12Overlay, ok := ledger.Phase12OperatorControlPlaneOverlays["phase12-operator-control-plane-v1"]
 	if !ok || len(ledger.Phase12OperatorControlPlaneOverlays) != 1 ||
-		len(phase12Overlay.Paths) != 45 || len(phase12Overlay.Entries) != 45 ||
-		phase12Overlay.Paths[15] != "internal/operator/controlplane/authority_state.go" {
+		len(phase12Overlay.Paths) != 47 || len(phase12Overlay.Entries) != 47 ||
+		phase12Overlay.Paths[17] != "internal/operator/controlplane/authority_state.go" {
 		t.Fatalf("invalid Phase 12 operator control-plane fixture overlay identity/cardinality: %+v", phase12Overlay)
 	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
