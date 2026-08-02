@@ -42,15 +42,20 @@ func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
 	gitTest(t, root, "config", "user.name", "Assure Test")
 	gitTest(t, root, "add", ".")
 	gitTest(t, root, "commit", "-m", "fixture")
+	commit, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var stdout, stderr bytes.Buffer
-	err := runReceiptIssue([]string{
+	err = runReceiptIssue([]string{
 		"-root", root,
 		"-gate", "gate.json",
 		"-workflow", ".github/workflows/assurance.yml",
 		"-out", ".tools/assurance/receipt.json",
 		"-run-id", "123",
 		"-job-id", "go-audit-linux",
+		"-commit", commit,
 		"-ref", "refs/heads/test",
 		"-os", "linux",
 	}, &stdout, &stderr)
