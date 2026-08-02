@@ -79,7 +79,7 @@
     {
       "path": "cmd/assure/issue_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "21033033268617c8dae0db497285022f3dad5bb39ccc5bf1cbd43c1c875e2330"
+      "post_sha256": "0f7dff822d79b049078172de4dcc51607ff605491e87670dc6f7607135857092"
     },
     {
       "path": "cmd/assure/main.go",

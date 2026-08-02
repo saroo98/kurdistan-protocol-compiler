@@ -132,6 +132,7 @@ func TestReceiptIssueStreamsAndroidSizedArtifact(t *testing.T) {
 		"-root", root,
 		"-gate", "gate.json",
 		"-workflow", ".github/workflows/assurance.yml",
+		"-workflow-source-commit", commit,
 		"-out", ".tools/assurance/receipt.json",
 		"-run-id", "123",
 		"-job-id", "go-audit-linux",
