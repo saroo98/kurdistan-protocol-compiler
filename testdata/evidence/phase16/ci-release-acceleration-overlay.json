@@ -544,7 +544,7 @@
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "65327efc88041307f50545ccbc7c4b695ed2f78d75aa9f41f4c03eb37f5a376b"
+      "post_sha256": "f2f63cf0e3c8a0ab943cb2045c86676169f949af0ef3b1879a032bced132bedd"
     },
     {
       "path": "tools/tools.go",

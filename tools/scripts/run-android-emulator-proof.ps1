@@ -131,10 +131,10 @@ $emulatorPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDRO
 $platformToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'platform-tools')
 $commandLineToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'cmdline-tools/latest')
 $systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64")
-$emulatorVersionLine = @(& $emulator -version 2>&1) | Where-Object { $_ -match '^Android emulator version ' } | Select-Object -First 1
-$adbVersionLine = @(& $adb version 2>&1) | Where-Object { $_ -match '^Android Debug Bridge version ' } | Select-Object -First 1
-$emulatorVersionMatch = [regex]::Match([string]$emulatorVersionLine, '^Android emulator version ([0-9.]+)')
-$adbVersionMatch = [regex]::Match([string]$adbVersionLine, '^Android Debug Bridge version ([0-9.]+)')
+$emulatorVersionText = (@(& $emulator -version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
+$adbVersionText = (@(& $adb version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
+$emulatorVersionMatch = [regex]::Match($emulatorVersionText, '(?m)(?:^|\|\s*)Android emulator version ([0-9]+(?:\.[0-9]+){1,3})(?:\s|$)')
+$adbVersionMatch = [regex]::Match($adbVersionText, '(?m)^Android Debug Bridge version ([0-9]+(?:\.[0-9]+){1,3})(?:\s|$)')
 if (-not $emulatorVersionMatch.Success) { throw 'emulator version is unavailable' }
 if (-not $adbVersionMatch.Success) { throw 'adb version is unavailable' }
 $emulatorVersion = $emulatorVersionMatch.Groups[1].Value
