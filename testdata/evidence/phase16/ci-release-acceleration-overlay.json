@@ -514,12 +514,12 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "a54cb2d85e2d87dbef45be9ca608268251a771de56a16e476991c7426eec6ee0"
+      "post_sha256": "deadd51ad47837f4d1b5daf5a2230ab1d9a368cc11605dce1004aa305f0c41cc"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b7072df449cc3765e8012ac6043ed7325bec334958748bb81d0b59fb625cee40"
+      "post_sha256": "f136e8fc074bbf450369c8f593e3b58dfe5c07b4dcc1a6de316c03bd484e33d0"
     },
     {
       "path": "tools/doc.go",
@@ -544,7 +544,7 @@
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "becc6daf2c6dd26ab6154180fe98e9f2c365e4ef33ba4976b9f9ad7c35f70a36"
+      "post_sha256": "c8ae41b54f6bdb3cbaa38224e11d1f923c7bab326051e2b02136f5d585790bde"
     },
     {
       "path": "tools/tools.go",

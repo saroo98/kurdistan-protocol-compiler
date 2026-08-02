@@ -109,6 +109,8 @@ func verifyEmulatorProofScript(path string) error {
 		"-not (Test-Path -LiteralPath $GateReceipt)",
 		"$emulatorIdentity = \".tools/phase16/emulator-api$Api-identity.json\"",
 		"kurdistan-emulator-package-identity-v1",
+		"Resolve-SdkPackageMetadata",
+		"source.properties",
 		"Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError",
 	} {
 		if !strings.Contains(content, token) {
