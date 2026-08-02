@@ -212,6 +212,33 @@ func TestWriteArtifactMetadataReplacesRegularOutputAtomically(t *testing.T) {
 	}
 }
 
+func TestWriteArtifactMetadataAcceptsAbsoluteOutputThroughRootAlias(t *testing.T) {
+	parent := t.TempDir()
+	realRoot := filepath.Join(parent, "real-root")
+	if err := os.Mkdir(realRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	aliasRoot := filepath.Join(parent, "alias-root")
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Skipf("symbolic-link aliases are unavailable: %v", err)
+	}
+	writeArtifactFixture(t, realRoot, "artifacts/app.apk", "app")
+	output := filepath.Join(aliasRoot, "metadata.json")
+	err := writeArtifactMetadata(
+		aliasRoot,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/app.apk"}},
+		output,
+	)
+	if err != nil {
+		t.Fatalf("write through repository-root alias: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(realRoot, "metadata.json")); err != nil {
+		t.Fatalf("canonical output was not written: %v", err)
+	}
+}
+
 func writeArtifactFixture(t *testing.T, root, relative, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(relative))
