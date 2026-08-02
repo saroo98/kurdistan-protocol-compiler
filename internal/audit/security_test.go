@@ -18,6 +18,7 @@ import (
 	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/lab/runtimeadversary"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 func expectedSecurityVersionAuditV1() map[string]string {
@@ -1209,6 +1210,17 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	phase15Pre, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path := range phase15Pre {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	fixturePaths = append(fixturePaths, evidenceoverlay.SuccessorPath)
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if readErr != nil {

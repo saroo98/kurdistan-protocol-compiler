@@ -9,7 +9,7 @@
     "phase13Verifier": "PASS_2026-08-02",
     "api36DeviceManifest": "PASS_EXACT_26_TESTS_2026-08-02",
     "phase14Api36DeviceManifest": "PASS_EXACT_28_TESTS_2026-08-02",
-    "integrationState": "READY_FOR_INTEGRATION"
+    "integrationState": "INTEGRATED_ON_MAIN"
   },
   "local": {
     "phase14Verifier": "PASS",

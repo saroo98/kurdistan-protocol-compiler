@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 type phase11OverlayEntryV1 struct {
@@ -43,7 +45,11 @@ func TestPhase11LocalTransportEvidenceOverlayV1(t *testing.T) {
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	phase14Pre := validateOverlayAtPostV1(t, root, "phase14-assurance-v1", manifest.Phase14Overlays, nil)
+	phase15Pre, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase14Pre := validateOverlayAtPostV1(t, root, "phase14-assurance-v1", manifest.Phase14Overlays, phase15Pre)
 	phase13Pre := validateOverlayAtPostV1(t, root, "phase13-android-product-v1", manifest.Phase13Overlays, phase14Pre)
 	phase12Pre := validateOverlayAtPostV1(t, root, "phase12-operator-control-plane-v1", manifest.Phase12Overlays, phase13Pre)
 	validateOverlayAtPostV1(t, root, "phase11-local-transport-v1", manifest.Phase11Overlays, phase12Pre)

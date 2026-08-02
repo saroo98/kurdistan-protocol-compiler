@@ -1,0 +1,388 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Saro
+
+// Command phase15verify validates the fail-closed Phase 15 production-contract
+// freeze. It authorizes bounded infrastructure engineering without permitting
+// production activation or weakening the Phase 14 NO_GO decision.
+package main
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
+)
+
+const contractPath = "testdata/evidence/phase15/production-contract.json"
+
+var requiredFiles = []string{
+	"ROADMAP.md",
+	"docs/KIP-0090-phase15-production-contract-freeze.md",
+	"docs/PHASE15_PRODUCTION_CONTRACT.md",
+	contractPath,
+	evidenceoverlay.SuccessorPath,
+}
+
+var requiredAuthorized = []string{
+	"VERSIONED_PRODUCTION_API_DESIGN",
+	"PROVIDER_NEUTRAL_INFRASTRUCTURE_CODE",
+	"POLICY_AS_CODE",
+	"DISPOSABLE_NON_PRODUCTION_VALIDATION",
+	"SECRET_REFERENCE_INTERFACES",
+	"FAILURE_INJECTION_AND_RECOVERY_TESTING",
+	"CAPACITY_COST_AND_ROLLBACK_MODELS",
+	"EVIDENCE_SCHEMA_IMPLEMENTATION",
+}
+
+var requiredProhibited = []string{
+	"PRODUCTION_ACCOUNT_OR_RESOURCE_MUTATION_WITHOUT_EXECUTION_AUTHORIZATION",
+	"PRODUCTION_KEY_ISSUANCE",
+	"PRODUCTION_DNS_OR_CERTIFICATE_ACTIVATION",
+	"PUBLIC_ENDPOINT_OR_RELAY_ACTIVATION",
+	"PUBLIC_OR_USER_TRAFFIC",
+	"PRODUCTION_PROFILE_ISSUANCE",
+	"PILOT_ACTIVATION",
+	"PRODUCTION_SIGNING",
+	"STORE_SUBMISSION",
+	"PUBLIC_RELEASE",
+}
+
+var requiredForbiddenData = []string{
+	"PAYLOAD",
+	"DESTINATION_HISTORY",
+	"CREDENTIAL",
+	"PRIVATE_KEY",
+	"RAW_FRAME",
+	"PACKAGE_INVENTORY",
+	"STABLE_HARDWARE_ID",
+}
+
+var requiredCIJobs = []string{
+	"Android Phase 14 local assurance (ubuntu-latest)",
+	"Android Phase 14 local assurance (windows-latest)",
+	"gate (ubuntu-latest)",
+	"gate (windows-latest)",
+}
+
+type contract struct {
+	Schema          string            `json:"schema"`
+	Phase           int               `json:"phase"`
+	Status          string            `json:"status"`
+	ReleaseDecision string            `json:"releaseDecision"`
+	Baseline        baseline          `json:"baseline"`
+	Android         androidContract   `json:"android"`
+	Versions        map[string]string `json:"versions"`
+	AuthorizedWork  []string          `json:"authorizedWork"`
+	Prohibited      []string          `json:"prohibitedActions"`
+	Privacy         privacyContract   `json:"privacy"`
+	TargetsEvidence bool              `json:"targetsAreEvidence"`
+	Limitations     []string          `json:"limitations"`
+}
+
+type baseline struct {
+	SourceCommit          string   `json:"sourceCommit"`
+	CandidateCIRun        string   `json:"candidateCiRun"`
+	MainCIRun             string   `json:"mainCiRun"`
+	CandidateCIConclusion string   `json:"candidateCiConclusion"`
+	MainCIConclusion      string   `json:"mainCiConclusion"`
+	WorkflowPath          string   `json:"workflowPath"`
+	WorkflowSHA256        string   `json:"workflowSha256"`
+	CIJobs                []string `json:"ciJobs"`
+}
+
+type androidContract struct {
+	MinAPI         int      `json:"minApi"`
+	TargetAPI      int      `json:"targetApi"`
+	CompileAPI     int      `json:"compileApi"`
+	ProductionABIs []string `json:"productionAbis"`
+	TestOnlyABIs   []string `json:"testOnlyAbis"`
+}
+
+type privacyContract struct {
+	TelemetryDefault string   `json:"telemetryDefault"`
+	ForbiddenData    []string `json:"forbiddenData"`
+}
+
+func main() {
+	root := flag.String("root", ".", "repository root")
+	flag.Parse()
+	if err := verify(*root); err != nil {
+		fmt.Fprintf(os.Stderr, "PHASE 15 VERIFICATION FAILED: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("PHASE 15 VERIFICATION PASSED")
+}
+
+func verify(root string) error {
+	for _, relative := range requiredFiles {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			return fmt.Errorf("required file %s: %w", relative, err)
+		}
+		if !info.Mode().IsRegular() || info.Size() == 0 {
+			return fmt.Errorf("required file %s is not a non-empty regular file", relative)
+		}
+	}
+	encoded, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(contractPath)))
+	if err != nil {
+		return err
+	}
+	value, err := decodeContract(encoded)
+	if err != nil {
+		return err
+	}
+	if err := validate(value); err != nil {
+		return err
+	}
+	workflowDigest, err := fileSHA256(filepath.Join(root, filepath.FromSlash(value.Baseline.WorkflowPath)))
+	if err != nil {
+		return fmt.Errorf("hash baseline workflow: %w", err)
+	}
+	if workflowDigest != value.Baseline.WorkflowSHA256 {
+		return fmt.Errorf("baseline workflow digest = %s, want %s", workflowDigest, value.Baseline.WorkflowSHA256)
+	}
+	if err := verifyBaselineCommit(root, value.Baseline.SourceCommit); err != nil {
+		return err
+	}
+	if err := verifyRoadmap(root, value); err != nil {
+		return err
+	}
+	if err := verifyHumanParity(root, value); err != nil {
+		return err
+	}
+	if err := verifyPhase14Reconciliation(root); err != nil {
+		return err
+	}
+	predecessors, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return fmt.Errorf("verify Phase 15 successor overlay: %w", err)
+	}
+	for _, required := range []string{
+		"ROADMAP.md",
+		"docs/KIP-0089-phase14-assurance-field-release.md",
+		"docs/PHASE14_EVIDENCE_INDEX.md",
+		"docs/PHASE14_READINESS_MATRIX.md",
+		"testdata/evidence/phase14/acceptance-status.json",
+	} {
+		if predecessors[required] == "" {
+			return fmt.Errorf("Phase 15 successor overlay is missing %s", required)
+		}
+	}
+	return nil
+}
+
+func fileSHA256(path string) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func decodeContract(encoded []byte) (contract, error) {
+	var value contract
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&value); err != nil {
+		return contract{}, fmt.Errorf("decode production contract: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return contract{}, errors.New("decode production contract: trailing JSON value")
+		}
+		return contract{}, fmt.Errorf("decode production contract: trailing JSON: %w", err)
+	}
+	return value, nil
+}
+
+func verifyBaselineCommit(root, sha string) error {
+	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sha) {
+		return errors.New("baseline source commit is not a full SHA-1")
+	}
+	command := exec.Command("git", "cat-file", "-e", sha+"^{commit}")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("baseline commit %s does not exist: %w: %s", sha, err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func verifyRoadmap(root string, value contract) error {
+	raw, err := os.ReadFile(filepath.Join(root, "ROADMAP.md"))
+	if err != nil {
+		return err
+	}
+	text := string(raw)
+	for _, required := range []string{
+		"Phases 1-14 are integrated on `main` at",
+		value.Baseline.SourceCommit,
+		"Phase 15 is active on `product/phase15-production-contract-freeze`",
+		"| 13 | Integrated |",
+		"| 14 | Integrated |",
+		"| 15 | Active |",
+		"The current release decision is `NO_GO`",
+	} {
+		if !strings.Contains(text, required) {
+			return fmt.Errorf("ROADMAP.md is missing Phase 15 authority %q", required)
+		}
+	}
+	return nil
+}
+
+func verifyHumanParity(root string, value contract) error {
+	requirements := map[string][]string{
+		"docs/PHASE15_PRODUCTION_CONTRACT.md": {
+			value.Baseline.SourceCommit,
+			"`NO_GO`",
+			fmt.Sprintf("API %d", value.Android.MinAPI),
+			fmt.Sprintf("API %d", value.Android.TargetAPI),
+			value.Android.ProductionABIs[0],
+			value.Android.TestOnlyABIs[0],
+			value.Baseline.WorkflowPath,
+			value.Baseline.WorkflowSHA256,
+		},
+		"docs/KIP-0090-phase15-production-contract-freeze.md": {
+			value.Baseline.SourceCommit,
+			"`NO_GO`",
+			value.Baseline.CandidateCIRun,
+			value.Baseline.MainCIRun,
+			value.Baseline.WorkflowSHA256,
+		},
+	}
+	for relative, snippets := range requirements {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			return err
+		}
+		for _, snippet := range snippets {
+			if !strings.Contains(string(raw), snippet) {
+				return fmt.Errorf("%s disagrees with the machine contract: missing %q", relative, snippet)
+			}
+		}
+	}
+	return nil
+}
+
+func verifyPhase14Reconciliation(root string) error {
+	for _, relative := range []string{
+		"docs/KIP-0089-phase14-assurance-field-release.md",
+		"docs/PHASE14_EVIDENCE_INDEX.md",
+		"docs/PHASE14_READINESS_MATRIX.md",
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			return err
+		}
+		lower := strings.ToLower(string(raw))
+		for _, stale := range []string{"integration pending", "not yet integrated", "ready for integration"} {
+			if strings.Contains(lower, stale) {
+				return fmt.Errorf("%s contains stale Phase 14 state %q", relative, stale)
+			}
+		}
+		if !strings.Contains(lower, "integrated") || !strings.Contains(string(raw), "NO_GO") {
+			return fmt.Errorf("%s must record integrated local assurance and NO_GO", relative)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "testdata", "evidence", "phase14", "acceptance-status.json"))
+	if err != nil {
+		return err
+	}
+	var status struct {
+		ReleaseDecision string `json:"releaseDecision"`
+		PriorPhase      struct {
+			IntegrationState string `json:"integrationState"`
+		} `json:"priorPhaseBaseline"`
+	}
+	if err := json.Unmarshal(raw, &status); err != nil {
+		return fmt.Errorf("decode Phase 14 acceptance status: %w", err)
+	}
+	if status.ReleaseDecision != "NO_GO" || status.PriorPhase.IntegrationState != "INTEGRATED_ON_MAIN" {
+		return errors.New("Phase 14 acceptance status must preserve NO_GO and record INTEGRATED_ON_MAIN")
+	}
+	return nil
+}
+
+func validate(value contract) error {
+	if value.Schema != "kurdistan-phase15-production-contract-v1" || value.Phase != 15 {
+		return errors.New("unexpected Phase 15 contract schema or phase")
+	}
+	if value.Status != "FROZEN_FOR_IMPLEMENTATION" || value.ReleaseDecision != "NO_GO" {
+		return errors.New("contract must be frozen for implementation and remain NO_GO")
+	}
+	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(value.Baseline.SourceCommit) {
+		return errors.New("baseline source commit is not a full SHA-1")
+	}
+	if value.Baseline.CandidateCIRun == "" || value.Baseline.MainCIRun == "" ||
+		value.Baseline.CandidateCIConclusion != "SUCCESS" || value.Baseline.MainCIConclusion != "SUCCESS" {
+		return errors.New("candidate and main CI success receipts are required")
+	}
+	if value.Baseline.WorkflowPath != ".github/workflows/ci.yml" || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(value.Baseline.WorkflowSHA256) {
+		return errors.New("baseline workflow identity is incomplete")
+	}
+	if err := exactSet("baseline CI job", value.Baseline.CIJobs, requiredCIJobs); err != nil {
+		return err
+	}
+	if value.Android.MinAPI != 26 || value.Android.TargetAPI != 36 || value.Android.CompileAPI != 36 {
+		return errors.New("unexpected Android API contract")
+	}
+	if err := exactSet("production ABI", value.Android.ProductionABIs, []string{"arm64-v8a"}); err != nil {
+		return err
+	}
+	if err := exactSet("test-only ABI", value.Android.TestOnlyABIs, []string{"x86_64"}); err != nil {
+		return err
+	}
+	for _, key := range []string{"androidBridge", "profileAdmission", "strategyRegistry", "relayAdmission", "diagnostics", "cryptographicSuite"} {
+		if strings.TrimSpace(value.Versions[key]) == "" {
+			return fmt.Errorf("version %s is missing", key)
+		}
+	}
+	if err := exactSet("authorized work", value.AuthorizedWork, requiredAuthorized); err != nil {
+		return err
+	}
+	if err := exactSet("prohibited action", value.Prohibited, requiredProhibited); err != nil {
+		return err
+	}
+	if value.Privacy.TelemetryDefault != "OFF" {
+		return errors.New("telemetry must remain off by default")
+	}
+	if err := exactSet("forbidden data", value.Privacy.ForbiddenData, requiredForbiddenData); err != nil {
+		return err
+	}
+	if value.TargetsEvidence {
+		return errors.New("production targets cannot be recorded as evidence")
+	}
+	if len(value.Limitations) < 3 {
+		return errors.New("contract limitations are incomplete")
+	}
+	return nil
+}
+
+func exactSet(name string, got, want []string) error {
+	got = append([]string(nil), got...)
+	want = append([]string(nil), want...)
+	sort.Strings(got)
+	sort.Strings(want)
+	if len(got) != len(want) {
+		return fmt.Errorf("%s set has %d entries, want %d", name, len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return fmt.Errorf("%s set differs at %d: got %q want %q", name, i, got[i], want[i])
+		}
+	}
+	return nil
+}
