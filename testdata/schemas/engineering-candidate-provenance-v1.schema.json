@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/engineering-candidate-provenance-v1.schema.json",
+  "title": "Kurdistan VPN unsigned engineering candidate provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repository", "commit", "tree", "assurance", "selectedBuilder", "selectedArtifacts", "comparisonSha256", "authoritative", "limitations"],
+  "properties": {
+    "schema": {"const": "kpc-engineering-candidate-provenance-v1"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "assurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "runAttempt", "trigger", "workflowPath", "certificatePath", "certificateSha256", "receipts", "inventories"],
+      "properties": {
+        "runId": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+        "runAttempt": {"type": "integer", "minimum": 1},
+        "trigger": {"enum": ["push", "workflow_dispatch"]},
+        "workflowPath": {"const": ".github/workflows/assurance.yml"},
+        "certificatePath": {"const": "assurance-certificate.json"},
+        "certificateSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "receipts": {"type": "array", "minItems": 15, "maxItems": 15, "items": {"$ref": "#/$defs/artifact"}},
+        "inventories": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"$ref": "#/$defs/artifact"}}
+      }
+    },
+    "selectedBuilder": {"const": "a"},
+    "selectedArtifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "comparisonSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "authoritative": {"const": false},
+    "limitations": {"type": "array", "prefixItems": [{"const": "unsigned engineering candidate; signing, upload, promotion, and release remain unauthorized"}], "items": false}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "size": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

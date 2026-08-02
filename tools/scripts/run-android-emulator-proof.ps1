@@ -41,8 +41,67 @@ $systemImage = "system-images;android-$Api;google_apis;x86_64"
 $avdName = "kurdistan_phase16_api$Api"
 $avdParent = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
 $avdHome = [IO.Path]::GetFullPath((Join-Path $avdParent "kurdistan-avd-api$Api"))
-$emulatorLog = ".tools/phase16/emulator-api$Api.log"
-$logcat = ".tools/phase16/logcat-api$Api.txt"
+$rawEmulatorLog = Join-Path $avdParent "kurdistan-emulator-api$Api.stdout.log"
+$rawEmulatorError = Join-Path $avdParent "kurdistan-emulator-api$Api.stderr.log"
+$rawPostRunLogcat = Join-Path $avdParent "kurdistan-logcat-api$Api.txt"
+$emulatorSummary = ".tools/phase16/emulator-api$Api-summary.txt"
+$deviceSummary = ".tools/phase16/logcat-api$Api-summary.txt"
+$emulatorIdentity = ".tools/phase16/emulator-api$Api-identity.json"
+
+function Get-SdkPackageRevision {
+    param([Parameter(Mandatory = $true)][string]$PackageXml)
+    if (-not (Test-Path -LiteralPath $PackageXml)) { throw "required SDK package metadata is missing: $PackageXml" }
+    [xml]$metadata = Get-Content -LiteralPath $PackageXml -Raw
+    $revision = $metadata.SelectSingleNode("//*[local-name()='revision']")
+    if ($null -eq $revision) { throw "SDK package revision is missing: $PackageXml" }
+    $major = $revision.SelectSingleNode("./*[local-name()='major']").InnerText
+    $minorNode = $revision.SelectSingleNode("./*[local-name()='minor']")
+    $microNode = $revision.SelectSingleNode("./*[local-name()='micro']")
+    if ($major -notmatch '^\d+$') { throw "SDK package major revision is invalid: $PackageXml" }
+    $minor = if ($null -eq $minorNode) { '0' } else { $minorNode.InnerText }
+    $micro = if ($null -eq $microNode) { '0' } else { $microNode.InnerText }
+    if ($minor -notmatch '^\d+$' -or $micro -notmatch '^\d+$') { throw "SDK package revision is invalid: $PackageXml" }
+    return "$major.$minor.$micro"
+}
+
+function Write-CategoricalSummary {
+    param(
+        [Parameter(Mandatory = $true)][string]$InputPath,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [Parameter(Mandatory = $true)][string]$Kind
+    )
+    $counts = [ordered]@{ error = 0; fatal = 0; crash = 0; anr = 0; panic = 0; target_package = 0 }
+    $lineCount = 0
+    $inputTruncated = $false
+    if (Test-Path -LiteralPath $InputPath) {
+        foreach ($line in [IO.File]::ReadLines($InputPath)) {
+            $lineCount++
+            if ($lineCount -gt 200000) { $inputTruncated = $true; break }
+            $lower = $line.ToLowerInvariant()
+            if ($lower.Contains('error')) { $counts.error++ }
+            if ($lower.Contains('fatal')) { $counts.fatal++ }
+            if ($lower.Contains('crash')) { $counts.crash++ }
+            if ($lower.Contains('anr in ')) { $counts.anr++ }
+            if ($lower.Contains('panic')) { $counts.panic++ }
+            if ($lower.Contains('org.kurdistanvpn.app.internal')) { $counts.target_package++ }
+        }
+    }
+    @(
+        'schema=kurdistan-emulator-diagnostic-summary-v1'
+        "kind=$Kind"
+        "input_truncated=$($inputTruncated.ToString().ToLowerInvariant())"
+        "lines_examined=$([Math]::Min($lineCount, 200000))"
+        "error_events=$($counts.error)"
+        "fatal_events=$($counts.fatal)"
+        "crash_events=$($counts.crash)"
+        "anr_events=$($counts.anr)"
+        "panic_events=$($counts.panic)"
+        "target_package_events=$($counts.target_package)"
+    ) | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM
+    if ((Get-Item -LiteralPath $OutputPath).Length -gt 4096) {
+        throw "categorical $Kind summary exceeded 4096 bytes"
+    }
+}
 
 New-Item -ItemType Directory -Force '.tools/phase16' | Out-Null
 New-Item -ItemType Directory -Force $avdHome | Out-Null
@@ -51,6 +110,46 @@ New-Item -ItemType Directory -Force (Split-Path -Parent $Timings) | Out-Null
 $env:ANDROID_AVD_HOME = $avdHome
 & $sdkManager 'platform-tools' 'emulator' $systemImage
 if ($LASTEXITCODE -ne 0) { throw 'sdkmanager failed' }
+$emulatorDigest = (Get-FileHash -LiteralPath $emulator -Algorithm SHA256).Hash.ToLowerInvariant()
+$adbDigest = (Get-FileHash -LiteralPath $adb -Algorithm SHA256).Hash.ToLowerInvariant()
+$emulatorPackage = Join-Path $env:ANDROID_HOME 'emulator/package.xml'
+$platformToolsPackage = Join-Path $env:ANDROID_HOME 'platform-tools/package.xml'
+$commandLineToolsPackage = Join-Path $env:ANDROID_HOME 'cmdline-tools/latest/package.xml'
+$systemImagePackage = Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64/package.xml"
+$emulatorVersionLine = @(& $emulator -version 2>&1) | Where-Object { $_ -match '^Android emulator version ' } | Select-Object -First 1
+$adbVersionLine = @(& $adb version 2>&1) | Where-Object { $_ -match '^Android Debug Bridge version ' } | Select-Object -First 1
+if ($emulatorVersionLine -notmatch '^Android emulator version ([0-9.]+)') { throw 'emulator version is unavailable' }
+$emulatorVersion = $Matches[1]
+if ($adbVersionLine -notmatch '^Android Debug Bridge version ([0-9.]+)') { throw 'adb version is unavailable' }
+$adbVersion = $Matches[1]
+$identity = [ordered]@{
+    schema = 'kurdistan-emulator-package-identity-v1'
+    api = $Api
+    abi = 'x86_64'
+    systemImage = [ordered]@{
+        package = $systemImage
+        revision = Get-SdkPackageRevision -PackageXml $systemImagePackage
+        metadataSha256 = (Get-FileHash -LiteralPath $systemImagePackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    emulator = [ordered]@{
+        version = $emulatorVersion
+        packageRevision = Get-SdkPackageRevision -PackageXml $emulatorPackage
+        executableSha256 = $emulatorDigest
+        metadataSha256 = (Get-FileHash -LiteralPath $emulatorPackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    platformTools = [ordered]@{
+        adbVersion = $adbVersion
+        packageRevision = Get-SdkPackageRevision -PackageXml $platformToolsPackage
+        adbSha256 = $adbDigest
+        metadataSha256 = (Get-FileHash -LiteralPath $platformToolsPackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    commandLineTools = [ordered]@{
+        packageRevision = Get-SdkPackageRevision -PackageXml $commandLineToolsPackage
+        metadataSha256 = (Get-FileHash -LiteralPath $commandLineToolsPackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
+$identity | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath $emulatorIdentity -Encoding utf8NoBOM
+if ((Get-Item -LiteralPath $emulatorIdentity).Length -gt 4096) { throw 'emulator identity manifest exceeded 4096 bytes' }
 
 try {
     & $avdManager delete avd --name $avdName 2>$null | Out-Null
@@ -67,6 +166,7 @@ if ($LASTEXITCODE -ne 0 -or $knownAVDs -notcontains $avdName) {
 $process = $null
 $gateExit = 1
 $failure = $null
+Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError -Force -ErrorAction SilentlyContinue
 try {
     $process = Start-Process -FilePath $emulator -ArgumentList @(
         '-avd', $avdName,
@@ -77,7 +177,7 @@ try {
         '-wipe-data',
         '-gpu', 'swiftshader_indirect',
         '-accel', 'on'
-    ) -RedirectStandardOutput $emulatorLog -RedirectStandardError "$emulatorLog.stderr" -PassThru
+    ) -RedirectStandardOutput $rawEmulatorLog -RedirectStandardError $rawEmulatorError -PassThru
 
     $discovered = $false
     for ($attempt = 0; $attempt -lt 90; $attempt++) {
@@ -109,11 +209,20 @@ try {
 } catch {
     $failure = $_.Exception.Message
 } finally {
-    try { & $adb logcat -d | Set-Content -LiteralPath $logcat -Encoding utf8NoBOM } catch {}
+    try {
+        & $adb logcat -b crash -d -v brief 1> $rawPostRunLogcat 2>&1
+        Write-CategoricalSummary -InputPath $rawPostRunLogcat -OutputPath $deviceSummary -Kind 'post-run-crash-buffer'
+    } catch {}
+    try {
+        Write-CategoricalSummary -InputPath $rawEmulatorLog -OutputPath $emulatorSummary -Kind 'emulator-stdout'
+        $stderrSummary = ".tools/phase16/emulator-api$Api-stderr-summary.txt"
+        Write-CategoricalSummary -InputPath $rawEmulatorError -OutputPath $stderrSummary -Kind 'emulator-stderr'
+    } catch {}
     try { & $adb emu kill | Out-Null } catch {}
     if ($null -ne $process -and -not $process.HasExited) {
         $process.Kill($true)
     }
+    Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError -Force -ErrorAction SilentlyContinue
 }
 
 if ($null -ne $failure) {

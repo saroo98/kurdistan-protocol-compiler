@@ -3,6 +3,7 @@
 
 package org.kurdistanvpn.app
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -247,9 +248,10 @@ class Phase9FoundationUiTest {
             .performScrollTo()
             .performClick()
 
-        instrumentation.uiAutomation.executeShellCommand(
-            "pm grant ${activity.packageName} android.permission.CAMERA",
-        ).close()
+        instrumentation.uiAutomation.grantRuntimePermission(
+            activity.packageName,
+            Manifest.permission.CAMERA,
+        )
         compose.onNodeWithTag("primary_profiles")
             .performClick()
         compose.onNodeWithText(activity.getString(UiR.string.scan_offline_qr))

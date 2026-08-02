@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -53,10 +54,12 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 		arg   string
 	}{
 		{name: "full audit", proof: "go-audit", want: []string{"audit"}, arg: "--full"},
+		{name: "executable evidence", proof: "go-executable-evidence", want: []string{"executable-evidence"}, arg: "./cmd/executableevidence"},
 		{name: "operator", proof: "operator", want: []string{"phase12-control-plane"}},
 		{name: "documentation evidence", proof: "docs-evidence", want: []string{"phase15-evidence", "release-metadata"}},
-		{name: "dependency freshness", proof: "dependency-freshness", want: []string{"build-govulncheck", "go-vulnerability-analysis", "fetch-osv-scanner", "dependency-manifest-scan"}},
-		{name: "Android host", proof: "android-host", want: []string{"android-phase14"}},
+		{name: "dependency freshness", proof: "dependency-freshness", want: []string{"build-govulncheck", "go-vulnerability-analysis", "fetch-osv-scanner", "android-runtime-vulnerability-analysis"}},
+		{name: "Android host", proof: "android-host", want: []string{"android-assurance-host"}, arg: "ciAssuranceHostGate"},
+		{name: "Android PR host", proof: "android-pr-host", want: []string{"android-pr-host"}, arg: "ciPrHostGate"},
 		{name: "Android API 26 device", proof: "android-device-api26", want: []string{"android-device-api26"}},
 		{name: "Android API 34 device", proof: "android-device-api34", want: []string{"android-device-api34"}},
 		{name: "Android API 36 device", proof: "android-device-api36", want: []string{"android-device-api36"}},
@@ -77,10 +80,27 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 	}
 }
 
+func TestDefaultGateRunsExecutableEvidenceExactlyOnce(t *testing.T) {
+	steps := gateSteps(false, "report.json", "status.md")
+	count := 0
+	for _, step := range steps {
+		if step.name == "executable-evidence" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("default gate executable-evidence count = %d, want 1", count)
+	}
+}
+
 func TestDependencyFreshnessProofUsesPolicyExactCommands(t *testing.T) {
 	steps, err := proofSteps("dependency-freshness", false, "report.json", "status.md")
 	if err != nil {
 		t.Fatal(err)
+	}
+	osvScanner := "./.tools/bin/osv-scanner_linux_amd64"
+	if runtime.GOOS == "windows" {
+		osvScanner = ".tools\\bin\\osv-scanner_windows_amd64.exe"
 	}
 	want := []struct {
 		program string
@@ -89,7 +109,7 @@ func TestDependencyFreshnessProofUsesPolicyExactCommands(t *testing.T) {
 		{program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"}},
 		{program: "./.tools/bin/govulncheck", args: []string{"./..."}},
 		{program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
-		{program: "./.tools/bin/osv-scanner_linux_amd64", args: []string{"-r", "."}},
+		{program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
 	}
 	if len(steps) != len(want) {
 		t.Fatalf("dependency-freshness steps = %v, want %d steps", stepNames(steps), len(want))
@@ -133,10 +153,10 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 		options gateOptions
 		want    []string
 	}{
-		{name: "default", want: []string{"module-verify", "build", "vet", "test", "audit", "phase12-control-plane"}},
-		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "audit", "phase12-control-plane"}},
-		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "audit", "phase12-control-plane", "android-phase14"}},
-		{name: "Android only", options: gateOptions{androidOnly: true}, want: []string{"android-phase14"}},
+		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane"}},
+		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane"}},
+		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "android-assurance-host"}},
+		{name: "Android only", options: gateOptions{androidOnly: true}, want: []string{"android-assurance-host"}},
 		{name: "proof", options: gateOptions{proof: "operator"}, want: []string{"phase12-control-plane"}},
 	}
 	for _, test := range tests {
@@ -148,8 +168,8 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 			if got := stepNames(steps); !equalStrings(got, test.want) {
 				t.Fatalf("steps = %v, want %v", got, test.want)
 			}
-			if test.options.quick && !containsString(steps[4].args, "--quick") {
-				t.Fatalf("quick audit args = %v", steps[4].args)
+			if test.options.quick && !containsString(steps[5].args, "--quick") {
+				t.Fatalf("quick audit args = %v", steps[5].args)
 			}
 		})
 	}
@@ -261,6 +281,19 @@ func TestRunFailsWhenRequestedReceiptCannotBeWritten(t *testing.T) {
 	}
 }
 
+func TestExecutableEvidenceProofFailureTurnsGateRed(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithExecutor([]string{"-proof", "go-executable-evidence"}, &stdout, &stderr, func(step step, _, _ io.Writer) error {
+		if step.name != "executable-evidence" {
+			t.Fatalf("unexpected step %q", step.name)
+		}
+		return errors.New("injected executable-evidence failure")
+	})
+	if code != 1 || !strings.Contains(stdout.String(), "GATE FAILED: [executable-evidence]") {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+}
+
 func decodeJSONFile(t *testing.T, path string, target any) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -314,7 +347,7 @@ func containsString(values []string, target string) bool {
 
 func TestGateStepsRemainCacheProof(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
-	if len(steps) != 6 {
+	if len(steps) != 7 {
 		t.Fatalf("got %d Go gate steps", len(steps))
 	}
 	if got := steps[0].args; len(got) != 2 || got[0] != "mod" || got[1] != "verify" {
@@ -328,13 +361,13 @@ func TestGateStepsRemainCacheProof(t *testing.T) {
 			t.Fatalf("unexpected Go gate program %q", value.program)
 		}
 	}
-	if got := steps[5].args; len(got) != 3 || got[0] != "run" || got[1] != "./cmd/koperator" || got[2] != "verify" {
+	if got := steps[6].args; len(got) != 3 || got[0] != "run" || got[1] != "./cmd/koperator" || got[2] != "verify" {
 		t.Fatalf("Phase 12 control-plane gate missing: %v", got)
 	}
 }
 
-func TestAndroidStepUsesRepositoryWrapper(t *testing.T) {
-	value := androidStep()
+func TestAndroidAssuranceStepUsesRepositoryWrapperWithoutCaches(t *testing.T) {
+	value := androidAssuranceStep()
 	if value.dir != "android" {
 		t.Fatalf("Android gate working directory = %q, want android", value.dir)
 	}
@@ -345,11 +378,29 @@ func TestAndroidStepUsesRepositoryWrapper(t *testing.T) {
 	if !found {
 		t.Fatalf("Android gate does not use the repository wrapper: %#v", value)
 	}
-	foundPhase14 := false
+	foundTask := false
+	foundNoBuildCache := false
+	foundNoConfigurationCache := false
+	foundRerunTasks := false
 	for _, argument := range value.args {
-		foundPhase14 = foundPhase14 || argument == "phase14Gate"
+		foundTask = foundTask || argument == "ciAssuranceHostGate"
+		foundNoBuildCache = foundNoBuildCache || argument == "--no-build-cache"
+		foundNoConfigurationCache = foundNoConfigurationCache || argument == "--no-configuration-cache"
+		foundRerunTasks = foundRerunTasks || argument == "--rerun-tasks"
 	}
-	if value.name != "android-phase14" || !foundPhase14 {
-		t.Fatalf("Android gate does not certify Phase 14: %#v", value)
+	if value.name != "android-assurance-host" || !foundTask || !foundNoBuildCache || !foundNoConfigurationCache || !foundRerunTasks {
+		t.Fatalf("Android assurance gate is not cache-independent: %#v", value)
+	}
+}
+
+func TestAndroidPRStepUsesCacheEnabledFeedbackTask(t *testing.T) {
+	value := androidPRStep()
+	if value.name != "android-pr-host" || !containsString(value.args, "ciPrHostGate") {
+		t.Fatalf("Android PR gate does not use feedback task: %#v", value)
+	}
+	for _, prohibited := range []string{"--no-build-cache", "--no-configuration-cache", "--rerun-tasks"} {
+		if containsString(value.args, prohibited) {
+			t.Fatalf("Android PR feedback unexpectedly disables cache with %q: %#v", prohibited, value)
+		}
 	}
 }

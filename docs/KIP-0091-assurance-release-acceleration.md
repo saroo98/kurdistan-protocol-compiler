@@ -39,22 +39,52 @@ The authoritative policy files are:
 - `config/ci/release-evidence-policy.json` for freshness and invalidation;
 - `config/ci/tools.json` and `config/ci/android-sdk.json` for tool identities.
 
-A receipt binds repository, commit, tree, ref, workflow path and digest, run and
-job identity, trigger, proof policy, test inventory, toolchain, runner, exact
-argv, timing, cache policy, result, artifacts, and limitations. A certificate
+A receipt binds repository, commit, tree, ref, workflow path, the exact commit
+containing the workflow definition GitHub executed, that workflow blob's
+digest, run and job identity, trigger, proof policy, test inventory, toolchain,
+runner, exact argv, timing, cache policy, result, artifacts, and limitations. A certificate
 binds the exact required receipt digests. Unknown fields and duplicate JSON keys
-are rejected. Receipt directories are ephemeral CI artifacts, not committed
+are rejected. A certificate also rejects receipts from a different workflow
+source, run ID, run attempt, or trigger. Receipt directories are ephemeral CI artifacts, not committed
 historical evidence.
+
+The dependency-freshness proof scans Go call reachability with the pinned
+`govulncheck` tool and scans the canonical Android release-runtime CycloneDX
+SBOM with the pinned OSV Scanner. It deliberately does not misclassify Gradle
+lint, unified-test-platform, source, or Javadoc configurations as shipped
+Android dependencies. The Android host proof regenerates and byte-compares the
+SBOM from the locked release runtime. Dependency proof invalidation binds every
+Gradle lockfile, the version catalog, verification metadata, and the canonical
+SBOM, so a dependency change cannot retain a stale runtime scan receipt.
 
 ## Workflow topology
 
 - Pull requests receive fast feedback selected by a deny-by-default impact
-  policy. The stable `pr-policy` job verifies all selected proof receipts.
-- Main and exact-SHA manual assurance remain full and cache independent.
+  policy. Impact selection and the stable `pr-policy` receipt enforcement run
+  from the protected base commit, not pull-request-owned tooling. Changes to
+  proof policy or enforcement code therefore fail closed until trusted review
+  integrates the new authority.
+- Main and exact-SHA manual assurance remain full and cache independent. The
+  authoritative `android-host` proof invokes `ciAssuranceHostGate` with build
+  cache, configuration cache, and task-output reuse disabled.
+- Pull requests substitute only the cache-enabled `android-pr-host` feedback
+  proof for `android-host`. The typed impact policy requires both proofs to
+  have identical invalidation coverage, so the substitution cannot narrow the
+  paths that trigger Android feedback. Pull-request receipts never become
+  candidate or release authority.
 - Android host jobs run Android-only proof; they do not repeat the Go gate.
+- The expensive nested executable-evidence matrix is a separate mandatory
+  `go-executable-evidence` proof on Linux and Windows. Ordinary `go test ./...`
+  verifies its immutable inventory without recursively executing it, while the
+  default local gate executes the matrix exactly once.
 - Device APK and test APK bytes are built once, hashed, uploaded once, and
   verified before each API lane installs them.
 - Candidate builders are isolated and produce unsigned engineering candidates.
+- Branch shadow receipts are feedback evidence only. An engineering candidate
+  may be requested only from the default-branch workflow for the exact current
+  `main` commit, and its certificate must authenticate one successful assurance
+  run attempt, workflow source commit, policy, inventory, and complete receipt
+  set before either clean builder starts.
 - Signing, Play, production promotion, and post-release workflows remain absent
   or inert until their named phases and external controls authorize activation.
 

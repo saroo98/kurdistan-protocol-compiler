@@ -9,9 +9,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +28,9 @@ const (
 	defaultAppPackage  = "org.kurdistanvpn.app.debug"
 	defaultTestPackage = "org.kurdistanvpn.app.debug.test"
 	defaultRunner      = "androidx.test.runner.AndroidJUnitRunner"
+	maxCommandEvidence = 2 << 20
+	maxLogcatInput     = 4 << 20
+	maxDiagnosticBytes = 16 << 10
 )
 
 var deviceEvidenceProperties = []struct {
@@ -202,6 +207,9 @@ func run(value options) error {
 	if _, err := client.capture(ctx, "04-install-test.txt", "install", "-r", value.testAPK); err != nil {
 		return fmt.Errorf("install instrumentation: %w", err)
 	}
+	if err := captureInstalledIdentity(ctx, client, value); err != nil {
+		return err
+	}
 	if value.conflictingAppPackage != "" {
 		if _, err := client.capture(
 			ctx,
@@ -285,18 +293,21 @@ func run(value options) error {
 		return fmt.Errorf("launch smoke test: %w", err)
 	}
 	time.Sleep(2 * time.Second)
-	pidOutput, pidErr := client.capture(ctx, "09-launch-pid.txt", "shell", "pidof", value.appPackage)
+	pidOutput, pidErr := client.captureProcessState(ctx, "09-launch-process.txt", value.appPackage)
 	if err := validateLaunchSmoke(launchOutput, pidOutput, value.appPackage, pidErr); err != nil {
-		_, _ = client.capture(ctx, "10-launch-failure-logcat.txt", "logcat", "-b", "all", "-d", "-v", "threadtime")
+		_, _ = client.captureDiagnostic(ctx, "10-launch-failure-diagnostics.txt", value.appPackage, "logcat", "-b", "all", "-d", "-v", "brief")
 		return err
 	}
 	_, _ = client.capture(ctx, "11-pre-test-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
+	if err := waitForAndroidFramework(ctx, client); err != nil {
+		return err
+	}
 	if err := clearLogcat(ctx, client, "12-pre-test-clear-logcat.txt"); err != nil {
 		return fmt.Errorf("clear pre-test logcat: %w", err)
 	}
-	instrumentation, instrumentationErr := client.capture(
+	instrumentation, instrumentationErr := client.captureInstrumentation(
 		ctx,
-		"13-instrumentation.txt",
+		"13-instrumentation-summary.txt",
 		"shell",
 		"am",
 		"instrument",
@@ -304,8 +315,8 @@ func run(value options) error {
 		"-r",
 		value.testPackage+"/"+value.runner,
 	)
-	logcat, logcatErr := client.capture(ctx, "14-logcat-all.txt", "logcat", "-b", "all", "-d", "-v", "threadtime")
-	crashLog, crashLogErr := client.capture(ctx, "15-logcat-crash.txt", "logcat", "-b", "crash", "-d", "-v", "threadtime")
+	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, "logcat", "-b", "all", "-d", "-v", "brief")
+	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, "logcat", "-b", "crash", "-d", "-v", "brief")
 	if logcatErr != nil {
 		return fmt.Errorf("capture logcat: %w", logcatErr)
 	}
@@ -347,6 +358,121 @@ func run(value options) error {
 		return fmt.Errorf("write summary: %w", err)
 	}
 	return nil
+}
+
+func (client adbClient) captureProcessState(ctx context.Context, name, appPackage string) (string, error) {
+	output, err := client.captureOutput(ctx, "shell", "pidof", appPackage)
+	alive := err == nil && strings.TrimSpace(output) != ""
+	summary := fmt.Sprintf("schema=kurdistan-process-state-v1\napplication=%s\nalive=%t\n", appPackage, alive)
+	if writeErr := os.WriteFile(filepath.Join(client.evidenceDir, name), []byte(summary), 0o644); writeErr != nil {
+		return output, fmt.Errorf("write %s: %w", name, writeErr)
+	}
+	return output, err
+}
+
+func (client adbClient) captureInstrumentation(ctx context.Context, name string, args ...string) (string, error) {
+	output, err := client.captureOutput(ctx, args...)
+	summary := summarizeInstrumentation(output)
+	if len(summary) > maxDiagnosticBytes {
+		return output, errors.New("instrumentation summary exceeded its byte limit")
+	}
+	if writeErr := os.WriteFile(filepath.Join(client.evidenceDir, name), []byte(summary), 0o644); writeErr != nil {
+		return output, fmt.Errorf("write %s: %w", name, writeErr)
+	}
+	return output, err
+}
+
+func summarizeInstrumentation(input string) string {
+	tests := completedTestCount(input)
+	lower := strings.ToLower(input)
+	failure := false
+	for _, marker := range []string{"instrumentation_failed", "process crashed", "failures!!!", "shortmsg=process crashed"} {
+		failure = failure || strings.Contains(lower, marker)
+	}
+	summary := fmt.Sprintf("schema=kurdistan-instrumentation-summary-v1\ncompleted_tests=%d\njunit_success=%t\nfailure_marker=%t\n", tests, strings.Contains(input, "OK ("), failure)
+	for _, test := range failedInstrumentationTests(input, 64) {
+		summary += "failed_test=" + test + "\n"
+	}
+	return summary
+}
+
+func failedInstrumentationTests(input string, limit int) []string {
+	if limit < 1 {
+		return nil
+	}
+	var className, testName string
+	failed := make([]string, 0)
+	for _, raw := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(raw)
+		switch {
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: class="):
+			className = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: class="))
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: test="):
+			testName = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: test="))
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS_CODE:"):
+			code, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS_CODE:")))
+			if err == nil && code < 0 {
+				identity := className + "#" + testName
+				if safeTestIdentity(identity) {
+					failed = append(failed, identity)
+					if len(failed) == limit {
+						return failed
+					}
+				}
+			}
+			className, testName = "", ""
+		}
+	}
+	return failed
+}
+
+func safeTestIdentity(value string) bool {
+	if value == "#" || len(value) > 256 || strings.Count(value, "#") != 1 {
+		return false
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '.' || character == '_' || character == '$' || character == '#' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func waitForAndroidFramework(parent context.Context, client adbClient) error {
+	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+	defer cancel()
+
+	const requiredConsecutiveChecks = 3
+	consecutive := 0
+	for attempt := 1; ; attempt++ {
+		name := fmt.Sprintf("11a-framework-health-%03d.txt", attempt)
+		output, err := client.capture(ctx, name, "shell", "service", "check", "activity")
+		if frameworkServiceReady(output, err) {
+			consecutive++
+			if consecutive == requiredConsecutiveChecks {
+				return nil
+			}
+		} else {
+			consecutive = 0
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("Android activity framework did not remain healthy: %w", ctx.Err())
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func frameworkServiceReady(output string, err error) bool {
+	if err != nil {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(output))
+	return normalized == "service activity: found"
 }
 
 func removeInstalledPackage(ctx context.Context, client adbClient, label, packageName string) error {
@@ -450,6 +576,30 @@ type adbClient struct {
 	evidenceDir string
 }
 
+type boundedBuffer struct {
+	buffer   bytes.Buffer
+	limit    int
+	exceeded bool
+}
+
+func (buffer *boundedBuffer) Write(input []byte) (int, error) {
+	remaining := buffer.limit - buffer.buffer.Len()
+	if remaining > 0 {
+		write := len(input)
+		if write > remaining {
+			write = remaining
+		}
+		_, _ = buffer.buffer.Write(input[:write])
+	}
+	if len(input) > remaining {
+		buffer.exceeded = true
+	}
+	return len(input), nil
+}
+
+func (buffer *boundedBuffer) String() string { return buffer.buffer.String() }
+func (buffer *boundedBuffer) Bytes() []byte  { return buffer.buffer.Bytes() }
+
 func (client adbClient) capture(ctx context.Context, name string, args ...string) (string, error) {
 	commandArgs := make([]string, 0, len(args)+2)
 	if client.serial != "" {
@@ -457,14 +607,146 @@ func (client adbClient) capture(ctx context.Context, name string, args ...string
 	}
 	commandArgs = append(commandArgs, args...)
 	command := exec.CommandContext(ctx, client.path, commandArgs...)
-	var combined bytes.Buffer
+	combined := boundedBuffer{limit: maxCommandEvidence}
 	command.Stdout = &combined
 	command.Stderr = &combined
 	err := command.Run()
 	if writeErr := os.WriteFile(filepath.Join(client.evidenceDir, name), combined.Bytes(), 0o644); writeErr != nil {
 		return combined.String(), fmt.Errorf("write %s: %w", name, writeErr)
 	}
+	if combined.exceeded {
+		return combined.String(), fmt.Errorf("adb evidence exceeded %d bytes", maxCommandEvidence)
+	}
 	return combined.String(), err
+}
+
+func (client adbClient) captureDiagnostic(ctx context.Context, name, appPackage string, args ...string) (string, error) {
+	commandArgs := make([]string, 0, len(args)+2)
+	if client.serial != "" {
+		commandArgs = append(commandArgs, "-s", client.serial)
+	}
+	commandArgs = append(commandArgs, args...)
+	command := exec.CommandContext(ctx, client.path, commandArgs...)
+	combined := boundedBuffer{limit: maxLogcatInput}
+	command.Stdout = &combined
+	command.Stderr = &combined
+	commandErr := command.Run()
+	summary := summarizeDiagnostics(combined.String(), appPackage, combined.exceeded)
+	if len(summary) > maxDiagnosticBytes {
+		return summary[:maxDiagnosticBytes], errors.New("sanitized diagnostic summary exceeded its byte limit")
+	}
+	if err := os.WriteFile(filepath.Join(client.evidenceDir, name), []byte(summary), 0o644); err != nil {
+		return summary, fmt.Errorf("write %s: %w", name, err)
+	}
+	if combined.exceeded {
+		return summary, fmt.Errorf("diagnostic input exceeded %d bytes", maxLogcatInput)
+	}
+	return summary, commandErr
+}
+
+func summarizeDiagnostics(input, appPackage string, truncated bool) string {
+	lower := strings.ToLower(strings.ReplaceAll(input, "\r\n", "\n"))
+	packageName := strings.ToLower(strings.TrimSpace(appPackage))
+	appCrash := containsAppCrash(lower, packageName)
+	anr := false
+	javaCrash := false
+	nativeCrash := false
+	for _, line := range strings.Split(lower, "\n") {
+		line = strings.TrimSpace(line)
+		if packageIdentityAt(line, "anr in ", packageName) {
+			anr = true
+		}
+		if strings.Contains(line, "fatal exception") && strings.Contains(lower, "process: "+packageName) {
+			javaCrash = true
+		}
+		if strings.Contains(line, "fatal signal") && (strings.Contains(lower, "cmdline: "+packageName) || strings.Contains(lower, ">>> "+packageName)) {
+			nativeCrash = true
+		}
+	}
+	instrumentationFailure := false
+	for _, marker := range []string{"instrumentation_failed", "process crashed", "failures!!!", "shortmsg=process crashed"} {
+		instrumentationFailure = instrumentationFailure || strings.Contains(lower, marker)
+	}
+	return fmt.Sprintf(
+		"schema=kurdistan-device-diagnostic-summary-v1\napp_package=%s\ninput_truncated=%t\napp_crash=%t\njava_crash=%t\nnative_crash=%t\nanr=%t\ninstrumentation_failure=%t\n",
+		appPackage, truncated, appCrash, javaCrash, nativeCrash, anr, instrumentationFailure,
+	)
+}
+
+func captureInstalledIdentity(ctx context.Context, client adbClient, value options) error {
+	appPaths, appErr := client.captureOutput(ctx, "shell", "pm", "path", value.appPackage)
+	testPaths, testErr := client.captureOutput(ctx, "shell", "pm", "path", value.testPackage)
+	runners, runnerErr := client.captureOutput(ctx, "shell", "pm", "list", "instrumentation")
+	if appErr != nil || testErr != nil || runnerErr != nil {
+		return errors.New("query installed package identity")
+	}
+	appSplits := installedPathCount(appPaths)
+	testSplits := installedPathCount(testPaths)
+	expectedRunner := "instrumentation:" + value.testPackage + "/" + value.runner + " (target=" + value.appPackage + ")"
+	if appSplits < 1 || testSplits < 1 || !containsExactLine(runners, expectedRunner) {
+		return errors.New("installed application or instrumentation identity is incomplete")
+	}
+	appDigest, err := fileSHA256(value.appAPK)
+	if err != nil {
+		return fmt.Errorf("digest application APK: %w", err)
+	}
+	testDigest, err := fileSHA256(value.testAPK)
+	if err != nil {
+		return fmt.Errorf("digest instrumentation APK: %w", err)
+	}
+	summary := fmt.Sprintf("schema=kurdistan-installed-package-identity-v1\napplication=%s\napplication_splits=%d\napplication_apk_sha256=%s\ninstrumentation=%s\ninstrumentation_splits=%d\ninstrumentation_apk_sha256=%s\nrunner=%s\n", value.appPackage, appSplits, appDigest, value.testPackage, testSplits, testDigest, value.runner)
+	if err := os.WriteFile(filepath.Join(value.evidenceDir, "04c-installed-package-identity.txt"), []byte(summary), 0o644); err != nil {
+		return fmt.Errorf("write installed package identity: %w", err)
+	}
+	return nil
+}
+
+func (client adbClient) captureOutput(ctx context.Context, args ...string) (string, error) {
+	commandArgs := make([]string, 0, len(args)+2)
+	if client.serial != "" {
+		commandArgs = append(commandArgs, "-s", client.serial)
+	}
+	commandArgs = append(commandArgs, args...)
+	command := exec.CommandContext(ctx, client.path, commandArgs...)
+	combined := boundedBuffer{limit: maxCommandEvidence}
+	command.Stdout, command.Stderr = &combined, &combined
+	err := command.Run()
+	if combined.exceeded {
+		return combined.String(), fmt.Errorf("adb identity output exceeded %d bytes", maxCommandEvidence)
+	}
+	return combined.String(), err
+}
+
+func installedPathCount(output string) int {
+	count := 0
+	for _, line := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "package:") {
+			count++
+		}
+	}
+	return count
+}
+
+func containsExactLine(output, wanted string) bool {
+	for _, line := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func fileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func locateADB(explicit string) (string, error) {
@@ -590,7 +872,7 @@ func evaluateInstrumentation(output, logcat, appPackage string, minimumTests int
 	if !strings.Contains(output, "OK (") {
 		return errors.New("instrumentation did not report a successful JUnit completion")
 	}
-	if containsAppCrash(logcat, appPackage) {
+	if diagnosticSummaryReportsCrash(logcat) || containsAppCrash(logcat, appPackage) {
 		return errors.New("device log records an application crash during the test interval")
 	}
 	return nil
@@ -648,6 +930,15 @@ func containsAppCrash(logcat, appPackage string) bool {
 				return true
 			}
 			javaCrashLinesRemaining--
+		}
+	}
+	return false
+}
+
+func diagnosticSummaryReportsCrash(summary string) bool {
+	for _, line := range strings.Split(strings.ReplaceAll(summary, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == "app_crash=true" {
+			return true
 		}
 	}
 	return false

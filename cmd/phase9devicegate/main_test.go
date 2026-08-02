@@ -60,6 +60,25 @@ func TestLogcatClearUsesDeviceShellForMinimumSdkCompatibility(t *testing.T) {
 	}
 }
 
+func TestFrameworkServiceReadyRequiresExactHealthyActivityService(t *testing.T) {
+	if !frameworkServiceReady("Service activity: found\n", nil) {
+		t.Fatal("frameworkServiceReady rejected the healthy activity service")
+	}
+	for _, test := range []struct {
+		output string
+		err    error
+	}{
+		{output: "Service activity: not found"},
+		{output: "activity: found"},
+		{output: "Service package: found"},
+		{output: "Service activity: found", err: errors.New("broken pipe")},
+	} {
+		if frameworkServiceReady(test.output, test.err) {
+			t.Fatalf("frameworkServiceReady accepted output %q with error %v", test.output, test.err)
+		}
+	}
+}
+
 func TestEvaluateInstrumentationAcceptsCompletedCrashFreeRun(t *testing.T) {
 	output := `
 INSTRUMENTATION_STATUS_CODE: 0
@@ -194,6 +213,91 @@ func TestEvaluateInstrumentationRejectsAppANR(t *testing.T) {
 	logcat := "ANR in org.kurdistanvpn.app.debug (org.kurdistanvpn.app.debug/.MainActivity)"
 	if err := evaluateInstrumentation(output, logcat, defaultAppPackage, 1); err == nil {
 		t.Fatal("evaluateInstrumentation() accepted an app ANR")
+	}
+}
+
+func TestDiagnosticSummaryPreservesCrashClassWithoutRawLogData(t *testing.T) {
+	raw := strings.Join([]string{
+		"FATAL EXCEPTION: main",
+		"Process: org.kurdistanvpn.app.debug, PID: 7781",
+		"java.lang.IllegalStateException: token=secret-value https://10.0.0.8/profile",
+		"at org.kurdistanvpn.app.MainActivity.onCreate(MainActivity.kt:42)",
+	}, "\n")
+	summary := summarizeDiagnostics(raw, defaultAppPackage, false)
+	for _, required := range []string{
+		"schema=kurdistan-device-diagnostic-summary-v1",
+		"app_crash=true",
+		"java_crash=true",
+		"input_truncated=false",
+	} {
+		if !strings.Contains(summary, required) {
+			t.Fatalf("summary %q is missing %q", summary, required)
+		}
+	}
+	for _, forbidden := range []string{"secret-value", "10.0.0.8", "https://", "7781", "MainActivity.kt"} {
+		if strings.Contains(summary, forbidden) {
+			t.Fatalf("summary retained private raw log content %q: %q", forbidden, summary)
+		}
+	}
+	if len(summary) > maxDiagnosticBytes {
+		t.Fatalf("summary size = %d, limit = %d", len(summary), maxDiagnosticBytes)
+	}
+}
+
+func TestEvaluateInstrumentationRejectsCategoricalCrashSummary(t *testing.T) {
+	output := "INSTRUMENTATION_STATUS_CODE: 0\nOK (1 test)"
+	summary := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=true\n"
+	if err := evaluateInstrumentation(output, summary, defaultAppPackage, 1); err == nil {
+		t.Fatal("evaluateInstrumentation accepted a categorical app-crash result")
+	}
+}
+
+func TestInstrumentationSummaryKeepsOnlyBoundedTestIdentity(t *testing.T) {
+	raw := strings.Join([]string{
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.ProfileImportTest",
+		"INSTRUMENTATION_STATUS: test=rejectsForgedProfile",
+		"INSTRUMENTATION_STATUS: stack=token=secret-value https://10.0.0.8/profile",
+		"INSTRUMENTATION_STATUS_CODE: -2",
+		"FAILURES!!!",
+	}, "\n")
+	summary := summarizeInstrumentation(raw)
+	if !strings.Contains(summary, "failed_test=org.kurdistanvpn.app.ProfileImportTest#rejectsForgedProfile") {
+		t.Fatalf("summary omitted safe failed-test identity: %q", summary)
+	}
+	for _, forbidden := range []string{"secret-value", "10.0.0.8", "https://", "stack="} {
+		if strings.Contains(summary, forbidden) {
+			t.Fatalf("summary retained raw instrumentation data %q: %q", forbidden, summary)
+		}
+	}
+	if safeTestIdentity("org.example.Test#method\ninjected=true") {
+		t.Fatal("safeTestIdentity accepted a line-injection payload")
+	}
+}
+
+func TestBoundedBufferRetainsPrefixAndSignalsOverflow(t *testing.T) {
+	buffer := boundedBuffer{limit: 4}
+	if written, err := buffer.Write([]byte("abcdef")); err != nil || written != 6 {
+		t.Fatalf("Write() = (%d, %v), want (6, nil)", written, err)
+	}
+	if got := buffer.String(); got != "abcd" {
+		t.Fatalf("buffer = %q, want %q", got, "abcd")
+	}
+	if !buffer.exceeded {
+		t.Fatal("bounded buffer did not report overflow")
+	}
+}
+
+func TestInstalledPackageIdentityParsersDoNotRetainPaths(t *testing.T) {
+	paths := "package:/data/app/~~stable-device-token/base.apk\npackage:/data/app/split.apk\n"
+	if got := installedPathCount(paths); got != 2 {
+		t.Fatalf("installedPathCount() = %d, want 2", got)
+	}
+	runner := "instrumentation:org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner (target=org.kurdistanvpn.app.internal)"
+	if !containsExactLine(runner+"\n", runner) {
+		t.Fatal("containsExactLine rejected the exact instrumentation identity")
+	}
+	if containsExactLine(runner+".suffix\n", runner) {
+		t.Fatal("containsExactLine accepted an instrumentation identity suffix collision")
 	}
 }
 

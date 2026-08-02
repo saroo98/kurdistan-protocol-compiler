@@ -148,6 +148,10 @@ func ValidateCertificate(value Certificate, documents []ReceiptDocument, policy 
 	}
 	seenLanes := map[string]bool{}
 	var earliestExpiry time.Time
+	var executionRunID string
+	var executionAttempt int
+	var executionTrigger string
+	var workflow WorkflowIdentity
 	for _, reference := range value.Receipts {
 		lane := reference.ProofID + "\x00" + reference.OperatingSystem
 		if !expectedLanes[lane] || seenLanes[lane] {
@@ -168,6 +172,14 @@ func ValidateCertificate(value Certificate, documents []ReceiptDocument, policy 
 		}
 		if receipt.ReceiptID != reference.ReceiptID || receipt.Proof.ID != reference.ProofID || receipt.Runner.OperatingSystem != reference.OperatingSystem || receipt.Subject != value.Subject || receipt.Proof.PolicySHA256 != value.PolicySHA256 {
 			return fmt.Errorf("assurance receipt identity or subject mismatch for %q", reference.Path)
+		}
+		if executionRunID == "" {
+			executionRunID = receipt.Execution.RunID
+			executionAttempt = receipt.Execution.Attempt
+			executionTrigger = receipt.Execution.Trigger
+			workflow = receipt.Workflow
+		} else if receipt.Execution.RunID != executionRunID || receipt.Execution.Attempt != executionAttempt || receipt.Execution.Trigger != executionTrigger || receipt.Workflow != workflow {
+			return fmt.Errorf("assurance receipt %q was replayed from another workflow execution", reference.Path)
 		}
 		if err := ValidateReceipt(receipt, policy, policySHA256, now); err != nil {
 			return fmt.Errorf("receipt %q: %w", reference.Path, err)
