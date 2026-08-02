@@ -157,6 +157,9 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}",
 			"include-hidden-files: true",
 			"-ref refs/subjects/${{ inputs.sha || github.sha }}",
+			"expected 13 proof receipts",
+			"-required', 'dependency-freshness'",
+			"-required', 'docs-evidence'",
 		},
 		"candidate.yml": {
 			"assurance_run_attempt:",

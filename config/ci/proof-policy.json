@@ -69,7 +69,7 @@
       "operatingSystems": ["linux"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": true,
-      "invalidatedBy": ["ROADMAP.md", "docs/**", "config/release/**", "testdata/evidence/**"],
+      "invalidatedBy": ["ROADMAP.md", "docs/**", "config/release/**", "testdata/evidence/**", "cmd/phase15verify/**", "cmd/releaseverify/**"],
       "authorizedPhase": 16
     },
     {

@@ -14,7 +14,7 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_evidence": "ABSENT",
-      "post_sha256": "ef8a9dab423373d0829c02d2189a40b29b378cd1e25e44222cef5ac93dbe1d1d"
+      "post_sha256": "7ef88343029a170b845c238ce16ba3549160557aaa1f9527001128246eab0de1"
     },
     {
       "path": ".github/workflows/candidate.yml",
@@ -274,12 +274,12 @@
     {
       "path": "config/ci/impact-policy.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "832b08b12a64d69444026833a3fa47af639d8ba18f2e0dcf87739ea302b2fe1d"
+      "post_sha256": "35d044e3908359ca7dc2551e778988db29609e3d163657cef0ecc0ef32e72b45"
     },
     {
       "path": "config/ci/proof-policy.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "77ab43250d0a3f3773c5d5303b9ed2fc3f2472589ac6fe1c104ac3d434cc0755"
+      "post_sha256": "a0077e61822ab088b2f9e18c8e2c7ad956f5f52158396b9c96c910c64cacc90c"
     },
     {
       "path": "config/ci/release-evidence-policy.json",
@@ -339,12 +339,12 @@
     {
       "path": "internal/assurance/policy.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "d5cb9aa508d4910d42a3debea5d8e2f9b3debc45dc9930a00451fff41eec0963"
+      "post_sha256": "8a7f471402cd4c5206e638c68dc182d36700216ac30cf39ed580f5c082d327ce"
     },
     {
       "path": "internal/assurance/policy_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b968dfa38352479a27d8e348055611ab318865448195f881c5f5af5e18ace6dc"
+      "post_sha256": "bc742f53bf5bdaa9547528718b25a60365a9b1d17db9130c8bd2eab4b606579e"
     },
     {
       "path": "internal/assurance/receipt.go",
@@ -479,7 +479,7 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f4dad48c537d2d23e0a78efded7a89446fbe7fdb32bcfbef0f4e17393b693c80"
+      "post_sha256": "33b035acd181e08e91731f960304615e3cece3fe3aad0cf065fc41c59c40ad26"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
