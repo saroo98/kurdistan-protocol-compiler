@@ -169,12 +169,12 @@
     {
       "path": "cmd/releaseverify/artifact_metadata.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "610b8f8a663fa2c51b1523fdbc68d5a34ae4b6ef3ef49dbd3a515a3e9902f833"
+      "post_sha256": "1dd918898a363a8a7042e6769b116dd258f631cb068ccea0128056d7fb5bfe9e"
     },
     {
       "path": "cmd/releaseverify/artifact_metadata_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "71be8c3c1c8fc3794e09121a6f638344acea671539a3eb0604e840dcee44e08c"
+      "post_sha256": "9972c5fc97a511e478b65fc66973d74889c43b7ef1d7a58d77a11b4e5f3f9a08"
     },
     {
       "path": "cmd/releaseverify/main.go",

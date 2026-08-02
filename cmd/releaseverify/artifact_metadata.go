@@ -55,11 +55,11 @@ func writeArtifactMetadata(root string, version versionProperties, subject strin
 	if len(specs) == 0 {
 		return errors.New("at least one artifact is required")
 	}
-	rootAbsolute, err := filepath.Abs(root)
+	rootInputAbsolute, err := filepath.Abs(root)
 	if err != nil {
 		return fmt.Errorf("resolve repository root: %w", err)
 	}
-	rootAbsolute, err = filepath.EvalSymlinks(rootAbsolute)
+	rootAbsolute, err := filepath.EvalSymlinks(rootInputAbsolute)
 	if err != nil {
 		return fmt.Errorf("resolve repository root symlinks: %w", err)
 	}
@@ -113,11 +113,7 @@ func writeArtifactMetadata(root string, version versionProperties, subject strin
 		return fmt.Errorf("encode artifact metadata: %w", err)
 	}
 	raw = append(raw, '\n')
-	outputAbsolute := output
-	if !filepath.IsAbs(outputAbsolute) {
-		outputAbsolute = filepath.Join(rootAbsolute, filepath.FromSlash(outputAbsolute))
-	}
-	outputRelative, err := pathWithinRoot(rootAbsolute, outputAbsolute)
+	outputRelative, err := outputPathWithinRoot(rootInputAbsolute, rootAbsolute, output)
 	if err != nil {
 		return fmt.Errorf("artifact metadata output: %w", err)
 	}
@@ -128,6 +124,19 @@ func writeArtifactMetadata(root string, version versionProperties, subject strin
 		return fmt.Errorf("write artifact metadata: %w", err)
 	}
 	return nil
+}
+
+func outputPathWithinRoot(inputRoot, canonicalRoot, output string) (string, error) {
+	if !filepath.IsAbs(output) {
+		return pathWithinRoot(canonicalRoot, filepath.Join(canonicalRoot, filepath.FromSlash(output)))
+	}
+	for _, root := range []string{inputRoot, canonicalRoot} {
+		relative, err := pathWithinRoot(root, output)
+		if err == nil {
+			return relative, nil
+		}
+	}
+	return "", errors.New("path escapes repository root")
 }
 
 func resolveArtifact(rootAbsolute, pattern string) (string, string, error) {
