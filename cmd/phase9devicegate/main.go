@@ -190,6 +190,9 @@ func run(value options) error {
 	if err := verifyExpectedDeviceIdentity(value.expectedAPI, value.expectedABI, sdkLevel, primaryABI); err != nil {
 		return err
 	}
+	if err := waitForAndroidFramework(ctx, client, "02a"); err != nil {
+		return err
+	}
 	expectedTests := expectedTestsForSDK(expectedTestManifest, sdkLevel)
 	minimumTests := value.minimumTests
 	if len(expectedTests) > 0 && minimumTests > len(expectedTests) {
@@ -201,10 +204,10 @@ func run(value options) error {
 	if err := removeInstalledPackage(ctx, client, "app", value.appPackage); err != nil {
 		return err
 	}
-	if _, err := client.capture(ctx, "03-install-app.txt", "install", "-r", value.appAPK); err != nil {
+	if err := installPackage(ctx, client, "03-install-app.txt", value.appAPK); err != nil {
 		return fmt.Errorf("install application: %w", err)
 	}
-	if _, err := client.capture(ctx, "04-install-test.txt", "install", "-r", value.testAPK); err != nil {
+	if err := installPackage(ctx, client, "04-install-test.txt", value.testAPK); err != nil {
 		return fmt.Errorf("install instrumentation: %w", err)
 	}
 	if err := captureInstalledIdentity(ctx, client, value); err != nil {
@@ -255,7 +258,7 @@ func run(value options) error {
 		value.appPackage,
 		"android.permission.POST_NOTIFICATIONS",
 	)
-	if err := clearLogcat(ctx, client, "05-clear-logcat.txt"); err != nil {
+	if err := prepareLogcatBaseline(ctx, client, "05-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear logcat: %w", err)
 	}
 	_, _ = client.capture(ctx, "06-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
@@ -299,10 +302,10 @@ func run(value options) error {
 		return err
 	}
 	_, _ = client.capture(ctx, "11-pre-test-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
-	if err := waitForAndroidFramework(ctx, client); err != nil {
+	if err := waitForAndroidFramework(ctx, client, "11a"); err != nil {
 		return err
 	}
-	if err := clearLogcat(ctx, client, "12-pre-test-clear-logcat.txt"); err != nil {
+	if err := prepareLogcatBaseline(ctx, client, "12-pre-test-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear pre-test logcat: %w", err)
 	}
 	instrumentation, instrumentationErr := client.captureInstrumentation(
@@ -442,16 +445,18 @@ func safeTestIdentity(value string) bool {
 	return true
 }
 
-func waitForAndroidFramework(parent context.Context, client adbClient) error {
+func waitForAndroidFramework(parent context.Context, client adbClient, evidencePrefix string) error {
 	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 	defer cancel()
 
 	const requiredConsecutiveChecks = 3
 	consecutive := 0
 	for attempt := 1; ; attempt++ {
-		name := fmt.Sprintf("11a-framework-health-%03d.txt", attempt)
-		output, err := client.capture(ctx, name, "shell", "service", "check", "activity")
-		if frameworkServiceReady(output, err) {
+		activityName := fmt.Sprintf("%s-framework-activity-%03d.txt", evidencePrefix, attempt)
+		packageName := fmt.Sprintf("%s-framework-package-%03d.txt", evidencePrefix, attempt)
+		activityOutput, activityErr := client.capture(ctx, activityName, "shell", "service", "check", "activity")
+		packageOutput, packageErr := client.capture(ctx, packageName, "shell", "service", "check", "package")
+		if frameworkServicesReady(activityOutput, activityErr, packageOutput, packageErr) {
 			consecutive++
 			if consecutive == requiredConsecutiveChecks {
 				return nil
@@ -461,18 +466,41 @@ func waitForAndroidFramework(parent context.Context, client adbClient) error {
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("Android activity framework did not remain healthy: %w", ctx.Err())
+			return fmt.Errorf("Android activity and package services did not remain healthy: %w", ctx.Err())
 		case <-time.After(time.Second):
 		}
 	}
 }
 
-func frameworkServiceReady(output string, err error) bool {
-	if err != nil {
+func frameworkServicesReady(activityOutput string, activityErr error, packageOutput string, packageErr error) bool {
+	if activityErr != nil || packageErr != nil {
 		return false
 	}
-	normalized := strings.ToLower(strings.TrimSpace(output))
-	return normalized == "service activity: found"
+	activity := strings.ToLower(strings.TrimSpace(activityOutput))
+	packages := strings.ToLower(strings.TrimSpace(packageOutput))
+	return activity == "service activity: found" && packages == "service package: found"
+}
+
+func installPackage(ctx context.Context, client adbClient, evidenceName, apkPath string) error {
+	output, err := client.capture(ctx, evidenceName, "install", "-r", apkPath)
+	if err == nil {
+		return nil
+	}
+	if !transientPackageServiceFailure(output) {
+		return err
+	}
+	stem := strings.TrimSuffix(evidenceName, filepath.Ext(evidenceName))
+	if waitErr := waitForAndroidFramework(ctx, client, stem+"-retry"); waitErr != nil {
+		return fmt.Errorf("package service recovery: %w", waitErr)
+	}
+	_, retryErr := client.capture(ctx, stem+"-retry.txt", "install", "-r", apkPath)
+	return retryErr
+}
+
+func transientPackageServiceFailure(output string) bool {
+	normalized := strings.ToLower(output)
+	return strings.Contains(normalized, "failure calling service package") &&
+		strings.Contains(normalized, "broken pipe")
 }
 
 func removeInstalledPackage(ctx context.Context, client adbClient, label, packageName string) error {
@@ -557,17 +585,52 @@ func logcatClearArgs() []string {
 	return []string{"shell", "logcat", "-b", "all", "-c"}
 }
 
-func clearLogcat(ctx context.Context, client adbClient, evidenceName string) error {
+func prepareLogcatBaseline(ctx context.Context, client adbClient, evidenceName, appPackage string) error {
 	if _, err := client.capture(ctx, evidenceName, logcatClearArgs()...); err == nil {
 		return nil
 	}
 	// API 26 can transiently fail the first clear immediately after package
-	// installation while logd reopens its buffers. Retry once, preserve both
-	// command results as evidence, and still fail closed if the retry fails.
+	// installation while logd reopens its buffers. Retry once and preserve both
+	// command results before attempting the bounded clean-baseline fallback.
 	time.Sleep(250 * time.Millisecond)
-	retryName := strings.TrimSuffix(evidenceName, filepath.Ext(evidenceName)) + "-retry.txt"
-	_, err := client.capture(ctx, retryName, logcatClearArgs()...)
-	return err
+	stem := strings.TrimSuffix(evidenceName, filepath.Ext(evidenceName))
+	retryName := stem + "-retry.txt"
+	if _, err := client.capture(ctx, retryName, logcatClearArgs()...); err == nil {
+		return nil
+	}
+
+	// Some API 26 images deny log-buffer clearing to the shell user. Android's
+	// own logcat documentation notes that options can be root-only and vary by
+	// OS version. In that case, fail closed unless bounded, redacted snapshots
+	// prove that the pre-run buffers contain no crash attributed to this app.
+	// This preserves crash detection without requiring elevated emulator access.
+	mainSummary, mainErr := client.captureDiagnostic(
+		ctx,
+		stem+"-baseline-main.txt",
+		appPackage,
+		"logcat", "-b", "all", "-d", "-v", "brief",
+	)
+	crashSummary, crashErr := client.captureDiagnostic(
+		ctx,
+		stem+"-baseline-crash.txt",
+		appPackage,
+		"logcat", "-b", "crash", "-d", "-v", "brief",
+	)
+	if mainErr != nil || crashErr != nil {
+		return fmt.Errorf("log buffers cannot be cleared or safely baselined: main=%v crash=%v", mainErr, crashErr)
+	}
+	if !diagnosticBaselineIsClean(mainSummary, crashSummary) {
+		return errors.New("log buffers cannot be cleared and contain a pre-existing app crash")
+	}
+	status := "schema=kurdistan-logcat-baseline-v1\nclear_supported=false\napp_crash=false\n"
+	if err := os.WriteFile(filepath.Join(client.evidenceDir, stem+"-baseline-status.txt"), []byte(status), 0o644); err != nil {
+		return fmt.Errorf("write logcat baseline status: %w", err)
+	}
+	return nil
+}
+
+func diagnosticBaselineIsClean(summaries ...string) bool {
+	return !diagnosticSummaryReportsCrash(strings.Join(summaries, "\n"))
 }
 
 type adbClient struct {
