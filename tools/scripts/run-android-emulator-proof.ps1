@@ -131,13 +131,14 @@ $emulatorPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDRO
 $platformToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'platform-tools')
 $commandLineToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'cmdline-tools/latest')
 $systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64")
+$emulatorPackageRevision = Get-SdkPackageRevision -MetadataPath $emulatorPackage
 $emulatorVersionText = (@(& $emulator -version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
 $adbVersionText = (@(& $adb version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
-$emulatorVersionMatch = [regex]::Match($emulatorVersionText, '(?m)(?:^|\|\s*)Android emulator version ([0-9]+(?:\.[0-9]+){1,3})(?:\s|$)')
+$emulatorVersionMatch = [regex]::Match($emulatorVersionText, '(?im)Android\s+emulator\s+version\s+([0-9]+(?:\.[0-9]+){1,3})(?:\s|$)')
 $adbVersionMatch = [regex]::Match($adbVersionText, '(?m)^Android Debug Bridge version ([0-9]+(?:\.[0-9]+){1,3})(?:\s|$)')
-if (-not $emulatorVersionMatch.Success) { throw 'emulator version is unavailable' }
 if (-not $adbVersionMatch.Success) { throw 'adb version is unavailable' }
-$emulatorVersion = $emulatorVersionMatch.Groups[1].Value
+$emulatorVersion = if ($emulatorVersionMatch.Success) { $emulatorVersionMatch.Groups[1].Value } else { $emulatorPackageRevision }
+$emulatorVersionSource = if ($emulatorVersionMatch.Success) { 'executable-output' } else { 'sdk-package-metadata' }
 $adbVersion = $adbVersionMatch.Groups[1].Value
 $identity = [ordered]@{
     schema = 'kurdistan-emulator-package-identity-v1'
@@ -150,7 +151,8 @@ $identity = [ordered]@{
     }
     emulator = [ordered]@{
         version = $emulatorVersion
-        packageRevision = Get-SdkPackageRevision -MetadataPath $emulatorPackage
+        versionSource = $emulatorVersionSource
+        packageRevision = $emulatorPackageRevision
         executableSha256 = $emulatorDigest
         metadataSha256 = (Get-FileHash -LiteralPath $emulatorPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     }

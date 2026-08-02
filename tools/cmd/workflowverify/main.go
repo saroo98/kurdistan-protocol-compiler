@@ -111,6 +111,8 @@ func verifyEmulatorProofScript(path string) error {
 		"kurdistan-emulator-package-identity-v1",
 		"Resolve-SdkPackageMetadata",
 		"source.properties",
+		"$emulatorPackageRevision = Get-SdkPackageRevision",
+		"$emulatorVersionSource = if ($emulatorVersionMatch.Success)",
 		"Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError",
 	} {
 		if !strings.Contains(content, token) {

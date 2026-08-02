@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -224,6 +225,13 @@ func runReceiptIssue(args []string, stdout, stderr io.Writer) error {
 const maxArtifactBytes int64 = 1 << 30
 
 func digestRootArtifact(root, relative string) (assurance.Artifact, error) {
+	return digestRootArtifactWithinLimit(root, relative, maxArtifactBytes)
+}
+
+func digestRootArtifactWithinLimit(root, relative string, maxBytes int64) (assurance.Artifact, error) {
+	if maxBytes < 0 || maxBytes == math.MaxInt64 {
+		return assurance.Artifact{}, fmt.Errorf("invalid artifact byte bound %d", maxBytes)
+	}
 	resolvedRoot, err := resolveRootDirectory(root, ".")
 	if err != nil {
 		return assurance.Artifact{}, err
@@ -239,8 +247,8 @@ func digestRootArtifact(root, relative string) (assurance.Artifact, error) {
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return assurance.Artifact{}, fmt.Errorf("path %q is not a regular non-symlink file", relative)
 	}
-	if info.Size() < 0 || info.Size() > maxArtifactBytes {
-		return assurance.Artifact{}, fmt.Errorf("artifact %q size %d is outside the 0..%d byte bound", relative, info.Size(), maxArtifactBytes)
+	if info.Size() < 0 || info.Size() > maxBytes {
+		return assurance.Artifact{}, fmt.Errorf("artifact %q size %d is outside the 0..%d byte bound", relative, info.Size(), maxBytes)
 	}
 	resolvedCandidate, err := filepath.EvalSymlinks(candidate)
 	if err != nil {
@@ -262,11 +270,11 @@ func digestRootArtifact(root, relative string) (assurance.Artifact, error) {
 		return assurance.Artifact{}, fmt.Errorf("artifact %q changed while being opened", relative)
 	}
 	hash := sha256.New()
-	written, err := io.Copy(hash, io.LimitReader(file, maxArtifactBytes+1))
+	written, err := io.Copy(hash, io.LimitReader(file, maxBytes+1))
 	if err != nil {
 		return assurance.Artifact{}, err
 	}
-	if written != opened.Size() || written > maxArtifactBytes {
+	if written != opened.Size() || written > maxBytes {
 		return assurance.Artifact{}, fmt.Errorf("artifact %q changed size while being hashed", relative)
 	}
 	finished, err := file.Stat()
