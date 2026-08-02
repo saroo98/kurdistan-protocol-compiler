@@ -133,10 +133,12 @@ $commandLineToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $e
 $systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64")
 $emulatorVersionLine = @(& $emulator -version 2>&1) | Where-Object { $_ -match '^Android emulator version ' } | Select-Object -First 1
 $adbVersionLine = @(& $adb version 2>&1) | Where-Object { $_ -match '^Android Debug Bridge version ' } | Select-Object -First 1
-if ($emulatorVersionLine -notmatch '^Android emulator version ([0-9.]+)') { throw 'emulator version is unavailable' }
-$emulatorVersion = $Matches[1]
-if ($adbVersionLine -notmatch '^Android Debug Bridge version ([0-9.]+)') { throw 'adb version is unavailable' }
-$adbVersion = $Matches[1]
+$emulatorVersionMatch = [regex]::Match([string]$emulatorVersionLine, '^Android emulator version ([0-9.]+)')
+$adbVersionMatch = [regex]::Match([string]$adbVersionLine, '^Android Debug Bridge version ([0-9.]+)')
+if (-not $emulatorVersionMatch.Success) { throw 'emulator version is unavailable' }
+if (-not $adbVersionMatch.Success) { throw 'adb version is unavailable' }
+$emulatorVersion = $emulatorVersionMatch.Groups[1].Value
+$adbVersion = $adbVersionMatch.Groups[1].Value
 $identity = [ordered]@{
     schema = 'kurdistan-emulator-package-identity-v1'
     api = $Api
@@ -217,8 +219,6 @@ try {
     }
     if (-not $booted) { throw 'emulator boot timed out' }
     & $adb shell input keyevent 82 | Out-Null
-    & $adb logcat -c
-
     & go run ./cmd/gate -proof $Proof -receipt $GateReceipt -timings $Timings
     $gateExit = $LASTEXITCODE
 } catch {

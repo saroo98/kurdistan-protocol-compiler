@@ -60,21 +60,55 @@ func TestLogcatClearUsesDeviceShellForMinimumSdkCompatibility(t *testing.T) {
 	}
 }
 
-func TestFrameworkServiceReadyRequiresExactHealthyActivityService(t *testing.T) {
-	if !frameworkServiceReady("Service activity: found\n", nil) {
-		t.Fatal("frameworkServiceReady rejected the healthy activity service")
+func TestDiagnosticBaselineAcceptsUnsupportedClearWithoutAppCrash(t *testing.T) {
+	main := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=false\n"
+	crash := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=false\n"
+	if !diagnosticBaselineIsClean(main, crash) {
+		t.Fatal("diagnosticBaselineIsClean rejected a clean bounded baseline")
+	}
+}
+
+func TestDiagnosticBaselineRejectsPreExistingAppCrash(t *testing.T) {
+	main := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=false\n"
+	crash := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=true\n"
+	if diagnosticBaselineIsClean(main, crash) {
+		t.Fatal("diagnosticBaselineIsClean accepted a pre-existing app crash")
+	}
+}
+
+func TestFrameworkServicesReadyRequiresExactHealthyServices(t *testing.T) {
+	if !frameworkServicesReady("Service activity: found\n", nil, "Service package: found\n", nil) {
+		t.Fatal("frameworkServicesReady rejected healthy activity and package services")
 	}
 	for _, test := range []struct {
-		output string
-		err    error
+		activityOutput string
+		activityErr    error
+		packageOutput  string
+		packageErr     error
 	}{
-		{output: "Service activity: not found"},
-		{output: "activity: found"},
-		{output: "Service package: found"},
-		{output: "Service activity: found", err: errors.New("broken pipe")},
+		{activityOutput: "Service activity: not found", packageOutput: "Service package: found"},
+		{activityOutput: "activity: found", packageOutput: "Service package: found"},
+		{activityOutput: "Service activity: found", packageOutput: "Service package: not found"},
+		{activityOutput: "Service activity: found", activityErr: errors.New("broken pipe"), packageOutput: "Service package: found"},
+		{activityOutput: "Service activity: found", packageOutput: "Service package: found", packageErr: errors.New("broken pipe")},
 	} {
-		if frameworkServiceReady(test.output, test.err) {
-			t.Fatalf("frameworkServiceReady accepted output %q with error %v", test.output, test.err)
+		if frameworkServicesReady(test.activityOutput, test.activityErr, test.packageOutput, test.packageErr) {
+			t.Fatalf("frameworkServicesReady accepted unhealthy services: %+v", test)
+		}
+	}
+}
+
+func TestTransientPackageServiceFailureIsNarrow(t *testing.T) {
+	if !transientPackageServiceFailure("Failure calling service package: Broken pipe (32)") {
+		t.Fatal("transientPackageServiceFailure rejected the observed package-service restart")
+	}
+	for _, output := range []string{
+		"INSTALL_FAILED_INVALID_APK",
+		"Failure calling service activity: Broken pipe (32)",
+		"Failure calling service package: Permission denied",
+	} {
+		if transientPackageServiceFailure(output) {
+			t.Fatalf("transientPackageServiceFailure accepted permanent failure %q", output)
 		}
 	}
 }

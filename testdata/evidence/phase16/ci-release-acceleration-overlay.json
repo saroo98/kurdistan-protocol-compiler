@@ -139,12 +139,12 @@
     {
       "path": "cmd/phase9devicegate/main.go",
       "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
-      "post_sha256": "321c46277f8ba77c663319bacf2bfa1961943b7c0524f2fc9492069a3b071ee5"
+      "post_sha256": "bcba8f517e088c57899a3e6790fa4e1ea38997b4afbc7fe33d592f05d536a517"
     },
     {
       "path": "cmd/phase9devicegate/main_test.go",
       "pre_sha256": "ef2d548a9e304470e91dbc77b6281fa791894776464e22b8e1080ab9acdfd41e",
-      "post_sha256": "3cf7d9d3af7badb951c84785ca2f00b668730031e820f4d856267c811b22c10c"
+      "post_sha256": "708cb9e712af98715d93978fb5aabf17ed0c4f07618e530a81788f1a18774f11"
     },
     {
       "path": "cmd/playrelease/main.go",
@@ -544,7 +544,7 @@
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c8ae41b54f6bdb3cbaa38224e11d1f923c7bab326051e2b02136f5d585790bde"
+      "post_sha256": "65327efc88041307f50545ccbc7c4b695ed2f78d75aa9f41f4c03eb37f5a376b"
     },
     {
       "path": "tools/tools.go",
