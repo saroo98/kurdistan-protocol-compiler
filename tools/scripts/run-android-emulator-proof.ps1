@@ -39,12 +39,15 @@ $emulator = Join-Path $env:ANDROID_HOME 'emulator/emulator'
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb'
 $systemImage = "system-images;android-$Api;google_apis;x86_64"
 $avdName = "kurdistan_phase16_api$Api"
+$avdHome = [IO.Path]::GetFullPath((Join-Path '.tools/phase16' "avd-api$Api"))
 $emulatorLog = ".tools/phase16/emulator-api$Api.log"
 $logcat = ".tools/phase16/logcat-api$Api.txt"
 
 New-Item -ItemType Directory -Force '.tools/phase16' | Out-Null
+New-Item -ItemType Directory -Force $avdHome | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $GateReceipt) | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $Timings) | Out-Null
+$env:ANDROID_AVD_HOME = $avdHome
 & $sdkManager 'platform-tools' 'emulator' $systemImage
 if ($LASTEXITCODE -ne 0) { throw 'sdkmanager failed' }
 
@@ -55,9 +58,14 @@ try {
 }
 'no' | & $avdManager create avd --force --name $avdName --package $systemImage --device 'pixel_6'
 if ($LASTEXITCODE -ne 0) { throw 'avdmanager failed' }
+$knownAVDs = @(& $emulator '-list-avds')
+if ($LASTEXITCODE -ne 0 -or $knownAVDs -notcontains $avdName) {
+    throw "created AVD $avdName is not visible to the emulator under ANDROID_AVD_HOME=$avdHome"
+}
 
 $process = $null
 $gateExit = 1
+$failure = $null
 try {
     $process = Start-Process -FilePath $emulator -ArgumentList @(
         '-avd', $avdName,
@@ -70,8 +78,17 @@ try {
         '-accel', 'on'
     ) -RedirectStandardOutput $emulatorLog -RedirectStandardError "$emulatorLog.stderr" -PassThru
 
-    & $adb wait-for-device
-    if ($LASTEXITCODE -ne 0) { throw 'adb did not discover the emulator' }
+    $discovered = $false
+    for ($attempt = 0; $attempt -lt 90; $attempt++) {
+        if ($process.HasExited) { throw "emulator exited before adb discovery with code $($process.ExitCode)" }
+        $devices = @(& $adb devices 2>$null)
+        if ($devices -match '^emulator-\d+\s+device$') {
+            $discovered = $true
+            break
+        }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $discovered) { throw 'adb emulator discovery timed out' }
     $booted = $false
     for ($attempt = 0; $attempt -lt 180; $attempt++) {
         if ($process.HasExited) { throw "emulator exited before boot with code $($process.ExitCode)" }
@@ -88,12 +105,22 @@ try {
 
     & go run ./cmd/gate -proof $Proof -receipt $GateReceipt -timings $Timings
     $gateExit = $LASTEXITCODE
+} catch {
+    $failure = $_.Exception.Message
 } finally {
     try { & $adb logcat -d | Set-Content -LiteralPath $logcat -Encoding utf8NoBOM } catch {}
     try { & $adb emu kill | Out-Null } catch {}
     if ($null -ne $process -and -not $process.HasExited) {
         $process.Kill($true)
     }
+}
+
+if ($null -ne $failure) {
+    Write-Host "::error::$failure"
+    if (-not (Test-Path -LiteralPath $GateReceipt)) {
+        & go run ./cmd/gate -proof $Proof -receipt $GateReceipt -timings $Timings
+    }
+    exit 1
 }
 
 exit $gateExit
