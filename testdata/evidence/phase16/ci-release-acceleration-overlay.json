@@ -49,7 +49,7 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
       "pre_sha256": "78d802b57630647970287df57bd07e5910e3c99c67729588115661149a8afbb7",
-      "post_sha256": "79fa0448e13ad0cc9f196eaac94cfb024d3996f1d29cbb68209bf2eb346e3c4b"
+      "post_sha256": "b3fdddd22806460a4eb943a73cb31a121c706613a2a429496f419cb41a4d397a"
     },
     {
       "path": "android/build.gradle.kts",
@@ -74,12 +74,12 @@
     {
       "path": "cmd/assure/issue.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "1acbf26086413c4c88739b8b7ec8afc593ccca67661d3d564f950eef881e828a"
+      "post_sha256": "af37de21e8d2f95f0f6ae376b5c00e7c489ae93d384aa9a606b214ed488d3fb2"
     },
     {
       "path": "cmd/assure/issue_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "bd18f647c9e5ce93075c9f0b76736a0407a340b861fbe4853f3e3dd1fc9ef3aa"
+      "post_sha256": "4e0112e03985232e9e30873a44af51290a72676fd44e68f639e8dd46a70b7d1c"
     },
     {
       "path": "cmd/assure/main.go",
@@ -139,7 +139,7 @@
     {
       "path": "cmd/phase9devicegate/main.go",
       "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
-      "post_sha256": "bcba8f517e088c57899a3e6790fa4e1ea38997b4afbc7fe33d592f05d536a517"
+      "post_sha256": "0aa566f1bcdaa8745d90917e653bd592208791d368fd0e6e570a3d39d78e4716"
     },
     {
       "path": "cmd/phase9devicegate/main_test.go",

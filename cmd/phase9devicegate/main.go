@@ -247,17 +247,25 @@ func run(value options) error {
 	); err != nil {
 		return fmt.Errorf("authorize test VPN: %w", err)
 	}
-	// POST_NOTIFICATIONS exists only on API 33 and newer. Record the result but
-	// keep the device gate compatible with the Phase 9 minimum API.
-	_, _ = client.capture(
-		ctx,
-		"04b-grant-notification-permission.txt",
-		"shell",
-		"pm",
-		"grant",
-		value.appPackage,
-		"android.permission.POST_NOTIFICATIONS",
-	)
+	if value.expectedAPI >= 33 {
+		if _, err := client.capture(
+			ctx,
+			"04b-grant-notification-permission.txt",
+			"shell",
+			"pm",
+			"grant",
+			value.appPackage,
+			"android.permission.POST_NOTIFICATIONS",
+		); err != nil {
+			return fmt.Errorf("grant notification permission: %w", err)
+		}
+	} else if err := os.WriteFile(
+		filepath.Join(value.evidenceDir, "04b-grant-notification-permission.txt"),
+		[]byte("not_applicable=api_below_33\n"),
+		0o644,
+	); err != nil {
+		return fmt.Errorf("record notification permission applicability: %w", err)
+	}
 	if err := prepareLogcatBaseline(ctx, client, "05-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear logcat: %w", err)
 	}

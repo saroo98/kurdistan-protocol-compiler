@@ -257,9 +257,11 @@ class Phase9FoundationUiTest {
         compose.onNodeWithText(activity.getString(UiR.string.scan_offline_qr))
             .performScrollTo()
             .performClick()
+        waitForText(activity.getString(UiR.string.cancel_scan))
         compose.onNodeWithText(activity.getString(UiR.string.cancel_scan))
             .assertIsDisplayed()
             .performClick()
+        waitForText(activity.getString(UiR.string.kurd_profiles))
         compose.onNodeWithText(activity.getString(UiR.string.kurd_profiles))
             .assertIsDisplayed()
     }
@@ -701,6 +703,12 @@ class Phase9FoundationUiTest {
             }
         } ?: controller.snapshot.value
         assertEquals("runtime did not become active: $observed", VpnRuntimeState.ACTIVE_KURD_LOOPBACK, observed.state)
+    }
+
+    private fun waitForText(text: String) {
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun resetRuntime(controller: VpnRuntimeController) {
