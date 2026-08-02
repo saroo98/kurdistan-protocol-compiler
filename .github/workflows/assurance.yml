@@ -1,0 +1,391 @@
+name: Phase 16 shadow assurance
+
+on:
+  push:
+    branches:
+      - engineering/ci-release-acceleration
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact commit SHA to validate
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  GOTELEMETRY: 'off'
+
+concurrency:
+  group: shadow-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: policy and workflow contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Verify running workflow definition equals exact subject
+        shell: pwsh
+        run: |
+          $running = (git rev-parse '${{ github.workflow_sha }}:.github/workflows/assurance.yml').Trim()
+          $subject = (git hash-object .github/workflows/assurance.yml).Trim()
+          if ($running -cne $subject) { throw "running workflow blob $running differs from exact-subject workflow blob $subject" }
+      - name: Verify workflow topology
+        run: go run ./cmd/assure workflow -root .
+      - name: Emit proof inventory
+        run: go run ./cmd/assure policy inventory -root . > proof-inventory.json
+      - name: Verify release metadata contract
+        run: go run ./cmd/releaseverify -root .
+      - name: Upload policy inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-policy-${{ github.run_id }}-${{ github.run_attempt }}
+          path: proof-inventory.json
+          if-no-files-found: error
+          retention-days: 14
+
+  go-proof:
+    name: ${{ matrix.proof }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        proof: [go-core, go-audit, operator]
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Create evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force ".tools/assurance/${{ github.run_id }}" | Out-Null
+      - name: Run exact proof
+        id: proof
+        continue-on-error: true
+        run: >-
+          go run ./cmd/gate
+          -proof ${{ matrix.proof }}
+          -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-timings.json
+      - name: Issue policy-bound terminal receipt
+        if: always()
+        run: >-
+          go run ./cmd/assure receipt issue
+          -root .
+          -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-gate.json
+          -workflow .github/workflows/assurance.yml
+          -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-receipt.json
+          -commit ${{ inputs.sha || github.sha }}
+          -ref refs/subjects/${{ inputs.sha || github.sha }}
+          -job-id go-proof
+          -os ${{ runner.os == 'Linux' && 'linux' || 'windows' }}
+          -runner-label ${{ matrix.os }}
+      - name: Validate passing receipt
+        if: steps.proof.outcome == 'success'
+        run: >-
+          go run ./cmd/assure receipt validate
+          -root .
+          -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-receipt.json
+      - name: Upload terminal gate records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-${{ matrix.proof }}-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Preserve proof failure
+        if: steps.proof.outcome != 'success'
+        shell: pwsh
+        run: throw 'proof failed; terminal evidence was retained'
+
+  android-host:
+    name: android-host (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Create evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force ".tools/assurance/${{ github.run_id }}" | Out-Null
+      - name: Run Android-only proof
+        id: proof
+        continue-on-error: true
+        run: >-
+          go run ./cmd/gate
+          -proof android-host
+          -receipt .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-timings.json
+      - name: Issue policy-bound terminal receipt
+        if: always()
+        run: >-
+          go run ./cmd/assure receipt issue
+          -root .
+          -gate .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-gate.json
+          -workflow .github/workflows/assurance.yml
+          -out .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-receipt.json
+          -commit ${{ inputs.sha || github.sha }}
+          -ref refs/subjects/${{ inputs.sha || github.sha }}
+          -job-id android-host
+          -os ${{ runner.os == 'Linux' && 'linux' || 'windows' }}
+          -runner-label ${{ matrix.os }}
+      - name: Validate passing receipt
+        if: steps.proof.outcome == 'success'
+        run: >-
+          go run ./cmd/assure receipt validate
+          -root .
+          -receipt .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-receipt.json
+      - name: Upload terminal gate records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-android-host-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Preserve proof failure
+        if: steps.proof.outcome != 'success'
+        shell: pwsh
+        run: throw 'proof failed; terminal evidence was retained'
+
+  device-artifacts:
+    name: build exact device artifact pair
+    needs: policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Build the device APK pair once
+        working-directory: android
+        run: >-
+          ./gradlew ciDeviceArtifacts
+          --no-build-cache
+          --no-configuration-cache
+          --rerun-tasks
+      - name: Stage fixed artifact names
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .tools/device | Out-Null
+          Copy-Item -LiteralPath android/app/build/outputs/apk/internal/app-internal.apk -Destination .tools/device/app-internal.apk
+          Copy-Item -LiteralPath android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk -Destination .tools/device/app-internal-androidTest.apk
+          Copy-Item -LiteralPath android/build/ci/device-artifacts.json -Destination .tools/device/device-artifacts.json
+      - name: Upload exact device bytes once
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/device/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  android-device:
+    name: ${{ matrix.proof }}
+    needs: device-artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 26
+            proof: android-device-api26
+          - api: 34
+            proof: android-device-api34
+          - api: 36
+            proof: android-device-api36
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Download the exact shared APK pair
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          name: device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/device
+      - name: Verify downloaded device artifact identity
+        shell: pwsh
+        run: |
+          $metadata = Get-Content -LiteralPath .tools/device/device-artifacts.json -Raw | ConvertFrom-Json
+          if ($metadata.schema -ne 'kpc-android-artifact-metadata-v1' -or $metadata.subject -ne 'DEVICE_TEST_SET' -or $metadata.authoritative) { throw 'device artifact metadata identity is invalid' }
+          if ($metadata.artifacts.Count -ne 3) { throw "expected three device artifact records, found $($metadata.artifacts.Count)" }
+          $paths = @{
+            'internal-apk' = '.tools/device/app-internal.apk'
+            'instrumentation-apk' = '.tools/device/app-internal-androidTest.apk'
+            'expected-tests' = 'android/config/phase14-required-device-tests.txt'
+          }
+          foreach ($entry in $metadata.artifacts) {
+            if (-not $paths.ContainsKey($entry.name)) { throw "unexpected device artifact $($entry.name)" }
+            $path = $paths[$entry.name]
+            $file = Get-Item -LiteralPath $path
+            $digest = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($file.Length -ne $entry.size -or $digest -cne $entry.sha256) { throw "device artifact identity mismatch for $($entry.name)" }
+          }
+      - name: Run exact API lane
+        id: proof
+        continue-on-error: true
+        shell: pwsh
+        run: >-
+          ./tools/scripts/run-android-emulator-proof.ps1
+          -Api ${{ matrix.api }}
+          -Proof ${{ matrix.proof }}
+          -GateReceipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json
+          -Timings .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-timings.json
+      - name: Issue policy-bound terminal receipt
+        if: always()
+        run: >-
+          go run ./cmd/assure receipt issue
+          -root .
+          -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json
+          -workflow .github/workflows/assurance.yml
+          -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json
+          -commit ${{ inputs.sha || github.sha }}
+          -ref refs/subjects/${{ inputs.sha || github.sha }}
+          -job-id android-device
+          -os android-emulator
+          -runner-label api-${{ matrix.api }}-x86_64
+          -artifact .tools/device/app-internal.apk
+          -artifact .tools/device/app-internal-androidTest.apk
+          -artifact .tools/device/device-artifacts.json
+          -artifact android/config/phase14-required-device-tests.txt
+      - name: Validate passing receipt
+        if: steps.proof.outcome == 'success'
+        run: >-
+          go run ./cmd/assure receipt validate
+          -root .
+          -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json
+      - name: Upload device receipt and bounded logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-${{ matrix.proof }}-Linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Upload bounded device logs separately
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/phase16/
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 7
+      - name: Preserve device proof failure
+        if: steps.proof.outcome != 'success'
+        shell: pwsh
+        run: throw 'device proof failed; bounded terminal evidence was retained when available'
+
+  certificate:
+    name: exact-subject assurance certificate
+    needs: [policy, go-proof, android-host, android-device]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Download exact-run proof artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          pattern: shadow-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/collected
+          merge-multiple: true
+      - name: Issue and validate aggregate certificate
+        shell: pwsh
+        run: |
+          $receipts = Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse | Sort-Object Name
+          if ($receipts.Count -ne 11) { throw "expected 11 proof receipts, found $($receipts.Count)" }
+          $arguments = @(
+            'run', './cmd/assure', 'certificate', 'issue',
+            '-root', '.',
+            '-out', '.tools/assurance-certificate.json',
+            '-certificate-id', "main-${{ github.run_id }}-${{ github.run_attempt }}",
+            '-required', 'android-device-api26',
+            '-required', 'android-device-api34',
+            '-required', 'android-device-api36',
+            '-required', 'android-host',
+            '-required', 'go-audit',
+            '-required', 'go-core',
+            '-required', 'operator'
+          )
+          foreach ($receipt in $receipts) {
+            $relative = [System.IO.Path]::GetRelativePath((Get-Location).Path, $receipt.FullName).Replace('\', '/')
+            $arguments += @('-receipt', $relative)
+          }
+          & go @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & go run ./cmd/assure certificate validate `
+            -root . `
+            -certificate .tools/assurance-certificate.json `
+            -receipts-root . `
+            -required android-device-api26 `
+            -required android-device-api34 `
+            -required android-device-api36 `
+            -required android-host `
+            -required go-audit `
+            -required go-core `
+            -required operator
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload aggregate certificate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-certificate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance-certificate.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14

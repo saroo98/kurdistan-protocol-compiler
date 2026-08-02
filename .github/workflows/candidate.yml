@@ -1,0 +1,196 @@
+name: Unsigned engineering candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact certified commit SHA
+        required: true
+        type: string
+      assurance_run_id:
+        description: Successful Phase 16 assurance workflow run ID
+        required: true
+        type: string
+      assurance_run_attempt:
+        description: Exact successful Phase 16 assurance workflow attempt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  GOTELEMETRY: 'off'
+
+concurrency:
+  group: engineering-candidate-${{ inputs.sha }}
+  cancel-in-progress: true
+
+jobs:
+  verify-assurance:
+    name: verify exact-subject assurance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Download assurance run evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          run-id: ${{ inputs.assurance_run_id }}
+          github-token: ${{ github.token }}
+          pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}
+          path: .tools/assurance-input
+          merge-multiple: true
+      - name: Validate certificate against requested commit and tree
+        shell: pwsh
+        run: |
+          if ('${{ inputs.sha }}' -notmatch '^[0-9a-f]{40}$') { throw 'sha must be exactly 40 lowercase hex characters' }
+          if ('${{ inputs.assurance_run_id }}' -notmatch '^[1-9][0-9]{0,19}$') { throw 'assurance_run_id is invalid' }
+          if ('${{ inputs.assurance_run_attempt }}' -notmatch '^[1-9][0-9]{0,5}$') { throw 'assurance_run_attempt is invalid' }
+          $certificate = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*certificate*.json' -File -Recurse
+          if ($certificate.Count -ne 1) { throw "expected one certificate, found $($certificate.Count)" }
+          $receipts = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*-receipt.json' -File -Recurse
+          if ($receipts.Count -ne 11) { throw "expected 11 receipts, found $($receipts.Count)" }
+          New-Item -ItemType Directory -Force .tools/collected | Out-Null
+          foreach ($receipt in $receipts) {
+            Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)
+          }
+          $tree = (git rev-parse '${{ inputs.sha }}^{tree}').Trim()
+          $certificatePath = [System.IO.Path]::GetRelativePath((Get-Location).Path, $certificate.FullName).Replace('\', '/')
+          go run ./cmd/assure certificate validate `
+            -root . `
+            -certificate $certificatePath `
+            -receipts-root . `
+            -expected-repository '${{ github.repository }}' `
+            -expected-commit '${{ inputs.sha }}' `
+            -expected-tree $tree `
+            -required android-device-api26 `
+            -required android-device-api34 `
+            -required android-device-api36 `
+            -required android-host `
+            -required go-audit `
+            -required go-core `
+            -required operator
+
+  build:
+    name: clean candidate build ${{ matrix.builder }}
+    needs: verify-assurance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: [a, b]
+    env:
+      GRADLE_USER_HOME: ${{ github.workspace }}/.tools/gradle-${{ matrix.builder }}
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Build clean unsigned engineering candidate
+        working-directory: android
+        run: >-
+          ./gradlew ciEngineeringCandidate
+          --no-build-cache
+          --no-configuration-cache
+          --rerun-tasks
+      - name: Normalize deterministic SBOM and refresh candidate metadata
+        shell: pwsh
+        run: |
+          $bomPath = 'android/build/reports/cyclonedx/bom.json'
+          $bom = Get-Content -LiteralPath $bomPath -Raw | ConvertFrom-Json
+          if ($null -eq $bom.metadata.timestamp) { throw 'CycloneDX metadata timestamp is missing' }
+          $bom.metadata.PSObject.Properties.Remove('timestamp')
+          $bom | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $bomPath -Encoding utf8NoBOM
+          go run ./cmd/releaseverify -root . `
+            -artifact-subject UNSIGNED_ENGINEERING_CANDIDATE `
+            -artifact-metadata android/build/ci/engineering-candidate.json `
+            -artifact unsigned-apk=android/app/build/outputs/apk/release/*.apk `
+            -artifact unsigned-aab=android/app/build/outputs/bundle/release/*.aab `
+            -artifact mapping=android/app/build/outputs/mapping/release/mapping.txt `
+            -artifact native-debug-symbols=android/app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip `
+            -artifact cyclonedx-sbom=android/build/reports/cyclonedx/bom.json `
+            -artifact license-evidence=testdata/evidence/phase9/android-licenses.spdx.json `
+            -artifact merged-manifest=android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml `
+            -artifact release-products=config/release/products.json `
+            -artifact release-version=config/release/version.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload exact candidate bytes and metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: candidate-builder-${{ matrix.builder }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/mapping/release/mapping.txt
+            android/app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip
+            android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
+            android/build/reports/cyclonedx/bom.json
+            android/build/ci/engineering-candidate.json
+            config/release/products.json
+            config/release/version.properties
+            testdata/evidence/phase9/android-licenses.spdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+  compare:
+    name: reproducibility comparison
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Download both independent candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          pattern: candidate-builder-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidates
+      - name: Compare every produced byte
+        shell: pwsh
+        run: |
+          $a = Get-ChildItem -LiteralPath candidates -Directory | Where-Object Name -Like 'candidate-builder-a-*'
+          $b = Get-ChildItem -LiteralPath candidates -Directory | Where-Object Name -Like 'candidate-builder-b-*'
+          if ($a.Count -ne 1 -or $b.Count -ne 1) { throw 'candidate A/B directories are incomplete' }
+          $filesA = Get-ChildItem -LiteralPath $a.FullName -File -Recurse | ForEach-Object {
+            [pscustomobject]@{
+              Path = [System.IO.Path]::GetRelativePath($a.FullName, $_.FullName).Replace('\', '/')
+              Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          } | Sort-Object Path
+          $filesB = Get-ChildItem -LiteralPath $b.FullName -File -Recurse | ForEach-Object {
+            [pscustomobject]@{
+              Path = [System.IO.Path]::GetRelativePath($b.FullName, $_.FullName).Replace('\', '/')
+              Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          } | Sort-Object Path
+          $left = $filesA | ConvertTo-Json -Depth 3 -Compress
+          $right = $filesB | ConvertTo-Json -Depth 3 -Compress
+          if ($left -cne $right) {
+            Write-Host 'candidate A:' $left
+            Write-Host 'candidate B:' $right
+            throw 'independent candidate outputs are not byte-identical'
+          }
+          $filesA | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath candidate-comparison.json -Encoding utf8NoBOM
+      - name: Upload selected unsigned engineering candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: unsigned-engineering-candidate-${{ inputs.sha }}
+          path: |
+            candidates/candidate-builder-a-*/**
+            candidate-comparison.json
+          if-no-files-found: error
+          retention-days: 30

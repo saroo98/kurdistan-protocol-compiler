@@ -1528,11 +1528,7 @@ func validateM2ConvergenceV1(currentAtPost map[string]string, overlays map[strin
 }
 
 func m2FileSHA256V1(root, path string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+	return evidenceoverlay.ResolveCurrentSHA256(root, path)
 }
 
 type m0EvidenceRowV1 struct {
@@ -1842,9 +1838,12 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	for path, predecessor := range phase15Pre {
 		if predecessor == "ABSENT" {
 			preHashes[path] = "ABSENT"
+		} else if _, reconstructed := preHashes[path]; !reconstructed {
+			preHashes[path] = predecessor
 		}
 	}
 	preHashes[evidenceoverlay.SuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.Phase16SuccessorPath] = "ABSENT"
 	return m0CandidateManifestFromPathsWithPreHashesV1(root, parts, preHashes)
 }
 

@@ -1,0 +1,13 @@
+{
+  "schema": "kurdistan-release-evidence-policy-v1",
+  "deterministicProof": {"freshnessSeconds": 0, "invalidation": "BOUND_DIGEST_CHANGE"},
+  "dependencyAndVulnerability": {"freshnessSeconds": 86400},
+  "signingCustodyAndIdentity": {"freshnessSeconds": 3600},
+  "playUploadedState": {"freshnessSeconds": 1800},
+  "infrastructureAndRollback": {"freshnessSeconds": 3600},
+  "physicalAndPilot": {
+    "freshnessSeconds": 1209600,
+    "invalidateOn": ["SOURCE", "PROFILE_AUTHORITY", "RELAY", "PROVIDER", "ANDROID", "RELEASE_POLICY"]
+  },
+  "independentCandidateReview": {"freshnessSeconds": 0, "invalidation": "EXACT_SUBJECT_CHANGE"}
+}

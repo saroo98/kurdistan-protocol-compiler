@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/assurance-certificate-v1.schema.json",
+  "title": "Kurdistan assurance certificate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "certificateId", "subject", "policySha256", "requiredProofs", "receipts", "issuedAt", "status"],
+  "properties": {
+    "schema": {"const": "kurdistan-assurance-certificate-v1"},
+    "certificateId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "requiredProofs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/proofId"}
+    },
+    "receipts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["proofId", "operatingSystem", "receiptId", "path", "sha256"],
+        "properties": {
+          "proofId": {"$ref": "#/$defs/proofId"},
+          "operatingSystem": {"type": "string", "minLength": 1, "maxLength": 128},
+          "receiptId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+          "path": {"$ref": "#/$defs/path"},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "issuedAt": {"$ref": "#/$defs/timestamp"},
+    "expiresAt": {"$ref": "#/$defs/timestamp"},
+    "status": {"const": "PASS"}
+  },
+  "$defs": {
+    "proofId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitObject": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "timestamp": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "tree", "ref"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+        "commit": {"$ref": "#/$defs/gitObject"},
+        "tree": {"$ref": "#/$defs/gitObject"},
+        "ref": {"type": "string", "pattern": "^refs/[^[:space:]\\\\]+$", "maxLength": 256}
+      }
+    }
+  }
+}

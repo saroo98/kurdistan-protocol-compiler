@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/assurance-receipt-v1.schema.json",
+  "title": "Kurdistan assurance receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "receiptId", "subject", "workflow", "execution", "proof", "inventories", "toolchain", "runner", "commands", "timing", "cachePolicy", "result", "terminal", "artifacts", "limitations"],
+  "properties": {
+    "schema": {"const": "kurdistan-assurance-receipt-v1"},
+    "receiptId": {"$ref": "#/$defs/id"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._/-]+\\.ya?ml$", "maxLength": 512},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "jobId", "attempt", "trigger"],
+      "properties": {
+        "runId": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+        "jobId": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,99}$"},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 100},
+        "trigger": {"enum": ["push", "pull_request", "workflow_dispatch", "schedule", "workflow_call"]}
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "policySha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/proofId"},
+        "policySha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "inventories": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/namedDigest"}
+    },
+    "toolchain": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "sha256"],
+        "properties": {
+          "name": {"$ref": "#/$defs/proofId"},
+          "version": {"type": "string", "minLength": 1, "maxLength": 128},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operatingSystem", "architecture", "requestedLabel", "image", "imageVersion"],
+      "properties": {
+        "operatingSystem": {"type": "string", "minLength": 1, "maxLength": 128},
+        "architecture": {"type": "string", "minLength": 1, "maxLength": 128},
+        "requestedLabel": {"type": "string", "minLength": 1, "maxLength": 128},
+        "image": {"type": "string", "minLength": 1, "maxLength": 128},
+        "imageVersion": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 32,
+        "items": {"type": "string", "minLength": 1, "maxLength": 2048}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "durationMillis"],
+      "properties": {
+        "startedAt": {"$ref": "#/$defs/timestamp"},
+        "completedAt": {"$ref": "#/$defs/timestamp"},
+        "durationMillis": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cachePolicy": {"enum": ["CACHE_INDEPENDENT", "CACHE_ALLOWED_FEEDBACK"]},
+    "result": {"enum": ["PASS", "FAIL"]},
+    "terminal": {"const": true},
+    "artifacts": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "size": {"type": "integer", "minimum": 0, "maximum": 1125899906842624},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "expiresAt": {"$ref": "#/$defs/timestamp"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "proofId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitObject": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "timestamp": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "tree", "ref"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+        "commit": {"$ref": "#/$defs/gitObject"},
+        "tree": {"$ref": "#/$defs/gitObject"},
+        "ref": {"type": "string", "pattern": "^refs/[^[:space:]\\\\]+$", "maxLength": 256}
+      }
+    },
+    "namedDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": {"$ref": "#/$defs/proofId"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

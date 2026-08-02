@@ -1,0 +1,520 @@
+{
+  "version": "phase16-ci-release-acceleration-v1",
+  "entries": [
+    {
+      "path": ".github/actions/setup-android/action.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e990fdfc1eb834dc21cc66a1e75d5f41b8363cb28ff972acd90233135946121c"
+    },
+    {
+      "path": ".github/actions/setup-go/action.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "71797f6eabb9d9e7c894ddebda1d185168b93b7a80712a1acbf36958f7ab6857"
+    },
+    {
+      "path": ".github/workflows/assurance.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ef8a9dab423373d0829c02d2189a40b29b378cd1e25e44222cef5ac93dbe1d1d"
+    },
+    {
+      "path": ".github/workflows/candidate.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1291823b8f6b0f08b81932d5641239f5b2177fcc42073962c053b96aab875316"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "pre_sha256": "e249f212339ca93429465db678ddd108190fd19f393b9cdc3e37976f8b280809",
+      "post_sha256": "15df631e96554ff71f080d1a20a2122ca57ba8f078c904dd568b4f28c57f8a92"
+    },
+    {
+      "path": ".github/workflows/pr.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a00ee7a564466e27198c2393d34de0af21d54c259901991a560e46162e2292a8"
+    },
+    {
+      "path": ".github/workflows/scheduled.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "27ee90a58a91e50ee0a63fabe019d3ce4e5747f0dc85d91188090cb798bb3855"
+    },
+    {
+      "path": "ROADMAP.md",
+      "pre_sha256": "da9e73bcd41c5045e38b17e06b23db853ea0a15fb7fa46b91b7db9813ec3274f",
+      "post_sha256": "c6850444c6d8a7befbc89c2d7b9b14dcb0356f5e8aa6ff6355201a28e89a1f55"
+    },
+    {
+      "path": "android/app/build.gradle.kts",
+      "pre_sha256": "7d511221248e0882b93fd2f6f19f53c16cfcd682fc94d804bfc22d1df5834d84",
+      "post_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45"
+    },
+    {
+      "path": "android/build.gradle.kts",
+      "pre_sha256": "128a1eb8952f2cbf1f86ef09a122f85c80244206cd705aa59149f8cc82a38068",
+      "post_sha256": "0b5ce80b1e6d8e7c6d1ffe1b1704066ce2b84ed564116c4fe62348e850e2195a"
+    },
+    {
+      "path": "cmd/assure/certificate_issue.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5bcb50d308cba6576b50932181a2fb26e81bf199631ac455cd6e5fac29d12299"
+    },
+    {
+      "path": "cmd/assure/issue.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "758272cfa111813788f29bf67332bfb045659fd4fd0acec2ff4217121deaea06"
+    },
+    {
+      "path": "cmd/assure/issue_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f28c60d47a736cbeb1ff54377338f192136d459fc8da2ffa5f83facae6f4df35"
+    },
+    {
+      "path": "cmd/assure/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5694374fe55c5284492de0158c6c95af02c3f7aa12c0d7a403e3797fcc13cffa"
+    },
+    {
+      "path": "cmd/assure/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c5e00db0f6c6afa286271696e1b8999af4cff1c3f29292a31d7f6f900d421efb"
+    },
+    {
+      "path": "cmd/assure/timings.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "73dd559c6ea3b4633551d9151e48341520b48b072c01c79f55b64d2b2f518c71"
+    },
+    {
+      "path": "cmd/gate/main.go",
+      "pre_sha256": "2d7c08fe7392cf8757c18aa1572361680fc240aa75f045adc7cdd3d4ebf87708",
+      "post_sha256": "e6daf204df4872fda9efb7fadc72d67b8a03a02e7902fc5e3ce1e87c07fc82b2"
+    },
+    {
+      "path": "cmd/gate/main_test.go",
+      "pre_sha256": "41ba177244dabff829934989e46e17324b1652f58aad56965f96141594786b92",
+      "post_sha256": "1fd950d32a20df022fd39725d8a8ed7b3eb542cafa970f44f0ce0e3cab1e0e39"
+    },
+    {
+      "path": "cmd/kcheck/executor_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e829a3294103cc5f07e63708eab1c5ccbe0f4f535c3b9943af97d34e19c4123f"
+    },
+    {
+      "path": "cmd/kcheck/main.go",
+      "pre_sha256": "9722b9e34b2a324c3a3a02e02934d888dc2242755884c69a6fa0560908a3b833",
+      "post_sha256": "64fc389f02eaa95e315dfa4e76ff6deb34f0a6e56ba92cd964779ba6ce0a62a2"
+    },
+    {
+      "path": "cmd/kgen/main_test.go",
+      "pre_sha256": "cb3559c478aabed3d866bd56682cfad809e4ae9b67fae7a7812a2d4668e39811",
+      "post_sha256": "2b06dd57f4130c9d980bdb32309ded4fedab722ce6768af459fdb987d15d6a0b"
+    },
+    {
+      "path": "cmd/phase15verify/main.go",
+      "pre_sha256": "9fd4f8718bbedfed90dd9aa21f0456177943fce4414ba995323fe3fa3af83d75",
+      "post_sha256": "f1a65bf095a71d6118e3ed14400f7a9da8bb3fc54e01487ae39d012a69cbc913"
+    },
+    {
+      "path": "cmd/phase15verify/main_test.go",
+      "pre_sha256": "e14f87dd6de118dabcb54b2f3e63289cdf893cdd051f7b1266409e5eb7682235",
+      "post_sha256": "ed471220bdcb212bdc1f092b1a7a547f392f861c01129e4841bf8a1e58de0b66"
+    },
+    {
+      "path": "cmd/phase9devicegate/main.go",
+      "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
+      "post_sha256": "b88e7d449c17eba8d21d453622b1605b8af72bd0ebf5ea0c76e7483add5ff449"
+    },
+    {
+      "path": "cmd/phase9devicegate/main_test.go",
+      "pre_sha256": "ef2d548a9e304470e91dbc77b6281fa791894776464e22b8e1080ab9acdfd41e",
+      "post_sha256": "5d19f104a2be31e926506e7424591cc468cf61c33cb203978a23709869fe3baa"
+    },
+    {
+      "path": "cmd/playrelease/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "dea40973b1f99f285e964a2dc6b8b69c265c76e8847690fdbe149bd11abaf0c4"
+    },
+    {
+      "path": "cmd/playrelease/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "296b530c507976566a6c61ac94dd2371425c0b871e26dc64e86bfb56ec0d26df"
+    },
+    {
+      "path": "cmd/releasepolicy/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e18994f3c96ddfabeba6036dbef59efd0aa761c625a3bcbee673cdccfab8d19c"
+    },
+    {
+      "path": "cmd/releasepolicy/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8b5d8f1e472ea7dbe40c0a5e551d120a02a7eb749dca0c581b427b5b4f99ac9b"
+    },
+    {
+      "path": "cmd/releaseverify/artifact_metadata.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "6f87fdd0909276f6c80f57bc827ac228aea557e36ee3cb6b49175390516ec552"
+    },
+    {
+      "path": "cmd/releaseverify/artifact_metadata_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "4415086eaec891406fe9d36d96ab2f9f1dd5debd4a21cfb8f81a10b92168033d"
+    },
+    {
+      "path": "cmd/releaseverify/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f9ed9c0dfe9bad33286ec370435b99a22988325d568ecb66bd1b59631eb1174c"
+    },
+    {
+      "path": "cmd/releaseverify/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a02baded9eacafa5b400d41b278720227d6fdbffaa4aa8261521356d4afcfc4f"
+    },
+    {
+      "path": "cmd/releaseverify/schema_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "885faebd6d4e8d29e6432fdb72e6bbfa6c95bef61d5c7c67765c46398da9fe38"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/hardcoded-gradle/android/app/build.gradle.kts",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a79ccb9ea01a27ad2ae30eda81c1317c2ae0270184a78599bbba3bf76294b1ff"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/hardcoded-gradle/android/build.gradle.kts",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "6f969b5fa9ea38dfae701e46770d9aecb7f405888ca62e1074570203544fd9ba"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/duplicate-products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ab4964a3f1e2244c92363da984b8ee7c6db0b409263a538463e936101a7e2c40"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/duplicate-version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e627b9d958339c23473e4dfdb943042e2572127574cb38b0bf9aa203e96f85e0"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/invalid-version-name.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f9bd625871c57c07340bda0d357f2c6f6ea44eff382dbbf74f94b4be27c738ed"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/missing-inspection-apk-flag.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a0b8a288338286f1c04bede5132082cf07d0cae0808904d1c1e64f55fabc165d"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/noncanonical-version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1ec6596b5cee6ad9974517f3f5ec6755d23f6030236daaa7607fb5758f8d3dbb"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/nonpositive-version-code.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5ad150ed33b308d489ac3b9ecf5e7fbeca89d4b3b600a24a2b10487f8577f7ff"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/oversized-version-code.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f7c7ea36bcc6a2fc68d30ed6f09531b2291866b37adeedbb1682ee00e7f4bb50"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/reordered-version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f16c4515b0f31e7576bd3a68a493e18d363627c8a0dc49e04f7e8b310a016b77"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/trailing-products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "070c2337fcdfc1091f54b3b6c2f0271b27ee246a7a161b1dc01e3d1a6a86844d"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/unknown-products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3fe46ca5c96e51bb8d3e08417bdc089b0859b109c39711ab68a440637e46b18a"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/invalid/unknown-version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ee24292b11346dbe71178e1d875acdeef9c185e85a50c137d4df055b55fa6b1d"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/metadata-only/config/release/products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "438962d2ab7ecf72b2578bd0032f3be4652eea41b2b652667f68067380cf6131"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/metadata-only/config/release/version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "446e6fb3d2ccf7d6b197f5d4175c816f1bcb617db39ed765618f9f7c779b415e"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/valid/android/app/build.gradle.kts",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3fc256d281dd9810cde1a6e30d6a7a58c778efbed7a6e75e86f3b94e72f2e89d"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/valid/android/build.gradle.kts",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "79f928afce79f5a9db79e071b464bd70e4a773bfa46e5d4ccdcf2bda32fbfc60"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/valid/config/release/products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "438962d2ab7ecf72b2578bd0032f3be4652eea41b2b652667f68067380cf6131"
+    },
+    {
+      "path": "cmd/releaseverify/testdata/valid/config/release/version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "446e6fb3d2ccf7d6b197f5d4175c816f1bcb617db39ed765618f9f7c779b415e"
+    },
+    {
+      "path": "config/ci/android-sdk.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "509fa9e4735677a52aa3423ee662adca57bdd53bd50fb7f2f37d5c2fdef4dd5a"
+    },
+    {
+      "path": "config/ci/impact-policy.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "832b08b12a64d69444026833a3fa47af639d8ba18f2e0dcf87739ea302b2fe1d"
+    },
+    {
+      "path": "config/ci/proof-policy.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "77ab43250d0a3f3773c5d5303b9ed2fc3f2472589ac6fe1c104ac3d434cc0755"
+    },
+    {
+      "path": "config/ci/release-evidence-policy.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b36975c5168b2a422a52b60e4251cc51884e164b9a144344f237ac2f6d4854fe"
+    },
+    {
+      "path": "config/ci/tools.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "88b3ecc2518a3afd9c9f5bd78674463225405bebe39729ca3cd5c38157764a34"
+    },
+    {
+      "path": "config/release/products.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "438962d2ab7ecf72b2578bd0032f3be4652eea41b2b652667f68067380cf6131"
+    },
+    {
+      "path": "config/release/version.properties",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "446e6fb3d2ccf7d6b197f5d4175c816f1bcb617db39ed765618f9f7c779b415e"
+    },
+    {
+      "path": "docs/GOVERNANCE.md",
+      "pre_sha256": "49ef557f6fbb8b9d6fc6e0a06e83141370d84d6e16b1aae9d054558854a4d776",
+      "post_sha256": "702f0946377cfc032e7cef5c639422d904c566e9383558de038ae817f38805c6"
+    },
+    {
+      "path": "docs/KIP-0091-assurance-release-acceleration.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9335c39e5dcefca7719db2be39813cc1a3f51bf76a39d79732e5b098928ca980"
+    },
+    {
+      "path": "internal/assurance/certificate.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "173a60af685463c4f7df47e074cf639735e4b5bd349153241266e737d1eab00b"
+    },
+    {
+      "path": "internal/assurance/certificate_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "81f45b047f2690f60ce012720ed5c39470753d68999d54be7aea8c44277edf6d"
+    },
+    {
+      "path": "internal/assurance/fixtures_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a62e6856d07c3e74d32ab46a8da97f93f031364d28d19c84ea1a42747810ec99"
+    },
+    {
+      "path": "internal/assurance/inventory.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9ba452431facb1a60819c4de5646d9fde437c914586f0009d58bc77e99810de0"
+    },
+    {
+      "path": "internal/assurance/inventory_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "01359029f8c3706a936331bcb3ddcc66c6d5b159d3ad368ee235cda5bac28fec"
+    },
+    {
+      "path": "internal/assurance/policy.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d5cb9aa508d4910d42a3debea5d8e2f9b3debc45dc9930a00451fff41eec0963"
+    },
+    {
+      "path": "internal/assurance/policy_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b968dfa38352479a27d8e348055611ab318865448195f881c5f5af5e18ace6dc"
+    },
+    {
+      "path": "internal/assurance/receipt.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "bc13fe905269e20a2a6b1db4c89f99d4735d83e9f53c7c24dab1082b0e37ac46"
+    },
+    {
+      "path": "internal/assurance/receipt_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8d7798197d1260909a3541524f119f48eea6b083c8ad68e09d09ed1d5ea1b2d3"
+    },
+    {
+      "path": "internal/assurance/strictjson.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "48fcbf53db7229037cf954c1e8a7118b8e7367eadaef73dcaae06fc6f0d27f04"
+    },
+    {
+      "path": "internal/audit/audit.go",
+      "pre_sha256": "33230b28e2bb89c855e3e62d34338608b950de59436942631e02c1eca77d64f9",
+      "post_sha256": "f4acc0cb25e98e1b56d59f72a00a0000867a765a2c9a300419e43d7e0021723e"
+    },
+    {
+      "path": "internal/audit/codegen_test.go",
+      "pre_sha256": "8c144659268a21d7fe9515d2dadd1475b69168f18a64c5a4b985560c1c4d821c",
+      "post_sha256": "3b1a404fefee5d136849b77e34cc88b69c79e82f59c3dc63cd44fe81936eb347"
+    },
+    {
+      "path": "internal/audit/executor.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5bd30235e58c516664e055d49f4a4257e4c968aacccb29fd995f8e702bbf6fd6"
+    },
+    {
+      "path": "internal/audit/executor_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3d5bb4fe28d4059b9f2483674f797d1afa7193447315e310aade1c3e2a221cd5"
+    },
+    {
+      "path": "internal/audit/main_families.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "6b6fc8c12f0f2b3371335a936f7490a88dc16ccec5a570f17df187d70928b014"
+    },
+    {
+      "path": "internal/audit/security.go",
+      "pre_sha256": "e39944db598ecf4155ccdbf0fd698377367534c1622b66babcca3487bb35a14c",
+      "post_sha256": "220af4b79c5ef88d4f83d316b143268b791487a0b8d558eb01dda10e96dce7d2"
+    },
+    {
+      "path": "internal/audit/security_test.go",
+      "pre_sha256": "f5f368deb607651b772fde2be652e80090831016a2ec0f5172bd25922f938d6e",
+      "post_sha256": "23aa836deb2286c6a61555c90abaa158a0a7a08fcf832aefb2e4b05005c2956a"
+    },
+    {
+      "path": "internal/codegen/authorization_v1_test.go",
+      "pre_sha256": "b816e5da3c720a5d319fba0771ec490f14cff3aa28390be7b15784d85ac70b2c",
+      "post_sha256": "a1bfe78d55e859f0bdd0fc44371be70f67d54b9d351404652365aef24fe923f3"
+    },
+    {
+      "path": "internal/runtime/policy_enforcement_test.go",
+      "pre_sha256": "8936facb0d4a5aa253cd1083271874f9013f5c2c22f6c24e324b6c1f99ea82db",
+      "post_sha256": "c8f4b9c3ab283cb83d5659ed8f40792b218e99bc3300454e67e03bbd5bb0c637"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor.go",
+      "pre_sha256": "f3dc53da79f7ca3ee79e1eb1c8843fdf24e485b3c50f200453af281d4598d926",
+      "post_sha256": "78bca274f7ad9ac4a6acdcc21f54b47a2ea337f8ea8b5886bc253642a591d91b"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor_test.go",
+      "pre_sha256": "358d7b6a9dbcd3e51c7bb679fc9709c9a163be0edec69421330a1b6f3f169203",
+      "post_sha256": "ea7c96bcd7fca7d2fb93ba24fd40808dff3e03fc0da763b7146a6b4e0226e3a3"
+    },
+    {
+      "path": "internal/testkit/importrules/importrules_test.go",
+      "pre_sha256": "cf82508765b428202e296997461510de5ee9e23c9de34505b3c703f74d855c22",
+      "post_sha256": "79bb5ced1b6bd46f188487511a50b1ba06595f989d27d9c72ed956c25b811bb4"
+    },
+    {
+      "path": "testdata/assurance/invalid/duplicate-key-receipt.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1f57b47f214cb92daae5f0c1e3ec9f091926f97c070d2e704e1a4a98963bf390"
+    },
+    {
+      "path": "testdata/assurance/invalid/traversal-certificate.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ec4a424f88b231ae29d4f3d9b99ec796763cda0cdd8e4f847f2db695d2a55f23"
+    },
+    {
+      "path": "testdata/assurance/invalid/truncated-certificate.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "becb7004447b0933e810d292e15c9f6e25477aa6ba31533ab4d773ad83ccaf33"
+    },
+    {
+      "path": "testdata/assurance/valid/certificate.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "43f9d0220d3fdfcd60203d607e88b0ea69921d088e8484113a29a5d460709fec"
+    },
+    {
+      "path": "testdata/assurance/valid/proof-inventory.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "cffe1aecaed606b8859d9adb8c8218539d3c8d71a5d73f5a25b04dae0b527b72"
+    },
+    {
+      "path": "testdata/assurance/valid/proof-policy.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e520d1d40dc0759e5ba921c0edffa806f8eef895353845fde71cbe9c0075ae65"
+    },
+    {
+      "path": "testdata/assurance/valid/receipt-go-core-linux.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f458b2848c575aab1612bd2a20a0745a4f46271f608bdb515c87b7c0f5a9f02a"
+    },
+    {
+      "path": "testdata/schemas/assurance-certificate-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7c55974414268a06f35202b3af5b60b0a2070ae1abc9b180e531c03f7e137c27"
+    },
+    {
+      "path": "testdata/schemas/assurance-receipt-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a95499b64347900875d7a1c65bce52bf7acf742babb83f7aac3f53096e532d7a"
+    },
+    {
+      "path": "testdata/schemas/proof-inventory-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f63e0dd2c8487e2f1557b67245f9a9c35a9b3454dbc7897b61025101eab38aa0"
+    },
+    {
+      "path": "testdata/schemas/release-products-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "294004d0ea7b68b55834a030b60f10146dcb0ff96dc10abbfa39494bf23ccf7f"
+    },
+    {
+      "path": "tools/cmd/workflowverify/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8ddde58953d6dfe68c478d5a4d6cf97bd12053c5ca3ec13341a6873502e9b3ef"
+    },
+    {
+      "path": "tools/cmd/workflowverify/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "119b07c30b1ae5ccf189d1995975e7b52ca06abc2b7b7a446536d24593f09067"
+    },
+    {
+      "path": "tools/doc.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7ad3453708889434246638a15ed4b770d1df466e2ba526734083254fbf731352"
+    },
+    {
+      "path": "tools/go.mod",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "41ebd7f0c851029eb19b755b80e92e592d7fb0f4706e389644a0a1c925140e52"
+    },
+    {
+      "path": "tools/go.sum",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "45ffd85630901cb7feeed3aab23f821118728c6b27968b165ba027ff37c15a5c"
+    },
+    {
+      "path": "tools/scripts/fetch-osv-scanner.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9816b4039122ebca25e3a786358c5fbb8a6a623e6c9ecfc3379aee86f6e5ac12"
+    },
+    {
+      "path": "tools/scripts/run-android-emulator-proof.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f22d06fb0e11f70cb0aee3fa75731a56fe7c6aa0b0b8da6f3a0f7ff761ac7349"
+    },
+    {
+      "path": "tools/tools.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "28f91d388dd7a1e279bb32804a7fc5ee5f44ebc4e8f3d84dfa873e91ff64b003"
+    }
+  ]
+}

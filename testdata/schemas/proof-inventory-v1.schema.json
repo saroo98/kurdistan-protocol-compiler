@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/proof-inventory-v1.schema.json",
+  "title": "Kurdistan proof inventory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policySha256", "lanes"],
+  "properties": {
+    "schema": {"const": "kurdistan-proof-inventory-v1"},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "lanes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["proofId", "operatingSystem", "commandsSha256", "cachePolicy", "deterministic", "authorizedPhase"],
+        "properties": {
+          "proofId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+          "operatingSystem": {"type": "string", "minLength": 1, "maxLength": 128},
+          "commandsSha256": {"$ref": "#/$defs/sha256"},
+          "cachePolicy": {"enum": ["CACHE_INDEPENDENT", "CACHE_ALLOWED_FEEDBACK"]},
+          "deterministic": {"type": "boolean"},
+          "freshnessSeconds": {"type": "integer", "minimum": 1},
+          "authorizedPhase": {"type": "integer", "minimum": 16, "maximum": 22}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"deterministic": {"const": false}}},
+            "then": {"required": ["freshnessSeconds"]},
+            "else": {"not": {"required": ["freshnessSeconds"]}}
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

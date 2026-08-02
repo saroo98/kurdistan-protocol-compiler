@@ -1,0 +1,1 @@
+{"schema":"kurdistan-proof-policy-v1","proofs":[{"id":"go-core","commands":[["go","test","./..."]],"operatingSystems":["linux"],"cachePolicy":"CACHE_INDEPENDENT","deterministic":true,"invalidatedBy":["go.mod"],"authorizedPhase":16}]}

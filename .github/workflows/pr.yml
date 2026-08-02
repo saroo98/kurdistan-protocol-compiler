@@ -1,0 +1,302 @@
+name: Pull request proof selection
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GOTELEMETRY: 'off'
+
+concurrency:
+  group: pr-proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  impact:
+    name: deny-by-default impact policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      proofs: ${{ steps.select.outputs.proofs }}
+      android_host: ${{ steps.select.outputs.android_host }}
+      android_device: ${{ steps.select.outputs.android_device }}
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Select exact proof inventory
+        id: select
+        shell: pwsh
+        run: |
+          git diff --name-only --no-renames '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}' | Set-Content -LiteralPath changed-paths.txt -Encoding utf8NoBOM
+          go run ./cmd/assure impact -root . -paths-file changed-paths.txt | Set-Content -LiteralPath impact.json -Encoding utf8NoBOM
+          $selection = Get-Content -LiteralPath impact.json -Raw | ConvertFrom-Json
+          $compact = $selection.proofs | ConvertTo-Json -Compress
+          "proofs=$compact" >> $env:GITHUB_OUTPUT
+          "android_host=$($selection.proofs -contains 'android-host')".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+          $device = @('android-device-api26', 'android-device-api34', 'android-device-api36') | Where-Object { $selection.proofs -contains $_ }
+          if ($device.Count -ne 0 -and $device.Count -ne 3) { throw 'device proof selection must contain all three API lanes' }
+          "android_device=$($device.Count -eq 3)".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+      - name: Verify workflow and policy contracts
+        run: |
+          go run ./cmd/assure workflow -root .
+          go run ./cmd/assure policy inventory -root . > proof-inventory.json
+      - name: Upload impact decision
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pr-impact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            changed-paths.txt
+            impact.json
+            proof-inventory.json
+          if-no-files-found: error
+          retention-days: 7
+
+  go-proofs:
+    name: selected Go and evidence proofs
+    needs: impact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Run every selected Go proof and retain terminal receipts
+        shell: pwsh
+        env:
+          SELECTED_PROOFS: ${{ needs.impact.outputs.proofs }}
+        run: |
+          New-Item -ItemType Directory -Force ".tools/assurance/${{ github.run_id }}" | Out-Null
+          $selected = $env:SELECTED_PROOFS | ConvertFrom-Json
+          $failed = @()
+          foreach ($proof in @('go-core', 'go-audit', 'operator', 'docs-evidence', 'dependency-freshness')) {
+            if ($selected -notcontains $proof) { continue }
+            $gate = ".tools/assurance/${{ github.run_id }}/$proof-gate.json"
+            $timings = ".tools/assurance/${{ github.run_id }}/$proof-timings.json"
+            $receipt = ".tools/assurance/${{ github.run_id }}/$proof-receipt.json"
+            & go run ./cmd/gate -proof $proof -receipt $gate -timings $timings
+            $proofExit = $LASTEXITCODE
+            & go run ./cmd/assure receipt issue -root . -gate $gate -workflow .github/workflows/pr.yml -out $receipt -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id go-proofs -os linux -runner-label ubuntu-24.04
+            if ($LASTEXITCODE -ne 0) { throw "failed to issue receipt for $proof" }
+            if ($proofExit -eq 0) {
+              & go run ./cmd/assure receipt validate -root . -receipt $receipt
+              if ($LASTEXITCODE -ne 0) { throw "failed to validate receipt for $proof" }
+            } else {
+              $failed += $proof
+            }
+          }
+          if ($failed.Count -ne 0) { throw "selected proofs failed: $($failed -join ', ')" }
+      - name: Upload selected Go receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pr-proof-go-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 7
+
+  android-host:
+    name: selected Android host proof
+    needs: impact
+    if: needs.impact.outputs.android_host == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Run Android host proof
+        id: proof
+        continue-on-error: true
+        run: >-
+          go run ./cmd/gate
+          -proof android-host
+          -receipt .tools/assurance/${{ github.run_id }}/android-host-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/android-host-timings.json
+      - name: Issue and validate Android host receipt
+        if: always()
+        run: |
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/android-host-gate.json -workflow .github/workflows/pr.yml -out .tools/assurance/${{ github.run_id }}/android-host-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-host -os linux -runner-label ubuntu-24.04
+          if [ '${{ steps.proof.outcome }}' = 'success' ]; then go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/android-host-receipt.json; fi
+      - name: Upload Android host receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pr-proof-android-host-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+      - name: Preserve Android host failure
+        if: steps.proof.outcome != 'success'
+        run: exit 1
+
+  device-artifacts:
+    name: selected device artifact pair
+    needs: impact
+    if: needs.impact.outputs.android_device == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Build exact device pair
+        working-directory: android
+        run: ./gradlew ciDeviceArtifacts --no-build-cache --no-configuration-cache --rerun-tasks
+      - name: Stage fixed artifact names
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .tools/device | Out-Null
+          Copy-Item android/app/build/outputs/apk/internal/app-internal.apk .tools/device/app-internal.apk
+          Copy-Item android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk .tools/device/app-internal-androidTest.apk
+          Copy-Item android/build/ci/device-artifacts.json .tools/device/device-artifacts.json
+      - name: Upload exact device pair
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pr-device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/device/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  android-device:
+    name: selected ${{ matrix.proof }}
+    needs: [impact, device-artifacts]
+    if: needs.impact.outputs.android_device == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 26
+            proof: android-device-api26
+          - api: 34
+            proof: android-device-api34
+          - api: 36
+            proof: android-device-api36
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Set up Android
+        uses: ./.github/actions/setup-android
+      - name: Download exact shared device pair
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          name: pr-device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/device
+      - name: Verify downloaded device artifact identity
+        shell: pwsh
+        run: |
+          $metadata = Get-Content -LiteralPath .tools/device/device-artifacts.json -Raw | ConvertFrom-Json
+          if ($metadata.schema -ne 'kpc-android-artifact-metadata-v1' -or $metadata.subject -ne 'DEVICE_TEST_SET' -or $metadata.authoritative) { throw 'device artifact metadata identity is invalid' }
+          if ($metadata.artifacts.Count -ne 3) { throw "expected three device artifact records, found $($metadata.artifacts.Count)" }
+          $paths = @{
+            'internal-apk' = '.tools/device/app-internal.apk'
+            'instrumentation-apk' = '.tools/device/app-internal-androidTest.apk'
+            'expected-tests' = 'android/config/phase14-required-device-tests.txt'
+          }
+          foreach ($entry in $metadata.artifacts) {
+            if (-not $paths.ContainsKey($entry.name)) { throw "unexpected device artifact $($entry.name)" }
+            $path = $paths[$entry.name]
+            $file = Get-Item -LiteralPath $path
+            $digest = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($file.Length -ne $entry.size -or $digest -cne $entry.sha256) { throw "device artifact identity mismatch for $($entry.name)" }
+          }
+      - name: Run selected device lane
+        id: proof
+        continue-on-error: true
+        shell: pwsh
+        run: ./tools/scripts/run-android-emulator-proof.ps1 -Api ${{ matrix.api }} -Proof ${{ matrix.proof }} -GateReceipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -Timings .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-timings.json
+      - name: Issue and validate device receipt
+        if: always()
+        shell: pwsh
+        run: |
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -workflow .github/workflows/pr.yml -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-device -os android-emulator -runner-label api-${{ matrix.api }}-x86_64 -artifact .tools/device/app-internal.apk -artifact .tools/device/app-internal-androidTest.apk -artifact .tools/device/device-artifacts.json -artifact android/config/phase14-required-device-tests.txt
+          if ('${{ steps.proof.outcome }}' -eq 'success') { go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json }
+      - name: Upload device receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pr-proof-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .tools/assurance/${{ github.run_id }}/
+            .tools/phase16/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+      - name: Preserve device failure
+        if: steps.proof.outcome != 'success'
+        run: exit 1
+
+  pr-policy:
+    name: pr-policy
+    needs: [impact, go-proofs, android-host, device-artifacts, android-device]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out pull request subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Download impact decision
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          name: pr-impact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/pr
+      - name: Download all produced proof receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          pattern: pr-proof-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/pr-proofs
+          merge-multiple: true
+      - name: Require and validate every selected receipt
+        shell: pwsh
+        run: |
+          $selection = Get-Content -LiteralPath .tools/pr/impact.json -Raw | ConvertFrom-Json
+          foreach ($proof in $selection.proofs) {
+            $receipt = Get-ChildItem -LiteralPath .tools/pr-proofs -Filter "$proof-receipt.json" -File -Recurse
+            if ($receipt.Count -ne 1) { throw "selected proof $proof produced $($receipt.Count) receipts" }
+            $relative = [System.IO.Path]::GetRelativePath((Get-Location).Path, $receipt.FullName).Replace('\', '/')
+            go run ./cmd/assure receipt validate -root . -receipt $relative
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

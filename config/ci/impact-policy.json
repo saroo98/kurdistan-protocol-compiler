@@ -1,0 +1,27 @@
+{
+  "schema": "kurdistan-impact-policy-v1",
+  "defaultProofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"],
+  "rules": [
+    {"pattern": ".github/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "config/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "go.mod", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness", "go-audit", "go-core", "operator"]},
+    {"pattern": "go.sum", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness", "go-audit", "go-core", "operator"]},
+    {"pattern": "android/gradle.lockfile", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness"]},
+    {"pattern": "android/gradle/verification-metadata.xml", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness"]},
+    {"pattern": "cmd/gate/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "cmd/assure/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "cmd/phase15verify/**", "proofs": ["docs-evidence", "go-audit", "go-core"]},
+    {"pattern": "cmd/releaseverify/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "docs-evidence", "go-audit", "go-core", "operator"]},
+    {"pattern": "internal/assurance/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "internal/crypto/**", "proofs": ["android-device-api26", "android-device-api34", "android-device-api36", "android-host", "go-audit", "go-core", "operator"]},
+    {"pattern": "internal/protocol/**", "proofs": ["go-core", "go-audit", "operator", "android-host"]},
+    {"pattern": "internal/operator/**", "proofs": ["go-core", "go-audit", "operator"]},
+    {"pattern": "android/**", "proofs": ["android-host", "android-device-api26", "android-device-api34", "android-device-api36"]},
+    {"pattern": "docs/**", "proofs": ["docs-evidence"]},
+    {"pattern": "ROADMAP.md", "proofs": ["docs-evidence"]},
+    {"pattern": "config/release/**", "proofs": ["docs-evidence"]},
+    {"pattern": "testdata/evidence/**", "proofs": ["docs-evidence", "go-audit", "go-core"]},
+    {"pattern": "testdata/evidence/phase12/**", "proofs": ["docs-evidence", "go-audit", "go-core", "operator"]},
+    {"pattern": "README.md", "proofs": ["docs-evidence"]}
+  ]
+}

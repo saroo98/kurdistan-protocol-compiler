@@ -17,6 +17,7 @@ subset was spot-checked.
 
 | Gate | Command | Green means |
 | --- | --- | --- |
+| Module integrity | `go mod verify` | downloaded module content matches `go.sum` |
 | Build | `go build ./...` | compiles |
 | Vet | `go vet ./...` | no vet findings |
 | Format | `gofmt -l .` | empty (see line-endings note) |
@@ -26,15 +27,45 @@ subset was spot-checked.
 | Regression | `kcheck compare --a <baseline.json> --b <new.json>` | no regression beyond thresholds |
 | Generated backend | `kgen --profile <p.json> --out <dir> && (cd <dir> && go test ./...)` | the emitted profile module builds and tests |
 
-A single command runs the whole bar (build, vet, test, and the audit), for use
-locally and in CI:
+A single command runs the complete Go bar (module verification, build, vet,
+uncached tests, full audit, and operator verification), for use locally and in
+CI. Existing quick and combined Android modes remain available:
 
 ```
-go run ./cmd/gate          # build + vet + test + full audit
-go run ./cmd/gate -quick   # build + vet + test + quick audit (faster)
+go run ./cmd/gate                    # complete Go bar
+go run ./cmd/gate -quick             # complete Go bar with quick audit
+go run ./cmd/gate -android           # complete Go bar plus Android Phase 14
+go run ./cmd/gate -android-only      # Android Phase 14 only
 ```
 
 It exits non-zero if any step fails.
+
+CI may run one independently certifiable proof class without repeating the
+others. Exactly one of these single-proof forms may be selected per invocation:
+
+```
+go run ./cmd/gate -proof go-core       # module verify, build, vet, JSON uncached tests
+go run ./cmd/gate -proof go-audit      # full audit; add -quick only for local feedback
+go run ./cmd/gate -proof operator      # Phase 12 operator verification
+go run ./cmd/gate -proof android-host  # Android Phase 14 host assurance
+```
+
+`-android-only` is the compatibility spelling for the `android-host` proof.
+`-proof` cannot be combined with `-android` or `-android-only`; ambiguous or
+unknown selections fail before any proof command starts.
+
+`-receipt <path>` writes `kurdistan-gate-execution-v1`, and `-timings <path>`
+writes `kurdistan-gate-timings-v1`. Both are terminal, atomic local execution
+records and are attempted even after a selected step fails. Failure to write a
+requested record fails the command. These files deliberately omit commit,
+workflow, policy, inventory, toolchain, runner, and artifact bindings, so they
+are intermediate inputs only. They are not reusable assurance receipts or
+release authority.
+
+The `go-core` proof uses the policy-exact test command
+`go test -json -count=1 ./...` so CI can retain package and test timing events.
+The legacy complete gate keeps its existing human-readable
+`go test -count=1 ./...` output.
 
 The repository CI workflow runs this command without the Go test cache on both
 Ubuntu and Windows. CI is a reproducibility control, not evidence of production

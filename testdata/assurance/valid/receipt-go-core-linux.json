@@ -1,0 +1,55 @@
+{
+  "schema": "kurdistan-assurance-receipt-v1",
+  "receiptId": "fixture-go-core-linux",
+  "subject": {
+    "repository": "saroo98/kurdistan-protocol-compiler",
+    "commit": "1111111111111111111111111111111111111111",
+    "tree": "2222222222222222222222222222222222222222",
+    "ref": "refs/heads/main"
+  },
+  "workflow": {
+    "path": ".github/workflows/assurance.yml",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "execution": {
+    "runId": "123",
+    "jobId": "go-core-linux",
+    "attempt": 1,
+    "trigger": "workflow_dispatch"
+  },
+  "proof": {
+    "id": "go-core",
+    "policySha256": "e520d1d40dc0759e5ba921c0edffa806f8eef895353845fde71cbe9c0075ae65"
+  },
+  "inventories": [
+    {
+      "name": "go-tests",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "toolchain": [
+    {
+      "name": "go",
+      "version": "go1.26.5",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "runner": {
+    "operatingSystem": "linux",
+    "architecture": "amd64",
+    "requestedLabel": "ubuntu-24.04",
+    "image": "ubuntu",
+    "imageVersion": "20260801.1"
+  },
+  "commands": [["go", "test", "./..."]],
+  "timing": {
+    "startedAt": "2026-08-02T10:00:00Z",
+    "completedAt": "2026-08-02T10:01:00Z",
+    "durationMillis": 60000
+  },
+  "cachePolicy": "CACHE_INDEPENDENT",
+  "result": "PASS",
+  "terminal": true,
+  "artifacts": [],
+  "limitations": []
+}

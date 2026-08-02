@@ -159,7 +159,14 @@ func runAudit(args []string) int {
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	traces := flags.Int("traces", 0, "optional trace count override")
+	executor := flags.String("executor", "serial", "audit executor: serial or parallel (parallel is a non-authoritative shadow)")
+	workers := flags.Int("workers", 1, "maximum workers for the parallel audit shadow")
 	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	executorOptions, err := auditExecutorOptions(*executor, *workers)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 
@@ -184,7 +191,7 @@ func runAudit(args []string) int {
 	cfg.StatusPath = *status
 	cfg.BaselinePath = *baseline
 
-	report, err := audit.Run(context.Background(), cfg)
+	report, err := audit.RunWithExecutor(context.Background(), cfg, executorOptions)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -216,6 +223,22 @@ func runAudit(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+func auditExecutorOptions(mode string, workers int) (audit.ExecutorOptions, error) {
+	if workers < 1 {
+		return audit.ExecutorOptions{}, fmt.Errorf("--workers must be positive")
+	}
+	options := audit.ExecutorOptions{Workers: workers}
+	switch mode {
+	case string(audit.ExecutorSerial):
+		options.Mode = audit.ExecutorSerial
+	case string(audit.ExecutorParallel):
+		options.Mode = audit.ExecutorParallel
+	default:
+		return audit.ExecutorOptions{}, fmt.Errorf("--executor must be serial or parallel")
+	}
+	return options, nil
 }
 
 func runCompare(args []string) int {

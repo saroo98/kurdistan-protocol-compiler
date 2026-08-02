@@ -33,6 +33,7 @@ var deviceEvidenceProperties = []struct {
 	key  string
 }{
 	{"02-sdk-level.txt", "ro.build.version.sdk"},
+	{"02-primary-abi.txt", "ro.product.cpu.abi"},
 	{"02-supported-abis.txt", "ro.product.cpu.abilist"},
 	{"02-security-patch.txt", "ro.build.version.security_patch"},
 }
@@ -46,6 +47,8 @@ type options struct {
 	testPackage           string
 	runner                string
 	minimumTests          int
+	expectedAPI           int
+	expectedABI           string
 	expectedTestsFile     string
 	evidenceDir           string
 	conflictingAppPackage string
@@ -67,6 +70,8 @@ func main() {
 	flag.StringVar(&value.testPackage, "test-package", defaultTestPackage, "instrumentation package")
 	flag.StringVar(&value.runner, "runner", defaultRunner, "instrumentation runner")
 	flag.IntVar(&value.minimumTests, "minimum-tests", 1, "minimum number of completed instrumentation tests")
+	flag.IntVar(&value.expectedAPI, "expected-api", 0, "exact Android API level expected for this lane; pair with expected-abi")
+	flag.StringVar(&value.expectedABI, "expected-abi", "", "exact primary Android ABI expected for this lane; pair with expected-api")
 	flag.StringVar(&value.expectedTestsFile, "expected-tests", "", "optional newline-delimited exact class#method manifest")
 	flag.StringVar(&value.label, "label", "PHASE 9", "bounded uppercase evidence label")
 	flag.StringVar(
@@ -107,6 +112,28 @@ func validLabel(value string) bool {
 	return true
 }
 
+func verifyExpectedDeviceIdentity(expectedAPI int, expectedABI string, actualAPI int, actualABI string) error {
+	if expectedAPI < 0 {
+		return errors.New("expected-api must be positive when supplied")
+	}
+	if (expectedAPI == 0) != (expectedABI == "") {
+		return errors.New("expected-api and expected-abi must be supplied together")
+	}
+	if expectedABI != "" {
+		allowed := map[string]bool{"arm64-v8a": true, "armeabi-v7a": true, "x86": true, "x86_64": true}
+		if !allowed[expectedABI] {
+			return fmt.Errorf("expected-abi %q is unsupported", expectedABI)
+		}
+	}
+	if expectedAPI > 0 && actualAPI != expectedAPI {
+		return fmt.Errorf("device API = %d, expected exactly %d", actualAPI, expectedAPI)
+	}
+	if expectedABI != "" && actualABI != expectedABI {
+		return fmt.Errorf("device primary ABI = %q, expected exactly %q", actualABI, expectedABI)
+	}
+	return nil
+}
+
 func run(value options) error {
 	if value.appAPK == "" || value.testAPK == "" {
 		return errors.New("app-apk and test-apk are required")
@@ -136,6 +163,7 @@ func run(value options) error {
 		return fmt.Errorf("device state: %w", err)
 	}
 	sdkLevel := 0
+	primaryABI := ""
 	for _, property := range deviceEvidenceProperties {
 		output, err := client.capture(ctx, property.file, "shell", "getprop", property.key)
 		if err != nil {
@@ -147,6 +175,15 @@ func run(value options) error {
 				return fmt.Errorf("invalid device SDK level %q", strings.TrimSpace(output))
 			}
 		}
+		if property.key == "ro.product.cpu.abi" {
+			primaryABI = strings.TrimSpace(output)
+			if primaryABI == "" {
+				return errors.New("device primary ABI is empty")
+			}
+		}
+	}
+	if err := verifyExpectedDeviceIdentity(value.expectedAPI, value.expectedABI, sdkLevel, primaryABI); err != nil {
+		return err
 	}
 	expectedTests := expectedTestsForSDK(expectedTestManifest, sdkLevel)
 	minimumTests := value.minimumTests
@@ -287,9 +324,13 @@ func run(value options) error {
 		return fmt.Errorf("instrumentation command: %w", instrumentationErr)
 	}
 	summary := fmt.Sprintf(
-		"device_gate=passed\nlabel=%s\napplication=%s\nminimum_tests=%d\ncompleted_tests=%d\nexpected_tests=%d\n",
+		"device_gate=passed\nlabel=%s\napplication=%s\nsdk_level=%d\nprimary_abi=%s\nexpected_sdk_level=%d\nexpected_primary_abi=%s\nminimum_tests=%d\ncompleted_tests=%d\nexpected_tests=%d\n",
 		value.label,
 		value.appPackage,
+		sdkLevel,
+		primaryABI,
+		value.expectedAPI,
+		value.expectedABI,
 		minimumTests,
 		completedTestCount(instrumentation),
 		len(expectedTests),

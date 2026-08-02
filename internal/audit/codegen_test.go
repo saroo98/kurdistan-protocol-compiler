@@ -446,12 +446,10 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 				t.Fatalf("%s invalid pre evidence for %s", set, entry.Path)
 			}
 		}
-		current, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+		post, err := evidenceoverlay.ResolveCurrentSHA256(root, entry.Path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sum := sha256.Sum256(current)
-		post := hex.EncodeToString(sum[:])
 		if historical, ok := historicalHashes[entry.Path]; ok {
 			post = historical
 		}
@@ -1618,11 +1616,7 @@ func validateConvergenceOverlayV1(currentAtPost map[string]string, overlays map[
 }
 
 func fileSHA256V1(root, path string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+	return evidenceoverlay.ResolveCurrentSHA256(root, path)
 }
 
 func validHelperOwnerSHA256V1(value string) bool {
