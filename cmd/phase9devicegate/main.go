@@ -156,7 +156,7 @@ func run(value options) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	client := adbClient{path: adb, serial: value.serial, evidenceDir: value.evidenceDir}
 	if _, err := client.capture(ctx, "01-device-state.txt", "get-state"); err != nil {
@@ -251,13 +251,21 @@ func run(value options) error {
 		return fmt.Errorf("clear logcat: %w", err)
 	}
 	_, _ = client.capture(ctx, "06-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
-	if _, err := client.capture(ctx, "07-dismiss-external-activity.txt", "shell", "input", "keyevent", "KEYCODE_BACK"); err != nil {
-		return fmt.Errorf("dismiss external activity before launch: %w", err)
-	}
-	time.Sleep(300 * time.Millisecond)
-	if _, err := client.capture(ctx, "07-home-before-launch.txt", "shell", "input", "keyevent", "KEYCODE_HOME"); err != nil {
+	if _, err := client.capture(
+		ctx,
+		"07-home-before-launch.txt",
+		"shell",
+		"am",
+		"start",
+		"-W",
+		"-a",
+		"android.intent.action.MAIN",
+		"-c",
+		"android.intent.category.HOME",
+	); err != nil {
 		return fmt.Errorf("return device to Home before launch: %w", err)
 	}
+	time.Sleep(300 * time.Millisecond)
 	component := value.appPackage + "/org.kurdistanvpn.app.MainActivity"
 	// NEW_TASK | CLEAR_TASK prevents a stale system picker, opened on behalf of
 	// the app, from being restored as the top activity during the smoke launch.

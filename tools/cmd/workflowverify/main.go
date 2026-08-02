@@ -102,6 +102,7 @@ func verifyEmulatorProofScript(path string) error {
 	content := string(raw)
 	for _, token := range []string{
 		"$env:ANDROID_AVD_HOME = $avdHome",
+		"$env:RUNNER_TEMP",
 		"& $emulator '-list-avds'",
 		"$process.HasExited",
 		"adb emulator discovery timed out",
@@ -113,6 +114,9 @@ func verifyEmulatorProofScript(path string) error {
 	}
 	if strings.Contains(content, "& $adb wait-for-device") {
 		return errors.New("Android emulator proof script uses unbounded adb wait-for-device")
+	}
+	if strings.Contains(content, "Join-Path '.tools/phase16' \"avd-api$Api\"") {
+		return errors.New("Android emulator proof script stores disposable AVD state in uploaded evidence")
 	}
 	return nil
 }

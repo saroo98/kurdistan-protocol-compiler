@@ -95,6 +95,7 @@ func TestVerifyKnownWorkflowContractRejectsAttemptAmbiguityAndUnboundDeviceBytes
 func TestVerifyEmulatorProofScriptRequiresSharedAVDHomeAndBoundedDiscovery(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "run-android-emulator-proof.ps1")
 	bad := `$env:ANDROID_AVD_HOME = $avdHome
+$env:RUNNER_TEMP
 & $emulator '-list-avds'
 $process.HasExited
 & $adb wait-for-device
