@@ -5,16 +5,19 @@ package org.kurdistanvpn.feature.settingsrecovery
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
@@ -27,11 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ResetScope
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.ui.R as UiR
 
@@ -48,9 +53,13 @@ fun SettingsRecoveryScreen(
     onCancelRestore: () -> Unit,
     onResetAll: () -> Unit,
     onBack: () -> Unit,
+    onResetScope: (ResetScope) -> Unit = { scope ->
+        if (scope == ResetScope.EVERYTHING) onResetAll()
+    },
 ) {
     var passphrase by remember { mutableStateOf("") }
     var resetArmed by remember { mutableStateOf(false) }
+    var resetScope by remember { mutableStateOf(ResetScope.EVERYTHING) }
     val highContrastLabel = stringResource(UiR.string.high_contrast)
     val reducedMotionLabel = stringResource(UiR.string.reduced_motion)
     Column(
@@ -174,20 +183,49 @@ fun SettingsRecoveryScreen(
                 Text(stringResource(UiR.string.backup_failed, backupState.error.name))
         }
         Text(stringResource(UiR.string.reset_limits))
+        Text(stringResource(UiR.string.reset_scope), style = MaterialTheme.typography.titleMedium)
+        ResetScope.entries.forEach { scope ->
+            val label = when (scope) {
+                ResetScope.SETTINGS -> stringResource(UiR.string.reset_scope_settings)
+                ResetScope.PROFILES_PROVIDERS -> stringResource(UiR.string.reset_scope_profiles)
+                ResetScope.ROUTING -> stringResource(UiR.string.reset_scope_routing)
+                ResetScope.DIAGNOSTICS -> stringResource(UiR.string.reset_scope_diagnostics)
+                ResetScope.EVERYTHING -> stringResource(UiR.string.reset_scope_everything)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("reset_scope_${scope.name.lowercase()}")
+                    .selectable(
+                        selected = resetScope == scope,
+                        role = Role.RadioButton,
+                        onClick = {
+                            resetScope = scope
+                        },
+                    )
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RadioButton(selected = resetScope == scope, onClick = null)
+                Text(label)
+            }
+        }
         if (!resetArmed) {
             TextButton(onClick = { resetArmed = true }) {
                 Text(stringResource(UiR.string.prepare_reset))
             }
         } else {
-            Button(
-                onClick = {
-                    resetArmed = false
-                    passphrase = ""
-                    onResetAll()
-                },
-            ) { Text(stringResource(UiR.string.confirm_reset)) }
-            TextButton(onClick = { resetArmed = false }) {
-                Text(stringResource(UiR.string.cancel_reset))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        resetArmed = false
+                        passphrase = ""
+                        onResetScope(resetScope)
+                    },
+                ) { Text(stringResource(UiR.string.confirm_reset)) }
+                TextButton(onClick = { resetArmed = false }) {
+                    Text(stringResource(UiR.string.cancel_reset))
+                }
             }
         }
         TextButton(onClick = onBack) { Text(stringResource(UiR.string.back)) }

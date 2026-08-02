@@ -53,6 +53,13 @@ func TestValidateLaunchSmokeRejectsMissingProcess(t *testing.T) {
 	}
 }
 
+func TestLogcatClearUsesDeviceShellForMinimumSdkCompatibility(t *testing.T) {
+	arguments := logcatClearArgs()
+	if got := strings.Join(arguments, " "); got != "shell logcat -b all -c" {
+		t.Fatalf("logcatClearArgs() = %q, want device-shell clearing", got)
+	}
+}
+
 func TestEvaluateInstrumentationAcceptsCompletedCrashFreeRun(t *testing.T) {
 	output := `
 INSTRUMENTATION_STATUS_CODE: 0
@@ -63,6 +70,54 @@ OK (4 tests)
 `
 	if err := evaluateInstrumentation(output, "clean device log", defaultAppPackage, 4); err != nil {
 		t.Fatalf("evaluateInstrumentation() error = %v", err)
+	}
+}
+
+func TestExpectedTestManifestRequiresExactCompletedTests(t *testing.T) {
+	output := strings.Join([]string{
+		"INSTRUMENTATION_STATUS: class=org.example.ProductTest",
+		"INSTRUMENTATION_STATUS: test=first",
+		"INSTRUMENTATION_STATUS_CODE: 0",
+		"INSTRUMENTATION_STATUS: class=org.example.ProductTest",
+		"INSTRUMENTATION_STATUS: test=second",
+		"INSTRUMENTATION_STATUS_CODE: 0",
+	}, "\n")
+	if err := verifyExpectedTests(output, []string{
+		"org.example.ProductTest#first",
+		"org.example.ProductTest#second",
+	}); err != nil {
+		t.Fatalf("verifyExpectedTests() error = %v", err)
+	}
+	if err := verifyExpectedTests(output, []string{"org.example.ProductTest#first"}); err == nil {
+		t.Fatal("verifyExpectedTests accepted an unexpected executed test")
+	}
+}
+
+func TestReadExpectedTestsRejectsDuplicateEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tests.txt")
+	if err := os.WriteFile(path, []byte("a.b.Test#one\na.b.Test#one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readExpectedTests(path); err == nil {
+		t.Fatal("readExpectedTests accepted duplicates")
+	}
+}
+
+func TestExpectedTestsForSDKFiltersGuardedCasesWithoutWeakeningExactManifest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tests.txt")
+	manifest := "a.b.Test#always\nminSdk=34 a.b.Test#accessibility\n"
+	if err := os.WriteFile(path, []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests, err := readExpectedTests(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(expectedTestsForSDK(tests, 26), "\n"); got != "a.b.Test#always" {
+		t.Fatalf("API 26 manifest = %q", got)
+	}
+	if got := strings.Join(expectedTestsForSDK(tests, 34), "\n"); got != "a.b.Test#accessibility\na.b.Test#always" {
+		t.Fatalf("API 34 manifest = %q", got)
 	}
 }
 

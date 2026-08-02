@@ -5,6 +5,10 @@ package org.kurdistanvpn.core.nativeapi
 
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.RedactedProfilePreview
+import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.IpMode
+import org.kurdistanvpn.core.model.PerAppSelectionMode
+import org.kurdistanvpn.core.model.SelectionMode
 
 data class NativeCompatibility(
     val bridgeVersion: String,
@@ -35,6 +39,28 @@ data class BackupPreviewHandle(
     val handle: Long,
     val previewBytes: ByteArray,
 )
+
+data class NativeRuntimeSessionSnapshot(
+    val generation: Long,
+    val planDigest: ByteArray,
+    val profileFingerprint: ByteArray,
+    val strategyFingerprint: ByteArray,
+    val relayFingerprint: ByteArray,
+    val selectionMode: SelectionMode,
+    val perAppMode: PerAppSelectionMode,
+    val packages: List<String>,
+    val ipMode: IpMode,
+    val dnsMode: DnsMode,
+    val mtu: Int,
+    val metered: Boolean,
+    val loopbackOnly: Boolean,
+)
+
+interface NativeRuntimeSession : AutoCloseable {
+    val snapshot: NativeRuntimeSessionSnapshot
+    fun roundTrip(payload: ByteArray): NativeResult<ByteArray>
+    fun cancel(): NativeResult<Unit>
+}
 
 data class ActivationCommand(
     val sequence: Long,
@@ -84,6 +110,7 @@ interface KurdNativeCore {
     fun openBackup(backup: ByteArray, passphrase: ByteArray): NativeResult<BackupPreviewHandle>
     fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray>
     fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray>
+    fun openRuntimeSession(request: ByteArray): NativeResult<NativeRuntimeSession>
     fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit>
     fun releaseBackup(preview: BackupPreviewHandle): NativeResult<Unit>
 }

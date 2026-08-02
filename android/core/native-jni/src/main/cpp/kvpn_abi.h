@@ -82,6 +82,20 @@ int32_t kvpn_phase11_roundtrip(
     uint8_t *output,
     uint32_t capacity,
     uint32_t *output_length);
+int32_t kvpn_runtime_session_open(
+    uint8_t *input,
+    uint32_t input_length,
+    uint64_t *output_handle,
+    uint8_t *output,
+    uint32_t capacity,
+    uint32_t *output_length);
+int32_t kvpn_runtime_session_roundtrip(
+    uint64_t handle,
+    uint8_t *input,
+    uint32_t input_length,
+    uint8_t *output,
+    uint32_t capacity,
+    uint32_t *output_length);
 int32_t kvpn_cancel(uint64_t handle);
 int32_t kvpn_free(uint64_t handle);
 

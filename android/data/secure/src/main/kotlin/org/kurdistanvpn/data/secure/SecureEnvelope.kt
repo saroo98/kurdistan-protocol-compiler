@@ -31,6 +31,8 @@ enum class SecureDataClass(val wireValue: Int) {
     ACTIVATION_ACTIVE(8),
     ACTIVATION_LAST_KNOWN_GOOD(9),
     RESTORE_BATCH(10),
+    ROUTING_POLICY(11),
+    DIAGNOSTIC_EVENTS(12),
 }
 
 data class WrappedKey(

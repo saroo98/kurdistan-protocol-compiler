@@ -1,0 +1,60 @@
+{
+  "schema": "kurdistan-phase14-acceptance-v1",
+  "phase": 14,
+  "complete": false,
+  "readinessStatus": "IN_PROGRESS",
+  "releaseDecision": "NO_GO",
+  "priorPhaseBaseline": {
+    "goAndroidGate": "PASS_2026-08-02",
+    "phase13Verifier": "PASS_2026-08-02",
+    "api36DeviceManifest": "PASS_EXACT_26_TESTS_2026-08-02",
+    "phase14Api36DeviceManifest": "PASS_EXACT_28_TESTS_2026-08-02",
+    "integrationState": "READY_FOR_INTEGRATION"
+  },
+  "local": {
+    "phase14Verifier": "PASS",
+    "phase14HostGate": "PASS",
+    "phase14DeviceGate": "PASS",
+    "featureInventoryReconciliation": "PASS",
+    "releaseArtifactReproducibility": "PASS",
+    "rollbackAndRecoveryDrills": "PASS",
+    "performanceAndLongevity": "PASS"
+  },
+  "external": {
+    "productionAuthorityAndKeyCustody": "UNVERIFIED",
+    "ownedProductionRelayFleet": "UNVERIFIED",
+    "productionProviderAndOperator": "UNVERIFIED",
+    "physicalDeviceAndOemMatrix": "UNVERIFIED",
+    "cellularWifiHandoverAndSleep": "UNVERIFIED",
+    "authorizedHostileNetworkFieldValidation": "UNVERIFIED",
+    "independentAssuranceReviews": "UNVERIFIED",
+    "productionSigningAndDistribution": "UNVERIFIED",
+    "playVpnServiceDeclarationAndReview": "UNVERIFIED",
+    "productionMonitoringIncidentAndDisasterRecovery": "UNVERIFIED"
+  },
+  "blockers": [
+    {
+      "id": "P14-EXT-001",
+      "severity": "CRITICAL",
+      "category": "production-infrastructure",
+      "conditionToClear": "Observe owned production authority, provider, relay, monitoring, rollback, and recovery systems with integrity-bound evidence."
+    },
+    {
+      "id": "P14-EXT-002",
+      "severity": "CRITICAL",
+      "category": "field-validation",
+      "conditionToClear": "Complete the authorized physical-device, OEM, mobile-network, handover, and hostile-network matrix."
+    },
+    {
+      "id": "P14-EXT-003",
+      "severity": "CRITICAL",
+      "category": "release-distribution",
+      "conditionToClear": "Produce protected production signing, Play VpnService declaration, signed artifacts, staged rollout, rollback, and store-review evidence."
+    }
+  ],
+  "limitations": [
+    "Local source, host, and emulator results cannot satisfy production or field evidence.",
+    "No release artifact may be described as production-signed while signing custody is unverified.",
+    "The release decision remains NO_GO until every mandatory evidence class passes."
+  ]
+}

@@ -37,18 +37,22 @@ func TestPhase11LocalTransportEvidenceOverlayV1(t *testing.T) {
 	var manifest struct {
 		Phase11Overlays map[string]phase11OverlayV1 `json:"phase11_local_transport_overlays"`
 		Phase12Overlays map[string]phase11OverlayV1 `json:"phase12_operator_control_plane_overlays"`
+		Phase13Overlays map[string]phase11OverlayV1 `json:"phase13_android_product_overlays"`
+		Phase14Overlays map[string]phase11OverlayV1 `json:"phase14_assurance_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	phase12Pre := validateOverlayAtPostV1(t, root, "phase12-operator-control-plane-v1", manifest.Phase12Overlays, nil)
+	phase14Pre := validateOverlayAtPostV1(t, root, "phase14-assurance-v1", manifest.Phase14Overlays, nil)
+	phase13Pre := validateOverlayAtPostV1(t, root, "phase13-android-product-v1", manifest.Phase13Overlays, phase14Pre)
+	phase12Pre := validateOverlayAtPostV1(t, root, "phase12-operator-control-plane-v1", manifest.Phase12Overlays, phase13Pre)
 	validateOverlayAtPostV1(t, root, "phase11-local-transport-v1", manifest.Phase11Overlays, phase12Pre)
 }
 
 func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[string]phase11OverlayV1, currentAtPost map[string]string) map[string]string {
 	t.Helper()
 	if name == "phase12-operator-control-plane-v1" {
-		return validatePhase12OverlayAtPostV1(t, root, overlays)
+		return validatePhase12OverlayAtPostV1(t, root, currentAtPost, overlays)
 	}
 	overlay, ok := overlays[name]
 	if len(overlays) != 1 || !ok || overlay.Version != name ||
@@ -59,6 +63,14 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		t.Fatalf("invalid %s overlay identity or cardinality", name)
 	}
 	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	phase13Binding := sha256.New()
+	phase14Binding := sha256.New()
+	if name == "phase13-android-product-v1" {
+		_, _ = phase13Binding.Write([]byte(overlay.SelfPreSHA256 + "\n"))
+	}
+	if name == "phase14-assurance-v1" {
+		_, _ = phase14Binding.Write([]byte(overlay.SelfPreSHA256 + "\n"))
+	}
 	for path, hash := range currentAtPost {
 		pre[path] = hash
 	}
@@ -79,6 +91,18 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		} else if entry.PreEvidence != "" || !validPhase11DigestV1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
 			t.Fatalf("invalid existing predecessor %d", index)
 		}
+		if name == "phase13-android-product-v1" {
+			_, _ = phase13Binding.Write([]byte(path))
+			_, _ = phase13Binding.Write([]byte{0})
+			_, _ = phase13Binding.Write([]byte(predecessor))
+			_, _ = phase13Binding.Write([]byte{'\n'})
+		}
+		if name == "phase14-assurance-v1" {
+			_, _ = phase14Binding.Write([]byte(path))
+			_, _ = phase14Binding.Write([]byte{0})
+			_, _ = phase14Binding.Write([]byte(predecessor))
+			_, _ = phase14Binding.Write([]byte{'\n'})
+		}
 		actual, present := currentAtPost[path]
 		if !present {
 			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
@@ -94,10 +118,16 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		pre[path] = predecessor
 		last = path
 	}
+	if name == "phase13-android-product-v1" && hex.EncodeToString(phase13Binding.Sum(nil)) != "53dde098ac5c6f2febee7f5069d8b11f5809f58ef94a5ada55835c2467ebd58f" {
+		t.Fatal("invalid phase13 predecessor binding")
+	}
+	if name == "phase14-assurance-v1" && hex.EncodeToString(phase14Binding.Sum(nil)) != "eefcbeb7a93a4472fa7563a3b0fb8d7399001da4fe309ae735861369ed57a0fa" {
+		t.Fatal("invalid phase14 predecessor binding")
+	}
 	return pre
 }
 
-func validatePhase12OverlayAtPostV1(t *testing.T, root string, overlays map[string]phase11OverlayV1) map[string]string {
+func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map[string]string, overlays map[string]phase11OverlayV1) map[string]string {
 	t.Helper()
 	const name = "phase12-operator-control-plane-v1"
 	paths := []string{
@@ -183,7 +213,10 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, overlays map[stri
 		len(overlay.Paths) != len(paths) || len(overlay.Entries) != len(paths) {
 		t.Fatalf("invalid %s overlay identity or cardinality", name)
 	}
-	pre := make(map[string]string, len(paths))
+	pre := make(map[string]string, len(currentAtPost)+len(paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for index, path := range paths {
 		entry := overlay.Entries[index]
 		if overlay.Paths[index] != path || entry.Path != path || !validPhase11DigestV1(entry.PostSHA256) {
@@ -200,12 +233,16 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, overlays map[stri
 			}
 			predecessor = "ABSENT"
 		}
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			t.Fatal(err)
+		actual, present := currentAtPost[path]
+		if !present {
+			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			digest := sha256.Sum256(content)
+			actual = hex.EncodeToString(digest[:])
 		}
-		digest := sha256.Sum256(content)
-		if hex.EncodeToString(digest[:]) != entry.PostSHA256 {
+		if actual != entry.PostSHA256 {
 			t.Fatalf("%s evidence drift: %s", name, path)
 		}
 		pre[path] = predecessor

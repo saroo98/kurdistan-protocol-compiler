@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -25,6 +26,8 @@ import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.Phase9Settings
 import org.kurdistanvpn.core.model.ProfileSummary
 import org.kurdistanvpn.core.model.ProfileTrust
+import org.kurdistanvpn.core.model.ProfilePreferences
+import org.kurdistanvpn.core.model.ResetScope
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.ui.R as UiR
 import org.kurdistanvpn.feature.diagnosticsabout.DiagnosticsAboutScreen
@@ -43,7 +46,14 @@ class Phase11ControlSurfaceDeviceTest {
 
     @Test
     fun homeInvokesEveryExposedControl() {
-        var appState by mutableStateOf<AppState>(AppState.Ready(emptyList()))
+        val profile = ProfileSummary(
+            localRecordId = "phase13-home-profile",
+            displayAlias = "Phase 13 home profile",
+            trust = ProfileTrust.VERIFIED_NONPRODUCTION,
+            generation = 7u,
+            expiresAtEpochSeconds = 2_000_000_000,
+        )
+        var appState by mutableStateOf<AppState>(AppState.Ready(listOf(profile)))
         var runtime by mutableStateOf(VpnRuntimeSnapshot())
         val invoked = linkedMapOf<String, Int>()
         fun record(name: String) {
@@ -53,6 +63,7 @@ class Phase11ControlSurfaceDeviceTest {
         compose.setContent {
             HomeScreen(
                 state = appState,
+                settings = Phase9Settings(profiles = ProfilePreferences(activeLocalRecordId = profile.localRecordId)),
                 vpnRuntime = runtime,
                 onStartVpn = {
                     record("start")
@@ -72,16 +83,19 @@ class Phase11ControlSurfaceDeviceTest {
             )
         }
 
-        compose.onNodeWithText(context.getString(UiR.string.start_local_vpn))
+        compose.onNodeWithText(context.getString(UiR.string.connect))
             .performClick()
-        compose.onNodeWithText(context.getString(UiR.string.stop_local_vpn))
+        compose.onNodeWithText(context.getString(UiR.string.disconnect))
             .assertIsDisplayed()
             .performClick()
-        compose.onNodeWithText(context.getString(UiR.string.profiles))
+        compose.onNodeWithTag("home_profiles")
+            .performScrollTo()
             .performClick()
-        compose.onNodeWithText(context.getString(UiR.string.privacy_recovery))
+        compose.onNodeWithTag("home_settings")
+            .performScrollTo()
             .performClick()
         compose.onNodeWithText(context.getString(UiR.string.diagnostics_about))
+            .performScrollTo()
             .performClick()
         compose.runOnIdle {
             appState = AppState.ImportRejected(OperationError.TRUST_REJECTED)
@@ -254,6 +268,7 @@ class Phase11ControlSurfaceDeviceTest {
                     backupState = BackupWorkflowState.Idle
                 },
                 onResetAll = { record("reset") },
+                onResetScope = { record("reset-${it.name.lowercase()}") },
                 onBack = { record("back") },
             )
         }
@@ -302,6 +317,9 @@ class Phase11ControlSurfaceDeviceTest {
         compose.onNodeWithText(context.getString(UiR.string.prepare_reset))
             .performScrollTo()
             .performClick()
+        compose.onNodeWithTag("reset_scope_${ResetScope.SETTINGS.name.lowercase()}")
+            .performScrollTo()
+            .performClick()
         compose.onNodeWithText(context.getString(UiR.string.confirm_reset))
             .performScrollTo()
             .performClick()
@@ -322,7 +340,7 @@ class Phase11ControlSurfaceDeviceTest {
                     "open-backup" to 1,
                     "cancel-restore" to 1,
                     "confirm-restore" to 1,
-                    "reset" to 1,
+                    "reset-settings" to 1,
                     "back" to 1,
                 ),
                 invoked,
@@ -343,6 +361,7 @@ class Phase11ControlSurfaceDeviceTest {
                 state = state,
                 appVersion = "phase11-control",
                 compatibility = null,
+                events = emptyList(),
                 onPrepare = {
                     record("prepare")
                     state = DiagnosticWorkflowState.Preview(1, "1", "1")
@@ -355,6 +374,7 @@ class Phase11ControlSurfaceDeviceTest {
                     record("cancel")
                     state = DiagnosticWorkflowState.Idle
                 },
+                onClearEvents = {},
                 onBack = { record("back") },
             )
         }

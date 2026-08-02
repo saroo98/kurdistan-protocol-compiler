@@ -19,6 +19,8 @@ import org.kurdistanvpn.data.secure.MissingKeyException
 import org.kurdistanvpn.data.secure.ProfileAdmissionJournal
 import org.kurdistanvpn.data.secure.SecureBlobStore
 import org.kurdistanvpn.data.secure.SecureEnvelopeCodec
+import org.kurdistanvpn.data.secure.SecureRoutingPolicyStore
+import org.kurdistanvpn.data.secure.EncryptedDiagnosticEventStore
 import org.kurdistanvpn.data.settings.Phase9SettingsStore
 import org.kurdistanvpn.runtime.api.UnavailableRuntime
 
@@ -27,11 +29,17 @@ class Phase9CompositionRoot private constructor(
     val nativeCore: KurdNativeCore,
     private var database: KurdistanMetadataDatabase,
     admissionJournal: ProfileAdmissionJournal?,
+    sensitiveRoutingStore: SecureRoutingPolicyStore?,
+    diagnosticEventStore: EncryptedDiagnosticEventStore?,
     storageFailure: StorageFailure?,
     val runtime: UnavailableRuntime,
     val settingsStore: Phase9SettingsStore,
 ) {
     var admissionJournal: ProfileAdmissionJournal? = admissionJournal
+        private set
+    var sensitiveRoutingStore: SecureRoutingPolicyStore? = sensitiveRoutingStore
+        private set
+    var diagnosticEventStore: EncryptedDiagnosticEventStore? = diagnosticEventStore
         private set
     var storageFailure: StorageFailure? = storageFailure
         private set
@@ -55,12 +63,21 @@ class Phase9CompositionRoot private constructor(
             val replacement = initializeProtectedStorage(context, nativeCore)
             database = replacement.database
             admissionJournal = replacement.journal
+            sensitiveRoutingStore = replacement.routingStore
+            diagnosticEventStore = replacement.diagnosticStore
             storageFailure = replacement.failure
-            check(replacement.journal != null && replacement.failure == null)
+            check(
+                replacement.journal != null &&
+                    replacement.routingStore != null &&
+                    replacement.diagnosticStore != null &&
+                    replacement.failure == null,
+            )
             check(marker.delete()) { "explicit-reset marker deletion failed" }
             true
         } catch (_: Throwable) {
             admissionJournal = null
+            sensitiveRoutingStore = null
+            diagnosticEventStore = null
             storageFailure = StorageFailure.DEGRADED
             false
         }
@@ -87,6 +104,8 @@ class Phase9CompositionRoot private constructor(
                 nativeCore = nativeCore,
                 database = storage.database,
                 admissionJournal = storage.journal,
+                sensitiveRoutingStore = storage.routingStore,
+                diagnosticEventStore = storage.diagnosticStore,
                 storageFailure = storage.failure,
                 runtime = UnavailableRuntime(RuntimeAvailability.PHASE_9_NO_RUNTIME),
                 settingsStore = Phase9SettingsStore(context),
@@ -124,17 +143,20 @@ class Phase9CompositionRoot private constructor(
                 failure = StorageFailure.DEGRADED
                 null
             }
-            val journal = kek?.let {
+            val blobStore = kek?.let { SecureBlobStore(context, SecureEnvelopeCodec(), it) }
+            val journal = blobStore?.let {
                 ProfileAdmissionJournal(
                     nativeCore = nativeCore,
                     catalog = database.profileCatalog(),
-                    blobs = SecureBlobStore(context, SecureEnvelopeCodec(), it),
+                    blobs = it,
                     productionTrust = false,
                 )
             }
             return ProtectedStorage(
                 database = database,
                 journal = journal,
+                routingStore = blobStore?.let(::SecureRoutingPolicyStore),
+                diagnosticStore = blobStore?.let(::EncryptedDiagnosticEventStore),
                 failure = failure,
             )
         }
@@ -186,6 +208,8 @@ class Phase9CompositionRoot private constructor(
         private data class ProtectedStorage(
             val database: KurdistanMetadataDatabase,
             val journal: ProfileAdmissionJournal?,
+            val routingStore: SecureRoutingPolicyStore?,
+            val diagnosticStore: EncryptedDiagnosticEventStore?,
             val failure: StorageFailure?,
         )
     }

@@ -1,0 +1,33 @@
+{
+  "schema": "kurdistan-phase13-acceptance-v1",
+  "phase": 13,
+  "complete": true,
+  "releaseDecision": "NO_GO",
+  "local": {
+    "goGate": "PASS_UNCACHED_BUILD_VET_TEST_AUDIT",
+    "phase13Gate": "PASS_CLEAN_NO_CACHE_1078_TASKS",
+    "combinedAndroidGate": "PASS_PHASE12_AND_ANDROID_PHASE13",
+    "api26EmulatorDeviceGate": "PASS_EXACT_25_APPLICABLE_TESTS_CRASH_SCAN_CLEAN",
+    "api34EmulatorDeviceGate": "PASS_EXACT_26_TESTS_CRASH_SCAN_CLEAN",
+    "api36EmulatorDeviceGate": "PASS_EXACT_26_TESTS_CRASH_SCAN_CLEAN",
+    "localeParity": "PASS_EXACT_KEYS",
+    "accessibility": "PASS_API36_AUTOMATED_LARGE_TEXT_RTL_ADAPTIVE",
+    "secretCanary": "PASS_LOCAL_ARTIFACT_GATE",
+    "verifiedSessionAuthority": "PASS_FOCUSED",
+    "encryptedSettingsAndDiagnostics": "PASS_FOCUSED",
+    "scopedReset": "PASS_SETTINGS_PROFILES_ROUTING_DIAGNOSTICS_EVERYTHING"
+  },
+  "external": {
+    "physicalDevicesAndOEMs": "UNVERIFIED",
+    "cellularHandover": "UNVERIFIED",
+    "publicRelay": "UNVERIFIED",
+    "productionProvider": "UNVERIFIED",
+    "hostileNetwork": "UNVERIFIED",
+    "productionSigningAndDistribution": "UNVERIFIED"
+  },
+  "limitations": [
+    "Phase 13 does not authorize public relays or unrestricted Internet egress.",
+    "A local emulator result is not production or censorship-resilience evidence.",
+    "Phases 16-22 remain required for production infrastructure, independent assurance, field validation, signing, distribution, and release."
+  ]
+}

@@ -470,6 +470,80 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePhase11RoundTrip(
 }
 
 JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionOpen(
+    JNIEnv *env,
+    jobject receiver,
+    jbyteArray input,
+    jobject output,
+    jlongArray metadata) {
+    (void)receiver;
+    if (input == NULL || metadata == NULL ||
+        (*env)->GetArrayLength(env, metadata) != 2) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jbyte *input_elements = NULL;
+    uint32_t input_length = 0;
+    uint8_t *input_bytes = array_bytes(env, input, &input_elements, &input_length);
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (input_bytes == NULL || target == NULL) {
+        release_array(env, input, input_elements);
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint64_t handle = 0;
+    uint32_t length = 0;
+    int32_t code = kvpn_runtime_session_open(
+        input_bytes,
+        input_length,
+        &handle,
+        target,
+        (uint32_t)capacity,
+        &length);
+    release_array(env, input, input_elements);
+    if (code == 0) {
+        jlong values[2] = {(jlong)handle, (jlong)length};
+        (*env)->SetLongArrayRegion(env, metadata, 0, 2, values);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionRoundTrip(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jbyteArray input,
+    jobject output,
+    jintArray output_length) {
+    (void)receiver;
+    if (input == NULL || output_length == NULL ||
+        (*env)->GetArrayLength(env, output_length) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jbyte *input_elements = NULL;
+    uint32_t input_length = 0;
+    uint8_t *input_bytes = array_bytes(env, input, &input_elements, &input_length);
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (input_bytes == NULL || target == NULL) {
+        release_array(env, input, input_elements);
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint32_t length = 0;
+    int32_t code = kvpn_runtime_session_roundtrip(
+        (uint64_t)handle,
+        input_bytes,
+        input_length,
+        target,
+        (uint32_t)capacity,
+        &length);
+    release_array(env, input, input_elements);
+    jint value = (jint)length;
+    (*env)->SetIntArrayRegion(env, output_length, 0, 1, &value);
+    return code;
+}
+
+JNIEXPORT jint JNICALL
 Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeCancel(
     JNIEnv *env,
     jobject receiver,

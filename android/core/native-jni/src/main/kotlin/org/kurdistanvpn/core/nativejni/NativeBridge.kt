@@ -15,7 +15,13 @@ import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.core.nativeapi.NativeActivationSession
 import org.kurdistanvpn.core.nativeapi.NativeCompatibility
 import org.kurdistanvpn.core.nativeapi.NativeResult
+import org.kurdistanvpn.core.nativeapi.NativeRuntimeSession
+import org.kurdistanvpn.core.nativeapi.NativeRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
+import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.IpMode
+import org.kurdistanvpn.core.model.PerAppSelectionMode
+import org.kurdistanvpn.core.model.SelectionMode
 
 class NativeBridge : KurdNativeCore {
     override fun compatibility(): NativeResult<NativeCompatibility> {
@@ -144,6 +150,26 @@ class NativeBridge : KurdNativeCore {
         }
     }
 
+    override fun openRuntimeSession(request: ByteArray): NativeResult<NativeRuntimeSession> {
+        if (request.isEmpty() || request.size > MAX_RUNTIME_OPEN_BYTES) {
+            return NativeResult.Failure(OperationError.SIZE_LIMIT)
+        }
+        val output = ByteBuffer.allocateDirect(MAX_RUNTIME_SNAPSHOT_BYTES)
+        val metadata = LongArray(2)
+        val code = nativeRuntimeSessionOpen(request, output, metadata)
+        if (code != CODE_OK) return NativeResult.Failure(mapError(code))
+        val decoded = decodeRuntimeSnapshot(readBytes(output, metadata[1].toInt()))
+        return when (decoded) {
+            is NativeResult.Failure -> {
+                nativeFree(metadata[0])
+                decoded
+            }
+            is NativeResult.Success -> NativeResult.Success(
+                JniRuntimeSession(metadata[0], decoded.value),
+            )
+        }
+    }
+
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =
         unitResult(nativeFree(preview.handle))
 
@@ -210,6 +236,42 @@ class NativeBridge : KurdNativeCore {
         }
     }
 
+    private inner class JniRuntimeSession(
+        private val handle: Long,
+        override val snapshot: NativeRuntimeSessionSnapshot,
+    ) : NativeRuntimeSession {
+        private var closed = false
+
+        override fun roundTrip(payload: ByteArray): NativeResult<ByteArray> {
+            if (closed) return NativeResult.Failure(OperationError.CANCELLED)
+            if (payload.isEmpty() || payload.size > MAX_PHASE11_PAYLOAD_BYTES) {
+                return NativeResult.Failure(OperationError.SIZE_LIMIT)
+            }
+            val output = ByteBuffer.allocateDirect(MAX_PHASE11_PAYLOAD_BYTES)
+            val length = IntArray(1)
+            val code = nativeRuntimeSessionRoundTrip(handle, payload, output, length)
+            return if (code == CODE_OK) {
+                NativeResult.Success(readBytes(output, length[0]))
+            } else {
+                NativeResult.Failure(mapError(code))
+            }
+        }
+
+        override fun cancel(): NativeResult<Unit> {
+            if (closed) return NativeResult.Failure(OperationError.CANCELLED)
+            val result = unitResult(nativeCancel(handle))
+            close()
+            return result
+        }
+
+        override fun close() {
+            if (!closed) {
+                closed = true
+                nativeFree(handle)
+            }
+        }
+    }
+
     private external fun nativeAbiInfo(output: ByteBuffer, outputLength: IntArray): Int
     private external fun nativeVerifyPreview(input: ByteArray, output: ByteBuffer, metadata: LongArray): Int
     private external fun nativeActivationOpen(verified: Long, outputHandle: LongArray): Int
@@ -252,6 +314,17 @@ class NativeBridge : KurdNativeCore {
         output: ByteBuffer,
         outputLength: IntArray,
     ): Int
+    private external fun nativeRuntimeSessionOpen(
+        input: ByteArray,
+        output: ByteBuffer,
+        metadata: LongArray,
+    ): Int
+    private external fun nativeRuntimeSessionRoundTrip(
+        handle: Long,
+        input: ByteArray,
+        output: ByteBuffer,
+        outputLength: IntArray,
+    ): Int
 
     companion object {
         private const val CODE_OK = 0
@@ -261,6 +334,8 @@ class NativeBridge : KurdNativeCore {
         private const val MAX_RESULT_BYTES = 1_200_000
         private const val MAX_DIAGNOSTIC_BYTES = 4096
         private const val MAX_BACKUP_BYTES = 8 * 1024 * 1024 + 128
+        private const val MAX_RUNTIME_OPEN_BYTES = 1_500_000 + 1_200_000 + 32 * 1024
+        private const val MAX_RUNTIME_SNAPSHOT_BYTES = 32 * 1024
         private const val MAX_PHASE11_PAYLOAD_BYTES = 32 * 1024
 
         init {
@@ -327,6 +402,57 @@ class NativeBridge : KurdNativeCore {
                 onFailure = { NativeResult.Failure(OperationError.INTERNAL_FAILURE) },
             )
 
+        private fun decodeRuntimeSnapshot(
+            encoded: ByteArray,
+        ): NativeResult<NativeRuntimeSessionSnapshot> = runCatching {
+            val reader = BinaryReader(encoded)
+            require(reader.ascii(4) == "KSS1")
+            require(reader.u8() == 1)
+            val flags = reader.u8()
+            require(flags and 0xfc == 0)
+            val selection = SelectionMode.entries.getOrNull(reader.u8() - 1)
+                ?: error("invalid selection")
+            val perApp = PerAppSelectionMode.entries.getOrNull(reader.u8() - 1)
+                ?: error("invalid per-app mode")
+            val ipMode = IpMode.entries.getOrNull(reader.u8() - 1)
+                ?: error("invalid IP mode")
+            val dnsMode = when (reader.u8()) {
+                1 -> DnsMode.INTERNAL_TUN
+                2 -> DnsMode.CUSTOM
+                else -> error("invalid DNS mode")
+            }
+            val mtu = reader.u16()
+            require(mtu in 1280..1500)
+            val generation = reader.u64()
+            val planDigest = reader.fixedBytes(32)
+            require(planDigest.any { it != 0.toByte() })
+            val profileFingerprint = reader.fixedBytes(16)
+            val strategyFingerprint = reader.fixedBytes(16)
+            val relayFingerprint = reader.fixedBytes(16)
+            val packageCount = reader.u16()
+            require(packageCount <= 64)
+            val packages = List(packageCount) { reader.u16String() }
+            require(packages == packages.sorted() && packages.distinct().size == packages.size)
+            NativeRuntimeSessionSnapshot(
+                generation = generation,
+                planDigest = planDigest,
+                profileFingerprint = profileFingerprint,
+                strategyFingerprint = strategyFingerprint,
+                relayFingerprint = relayFingerprint,
+                selectionMode = selection,
+                perAppMode = perApp,
+                packages = packages,
+                ipMode = ipMode,
+                dnsMode = dnsMode,
+                mtu = mtu,
+                metered = flags and 2 != 0,
+                loopbackOnly = flags and 1 != 0,
+            ).also { require(reader.exhausted()) }
+        }.fold(
+            onSuccess = { NativeResult.Success(it) },
+            onFailure = { NativeResult.Failure(OperationError.INTERNAL_FAILURE) },
+        )
+
         private fun unitResult(code: Int): NativeResult<Unit> =
             if (code == CODE_OK) NativeResult.Success(Unit) else NativeResult.Failure(mapError(code))
 
@@ -359,6 +485,10 @@ private class BinaryReader(
     fun u32(): Int = buffer.int.also { require(it >= 0) }
     fun u64(): Long = buffer.long.also { require(it >= 0) }
     fun i64(): Long = buffer.long
+    fun fixedBytes(length: Int): ByteArray = bytes(length)
+    fun u16String(): String = bytes(u16()).toString(Charsets.UTF_8).also {
+        require(it.length in 3..255)
+    }
     fun exhausted(): Boolean = !buffer.hasRemaining()
 
     private fun bytes(length: Int): ByteArray {
