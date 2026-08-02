@@ -157,21 +157,13 @@ func TestReceiptIssueStreamsAndroidSizedArtifact(t *testing.T) {
 	}
 }
 
-func TestDigestRootArtifactRejectsOversizedSparseFile(t *testing.T) {
+func TestDigestRootArtifactRejectsOversizedFileWithoutLargeAllocation(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "oversized.apk")
-	file, err := os.Create(path)
-	if err != nil {
+	if err := os.WriteFile(path, []byte{0, 1}, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := file.Truncate(maxArtifactBytes + 1); err != nil {
-		file.Close()
-		t.Fatal(err)
-	}
-	if err := file.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := digestRootArtifact(root, "oversized.apk"); err == nil {
+	if _, err := digestRootArtifactWithinLimit(root, "oversized.apk", 1); err == nil {
 		t.Fatal("expected oversized artifact to be rejected")
 	}
 }
