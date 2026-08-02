@@ -92,6 +92,31 @@ func TestVerifyKnownWorkflowContractRejectsAttemptAmbiguityAndUnboundDeviceBytes
 	}
 }
 
+func TestVerifyEmulatorProofScriptRequiresSharedAVDHomeAndBoundedDiscovery(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "run-android-emulator-proof.ps1")
+	bad := `$env:ANDROID_AVD_HOME = $avdHome
+& $emulator '-list-avds'
+$process.HasExited
+& $adb wait-for-device
+adb emulator discovery timed out
+-not (Test-Path -LiteralPath $GateReceipt)
+`
+	if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyEmulatorProofScript(path); err == nil || !strings.Contains(err.Error(), "unbounded adb") {
+		t.Fatalf("error = %v, want unbounded adb rejection", err)
+	}
+
+	good := strings.ReplaceAll(bad, "& $adb wait-for-device\n", "")
+	if err := os.WriteFile(path, []byte(good), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyEmulatorProofScript(path); err != nil {
+		t.Fatalf("verify bounded emulator proof script: %v", err)
+	}
+}
+
 func writeWorkflow(t *testing.T, root, name, content string) {
 	t.Helper()
 	path := filepath.Join(root, ".github", "workflows", name)

@@ -58,6 +58,11 @@ func verifyRoot(root string) error {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
+	if workflowReferencesEmulatorProof(directory, names) {
+		if err := verifyEmulatorProofScript(filepath.Join(root, "tools", "scripts", "run-android-emulator-proof.ps1")); err != nil {
+			return err
+		}
+	}
 	actionsRoot := filepath.Join(root, ".github", "actions")
 	if err := filepath.WalkDir(actionsRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -75,6 +80,39 @@ func verifyRoot(root string) error {
 		return nil
 	}); err != nil && !os.IsNotExist(err) {
 		return err
+	}
+	return nil
+}
+
+func workflowReferencesEmulatorProof(directory string, names []string) bool {
+	for _, name := range names {
+		raw, err := os.ReadFile(filepath.Join(directory, name))
+		if err == nil && strings.Contains(string(raw), "run-android-emulator-proof.ps1") {
+			return true
+		}
+	}
+	return false
+}
+
+func verifyEmulatorProofScript(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read Android emulator proof script: %w", err)
+	}
+	content := string(raw)
+	for _, token := range []string{
+		"$env:ANDROID_AVD_HOME = $avdHome",
+		"& $emulator '-list-avds'",
+		"$process.HasExited",
+		"adb emulator discovery timed out",
+		"-not (Test-Path -LiteralPath $GateReceipt)",
+	} {
+		if !strings.Contains(content, token) {
+			return fmt.Errorf("Android emulator proof script is missing fail-closed contract %q", token)
+		}
+	}
+	if strings.Contains(content, "& $adb wait-for-device") {
+		return errors.New("Android emulator proof script uses unbounded adb wait-for-device")
 	}
 	return nil
 }
