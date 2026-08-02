@@ -18,6 +18,20 @@ val invokedFromAndroidStudio = providers.gradleProperty("android.injected.invoke
     .map(String::toBoolean)
     .orElse(false)
 
+val releaseVersionProperties = Properties().apply {
+    rootProject.file("../config/release/version.properties").inputStream().use(::load)
+}
+val releaseVersionName = requireNotNull(releaseVersionProperties.getProperty("versionName")) {
+    "config/release/version.properties is missing versionName"
+}
+val releaseVersionCode = requireNotNull(releaseVersionProperties.getProperty("versionCode")) {
+    "config/release/version.properties is missing versionCode"
+}.toInt()
+require(releaseVersionName.isNotBlank()) { "release versionName must not be blank" }
+require(releaseVersionCode > 0) { "release versionCode must be positive" }
+extra["releaseVersionName"] = releaseVersionName
+extra["releaseVersionCode"] = releaseVersionCode
+
 val configuredSdk = rootProject.file("local.properties").takeIf(File::isFile)?.let { propertiesFile ->
     Properties().run {
         propertiesFile.inputStream().use(::load)
@@ -36,7 +50,7 @@ val adbExecutable = androidSdkDirectory.resolve(
 
 allprojects {
     group = "org.kurdistanvpn"
-    version = "0.9.0"
+    version = releaseVersionName
     dependencyLocking {
         lockAllConfigurations()
         // Android Studio resolves ephemeral Configuration copies whose generated
@@ -60,7 +74,7 @@ allprojects {
 tasks.withType<CyclonedxAggregateTask>().configureEach {
     componentGroup.set("org.kurdistanvpn")
     componentName.set("KurdistanVPN")
-    componentVersion.set("0.9.0")
+    componentVersion.set(releaseVersionName)
     includeBomSerialNumber.set(false)
     includeBuildSystem.set(false)
     includeLicenseText.set(false)
@@ -224,7 +238,7 @@ tasks.register("phase13Gate") {
     )
 }
 
-tasks.register("phase14Gate") {
+val phase14Gate = tasks.register("phase14Gate") {
     group = "verification"
     description = "Runs the cache-independent Phase 14 local assurance and release-readiness bar."
     dependsOn(
@@ -389,4 +403,35 @@ tasks.register<Exec>("phase14DeviceGate") {
         "-expected-tests",
         "android/config/phase14-required-device-tests.txt",
     )
+}
+
+val ciReleaseMetadata = tasks.register<Exec>("ciReleaseMetadata") {
+    group = "verification"
+    description = "Validates centralized release metadata in offline, non-authoritative mode."
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("go", "run", "./cmd/releaseverify", "-root", ".")
+}
+
+tasks.register("ciPrHostGate") {
+    group = "verification"
+    description = "Runs the existing Phase 14 host proof and centralized metadata check for pull requests."
+    dependsOn(phase14Gate, ciReleaseMetadata)
+}
+
+tasks.register("ciAssuranceHostGate") {
+    group = "verification"
+    description = "Runs the existing Phase 14 host proof and centralized metadata check for assurance."
+    dependsOn(phase14Gate, ciReleaseMetadata)
+}
+
+tasks.register("ciDeviceArtifacts") {
+    group = "build"
+    description = "Builds one internal APK pair and writes deterministic, non-authoritative artifact metadata."
+    dependsOn(":app:writeCiDeviceArtifactMetadata")
+}
+
+tasks.register("ciEngineeringCandidate") {
+    group = "build"
+    description = "Builds unsigned engineering artifacts and writes deterministic, non-authoritative metadata."
+    dependsOn(":app:writeCiEngineeringCandidateMetadata")
 }

@@ -1,7 +1,13 @@
+import com.android.build.api.artifact.SingleArtifact
+import org.gradle.api.tasks.Exec
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
 }
+
+val releaseVersionName: String by rootProject.extra
+val releaseVersionCode: Int by rootProject.extra
 
 android {
     namespace = "org.kurdistanvpn.app"
@@ -14,8 +20,8 @@ android {
         applicationId = "org.kurdistanvpn.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.9.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -70,6 +76,133 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+val repositoryDirectory = rootProject.projectDir.parentFile
+
+androidComponents {
+    onVariants(selector().withName("internal")) { variant ->
+        val appApkDirectory = variant.artifacts.get(SingleArtifact.APK)
+        val appApkLoader = variant.artifacts.getBuiltArtifactsLoader()
+        val testComponent = requireNotNull(variant.androidTest) {
+            "internal Android test component is required for CI device artifacts"
+        }
+        val testApkDirectory = testComponent.artifacts.get(SingleArtifact.APK)
+        val testApkLoader = testComponent.artifacts.getBuiltArtifactsLoader()
+        val expectedTests = rootProject.file("config/phase14-required-device-tests.txt")
+        val metadataOutput = rootProject.layout.buildDirectory.file("ci/device-artifacts.json")
+
+        tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
+            group = "build"
+            description = "Builds and hashes the exact internal app and instrumentation APK pair."
+            dependsOn("assembleInternal", "assembleInternalAndroidTest")
+            inputs.dir(appApkDirectory)
+            inputs.dir(testApkDirectory)
+            inputs.file(expectedTests)
+            outputs.file(metadataOutput)
+            workingDir(repositoryDirectory)
+            doFirst {
+                val appArtifacts = requireNotNull(appApkLoader.load(appApkDirectory.get())) {
+                    "internal APK metadata is missing"
+                }
+                val testArtifacts = requireNotNull(testApkLoader.load(testApkDirectory.get())) {
+                    "internal instrumentation APK metadata is missing"
+                }
+                val appApk = appArtifacts.elements.singleOrNull()?.outputFile?.let(::file)
+                    ?: error("require exactly one internal application APK")
+                val testApk = testArtifacts.elements.singleOrNull()?.outputFile?.let(::file)
+                    ?: error("require exactly one internal instrumentation APK")
+                fun relative(path: File) = path.relativeTo(repositoryDirectory).invariantSeparatorsPath
+                commandLine(
+                    "go",
+                    "run",
+                    "./cmd/releaseverify",
+                    "-root",
+                    ".",
+                    "-artifact-subject",
+                    "DEVICE_TEST_SET",
+                    "-artifact-metadata",
+                    relative(metadataOutput.get().asFile),
+                    "-artifact",
+                    "internal-apk=${relative(appApk)}",
+                    "-artifact",
+                    "instrumentation-apk=${relative(testApk)}",
+                    "-artifact",
+                    "expected-tests=${relative(expectedTests)}",
+                )
+            }
+        }
+    }
+
+    onVariants(selector().withName("release")) { variant ->
+        val apkDirectory = variant.artifacts.get(SingleArtifact.APK)
+        val apkLoader = variant.artifacts.getBuiltArtifactsLoader()
+        val bundle = variant.artifacts.get(SingleArtifact.BUNDLE)
+        val mapping = variant.artifacts.get(SingleArtifact.OBFUSCATION_MAPPING_FILE)
+        val mergedManifest = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
+        val nativeDebugSymbols = layout.buildDirectory.file(
+            "outputs/native-debug-symbols/release/native-debug-symbols.zip",
+        )
+        val cyclonedx = rootProject.layout.buildDirectory.file("reports/cyclonedx/bom.json")
+        val licenseEvidence = repositoryDirectory.resolve("testdata/evidence/phase9/android-licenses.spdx.json")
+        val releaseProducts = repositoryDirectory.resolve("config/release/products.json")
+        val releaseVersion = repositoryDirectory.resolve("config/release/version.properties")
+        val metadataOutput = rootProject.layout.buildDirectory.file("ci/engineering-candidate.json")
+
+        tasks.register<Exec>("writeCiEngineeringCandidateMetadata") {
+            group = "build"
+            description = "Builds and hashes unsigned engineering-candidate artifacts without signing or publication."
+            dependsOn("assembleRelease", "bundleRelease", ":cyclonedxBom")
+            inputs.dir(apkDirectory)
+            inputs.file(bundle)
+            inputs.file(mapping)
+            inputs.file(mergedManifest)
+            inputs.file(nativeDebugSymbols)
+            inputs.file(cyclonedx)
+            inputs.file(licenseEvidence)
+            inputs.file(releaseProducts)
+            inputs.file(releaseVersion)
+            outputs.file(metadataOutput)
+            workingDir(repositoryDirectory)
+            doFirst {
+                val apkArtifacts = requireNotNull(apkLoader.load(apkDirectory.get())) {
+                    "release APK metadata is missing"
+                }
+                val releaseApk = apkArtifacts.elements.singleOrNull()?.outputFile?.let(::file)
+                    ?: error("require exactly one release APK")
+                fun relative(path: File) = path.relativeTo(repositoryDirectory).invariantSeparatorsPath
+                commandLine(
+                    "go",
+                    "run",
+                    "./cmd/releaseverify",
+                    "-root",
+                    ".",
+                    "-artifact-subject",
+                    "UNSIGNED_ENGINEERING_CANDIDATE",
+                    "-artifact-metadata",
+                    relative(metadataOutput.get().asFile),
+                    "-artifact",
+                    "unsigned-apk=${relative(releaseApk)}",
+                    "-artifact",
+                    "unsigned-aab=${relative(bundle.get().asFile)}",
+                    "-artifact",
+                    "mapping=${relative(mapping.get().asFile)}",
+                    "-artifact",
+                    "native-debug-symbols=${relative(nativeDebugSymbols.get().asFile)}",
+                    "-artifact",
+                    "cyclonedx-sbom=${relative(cyclonedx.get().asFile)}",
+                    "-artifact",
+                    "license-evidence=${relative(licenseEvidence)}",
+                    "-artifact",
+                    "merged-manifest=${relative(mergedManifest.get().asFile)}",
+                    "-artifact",
+                    "release-products=${relative(releaseProducts)}",
+                    "-artifact",
+                    "release-version=${relative(releaseVersion)}",
+                )
+            }
+        }
     }
 }
 

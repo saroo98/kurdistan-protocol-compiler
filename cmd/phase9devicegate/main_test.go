@@ -251,3 +251,41 @@ func TestPackageListContainsExactRejectsPrefixAndSuffixCollisions(t *testing.T) 
 		t.Fatal("packageListContainsExact accepted an empty package")
 	}
 }
+
+func TestExpectedDeviceIdentityRejectsWrongAPI(t *testing.T) {
+	if err := verifyExpectedDeviceIdentity(34, "x86_64", 36, "x86_64"); err == nil {
+		t.Fatal("API 34 lane accepted an API 36 device")
+	}
+}
+
+func TestExpectedDeviceIdentityRejectsWrongPrimaryABI(t *testing.T) {
+	if err := verifyExpectedDeviceIdentity(34, "x86_64", 34, "arm64-v8a"); err == nil {
+		t.Fatal("x86_64 lane accepted an arm64-v8a device")
+	}
+}
+
+func TestExpectedDeviceIdentityRequiresAPIBandABIAsPair(t *testing.T) {
+	for _, expected := range []struct {
+		api int
+		abi string
+	}{
+		{api: 34},
+		{abi: "x86_64"},
+	} {
+		if err := verifyExpectedDeviceIdentity(expected.api, expected.abi, 34, "x86_64"); err == nil {
+			t.Fatalf("incomplete expected identity passed: API %d ABI %q", expected.api, expected.abi)
+		}
+	}
+}
+
+func TestExpectedDeviceIdentityRejectsInvalidExpectation(t *testing.T) {
+	if err := verifyExpectedDeviceIdentity(-1, "x86_64", 34, "x86_64"); err == nil {
+		t.Fatal("negative expected API passed")
+	}
+}
+
+func TestExpectedDeviceIdentityRejectsUnknownABI(t *testing.T) {
+	if err := verifyExpectedDeviceIdentity(34, "x86_64;unexpected", 34, "x86_64;unexpected"); err == nil {
+		t.Fatal("unknown expected ABI passed")
+	}
+}

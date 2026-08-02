@@ -1220,7 +1220,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 			seen[path] = true
 		}
 	}
-	fixturePaths = append(fixturePaths, evidenceoverlay.SuccessorPath)
+	fixturePaths = append(fixturePaths, evidenceoverlay.SuccessorPath, evidenceoverlay.Phase16SuccessorPath)
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if readErr != nil {

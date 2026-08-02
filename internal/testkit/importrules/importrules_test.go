@@ -2499,11 +2499,7 @@ func validateCommittedConvergenceV1(currentAtPost map[string]string, overlays ma
 }
 
 func committedFileSHA256V1(root, path string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+	return evidenceoverlay.ResolveCurrentSHA256(root, path)
 }
 
 func validCommittedSHA256V1(value string) bool {

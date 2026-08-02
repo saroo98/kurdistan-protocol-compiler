@@ -18,7 +18,10 @@ import (
 	"strings"
 )
 
-const SuccessorPath = "testdata/evidence/phase15/production-contract-overlay.json"
+const (
+	SuccessorPath        = "testdata/evidence/phase15/production-contract-overlay.json"
+	Phase16SuccessorPath = "testdata/evidence/phase16/ci-release-acceleration-overlay.json"
+)
 
 type overlay struct {
 	Version string  `json:"version"`
@@ -35,57 +38,112 @@ type entry struct {
 // LoadSuccessor verifies the exact current post-state and returns the
 // predecessor state that the historical overlay validators must evaluate.
 func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(SuccessorPath)))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return map[string]string{}, nil
+	layers := []struct {
+		path    string
+		version string
+	}{
+		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1"},
+		{SuccessorPath, expectedVersion},
+	}
+	pre := map[string]string{}
+	for _, layer := range layers {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(layer.path))); err != nil {
+			if errors.Is(err, os.ErrNotExist) && layer.path == Phase16SuccessorPath {
+				continue
+			}
+			if errors.Is(err, os.ErrNotExist) && layer.path == SuccessorPath {
+				return map[string]string{}, nil
+			}
+			return nil, err
 		}
-		return nil, err
+		value, err := readOverlay(root, layer.path, layer.version)
+		if err != nil {
+			return nil, err
+		}
+		for index, item := range value.Entries {
+			observed, ok := pre[item.Path]
+			if !ok {
+				content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(item.Path)))
+				if err != nil {
+					return nil, fmt.Errorf("read successor path %s: %w", item.Path, err)
+				}
+				digest := sha256.Sum256(content)
+				observed = hex.EncodeToString(digest[:])
+			}
+			if observed != item.PostSHA256 {
+				return nil, fmt.Errorf("successor evidence drift in %s entry %d: %s", layer.path, index, item.Path)
+			}
+			pre[item.Path] = predecessor(item)
+		}
+	}
+	return pre, nil
+}
+
+// ResolveCurrentSHA256 returns the effective current hash for a historical
+// evidence validator. A validated successor overlay contributes the exact
+// predecessor hash for paths it advances; all other paths are hashed from the
+// working tree. This lets a new append-only overlay advance a path whose most
+// recent historical owner is older than the immediately preceding phase.
+func ResolveCurrentSHA256(root, path string) (string, error) {
+	predecessors, err := LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return "", err
+	}
+	if digest, ok := predecessors[path]; ok {
+		return digest, nil
+	}
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func readOverlay(root, relative, expectedVersion string) (overlay, error) {
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+	if err != nil {
+		return overlay{}, err
 	}
 	var value overlay
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&value); err != nil {
-		return nil, fmt.Errorf("decode successor overlay: %w", err)
+		return overlay{}, fmt.Errorf("decode successor overlay %s: %w", relative, err)
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return nil, errors.New("decode successor overlay: trailing JSON")
+		return overlay{}, fmt.Errorf("decode successor overlay %s: trailing JSON", relative)
 	}
 	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 {
-		return nil, errors.New("invalid successor overlay identity or cardinality")
+		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)
 	}
-	pre := make(map[string]string, len(value.Entries))
 	last := ""
 	for index, item := range value.Entries {
 		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(item.Path)))
 		if clean != item.Path || item.Path <= last || filepath.IsAbs(item.Path) || strings.HasPrefix(item.Path, "../") || strings.HasPrefix(item.Path, ".tools/") || strings.HasPrefix(item.Path, "planning/") {
-			return nil, fmt.Errorf("invalid successor overlay path %d", index)
+			return overlay{}, fmt.Errorf("invalid successor overlay path %d in %s", index, relative)
 		}
 		if !validDigest(item.PostSHA256) {
-			return nil, fmt.Errorf("invalid successor post digest %d", index)
+			return overlay{}, fmt.Errorf("invalid successor post digest %d in %s", index, relative)
 		}
-		predecessor := item.PreSHA256
 		if item.PreEvidence == "ABSENT" {
 			if item.PreSHA256 != "" {
-				return nil, fmt.Errorf("invalid absent predecessor %d", index)
+				return overlay{}, fmt.Errorf("invalid absent predecessor %d in %s", index, relative)
 			}
-			predecessor = "ABSENT"
 		} else if item.PreEvidence != "" || !validDigest(item.PreSHA256) || item.PreSHA256 == item.PostSHA256 {
-			return nil, fmt.Errorf("invalid existing predecessor %d", index)
+			return overlay{}, fmt.Errorf("invalid existing predecessor %d in %s", index, relative)
 		}
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(item.Path)))
-		if err != nil {
-			return nil, fmt.Errorf("read successor path %s: %w", item.Path, err)
-		}
-		digest := sha256.Sum256(content)
-		if hex.EncodeToString(digest[:]) != item.PostSHA256 {
-			return nil, fmt.Errorf("successor evidence drift: %s", item.Path)
-		}
-		pre[item.Path] = predecessor
 		last = item.Path
 	}
-	return pre, nil
+	return value, nil
+}
+
+func predecessor(item entry) string {
+	if item.PreEvidence == "ABSENT" {
+		return "ABSENT"
+	}
+	return item.PreSHA256
 }
 
 func validDigest(value string) bool {

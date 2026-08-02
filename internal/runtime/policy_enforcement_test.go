@@ -1172,37 +1172,53 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 		}
 		changed[filepath.ToSlash(strings.TrimSpace(line[3:]))] = true
 	}
-	if len(changed) == 0 {
-		if len(output) != 0 {
-			t.Fatalf("clean status must be exactly empty, got %q", output)
-		}
-		args := append([]string{"ls-files", "--error-unmatch", "--"}, manifestPaths...)
-		trackedCommand := exec.Command("git", args...)
-		trackedCommand.Dir = filepath.Join("..", "..")
-		trackedOutput, err := trackedCommand.Output()
+	hadPhysicalChanges := len(changed) != 0
+	if len(changed) != 0 {
+		successorPaths, err := evidenceoverlay.LoadSuccessor(filepath.Join("..", ".."), "phase15-production-contract-v1")
 		if err != nil {
-			t.Fatalf("clean status requires all WO-050 paths tracked: %v", err)
+			t.Fatalf("successor evidence: %v", err)
 		}
-		tracked := make(map[string]bool)
-		for _, line := range strings.Split(strings.TrimRight(string(trackedOutput), "\r\n"), "\n") {
-			line = filepath.ToSlash(strings.TrimSpace(strings.TrimSuffix(line, "\r")))
-			if line != "" {
-				tracked[line] = true
+		for path := range successorPaths {
+			delete(changed, path)
+		}
+		delete(changed, evidenceoverlay.Phase16SuccessorPath)
+	}
+	if len(changed) == 0 {
+		if hadPhysicalChanges {
+			if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
+				t.Fatal(err)
 			}
-		}
-		if len(tracked) != 13 {
-			t.Fatalf("clean tracked WO-050 paths=%d want 13", len(tracked))
-		}
-		for _, path := range manifestPaths {
-			if !tracked[path] {
-				t.Fatalf("clean WO-050 path is not tracked: %s", path)
+		} else if len(output) != 0 {
+			t.Fatalf("clean status must be exactly empty, got %q", output)
+		} else {
+			args := append([]string{"ls-files", "--error-unmatch", "--"}, manifestPaths...)
+			trackedCommand := exec.Command("git", args...)
+			trackedCommand.Dir = filepath.Join("..", "..")
+			trackedOutput, err := trackedCommand.Output()
+			if err != nil {
+				t.Fatalf("clean status requires all WO-050 paths tracked: %v", err)
 			}
-			if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(path))); err != nil {
-				t.Fatalf("clean tracked WO-050 path missing: %s: %v", path, err)
+			tracked := make(map[string]bool)
+			for _, line := range strings.Split(strings.TrimRight(string(trackedOutput), "\r\n"), "\n") {
+				line = filepath.ToSlash(strings.TrimSpace(strings.TrimSuffix(line, "\r")))
+				if line != "" {
+					tracked[line] = true
+				}
 			}
-		}
-		if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
-			t.Fatal(err)
+			if len(tracked) != 13 {
+				t.Fatalf("clean tracked WO-050 paths=%d want 13", len(tracked))
+			}
+			for _, path := range manifestPaths {
+				if !tracked[path] {
+					t.Fatalf("clean WO-050 path is not tracked: %s", path)
+				}
+				if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(path))); err != nil {
+					t.Fatalf("clean tracked WO-050 path missing: %s: %v", path, err)
+				}
+			}
+			if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
+				t.Fatal(err)
+			}
 		}
 	} else if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
 		t.Fatal(err)
@@ -3115,11 +3131,7 @@ func policyPhase2CandidateInventoryV1(root string) (map[string]bool, error) {
 }
 
 func policyFileSHA256V1(root, path string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
+	return evidenceoverlay.ResolveCurrentSHA256(root, path)
 }
 
 func validatePolicyM2MaintenanceV1(root string, changed map[string]bool, overlay policyMaintenanceOverlayV1) error {

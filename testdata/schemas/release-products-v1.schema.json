@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/release-products-v1.schema.json",
+  "title": "Kurdistan release products v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "android", "go"],
+  "properties": {
+    "schema": {"const": "kpc-release-products-v1"},
+    "android": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationId", "internalApplicationId", "publishAab", "publishInspectionApk", "releaseAbis", "minSdk", "targetSdk", "play"],
+      "properties": {
+        "applicationId": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"},
+        "internalApplicationId": {"const": "org.kurdistanvpn.app.internal"},
+        "publishAab": {"const": true},
+        "publishInspectionApk": {"const": false},
+        "releaseAbis": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]}
+        },
+        "minSdk": {"type": "integer", "minimum": 1},
+        "targetSdk": {"type": "integer", "minimum": 1},
+        "play": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["testTrack", "productionTrack"],
+          "properties": {
+            "testTrack": {"const": "<CONFIGURE_AFTER_TRACK_DISCOVERY>"},
+            "productionTrack": {"const": "production"}
+          }
+        }
+      }
+    },
+    "go": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvedCommands", "targets"],
+      "properties": {
+        "approvedCommands": {"type": "array", "maxItems": 0},
+        "targets": {"type": "array", "maxItems": 0}
+      }
+    }
+  }
+}

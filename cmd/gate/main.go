@@ -7,15 +7,24 @@
 //
 // Usage:
 //
-//	go run ./cmd/gate           # build + vet + test + full audit
-//	go run ./cmd/gate -quick    # build + vet + test + quick audit (faster)
-//	go run ./cmd/gate -android  # Go gate plus the current Android Phase 14 gate
+//	go run ./cmd/gate                         # modules + build + vet + test + full audit + operator
+//	go run ./cmd/gate -quick                  # complete Go gate with the quick audit
+//	go run ./cmd/gate -android                # complete Go gate plus Android Phase 14
+//	go run ./cmd/gate -android-only           # Android Phase 14 only
+//	go run ./cmd/gate -proof go-core          # modules + build + vet + uncached tests
+//	go run ./cmd/gate -proof go-audit         # full audit only
+//	go run ./cmd/gate -proof operator         # operator verification only
+//	go run ./cmd/gate -proof android-host     # Android Phase 14 only
 //
 // It exits non-zero if any step fails.
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,12 +39,99 @@ type step struct {
 	dir     string
 }
 
+type gateOptions struct {
+	quick       bool
+	android     bool
+	androidOnly bool
+	proof       string
+	receiptPath string
+	timingsPath string
+}
+
+const (
+	gateExecutionSchema = "kurdistan-gate-execution-v1"
+	gateTimingsSchema   = "kurdistan-gate-timings-v1"
+)
+
+type gateStepExecution struct {
+	Name     string   `json:"name"`
+	Command  []string `json:"command"`
+	Status   string   `json:"status"`
+	ExitCode int      `json:"exitCode"`
+}
+
+type gateExecution struct {
+	Schema      string              `json:"schema"`
+	Proof       string              `json:"proof,omitempty"`
+	Quick       bool                `json:"quick"`
+	Android     bool                `json:"android"`
+	AndroidOnly bool                `json:"androidOnly"`
+	StartedAt   string              `json:"startedAt"`
+	FinishedAt  string              `json:"finishedAt"`
+	Terminal    bool                `json:"terminal"`
+	Status      string              `json:"status"`
+	Steps       []gateStepExecution `json:"steps"`
+}
+
+type gateStepTiming struct {
+	Name           string `json:"name"`
+	Status         string `json:"status"`
+	DurationMillis int64  `json:"durationMillis"`
+}
+
+type gateTimings struct {
+	Schema         string           `json:"schema"`
+	StartedAt      string           `json:"startedAt"`
+	FinishedAt     string           `json:"finishedAt"`
+	DurationMillis int64            `json:"durationMillis"`
+	Steps          []gateStepTiming `json:"steps"`
+}
+
+type stepExecutor func(step, io.Writer, io.Writer) error
+
+func parseOptions(args []string) (gateOptions, error) {
+	var options gateOptions
+	flags := flag.NewFlagSet("gate", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.BoolVar(&options.quick, "quick", false, "run the quick audit mode")
+	flags.BoolVar(&options.android, "android", false, "append Android Phase 14 assurance")
+	flags.BoolVar(&options.androidOnly, "android-only", false, "run only Android Phase 14 assurance")
+	flags.StringVar(&options.proof, "proof", "", "run one proof class")
+	flags.StringVar(&options.receiptPath, "receipt", "", "write a gate execution receipt")
+	flags.StringVar(&options.timingsPath, "timings", "", "write gate timing data")
+	if err := flags.Parse(args); err != nil {
+		return gateOptions{}, err
+	}
+	if flags.NArg() != 0 {
+		return gateOptions{}, fmt.Errorf("unexpected arguments: %v", flags.Args())
+	}
+	if options.proof != "" {
+		if options.quick {
+			return gateOptions{}, fmt.Errorf("-proof cannot be combined with -quick")
+		}
+		if _, err := proofSteps(options.proof, options.quick, "", ""); err != nil {
+			return gateOptions{}, err
+		}
+		if options.android || options.androidOnly {
+			return gateOptions{}, fmt.Errorf("-proof cannot be combined with -android or -android-only")
+		}
+	}
+	if options.android && options.androidOnly {
+		return gateOptions{}, fmt.Errorf("-android and -android-only are mutually exclusive")
+	}
+	if options.receiptPath != "" && options.timingsPath != "" && filepath.Clean(options.receiptPath) == filepath.Clean(options.timingsPath) {
+		return gateOptions{}, fmt.Errorf("-receipt and -timings require different paths")
+	}
+	return options, nil
+}
+
 func gateSteps(quick bool, jsonOut, statusOut string) []step {
 	auditMode := "--full"
 	if quick {
 		auditMode = "--quick"
 	}
 	return []step{
+		{"module-verify", "go", []string{"mod", "verify"}, ""},
 		{"build", "go", []string{"build", "./..."}, ""},
 		{"vet", "go", []string{"vet", "./..."}, ""},
 		{"test", "go", []string{"test", "-count=1", "./..."}, ""},
@@ -44,53 +140,205 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 	}
 }
 
-func main() {
-	quick := false
-	android := false
-	for _, a := range os.Args[1:] {
-		if a == "-quick" || a == "--quick" {
-			quick = true
-		}
-		if a == "-android" || a == "--android" {
-			android = true
-		}
-	}
-
-	statusOut := filepath.Join(os.TempDir(), "kcheck-gate-status.md")
-	jsonOut := filepath.Join(os.TempDir(), "kcheck-gate-report.json")
+func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, error) {
 	steps := gateSteps(quick, jsonOut, statusOut)
-	if android {
+	switch proof {
+	case "go-core":
+		core := append([]step(nil), steps[:4]...)
+		core[3].args = []string{"test", "-json", "-count=1", "./..."}
+		return core, nil
+	case "go-audit":
+		audit := steps[4]
+		audit.args = []string{"run", "./cmd/kcheck", "--full"}
+		return []step{audit}, nil
+	case "operator":
+		return steps[5:6], nil
+	case "docs-evidence":
+		return []step{
+			{name: "phase15-evidence", program: "go", args: []string{"run", "./cmd/phase15verify", "-root", "."}},
+			{name: "release-metadata", program: "go", args: []string{"run", "./cmd/releaseverify", "-root", "."}},
+		}, nil
+	case "dependency-freshness":
+		return []step{
+			{name: "build-govulncheck", program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"}},
+			{name: "go-vulnerability-analysis", program: "./.tools/bin/govulncheck", args: []string{"./..."}},
+			{name: "fetch-osv-scanner", program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
+			{name: "dependency-manifest-scan", program: "./.tools/bin/osv-scanner_linux_amd64", args: []string{"-r", "."}},
+		}, nil
+	case "android-host":
+		return []step{androidStep()}, nil
+	case "android-device-api26":
+		return []step{androidDeviceStep(26)}, nil
+	case "android-device-api34":
+		return []step{androidDeviceStep(34)}, nil
+	case "android-device-api36":
+		return []step{androidDeviceStep(36)}, nil
+	default:
+		return nil, fmt.Errorf("unknown proof %q", proof)
+	}
+}
+
+func stepsForOptions(options gateOptions, jsonOut, statusOut string) ([]step, error) {
+	if options.proof != "" {
+		return proofSteps(options.proof, options.quick, jsonOut, statusOut)
+	}
+	if options.androidOnly {
+		return []step{androidStep()}, nil
+	}
+	steps := gateSteps(options.quick, jsonOut, statusOut)
+	if options.android {
 		steps = append(steps, androidStep())
 	}
+	return steps, nil
+}
 
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	return runWithExecutor(args, stdout, stderr, executeStep)
+}
+
+func runWithExecutor(args []string, stdout, stderr io.Writer, execute stepExecutor) int {
+	options, err := parseOptions(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "gate: %v\n", err)
+		return 2
+	}
+	statusOut := filepath.Join(os.TempDir(), "kcheck-gate-status.md")
+	jsonOut := filepath.Join(os.TempDir(), "kcheck-gate-report.json")
+	steps, err := stepsForOptions(options, jsonOut, statusOut)
+	if err != nil {
+		fmt.Fprintf(stderr, "gate: %v\n", err)
+		return 2
+	}
+
+	startedAt := time.Now().UTC()
+	execution := gateExecution{
+		Schema:      gateExecutionSchema,
+		Proof:       options.proof,
+		Quick:       options.quick,
+		Android:     options.android,
+		AndroidOnly: options.androidOnly,
+		StartedAt:   startedAt.Format(time.RFC3339Nano),
+		Steps:       make([]gateStepExecution, 0, len(steps)),
+	}
+	timings := gateTimings{
+		Schema:    gateTimingsSchema,
+		StartedAt: execution.StartedAt,
+		Steps:     make([]gateStepTiming, 0, len(steps)),
+	}
 	failed := []string{}
 	for _, s := range steps {
-		fmt.Printf("== gate: %s (%s %v) ==\n", s.name, s.program, s.args)
+		fmt.Fprintf(stdout, "== gate: %s (%s %v) ==\n", s.name, s.program, s.args)
 		start := time.Now()
-		cmd := exec.Command(s.program, s.args...)
-		cmd.Dir = s.dir
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
+		err := execute(s, stdout, stderr)
 		dur := time.Since(start).Round(time.Millisecond)
+		status := "PASS"
 		if err != nil {
-			fmt.Printf("-- gate: %s FAILED in %s: %v\n", s.name, dur, err)
+			status = "FAIL"
+			fmt.Fprintf(stdout, "-- gate: %s FAILED in %s: %v\n", s.name, dur, err)
 			failed = append(failed, s.name)
 		} else {
-			fmt.Printf("-- gate: %s ok in %s\n", s.name, dur)
+			fmt.Fprintf(stdout, "-- gate: %s ok in %s\n", s.name, dur)
+		}
+		command := append([]string{s.program}, s.args...)
+		execution.Steps = append(execution.Steps, gateStepExecution{Name: s.name, Command: command, Status: status, ExitCode: exitCode(err)})
+		timings.Steps = append(timings.Steps, gateStepTiming{Name: s.name, Status: status, DurationMillis: dur.Milliseconds()})
+	}
+	finishedAt := time.Now().UTC()
+	execution.FinishedAt = finishedAt.Format(time.RFC3339Nano)
+	execution.Terminal = true
+	execution.Status = "PASS"
+	if len(failed) > 0 {
+		execution.Status = "FAIL"
+	}
+	timings.FinishedAt = execution.FinishedAt
+	timings.DurationMillis = finishedAt.Sub(startedAt).Round(time.Millisecond).Milliseconds()
+	outputFailed := false
+	if options.receiptPath != "" {
+		if err := writeJSONAtomic(options.receiptPath, execution); err != nil {
+			fmt.Fprintf(stderr, "gate: write receipt: %v\n", err)
+			outputFailed = true
+		}
+	}
+	if options.timingsPath != "" {
+		if err := writeJSONAtomic(options.timingsPath, timings); err != nil {
+			fmt.Fprintf(stderr, "gate: write timings: %v\n", err)
+			outputFailed = true
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdout)
 	if len(failed) > 0 {
-		fmt.Printf("GATE FAILED: %v\n", failed)
-		os.Exit(1)
+		fmt.Fprintf(stdout, "GATE FAILED: %v\n", failed)
+		return 1
 	}
-	if android {
-		fmt.Println("GATE PASSED: build, vet, test, audit, Phase 12 control plane, and Android Phase 14 local assurance all green")
+	if outputFailed {
+		fmt.Fprintln(stdout, "GATE FAILED: execution record output")
+		return 1
+	}
+	if options.android {
+		fmt.Fprintln(stdout, "GATE PASSED: module verification, build, vet, test, audit, Phase 12 control plane, and Android Phase 14 local assurance all green")
+	} else if options.androidOnly {
+		fmt.Fprintln(stdout, "GATE PASSED: Android Phase 14 local assurance green")
+	} else if options.proof != "" {
+		fmt.Fprintf(stdout, "GATE PASSED: proof %s green\n", options.proof)
 	} else {
-		fmt.Println("GATE PASSED: build, vet, test, audit, and Phase 12 control plane all green")
+		fmt.Fprintln(stdout, "GATE PASSED: module verification, build, vet, test, audit, and Phase 12 control plane all green")
 	}
+	return 0
+}
+
+func executeStep(value step, stdout, stderr io.Writer) error {
+	cmd := exec.Command(value.program, value.args...)
+	cmd.Dir = value.dir
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	return cmd.Run()
+}
+
+func exitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		return exitError.ExitCode()
+	}
+	return -1
+}
+
+func writeJSONAtomic(path string, value any) (err error) {
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".gate-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() {
+		if temporary != nil {
+			_ = temporary.Close()
+		}
+		_ = os.Remove(temporaryPath)
+	}()
+	encoder := json.NewEncoder(temporary)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(value); err != nil {
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	temporary = nil
+	return os.Rename(temporaryPath, path)
 }
 
 func androidStep() step {
@@ -107,5 +355,26 @@ func androidStep() step {
 		program: "./gradlew",
 		args:    []string{"phase14Gate", "--no-build-cache"},
 		dir:     "android",
+	}
+}
+
+func androidDeviceStep(api int) step {
+	return step{
+		name:    fmt.Sprintf("android-device-api%d", api),
+		program: "go",
+		args: []string{
+			"run", "./cmd/phase9devicegate",
+			"-label", "PHASE 14",
+			"-evidence-dir", fmt.Sprintf(".tools/phase16/device-api%d", api),
+			"-app-apk", ".tools/device/app-internal.apk",
+			"-test-apk", ".tools/device/app-internal-androidTest.apk",
+			"-app-package", "org.kurdistanvpn.app.internal",
+			"-test-package", "org.kurdistanvpn.app.internal.test",
+			"-conflicting-app-package", "org.kurdistanvpn.app.debug",
+			"-minimum-tests", "1",
+			"-expected-tests", "android/config/phase14-required-device-tests.txt",
+			"-expected-api", fmt.Sprintf("%d", api),
+			"-expected-abi", "x86_64",
+		},
 	}
 }

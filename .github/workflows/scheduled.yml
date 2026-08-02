@@ -1,0 +1,88 @@
+name: Scheduled assurance freshness
+
+on:
+  schedule:
+    - cron: '17 3 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GOTELEMETRY: 'off'
+
+concurrency:
+  group: scheduled-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-freshness:
+    name: dependency freshness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Create bounded freshness evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force .tools/bin, .tools/assurance/${{ github.run_id }} | Out-Null
+      - name: Run exact dependency freshness proof
+        id: proof
+        continue-on-error: true
+        run: >-
+          go run ./cmd/gate
+          -proof dependency-freshness
+          -receipt .tools/assurance/${{ github.run_id }}/dependency-freshness-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/dependency-freshness-timings.json
+      - name: Issue and validate freshness receipt
+        if: always()
+        shell: pwsh
+        run: |
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/dependency-freshness-gate.json -workflow .github/workflows/scheduled.yml -out .tools/assurance/${{ github.run_id }}/dependency-freshness-receipt.json -commit '${{ github.sha }}' -ref 'refs/subjects/${{ github.sha }}' -job-id dependency-freshness -os linux -runner-label ubuntu-24.04
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ('${{ steps.proof.outcome }}' -eq 'success') {
+            go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/dependency-freshness-receipt.json
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Upload terminal freshness evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: dependency-freshness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/assurance/${{ github.run_id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+      - name: Preserve freshness proof failure
+        if: steps.proof.outcome != 'success'
+        run: exit 1
+
+  race-and-benchmark-freshness:
+    name: race and benchmark freshness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Run race detector
+        run: go test -race -count=1 ./...
+      - name: Capture one-iteration benchmark freshness
+        run: go test -run '^$' -bench . -benchtime=1x ./... > scheduled-benchmarks.txt
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: scheduled-benchmarks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: scheduled-benchmarks.txt
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,23 @@
+{
+  "schema": "kurdistan-assurance-certificate-v1",
+  "certificateId": "fixture-main-assurance",
+  "subject": {
+    "repository": "saroo98/kurdistan-protocol-compiler",
+    "commit": "1111111111111111111111111111111111111111",
+    "tree": "2222222222222222222222222222222222222222",
+    "ref": "refs/heads/main"
+  },
+  "policySha256": "e520d1d40dc0759e5ba921c0edffa806f8eef895353845fde71cbe9c0075ae65",
+  "requiredProofs": ["go-core"],
+  "receipts": [
+    {
+      "proofId": "go-core",
+      "operatingSystem": "linux",
+      "receiptId": "fixture-go-core-linux",
+      "path": "receipt-go-core-linux.json",
+      "sha256": "f458b2848c575aab1612bd2a20a0745a4f46271f608bdb515c87b7c0f5a9f02a"
+    }
+  ],
+  "issuedAt": "2026-08-02T10:01:30Z",
+  "status": "PASS"
+}

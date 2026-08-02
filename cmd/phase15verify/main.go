@@ -146,14 +146,10 @@ func verify(root string) error {
 	if err := validate(value); err != nil {
 		return err
 	}
-	workflowDigest, err := fileSHA256(filepath.Join(root, filepath.FromSlash(value.Baseline.WorkflowPath)))
-	if err != nil {
-		return fmt.Errorf("hash baseline workflow: %w", err)
-	}
-	if workflowDigest != value.Baseline.WorkflowSHA256 {
-		return fmt.Errorf("baseline workflow digest = %s, want %s", workflowDigest, value.Baseline.WorkflowSHA256)
-	}
 	if err := verifyBaselineCommit(root, value.Baseline.SourceCommit); err != nil {
+		return err
+	}
+	if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
 		return err
 	}
 	if err := verifyRoadmap(root, value); err != nil {
@@ -181,15 +177,6 @@ func verify(root string) error {
 		}
 	}
 	return nil
-}
-
-func fileSHA256(path string) (string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(content)
-	return hex.EncodeToString(digest[:]), nil
 }
 
 func decodeContract(encoded []byte) (contract, error) {
@@ -221,6 +208,24 @@ func verifyBaselineCommit(root, sha string) error {
 	return nil
 }
 
+func verifyBaselineWorkflow(root string, value baseline) error {
+	if value.WorkflowPath != ".github/workflows/ci.yml" || strings.Contains(value.WorkflowPath, "..") {
+		return errors.New("baseline workflow path is invalid")
+	}
+	command := exec.Command("git", "show", value.SourceCommit+":"+value.WorkflowPath)
+	command.Dir = root
+	content, err := command.Output()
+	if err != nil {
+		return fmt.Errorf("read baseline workflow from %s: %w", value.SourceCommit, err)
+	}
+	digest := sha256.Sum256(content)
+	actual := hex.EncodeToString(digest[:])
+	if actual != value.WorkflowSHA256 {
+		return fmt.Errorf("baseline workflow digest = %s, want %s", actual, value.WorkflowSHA256)
+	}
+	return nil
+}
+
 func verifyRoadmap(root string, value contract) error {
 	raw, err := os.ReadFile(filepath.Join(root, "ROADMAP.md"))
 	if err != nil {
@@ -228,12 +233,13 @@ func verifyRoadmap(root string, value contract) error {
 	}
 	text := string(raw)
 	for _, required := range []string{
-		"Phases 1-14 are integrated on `main` at",
+		"Phases 1-15 are integrated on `main` at",
 		value.Baseline.SourceCommit,
-		"Phase 15 is active on `product/phase15-production-contract-freeze`",
+		"Phase 16 is active on `engineering/ci-release-acceleration`",
 		"| 13 | Integrated |",
 		"| 14 | Integrated |",
-		"| 15 | Active |",
+		"| 15 | Integrated |",
+		"| 16 | Active |",
 		"The current release decision is `NO_GO`",
 	} {
 		if !strings.Contains(text, required) {

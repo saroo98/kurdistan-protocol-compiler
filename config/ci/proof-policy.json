@@ -1,0 +1,103 @@
+{
+  "schema": "kurdistan-proof-policy-v1",
+  "proofs": [
+    {
+      "id": "go-core",
+      "commands": [
+        ["go", "mod", "verify"],
+        ["go", "build", "./..."],
+        ["go", "vet", "./..."],
+        ["go", "test", "-json", "-count=1", "./..."]
+      ],
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["go.mod", "go.sum", "cmd/**", "internal/**", "testdata/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "go-audit",
+      "commands": [["go", "run", "./cmd/kcheck", "--full"]],
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["go.mod", "go.sum", "cmd/kcheck/**", "internal/audit/**", "testdata/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "operator",
+      "commands": [["go", "run", "./cmd/koperator", "verify"]],
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["cmd/koperator/**", "internal/operator/**", "testdata/evidence/phase12/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "android-host",
+      "commandsByOperatingSystem": {
+        "linux": [["./gradlew", "phase14Gate", "--no-build-cache"]],
+        "windows": [["cmd", "/c", "gradlew.bat", "phase14Gate", "--no-build-cache"]]
+      },
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["android/**", "cmd/phase9verify/**", "cmd/phase13verify/**", "cmd/phase14verify/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "dependency-freshness",
+      "commands": [
+        ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
+        ["./.tools/bin/govulncheck", "./..."],
+        ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
+        ["./.tools/bin/osv-scanner_linux_amd64", "-r", "."]
+      ],
+      "operatingSystems": ["linux"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": false,
+      "freshnessSeconds": 86400,
+      "invalidatedBy": ["go.mod", "go.sum", "android/gradle.lockfile", "android/gradle/verification-metadata.xml"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "docs-evidence",
+      "commands": [
+        ["go", "run", "./cmd/phase15verify", "-root", "."],
+        ["go", "run", "./cmd/releaseverify", "-root", "."]
+      ],
+      "operatingSystems": ["linux"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["ROADMAP.md", "docs/**", "config/release/**", "testdata/evidence/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "android-device-api26",
+      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api26", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "26", "-expected-abi", "x86_64"]],
+      "operatingSystems": ["android-emulator"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "android-device-api34",
+      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api34", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "34", "-expected-abi", "x86_64"]],
+      "operatingSystems": ["android-emulator"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "android-device-api36",
+      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api36", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "36", "-expected-abi", "x86_64"]],
+      "operatingSystems": ["android-emulator"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
+      "authorizedPhase": 16
+    }
+  ]
+}

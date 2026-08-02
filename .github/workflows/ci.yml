@@ -37,9 +37,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Verify modules
-        run: go mod verify
-
       - name: Run cache-proof validation gate
         run: go run ./cmd/gate
 
@@ -93,5 +90,5 @@ jobs:
       - name: Verify modules
         run: go mod verify
 
-      - name: Run combined cache-proof gate
-        run: go run ./cmd/gate -android
+      - name: Run Android-only cache-proof gate
+        run: go run ./cmd/gate -android-only

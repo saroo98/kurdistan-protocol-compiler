@@ -4,7 +4,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -67,6 +70,47 @@ func TestVerifyPhase14ReconciliationRejectsIntegrationPending(t *testing.T) {
 	}
 }
 
+func TestVerifyBaselineWorkflowReadsFrozenCommit(t *testing.T) {
+	root := t.TempDir()
+	runGit(t, root, "init")
+	runGit(t, root, "config", "user.email", "test@example.invalid")
+	runGit(t, root, "config", "user.name", "Phase 15 Test")
+	workflow := []byte("name: frozen\n")
+	writeTestFile(t, root, ".github/workflows/ci.yml", string(workflow))
+	runGit(t, root, "add", ".github/workflows/ci.yml")
+	runGit(t, root, "commit", "-m", "freeze workflow")
+	commit := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+	digest := sha256.Sum256(workflow)
+	writeTestFile(t, root, ".github/workflows/ci.yml", "name: evolved\n")
+
+	value := baseline{
+		SourceCommit:   commit,
+		WorkflowPath:   ".github/workflows/ci.yml",
+		WorkflowSHA256: hex.EncodeToString(digest[:]),
+	}
+	if err := verifyBaselineWorkflow(root, value); err != nil {
+		t.Fatalf("verify frozen workflow: %v", err)
+	}
+}
+
+func TestVerifyRoadmapAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
+	value := validContractForTest()
+	root := t.TempDir()
+	writeTestFile(t, root, "ROADMAP.md", strings.Join([]string{
+		"Phases 1-15 are integrated on `main` at `8fe2d59034deea215c45734f4bb8582bff004d9b`.",
+		"Phase 16 is active on `engineering/ci-release-acceleration`.",
+		value.Baseline.SourceCommit,
+		"| 13 | Integrated |",
+		"| 14 | Integrated |",
+		"| 15 | Integrated |",
+		"| 16 | Active |",
+		"The current release decision is `NO_GO`.",
+	}, "\n"))
+	if err := verifyRoadmap(root, value); err != nil {
+		t.Fatalf("verify roadmap: %v", err)
+	}
+}
+
 func validContractForTest() contract {
 	return contract{
 		Schema:          "kurdistan-phase15-production-contract-v1",
@@ -104,4 +148,15 @@ func writeTestFile(t *testing.T, root, relative, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func runGit(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	command := exec.Command("git", args...)
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v: %s", args, err, output)
+	}
+	return string(output)
 }

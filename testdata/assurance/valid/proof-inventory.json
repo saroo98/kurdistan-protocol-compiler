@@ -1,0 +1,14 @@
+{
+  "schema": "kurdistan-proof-inventory-v1",
+  "policySha256": "e520d1d40dc0759e5ba921c0edffa806f8eef895353845fde71cbe9c0075ae65",
+  "lanes": [
+    {
+      "proofId": "go-core",
+      "operatingSystem": "linux",
+      "commandsSha256": "6b86d14b97fbc9a16f787f4dd363be17e6e547a57a03a48ada95a3922898dd27",
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "authorizedPhase": 16
+    }
+  ]
+}

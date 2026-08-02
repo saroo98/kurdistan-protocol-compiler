@@ -1,0 +1,15 @@
+{
+  "schema": "kurdistan-android-sdk-v1",
+  "compileSdk": 36,
+  "targetSdk": 36,
+  "minSdk": 26,
+  "buildTools": "36.0.0",
+  "ndk": "28.2.13676358",
+  "cmake": "3.22.1",
+  "jdk": "17",
+  "gradle": "9.4.1",
+  "agp": "9.2.1",
+  "emulatorApis": [26, 34, 36],
+  "productionAbis": ["arm64-v8a"],
+  "testOnlyAbis": ["x86_64"]
+}

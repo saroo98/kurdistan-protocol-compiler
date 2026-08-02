@@ -8,67 +8,72 @@ import (
 	"path/filepath"
 	"time"
 
-	"kurdistan/internal/lab/adapteradversary"
-	"kurdistan/internal/transport/adaptivepath"
 	"kurdistan/internal/contracts/android/androidcarrier"
 	"kurdistan/internal/contracts/android/androidreview"
 	"kurdistan/internal/contracts/android/androidruntime"
 	"kurdistan/internal/contracts/android/androidvpnservice"
-	"kurdistan/internal/observe/byteparity"
-	"kurdistan/internal/lab/bytetransportadversary"
-	"kurdistan/internal/lab/carrieradversary"
 	"kurdistan/internal/contracts/carrier/carriercollapse"
 	"kurdistan/internal/contracts/carrier/carrierreadiness"
 	"kurdistan/internal/contracts/carrier/carrierreview"
-	"kurdistan/internal/observe/classifierdata"
-	"kurdistan/internal/lab/concretelocaladapter"
 	"kurdistan/internal/contracts/carrier/constrainedcarrier"
 	"kurdistan/internal/contracts/carrier/constrainedcarrierreview"
-	"kurdistan/internal/observe/diversity"
-	"kurdistan/internal/lab/fixtures"
-	"kurdistan/internal/observe/hostdetect"
 	"kurdistan/internal/contracts/carrier/httpscarrieradversary"
 	"kurdistan/internal/contracts/carrier/httpscarrierreview"
 	"kurdistan/internal/contracts/carrier/httpslikecarrier"
-	"kurdistan/internal/protocol/ir"
-	"kurdistan/internal/contracts/readiness/keyexchangeplan"
+	"kurdistan/internal/contracts/carrier/multicarrierselect"
 	"kurdistan/internal/contracts/lab/labegress"
-	"kurdistan/internal/observe/labtrace"
-	"kurdistan/internal/lab/localadapteradversary"
 	"kurdistan/internal/contracts/lab/localpipeline"
+	"kurdistan/internal/contracts/lab/loopbackrelay"
+	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
+	"kurdistan/internal/contracts/proxy/proxyingressreview"
+	"kurdistan/internal/contracts/readiness/keyexchangeplan"
+	"kurdistan/internal/contracts/readiness/measurementreview"
+	"kurdistan/internal/contracts/readiness/operationalhardening"
+	"kurdistan/internal/contracts/readiness/productionreadiness"
+	"kurdistan/internal/contracts/vpn/localvpnadapter"
+	"kurdistan/internal/contracts/vpn/vpnsemantics"
+	"kurdistan/internal/lab/adapteradversary"
+	"kurdistan/internal/lab/bytetransportadversary"
+	"kurdistan/internal/lab/carrieradversary"
+	"kurdistan/internal/lab/concretelocaladapter"
+	"kurdistan/internal/lab/fixtures"
+	"kurdistan/internal/lab/localadapteradversary"
 	"kurdistan/internal/lab/localprotocoladapter"
 	"kurdistan/internal/lab/localproxyadapter"
-	"kurdistan/internal/contracts/proxy/localproxyadapterreview"
 	"kurdistan/internal/lab/localproxyingress"
 	"kurdistan/internal/lab/localproxyingressadversary"
-	"kurdistan/internal/contracts/vpn/localvpnadapter"
-	"kurdistan/internal/contracts/lab/loopbackrelay"
-	"kurdistan/internal/contracts/readiness/measurementreview"
-	"kurdistan/internal/contracts/carrier/multicarrierselect"
-	"kurdistan/internal/contracts/readiness/operationalhardening"
-	"kurdistan/internal/transport/pathhealth"
-	"kurdistan/internal/transport/pathrace"
-	"kurdistan/internal/contracts/readiness/productionreadiness"
-	"kurdistan/internal/observe/protocorpus"
-	"kurdistan/internal/transport/proxyadversary"
 	"kurdistan/internal/lab/proxyegress"
 	"kurdistan/internal/lab/proxyingress"
-	"kurdistan/internal/contracts/proxy/proxyingressreview"
-	"kurdistan/internal/operator/relayauthplan"
-	"kurdistan/internal/operator/relaybridge"
-	"kurdistan/internal/operator/relayfleet"
-	"kurdistan/internal/operator/relayprocess"
 	"kurdistan/internal/lab/runtimeadversary"
+	"kurdistan/internal/observe/diversity"
+	"kurdistan/internal/observe/hostdetect"
+	"kurdistan/internal/observe/labtrace"
+	"kurdistan/internal/observe/protocorpus"
 	ktrace "kurdistan/internal/observe/trace"
-	"kurdistan/internal/transport/transportbundle"
-	"kurdistan/internal/contracts/vpn/vpnsemantics"
-	"kurdistan/internal/observe/wireeval"
 	"kurdistan/internal/observe/wirefeatures"
 	"kurdistan/internal/observe/wiregen"
 	"kurdistan/internal/observe/wiregencompare"
+	"kurdistan/internal/operator/relayauthplan"
+	"kurdistan/internal/operator/relaybridge"
+	"kurdistan/internal/operator/relayprocess"
+	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/transport/adaptivepath"
+	"kurdistan/internal/transport/pathhealth"
+	"kurdistan/internal/transport/pathrace"
+	"kurdistan/internal/transport/proxyadversary"
+	"kurdistan/internal/transport/transportbundle"
 )
 
 func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
+	return RunWithExecutor(ctx, cfg, ExecutorOptions{Mode: ExecutorSerial, Workers: 1})
+}
+
+// RunWithExecutor keeps serial results authoritative. ExecutorParallel also runs
+// a bounded shadow and fails unless its canonical family results match serial.
+func RunWithExecutor(ctx context.Context, cfg AuditConfig, executor ExecutorOptions) (AuditReport, error) {
+	if err := validateExecutorOptions(executor); err != nil {
+		return AuditReport{}, err
+	}
 	cfg = NormalizeConfig(cfg)
 	start := time.Now()
 
@@ -87,7 +92,6 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	}
 	traceMillis := time.Since(traceStart).Milliseconds()
 	traceScan := ktrace.ScanTraces(traces, ktrace.DefaultStabilityThreshold)
-	hardeningGates := HardeningGates(ctx, profiles, cfg)
 	fixtureRoot, fixtureRootErr := repoRoot()
 	if fixtureRootErr != nil {
 		fixtureRoot = "."
@@ -97,10 +101,6 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	protocolCorpusPath := filepath.Join(fixtureRoot, "testdata", "protocorpus", "corpus-v1.json")
 	protocolBucketsPath := filepath.Join(fixtureRoot, "testdata", "protocorpus", "feature-buckets-v1.json")
 	wireFeatureBaselinePath := filepath.Join(fixtureRoot, "testdata", "wirefeatures", "wirefeatures-golden.json")
-	bytepathParity, parityErr := byteparity.Run(ctx, fixtures.DefaultSeeds(), fixtures.DefaultScenarios())
-	if parityErr != nil {
-		bytepathParity = byteparity.ByteParityReport{Conclusion: "failed", UnexpectedDifferences: []string{parityErr.Error()}}
-	}
 	protocolCorpus, corpusErr := protocorpus.LoadManifest(protocolCorpusPath)
 	if corpusErr != nil {
 		protocolCorpus = protocorpus.CorpusManifest{Version: protocorpus.CorpusSchemaVersion}
@@ -120,15 +120,20 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 		wireGenPolicies = append(wireGenPolicies, wiregen.FromIRPolicy(profile.WireShape))
 	}
 	wireGenVectors := expectedVectorsForProfiles(wireGenPolicies, wiregencompare.DefaultScenarios())
-	wireEvalDataset, wireEvalErr := wireeval.BuildDataset(ctx, protocolCorpus, wireeval.BuildOptions{Seeds: wireeval.DefaultSeeds(), Scenarios: wireeval.DefaultScenarios(), SplitMode: wireeval.DefaultSplitMode(), Controls: true})
-	wireEvalCSV, wireEvalJSONL := []byte{}, []byte{}
 	hostDetectBaselinePath := filepath.Join(fixtureRoot, "testdata", "hostdetect", "host-observations-golden.json")
-	hostDetectSummary := hostdetect.HostDetectSummary{}
-	hostDetectErr := wireEvalErr
-	relayFleetSummary := relayfleet.RelayFleetSummary{}
-	relayFleetErr := wireEvalErr
 	relayFleetBaselinePath := filepath.Join(fixtureRoot, "testdata", "relayfleet", "relayfleet-golden.json")
-	relayFleetComparison := relayfleet.RelayFleetComparisonReport{Version: string(relayfleet.Version), Conclusion: "failed"}
+	familyResults, err := runMainAuditFamilies(ctx, executor, profiles, cfg, protocolCorpus, relayFleetBaselinePath)
+	if err != nil {
+		return AuditReport{}, err
+	}
+	hardeningGates := familyResults.Hardening
+	bytepathParity := familyResults.BytePathParity.Report
+	wireEvalDataset := familyResults.WireEvaluation.Dataset
+	wireEvalCSV, wireEvalJSONL := familyResults.WireEvaluation.CSV, familyResults.WireEvaluation.JSONL
+	wireEvalErr := familyResults.WireEvaluation.Err
+	hostDetectSummary, hostDetectErr := familyResults.HostDetection.Summary, familyResults.HostDetection.Err
+	relayFleetSummary, relayFleetErr := familyResults.RelayFleet.Summary, familyResults.RelayFleet.Err
+	relayFleetComparison := familyResults.RelayFleet.Comparison
 	proxyIngressSet, proxyIngressErr := proxyingress.GoldenFixtureSet()
 	proxyIngressReview, proxyIngressMisuse, proxyIngressParity, proxyIngressReviewErr := proxyingressreview.GenerateGoldenReview()
 	proxyIngressComparison, _ := proxyingress.VerifyContract(ctx, filepath.Join(fixtureRoot, "testdata", "proxyingress", "proxyingress-contract-golden.json"))
@@ -204,18 +209,6 @@ func Run(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
 	androidVPNServiceDrift := androidVPNServiceComparison(filepath.Join(fixtureRoot, "testdata", "androidvpnservice", "androidvpnservice-report-golden.json"), androidVPNServiceSet)
 	androidCarrierSet, androidCarrierErr := androidcarrier.GenerateFixtureSet()
 	androidCarrierDrift := androidCarrierComparison(filepath.Join(fixtureRoot, "testdata", "androidcarrier", "androidcarrier-report-golden.json"), androidCarrierSet)
-	if wireEvalErr == nil {
-		wireEvalCSV, _ = classifierdata.ExportCSV(wireEvalDataset.Records)
-		wireEvalJSONL, _ = classifierdata.ExportJSONL(wireEvalDataset.Records)
-		hostDetectSummary, hostDetectErr = hostdetect.Run(wireEvalDataset, hostdetect.DefaultBuildOptions())
-		if hostDetectErr == nil {
-			relayFleetSummary, relayFleetErr = relayfleet.Run(wireEvalDataset, hostDetectSummary, relayfleet.DefaultOptions())
-			relayFleetComparison, _ = relayfleet.VerifyFleet(ctx, relayFleetBaselinePath)
-		} else {
-			relayFleetErr = hostDetectErr
-		}
-	}
-
 	gates := []GateResult{
 		ProfileCorpusDiversityGate(corpusSummary, cfg.Thresholds),
 		BlackBoxTraceDiversityGate(traceScan, cfg.Thresholds),
