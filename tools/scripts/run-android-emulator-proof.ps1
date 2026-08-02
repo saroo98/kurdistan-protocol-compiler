@@ -48,19 +48,34 @@ $emulatorSummary = ".tools/phase16/emulator-api$Api-summary.txt"
 $deviceSummary = ".tools/phase16/logcat-api$Api-summary.txt"
 $emulatorIdentity = ".tools/phase16/emulator-api$Api-identity.json"
 
+function Resolve-SdkPackageMetadata {
+    param([Parameter(Mandatory = $true)][string]$PackageRoot)
+    foreach ($name in @('package.xml', 'source.properties')) {
+        $candidate = Join-Path $PackageRoot $name
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    throw "required SDK package metadata is missing under: $PackageRoot"
+}
+
 function Get-SdkPackageRevision {
-    param([Parameter(Mandatory = $true)][string]$PackageXml)
-    if (-not (Test-Path -LiteralPath $PackageXml)) { throw "required SDK package metadata is missing: $PackageXml" }
-    [xml]$metadata = Get-Content -LiteralPath $PackageXml -Raw
+    param([Parameter(Mandatory = $true)][string]$MetadataPath)
+    if (-not (Test-Path -LiteralPath $MetadataPath -PathType Leaf)) { throw "required SDK package metadata is missing: $MetadataPath" }
+    if ([IO.Path]::GetFileName($MetadataPath) -eq 'source.properties') {
+        $revisionLine = Get-Content -LiteralPath $MetadataPath | Where-Object { $_ -match '^Pkg\.Revision\s*=\s*([0-9]+(?:\.[0-9]+){0,2})\s*$' } | Select-Object -First 1
+        if ($null -eq $revisionLine) { throw "SDK package revision is missing: $MetadataPath" }
+        if ($revisionLine -notmatch '^Pkg\.Revision\s*=\s*([0-9]+(?:\.[0-9]+){0,2})\s*$') { throw "SDK package revision is invalid: $MetadataPath" }
+        return $Matches[1]
+    }
+    [xml]$metadata = Get-Content -LiteralPath $MetadataPath -Raw
     $revision = $metadata.SelectSingleNode("//*[local-name()='revision']")
-    if ($null -eq $revision) { throw "SDK package revision is missing: $PackageXml" }
+    if ($null -eq $revision) { throw "SDK package revision is missing: $MetadataPath" }
     $major = $revision.SelectSingleNode("./*[local-name()='major']").InnerText
     $minorNode = $revision.SelectSingleNode("./*[local-name()='minor']")
     $microNode = $revision.SelectSingleNode("./*[local-name()='micro']")
-    if ($major -notmatch '^\d+$') { throw "SDK package major revision is invalid: $PackageXml" }
+    if ($major -notmatch '^\d+$') { throw "SDK package major revision is invalid: $MetadataPath" }
     $minor = if ($null -eq $minorNode) { '0' } else { $minorNode.InnerText }
     $micro = if ($null -eq $microNode) { '0' } else { $microNode.InnerText }
-    if ($minor -notmatch '^\d+$' -or $micro -notmatch '^\d+$') { throw "SDK package revision is invalid: $PackageXml" }
+    if ($minor -notmatch '^\d+$' -or $micro -notmatch '^\d+$') { throw "SDK package revision is invalid: $MetadataPath" }
     return "$major.$minor.$micro"
 }
 
@@ -112,10 +127,10 @@ $env:ANDROID_AVD_HOME = $avdHome
 if ($LASTEXITCODE -ne 0) { throw 'sdkmanager failed' }
 $emulatorDigest = (Get-FileHash -LiteralPath $emulator -Algorithm SHA256).Hash.ToLowerInvariant()
 $adbDigest = (Get-FileHash -LiteralPath $adb -Algorithm SHA256).Hash.ToLowerInvariant()
-$emulatorPackage = Join-Path $env:ANDROID_HOME 'emulator/package.xml'
-$platformToolsPackage = Join-Path $env:ANDROID_HOME 'platform-tools/package.xml'
-$commandLineToolsPackage = Join-Path $env:ANDROID_HOME 'cmdline-tools/latest/package.xml'
-$systemImagePackage = Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64/package.xml"
+$emulatorPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'emulator')
+$platformToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'platform-tools')
+$commandLineToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'cmdline-tools/latest')
+$systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64")
 $emulatorVersionLine = @(& $emulator -version 2>&1) | Where-Object { $_ -match '^Android emulator version ' } | Select-Object -First 1
 $adbVersionLine = @(& $adb version 2>&1) | Where-Object { $_ -match '^Android Debug Bridge version ' } | Select-Object -First 1
 if ($emulatorVersionLine -notmatch '^Android emulator version ([0-9.]+)') { throw 'emulator version is unavailable' }
@@ -128,23 +143,23 @@ $identity = [ordered]@{
     abi = 'x86_64'
     systemImage = [ordered]@{
         package = $systemImage
-        revision = Get-SdkPackageRevision -PackageXml $systemImagePackage
+        revision = Get-SdkPackageRevision -MetadataPath $systemImagePackage
         metadataSha256 = (Get-FileHash -LiteralPath $systemImagePackage -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     emulator = [ordered]@{
         version = $emulatorVersion
-        packageRevision = Get-SdkPackageRevision -PackageXml $emulatorPackage
+        packageRevision = Get-SdkPackageRevision -MetadataPath $emulatorPackage
         executableSha256 = $emulatorDigest
         metadataSha256 = (Get-FileHash -LiteralPath $emulatorPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     platformTools = [ordered]@{
         adbVersion = $adbVersion
-        packageRevision = Get-SdkPackageRevision -PackageXml $platformToolsPackage
+        packageRevision = Get-SdkPackageRevision -MetadataPath $platformToolsPackage
         adbSha256 = $adbDigest
         metadataSha256 = (Get-FileHash -LiteralPath $platformToolsPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     commandLineTools = [ordered]@{
-        packageRevision = Get-SdkPackageRevision -PackageXml $commandLineToolsPackage
+        packageRevision = Get-SdkPackageRevision -MetadataPath $commandLineToolsPackage
         metadataSha256 = (Get-FileHash -LiteralPath $commandLineToolsPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 }
