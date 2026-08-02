@@ -427,6 +427,7 @@ type emulatorPackageIdentity struct {
 	ABI      string `json:"abi"`
 	Emulator struct {
 		Version          string `json:"version"`
+		VersionSource    string `json:"versionSource"`
 		PackageRevision  string `json:"packageRevision"`
 		ExecutableSHA256 string `json:"executableSha256"`
 		MetadataSHA256   string `json:"metadataSha256"`
@@ -462,6 +463,9 @@ func (value emulatorPackageIdentity) validate(proof string) error {
 		if version == "" || version != strings.TrimSpace(version) || len(version) > 64 {
 			return fmt.Errorf("emulator identity %s version is invalid", name)
 		}
+	}
+	if value.Emulator.VersionSource != "executable-output" && value.Emulator.VersionSource != "sdk-package-metadata" {
+		return errors.New("emulator identity version source is invalid")
 	}
 	return nil
 }

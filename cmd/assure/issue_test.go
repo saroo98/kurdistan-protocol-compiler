@@ -191,6 +191,7 @@ func TestEmulatorPackageIdentityRequiresExactProofAndDigests(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	identity := emulatorPackageIdentity{Schema: "kurdistan-emulator-package-identity-v1", API: 34, ABI: "x86_64"}
 	identity.Emulator.Version = "36.2.12"
+	identity.Emulator.VersionSource = "executable-output"
 	identity.Emulator.PackageRevision = "36.2.12"
 	identity.Emulator.ExecutableSHA256 = digest
 	identity.Emulator.MetadataSHA256 = digest
@@ -209,6 +210,11 @@ func TestEmulatorPackageIdentityRequiresExactProofAndDigests(t *testing.T) {
 	identity.API = 36
 	if err := identity.validate("android-device-api34"); err == nil {
 		t.Fatal("mismatched emulator API passed")
+	}
+	identity.API = 34
+	identity.Emulator.VersionSource = "untrusted-output"
+	if err := identity.validate("android-device-api34"); err == nil {
+		t.Fatal("unknown emulator version source passed")
 	}
 }
 
