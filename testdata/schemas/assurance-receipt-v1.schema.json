@@ -12,9 +12,10 @@
     "workflow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": ["path", "sourceCommit", "sha256"],
       "properties": {
         "path": {"type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._/-]+\\.ya?ml$", "maxLength": 512},
+        "sourceCommit": {"$ref": "#/$defs/gitObject"},
         "sha256": {"$ref": "#/$defs/sha256"}
       }
     },

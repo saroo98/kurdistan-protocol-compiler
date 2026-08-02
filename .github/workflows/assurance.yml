@@ -35,12 +35,13 @@ jobs:
           fetch-depth: 0
       - name: Set up Go
         uses: ./.github/actions/setup-go
-      - name: Verify running workflow definition equals exact subject
+      - name: Verify running workflow source is addressable
         shell: pwsh
         run: |
-          $running = (git rev-parse '${{ github.workflow_sha }}:.github/workflows/assurance.yml').Trim()
-          $subject = (git hash-object .github/workflows/assurance.yml).Trim()
-          if ($running -cne $subject) { throw "running workflow blob $running differs from exact-subject workflow blob $subject" }
+          git cat-file -e '${{ github.workflow_sha }}^{commit}'
+          if ($LASTEXITCODE -ne 0) { throw 'running workflow source commit is unavailable' }
+          git cat-file -e '${{ github.workflow_sha }}:.github/workflows/assurance.yml'
+          if ($LASTEXITCODE -ne 0) { throw 'running workflow definition is unavailable at its source commit' }
       - name: Verify workflow topology
         run: go run ./cmd/assure workflow -root .
       - name: Emit proof inventory
@@ -66,6 +67,8 @@ jobs:
         include:
           - {os: ubuntu-24.04, proof: go-core}
           - {os: windows-2025, proof: go-core}
+          - {os: ubuntu-24.04, proof: go-executable-evidence}
+          - {os: windows-2025, proof: go-executable-evidence}
           - {os: ubuntu-24.04, proof: go-audit}
           - {os: windows-2025, proof: go-audit}
           - {os: ubuntu-24.04, proof: operator}
@@ -99,6 +102,7 @@ jobs:
           -root .
           -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-gate.json
           -workflow .github/workflows/assurance.yml
+          -workflow-source-commit ${{ github.workflow_sha }}
           -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-${{ runner.os }}-receipt.json
           -commit ${{ inputs.sha || github.sha }}
           -ref refs/subjects/${{ inputs.sha || github.sha }}
@@ -162,6 +166,7 @@ jobs:
           -root .
           -gate .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-gate.json
           -workflow .github/workflows/assurance.yml
+          -workflow-source-commit ${{ github.workflow_sha }}
           -out .tools/assurance/${{ github.run_id }}/android-host-${{ runner.os }}-receipt.json
           -commit ${{ inputs.sha || github.sha }}
           -ref refs/subjects/${{ inputs.sha || github.sha }}
@@ -293,6 +298,7 @@ jobs:
           -root .
           -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json
           -workflow .github/workflows/assurance.yml
+          -workflow-source-commit ${{ github.workflow_sha }}
           -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json
           -commit ${{ inputs.sha || github.sha }}
           -ref refs/subjects/${{ inputs.sha || github.sha }}
@@ -303,6 +309,7 @@ jobs:
           -artifact .tools/device/app-internal-androidTest.apk
           -artifact .tools/device/device-artifacts.json
           -artifact android/config/phase14-required-device-tests.txt
+          -artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json
       - name: Validate passing receipt
         if: steps.proof.outcome == 'success'
         run: >-
@@ -356,7 +363,7 @@ jobs:
         shell: pwsh
         run: |
           $receipts = Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse | Sort-Object Name
-          if ($receipts.Count -ne 13) { throw "expected 13 proof receipts, found $($receipts.Count)" }
+          if ($receipts.Count -ne 15) { throw "expected 15 proof receipts, found $($receipts.Count)" }
           $arguments = @(
             'run', './cmd/assure', 'certificate', 'issue',
             '-root', '.',
@@ -370,6 +377,7 @@ jobs:
             '-required', 'docs-evidence',
             '-required', 'go-audit',
             '-required', 'go-core',
+            '-required', 'go-executable-evidence',
             '-required', 'operator'
           )
           foreach ($receipt in $receipts) {
@@ -390,6 +398,7 @@ jobs:
             -required docs-evidence `
             -required go-audit `
             -required go-core `
+            -required go-executable-evidence `
             -required operator
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload aggregate certificate

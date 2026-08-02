@@ -142,9 +142,10 @@ func validateCommandSet(commands [][]string) error {
 }
 
 type ImpactPolicy struct {
-	Schema        string       `json:"schema"`
-	DefaultProofs []string     `json:"defaultProofs"`
-	Rules         []ImpactRule `json:"rules"`
+	Schema                string            `json:"schema"`
+	DefaultProofs         []string          `json:"defaultProofs"`
+	FeedbackSubstitutions map[string]string `json:"feedbackSubstitutions,omitempty"`
+	Rules                 []ImpactRule      `json:"rules"`
 }
 
 type ImpactRule struct {
@@ -169,6 +170,11 @@ func (value ImpactPolicy) Validate() error {
 	}
 	if err := exactStrings("default proof", value.DefaultProofs, nil); err != nil {
 		return err
+	}
+	for authoritative, feedback := range value.FeedbackSubstitutions {
+		if !identifierPattern.MatchString(authoritative) || !identifierPattern.MatchString(feedback) || authoritative == feedback {
+			return errors.New("invalid feedback proof substitution")
+		}
 	}
 	seen := map[string]bool{}
 	for index, rule := range value.Rules {
@@ -211,8 +217,15 @@ func (value ImpactPolicy) ProofsForPaths(paths []string) ([]string, error) {
 			}
 		}
 	}
-	result := make([]string, 0, len(proofs))
+	selectedProofs := make(map[string]bool, len(proofs))
 	for proof := range proofs {
+		if feedback, ok := value.FeedbackSubstitutions[proof]; ok {
+			proof = feedback
+		}
+		selectedProofs[proof] = true
+	}
+	result := make([]string, 0, len(selectedProofs))
+	for proof := range selectedProofs {
 		result = append(result, proof)
 	}
 	sort.Strings(result)
@@ -230,8 +243,10 @@ func ValidateImpactProofReferences(impact ImpactPolicy, proofs ProofPolicy) erro
 		return err
 	}
 	known := make(map[string]bool, len(proofs.Proofs))
+	proofByID := make(map[string]Proof, len(proofs.Proofs))
 	for _, proof := range proofs.Proofs {
 		known[proof.ID] = true
+		proofByID[proof.ID] = proof
 	}
 	check := func(values []string) error {
 		for _, value := range values {
@@ -247,6 +262,22 @@ func ValidateImpactProofReferences(impact ImpactPolicy, proofs ProofPolicy) erro
 	for _, rule := range impact.Rules {
 		if err := check(rule.Proofs); err != nil {
 			return fmt.Errorf("impact pattern %s: %w", rule.Pattern, err)
+		}
+	}
+	for authoritativeID, feedbackID := range impact.FeedbackSubstitutions {
+		authoritative, authoritativeOK := proofByID[authoritativeID]
+		feedback, feedbackOK := proofByID[feedbackID]
+		if !authoritativeOK || !feedbackOK {
+			return fmt.Errorf("feedback substitution %q -> %q references an unknown proof", authoritativeID, feedbackID)
+		}
+		if authoritative.CachePolicy != CacheIndependent || feedback.CachePolicy != CacheAllowed {
+			return fmt.Errorf("feedback substitution %q -> %q must replace cache-independent proof with cache-allowed proof", authoritativeID, feedbackID)
+		}
+		if !equalStringSets(authoritative.InvalidatedBy, feedback.InvalidatedBy) {
+			return fmt.Errorf("feedback substitution %q -> %q changes invalidation coverage", authoritativeID, feedbackID)
+		}
+		if _, chained := impact.FeedbackSubstitutions[feedbackID]; chained {
+			return fmt.Errorf("feedback substitution %q -> %q is chained", authoritativeID, feedbackID)
 		}
 	}
 	selectedFor := func(path string) (map[string]bool, error) {
@@ -267,7 +298,8 @@ func ValidateImpactProofReferences(impact ImpactPolicy, proofs ProofPolicy) erro
 		}
 		for _, proof := range proofs.Proofs {
 			for _, invalidator := range proof.InvalidatedBy {
-				if patternMatches(invalidator, path) && !selected[proof.ID] {
+				feedbackID := impact.FeedbackSubstitutions[proof.ID]
+				if patternMatches(invalidator, path) && !selected[proof.ID] && (feedbackID == "" || !selected[feedbackID]) {
 					return fmt.Errorf("changed path %q invalidates proof %q but impact policy does not select it", path, proof.ID)
 				}
 			}
@@ -287,6 +319,22 @@ func ValidateImpactProofReferences(impact ImpactPolicy, proofs ProofPolicy) erro
 		}
 	}
 	return nil
+}
+
+func equalStringSets(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]bool, len(left))
+	for _, value := range left {
+		seen[value] = true
+	}
+	for _, value := range right {
+		if !seen[value] {
+			return false
+		}
+	}
+	return true
 }
 
 func representativePath(pattern string) string {

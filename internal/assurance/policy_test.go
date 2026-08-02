@@ -102,3 +102,37 @@ func TestValidateImpactProofReferencesRejectsInvalidationBypass(t *testing.T) {
 		t.Fatalf("validate covered invalidation: %v", err)
 	}
 }
+
+func TestImpactFeedbackSubstitutionPreservesCoverageAndCannotWeakenAuthority(t *testing.T) {
+	invalidators := []string{"android/**"}
+	proofs := ProofPolicy{
+		Schema: ProofPolicySchema,
+		Proofs: []Proof{
+			{ID: "android-host", Commands: [][]string{{"./gradlew", "ciAssuranceHostGate"}}, OperatingSystems: []string{"linux"}, CachePolicy: CacheIndependent, Deterministic: false, FreshnessSeconds: 60, InvalidatedBy: invalidators, AuthorizedPhase: 16},
+			{ID: "android-pr-host", Commands: [][]string{{"./gradlew", "ciPrHostGate"}}, OperatingSystems: []string{"linux"}, CachePolicy: CacheAllowed, Deterministic: false, FreshnessSeconds: 60, InvalidatedBy: invalidators, AuthorizedPhase: 16},
+		},
+	}
+	impact := ImpactPolicy{
+		Schema:                ImpactPolicySchema,
+		DefaultProofs:         []string{"android-host"},
+		FeedbackSubstitutions: map[string]string{"android-host": "android-pr-host"},
+		Rules:                 []ImpactRule{{Pattern: "android/**", Proofs: []string{"android-host"}}},
+	}
+	if err := ValidateImpactProofReferences(impact, proofs); err != nil {
+		t.Fatalf("validate safe feedback substitution: %v", err)
+	}
+	selected, err := impact.ProofsForPaths([]string{"android/app/build.gradle.kts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selected) != 1 || selected[0] != "android-pr-host" {
+		t.Fatalf("selected proofs = %v, want android-pr-host only", selected)
+	}
+
+	weakened := proofs
+	weakened.Proofs = append([]Proof(nil), proofs.Proofs...)
+	weakened.Proofs[1].InvalidatedBy = []string{"android/app/**"}
+	if err := ValidateImpactProofReferences(impact, weakened); err == nil || !strings.Contains(err.Error(), "changes invalidation coverage") {
+		t.Fatalf("error = %v, want invalidation coverage rejection", err)
+	}
+}

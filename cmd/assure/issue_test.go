@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kurdistan/internal/assurance"
@@ -42,16 +43,25 @@ func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
 	gitTest(t, root, "config", "user.name", "Assure Test")
 	gitTest(t, root, "add", ".")
 	gitTest(t, root, "commit", "-m", "fixture")
+	workflowSourceCommit, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, root, "subject.txt", "new exact subject\n")
+	gitTest(t, root, "add", "subject.txt")
+	gitTest(t, root, "commit", "-m", "new subject")
 	commit, err := gitOutput(root, "rev-parse", "HEAD")
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeTestFile(t, root, ".github/workflows/assurance.yml", "name: uncommitted substitution\n")
 
 	var stdout, stderr bytes.Buffer
 	err = runReceiptIssue([]string{
 		"-root", root,
 		"-gate", "gate.json",
 		"-workflow", ".github/workflows/assurance.yml",
+		"-workflow-source-commit", workflowSourceCommit,
 		"-out", ".tools/assurance/receipt.json",
 		"-run-id", "123",
 		"-job-id", "go-audit-linux",
@@ -72,6 +82,9 @@ func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
 	}
 	if receipt.Proof.ID != "go-audit" || receipt.Result != "PASS" || receipt.Subject.Repository != "saroo98/kurdistan-protocol-compiler" {
 		t.Fatalf("unexpected receipt: %+v", receipt)
+	}
+	if receipt.Subject.Commit != commit || receipt.Workflow.SourceCommit != workflowSourceCommit || receipt.Workflow.SHA256 != digestBytes([]byte("name: assurance\n")) {
+		t.Fatalf("receipt did not preserve separate subject and executed-workflow identity: %+v", receipt)
 	}
 }
 
@@ -178,6 +191,50 @@ func TestTimingPercentilesUseNearestRank(t *testing.T) {
 	got := percentiles([]int64{50, 10, 40, 20, 30})
 	if got.P50Millis != 30 || got.P95Millis != 50 {
 		t.Fatalf("percentiles = %+v", got)
+	}
+}
+
+func TestEmulatorPackageIdentityRequiresExactProofAndDigests(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	identity := emulatorPackageIdentity{Schema: "kurdistan-emulator-package-identity-v1", API: 34, ABI: "x86_64"}
+	identity.Emulator.Version = "36.2.12"
+	identity.Emulator.PackageRevision = "36.2.12"
+	identity.Emulator.ExecutableSHA256 = digest
+	identity.Emulator.MetadataSHA256 = digest
+	identity.PlatformTools.ADBVersion = "1.0.41"
+	identity.PlatformTools.PackageRevision = "36.0.0"
+	identity.PlatformTools.ADBSHA256 = digest
+	identity.PlatformTools.MetadataSHA256 = digest
+	identity.SystemImage.Package = "system-images;android-34;google_apis;x86_64"
+	identity.SystemImage.Revision = "14"
+	identity.SystemImage.MetadataSHA256 = digest
+	identity.CommandLineTools.PackageRevision = "19.0"
+	identity.CommandLineTools.MetadataSHA256 = digest
+	if err := identity.validate("android-device-api34"); err != nil {
+		t.Fatalf("valid emulator identity rejected: %v", err)
+	}
+	identity.API = 36
+	if err := identity.validate("android-device-api34"); err == nil {
+		t.Fatal("mismatched emulator API passed")
+	}
+}
+
+func TestDeviceProofToolchainRequiresIdentityArtifact(t *testing.T) {
+	if _, err := proofToolchain(t.TempDir(), "android-device-api34", nil); err == nil {
+		t.Fatal("device proof without emulator identity artifact passed")
+	}
+}
+
+func TestGradleWrapperVersionFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "android/gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.4.1-bin.zip\n")
+	version, err := gradleWrapperVersion(root)
+	if err != nil || version != "9.4.1" {
+		t.Fatalf("Gradle version = %q, err = %v", version, err)
+	}
+	writeTestFile(t, root, "android/gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https://example.invalid/not-gradle.zip\n")
+	if _, err := gradleWrapperVersion(root); err == nil {
+		t.Fatal("missing Gradle version passed")
 	}
 }
 

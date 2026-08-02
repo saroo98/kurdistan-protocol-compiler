@@ -101,6 +101,9 @@ $process.HasExited
 & $adb wait-for-device
 adb emulator discovery timed out
 -not (Test-Path -LiteralPath $GateReceipt)
+$emulatorIdentity = ".tools/phase16/emulator-api$Api-identity.json"
+kurdistan-emulator-package-identity-v1
+Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError
 `
 	if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
 		t.Fatal(err)

@@ -15,7 +15,7 @@
       "operatingSystem": "linux",
       "receiptId": "fixture-go-core-linux",
       "path": "receipt-go-core-linux.json",
-      "sha256": "f458b2848c575aab1612bd2a20a0745a4f46271f608bdb515c87b7c0f5a9f02a"
+      "sha256": "847cc42a0f863c3463c8a424b8dc86edf4ff82cb5513febe3eae36d074f39018"
     }
   ],
   "issuedAt": "2026-08-02T10:01:30Z",

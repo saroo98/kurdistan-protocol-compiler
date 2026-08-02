@@ -33,7 +33,7 @@ func main() {
 
 func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("expected receipt, certificate, policy, impact, timings, or workflow subcommand")
+		return errors.New("expected receipt, certificate, policy, inventory, impact, timings, workflow, or candidate subcommand")
 	}
 	switch args[0] {
 	case "receipt":
@@ -65,12 +65,19 @@ func run(args []string, stdout, stderr io.Writer) error {
 			return errors.New("expected policy inventory")
 		}
 		return runPolicyInventory(args[2:], stdout, stderr)
+	case "inventory":
+		return runPolicyInventory(args[1:], stdout, stderr)
 	case "impact":
 		return runImpact(args[1:], stdout, stderr)
 	case "timings":
 		return runTimings(args[1:], stdout, stderr)
 	case "workflow":
 		return runWorkflow(args[1:], stdout, stderr)
+	case "candidate":
+		if len(args) < 2 || args[1] != "validate" {
+			return errors.New("expected candidate validate")
+		}
+		return runCandidateValidate(args[2:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown subcommand %q", args[0])
 	}
@@ -153,6 +160,11 @@ func runCertificateValidate(args []string, stdout, stderr io.Writer) error {
 	expectedRepository := flags.String("expected-repository", "", "optional exact repository owner/name")
 	expectedCommit := flags.String("expected-commit", "", "optional exact subject commit")
 	expectedTree := flags.String("expected-tree", "", "optional exact subject tree")
+	expectedRunID := flags.String("expected-run-id", "", "optional exact workflow run id")
+	expectedRunAttempt := flags.Int("expected-run-attempt", 0, "optional exact workflow run attempt")
+	expectedTrigger := flags.String("expected-trigger", "", "optional exact workflow trigger")
+	expectedWorkflowPath := flags.String("expected-workflow-path", "", "optional exact executed workflow path")
+	expectedWorkflowSource := flags.String("expected-workflow-source-commit", "", "optional exact executed workflow source commit")
 	var required stringList
 	flags.Var(&required, "required", "required proof id; repeat for multiple proofs")
 	if err := flags.Parse(args); err != nil {
@@ -199,6 +211,12 @@ func runCertificateValidate(args []string, stdout, stderr io.Writer) error {
 		if err := validateReceiptWorkflow(*root, receipt); err != nil {
 			return fmt.Errorf("receipt %q: %w", reference.Path, err)
 		}
+		if *expectedRunID != "" && receipt.Execution.RunID != *expectedRunID || *expectedRunAttempt != 0 && receipt.Execution.Attempt != *expectedRunAttempt || *expectedTrigger != "" && receipt.Execution.Trigger != *expectedTrigger {
+			return fmt.Errorf("receipt %q does not match the expected workflow execution", reference.Path)
+		}
+		if *expectedWorkflowPath != "" && receipt.Workflow.Path != *expectedWorkflowPath || *expectedWorkflowSource != "" && receipt.Workflow.SourceCommit != *expectedWorkflowSource {
+			return fmt.Errorf("receipt %q does not match the expected workflow source", reference.Path)
+		}
 		documents = append(documents, assurance.ReceiptDocument{Path: reference.Path, Raw: raw})
 	}
 	now, err := validationTime(*nowText)
@@ -214,13 +232,13 @@ func runCertificateValidate(args []string, stdout, stderr io.Writer) error {
 }
 
 func validateReceiptWorkflow(root string, receipt assurance.Receipt) error {
-	raw, err := readRootFile(root, receipt.Workflow.Path)
+	raw, err := readGitBlob(root, receipt.Workflow.SourceCommit, receipt.Workflow.Path)
 	if err != nil {
-		return fmt.Errorf("read receipt workflow: %w", err)
+		return fmt.Errorf("read receipt workflow source: %w", err)
 	}
 	digest := fmt.Sprintf("%x", sha256.Sum256(raw))
 	if digest != receipt.Workflow.SHA256 {
-		return errors.New("receipt workflow digest does not match checked-out subject")
+		return errors.New("receipt workflow digest does not match its recorded source commit")
 	}
 	return nil
 }

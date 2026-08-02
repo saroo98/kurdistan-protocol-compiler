@@ -12,9 +12,11 @@
 //	go run ./cmd/gate -android                # complete Go gate plus Android Phase 14
 //	go run ./cmd/gate -android-only           # Android Phase 14 only
 //	go run ./cmd/gate -proof go-core          # modules + build + vet + uncached tests
+//	go run ./cmd/gate -proof go-executable-evidence # nested executable evidence only
 //	go run ./cmd/gate -proof go-audit         # full audit only
 //	go run ./cmd/gate -proof operator         # operator verification only
 //	go run ./cmd/gate -proof android-host     # Android Phase 14 only
+//	go run ./cmd/gate -proof android-pr-host  # cache-enabled PR feedback only
 //
 // It exits non-zero if any step fails.
 package main
@@ -135,6 +137,7 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"build", "go", []string{"build", "./..."}, ""},
 		{"vet", "go", []string{"vet", "./..."}, ""},
 		{"test", "go", []string{"test", "-count=1", "./..."}, ""},
+		{"executable-evidence", "go", []string{"run", "./cmd/executableevidence"}, ""},
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
 		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
 	}
@@ -147,26 +150,34 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 		core := append([]step(nil), steps[:4]...)
 		core[3].args = []string{"test", "-json", "-count=1", "./..."}
 		return core, nil
+	case "go-executable-evidence":
+		return steps[4:5], nil
 	case "go-audit":
-		audit := steps[4]
+		audit := steps[5]
 		audit.args = []string{"run", "./cmd/kcheck", "--full"}
 		return []step{audit}, nil
 	case "operator":
-		return steps[5:6], nil
+		return steps[6:7], nil
 	case "docs-evidence":
 		return []step{
 			{name: "phase15-evidence", program: "go", args: []string{"run", "./cmd/phase15verify", "-root", "."}},
 			{name: "release-metadata", program: "go", args: []string{"run", "./cmd/releaseverify", "-root", "."}},
 		}, nil
 	case "dependency-freshness":
+		osvScanner := "./.tools/bin/osv-scanner_linux_amd64"
+		if runtime.GOOS == "windows" {
+			osvScanner = ".tools\\bin\\osv-scanner_windows_amd64.exe"
+		}
 		return []step{
 			{name: "build-govulncheck", program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"}},
 			{name: "go-vulnerability-analysis", program: "./.tools/bin/govulncheck", args: []string{"./..."}},
 			{name: "fetch-osv-scanner", program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
-			{name: "dependency-manifest-scan", program: "./.tools/bin/osv-scanner_linux_amd64", args: []string{"-r", "."}},
+			{name: "android-runtime-vulnerability-analysis", program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
 		}, nil
 	case "android-host":
-		return []step{androidStep()}, nil
+		return []step{androidAssuranceStep()}, nil
+	case "android-pr-host":
+		return []step{androidPRStep()}, nil
 	case "android-device-api26":
 		return []step{androidDeviceStep(26)}, nil
 	case "android-device-api34":
@@ -183,11 +194,11 @@ func stepsForOptions(options gateOptions, jsonOut, statusOut string) ([]step, er
 		return proofSteps(options.proof, options.quick, jsonOut, statusOut)
 	}
 	if options.androidOnly {
-		return []step{androidStep()}, nil
+		return []step{androidAssuranceStep()}, nil
 	}
 	steps := gateSteps(options.quick, jsonOut, statusOut)
 	if options.android {
-		steps = append(steps, androidStep())
+		steps = append(steps, androidAssuranceStep())
 	}
 	return steps, nil
 }
@@ -341,19 +352,28 @@ func writeJSONAtomic(path string, value any) (err error) {
 	return os.Rename(temporaryPath, path)
 }
 
-func androidStep() step {
+func androidAssuranceStep() step {
+	return androidStep("android-assurance-host", "ciAssuranceHostGate", "--no-build-cache", "--no-configuration-cache", "--rerun-tasks")
+}
+
+func androidPRStep() step {
+	return androidStep("android-pr-host", "ciPrHostGate")
+}
+
+func androidStep(name, task string, extraArgs ...string) step {
+	args := append([]string{task}, extraArgs...)
 	if runtime.GOOS == "windows" {
 		return step{
-			name:    "android-phase14",
+			name:    name,
 			program: "cmd",
-			args:    []string{"/c", "gradlew.bat", "phase14Gate", "--no-build-cache"},
+			args:    append([]string{"/c", "gradlew.bat"}, args...),
 			dir:     "android",
 		}
 	}
 	return step{
-		name:    "android-phase14",
+		name:    name,
 		program: "./gradlew",
-		args:    []string{"phase14Gate", "--no-build-cache"},
+		args:    args,
 		dir:     "android",
 	}
 }

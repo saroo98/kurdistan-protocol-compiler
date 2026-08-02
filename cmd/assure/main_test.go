@@ -78,6 +78,29 @@ func TestRunCertificateValidate(t *testing.T) {
 	}
 }
 
+func TestRunCertificateValidateRejectsUnexpectedWorkflowExecution(t *testing.T) {
+	root, policy, policyRaw := writeTestPolicy(t)
+	receipt, receiptRaw := writeTestReceipt(t, root, policy, policyRaw)
+	certificate := assurance.Certificate{
+		Schema: assurance.CertificateSchema, CertificateID: "main-assurance", Subject: receipt.Subject,
+		PolicySHA256: receipt.Proof.PolicySHA256, RequiredProofs: []string{"go-core"},
+		Receipts: []assurance.ReceiptReference{{
+			ProofID: receipt.Proof.ID, OperatingSystem: receipt.Runner.OperatingSystem,
+			ReceiptID: receipt.ReceiptID, Path: "receipts/go-core-linux.json", SHA256: fmt.Sprintf("%x", sha256.Sum256(receiptRaw)),
+		}},
+		IssuedAt: "2026-08-02T10:01:30Z", Status: "PASS",
+	}
+	writeJSONFile(t, filepath.Join(root, "certificate.json"), certificate)
+	err := run([]string{
+		"certificate", "validate", "-root", root,
+		"-certificate", "certificate.json", "-receipts-root", ".", "-required", "go-core",
+		"-expected-run-id", "999", "-now", "2026-08-02T10:02:00Z",
+	}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected workflow run mismatch rejection")
+	}
+}
+
 func TestRunPolicyInventory(t *testing.T) {
 	root, _, _ := writeTestPolicy(t)
 	var stdout, stderr bytes.Buffer
@@ -168,7 +191,7 @@ func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 		{
 			name: "Go dependencies require freshness",
 			path: "go.mod",
-			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness", "go-audit", "go-core", "operator"},
+			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-pr-host", "dependency-freshness", "go-audit", "go-core", "go-executable-evidence", "operator"},
 		},
 		{
 			name: "evidence validator changes require their own proof",
@@ -244,10 +267,23 @@ func writeTestReceipt(t *testing.T, root string, policy assurance.ProofPolicy, p
 	if err := os.WriteFile(workflowPath, workflowRaw, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	gitTest(t, root, "init")
+	gitTest(t, root, "config", "user.email", "test@example.invalid")
+	gitTest(t, root, "config", "user.name", "Assure Test")
+	gitTest(t, root, "add", ".")
+	gitTest(t, root, "commit", "-m", "fixture")
+	workflowSourceCommit, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
 	receipt := assurance.Receipt{
 		Schema: assurance.ReceiptSchema, ReceiptID: "run-123-go-core-linux",
-		Subject:     assurance.Subject{Repository: "saroo98/kurdistan-protocol-compiler", Commit: strings.Repeat("1", 40), Tree: strings.Repeat("2", 40), Ref: "refs/heads/main"},
-		Workflow:    assurance.WorkflowIdentity{Path: ".github/workflows/assurance.yml", SHA256: fmt.Sprintf("%x", sha256.Sum256(workflowRaw))},
+		Subject: assurance.Subject{Repository: "saroo98/kurdistan-protocol-compiler", Commit: strings.Repeat("1", 40), Tree: strings.Repeat("2", 40), Ref: "refs/heads/main"},
+		Workflow: assurance.WorkflowIdentity{
+			Path:         ".github/workflows/assurance.yml",
+			SourceCommit: workflowSourceCommit,
+			SHA256:       fmt.Sprintf("%x", sha256.Sum256(workflowRaw)),
+		},
 		Execution:   assurance.ExecutionIdentity{RunID: "123", JobID: "test-linux", Attempt: 1, Trigger: "push"},
 		Proof:       assurance.ProofIdentity{ID: "go-core", PolicySHA256: fmt.Sprintf("%x", sha256.Sum256(policyRaw))},
 		Inventories: []assurance.NamedDigest{{Name: "go-tests", SHA256: strings.Repeat("4", 64)}},
@@ -283,5 +319,20 @@ func writeJSONFile(t *testing.T, path string, value any) {
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInventoryDirectAliasMatchesPolicyInventory(t *testing.T) {
+	var direct, legacy, stderr bytes.Buffer
+	root := filepath.Join("..", "..")
+	if err := run([]string{"inventory", "-root", root}, &direct, &stderr); err != nil {
+		t.Fatalf("direct inventory: %v (stderr %q)", err, stderr.String())
+	}
+	stderr.Reset()
+	if err := run([]string{"policy", "inventory", "-root", root}, &legacy, &stderr); err != nil {
+		t.Fatalf("legacy inventory: %v (stderr %q)", err, stderr.String())
+	}
+	if direct.String() != legacy.String() {
+		t.Fatal("direct and legacy inventory commands differ")
 	}
 }

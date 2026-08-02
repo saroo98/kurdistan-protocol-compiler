@@ -54,8 +54,9 @@ type Subject struct {
 }
 
 type WorkflowIdentity struct {
-	Path   string `json:"path"`
-	SHA256 string `json:"sha256"`
+	Path         string `json:"path"`
+	SourceCommit string `json:"sourceCommit"`
+	SHA256       string `json:"sha256"`
 }
 
 type ExecutionIdentity struct {
@@ -119,7 +120,7 @@ func (value Receipt) Validate() error {
 	if !repositoryPattern.MatchString(value.Subject.Repository) || !gitObjectPattern.MatchString(value.Subject.Commit) || !gitObjectPattern.MatchString(value.Subject.Tree) || !validRef(value.Subject.Ref) {
 		return errors.New("invalid assurance receipt subject")
 	}
-	if !validWorkflowPath(value.Workflow.Path) || !sha256Pattern.MatchString(value.Workflow.SHA256) {
+	if !validWorkflowPath(value.Workflow.Path) || !gitObjectPattern.MatchString(value.Workflow.SourceCommit) || !sha256Pattern.MatchString(value.Workflow.SHA256) {
 		return errors.New("invalid assurance receipt workflow identity")
 	}
 	if !decimalIDPattern.MatchString(value.Execution.RunID) || !jobIDPattern.MatchString(value.Execution.JobID) || value.Execution.Attempt < 1 || value.Execution.Attempt > 100 || !allowedTrigger(value.Execution.Trigger) {

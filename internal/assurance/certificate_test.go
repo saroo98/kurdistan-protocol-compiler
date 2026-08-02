@@ -47,6 +47,37 @@ func TestValidateCertificateRejectsReplayedReceipt(t *testing.T) {
 	}
 }
 
+func TestValidateCertificateRejectsReceiptFromAnotherWorkflowRun(t *testing.T) {
+	receipt, err := DecodeReceipt(strings.NewReader(validReceiptJSON))
+	if err != nil {
+		t.Fatal(err)
+	}
+	windowsReceipt := receipt
+	windowsReceipt.ReceiptID = "run-124-go-core-windows"
+	windowsReceipt.Runner.OperatingSystem = "windows"
+	windowsReceipt.Execution.RunID = "124"
+	windowsRaw, err := json.Marshal(windowsReceipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linuxRaw := []byte(validReceiptJSON)
+	policy := testProofPolicy()
+	policy.Proofs[0].OperatingSystems = []string{"linux", "windows"}
+	certificate := Certificate{
+		Schema: CertificateSchema, CertificateID: "mixed-run-assurance", Subject: receipt.Subject,
+		PolicySHA256: receipt.Proof.PolicySHA256, RequiredProofs: []string{"go-core"},
+		Receipts: []ReceiptReference{
+			{ProofID: "go-core", OperatingSystem: "linux", ReceiptID: receipt.ReceiptID, Path: "receipts/linux.json", SHA256: fmt.Sprintf("%x", sha256.Sum256(linuxRaw))},
+			{ProofID: "go-core", OperatingSystem: "windows", ReceiptID: windowsReceipt.ReceiptID, Path: "receipts/windows.json", SHA256: fmt.Sprintf("%x", sha256.Sum256(windowsRaw))},
+		},
+		IssuedAt: "2026-08-02T10:02:00Z", Status: "PASS",
+	}
+	documents := []ReceiptDocument{{Path: "receipts/linux.json", Raw: linuxRaw}, {Path: "receipts/windows.json", Raw: windowsRaw}}
+	if err := ValidateCertificate(certificate, documents, policy, certificate.PolicySHA256, []string{"go-core"}, time.Date(2026, 8, 2, 10, 3, 0, 0, time.UTC)); err == nil {
+		t.Fatal("expected cross-run receipt replay rejection")
+	}
+}
+
 func TestValidateCertificateRejectsReceiptSubjectMismatch(t *testing.T) {
 	certificate, documents, policy := validCertificateFixture(t)
 	certificate.Subject.Commit = strings.Repeat("2", 40)

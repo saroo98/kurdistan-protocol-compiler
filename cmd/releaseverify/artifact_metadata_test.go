@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,6 +98,117 @@ func TestWriteArtifactMetadataRejectsAmbiguousArtifactGlob(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("ambiguous artifact glob passed")
+	}
+}
+
+func TestWriteArtifactMetadataRejectsSymlinkArtifact(t *testing.T) {
+	root := t.TempDir()
+	writeArtifactFixture(t, root, "artifacts/real.apk", "real")
+	link := filepath.Join(root, "artifacts", "linked.apk")
+	if err := os.Symlink(filepath.Join(root, "artifacts", "real.apk"), link); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	err := writeArtifactMetadata(
+		root,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/linked.apk"}},
+		filepath.Join(root, "metadata.json"),
+	)
+	if err == nil {
+		t.Fatal("symbolic-link artifact passed")
+	}
+}
+
+func TestWriteArtifactMetadataRejectsArtifactThroughSymlinkedParent(t *testing.T) {
+	root := t.TempDir()
+	writeArtifactFixture(t, root, "real/app.apk", "real")
+	link := filepath.Join(root, "artifacts")
+	if err := os.Symlink(filepath.Join(root, "real"), link); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	err := writeArtifactMetadata(
+		root,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/app.apk"}},
+		filepath.Join(root, "metadata.json"),
+	)
+	if err == nil {
+		t.Fatal("artifact below a symbolic-link parent passed")
+	}
+}
+
+func TestWriteArtifactMetadataRejectsSymlinkOutputTarget(t *testing.T) {
+	root := t.TempDir()
+	writeArtifactFixture(t, root, "artifacts/app.apk", "app")
+	writeArtifactFixture(t, root, "protected.json", "unchanged")
+	output := filepath.Join(root, "metadata.json")
+	if err := os.Symlink(filepath.Join(root, "protected.json"), output); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	err := writeArtifactMetadata(
+		root,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/app.apk"}},
+		output,
+	)
+	if err == nil {
+		t.Fatal("symbolic-link output target passed")
+	}
+	raw, readErr := os.ReadFile(filepath.Join(root, "protected.json"))
+	if readErr != nil || string(raw) != "unchanged" {
+		t.Fatalf("symlink target changed: content=%q err=%v", raw, readErr)
+	}
+}
+
+func TestWriteArtifactMetadataRejectsSymlinkOutputParent(t *testing.T) {
+	root := t.TempDir()
+	writeArtifactFixture(t, root, "artifacts/app.apk", "app")
+	if err := os.Mkdir(filepath.Join(root, "real-output"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "output")
+	if err := os.Symlink(filepath.Join(root, "real-output"), link); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	err := writeArtifactMetadata(
+		root,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/app.apk"}},
+		filepath.Join(link, "metadata.json"),
+	)
+	if err == nil {
+		t.Fatal("symbolic-link output parent passed")
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "real-output", "metadata.json")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("metadata unexpectedly written through symlink: %v", statErr)
+	}
+}
+
+func TestWriteArtifactMetadataReplacesRegularOutputAtomically(t *testing.T) {
+	root := t.TempDir()
+	writeArtifactFixture(t, root, "artifacts/app.apk", "app")
+	output := filepath.Join(root, "metadata.json")
+	writeArtifactFixture(t, root, "metadata.json", "old")
+	err := writeArtifactMetadata(
+		root,
+		versionProperties{Name: "0.9.0", Code: 1},
+		"DEVICE_TEST_SET",
+		[]artifactSpec{{Name: "app-apk", Pattern: "artifacts/app.apk"}},
+		output,
+	)
+	if err != nil {
+		t.Fatalf("replace regular output: %v", err)
+	}
+	raw, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(artifactMetadataSchema)) {
+		t.Fatalf("output was not replaced with metadata: %q", raw)
 	}
 }
 

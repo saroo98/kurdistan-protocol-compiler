@@ -128,6 +128,7 @@ const validReceiptJSON = `{
   },
   "workflow": {
     "path": ".github/workflows/assurance.yml",
+    "sourceCommit": "9999999999999999999999999999999999999999",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "execution": {"runId": "123", "jobId": "test-linux", "attempt": 1, "trigger": "push"},

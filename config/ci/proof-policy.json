@@ -16,6 +16,15 @@
       "authorizedPhase": 16
     },
     {
+      "id": "go-executable-evidence",
+      "commands": [["go", "run", "./cmd/executableevidence"]],
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": ["go.mod", "go.sum", "cmd/executableevidence/**", "internal/assurance/**", "internal/audit/security_test.go", "internal/crypto/**", "internal/runtime/**", "internal/protocol/framing/**", "internal/codegen/**", "internal/testkit/importrules/**"],
+      "authorizedPhase": 16
+    },
+    {
       "id": "go-audit",
       "commands": [["go", "run", "./cmd/kcheck", "--full"]],
       "operatingSystems": ["linux", "windows"],
@@ -36,28 +45,50 @@
     {
       "id": "android-host",
       "commandsByOperatingSystem": {
-        "linux": [["./gradlew", "phase14Gate", "--no-build-cache"]],
-        "windows": [["cmd", "/c", "gradlew.bat", "phase14Gate", "--no-build-cache"]]
+        "linux": [["./gradlew", "ciAssuranceHostGate", "--no-build-cache", "--no-configuration-cache", "--rerun-tasks"]],
+        "windows": [["cmd", "/c", "gradlew.bat", "ciAssuranceHostGate", "--no-build-cache", "--no-configuration-cache", "--rerun-tasks"]]
       },
       "operatingSystems": ["linux", "windows"],
       "cachePolicy": "CACHE_INDEPENDENT",
-      "deterministic": true,
+      "deterministic": false,
+      "freshnessSeconds": 86400,
+      "invalidatedBy": ["android/**", "cmd/phase9verify/**", "cmd/phase13verify/**", "cmd/phase14verify/**"],
+      "authorizedPhase": 16
+    },
+    {
+      "id": "android-pr-host",
+      "commandsByOperatingSystem": {
+        "linux": [["./gradlew", "ciPrHostGate"]],
+        "windows": [["cmd", "/c", "gradlew.bat", "ciPrHostGate"]]
+      },
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_ALLOWED_FEEDBACK",
+      "deterministic": false,
+      "freshnessSeconds": 86400,
       "invalidatedBy": ["android/**", "cmd/phase9verify/**", "cmd/phase13verify/**", "cmd/phase14verify/**"],
       "authorizedPhase": 16
     },
     {
       "id": "dependency-freshness",
-      "commands": [
-        ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
-        ["./.tools/bin/govulncheck", "./..."],
-        ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
-        ["./.tools/bin/osv-scanner_linux_amd64", "-r", "."]
-      ],
-      "operatingSystems": ["linux"],
+      "commandsByOperatingSystem": {
+        "linux": [
+          ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
+          ["./.tools/bin/govulncheck", "./..."],
+          ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
+          ["./.tools/bin/osv-scanner_linux_amd64", "scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"]
+        ],
+        "windows": [
+          ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
+          ["./.tools/bin/govulncheck", "./..."],
+          ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
+          [".tools\\bin\\osv-scanner_windows_amd64.exe", "scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"]
+        ]
+      },
+      "operatingSystems": ["linux", "windows"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
       "freshnessSeconds": 86400,
-      "invalidatedBy": ["go.mod", "go.sum", "android/gradle.lockfile", "android/gradle/verification-metadata.xml"],
+      "invalidatedBy": ["go.mod", "go.sum", "tools/go.mod", "tools/go.sum", "android/**", "testdata/evidence/phase9/android-sbom.cdx.json"],
       "authorizedPhase": 16
     },
     {
@@ -77,7 +108,8 @@
       "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api26", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "26", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
-      "deterministic": true,
+      "deterministic": false,
+      "freshnessSeconds": 86400,
       "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
       "authorizedPhase": 16
     },
@@ -86,7 +118,8 @@
       "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api34", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "34", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
-      "deterministic": true,
+      "deterministic": false,
+      "freshnessSeconds": 86400,
       "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
       "authorizedPhase": 16
     },
@@ -95,7 +128,8 @@
       "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api36", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "36", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
-      "deterministic": true,
+      "deterministic": false,
+      "freshnessSeconds": 86400,
       "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
       "authorizedPhase": 16
     }

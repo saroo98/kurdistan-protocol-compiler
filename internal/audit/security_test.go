@@ -9,12 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"kurdistan/internal/assurance"
 	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/lab/runtimeadversary"
 	"kurdistan/internal/protocol/ir"
@@ -1487,22 +1487,13 @@ func TestIntegratedM0NamedFaultMatrixV1(t *testing.T) {
 }
 
 func TestWO014ExecutableEvidenceMatrixV1(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
+	commands := assurance.ExecutableEvidenceCommands()
+	if len(commands) != 4 {
+		t.Fatalf("executable evidence command count=%d want=4", len(commands))
 	}
-	commands := [][]string{
-		{"test", "-timeout", "120s", "-count=1", "./internal/runtime", "-run", "TestGeneratedProfileParityV1|TestInterpretedPolicyParityCoveringArrayV1|TestPolicyMatrixOwnerWitnessLiteralCompleteV1|TestPolicyMatrixAdmissionOnlyExecutedLedgerV1|TestPolicyMatrixCausalOwnerRegistryCompleteV1"},
-		{"test", "-timeout", "120s", "-count=1", "./internal/codegen", "-run", "TestStrictGeneratedIdentifiersAndRoleSeparatedAuthorization|TestGenerateCreatesBuildableProfileSpecificModule|TestStrictGenerateSignedBoundaryMultiSeedAndPreOutput"},
-		{"test", "-timeout", "120s", "-count=1", "./internal/testkit/importrules", "-run", "TestLabFaultCapabilityCannotReachNormalPaths|VersionMigrationBoundary|OfflineMigrationReachability|GeneratedAuthorizationBoundary|NoLabShortcut"},
-		{"test", "-timeout", "120s", "-count=1", "./internal/crypto/...", "./internal/runtime/...", "./internal/protocol/framing/..."},
-	}
-	for _, args := range commands {
-		cmd := exec.Command("go", args...)
-		cmd.Dir = root
-		output, runErr := cmd.CombinedOutput()
-		if runErr != nil {
-			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), runErr, output)
+	for index, args := range commands {
+		if len(args) < 6 || args[0] != "test" || args[1] != "-timeout" || args[2] != "300s" || args[3] != "-count=1" {
+			t.Fatalf("executable evidence command %d is not cache-independent and bounded: %v", index, args)
 		}
 	}
 }

@@ -23,10 +23,10 @@ jobs:
       android_host: ${{ steps.select.outputs.android_host }}
       android_device: ${{ steps.select.outputs.android_device }}
     steps:
-      - name: Check out pull request subject
+      - name: Check out protected base policy tooling
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Go
@@ -35,12 +35,14 @@ jobs:
         id: select
         shell: pwsh
         run: |
+          git fetch --no-tags origin '${{ github.event.pull_request.head.sha }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git diff --name-only --no-renames '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}' | Set-Content -LiteralPath changed-paths.txt -Encoding utf8NoBOM
           go run ./cmd/assure impact -root . -paths-file changed-paths.txt | Set-Content -LiteralPath impact.json -Encoding utf8NoBOM
           $selection = Get-Content -LiteralPath impact.json -Raw | ConvertFrom-Json
           $compact = $selection.proofs | ConvertTo-Json -Compress
           "proofs=$compact" >> $env:GITHUB_OUTPUT
-          "android_host=$($selection.proofs -contains 'android-host')".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+          "android_host=$($selection.proofs -contains 'android-pr-host')".ToLowerInvariant() >> $env:GITHUB_OUTPUT
           $device = @('android-device-api26', 'android-device-api34', 'android-device-api36') | Where-Object { $selection.proofs -contains $_ }
           if ($device.Count -ne 0 -and $device.Count -ne 3) { throw 'device proof selection must contain all three API lanes' }
           "android_device=$($device.Count -eq 3)".ToLowerInvariant() >> $env:GITHUB_OUTPUT
@@ -73,6 +75,13 @@ jobs:
           fetch-depth: 0
       - name: Set up Go
         uses: ./.github/actions/setup-go
+      - name: Fetch and verify executed pull-request workflow source
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin '+refs/pull/${{ github.event.pull_request.number }}/merge:refs/remotes/pull/${{ github.event.pull_request.number }}/merge'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $merge = (git rev-parse 'refs/remotes/pull/${{ github.event.pull_request.number }}/merge').Trim()
+          if ($merge -cne '${{ github.workflow_sha }}') { throw "workflow source ${{ github.workflow_sha }} does not match fetched merge commit $merge" }
       - name: Run every selected Go proof and retain terminal receipts
         shell: pwsh
         env:
@@ -81,14 +90,14 @@ jobs:
           New-Item -ItemType Directory -Force ".tools/assurance/${{ github.run_id }}" | Out-Null
           $selected = $env:SELECTED_PROOFS | ConvertFrom-Json
           $failed = @()
-          foreach ($proof in @('go-core', 'go-audit', 'operator', 'docs-evidence', 'dependency-freshness')) {
+          foreach ($proof in @('go-core', 'go-executable-evidence', 'go-audit', 'operator', 'docs-evidence', 'dependency-freshness')) {
             if ($selected -notcontains $proof) { continue }
             $gate = ".tools/assurance/${{ github.run_id }}/$proof-gate.json"
             $timings = ".tools/assurance/${{ github.run_id }}/$proof-timings.json"
             $receipt = ".tools/assurance/${{ github.run_id }}/$proof-receipt.json"
             & go run ./cmd/gate -proof $proof -receipt $gate -timings $timings
             $proofExit = $LASTEXITCODE
-            & go run ./cmd/assure receipt issue -root . -gate $gate -workflow .github/workflows/pr.yml -out $receipt -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id go-proofs -os linux -runner-label ubuntu-24.04
+            & go run ./cmd/assure receipt issue -root . -gate $gate -workflow .github/workflows/pr.yml -workflow-source-commit '${{ github.workflow_sha }}' -out $receipt -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id go-proofs -os linux -runner-label ubuntu-24.04
             if ($LASTEXITCODE -ne 0) { throw "failed to issue receipt for $proof" }
             if ($proofExit -eq 0) {
               & go run ./cmd/assure receipt validate -root . -receipt $receipt
@@ -125,24 +134,31 @@ jobs:
         uses: ./.github/actions/setup-go
       - name: Set up Android
         uses: ./.github/actions/setup-android
+      - name: Fetch and verify executed pull-request workflow source
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin '+refs/pull/${{ github.event.pull_request.number }}/merge:refs/remotes/pull/${{ github.event.pull_request.number }}/merge'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $merge = (git rev-parse 'refs/remotes/pull/${{ github.event.pull_request.number }}/merge').Trim()
+          if ($merge -cne '${{ github.workflow_sha }}') { throw "workflow source ${{ github.workflow_sha }} does not match fetched merge commit $merge" }
       - name: Run Android host proof
         id: proof
         continue-on-error: true
         run: >-
           go run ./cmd/gate
-          -proof android-host
-          -receipt .tools/assurance/${{ github.run_id }}/android-host-gate.json
-          -timings .tools/assurance/${{ github.run_id }}/android-host-timings.json
+          -proof android-pr-host
+          -receipt .tools/assurance/${{ github.run_id }}/android-pr-host-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/android-pr-host-timings.json
       - name: Issue and validate Android host receipt
         if: always()
         run: |
-          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/android-host-gate.json -workflow .github/workflows/pr.yml -out .tools/assurance/${{ github.run_id }}/android-host-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-host -os linux -runner-label ubuntu-24.04
-          if [ '${{ steps.proof.outcome }}' = 'success' ]; then go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/android-host-receipt.json; fi
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/android-pr-host-gate.json -workflow .github/workflows/pr.yml -workflow-source-commit '${{ github.workflow_sha }}' -out .tools/assurance/${{ github.run_id }}/android-pr-host-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-pr-host -os linux -runner-label ubuntu-24.04
+          if [ '${{ steps.proof.outcome }}' = 'success' ]; then go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/android-pr-host-receipt.json; fi
       - name: Upload Android host receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
-          name: pr-proof-android-host-${{ github.run_id }}-${{ github.run_attempt }}
+          name: pr-proof-android-pr-host-${{ github.run_id }}-${{ github.run_attempt }}
           path: .tools/assurance/${{ github.run_id }}/
           if-no-files-found: error
           include-hidden-files: true
@@ -219,6 +235,13 @@ jobs:
         with:
           name: pr-device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
           path: .tools/device
+      - name: Fetch and verify executed pull-request workflow source
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin '+refs/pull/${{ github.event.pull_request.number }}/merge:refs/remotes/pull/${{ github.event.pull_request.number }}/merge'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $merge = (git rev-parse 'refs/remotes/pull/${{ github.event.pull_request.number }}/merge').Trim()
+          if ($merge -cne '${{ github.workflow_sha }}') { throw "workflow source ${{ github.workflow_sha }} does not match fetched merge commit $merge" }
       - name: Verify downloaded device artifact identity
         shell: pwsh
         run: |
@@ -246,7 +269,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -workflow .github/workflows/pr.yml -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-device -os android-emulator -runner-label api-${{ matrix.api }}-x86_64 -artifact .tools/device/app-internal.apk -artifact .tools/device/app-internal-androidTest.apk -artifact .tools/device/device-artifacts.json -artifact android/config/phase14-required-device-tests.txt
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -workflow .github/workflows/pr.yml -workflow-source-commit '${{ github.workflow_sha }}' -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-device -os android-emulator -runner-label api-${{ matrix.api }}-x86_64 -artifact .tools/device/app-internal.apk -artifact .tools/device/app-internal-androidTest.apk -artifact .tools/device/device-artifacts.json -artifact android/config/phase14-required-device-tests.txt -artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json
           if ('${{ steps.proof.outcome }}' -eq 'success') { go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json }
       - name: Upload device receipt
         if: always()
@@ -270,14 +293,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check out pull request subject
+      - name: Check out protected base enforcement tooling
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Go
         uses: ./.github/actions/setup-go
+      - name: Fetch executed pull-request workflow source
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin '+refs/pull/${{ github.event.pull_request.number }}/merge:refs/remotes/pull/${{ github.event.pull_request.number }}/merge'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $merge = (git rev-parse 'refs/remotes/pull/${{ github.event.pull_request.number }}/merge').Trim()
+          if ($merge -cne '${{ github.workflow_sha }}') { throw "workflow source ${{ github.workflow_sha }} does not match fetched merge commit $merge" }
       - name: Download impact decision
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:

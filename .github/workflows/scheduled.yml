@@ -43,7 +43,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/dependency-freshness-gate.json -workflow .github/workflows/scheduled.yml -out .tools/assurance/${{ github.run_id }}/dependency-freshness-receipt.json -commit '${{ github.sha }}' -ref 'refs/subjects/${{ github.sha }}' -job-id dependency-freshness -os linux -runner-label ubuntu-24.04
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/dependency-freshness-gate.json -workflow .github/workflows/scheduled.yml -workflow-source-commit '${{ github.workflow_sha }}' -out .tools/assurance/${{ github.run_id }}/dependency-freshness-receipt.json -commit '${{ github.sha }}' -ref 'refs/subjects/${{ github.sha }}' -job-id dependency-freshness -os linux -runner-label ubuntu-24.04
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ('${{ steps.proof.outcome }}' -eq 'success') {
             go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/dependency-freshness-receipt.json

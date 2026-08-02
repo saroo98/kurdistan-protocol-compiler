@@ -107,6 +107,9 @@ func verifyEmulatorProofScript(path string) error {
 		"$process.HasExited",
 		"adb emulator discovery timed out",
 		"-not (Test-Path -LiteralPath $GateReceipt)",
+		"$emulatorIdentity = \".tools/phase16/emulator-api$Api-identity.json\"",
+		"kurdistan-emulator-package-identity-v1",
+		"Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError",
 	} {
 		if !strings.Contains(content, token) {
 			return fmt.Errorf("Android emulator proof script is missing fail-closed contract %q", token)
@@ -117,6 +120,11 @@ func verifyEmulatorProofScript(path string) error {
 	}
 	if strings.Contains(content, "Join-Path '.tools/phase16' \"avd-api$Api\"") {
 		return errors.New("Android emulator proof script stores disposable AVD state in uploaded evidence")
+	}
+	for _, prohibited := range []string{".tools/phase16/emulator-api$Api.log", ".tools/phase16/logcat-api$Api.txt"} {
+		if strings.Contains(content, prohibited) {
+			return errors.New("Android emulator proof script stores raw diagnostic output in uploaded evidence")
+		}
 	}
 	return nil
 }
@@ -148,38 +156,64 @@ func verifyWorkflow(path, name string) error {
 func verifyKnownWorkflowContract(name, content string) error {
 	required := map[string][]string{
 		"assurance.yml": {
-			"github.workflow_sha }}:.github/workflows/assurance.yml",
-			"running workflow blob $running differs from exact-subject workflow blob $subject",
+			"github.workflow_sha }}^{commit}",
+			"-workflow-source-commit ${{ github.workflow_sha }}",
 			"-artifact .tools/device/app-internal.apk",
 			"-artifact .tools/device/app-internal-androidTest.apk",
 			"-artifact .tools/device/device-artifacts.json",
+			"-artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json",
 			"Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse",
 			"name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}",
 			"include-hidden-files: true",
 			"-ref refs/subjects/${{ inputs.sha || github.sha }}",
-			"expected 13 proof receipts",
+			"expected 15 proof receipts",
+			"'-required', 'go-executable-evidence'",
 			"-required', 'dependency-freshness'",
 			"-required', 'docs-evidence'",
+			"-proof android-host",
 		},
 		"candidate.yml": {
 			"assurance_run_attempt:",
+			"if ('${{ github.ref }}' -cne 'refs/heads/main')",
+			"refs/heads/main:refs/remotes/origin/main",
+			"actions/runs/${{ inputs.assurance_run_id }}/attempts/${{ inputs.assurance_run_attempt }}",
+			".github/workflows/assurance.yml",
 			"pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}",
+			"expected 15 receipts",
+			"-required go-executable-evidence",
+			"expected one API $api emulator identity",
+			"expected three emulator identity inventories",
 			"Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)",
+			"-expected-run-id '${{ inputs.assurance_run_id }}'",
+			"-expected-run-attempt '${{ inputs.assurance_run_attempt }}'",
+			"-expected-workflow-path .github/workflows/assurance.yml",
+			"-required dependency-freshness",
+			"-required docs-evidence",
 			"Normalize deterministic SBOM and refresh candidate metadata",
+			"candidate-provenance.json",
+			"candidate validate",
+			"verified-assurance/**",
 		},
 		"pr.yml": {
+			"ref: ${{ github.event.pull_request.base.sha }}",
+			"Check out protected base enforcement tooling",
+			"-workflow-source-commit '${{ github.workflow_sha }}'",
 			"-artifact .tools/device/app-internal.apk",
 			"-artifact .tools/device/app-internal-androidTest.apk",
 			"-artifact .tools/device/device-artifacts.json",
+			"-artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json",
 			"ref: ${{ github.event.pull_request.head.sha }}",
 			"git diff --name-only --no-renames",
 			"include-hidden-files: true",
 			"-ref 'refs/subjects/${{ github.event.pull_request.head.sha }}'",
 			"'dependency-freshness'",
+			"-proof android-pr-host",
+			"android-pr-host-receipt.json",
 		},
 		"scheduled.yml": {
 			"-proof dependency-freshness",
 			"dependency-freshness-receipt.json",
+			"-workflow-source-commit '${{ github.workflow_sha }}'",
 			"include-hidden-files: true",
 		},
 	}

@@ -39,8 +39,51 @@ jobs:
           ref: ${{ inputs.sha }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Require current trusted main subject
+        shell: pwsh
+        run: |
+          if ('${{ github.ref }}' -cne 'refs/heads/main') { throw 'candidate workflow must be dispatched from main' }
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $main = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($main -cne '${{ inputs.sha }}') { throw "candidate subject ${{ inputs.sha }} is not current origin/main $main" }
       - name: Set up Go
         uses: ./.github/actions/setup-go
+      - name: Authenticate assurance run provenance
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ('${{ inputs.sha }}' -notmatch '^[0-9a-f]{40}$') { throw 'sha must be exactly 40 lowercase hex characters' }
+          if ('${{ inputs.assurance_run_id }}' -notmatch '^[1-9][0-9]{0,19}$') { throw 'assurance_run_id is invalid' }
+          if ('${{ inputs.assurance_run_attempt }}' -notmatch '^[1-9][0-9]{0,5}$') { throw 'assurance_run_attempt is invalid' }
+          $headers = @{
+            Accept = 'application/vnd.github+json'
+            Authorization = "Bearer $env:GH_TOKEN"
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $uri = "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ inputs.assurance_run_id }}/attempts/${{ inputs.assurance_run_attempt }}"
+          $run = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+          $workflow = Invoke-RestMethod -Method Get -Uri $run.workflow_url -Headers $headers
+          if ($run.repository.full_name -cne '${{ github.repository }}') { throw 'assurance run repository mismatch' }
+          if ([string]$run.id -cne '${{ inputs.assurance_run_id }}' -or [int]$run.run_attempt -ne [int]'${{ inputs.assurance_run_attempt }}') { throw 'assurance run identity mismatch' }
+          if ($run.status -cne 'completed' -or $run.conclusion -cne 'success') { throw 'assurance run is not successfully completed' }
+          if ($run.head_sha -cne '${{ inputs.sha }}' -or $run.head_branch -cne 'main') { throw 'assurance run did not validate the requested main commit' }
+          if ($workflow.path -cne '.github/workflows/assurance.yml') { throw "unexpected assurance workflow $($workflow.path)" }
+          if ($run.event -cne 'push' -and $run.event -cne 'workflow_dispatch') { throw "unexpected assurance trigger $($run.event)" }
+          New-Item -ItemType Directory -Force .tools | Out-Null
+          [ordered]@{
+            schema = 'kpc-authenticated-assurance-run-v1'
+            repository = $run.repository.full_name
+            runId = [string]$run.id
+            runAttempt = [int]$run.run_attempt
+            workflowPath = $workflow.path
+            event = $run.event
+            headBranch = $run.head_branch
+            headSha = $run.head_sha
+            status = $run.status
+            conclusion = $run.conclusion
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath .tools/assurance-run.json -Encoding utf8NoBOM
       - name: Download assurance run evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
@@ -52,13 +95,11 @@ jobs:
       - name: Validate certificate against requested commit and tree
         shell: pwsh
         run: |
-          if ('${{ inputs.sha }}' -notmatch '^[0-9a-f]{40}$') { throw 'sha must be exactly 40 lowercase hex characters' }
-          if ('${{ inputs.assurance_run_id }}' -notmatch '^[1-9][0-9]{0,19}$') { throw 'assurance_run_id is invalid' }
-          if ('${{ inputs.assurance_run_attempt }}' -notmatch '^[1-9][0-9]{0,5}$') { throw 'assurance_run_attempt is invalid' }
+          $run = Get-Content -LiteralPath .tools/assurance-run.json -Raw | ConvertFrom-Json
           $certificate = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*certificate*.json' -File -Recurse
           if ($certificate.Count -ne 1) { throw "expected one certificate, found $($certificate.Count)" }
           $receipts = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*-receipt.json' -File -Recurse
-          if ($receipts.Count -ne 11) { throw "expected 11 receipts, found $($receipts.Count)" }
+          if ($receipts.Count -ne 15) { throw "expected 15 receipts, found $($receipts.Count)" }
           New-Item -ItemType Directory -Force .tools/collected | Out-Null
           foreach ($receipt in $receipts) {
             Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)
@@ -72,13 +113,40 @@ jobs:
             -expected-repository '${{ github.repository }}' `
             -expected-commit '${{ inputs.sha }}' `
             -expected-tree $tree `
+            -expected-run-id '${{ inputs.assurance_run_id }}' `
+            -expected-run-attempt '${{ inputs.assurance_run_attempt }}' `
+            -expected-trigger $run.event `
+            -expected-workflow-path .github/workflows/assurance.yml `
+            -expected-workflow-source-commit '${{ inputs.sha }}' `
             -required android-device-api26 `
             -required android-device-api34 `
             -required android-device-api36 `
             -required android-host `
+            -required dependency-freshness `
+            -required docs-evidence `
             -required go-audit `
             -required go-core `
+            -required go-executable-evidence `
             -required operator
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force .tools/verified-assurance/receipts | Out-Null
+          New-Item -ItemType Directory -Force .tools/verified-assurance/inventories | Out-Null
+          Copy-Item -LiteralPath $certificate.FullName -Destination .tools/verified-assurance/assurance-certificate.json
+          foreach ($receipt in $receipts) { Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/verified-assurance/receipts $receipt.Name) }
+          foreach ($api in 26, 34, 36) {
+            $identity = Get-ChildItem -LiteralPath .tools/assurance-input -Filter "emulator-api$api-identity.json" -File -Recurse
+            if ($identity.Count -ne 1) { throw "expected one API $api emulator identity, found $($identity.Count)" }
+            Copy-Item -LiteralPath $identity.FullName -Destination (Join-Path .tools/verified-assurance/inventories $identity.Name)
+          }
+          Copy-Item -LiteralPath .tools/assurance-run.json -Destination .tools/verified-assurance/assurance-run.json
+      - name: Upload authenticated assurance bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: verified-assurance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tools/verified-assurance/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
 
   build:
     name: clean candidate build ${{ matrix.builder }}
@@ -154,11 +222,24 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Check out exact trusted subject tooling
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
       - name: Download both independent candidates
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
           pattern: candidate-builder-*-${{ github.run_id }}-${{ github.run_attempt }}
           path: candidates
+      - name: Download authenticated assurance bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          name: verified-assurance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: verified-assurance
       - name: Compare every produced byte
         shell: pwsh
         run: |
@@ -166,17 +247,19 @@ jobs:
           $b = Get-ChildItem -LiteralPath candidates -Directory | Where-Object Name -Like 'candidate-builder-b-*'
           if ($a.Count -ne 1 -or $b.Count -ne 1) { throw 'candidate A/B directories are incomplete' }
           $filesA = Get-ChildItem -LiteralPath $a.FullName -File -Recurse | ForEach-Object {
-            [pscustomobject]@{
-              Path = [System.IO.Path]::GetRelativePath($a.FullName, $_.FullName).Replace('\', '/')
-              Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            [ordered]@{
+              path = [System.IO.Path]::GetRelativePath($a.FullName, $_.FullName).Replace('\', '/')
+              size = $_.Length
+              sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             }
-          } | Sort-Object Path
+          } | Sort-Object path
           $filesB = Get-ChildItem -LiteralPath $b.FullName -File -Recurse | ForEach-Object {
-            [pscustomobject]@{
-              Path = [System.IO.Path]::GetRelativePath($b.FullName, $_.FullName).Replace('\', '/')
-              Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            [ordered]@{
+              path = [System.IO.Path]::GetRelativePath($b.FullName, $_.FullName).Replace('\', '/')
+              size = $_.Length
+              sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             }
-          } | Sort-Object Path
+          } | Sort-Object path
           $left = $filesA | ConvertTo-Json -Depth 3 -Compress
           $right = $filesB | ConvertTo-Json -Depth 3 -Compress
           if ($left -cne $right) {
@@ -185,6 +268,41 @@ jobs:
             throw 'independent candidate outputs are not byte-identical'
           }
           $filesA | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath candidate-comparison.json -Encoding utf8NoBOM
+          $certificate = Get-Item -LiteralPath verified-assurance/assurance-certificate.json
+          $certificateDigest = (Get-FileHash -LiteralPath $certificate.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $run = Get-Content -LiteralPath verified-assurance/assurance-run.json -Raw | ConvertFrom-Json
+          $tree = (Get-Content -LiteralPath $certificate.FullName -Raw | ConvertFrom-Json).subject.tree
+          $receiptDigests = Get-ChildItem -LiteralPath verified-assurance/receipts -Filter '*-receipt.json' -File | Sort-Object Name | ForEach-Object {
+            [ordered]@{ path = "receipts/$($_.Name)"; size = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+          }
+          $inventoryDigests = Get-ChildItem -LiteralPath verified-assurance/inventories -Filter 'emulator-api*-identity.json' -File | Sort-Object Name | ForEach-Object {
+            [ordered]@{ path = $_.Name; size = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+          }
+          if ($inventoryDigests.Count -ne 3) { throw "expected three emulator identity inventories, found $($inventoryDigests.Count)" }
+          [ordered]@{
+            schema = 'kpc-engineering-candidate-provenance-v1'
+            repository = '${{ github.repository }}'
+            commit = '${{ inputs.sha }}'
+            tree = $tree
+            assurance = [ordered]@{
+              runId = [string]$run.runId
+              runAttempt = [int]$run.runAttempt
+              trigger = $run.event
+              workflowPath = $run.workflowPath
+              certificatePath = 'assurance-certificate.json'
+              certificateSha256 = $certificateDigest
+              receipts = @($receiptDigests)
+              inventories = @($inventoryDigests)
+            }
+            selectedBuilder = 'a'
+            selectedArtifacts = @($filesA)
+            comparisonSha256 = (Get-FileHash -LiteralPath candidate-comparison.json -Algorithm SHA256).Hash.ToLowerInvariant()
+            authoritative = $false
+            limitations = @('unsigned engineering candidate; signing, upload, promotion, and release remain unauthorized')
+          } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath candidate-provenance.json -Encoding utf8NoBOM
+          $candidateRoot = [System.IO.Path]::GetRelativePath((Get-Location).Path, $a.FullName).Replace('\', '/')
+          go run ./cmd/assure candidate validate -root . -provenance candidate-provenance.json -candidate-root $candidateRoot -assurance-root verified-assurance -comparison candidate-comparison.json -expected-repository '${{ github.repository }}' -expected-commit '${{ inputs.sha }}' -expected-tree $tree -expected-run-id '${{ inputs.assurance_run_id }}' -expected-run-attempt '${{ inputs.assurance_run_attempt }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload selected unsigned engineering candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
@@ -192,5 +310,7 @@ jobs:
           path: |
             candidates/candidate-builder-a-*/**
             candidate-comparison.json
+            candidate-provenance.json
+            verified-assurance/**
           if-no-files-found: error
           retention-days: 30
