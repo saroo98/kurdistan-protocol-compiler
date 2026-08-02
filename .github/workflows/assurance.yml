@@ -63,8 +63,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025]
-        proof: [go-core, go-audit, operator]
+        include:
+          - {os: ubuntu-24.04, proof: go-core}
+          - {os: windows-2025, proof: go-core}
+          - {os: ubuntu-24.04, proof: go-audit}
+          - {os: windows-2025, proof: go-audit}
+          - {os: ubuntu-24.04, proof: operator}
+          - {os: windows-2025, proof: operator}
+          - {os: ubuntu-24.04, proof: docs-evidence}
+          - {os: ubuntu-24.04, proof: dependency-freshness}
     steps:
       - name: Check out exact subject
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -349,7 +356,7 @@ jobs:
         shell: pwsh
         run: |
           $receipts = Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse | Sort-Object Name
-          if ($receipts.Count -ne 11) { throw "expected 11 proof receipts, found $($receipts.Count)" }
+          if ($receipts.Count -ne 13) { throw "expected 13 proof receipts, found $($receipts.Count)" }
           $arguments = @(
             'run', './cmd/assure', 'certificate', 'issue',
             '-root', '.',
@@ -359,6 +366,8 @@ jobs:
             '-required', 'android-device-api34',
             '-required', 'android-device-api36',
             '-required', 'android-host',
+            '-required', 'dependency-freshness',
+            '-required', 'docs-evidence',
             '-required', 'go-audit',
             '-required', 'go-core',
             '-required', 'operator'
@@ -377,6 +386,8 @@ jobs:
             -required android-device-api34 `
             -required android-device-api36 `
             -required android-host `
+            -required dependency-freshness `
+            -required docs-evidence `
             -required go-audit `
             -required go-core `
             -required operator

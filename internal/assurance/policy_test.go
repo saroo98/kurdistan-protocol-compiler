@@ -80,3 +80,25 @@ func TestValidateImpactProofReferencesRejectsUnknownProof(t *testing.T) {
 		t.Fatalf("validate known impact proofs: %v", err)
 	}
 }
+
+func TestValidateImpactProofReferencesRejectsInvalidationBypass(t *testing.T) {
+	proofs := ProofPolicy{
+		Schema: ProofPolicySchema,
+		Proofs: []Proof{
+			{ID: "go-core", Commands: [][]string{{"go", "test", "./..."}}, OperatingSystems: []string{"linux"}, CachePolicy: CacheIndependent, Deterministic: true, InvalidatedBy: []string{"testdata/**"}, AuthorizedPhase: 16},
+			{ID: "docs-evidence", Commands: [][]string{{"go", "test", "./docs"}}, OperatingSystems: []string{"linux"}, CachePolicy: CacheIndependent, Deterministic: true, InvalidatedBy: []string{"testdata/evidence/**"}, AuthorizedPhase: 16},
+		},
+	}
+	impact := ImpactPolicy{
+		Schema:        ImpactPolicySchema,
+		DefaultProofs: []string{"go-core", "docs-evidence"},
+		Rules:         []ImpactRule{{Pattern: "testdata/evidence/**", Proofs: []string{"docs-evidence"}}},
+	}
+	if err := ValidateImpactProofReferences(impact, proofs); err == nil || !strings.Contains(err.Error(), "go-core") {
+		t.Fatalf("error = %v, want go-core invalidation bypass rejection", err)
+	}
+	impact.Rules[0].Proofs = []string{"docs-evidence", "go-core"}
+	if err := ValidateImpactProofReferences(impact, proofs); err != nil {
+		t.Fatalf("validate covered invalidation: %v", err)
+	}
+}

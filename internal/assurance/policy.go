@@ -249,7 +249,54 @@ func ValidateImpactProofReferences(impact ImpactPolicy, proofs ProofPolicy) erro
 			return fmt.Errorf("impact pattern %s: %w", rule.Pattern, err)
 		}
 	}
+	selectedFor := func(path string) (map[string]bool, error) {
+		selected, err := impact.ProofsForPaths([]string{path})
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string]bool, len(selected))
+		for _, proof := range selected {
+			result[proof] = true
+		}
+		return result, nil
+	}
+	verifyPath := func(path string) error {
+		selected, err := selectedFor(path)
+		if err != nil {
+			return err
+		}
+		for _, proof := range proofs.Proofs {
+			for _, invalidator := range proof.InvalidatedBy {
+				if patternMatches(invalidator, path) && !selected[proof.ID] {
+					return fmt.Errorf("changed path %q invalidates proof %q but impact policy does not select it", path, proof.ID)
+				}
+			}
+		}
+		return nil
+	}
+	for _, proof := range proofs.Proofs {
+		for _, invalidator := range proof.InvalidatedBy {
+			if err := verifyPath(representativePath(invalidator)); err != nil {
+				return err
+			}
+		}
+	}
+	for _, rule := range impact.Rules {
+		if err := verifyPath(representativePath(rule.Pattern)); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func representativePath(pattern string) string {
+	if strings.HasSuffix(pattern, "/**") {
+		return strings.TrimSuffix(pattern, "**") + "__impact_policy_probe__"
+	}
+	if pattern == "*" {
+		return "__impact_policy_probe__"
+	}
+	return pattern
 }
 
 func exactStrings(name string, values []string, allowed map[string]bool) error {
