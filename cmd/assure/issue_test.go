@@ -75,6 +75,93 @@ func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
 	}
 }
 
+func TestReceiptIssueStreamsAndroidSizedArtifact(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "config/ci/proof-policy.json", `{
+  "schema":"kurdistan-proof-policy-v1",
+  "proofs":[{
+    "id":"go-audit",
+    "commands":[["go","run","./cmd/kcheck","--full"]],
+    "operatingSystems":["linux"],
+    "cachePolicy":"CACHE_INDEPENDENT",
+    "deterministic":true,
+    "invalidatedBy":["internal/audit/**"],
+    "authorizedPhase":16
+  }]
+}`)
+	writeTestFile(t, root, ".github/workflows/assurance.yml", "name: assurance\n")
+	writeTestFile(t, root, "gate.json", `{
+  "schema":"kurdistan-gate-execution-v1",
+  "proof":"go-audit",
+  "startedAt":"2026-08-02T10:00:00Z",
+  "finishedAt":"2026-08-02T10:00:01Z",
+  "terminal":true,
+  "status":"PASS",
+  "steps":[{"name":"audit","command":["go","run","./cmd/kcheck","--full"],"status":"PASS","exitCode":0}]
+}`)
+	artifact := bytes.Repeat([]byte{0xa5}, maxInputBytes+1)
+	artifactPath := filepath.Join(root, "app.apk")
+	if err := os.WriteFile(artifactPath, artifact, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gitTest(t, root, "init")
+	gitTest(t, root, "config", "user.email", "test@example.invalid")
+	gitTest(t, root, "config", "user.name", "Assure Test")
+	gitTest(t, root, "add", ".")
+	gitTest(t, root, "commit", "-m", "fixture")
+	commit, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	err = runReceiptIssue([]string{
+		"-root", root,
+		"-gate", "gate.json",
+		"-workflow", ".github/workflows/assurance.yml",
+		"-out", ".tools/assurance/receipt.json",
+		"-run-id", "123",
+		"-job-id", "go-audit-linux",
+		"-commit", commit,
+		"-ref", "refs/heads/test",
+		"-os", "linux",
+		"-artifact", "app.apk",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("receipt issue: %v; stderr=%s", err, stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(root, ".tools", "assurance", "receipt.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := assurance.DecodeReceipt(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(receipt.Artifacts) != 1 || receipt.Artifacts[0].Size != int64(len(artifact)) || receipt.Artifacts[0].SHA256 != digestBytes(artifact) {
+		t.Fatalf("unexpected artifact receipt: %+v", receipt.Artifacts)
+	}
+}
+
+func TestDigestRootArtifactRejectsOversizedSparseFile(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "oversized.apk")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(maxArtifactBytes + 1); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := digestRootArtifact(root, "oversized.apk"); err == nil {
+		t.Fatal("expected oversized artifact to be rejected")
+	}
+}
+
 func TestValidateGateStepsRejectsContradictoryResult(t *testing.T) {
 	record := gateExecutionRecord{Status: "PASS", Steps: []struct {
 		Name     string   `json:"name"`

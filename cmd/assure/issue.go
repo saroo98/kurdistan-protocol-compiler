@@ -167,11 +167,11 @@ func runReceiptIssue(args []string, stdout, stderr io.Writer) error {
 
 	artifactRecords := make([]assurance.Artifact, 0, len(artifacts))
 	for _, path := range artifacts {
-		raw, readErr := readRootFile(*root, path)
-		if readErr != nil {
-			return fmt.Errorf("read artifact %q: %w", path, readErr)
+		record, digestErr := digestRootArtifact(*root, path)
+		if digestErr != nil {
+			return fmt.Errorf("digest artifact %q: %w", path, digestErr)
 		}
-		artifactRecords = append(artifactRecords, assurance.Artifact{Path: path, Size: int64(len(raw)), SHA256: digestBytes(raw)})
+		artifactRecords = append(artifactRecords, record)
 	}
 	sort.Slice(artifactRecords, func(i, j int) bool { return artifactRecords[i].Path < artifactRecords[j].Path })
 
@@ -211,6 +211,64 @@ func runReceiptIssue(args []string, stdout, stderr io.Writer) error {
 	}
 	_, err = fmt.Fprintf(stdout, "issued terminal receipt %s (%s)\n", receipt.ReceiptID, receipt.Result)
 	return err
+}
+
+const maxArtifactBytes int64 = 1 << 30
+
+func digestRootArtifact(root, relative string) (assurance.Artifact, error) {
+	resolvedRoot, err := resolveRootDirectory(root, ".")
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if !safeRelativePath(relative) {
+		return assurance.Artifact{}, fmt.Errorf("unsafe relative path %q", relative)
+	}
+	candidate := filepath.Join(resolvedRoot, filepath.FromSlash(relative))
+	info, err := os.Lstat(candidate)
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return assurance.Artifact{}, fmt.Errorf("path %q is not a regular non-symlink file", relative)
+	}
+	if info.Size() < 0 || info.Size() > maxArtifactBytes {
+		return assurance.Artifact{}, fmt.Errorf("artifact %q size %d is outside the 0..%d byte bound", relative, info.Size(), maxArtifactBytes)
+	}
+	resolvedCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if !withinDirectory(resolvedRoot, resolvedCandidate) {
+		return assurance.Artifact{}, fmt.Errorf("path %q escapes root", relative)
+	}
+	file, err := os.Open(resolvedCandidate)
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+		return assurance.Artifact{}, fmt.Errorf("artifact %q changed while being opened", relative)
+	}
+	hash := sha256.New()
+	written, err := io.Copy(hash, io.LimitReader(file, maxArtifactBytes+1))
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if written != opened.Size() || written > maxArtifactBytes {
+		return assurance.Artifact{}, fmt.Errorf("artifact %q changed size while being hashed", relative)
+	}
+	finished, err := file.Stat()
+	if err != nil {
+		return assurance.Artifact{}, err
+	}
+	if finished.Size() != opened.Size() || !finished.ModTime().Equal(opened.ModTime()) {
+		return assurance.Artifact{}, fmt.Errorf("artifact %q changed while being hashed", relative)
+	}
+	return assurance.Artifact{Path: relative, Size: written, SHA256: hex.EncodeToString(hash.Sum(nil))}, nil
 }
 
 func proofByID(policy assurance.ProofPolicy, id string) (assurance.Proof, error) {

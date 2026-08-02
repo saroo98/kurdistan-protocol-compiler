@@ -59,12 +59,12 @@
     {
       "path": "cmd/assure/issue.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "758272cfa111813788f29bf67332bfb045659fd4fd0acec2ff4217121deaea06"
+      "post_sha256": "ae243c663ef075dd48e31cd0f4a22f0d6598df268d5f4182b6fc22d25b71df62"
     },
     {
       "path": "cmd/assure/issue_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "94c509ca0c1ab165a315d04db35461ce127611f0b8444b1f9beaa27933f0882c"
+      "post_sha256": "a90d6bcb6f6b38401f1f2f1c294bc437bbb64c6baa9c07802bd9b20cfab81f4d"
     },
     {
       "path": "cmd/assure/main.go",
@@ -119,7 +119,7 @@
     {
       "path": "cmd/phase9devicegate/main.go",
       "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
-      "post_sha256": "b88e7d449c17eba8d21d453622b1605b8af72bd0ebf5ea0c76e7483add5ff449"
+      "post_sha256": "7b4888f91a6eb45412811ea4f51ddf9de011640ef1d74deaae71bc1ca99928bb"
     },
     {
       "path": "cmd/phase9devicegate/main_test.go",
@@ -479,12 +479,12 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "55469c483ec10e8ff7f9052f6a32d8022a4d4f66f5fcf369b6e8753059304e4a"
+      "post_sha256": "f4dad48c537d2d23e0a78efded7a89446fbe7fdb32bcfbef0f4e17393b693c80"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "423ad041e6ce29a407b0cca319471de8aaaca3d63d8a0e4137c3f65cc8fdadcd"
+      "post_sha256": "b37eaed588f4d0b821adc36e25aed41b9968e3bda131ddd7845ed89f4cfc9ad1"
     },
     {
       "path": "tools/doc.go",
@@ -509,7 +509,7 @@
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "35d225ba6dc5a6e6251cf4fe0ffbc4842d044540b61916791e0284b8139b4fcd"
+      "post_sha256": "5c000df8f26e7c21181ce152432772aee5609008ac70221e4d494d905f5a128c"
     },
     {
       "path": "tools/tools.go",

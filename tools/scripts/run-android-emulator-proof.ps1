@@ -39,7 +39,8 @@ $emulator = Join-Path $env:ANDROID_HOME 'emulator/emulator'
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb'
 $systemImage = "system-images;android-$Api;google_apis;x86_64"
 $avdName = "kurdistan_phase16_api$Api"
-$avdHome = [IO.Path]::GetFullPath((Join-Path '.tools/phase16' "avd-api$Api"))
+$avdParent = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$avdHome = [IO.Path]::GetFullPath((Join-Path $avdParent "kurdistan-avd-api$Api"))
 $emulatorLog = ".tools/phase16/emulator-api$Api.log"
 $logcat = ".tools/phase16/logcat-api$Api.txt"
 
