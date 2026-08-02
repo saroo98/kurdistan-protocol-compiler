@@ -20,5 +20,9 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="user-initiated local VPN tunnel runtime" />
         </service>
+        <service
+            android:name=".RuntimeAuthorityHandoffService"
+            android:exported="false"
+            android:process=":vpn" />
     </application>
 </manifest>

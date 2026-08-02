@@ -1,0 +1,18 @@
+{
+  "schema": "kurdistan-phase14-local-evidence-v1",
+  "evidenceKey": "performanceAndLongevity",
+  "status": "PASS",
+  "scope": "API 36 emulator responsiveness and crash-safety during repeated primary navigation",
+  "commands": [
+    "android/gradlew phase14DeviceGate --dependency-verification=strict --no-build-cache --rerun-tasks"
+  ],
+  "evidence": [
+    "Phase14LongevityDeviceTest repeated Home, Profiles, Settings, and Home navigation for 50 cycles.",
+    "The exact Phase 14 device manifest completed 28 of 28 tests in 122.873 seconds.",
+    "The device gate reported no application crash, ANR, zero-test false pass, or missing expected test."
+  ],
+  "limitations": [
+    "An emulator navigation loop is not long-duration CPU, memory, thermal, battery, radio, sleep, or process-pressure evidence.",
+    "Weak physical devices, OEM firmware, foldables, tablets, cellular handover, and multi-hour endurance remain UNVERIFIED."
+  ]
+}

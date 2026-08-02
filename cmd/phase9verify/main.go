@@ -38,6 +38,8 @@ var bridgeSymbols = []string{
 	"kvpn_diagnostic_preview",
 	"kvpn_free",
 	"kvpn_phase11_roundtrip",
+	"kvpn_runtime_session_open",
+	"kvpn_runtime_session_roundtrip",
 	"kvpn_verify_preview",
 }
 
@@ -57,6 +59,8 @@ var jniSymbols = []string{
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticPreview",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeFree",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePhase11RoundTrip",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionOpen",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionRoundTrip",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeVerifyPreview",
 }
 
@@ -118,7 +122,7 @@ var phase11InternalOnlyMarkers = []string{
 
 var requiredPhase11APKMarkers = []string{
 	"ACTIVE_KURD_LOOPBACK",
-	"Kurd loopback transport active",
+	"Connected to owned loopback",
 }
 
 type apkContents struct {

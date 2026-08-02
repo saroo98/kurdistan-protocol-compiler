@@ -35,4 +35,11 @@ func TestAndroidStepUsesRepositoryWrapper(t *testing.T) {
 	if !found {
 		t.Fatalf("Android gate does not use the repository wrapper: %#v", value)
 	}
+	foundPhase14 := false
+	for _, argument := range value.args {
+		foundPhase14 = foundPhase14 || argument == "phase14Gate"
+	}
+	if value.name != "android-phase14" || !foundPhase14 {
+		t.Fatalf("Android gate does not certify Phase 14: %#v", value)
+	}
 }

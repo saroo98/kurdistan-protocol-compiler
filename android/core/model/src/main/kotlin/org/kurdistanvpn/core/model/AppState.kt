@@ -58,6 +58,14 @@ data class Phase9Settings(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val highContrast: Boolean = false,
     val reducedMotion: Boolean = false,
+    val connection: ConnectionPreferences = ConnectionPreferences(),
+    val tunnel: TunnelPreferences = TunnelPreferences(),
+    val routing: RoutingPreferences = RoutingPreferences(),
+    val updates: UpdatePreferences = UpdatePreferences(),
+    val probes: ProbePreferences = ProbePreferences(),
+    val diagnostics: DiagnosticPreferences = DiagnosticPreferences(),
+    val expert: ExpertPreferences = ExpertPreferences(),
+    val profiles: ProfilePreferences = ProfilePreferences(),
 )
 
 data class CompatibilitySummary(

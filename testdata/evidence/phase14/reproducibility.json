@@ -1,0 +1,19 @@
+{
+  "schema": "kurdistan-phase14-local-evidence-v1",
+  "evidenceKey": "releaseArtifactReproducibility",
+  "status": "PASS",
+  "scope": "Two same-host, fully clean, cache-disabled unsigned release APK builds",
+  "commands": [
+    "android/gradlew clean :app:assembleRelease --dependency-verification=strict --no-build-cache --no-configuration-cache",
+    "android/gradlew clean :app:assembleRelease --dependency-verification=strict --no-build-cache --no-configuration-cache"
+  ],
+  "evidence": [
+    "build-a.apk size=6090389 sha256=0ebb3a030a1ebe5955927c19c66bea9e4962191c74adfab7a2aa7616f864e8dd",
+    "build-b.apk size=6090389 sha256=0ebb3a030a1ebe5955927c19c66bea9e4962191c74adfab7a2aa7616f864e8dd",
+    "both builds completed successfully on 2026-08-02"
+  ],
+  "limitations": [
+    "This is same-host unsigned-artifact evidence, not an independent cross-host reproducible-build result.",
+    "Production signing keys, protected signing service, signed AAB/APK provenance, and store distribution remain UNVERIFIED."
+  ]
+}

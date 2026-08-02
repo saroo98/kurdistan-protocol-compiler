@@ -4,8 +4,10 @@
 package org.kurdistanvpn.app
 
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -23,9 +25,10 @@ class ZzzExternalPickerDeviceTest {
 
     @Test
     fun profileFileImportLaunchesTheSystemDocumentPickerWithoutCrashing() {
-        compose.onNodeWithText(compose.activity.getString(UiR.string.profiles))
+        compose.onNodeWithTag("primary_profiles")
             .performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.import_profile_file))
+            .performScrollTo()
             .performClick()
 
         compose.waitUntil(timeoutMillis = 10_000) {

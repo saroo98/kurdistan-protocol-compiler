@@ -124,6 +124,22 @@ val verifyPhase11Artifacts = tasks.register<Exec>("verifyPhase11Artifacts") {
     )
 }
 
+val verifyPhase13Artifacts = tasks.register<Exec>("verifyPhase13Artifacts") {
+    group = "verification"
+    description = "Inspects the Phase 13 Android product artifact and verified-session boundary."
+    dependsOn(verifyPhase11Artifacts)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("go", "run", "./cmd/phase13verify", "-root", ".")
+}
+
+val verifyPhase14Artifacts = tasks.register<Exec>("verifyPhase14Artifacts") {
+    group = "verification"
+    description = "Validates the fail-closed Phase 14 assurance and release-readiness record."
+    dependsOn(verifyPhase13Artifacts)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("go", "run", "./cmd/phase14verify", "-root", ".")
+}
+
 val verifyPhase9Evidence = tasks.register<Exec>("verifyPhase9Evidence") {
     group = "verification"
     description = "Verifies canonical SBOM, SPDX license, and pinned toolchain evidence."
@@ -184,6 +200,48 @@ tasks.register("phase11Gate") {
         ":platform:import:testDebugUnitTest",
         "cyclonedxBom",
         verifyPhase11Artifacts,
+    )
+}
+
+tasks.register("phase13Gate") {
+    group = "verification"
+    description = "Runs the cache-independent Phase 13 Android product-completion verification bar."
+    dependsOn(
+        ":app:assembleRelease",
+        ":app:assembleInternal",
+        ":app:lintRelease",
+        ":app:testInternalUnitTest",
+        ":app:compileInternalAndroidTestKotlin",
+        ":core:model:testDebugUnitTest",
+        ":runtime:api:testDebugUnitTest",
+        ":runtime:android:testDebugUnitTest",
+        ":data:metadata:testDebugUnitTest",
+        ":data:secure:testDebugUnitTest",
+        ":data:settings:testDebugUnitTest",
+        ":platform:import:testDebugUnitTest",
+        "cyclonedxBom",
+        verifyPhase13Artifacts,
+    )
+}
+
+tasks.register("phase14Gate") {
+    group = "verification"
+    description = "Runs the cache-independent Phase 14 local assurance and release-readiness bar."
+    dependsOn(
+        ":app:assembleRelease",
+        ":app:assembleInternal",
+        ":app:lintRelease",
+        ":app:testInternalUnitTest",
+        ":app:compileInternalAndroidTestKotlin",
+        ":core:model:testDebugUnitTest",
+        ":runtime:api:testDebugUnitTest",
+        ":runtime:android:testDebugUnitTest",
+        ":data:metadata:testDebugUnitTest",
+        ":data:secure:testDebugUnitTest",
+        ":data:settings:testDebugUnitTest",
+        ":platform:import:testDebugUnitTest",
+        "cyclonedxBom",
+        verifyPhase14Artifacts,
     )
 }
 
@@ -265,6 +323,70 @@ tasks.register<Exec>("phase11DeviceGate") {
         "-conflicting-app-package",
         "org.kurdistanvpn.app.debug",
         "-minimum-tests",
-        "15",
+        "19",
+    )
+}
+
+tasks.register<Exec>("phase13DeviceGate") {
+    group = "verification"
+    description = "Runs the exact Phase 13 Android product test manifest on a connected device."
+    dependsOn(":app:assembleInternal", ":app:assembleInternalAndroidTest")
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(
+        "go",
+        "run",
+        "./cmd/phase9devicegate",
+        "-label",
+        "PHASE 13",
+        "-evidence-dir",
+        ".tools/phase13/device-gate/latest",
+        "-adb",
+        adbExecutable.absolutePath,
+        "-app-apk",
+        "android/app/build/outputs/apk/internal/app-internal.apk",
+        "-test-apk",
+        "android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk",
+        "-app-package",
+        "org.kurdistanvpn.app.internal",
+        "-test-package",
+        "org.kurdistanvpn.app.internal.test",
+        "-conflicting-app-package",
+        "org.kurdistanvpn.app.debug",
+        "-minimum-tests",
+        "26",
+        "-expected-tests",
+        "android/config/phase13-required-device-tests.txt",
+    )
+}
+
+tasks.register<Exec>("phase14DeviceGate") {
+    group = "verification"
+    description = "Runs the exact Phase 14 local assurance manifest on a connected device."
+    dependsOn(":app:assembleInternal", ":app:assembleInternalAndroidTest")
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(
+        "go",
+        "run",
+        "./cmd/phase9devicegate",
+        "-label",
+        "PHASE 14",
+        "-evidence-dir",
+        ".tools/phase14/device-gate/latest",
+        "-adb",
+        adbExecutable.absolutePath,
+        "-app-apk",
+        "android/app/build/outputs/apk/internal/app-internal.apk",
+        "-test-apk",
+        "android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk",
+        "-app-package",
+        "org.kurdistanvpn.app.internal",
+        "-test-package",
+        "org.kurdistanvpn.app.internal.test",
+        "-conflicting-app-package",
+        "org.kurdistanvpn.app.debug",
+        "-minimum-tests",
+        "28",
+        "-expected-tests",
+        "android/config/phase14-required-device-tests.txt",
     )
 }

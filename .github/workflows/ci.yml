@@ -43,8 +43,8 @@ jobs:
       - name: Run cache-proof validation gate
         run: go run ./cmd/gate
 
-  android-phase9:
-    name: Android Phase 9 (${{ matrix.os }})
+  android-phase14:
+    name: Android Phase 14 local assurance (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:

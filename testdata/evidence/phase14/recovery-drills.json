@@ -1,0 +1,21 @@
+{
+  "schema": "kurdistan-phase14-local-evidence-v1",
+  "evidenceKey": "rollbackAndRecoveryDrills",
+  "status": "PASS",
+  "scope": "Local host and emulator recovery, rollback, fail-closed startup, backup, restore, reset, and corruption exercises",
+  "commands": [
+    "android/gradlew phase14Gate --dependency-verification=strict --no-build-cache --no-configuration-cache",
+    "android/gradlew phase14DeviceGate --dependency-verification=strict --no-build-cache --rerun-tasks"
+  ],
+  "evidence": [
+    "ProtectedStateBoundaryTest covers malformed backup, atomic restore publication, process-death recovery, and reset failure/success.",
+    "Phase9FoundationUiTest covers missing, malformed, and duplicate runtime authority before TUN establishment.",
+    "ProtectedStateResetDeviceTest proves explicit protected-state reset recreates an empty usable store.",
+    "Phase11ControlSurfaceDeviceTest exercises backup preview, cancel, confirm, scoped reset, and reset cancellation UI branches.",
+    "Phase 14 exact device manifest passed 28 tests with a clean crash and ANR scan.",
+    "The final cache-disabled Phase 14 host gate passed 1,079 executed tasks on 2026-08-02."
+  ],
+  "limitations": [
+    "Production fleet rollback, key-custody recovery, store rollback, disaster recovery, and cross-OEM reinstall remain UNVERIFIED."
+  ]
+}

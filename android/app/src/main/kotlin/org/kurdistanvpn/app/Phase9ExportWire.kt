@@ -5,13 +5,23 @@ package org.kurdistanvpn.app
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import org.kurdistanvpn.core.model.DiagnosticComponent
+import org.kurdistanvpn.core.model.DiagnosticEvent
+import org.kurdistanvpn.core.model.DiagnosticLogLevel
 
 internal object Phase9ExportWire {
-    fun diagnosticRequest(profileCount: Int): ByteArray {
-        return ByteBuffer.allocate(22).order(ByteOrder.BIG_ENDIAN).apply {
+    fun diagnosticRequest(profileCount: Int, events: List<DiagnosticEvent> = emptyList()): ByteArray {
+        val failures = events.asSequence()
+            .filter { it.level == DiagnosticLogLevel.ERROR || it.level == DiagnosticLogLevel.WARNING }
+            .mapNotNull(::failureValue)
+            .groupingBy { it }
+            .eachCount()
+            .toSortedMap()
+        val entryCount = 3 + failures.size
+        return ByteBuffer.allocate(13 + entryCount * 3).order(ByteOrder.BIG_ENDIAN).apply {
             put("KDR1".encodeToByteArray())
             putLong(1)
-            put(3.toByte())
+            put(entryCount.toByte())
             put(1.toByte()) // contract versions
             put(1.toByte()) // supported
             put(0.toByte()) // counts are forbidden for this category
@@ -21,7 +31,36 @@ internal object Phase9ExportWire {
             put(5.toByte()) // runtime disposition
             put(14.toByte()) // unavailable
             put(0.toByte()) // counts are forbidden for this category
+            failures.forEach { (value, count) ->
+                put(6.toByte()) // failure summary
+                put(value.toByte())
+                put(countBucket(count).toByte())
+            }
         }.array()
+    }
+
+    private fun failureValue(event: DiagnosticEvent): Int? {
+        val category = event.category.uppercase()
+        return when {
+            "PERMISSION" in category -> 15
+            event.component == DiagnosticComponent.STORAGE || "KEY_" in category || "STORAGE" in category -> 16
+            "ROUT" in category -> 17
+            "DNS" in category -> 18
+            "KILL" in category -> 19
+            event.component == DiagnosticComponent.PROFILE || "PROFILE" in category || "IMPORT" in category -> 20
+            "FALLBACK" in category -> 21
+            "RELAY" in category -> 22
+            "INCOMPATIBLE" in category || "ABI" in category || "AUTHORITY" in category -> 23
+            "MALFORMED" in category || "INVALID_INPUT" in category -> 24
+            else -> null
+        }
+    }
+
+    private fun countBucket(count: Int): Int = when {
+        count <= 0 -> 1
+        count == 1 -> 2
+        count <= 8 -> 3
+        else -> 4
     }
 
     fun diagnosticPreview(encoded: ByteArray): Triple<Int, String, String> {

@@ -35,6 +35,21 @@ sealed interface RestoreResult {
     data class Failure(val error: OperationError) : RestoreResult
 }
 
+class RuntimeAuthorityMaterial(
+    val verifyRequest: ByteArray,
+    val activationRecord: ByteArray,
+) : AutoCloseable {
+    override fun close() {
+        verifyRequest.fill(0)
+        activationRecord.fill(0)
+    }
+}
+
+sealed interface RuntimeAuthorityResult {
+    data class Success(val material: RuntimeAuthorityMaterial) : RuntimeAuthorityResult
+    data class Failure(val error: OperationError) : RuntimeAuthorityResult
+}
+
 /**
  * Cross-resource journal for Go activation plus Room metadata and encrypted
  * blob persistence. Every durable boundary is recorded before the next Go
@@ -211,6 +226,48 @@ class ProfileAdmissionJournal(
             records.forEach { it.verifyRequest.fill(0) }
         }
     }
+
+    suspend fun openRuntimeAuthority(localRecordId: String): RuntimeAuthorityResult =
+        withContext(Dispatchers.IO) {
+            val row = catalog.get(localRecordId)
+                ?: return@withContext RuntimeAuthorityResult.Failure(
+                    OperationError.POLICY_REJECTED,
+                )
+            if (row.transactionState != TransactionState.FINALIZED.name ||
+                row.health != CatalogHealth.AVAILABLE.name
+            ) {
+                return@withContext RuntimeAuthorityResult.Failure(
+                    OperationError.POLICY_REJECTED,
+                )
+            }
+            var verifyRequest: ByteArray? = null
+            var activationRecord: ByteArray? = null
+            try {
+                verifyRequest = blobs.reopen(localRecordId, SecureDataClass.IMPORT_REQUEST)
+                activationRecord = blobs.reopen(
+                    localRecordId,
+                    SecureDataClass.ACTIVATION_ACTIVE,
+                )
+                if (verifyRequest.isEmpty() || activationRecord.isEmpty()) {
+                    verifyRequest.fill(0)
+                    activationRecord.fill(0)
+                    return@withContext RuntimeAuthorityResult.Failure(
+                        OperationError.QUARANTINED,
+                    )
+                }
+                RuntimeAuthorityResult.Success(
+                    RuntimeAuthorityMaterial(verifyRequest, activationRecord),
+                )
+            } catch (_: KeyInvalidatedException) {
+                verifyRequest?.fill(0)
+                activationRecord?.fill(0)
+                RuntimeAuthorityResult.Failure(OperationError.KEY_INVALIDATED)
+            } catch (_: Throwable) {
+                verifyRequest?.fill(0)
+                activationRecord?.fill(0)
+                RuntimeAuthorityResult.Failure(OperationError.STORAGE_FAILURE)
+            }
+        }
 
     suspend fun delete(localRecordId: String): Boolean = withContext(Dispatchers.IO) {
         try {

@@ -31,6 +31,40 @@ import org.kurdistanvpn.data.metadata.TransactionState
 
 class ProtectedStateBoundaryTest {
     @Test
+    fun runtimeAuthorityReopensOnlyFinalizedEncryptedActivationAndWipesOnClose() = runBlocking {
+        val native = FakeNativeCore(preview())
+        val journal = ProfileAdmissionJournal(
+            nativeCore = native,
+            catalog = FakeCatalog(),
+            blobs = FakeBlobs(),
+            productionTrust = false,
+            random = FixedSecureRandom(),
+        )
+        val verifyRequest = byteArrayOf(9, 8, 7)
+        val admitted = journal.admit(verifyRequest, preview()) as AdmissionResult.Success
+        val opened = journal.openRuntimeAuthority(admitted.outcome.localRecordId)
+        val material = (opened as RuntimeAuthorityResult.Success).material
+        assertArrayEquals(verifyRequest, material.verifyRequest)
+        assertTrue(material.activationRecord.isNotEmpty())
+        material.close()
+        assertTrue(material.verifyRequest.all { it == 0.toByte() })
+        assertTrue(material.activationRecord.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun runtimeAuthorityFailsClosedForUnknownRecord() = runBlocking {
+        val journal = ProfileAdmissionJournal(
+            nativeCore = FakeNativeCore(preview()),
+            catalog = FakeCatalog(),
+            blobs = FakeBlobs(),
+            productionTrust = false,
+        )
+        assertEquals(
+            OperationError.POLICY_REJECTED,
+            (journal.openRuntimeAuthority("missing-record") as RuntimeAuthorityResult.Failure).error,
+        )
+    }
+    @Test
     fun previewCodecRejectsTruncationAndInvalidState() {
         val encoded = ProfilePreviewCodec.encode(preview(), "Kurd profile")
         val decoded = ProfilePreviewCodec.decode(encoded)
@@ -407,6 +441,11 @@ private class FakeNativeCore(
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray> =
+        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+
+    override fun openRuntimeSession(
+        request: ByteArray,
+    ): NativeResult<org.kurdistanvpn.core.nativeapi.NativeRuntimeSession> =
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =

@@ -478,7 +478,15 @@ func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 
 func phase10Phase9PreForTestV1(t *testing.T, root string, ledger m2MaintenanceManifestV1) map[string]string {
 	t.Helper()
-	phase12Pre, err := validateM12OperatorControlPlaneOverlayV1(root, ledger.Phase12OperatorControlPlaneOverlays)
+	phase14Pre, err := validateM14AssuranceOverlayV1(root, ledger.Phase14AssuranceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase13Pre, err := validateM13AndroidProductOverlayV1(root, phase14Pre, ledger.Phase13AndroidProductOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase12Pre, err := validateM12OperatorControlPlaneOverlayV1(root, phase13Pre, ledger.Phase12OperatorControlPlaneOverlays)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -821,6 +829,166 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	}
 }
 
+func TestPhase14AssuranceOverlayRejectsMutationV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	clone := func() map[string]m2MaintenanceOverlayRecordV1 {
+		encoded, err := json.Marshal(manifest.Phase14AssuranceOverlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]m2MaintenanceOverlayRecordV1
+		if err := json.Unmarshal(encoded, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if _, err := validateM14AssuranceOverlayV1(root, clone()); err != nil {
+		t.Fatal(err)
+	}
+	absentIndex := -1
+	for index, entry := range manifest.Phase14AssuranceOverlays["phase14-assurance-v1"].Entries {
+		if entry.PreEvidence == "ABSENT" {
+			absentIndex = index
+			break
+		}
+	}
+	if absentIndex < 0 {
+		t.Fatal("phase14 mutation fixture has no absent predecessor")
+	}
+	mutations := map[string]func(map[string]m2MaintenanceOverlayRecordV1){
+		"missing-overlay": func(v map[string]m2MaintenanceOverlayRecordV1) { delete(v, "phase14-assurance-v1") },
+		"extra-overlay":   func(v map[string]m2MaintenanceOverlayRecordV1) { v["extra"] = v["phase14-assurance-v1"] },
+		"reordered-path": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase14-assurance-v1"]
+			o.Paths[0], o.Paths[1] = o.Paths[1], o.Paths[0]
+			v[o.Version] = o
+		},
+		"self-pre": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase14-assurance-v1"]
+			o.SelfPreSHA256 = strings.Repeat("1", 64)
+			v[o.Version] = o
+		},
+		"pre-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase14-assurance-v1"]
+			o.Entries[0].PreSHA256 = strings.Repeat("2", 64)
+			v[o.Version] = o
+		},
+		"absent-predecessor": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase14-assurance-v1"]
+			o.Entries[absentIndex].PreEvidence = ""
+			o.Entries[absentIndex].PreSHA256 = strings.Repeat("3", 64)
+			v[o.Version] = o
+		},
+		"post-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase14-assurance-v1"]
+			o.Entries[0].PostSHA256 = strings.Repeat("4", 64)
+			v[o.Version] = o
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			candidate := clone()
+			mutate(candidate)
+			if _, err := validateM14AssuranceOverlayV1(root, candidate); err == nil {
+				t.Fatal("mutation accepted")
+			}
+		})
+	}
+}
+
+func TestPhase13AndroidProductOverlayRejectsMutationV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	clone := func() map[string]m2MaintenanceOverlayRecordV1 {
+		encoded, err := json.Marshal(manifest.Phase13AndroidProductOverlays)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]m2MaintenanceOverlayRecordV1
+		if err := json.Unmarshal(encoded, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	phase14Pre, err := validateM14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateM13AndroidProductOverlayV1(root, phase14Pre, clone()); err != nil {
+		t.Fatal(err)
+	}
+	absentIndex := -1
+	for index, entry := range manifest.Phase13AndroidProductOverlays["phase13-android-product-v1"].Entries {
+		if entry.PreEvidence == "ABSENT" {
+			absentIndex = index
+			break
+		}
+	}
+	if absentIndex < 0 {
+		t.Fatal("phase13 mutation fixture has no absent predecessor")
+	}
+	mutations := map[string]func(map[string]m2MaintenanceOverlayRecordV1){
+		"missing-overlay": func(v map[string]m2MaintenanceOverlayRecordV1) { delete(v, "phase13-android-product-v1") },
+		"extra-overlay":   func(v map[string]m2MaintenanceOverlayRecordV1) { v["extra"] = v["phase13-android-product-v1"] },
+		"reordered-path": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase13-android-product-v1"]
+			o.Paths[0], o.Paths[1] = o.Paths[1], o.Paths[0]
+			v[o.Version] = o
+		},
+		"self-pre": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase13-android-product-v1"]
+			o.SelfPreSHA256 = strings.Repeat("1", 64)
+			v[o.Version] = o
+		},
+		"pre-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase13-android-product-v1"]
+			o.Entries[0].PreSHA256 = strings.Repeat("2", 64)
+			v[o.Version] = o
+		},
+		"absent-predecessor": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase13-android-product-v1"]
+			o.Entries[absentIndex].PreEvidence = ""
+			o.Entries[absentIndex].PreSHA256 = strings.Repeat("3", 64)
+			v[o.Version] = o
+		},
+		"post-hash": func(v map[string]m2MaintenanceOverlayRecordV1) {
+			o := v["phase13-android-product-v1"]
+			o.Entries[0].PostSHA256 = strings.Repeat("4", 64)
+			v[o.Version] = o
+		},
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			candidate := clone()
+			mutate(candidate)
+			if _, err := validateM13AndroidProductOverlayV1(root, phase14Pre, candidate); err == nil {
+				t.Fatal("mutation accepted")
+			}
+		})
+	}
+}
+
 func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	root, err := repoRoot()
 	if err != nil {
@@ -917,8 +1085,17 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		phase12Overlay.Paths[17] != "internal/operator/controlplane/authority_state.go" {
 		t.Fatalf("invalid Phase 12 operator control-plane fixture overlay identity/cardinality: %+v", phase12Overlay)
 	}
+	phase13Overlay, ok := ledger.Phase13AndroidProductOverlays["phase13-android-product-v1"]
+	if !ok || len(ledger.Phase13AndroidProductOverlays) != 1 ||
+		len(phase13Overlay.Paths) == 0 || len(phase13Overlay.Entries) != len(phase13Overlay.Paths) {
+		t.Fatalf("invalid Phase 13 Android product fixture overlay identity/cardinality: %+v", phase13Overlay)
+	}
+	phase14Overlay, ok := ledger.Phase14AssuranceOverlays["phase14-assurance-v1"]
+	if !ok || len(ledger.Phase14AssuranceOverlays) != 1 || len(phase14Overlay.Paths) == 0 || len(phase14Overlay.Entries) != len(phase14Overlay.Paths) {
+		t.Fatalf("invalid Phase 14 assurance fixture overlay identity/cardinality: %+v", phase14Overlay)
+	}
 	fixturePaths := append([]string(nil), m2Phase2CompletePathsV1...)
-	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries)+len(phase10Overlay.Entries)+len(phase11Overlay.Entries)+len(phase12Overlay.Entries))
+	seen := make(map[string]bool, len(fixturePaths)+len(m3Overlay.Entries)+len(m4Overlay.Entries)+len(m5Overlay.Entries)+len(m6Overlay.Entries)+len(m7Overlay.Entries)+len(m8Overlay.Entries)+len(wo801Overlay.Entries)+len(adoptionOverlay.Entries)+len(stabilizationOverlay.Entries)+len(guardOverlay.Entries)+len(finalGuardOverlay.Entries)+len(phase9Overlay.Entries)+len(phase10Overlay.Entries)+len(phase11Overlay.Entries)+len(phase12Overlay.Entries)+len(phase13Overlay.Entries)+len(phase14Overlay.Entries))
 	for _, path := range fixturePaths {
 		seen[path] = true
 	}
@@ -1015,6 +1192,18 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	for _, path := range phase12Overlay.Paths {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range phase13Overlay.Paths {
+		if !seen[path] {
+			fixturePaths = append(fixturePaths, path)
+			seen[path] = true
+		}
+	}
+	for _, path := range phase14Overlay.Paths {
 		if !seen[path] {
 			fixturePaths = append(fixturePaths, path)
 			seen[path] = true

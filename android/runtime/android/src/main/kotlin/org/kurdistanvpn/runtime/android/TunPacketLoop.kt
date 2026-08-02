@@ -13,6 +13,7 @@ internal class TunPacketLoop(
     private val output: OutputStream,
     private val kurdRoundTrip: (ByteArray) -> ByteArray?,
     private val onPacketCount: (Long, Long, String) -> Unit,
+    private val awaitReadable: (() -> Boolean)? = null,
 ) : AutoCloseable {
     enum class ExitReason {
         STOP_REQUESTED,
@@ -27,6 +28,17 @@ internal class TunPacketLoop(
     fun run(): ExitReason {
         val packet = ByteArray(MAX_PACKET_BYTES)
         while (running.get()) {
+            if (awaitReadable != null) {
+                val readable = try {
+                    awaitReadable.invoke()
+                } catch (_: Exception) {
+                    packet.fill(0)
+                    return if (running.get()) ExitReason.INPUT_FAILURE else ExitReason.STOP_REQUESTED
+                }
+                if (!readable) {
+                    continue
+                }
+            }
             val read = try {
                 input.read(packet)
             } catch (_: Exception) {
@@ -54,8 +66,12 @@ internal class TunPacketLoop(
         return ExitReason.STOP_REQUESTED
     }
 
-    override fun close() {
+    fun requestStop() {
         running.set(false)
+    }
+
+    override fun close() {
+        requestStop()
         runCatching { input.close() }
         runCatching { output.close() }
     }

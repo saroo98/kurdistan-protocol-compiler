@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,9 +46,15 @@ type options struct {
 	testPackage           string
 	runner                string
 	minimumTests          int
+	expectedTestsFile     string
 	evidenceDir           string
 	conflictingAppPackage string
 	label                 string
+}
+
+type expectedTest struct {
+	name   string
+	minSDK int
 }
 
 func main() {
@@ -60,6 +67,7 @@ func main() {
 	flag.StringVar(&value.testPackage, "test-package", defaultTestPackage, "instrumentation package")
 	flag.StringVar(&value.runner, "runner", defaultRunner, "instrumentation runner")
 	flag.IntVar(&value.minimumTests, "minimum-tests", 1, "minimum number of completed instrumentation tests")
+	flag.StringVar(&value.expectedTestsFile, "expected-tests", "", "optional newline-delimited exact class#method manifest")
 	flag.StringVar(&value.label, "label", "PHASE 9", "bounded uppercase evidence label")
 	flag.StringVar(
 		&value.conflictingAppPackage,
@@ -106,6 +114,10 @@ func run(value options) error {
 	if value.minimumTests < 1 {
 		return errors.New("minimum-tests must be at least one")
 	}
+	expectedTestManifest, err := readExpectedTests(value.expectedTestsFile)
+	if err != nil {
+		return err
+	}
 	adb, err := locateADB(value.adbPath)
 	if err != nil {
 		return err
@@ -123,10 +135,23 @@ func run(value options) error {
 	if _, err := client.capture(ctx, "01-device-state.txt", "get-state"); err != nil {
 		return fmt.Errorf("device state: %w", err)
 	}
+	sdkLevel := 0
 	for _, property := range deviceEvidenceProperties {
-		if _, err := client.capture(ctx, property.file, "shell", "getprop", property.key); err != nil {
+		output, err := client.capture(ctx, property.file, "shell", "getprop", property.key)
+		if err != nil {
 			return fmt.Errorf("device compatibility property %s: %w", property.key, err)
 		}
+		if property.key == "ro.build.version.sdk" {
+			sdkLevel, err = strconv.Atoi(strings.TrimSpace(output))
+			if err != nil || sdkLevel < 1 {
+				return fmt.Errorf("invalid device SDK level %q", strings.TrimSpace(output))
+			}
+		}
+	}
+	expectedTests := expectedTestsForSDK(expectedTestManifest, sdkLevel)
+	minimumTests := value.minimumTests
+	if len(expectedTests) > 0 && minimumTests > len(expectedTests) {
+		minimumTests = len(expectedTests)
 	}
 	if err := removeInstalledPackage(ctx, client, "test", value.testPackage); err != nil {
 		return err
@@ -185,7 +210,7 @@ func run(value options) error {
 		value.appPackage,
 		"android.permission.POST_NOTIFICATIONS",
 	)
-	if _, err := client.capture(ctx, "05-clear-logcat.txt", "logcat", "-c"); err != nil {
+	if err := clearLogcat(ctx, client, "05-clear-logcat.txt"); err != nil {
 		return fmt.Errorf("clear logcat: %w", err)
 	}
 	_, _ = client.capture(ctx, "06-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
@@ -221,7 +246,7 @@ func run(value options) error {
 		return err
 	}
 	_, _ = client.capture(ctx, "11-pre-test-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
-	if _, err := client.capture(ctx, "12-pre-test-clear-logcat.txt", "logcat", "-c"); err != nil {
+	if err := clearLogcat(ctx, client, "12-pre-test-clear-logcat.txt"); err != nil {
 		return fmt.Errorf("clear pre-test logcat: %w", err)
 	}
 	instrumentation, instrumentationErr := client.capture(
@@ -246,22 +271,28 @@ func run(value options) error {
 		instrumentation,
 		logcat+"\n"+crashLog,
 		value.appPackage,
-		value.minimumTests,
+		minimumTests,
 	); err != nil {
 		if instrumentationErr != nil {
 			return fmt.Errorf("%w; adb instrumentation error: %v", err, instrumentationErr)
 		}
 		return err
 	}
+	if len(expectedTests) > 0 {
+		if err := verifyExpectedTests(instrumentation, expectedTests); err != nil {
+			return err
+		}
+	}
 	if instrumentationErr != nil {
 		return fmt.Errorf("instrumentation command: %w", instrumentationErr)
 	}
 	summary := fmt.Sprintf(
-		"device_gate=passed\nlabel=%s\napplication=%s\nminimum_tests=%d\ncompleted_tests=%d\n",
+		"device_gate=passed\nlabel=%s\napplication=%s\nminimum_tests=%d\ncompleted_tests=%d\nexpected_tests=%d\n",
 		value.label,
 		value.appPackage,
-		value.minimumTests,
+		minimumTests,
 		completedTestCount(instrumentation),
+		len(expectedTests),
 	)
 	if err := os.WriteFile(filepath.Join(value.evidenceDir, "16-summary.txt"), []byte(summary), 0o644); err != nil {
 		return fmt.Errorf("write summary: %w", err)
@@ -343,6 +374,27 @@ func validateLaunchSmoke(launchOutput, pidOutput, appPackage string, pidErr erro
 	return nil
 }
 
+func logcatClearArgs() []string {
+	// Android 8 can reject the adb host-side `logcat -c` service command even
+	// though the device shell command is supported. Clearing through the shell
+	// works across the supported API 26-36 matrix and still fails closed when
+	// the device or logcat process is unavailable.
+	return []string{"shell", "logcat", "-b", "all", "-c"}
+}
+
+func clearLogcat(ctx context.Context, client adbClient, evidenceName string) error {
+	if _, err := client.capture(ctx, evidenceName, logcatClearArgs()...); err == nil {
+		return nil
+	}
+	// API 26 can transiently fail the first clear immediately after package
+	// installation while logd reopens its buffers. Retry once, preserve both
+	// command results as evidence, and still fail closed if the retry fails.
+	time.Sleep(250 * time.Millisecond)
+	retryName := strings.TrimSuffix(evidenceName, filepath.Ext(evidenceName)) + "-retry.txt"
+	_, err := client.capture(ctx, retryName, logcatClearArgs()...)
+	return err
+}
+
 type adbClient struct {
 	path        string
 	serial      string
@@ -387,6 +439,87 @@ func locateADB(explicit string) (string, error) {
 		return "", errors.New("adb was not found; set ANDROID_HOME, ANDROID_SDK_ROOT, PATH, or -adb")
 	}
 	return path, nil
+}
+
+func readExpectedTests(path string) ([]expectedTest, error) {
+	if path == "" {
+		return nil, nil
+	}
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read expected tests: %w", err)
+	}
+	seen := map[string]bool{}
+	var tests []expectedTest
+	for _, line := range strings.Split(strings.ReplaceAll(string(encoded), "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		minimumSDK := 0
+		testName := line
+		if strings.HasPrefix(line, "minSdk=") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 {
+				return nil, fmt.Errorf("invalid expected test %q", line)
+			}
+			minimumSDK, err = strconv.Atoi(strings.TrimPrefix(fields[0], "minSdk="))
+			if err != nil || minimumSDK < 1 {
+				return nil, fmt.Errorf("invalid expected test SDK guard %q", fields[0])
+			}
+			testName = fields[1]
+		}
+		parts := strings.Split(testName, "#")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" || seen[testName] {
+			return nil, fmt.Errorf("invalid expected test %q", line)
+		}
+		seen[testName] = true
+		tests = append(tests, expectedTest{name: testName, minSDK: minimumSDK})
+	}
+	if len(tests) == 0 {
+		return nil, errors.New("expected test manifest is empty")
+	}
+	sort.Slice(tests, func(left, right int) bool { return tests[left].name < tests[right].name })
+	return tests, nil
+}
+
+func expectedTestsForSDK(manifest []expectedTest, sdkLevel int) []string {
+	tests := make([]string, 0, len(manifest))
+	for _, test := range manifest {
+		if test.minSDK == 0 || sdkLevel >= test.minSDK {
+			tests = append(tests, test.name)
+		}
+	}
+	sort.Strings(tests)
+	return tests
+}
+
+func verifyExpectedTests(output string, expected []string) error {
+	actualSet := map[string]bool{}
+	var className, testName string
+	for _, raw := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(raw)
+		switch {
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: class="):
+			className = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: class="))
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: test="):
+			testName = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: test="))
+		case line == "INSTRUMENTATION_STATUS_CODE: 0" && className != "" && testName != "":
+			actualSet[className+"#"+testName] = true
+			className, testName = "", ""
+		}
+	}
+	actual := make([]string, 0, len(actualSet))
+	for test := range actualSet {
+		actual = append(actual, test)
+	}
+	sort.Strings(actual)
+	want := append([]string(nil), expected...)
+	sort.Strings(want)
+	if strings.Join(actual, "\n") != strings.Join(want, "\n") {
+		return fmt.Errorf("executed test manifest differs: got %v want %v", actual, want)
+	}
+	return nil
 }
 
 func evaluateInstrumentation(output, logcat, appPackage string, minimumTests int) error {

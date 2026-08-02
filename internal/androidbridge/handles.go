@@ -12,6 +12,7 @@ const (
 	HandleActivation
 	HandleDiagnostic
 	HandleBackup
+	HandleRuntimeSession
 )
 
 type Handle uint64
@@ -34,7 +35,7 @@ type HandleRegistry struct {
 }
 
 func (r *HandleRegistry) Open(kind HandleType, value any) (Handle, ErrorCode) {
-	if r == nil || kind < HandleVerifyPreview || kind > HandleBackup || value == nil {
+	if r == nil || kind < HandleVerifyPreview || kind > HandleRuntimeSession || value == nil {
 		return 0, CodeInvalidArgument
 	}
 	r.mu.Lock()
@@ -139,7 +140,7 @@ func decodeHandle(handle Handle) (uint16, uint32, HandleType, bool) {
 	generation := uint32(raw >> 16)
 	kind := HandleType(raw >> 56)
 	if indexPlusOne == 0 || int(indexPlusOne) > MaxBridgeHandles ||
-		generation == 0 || kind < HandleVerifyPreview || kind > HandleBackup {
+		generation == 0 || kind < HandleVerifyPreview || kind > HandleRuntimeSession {
 		return 0, 0, 0, false
 	}
 	return indexPlusOne - 1, generation, kind, true

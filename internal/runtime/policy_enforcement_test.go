@@ -1602,11 +1602,21 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 		Phase10VPNRuntimeOverlays           map[string]policyMaintenanceOverlayV1    `json:"phase10_vpn_runtime_overlays"`
 		Phase11LocalTransportOverlays       map[string]policyMaintenanceOverlayV1    `json:"phase11_local_transport_overlays"`
 		Phase12OperatorControlPlaneOverlays map[string]policyMaintenanceOverlayV1    `json:"phase12_operator_control_plane_overlays"`
+		Phase13AndroidProductOverlays       map[string]policyMaintenanceOverlayV1    `json:"phase13_android_product_overlays"`
+		Phase14AssuranceOverlays            map[string]policyMaintenanceOverlayV1    `json:"phase14_assurance_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return err
 	}
-	phase12Pre, err := validatePolicyPhase12OperatorControlPlaneOverlayV1(root, manifest.Phase12OperatorControlPlaneOverlays)
+	phase14Pre, err := validatePolicyPhase14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
+	if err != nil {
+		return err
+	}
+	phase13Pre, err := validatePolicyPhase13AndroidProductOverlayV1(root, phase14Pre, manifest.Phase13AndroidProductOverlays)
+	if err != nil {
+		return err
+	}
+	phase12Pre, err := validatePolicyPhase12OperatorControlPlaneOverlayAtPostV1(root, phase13Pre, manifest.Phase12OperatorControlPlaneOverlays)
 	if err != nil {
 		return err
 	}
@@ -1675,7 +1685,100 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	return validatePolicyM2ComposedStateV1(root, candidate, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase8WO801ThreatModelOverlays, manifest.Phase8ProfileCryptographyOverlays, manifest.BaselineStabilizationOverlays, manifest.Phase7AppRuntimeOverlays, manifest.Phase6DiagnosticExportOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
 }
 
+func validatePolicyPhase14AssuranceOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase14-assurance-v1"
+	const predecessorBinding = "eefcbeb7a93a4472fa7563a3b0fb8d7399001da4fe309ae735861369ed57a0fa"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.SelfPath != policyMaintenanceManifestPathV1 || !validPolicySHA256V1(overlay.SelfPreSHA256) || len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
+		return nil, fmt.Errorf("invalid phase14 assurance overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(overlay.Paths))
+	binding := sha256.New()
+	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
+	last := ""
+	for index, path := range overlay.Paths {
+		entry := overlay.Entries[index]
+		if path != entry.Path || path <= last || path == overlay.SelfPath || strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") || !validPolicySHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase14 assurance overlay entry %d", index)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase14 absent predecessor %d", index)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validPolicySHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase14 predecessor %d", index)
+		}
+		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
+		actual, err := policyFileSHA256V1(root, path)
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase14 assurance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		last = path
+	}
+	if fmt.Sprintf("%x", binding.Sum(nil)) != predecessorBinding {
+		return nil, fmt.Errorf("invalid phase14 predecessor binding")
+	}
+	return pre, nil
+}
+
+func validatePolicyPhase13AndroidProductOverlayV1(root string, currentAtPost map[string]string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	const name = "phase13-android-product-v1"
+	const predecessorBinding = "53dde098ac5c6f2febee7f5069d8b11f5809f58ef94a5ada55835c2467ebd58f"
+	overlay, ok := overlays[name]
+	if len(overlays) != 1 || !ok || overlay.Version != name ||
+		overlay.SelfPath != policyMaintenanceManifestPathV1 || !validPolicySHA256V1(overlay.SelfPreSHA256) ||
+		len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
+		return nil, fmt.Errorf("invalid phase13 Android product overlay identity/cardinality")
+	}
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
+	binding := sha256.New()
+	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
+	last := ""
+	for index, path := range overlay.Paths {
+		entry := overlay.Entries[index]
+		if path != entry.Path || path <= last || path == overlay.SelfPath ||
+			strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") ||
+			!validPolicySHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase13 Android product overlay entry %d", index)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase13 absent predecessor %d", index)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validPolicySHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase13 predecessor %d", index)
+		}
+		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = policyFileSHA256V1(root, path)
+		}
+		if err != nil || actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase13 Android product hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
+		}
+		pre[path] = predecessor
+		last = path
+	}
+	if fmt.Sprintf("%x", binding.Sum(nil)) != predecessorBinding {
+		return nil, fmt.Errorf("invalid phase13 predecessor binding")
+	}
+	return pre, nil
+}
+
 func validatePolicyPhase12OperatorControlPlaneOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
+	return validatePolicyPhase12OperatorControlPlaneOverlayAtPostV1(root, nil, overlays)
+}
+
+func validatePolicyPhase12OperatorControlPlaneOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase12-operator-control-plane-v1"
 	paths := []string{
 		"ROADMAP.md",
@@ -1760,7 +1863,10 @@ func validatePolicyPhase12OperatorControlPlaneOverlayV1(root string, overlays ma
 		len(overlay.Paths) != len(paths) || len(overlay.Entries) != len(paths) {
 		return nil, fmt.Errorf("invalid phase12 operator control-plane overlay identity/cardinality")
 	}
-	pre := make(map[string]string, len(paths))
+	pre := make(map[string]string, len(currentAtPost)+len(paths))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
 	for i, path := range paths {
 		entry := overlay.Entries[i]
 		if overlay.Paths[i] != path || entry.Path != path || !validPolicySHA256V1(entry.PostSHA256) {
@@ -1777,7 +1883,11 @@ func validatePolicyPhase12OperatorControlPlaneOverlayV1(root string, overlays ma
 			}
 			predecessor = "ABSENT"
 		}
-		actual, err := policyFileSHA256V1(root, path)
+		actual, present := currentAtPost[path]
+		var err error
+		if !present {
+			actual, err = policyFileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase12 operator control-plane hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}
@@ -2589,11 +2699,21 @@ func validatePolicyPhase9GuardMaintenanceOverlayV1(root string, overlays map[str
 		Phase10VPNRuntimeOverlays           map[string]policyMaintenanceOverlayV1 `json:"phase10_vpn_runtime_overlays"`
 		Phase11LocalTransportOverlays       map[string]policyMaintenanceOverlayV1 `json:"phase11_local_transport_overlays"`
 		Phase12OperatorControlPlaneOverlays map[string]policyMaintenanceOverlayV1 `json:"phase12_operator_control_plane_overlays"`
+		Phase13AndroidProductOverlays       map[string]policyMaintenanceOverlayV1 `json:"phase13_android_product_overlays"`
+		Phase14AssuranceOverlays            map[string]policyMaintenanceOverlayV1 `json:"phase14_assurance_overlays"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return nil, err
 	}
-	phase12Pre, err := validatePolicyPhase12OperatorControlPlaneOverlayV1(root, manifest.Phase12OperatorControlPlaneOverlays)
+	phase14Pre, err := validatePolicyPhase14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase13Pre, err := validatePolicyPhase13AndroidProductOverlayV1(root, phase14Pre, manifest.Phase13AndroidProductOverlays)
+	if err != nil {
+		return nil, err
+	}
+	phase12Pre, err := validatePolicyPhase12OperatorControlPlaneOverlayAtPostV1(root, phase13Pre, manifest.Phase12OperatorControlPlaneOverlays)
 	if err != nil {
 		return nil, err
 	}
