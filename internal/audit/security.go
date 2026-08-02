@@ -22,6 +22,7 @@ import (
 	"kurdistan/internal/lab/runtimeadversary"
 	ktrace "kurdistan/internal/observe/trace"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 func RunSecurityAudit(ctx context.Context, cfg AuditConfig) (AuditReport, error) {
@@ -826,6 +827,10 @@ func validateM14AssuranceOverlayV1(root string, overlays map[string]m2Maintenanc
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.SelfPath != m2MaintenanceSelfPathV1 || !validSHA256V1(overlay.SelfPreSHA256) || len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
 		return nil, fmt.Errorf("invalid phase14 assurance overlay identity/cardinality")
 	}
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
+	}
 	pre := make(map[string]string, len(overlay.Paths))
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
@@ -845,7 +850,10 @@ func validateM14AssuranceOverlayV1(root string, overlays map[string]m2Maintenanc
 			return nil, fmt.Errorf("invalid phase14 predecessor %d", index)
 		}
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
-		actual, err := m2FileSHA256V1(root, path)
+		actual, found := successor[path]
+		if !found {
+			actual, err = m2FileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase14 assurance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}
@@ -1827,6 +1835,16 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 			}
 		}
 	}
+	phase15Pre, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return m0CandidateManifestV1{}, err
+	}
+	for path, predecessor := range phase15Pre {
+		if predecessor == "ABSENT" {
+			preHashes[path] = "ABSENT"
+		}
+	}
+	preHashes[evidenceoverlay.SuccessorPath] = "ABSENT"
 	return m0CandidateManifestFromPathsWithPreHashesV1(root, parts, preHashes)
 }
 

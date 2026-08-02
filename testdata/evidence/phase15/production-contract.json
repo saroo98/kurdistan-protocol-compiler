@@ -1,0 +1,76 @@
+{
+  "schema": "kurdistan-phase15-production-contract-v1",
+  "phase": 15,
+  "status": "FROZEN_FOR_IMPLEMENTATION",
+  "releaseDecision": "NO_GO",
+  "baseline": {
+    "sourceCommit": "1fcfeab111cf64f1295f10d788e4977ab4666a7a",
+    "candidateCiRun": "30739580424",
+    "mainCiRun": "30740549679",
+    "candidateCiConclusion": "SUCCESS",
+    "mainCiConclusion": "SUCCESS",
+    "workflowPath": ".github/workflows/ci.yml",
+    "workflowSha256": "e249f212339ca93429465db678ddd108190fd19f393b9cdc3e37976f8b280809",
+    "ciJobs": [
+      "Android Phase 14 local assurance (ubuntu-latest)",
+      "Android Phase 14 local assurance (windows-latest)",
+      "gate (ubuntu-latest)",
+      "gate (windows-latest)"
+    ]
+  },
+  "android": {
+    "minApi": 26,
+    "targetApi": 36,
+    "compileApi": 36,
+    "productionAbis": ["arm64-v8a"],
+    "testOnlyAbis": ["x86_64"]
+  },
+  "versions": {
+    "androidBridge": "kurd-android-bridge-v1",
+    "profileAdmission": "product-profile-admission-v1",
+    "strategyRegistry": "permitted-fallback-v1",
+    "relayAdmission": "offline-relay-descriptor-admission-v1",
+    "diagnostics": "offline-diagnostic-export-v1",
+    "cryptographicSuite": "1"
+  },
+  "authorizedWork": [
+    "VERSIONED_PRODUCTION_API_DESIGN",
+    "PROVIDER_NEUTRAL_INFRASTRUCTURE_CODE",
+    "POLICY_AS_CODE",
+    "DISPOSABLE_NON_PRODUCTION_VALIDATION",
+    "SECRET_REFERENCE_INTERFACES",
+    "FAILURE_INJECTION_AND_RECOVERY_TESTING",
+    "CAPACITY_COST_AND_ROLLBACK_MODELS",
+    "EVIDENCE_SCHEMA_IMPLEMENTATION"
+  ],
+  "prohibitedActions": [
+    "PRODUCTION_ACCOUNT_OR_RESOURCE_MUTATION_WITHOUT_EXECUTION_AUTHORIZATION",
+    "PRODUCTION_KEY_ISSUANCE",
+    "PRODUCTION_DNS_OR_CERTIFICATE_ACTIVATION",
+    "PUBLIC_ENDPOINT_OR_RELAY_ACTIVATION",
+    "PUBLIC_OR_USER_TRAFFIC",
+    "PRODUCTION_PROFILE_ISSUANCE",
+    "PILOT_ACTIVATION",
+    "PRODUCTION_SIGNING",
+    "STORE_SUBMISSION",
+    "PUBLIC_RELEASE"
+  ],
+  "privacy": {
+    "telemetryDefault": "OFF",
+    "forbiddenData": [
+      "PAYLOAD",
+      "DESTINATION_HISTORY",
+      "CREDENTIAL",
+      "PRIVATE_KEY",
+      "RAW_FRAME",
+      "PACKAGE_INVENTORY",
+      "STABLE_HARDWARE_ID"
+    ]
+  },
+  "targetsAreEvidence": false,
+  "limitations": [
+    "This contract authorizes bounded engineering, not production activation.",
+    "No SLO, field, production, security-review, signing, distribution, or release claim is established by this file.",
+    "The Phase 14 release decision remains NO_GO until Phases 16-22 provide the required evidence."
+  ]
+}

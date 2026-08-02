@@ -11,10 +11,10 @@ between phases.
 
 ## Current truth
 
-- Phases 1-12 are integrated on `main`.
-- Phase 13 is locally implemented and validated in the preserved product
-  worktree, but is not committed or merged.
-- Phase 14 local assurance is in progress over that exact candidate.
+- Phases 1-14 are integrated on `main` at
+  `1fcfeab111cf64f1295f10d788e4977ab4666a7a` with green Linux and Windows Go
+  and Android assurance CI.
+- Phase 15 is active on `product/phase15-production-contract-freeze`.
 - The current release decision is `NO_GO`.
 - Production authority, non-loopback relays, a deployed provider service,
   production Android networking, signing, distribution, physical-device proof,
@@ -52,9 +52,9 @@ production, field, privacy, reliability, or censorship-resilience claims.
 | 10 | Integrated | Bounded Android `VpnService`/TUN and deterministic local routing. |
 | 11 | Integrated | Kurd wire-v1, authenticated records, fallback authority, and loopback relay conformance. |
 | 12 | Integrated | Local operator, provisioning, publication, revocation, and emergency-control semantics. |
-| 13 | Local complete | Android product surface, validated settings, routing, diagnostics, recovery, and operator projections. |
-| 14 | Active | Candidate-local assurance, coverage reconciliation, reproducibility, and production-program readiness. |
-| 15 | Future | Integrate and freeze the Phase 13-14 production contract. |
+| 13 | Integrated | Android product surface, validated settings, routing, diagnostics, recovery, and operator projections. |
+| 14 | Integrated | Candidate-local assurance, coverage reconciliation, reproducibility, and production-program readiness. |
+| 15 | Active | Freeze the Phase 13-14 production contract and authorize bounded infrastructure engineering. |
 | 16 | Future | Production trust, identity, key custody, and control plane. |
 | 17 | Future | Owned provider, relay fleet, and live Kurd data plane. |
 | 18 | Future | Production Android integration and complete accepted product surface. |
@@ -82,18 +82,18 @@ fleet evidence remain **[UNVERIFIED]**.
 
 ## Phase 13: Android product completion candidate
 
-**State:** local complete, integration pending.
+**State:** integrated.
 
 The preserved candidate contains the three-area Android product structure,
 verified runtime handoff, encrypted routing and diagnostics, validated settings,
 profile/provider/operator views, recovery flows, localization parity, adaptive
-layouts, and exact emulator manifests. Its local gates are evidence for the
-candidate only. They are not merge, physical-device, production, or release
-evidence.
+layouts, and exact emulator manifests. Its local gates and merged CI establish
+the integrated local product baseline. They are not physical-device,
+production, field, or release evidence.
 
 ## Phase 14: candidate-local assurance and production-program readiness
 
-**State:** active. **Release decision:** `NO_GO`.
+**State:** integrated; local assurance complete. **Release decision:** `NO_GO`.
 
 Phase 14 must close every locally resolvable problem before production work is
 allowed to build on the candidate:
@@ -117,14 +117,16 @@ allowed to build on the candidate:
 - Phase 13 and Phase 14 are ready for integration review.
 - External production and field evidence stays explicitly **[UNVERIFIED]**.
 
-## Phase 15: candidate integration and production contract freeze
+## Phase 15: production contract freeze
+
+**State:** active.
 
 **Purpose:** establish a clean, reviewable baseline before any production
 identity, network, key, deployment, pilot, or release work begins.
 
 ### Code and repository work
 
-- Review, correct, commit, and integrate the complete Phase 13-14 candidate.
+- Preserve the reviewed and integrated Phase 13-14 baseline.
 - Reconcile Android/native ABI versions, schemas, evidence manifests, feature
   coverage, generated artifacts, and documentation.
 - Remove stale evidence, contradictory claims, unsupported controls, accidental
@@ -141,7 +143,7 @@ identity, network, key, deployment, pilot, or release work begins.
 
 ### Exit gate
 
-- Clean `main` contains the reviewed Phase 13-14 commits and green CI evidence.
+- Clean `main` contains the reviewed Phase 13-14 commit and green CI evidence.
 - All evidence is bound to the merged commit.
 - Phase 14 records local completion with `releaseDecision=NO_GO`.
 - No production phase starts from an uncommitted or ambiguous baseline.

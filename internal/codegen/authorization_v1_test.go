@@ -20,6 +20,7 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 var _ func([]byte) (AuthorizationCatalogV1, error) = ParseAuthorizationCatalogV1
@@ -1554,6 +1555,10 @@ func validatePhase14AssuranceOverlayV1(root string, overlays map[string]committe
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.SelfPath != committedEvidenceManifestPathV1 || !validHelperOwnerSHA256V1(overlay.SelfPreSHA256) || len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
 		return nil, fmt.Errorf("invalid phase14 assurance overlay identity/cardinality")
 	}
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
+	}
 	pre := make(map[string]string, len(overlay.Paths))
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
@@ -1573,7 +1578,10 @@ func validatePhase14AssuranceOverlayV1(root string, overlays map[string]committe
 			return nil, fmt.Errorf("invalid phase14 predecessor %d", index)
 		}
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
-		actual, err := fileSHA256V1(root, path)
+		actual, found := successor[path]
+		if !found {
+			actual, err = fileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase14 assurance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}

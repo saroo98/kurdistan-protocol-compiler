@@ -24,6 +24,7 @@ import (
 	"kurdistan/internal/crypto/auth"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 var policyCoveringArraySeedsV1 = func() []int64 {
@@ -1640,6 +1641,17 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	if len(changed) == 0 {
 		return nil
 	}
+	phase15Pre, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return err
+	}
+	phase15Changed := map[string]bool{evidenceoverlay.SuccessorPath: true}
+	for path := range phase15Pre {
+		phase15Changed[path] = true
+	}
+	if exactPathSetV1(changed, phase15Changed) {
+		return nil
+	}
 	phase10Changed := map[string]bool{policyMaintenanceManifestPathV1: true}
 	phase10OverlayPaths := make(map[string]bool)
 	for _, overlay := range manifest.Phase10VPNRuntimeOverlays {
@@ -1692,6 +1704,10 @@ func validatePolicyPhase14AssuranceOverlayV1(root string, overlays map[string]po
 	if len(overlays) != 1 || !ok || overlay.Version != name || overlay.SelfPath != policyMaintenanceManifestPathV1 || !validPolicySHA256V1(overlay.SelfPreSHA256) || len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
 		return nil, fmt.Errorf("invalid phase14 assurance overlay identity/cardinality")
 	}
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
+	}
 	pre := make(map[string]string, len(overlay.Paths))
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
@@ -1711,7 +1727,10 @@ func validatePolicyPhase14AssuranceOverlayV1(root string, overlays map[string]po
 			return nil, fmt.Errorf("invalid phase14 predecessor %d", index)
 		}
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
-		actual, err := policyFileSHA256V1(root, path)
+		actual, found := successor[path]
+		if !found {
+			actual, err = policyFileSHA256V1(root, path)
+		}
 		if err != nil || actual != entry.PostSHA256 {
 			return nil, fmt.Errorf("phase14 assurance hash drift %s=%s want %s: %v", path, actual, entry.PostSHA256, err)
 		}

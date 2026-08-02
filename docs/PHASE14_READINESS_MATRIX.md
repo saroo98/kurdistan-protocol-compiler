@@ -3,14 +3,14 @@
 
 # Phase 14 readiness matrix
 
-Status: local assurance complete; candidate integration pending; release decision `NO_GO`
+Status: local assurance complete and integrated; release decision `NO_GO`
 
 This matrix separates locally resolvable engineering work from evidence that
 can exist only in an authorized production or field environment.
 
 | Area | Local prerequisite | External completion evidence | Current status |
 | --- | --- | --- | --- |
-| Prior phases | Phase 13 host and API 26/34/36 device gates | Reviewed integration baseline | Local pass; integration pending |
+| Prior phases | Phase 13 host and API 26/34/36 device gates | Reviewed integration baseline | Integrated on `main` at `1fcfeab111cf64f1295f10d788e4977ab4666a7a` |
 | Product coverage | Reconciled D0-D28 and inspiration inventory map | Physical-device workflow observation | Local reconciliation pass; external unverified |
 | Android quality | API 26/34/36 emulator, accessibility, adaptive, recovery, performance | OEM, weak-device, foldable, tablet, cellular and sleep matrix | Emulator pass; external unverified |
 | VPN correctness | Authority-bound TUN, fail-closed DNS, route and lifecycle tests | Owned non-loopback relay and leak tests | Local pass; external unverified |

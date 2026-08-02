@@ -1,0 +1,25 @@
+{
+  "version": "phase15-production-contract-v1",
+  "entries": [
+    {"path":"ROADMAP.md","pre_sha256":"2667320dee8453456f13e3c69928310fe5eab32f3bd95c58cdbb7b8699ad7a4e","post_sha256":"da9e73bcd41c5045e38b17e06b23db853ea0a15fb7fa46b91b7db9813ec3274f"},
+    {"path":"cmd/kgen/main_test.go","pre_sha256":"d08c51f10801b97a15d08c69fa23a298b70e735950c34dd982a19959c03cc168","post_sha256":"cb3559c478aabed3d866bd56682cfad809e4ae9b67fae7a7812a2d4668e39811"},
+    {"path":"cmd/phase15verify/main.go","pre_evidence":"ABSENT","post_sha256":"9fd4f8718bbedfed90dd9aa21f0456177943fce4414ba995323fe3fa3af83d75"},
+    {"path":"cmd/phase15verify/main_test.go","pre_evidence":"ABSENT","post_sha256":"e14f87dd6de118dabcb54b2f3e63289cdf893cdd051f7b1266409e5eb7682235"},
+    {"path":"cmd/phase9verify/phase11_overlay_test.go","pre_sha256":"c0a7ec118a68b6ff52309987de45636e355c700e650d9fe543ed6ebe6f35af74","post_sha256":"ecdcb5bb0686ca49fbb119d1b5e04223eefef2b6a05f1ef3bb5b34b09b562735"},
+    {"path":"docs/KIP-0089-phase14-assurance-field-release.md","pre_sha256":"fa8f4405cd23698c6baa9db593f80b28ed0b8082b97306374ff3156db2839367","post_sha256":"a1a370944ce85b47c139d9019e2d99b4b88cede6ac1f5ea6a612c95f3375de4f"},
+    {"path":"docs/KIP-0090-phase15-production-contract-freeze.md","pre_evidence":"ABSENT","post_sha256":"c5fa9c14a693349014728ab9ddfc2ed0e885db3d0dbadfef4b18b14f7a6befa8"},
+    {"path":"docs/PHASE14_EVIDENCE_INDEX.md","pre_sha256":"434502514607dafbe61cae1edc2ae821455acedd720c05e862402723cb05fbca","post_sha256":"58d7fc2d70ee244c77083b6ed68beb323e56c084fe34b52d51f3a45f8d59bdc3"},
+    {"path":"docs/PHASE14_READINESS_MATRIX.md","pre_sha256":"f6dfbc344d6ddc1f0e825ba4d41068c2f80122aa40db920ca56cf1630a5c9704","post_sha256":"72c2731c2602969ce8e81d3ec47487405ce599a7435bc9d3206933d8054f19ac"},
+    {"path":"docs/PHASE15_PRODUCTION_CONTRACT.md","pre_evidence":"ABSENT","post_sha256":"fdf8282cc8d540ab1f4c52515e84aa85fc46b3626fb5c4e342dd6f6cb5f555d3"},
+    {"path":"internal/audit/codegen_test.go","pre_sha256":"e2e0b3df58c52a735cd1cb0c398048e41ef053d7bbfd04887c9047d36e2c002f","post_sha256":"8c144659268a21d7fe9515d2dadd1475b69168f18a64c5a4b985560c1c4d821c"},
+    {"path":"internal/audit/security.go","pre_sha256":"2508764a40321b08524b06dce5480843393db144c6900eea3fc9e775caa3c006","post_sha256":"e39944db598ecf4155ccdbf0fd698377367534c1622b66babcca3487bb35a14c"},
+    {"path":"internal/audit/security_test.go","pre_sha256":"186437ffb88e4066da3a035736022d32667ce24ac9f271ba62229c79d2b8f339","post_sha256":"f5f368deb607651b772fde2be652e80090831016a2ec0f5172bd25922f938d6e"},
+    {"path":"internal/codegen/authorization_v1_test.go","pre_sha256":"b7331735c05690853216b6390734267dc12dedb0ac56f6e4dbffe7072e0eae03","post_sha256":"b816e5da3c720a5d319fba0771ec490f14cff3aa28390be7b15784d85ac70b2c"},
+    {"path":"internal/runtime/policy_enforcement_test.go","pre_sha256":"e6163e0328fb647331ce3a6d4b5a154fd79f3b33916172ab6e03b92fb74ec610","post_sha256":"8936facb0d4a5aa253cd1083271874f9013f5c2c22f6c24e324b6c1f99ea82db"},
+    {"path":"internal/testkit/evidenceoverlay/successor.go","pre_evidence":"ABSENT","post_sha256":"f3dc53da79f7ca3ee79e1eb1c8843fdf24e485b3c50f200453af281d4598d926"},
+    {"path":"internal/testkit/evidenceoverlay/successor_test.go","pre_evidence":"ABSENT","post_sha256":"358d7b6a9dbcd3e51c7bb679fc9709c9a163be0edec69421330a1b6f3f169203"},
+    {"path":"internal/testkit/importrules/importrules_test.go","pre_sha256":"f3f5e2d7568c378053547ee211fe8239c0582801ad7a43bfb6caafe34e050ef2","post_sha256":"cf82508765b428202e296997461510de5ee9e23c9de34505b3c703f74d855c22"},
+    {"path":"testdata/evidence/phase14/acceptance-status.json","pre_sha256":"d5e814c9287d70a51c35fd0eaa930294878a6f8e65b878244dc6e04098f08def","post_sha256":"c6dd6f32591c5ade8cb3cbc6bda4395e92c4e15952d5edd093ac9e5b37766580"},
+    {"path":"testdata/evidence/phase15/production-contract.json","pre_evidence":"ABSENT","post_sha256":"78b43225a55484bce2ac3b0537b41a81e3b2ab3babc53ce687ba8d2dc3847752"}
+  ]
+}

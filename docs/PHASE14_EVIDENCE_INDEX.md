@@ -3,7 +3,7 @@
 
 # Phase 14 evidence index
 
-Status: local assurance complete; candidate integration pending; release decision **NO_GO**
+Status: local assurance complete and integrated; release decision **NO_GO**
 
 This index separates evidence that can be produced in the repository from
 evidence that requires production systems, owned infrastructure, physical
@@ -57,7 +57,8 @@ alias, scope, result, limitations, expiry, and revalidation condition:
 - `GO` requires every mandatory local and external item to be `PASS`; one
   missing item keeps the decision at `NO_GO`.
 
-The external evidence classes are carried forward to Phases 16-22. Phase 15
-may integrate and freeze this locally complete candidate, but cannot substitute
-repository or emulator evidence for production, field, signing, distribution,
-or independent observation.
+The local candidate is integrated on `main` at
+`1fcfeab111cf64f1295f10d788e4977ab4666a7a`. The external evidence classes are
+carried forward to Phases 16-22. Phase 15 freezes this integrated baseline but
+cannot substitute repository or emulator evidence for production, field,
+signing, distribution, or independent observation.

@@ -3,7 +3,7 @@
 
 # KIP-0089: Phase 14 assurance, field validation, and release readiness
 
-Status: local assurance complete; candidate integration pending; release remains no-go
+Status: local assurance complete and integrated; release remains `NO_GO`
 
 Last updated: 2026-08-02
 
@@ -30,9 +30,10 @@ Phase 14 work begins only after:
 - `git diff --check` passes;
 - Phase 13 evidence continues to distinguish local proof from external proof.
 
-These entry checks passed on 2026-08-02. The Phase 13-14 candidate is ready for
-integration review but is not yet integrated into `main`, so this KIP does not
-claim an integrated baseline.
+These entry checks passed on 2026-08-02. The reviewed Phase 13-14 candidate was
+subsequently integrated into `main` at
+`1fcfeab111cf64f1295f10d788e4977ab4666a7a`. That integration preserves the
+local-assurance scope and does not change the release decision from `NO_GO`.
 
 ## Mandatory evidence classes
 
