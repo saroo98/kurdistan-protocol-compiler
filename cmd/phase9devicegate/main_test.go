@@ -334,7 +334,7 @@ func TestInstrumentationSummaryRecordsOnlySafeProgressIdentities(t *testing.T) {
 }
 
 func TestGeneralDiagnosticLogcatExcludesDebugNoise(t *testing.T) {
-	want := []string{"logcat", "-b", "all", "-d", "-v", "brief", "*:W"}
+	want := []string{"logcat", "-b", "all", "-t", "4096", "-v", "brief", "*:W"}
 	if got := diagnosticLogcatArgs("all"); !reflect.DeepEqual(got, want) {
 		t.Fatalf("diagnosticLogcatArgs() = %v, want %v", got, want)
 	}
