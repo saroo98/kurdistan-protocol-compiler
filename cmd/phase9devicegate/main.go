@@ -219,17 +219,8 @@ func run(value options) error {
 		return err
 	}
 	if recoveredPackageService {
-		if err := waitForAndroidFramework(ctx, client, "04r"); err != nil {
+		if err := restoreInstalledPackages(ctx, client, value, "04r"); err != nil {
 			return err
-		}
-		if err := installPackage(ctx, client, "04r-install-app.txt", value.appAPK); err != nil {
-			return fmt.Errorf("restore application after package service recovery: %w", err)
-		}
-		if err := installPackage(ctx, client, "04r-install-test.txt", value.testAPK); err != nil {
-			return fmt.Errorf("restore instrumentation after package service recovery: %w", err)
-		}
-		if err := captureInstalledIdentity(ctx, client, value); err != nil {
-			return fmt.Errorf("verify restored package identity: %w", err)
 		}
 	}
 	if err := waitForAndroidFramework(ctx, client, "04i"); err != nil {
@@ -247,46 +238,8 @@ func run(value options) error {
 			return fmt.Errorf("force-stop conflicting application: %w", err)
 		}
 	}
-	if _, err := client.capture(
-		ctx,
-		"04-clear-app-data.txt",
-		"shell",
-		"pm",
-		"clear",
-		value.appPackage,
-	); err != nil {
-		return fmt.Errorf("clear application data: %w", err)
-	}
-	if _, err := client.capture(
-		ctx,
-		"04a-authorize-test-vpn.txt",
-		"shell",
-		"appops",
-		"set",
-		value.appPackage,
-		"ACTIVATE_VPN",
-		"allow",
-	); err != nil {
-		return fmt.Errorf("authorize test VPN: %w", err)
-	}
-	if value.expectedAPI >= 33 {
-		if _, err := client.capture(
-			ctx,
-			"04b-grant-notification-permission.txt",
-			"shell",
-			"pm",
-			"grant",
-			value.appPackage,
-			"android.permission.POST_NOTIFICATIONS",
-		); err != nil {
-			return fmt.Errorf("grant notification permission: %w", err)
-		}
-	} else if err := os.WriteFile(
-		filepath.Join(value.evidenceDir, "04b-grant-notification-permission.txt"),
-		[]byte("not_applicable=api_below_33\n"),
-		0o644,
-	); err != nil {
-		return fmt.Errorf("record notification permission applicability: %w", err)
+	if err := configureInstalledPackages(ctx, client, value); err != nil {
+		return err
 	}
 	if err := prepareLogcatBaseline(ctx, client, "05-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear logcat: %w", err)
@@ -512,6 +465,93 @@ func prepareInstrumentationRuntimeWith(
 		}
 	}
 	return recoveredPackageService, nil
+}
+
+func restoreInstalledPackages(ctx context.Context, client adbClient, value options, prefix string) error {
+	if err := waitForAndroidFramework(ctx, client, prefix); err != nil {
+		return err
+	}
+	if err := installPackage(ctx, client, prefix+"-install-app.txt", value.appAPK); err != nil {
+		return fmt.Errorf("restore application after package service recovery: %w", err)
+	}
+	if err := installPackage(ctx, client, prefix+"-install-test.txt", value.testAPK); err != nil {
+		return fmt.Errorf("restore instrumentation after package service recovery: %w", err)
+	}
+	if err := captureInstalledIdentity(ctx, client, value); err != nil {
+		return fmt.Errorf("verify restored package identity: %w", err)
+	}
+	return nil
+}
+
+func packageConfigurationCommands(appPackage string, api int) []instrumentationPreparationCommand {
+	commands := []instrumentationPreparationCommand{
+		{evidence: "04-clear-app-data.txt", args: []string{"shell", "pm", "clear", appPackage}},
+		{evidence: "04a-authorize-test-vpn.txt", args: []string{"shell", "appops", "set", appPackage, "ACTIVATE_VPN", "allow"}},
+	}
+	if api >= 33 {
+		commands = append(commands, instrumentationPreparationCommand{
+			evidence: "04b-grant-notification-permission.txt",
+			args:     []string{"shell", "pm", "grant", appPackage, "android.permission.POST_NOTIFICATIONS"},
+		})
+	}
+	return commands
+}
+
+func configureInstalledPackages(ctx context.Context, client adbClient, value options) error {
+	if value.expectedAPI < 33 {
+		if err := os.WriteFile(
+			filepath.Join(value.evidenceDir, "04b-grant-notification-permission.txt"),
+			[]byte("not_applicable=api_below_33\n"),
+			0o644,
+		); err != nil {
+			return fmt.Errorf("record notification permission applicability: %w", err)
+		}
+	}
+	return configureInstalledPackagesWith(
+		ctx,
+		packageConfigurationCommands(value.appPackage, value.expectedAPI),
+		func(ctx context.Context, name string, args ...string) (string, error) {
+			return client.capture(ctx, name, args...)
+		},
+		func(prefix string) error {
+			return restoreInstalledPackages(ctx, client, value, prefix)
+		},
+	)
+}
+
+func configureInstalledPackagesWith(
+	ctx context.Context,
+	commands []instrumentationPreparationCommand,
+	capture func(context.Context, string, ...string) (string, error),
+	recoverPackages func(string) error,
+) error {
+	for attempt := 1; attempt <= 2; attempt++ {
+		replay := false
+		for _, command := range commands {
+			evidence := command.evidence
+			if attempt > 1 {
+				stem := strings.TrimSuffix(command.evidence, filepath.Ext(command.evidence))
+				evidence = stem + "-retry.txt"
+			}
+			output, err := capture(ctx, evidence, command.args...)
+			if err == nil {
+				continue
+			}
+			if attempt == 1 && transientPackageServiceFailure(output) {
+				stem := strings.TrimSuffix(command.evidence, filepath.Ext(command.evidence))
+				if recoverErr := recoverPackages(stem + "-recovery"); recoverErr != nil {
+					return fmt.Errorf("configure installed packages recovery (%s): %w", command.evidence, recoverErr)
+				}
+				replay = true
+				break
+			}
+			return fmt.Errorf("configure installed packages (%s): %w", command.evidence, err)
+		}
+		if !replay {
+			return nil
+		}
+	}
+	return errors.New("configure installed packages exhausted recovery budget")
 }
 
 func failedInstrumentationTests(input string, limit int) []string {

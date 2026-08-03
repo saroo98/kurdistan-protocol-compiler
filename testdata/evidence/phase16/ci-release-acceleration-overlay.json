@@ -47,9 +47,14 @@
       "post_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45"
     },
     {
+      "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt",
+      "pre_sha256": "447b417ba1229af7589863720b5090f37c5cdcba6362d52f3a482698292cf2df",
+      "post_sha256": "8e33622eaaaa20c58b5b8233ca4246cb271141857ab853b98a74ff55974f03d5"
+    },
+    {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
       "pre_sha256": "78d802b57630647970287df57bd07e5910e3c99c67729588115661149a8afbb7",
-      "post_sha256": "1a93a8a689f1f48d53c61b335bb0b25b12c5f37f328baad9b5e6dbf615fbe22b"
+      "post_sha256": "37ad84cebaa7a7d04cf010976794f0c0a7dd972d0d527ebf5eea42e78b3a37b5"
     },
     {
       "path": "android/build.gradle.kts",
@@ -139,12 +144,12 @@
     {
       "path": "cmd/phase9devicegate/main.go",
       "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
-      "post_sha256": "aa9bf61c77b45458bd993bdbcf9b4cf519a5e8b060bc68dfca5bb049303537db"
+      "post_sha256": "23797d531ed4679d54b829dd023540395e4afafb32b8bb65354565a81199389a"
     },
     {
       "path": "cmd/phase9devicegate/main_test.go",
       "pre_sha256": "ef2d548a9e304470e91dbc77b6281fa791894776464e22b8e1080ab9acdfd41e",
-      "post_sha256": "a0b61991ab91c35b5395c037ae8a88311d9831557e3f7df03b5dd951f2f5ea13"
+      "post_sha256": "ba15433cc89a4bae52620424a5f8d9ab0ee6b138437f1455964f993f084366a3"
     },
     {
       "path": "cmd/playrelease/main.go",
