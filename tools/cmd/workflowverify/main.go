@@ -172,6 +172,7 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"pattern: shadow-*-${{ github.run_id }}-*",
 			"path: .tools/collected-attempts",
 			"Select newest receipt for each proof identity",
+			"$safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '-receipt.json'",
 			"Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse",
 			"name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}",
 			"include-hidden-files: true",
