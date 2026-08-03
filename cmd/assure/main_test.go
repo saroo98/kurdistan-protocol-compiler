@@ -218,6 +218,42 @@ func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 	}
 }
 
+func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
+	policy, _, err := readProofPolicy("../..", "config/ci/proof-policy.json")
+	if err != nil {
+		t.Fatalf("read repository proof policy: %v", err)
+	}
+	required := map[string]bool{
+		"android-device-api26":   true,
+		"android-device-api34":   true,
+		"android-device-api36":   true,
+		"android-host":           true,
+		"dependency-freshness":   true,
+		"docs-evidence":          true,
+		"go-audit":               true,
+		"go-core":                true,
+		"go-executable-evidence": true,
+		"operator":               true,
+	}
+	laneCount := 0
+	for _, proof := range policy.Proofs {
+		if !required[proof.ID] {
+			continue
+		}
+		laneCount += len(proof.OperatingSystems)
+		if proof.ID == "dependency-freshness" && (len(proof.OperatingSystems) != 1 || proof.OperatingSystems[0] != "linux") {
+			t.Fatalf("dependency-freshness operating systems = %v, want [linux]", proof.OperatingSystems)
+		}
+		delete(required, proof.ID)
+	}
+	if len(required) != 0 {
+		t.Fatalf("repository policy is missing required certificate proofs: %v", required)
+	}
+	if laneCount != 15 {
+		t.Fatalf("repository certificate lane count = %d, want 15", laneCount)
+	}
+}
+
 func TestRunWorkflowVerifierAgainstRepository(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
