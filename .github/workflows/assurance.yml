@@ -261,8 +261,28 @@ jobs:
       - name: Download the exact shared APK pair
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
-          name: device-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .tools/device
+          pattern: device-artifacts-${{ github.run_id }}-*
+          path: .tools/device-attempts
+          merge-multiple: false
+      - name: Select newest available device artifact attempt
+        shell: pwsh
+        run: |
+          $prefix = 'device-artifacts-${{ github.run_id }}-'
+          $candidates = Get-ChildItem -LiteralPath .tools/device-attempts -Directory | ForEach-Object {
+            if (-not $_.Name.StartsWith($prefix, [System.StringComparison]::Ordinal)) { return }
+            $attemptText = $_.Name.Substring($prefix.Length)
+            $attempt = 0
+            if (-not [int]::TryParse($attemptText, [ref]$attempt) -or $attempt -lt 1) {
+              throw "invalid device artifact attempt directory $($_.Name)"
+            }
+            [pscustomobject]@{ Attempt = $attempt; Path = $_.FullName }
+          }
+          $selected = $candidates | Sort-Object Attempt -Descending | Select-Object -First 1
+          if ($null -eq $selected) { throw 'no exact-run device artifact attempt is available' }
+          New-Item -ItemType Directory -Force .tools/device | Out-Null
+          Copy-Item -LiteralPath (Join-Path $selected.Path 'app-internal.apk') -Destination .tools/device/app-internal.apk
+          Copy-Item -LiteralPath (Join-Path $selected.Path 'app-internal-androidTest.apk') -Destination .tools/device/app-internal-androidTest.apk
+          Copy-Item -LiteralPath (Join-Path $selected.Path 'device-artifacts.json') -Destination .tools/device/device-artifacts.json
       - name: Verify downloaded device artifact identity
         shell: pwsh
         run: |
@@ -356,9 +376,35 @@ jobs:
       - name: Download exact-run proof artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
-          pattern: shadow-*-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .tools/collected
-          merge-multiple: true
+          pattern: shadow-*-${{ github.run_id }}-*
+          path: .tools/collected-attempts
+          merge-multiple: false
+      - name: Select newest receipt for each proof identity
+        shell: pwsh
+        run: |
+          $latest = @{}
+          $receiptFiles = Get-ChildItem -LiteralPath .tools/collected-attempts -Filter '*-receipt.json' -File -Recurse
+          foreach ($file in $receiptFiles) {
+            $receipt = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+            if ($receipt.schema -ne 'kurdistan-assurance-receipt-v1') { throw "unexpected receipt schema in $($file.FullName)" }
+            $attempt = [int]$receipt.execution.attempt
+            if ($attempt -lt 1) { throw "invalid receipt attempt in $($file.FullName)" }
+            $identity = @(
+              [string]$receipt.proof.id,
+              [string]$receipt.execution.jobId,
+              [string]$receipt.runner.operatingSystem,
+              [string]$receipt.runner.requestedLabel
+            ) -join '|'
+            if (-not $latest.ContainsKey($identity) -or $attempt -gt $latest[$identity].Attempt) {
+              $latest[$identity] = [pscustomobject]@{ Attempt = $attempt; File = $file }
+            }
+          }
+          if ($latest.Count -ne 15) { throw "expected 15 proof identities, found $($latest.Count)" }
+          New-Item -ItemType Directory -Force .tools/collected | Out-Null
+          foreach ($identity in ($latest.Keys | Sort-Object)) {
+            $safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '.json'
+            Copy-Item -LiteralPath $latest[$identity].File.FullName -Destination (Join-Path '.tools/collected' $safeName)
+          }
       - name: Issue and validate aggregate certificate
         shell: pwsh
         run: |
