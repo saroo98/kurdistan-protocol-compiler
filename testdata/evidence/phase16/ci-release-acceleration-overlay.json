@@ -39,7 +39,7 @@
     {
       "path": "ROADMAP.md",
       "pre_sha256": "da9e73bcd41c5045e38b17e06b23db853ea0a15fb7fa46b91b7db9813ec3274f",
-      "post_sha256": "c6850444c6d8a7befbc89c2d7b9b14dcb0356f5e8aa6ff6355201a28e89a1f55"
+      "post_sha256": "767ca1af402c767a712eaafcd15c82ce54a4ca4b008e5f0257743c5894eb5b5b"
     },
     {
       "path": "android/app/build.gradle.kts",
@@ -129,7 +129,7 @@
     {
       "path": "cmd/kgen/main_test.go",
       "pre_sha256": "cb3559c478aabed3d866bd56682cfad809e4ae9b67fae7a7812a2d4668e39811",
-      "post_sha256": "2b06dd57f4130c9d980bdb32309ded4fedab722ce6768af459fdb987d15d6a0b"
+      "post_sha256": "3e1b65ed1a93c97572f86967793f48a4b4975be576ac567c8b8e65690853fa16"
     },
     {
       "path": "cmd/phase15verify/main.go",
@@ -139,7 +139,7 @@
     {
       "path": "cmd/phase15verify/main_test.go",
       "pre_sha256": "e14f87dd6de118dabcb54b2f3e63289cdf893cdd051f7b1266409e5eb7682235",
-      "post_sha256": "ed471220bdcb212bdc1f092b1a7a547f392f861c01129e4841bf8a1e58de0b66"
+      "post_sha256": "a2f79d41e20760cb79b51692cfedf2f3ff571ada30a0f1286e7e7d3df9e5bd34"
     },
     {
       "path": "cmd/phase9devicegate/main.go",
@@ -332,9 +332,34 @@
       "post_sha256": "702f0946377cfc032e7cef5c639422d904c566e9383558de038ae817f38805c6"
     },
     {
+      "path": "docs/KIP-0089-phase14-assurance-field-release.md",
+      "pre_sha256": "a1a370944ce85b47c139d9019e2d99b4b88cede6ac1f5ea6a612c95f3375de4f",
+      "post_sha256": "c62946e88e0799e563a3304331ae50d48398bea6358e8ba649923e608f9b6959"
+    },
+    {
+      "path": "docs/KIP-0090-phase15-production-contract-freeze.md",
+      "pre_sha256": "c5fa9c14a693349014728ab9ddfc2ed0e885db3d0dbadfef4b18b14f7a6befa8",
+      "post_sha256": "c7d92dad24c95bc9c9ab8aa6e7335ea5936216f6e512dc8ef310abd0bef79b9e"
+    },
+    {
       "path": "docs/KIP-0091-assurance-release-acceleration.md",
       "pre_evidence": "ABSENT",
-      "post_sha256": "19a0366de7971d2ca2cb4312cb9151c7af75e039fa363dc81b78fa97f388cb33"
+      "post_sha256": "0eefd4ffb99f69b099d5450e9fea4b51c9d811eca334c33a1e41780d40ae3852"
+    },
+    {
+      "path": "docs/PHASE14_EVIDENCE_INDEX.md",
+      "pre_sha256": "58d7fc2d70ee244c77083b6ed68beb323e56c084fe34b52d51f3a45f8d59bdc3",
+      "post_sha256": "6780473c03095287feff59e639168d023bfcbe89c9ab5751b979e567c7f3114e"
+    },
+    {
+      "path": "docs/PHASE14_READINESS_MATRIX.md",
+      "pre_sha256": "72c2731c2602969ce8e81d3ec47487405ce599a7435bc9d3206933d8054f19ac",
+      "post_sha256": "50d988e8e8602872ea51ef793ce77ae1fd2b4b2d78d4ec29ec974d236b6b8869"
+    },
+    {
+      "path": "docs/PHASE15_PRODUCTION_CONTRACT.md",
+      "pre_sha256": "fdf8282cc8d540ab1f4c52515e84aa85fc46b3626fb5c4e342dd6f6cb5f555d3",
+      "post_sha256": "c3563b819420af38aac5e91b108d5d841438f8e7c8a94fbba4d17cd2f92b2d59"
     },
     {
       "path": "internal/assurance/certificate.go",
@@ -389,7 +414,7 @@
     {
       "path": "internal/assurance/receipt_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c776caf21bf8324fba77d506a5dcf56ba7a8b278163d5942ab1b5ac4ced3e240"
+      "post_sha256": "146123518bfc7cb8c69430b3eb8734c3a0366b849e3154e39d379e1fc2c49bdc"
     },
     {
       "path": "internal/assurance/strictjson.go",
@@ -404,7 +429,7 @@
     {
       "path": "internal/audit/codegen_test.go",
       "pre_sha256": "8c144659268a21d7fe9515d2dadd1475b69168f18a64c5a4b985560c1c4d821c",
-      "post_sha256": "3b1a404fefee5d136849b77e34cc88b69c79e82f59c3dc63cd44fe81936eb347"
+      "post_sha256": "120b281dcb237b97347a5db84c1866efccc3695d9941519e3c796eb6ad7a9023"
     },
     {
       "path": "internal/audit/executor.go",
@@ -434,7 +459,7 @@
     {
       "path": "internal/codegen/authorization_v1_test.go",
       "pre_sha256": "b816e5da3c720a5d319fba0771ec490f14cff3aa28390be7b15784d85ac70b2c",
-      "post_sha256": "a1bfe78d55e859f0bdd0fc44371be70f67d54b9d351404652365aef24fe923f3"
+      "post_sha256": "3f19e467f59f7375e5d4b2ea71517b246be3a476c48e0c213b946bcacb34ad5a"
     },
     {
       "path": "internal/runtime/policy_enforcement_test.go",
@@ -454,7 +479,7 @@
     {
       "path": "internal/testkit/importrules/importrules_test.go",
       "pre_sha256": "cf82508765b428202e296997461510de5ee9e23c9de34505b3c703f74d855c22",
-      "post_sha256": "79bb5ced1b6bd46f188487511a50b1ba06595f989d27d9c72ed956c25b811bb4"
+      "post_sha256": "bb931c4ba3006fd64f7a4f452497d91efea01b6ad5e3d543c97264b81525e3af"
     },
     {
       "path": "testdata/assurance/invalid/duplicate-key-receipt.json",
@@ -490,6 +515,36 @@
       "path": "testdata/assurance/valid/receipt-go-core-linux.json",
       "pre_evidence": "ABSENT",
       "post_sha256": "847cc42a0f863c3463c8a424b8dc86edf4ff82cb5513febe3eae36d074f39018"
+    },
+    {
+      "path": "testdata/evidence/phase1-m0-committed-sha256.json",
+      "pre_sha256": "51a046f6580db2a2ee77ad8e02f24cd29669073be390bd9d87072c45541fc92d",
+      "post_sha256": "86782763f1c0f0e8b8dac89f061abcfafaaaf03e3daf7e35c1dbab90a49b5cc6"
+    },
+    {
+      "path": "testdata/evidence/phase15/production-contract.json",
+      "pre_sha256": "78b43225a55484bce2ac3b0537b41a81e3b2ab3babc53ce687ba8d2dc3847752",
+      "post_sha256": "04e6750d3bd5d4e8486fbc463ee9b87ed728e3fc229a731a22c13e3a6c1efdec"
+    },
+    {
+      "path": "testdata/evidence/phase8-release-corpus-manifest.json",
+      "pre_sha256": "5b8322186b59837f77dd424b1d0f5cfda18d08871c64c7df6ff18aebe8d57b5a",
+      "post_sha256": "645493387005ac9c148ff81ddfa0a484078eede17ec9e544d895178422680943"
+    },
+    {
+      "path": "testdata/evidence/phase8-stabilization-baseline-2026-07-17.json",
+      "pre_sha256": "02d0e9aee4d56cfdb1f2db3b5e1d0aae3f077349243b5f6de1409125d1719696",
+      "post_sha256": "f09b215c77f336bb5995b3fc530bd4a13a9be0ac19907086f4e1f61a63eebb42"
+    },
+    {
+      "path": "testdata/evidence/phase8-suite-decision-matrix.json",
+      "pre_sha256": "aec5be19e0efd4c876c6941f5a6aef1409a2c90d63901f971705dddada1d5740",
+      "post_sha256": "cbd89aecf41a4029c6eeec4f519e783d393f5597feefcec62f26379bc3300c51"
+    },
+    {
+      "path": "testdata/evidence/phase8-wo801-adoption-2026-07-17.json",
+      "pre_sha256": "e046d14ddee336e0b7689a5a165414685f10a82f48844d4f027143f92c4a552c",
+      "post_sha256": "31cd3d40d273239d459b85961c80cea647e3d76489bb2a94278b10fa2cab4bdc"
     },
     {
       "path": "testdata/schemas/assurance-certificate-v1.schema.json",

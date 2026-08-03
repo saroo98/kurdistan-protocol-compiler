@@ -4,7 +4,7 @@
   "status": "FROZEN_FOR_IMPLEMENTATION",
   "releaseDecision": "NO_GO",
   "baseline": {
-    "sourceCommit": "1fcfeab111cf64f1295f10d788e4977ab4666a7a",
+    "sourceCommit": "bd7fb851bdc5103fb77310839e1cdeebfe8ffda1",
     "candidateCiRun": "30739580424",
     "mainCiRun": "30740549679",
     "candidateCiConclusion": "SUCCESS",

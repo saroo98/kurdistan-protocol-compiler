@@ -56,7 +56,7 @@
       "category": "cose",
       "disposition": "selected",
       "official_source_url": "https://www.rfc-editor.org/rfc/rfc9052.html",
-      "version_or_commit": "RFC 9052 plus RFC 9053; Phase 8 candidate at internal/product/envelope/phase8_suite.go SHA-256 71c67b4e27d4f8708115030dd9469f3b133a7b4fdc09a3732e2efb6c2d67944f; absent from baseline HEAD f85fe8b0b5784db21ebf6770a8b8a8113b739f23",
+      "version_or_commit": "RFC 9052 plus RFC 9053; Phase 8 candidate at internal/product/envelope/phase8_suite.go SHA-256 71c67b4e27d4f8708115030dd9469f3b133a7b4fdc09a3732e2efb6c2d67944f; absent from baseline HEAD 85b3f7c076104a98f7f33ab0d3c7fa3e71bb5a04",
       "license": "IETF Trust RFC text; repository adapter AGPL-3.0-or-later",
       "api_evidence": "BuildSignedProtectedHeaders, BuildCOSESigStructure, BuildTaggedCOSESign1, EncodeRawES256Signature, DecodeRawES256Signature",
       "maintenance_evidence": "stable RFCs with IANA-registered tag, algorithm, and headers; private application labels use the registered private-use range",

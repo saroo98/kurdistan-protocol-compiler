@@ -58,8 +58,8 @@ func TestDecodeReceiptRejectsMissingOrFalseTerminalMarker(t *testing.T) {
 
 func TestDecodeReceiptRejectsDuplicateJSONKeys(t *testing.T) {
 	duplicate := strings.Replace(validReceiptJSON,
-		`"commit": "8fe2d59034deea215c45734f4bb8582bff004d9b",`,
-		`"commit": "8fe2d59034deea215c45734f4bb8582bff004d9b", "commit": "8fe2d59034deea215c45734f4bb8582bff004d9b",`, 1)
+		`"commit": "83e262921d3ae8ecd8c04a2a440699b6cccace7b",`,
+		`"commit": "83e262921d3ae8ecd8c04a2a440699b6cccace7b", "commit": "83e262921d3ae8ecd8c04a2a440699b6cccace7b",`, 1)
 	if _, err := DecodeReceipt(strings.NewReader(duplicate)); err == nil {
 		t.Fatal("expected duplicate JSON key rejection")
 	}
@@ -122,7 +122,7 @@ const validReceiptJSON = `{
   "receiptId": "run-123-go-core-linux",
   "subject": {
     "repository": "saroo98/kurdistan-protocol-compiler",
-    "commit": "8fe2d59034deea215c45734f4bb8582bff004d9b",
+    "commit": "83e262921d3ae8ecd8c04a2a440699b6cccace7b",
     "tree": "1111111111111111111111111111111111111111",
     "ref": "refs/heads/main"
   },

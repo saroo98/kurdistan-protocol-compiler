@@ -2,7 +2,7 @@
   "schema": "kurdistan.phase8.wo801-adoption.v1",
   "adoption_id": "phase8-wo801-adoption-v1",
   "branch": "product/phase8-profile-cryptography",
-  "head": "1d5d53c75fdf084689cf089a2ee9a363ea4f84f4",
+  "head": "b3a634662f37c4987e9c0caebf0b5fcaab8d8034",
   "authorized_repository_state_sha256": "eb6c4dfde4cc2483471c46c96e56cb747a2d14f20b9bac08165424bee0f88984",
   "predecessor_manifest_sha256": "989df23699da6edfb8e5279752dbe66863a854b530a532119a2689320049c56f",
   "kip_0075_sha256": "59ca1cc0df03c0fa3b7beb8fa5bcf6982851cb8ca94b3d6a65931f4e71bdfa60",

@@ -341,13 +341,13 @@
       "id": "phase8-suite-decision-matrix.json",
       "kind": "release-source",
       "source_path": "testdata/evidence/phase8-suite-decision-matrix.json",
-      "source_sha256": "aec5be19e0efd4c876c6941f5a6aef1409a2c90d63901f971705dddada1d5740",
+      "source_sha256": "cbd89aecf41a4029c6eeec4f519e783d393f5597feefcec62f26379bc3300c51",
       "generator_path": "testdata/evidence/phase8-suite-decision-matrix.json",
-      "generator_sha256": "aec5be19e0efd4c876c6941f5a6aef1409a2c90d63901f971705dddada1d5740",
+      "generator_sha256": "cbd89aecf41a4029c6eeec4f519e783d393f5597feefcec62f26379bc3300c51",
       "provenance": "repository-controlled standards and dependency evidence",
       "license_path": "docs/third-party/phase8-profile-cryptography.md",
       "expected_decision": "informational",
-      "expected_bytes_sha256": "aec5be19e0efd4c876c6941f5a6aef1409a2c90d63901f971705dddada1d5740"
+      "expected_bytes_sha256": "cbd89aecf41a4029c6eeec4f519e783d393f5597feefcec62f26379bc3300c51"
     },
     {
       "id": "phase8-toolchain-randomness-report.json",
