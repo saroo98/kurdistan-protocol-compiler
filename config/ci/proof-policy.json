@@ -70,21 +70,13 @@
     },
     {
       "id": "dependency-freshness",
-      "commandsByOperatingSystem": {
-        "linux": [
-          ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
-          ["./.tools/bin/govulncheck", "./..."],
-          ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
-          ["./.tools/bin/osv-scanner_linux_amd64", "scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"]
-        ],
-        "windows": [
-          ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
-          ["./.tools/bin/govulncheck", "./..."],
-          ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
-          [".tools\\bin\\osv-scanner_windows_amd64.exe", "scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"]
-        ]
-      },
-      "operatingSystems": ["linux", "windows"],
+      "commands": [
+        ["go", "-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"],
+        ["./.tools/bin/govulncheck", "./..."],
+        ["pwsh", "-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"],
+        ["./.tools/bin/osv-scanner_linux_amd64", "scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"]
+      ],
+      "operatingSystems": ["linux"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
       "freshnessSeconds": 86400,

@@ -94,7 +94,7 @@
     {
       "path": "cmd/assure/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "64f48ea0d94f521667e4c371f34bccfc5b9abc84d1289b658ddbccb6ab8857b5"
+      "post_sha256": "8376a9de2804b20e3f3097f0e6f0d6f4b7f0ea5424bf0adb3b28737c4ce3ac0c"
     },
     {
       "path": "cmd/assure/timings.go",
@@ -304,7 +304,7 @@
     {
       "path": "config/ci/proof-policy.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e801553eb89210998876e52dc8e0b1e444cafa186e5361360daf43c4a51234d2"
+      "post_sha256": "fa158b49548f25e7b93a0be6a7f18a125d89b763b1afb7ae234110006244a8d2"
     },
     {
       "path": "config/ci/release-evidence-policy.json",
