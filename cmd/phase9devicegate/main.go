@@ -214,8 +214,23 @@ func run(value options) error {
 	if err := captureInstalledIdentity(ctx, client, value); err != nil {
 		return err
 	}
-	if err := prepareInstrumentationRuntime(ctx, client, value.appPackage, value.testPackage); err != nil {
+	recoveredPackageService, err := prepareInstrumentationRuntime(ctx, client, value.appPackage, value.testPackage)
+	if err != nil {
 		return err
+	}
+	if recoveredPackageService {
+		if err := waitForAndroidFramework(ctx, client, "04r"); err != nil {
+			return err
+		}
+		if err := installPackage(ctx, client, "04r-install-app.txt", value.appAPK); err != nil {
+			return fmt.Errorf("restore application after package service recovery: %w", err)
+		}
+		if err := installPackage(ctx, client, "04r-install-test.txt", value.testAPK); err != nil {
+			return fmt.Errorf("restore instrumentation after package service recovery: %w", err)
+		}
+		if err := captureInstalledIdentity(ctx, client, value); err != nil {
+			return fmt.Errorf("verify restored package identity: %w", err)
+		}
 	}
 	if err := waitForAndroidFramework(ctx, client, "04i"); err != nil {
 		return err
@@ -466,7 +481,7 @@ func instrumentationPreparationCommands(appPackage, testPackage string) []instru
 	}
 }
 
-func prepareInstrumentationRuntime(ctx context.Context, client adbClient, appPackage, testPackage string) error {
+func prepareInstrumentationRuntime(ctx context.Context, client adbClient, appPackage, testPackage string) (bool, error) {
 	return prepareInstrumentationRuntimeWith(
 		ctx,
 		instrumentationPreparationCommands(appPackage, testPackage),
@@ -480,21 +495,23 @@ func prepareInstrumentationRuntimeWith(
 	commands []instrumentationPreparationCommand,
 	capture func(context.Context, string, ...string) (string, error),
 	waitForFramework func(string) error,
-) error {
+) (bool, error) {
+	recoveredPackageService := false
 	for _, command := range commands {
 		output, err := capture(ctx, command.evidence, command.args...)
 		if err != nil && transientPackageServiceFailure(output) {
+			recoveredPackageService = true
 			stem := strings.TrimSuffix(command.evidence, filepath.Ext(command.evidence))
 			if waitErr := waitForFramework(stem + "-retry"); waitErr != nil {
-				return fmt.Errorf("prepare instrumentation runtime package service recovery (%s): %w", command.evidence, waitErr)
+				return false, fmt.Errorf("prepare instrumentation runtime package service recovery (%s): %w", command.evidence, waitErr)
 			}
 			_, err = capture(ctx, stem+"-retry.txt", command.args...)
 		}
 		if err != nil {
-			return fmt.Errorf("prepare instrumentation runtime (%s): %w", command.evidence, err)
+			return false, fmt.Errorf("prepare instrumentation runtime (%s): %w", command.evidence, err)
 		}
 	}
-	return nil
+	return recoveredPackageService, nil
 }
 
 func failedInstrumentationTests(input string, limit int) []string {
