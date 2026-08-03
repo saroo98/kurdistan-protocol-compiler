@@ -14,7 +14,7 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_evidence": "ABSENT",
-      "post_sha256": "020591350ef74ea422cb6b497fa9e7c388d04c52013048ae5885135386bbcd02"
+      "post_sha256": "f4bd289298bcb717a7f4f8ec5439981b9f07c1ef15267a5d41916873d125cf69"
     },
     {
       "path": ".github/workflows/candidate.yml",

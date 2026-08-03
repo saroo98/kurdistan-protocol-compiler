@@ -268,14 +268,19 @@ jobs:
         shell: pwsh
         run: |
           $prefix = 'device-artifacts-${{ github.run_id }}-'
-          $candidates = Get-ChildItem -LiteralPath .tools/device-attempts -Directory | ForEach-Object {
-            if (-not $_.Name.StartsWith($prefix, [System.StringComparison]::Ordinal)) { return }
-            $attemptText = $_.Name.Substring($prefix.Length)
-            $attempt = 0
-            if (-not [int]::TryParse($attemptText, [ref]$attempt) -or $attempt -lt 1) {
-              throw "invalid device artifact attempt directory $($_.Name)"
+          $candidates = @()
+          if (Test-Path -LiteralPath .tools/device-attempts/device-artifacts.json -PathType Leaf) {
+            $candidates += [pscustomobject]@{ Attempt = 1; Path = (Resolve-Path -LiteralPath .tools/device-attempts).Path }
+          }
+          Get-ChildItem -LiteralPath .tools/device-attempts -Directory | ForEach-Object {
+            if ($_.Name.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+              $attemptText = $_.Name.Substring($prefix.Length)
+              $attempt = 0
+              if (-not [int]::TryParse($attemptText, [ref]$attempt) -or $attempt -lt 1) {
+                throw "invalid device artifact attempt directory $($_.Name)"
+              }
+              $candidates += [pscustomobject]@{ Attempt = $attempt; Path = $_.FullName }
             }
-            [pscustomobject]@{ Attempt = $attempt; Path = $_.FullName }
           }
           $selected = $candidates | Sort-Object Attempt -Descending | Select-Object -First 1
           if ($null -eq $selected) { throw 'no exact-run device artifact attempt is available' }
