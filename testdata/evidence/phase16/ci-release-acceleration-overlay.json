@@ -14,7 +14,7 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_evidence": "ABSENT",
-      "post_sha256": "24f080943d642f5b25cb5c7f3bd9ee3bd1b374ccbdde40f5c6944461e7c0aab8"
+      "post_sha256": "020591350ef74ea422cb6b497fa9e7c388d04c52013048ae5885135386bbcd02"
     },
     {
       "path": ".github/workflows/candidate.yml",
@@ -514,7 +514,7 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3e76b347d225772ff58a8507a6c51c459aada57769749745e020a3e3daae0736"
+      "post_sha256": "c0f96c83e3e3de25d0280ad615e115dac1a7ae546359a5dde7011ba94d367dca"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
