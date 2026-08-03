@@ -407,7 +407,7 @@ jobs:
           if ($latest.Count -ne 15) { throw "expected 15 proof identities, found $($latest.Count)" }
           New-Item -ItemType Directory -Force .tools/collected | Out-Null
           foreach ($identity in ($latest.Keys | Sort-Object)) {
-            $safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '.json'
+            $safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '-receipt.json'
             Copy-Item -LiteralPath $latest[$identity].File.FullName -Destination (Join-Path '.tools/collected' $safeName)
           }
       - name: Issue and validate aggregate certificate
