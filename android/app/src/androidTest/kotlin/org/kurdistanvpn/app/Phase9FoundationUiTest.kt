@@ -31,9 +31,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.core.content.ContextCompat
+import androidx.test.espresso.IdlingPolicies
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -43,6 +45,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kurdistanvpn.core.model.AppState
@@ -62,6 +65,12 @@ import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
 class Phase9FoundationUiTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
+
+    @Before
+    fun configureHostedEmulatorIdlingBudget() {
+        IdlingPolicies.setMasterPolicyTimeout(2, TimeUnit.MINUTES)
+        IdlingPolicies.setIdlingResourceTimeout(2, TimeUnit.MINUTES)
+    }
 
     @Test
     fun phase11PresentsOnlyTheTruthfulOwnedLoopbackRuntimeControl() {
@@ -723,8 +732,16 @@ class Phase9FoundationUiTest {
         }
     }
 
-    private fun runtimeTimeout(baseMillis: Long): Long =
-        if (Build.VERSION.SDK_INT <= 28) maxOf(baseMillis, 30_000L) else baseMillis
+    private fun runtimeTimeout(baseMillis: Long): Long {
+        val emulator = Build.FINGERPRINT.contains("generic", ignoreCase = true) ||
+            Build.MODEL.contains("emulator", ignoreCase = true) ||
+            Build.PRODUCT.contains("sdk", ignoreCase = true)
+        return when {
+            emulator -> maxOf(baseMillis, 60_000L)
+            Build.VERSION.SDK_INT <= 28 -> maxOf(baseMillis, 30_000L)
+            else -> baseMillis
+        }
+    }
 }
 
 private const val INTERNAL_SIGNED_PROFILE_LINK =

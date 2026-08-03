@@ -438,6 +438,77 @@ func TestInstrumentationPreparationReportsNoRecoveryOnCleanSuccess(t *testing.T)
 	}
 }
 
+func TestPackageConfigurationCommandsRespectNotificationPermissionAPI(t *testing.T) {
+	legacy := packageConfigurationCommands("org.example.app", 26)
+	modern := packageConfigurationCommands("org.example.app", 36)
+	if len(legacy) != 2 || len(modern) != 3 {
+		t.Fatalf("legacy commands=%d modern commands=%d", len(legacy), len(modern))
+	}
+	if modern[2].evidence != "04b-grant-notification-permission.txt" {
+		t.Fatalf("modern notification evidence=%q", modern[2].evidence)
+	}
+}
+
+func TestPackageConfigurationReplaysAllStateAfterPackageServiceRecovery(t *testing.T) {
+	commands := packageConfigurationCommands("org.example.app", 36)
+	var evidence []string
+	recoveryPrefix := ""
+	grantCalls := 0
+	err := configureInstalledPackagesWith(
+		context.Background(),
+		commands,
+		func(_ context.Context, name string, _ ...string) (string, error) {
+			evidence = append(evidence, name)
+			if strings.HasPrefix(name, "04b-grant-notification-permission") {
+				grantCalls++
+				if grantCalls == 1 {
+					return "cmd: Failure calling service package: Broken pipe (32)", errors.New("exit status 224")
+				}
+			}
+			return "Success", nil
+		},
+		func(prefix string) error {
+			recoveryPrefix = prefix
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("configureInstalledPackagesWith transient recovery: %v", err)
+	}
+	if recoveryPrefix != "04b-grant-notification-permission-recovery" {
+		t.Fatalf("recovery prefix=%q", recoveryPrefix)
+	}
+	want := []string{
+		"04-clear-app-data.txt",
+		"04a-authorize-test-vpn.txt",
+		"04b-grant-notification-permission.txt",
+		"04-clear-app-data-retry.txt",
+		"04a-authorize-test-vpn-retry.txt",
+		"04b-grant-notification-permission-retry.txt",
+	}
+	if !reflect.DeepEqual(evidence, want) {
+		t.Fatalf("configuration evidence=%v want=%v", evidence, want)
+	}
+}
+
+func TestPackageConfigurationDoesNotRecoverPermanentFailure(t *testing.T) {
+	recovered := false
+	err := configureInstalledPackagesWith(
+		context.Background(),
+		packageConfigurationCommands("org.example.app", 36),
+		func(context.Context, string, ...string) (string, error) {
+			return "permission denied", errors.New("exit status 1")
+		},
+		func(string) error {
+			recovered = true
+			return nil
+		},
+	)
+	if err == nil || recovered {
+		t.Fatalf("permanent configuration failure err=%v recovered=%t", err, recovered)
+	}
+}
+
 func TestBoundedBufferRetainsPrefixAndSignalsOverflow(t *testing.T) {
 	buffer := boundedBuffer{limit: 4}
 	if written, err := buffer.Write([]byte("abcdef")); err != nil || written != 6 {
