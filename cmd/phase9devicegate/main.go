@@ -313,7 +313,7 @@ func run(value options) error {
 	time.Sleep(2 * time.Second)
 	pidOutput, pidErr := client.captureProcessState(ctx, "09-launch-process.txt", value.appPackage)
 	if err := validateLaunchSmoke(launchOutput, pidOutput, value.appPackage, pidErr); err != nil {
-		_, _ = client.captureDiagnostic(ctx, "10-launch-failure-diagnostics.txt", value.appPackage, "logcat", "-b", "all", "-d", "-v", "brief")
+		_, _ = client.captureDiagnostic(ctx, "10-launch-failure-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
 		return err
 	}
 	_, _ = client.capture(ctx, "11-pre-test-force-stop.txt", "shell", "am", "force-stop", value.appPackage)
@@ -333,7 +333,7 @@ func run(value options) error {
 		"-r",
 		value.testPackage+"/"+value.runner,
 	)
-	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, "logcat", "-b", "all", "-d", "-v", "brief")
+	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
 	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, "logcat", "-b", "crash", "-d", "-v", "brief")
 	if logcatErr != nil {
 		return fmt.Errorf("capture logcat: %w", logcatErr)
@@ -400,6 +400,10 @@ func (client adbClient) captureInstrumentation(ctx context.Context, name string,
 	return output, err
 }
 
+func diagnosticLogcatArgs(buffer string) []string {
+	return []string{"logcat", "-b", buffer, "-d", "-v", "brief", "*:W"}
+}
+
 func summarizeInstrumentation(input string) string {
 	tests := completedTestCount(input)
 	lower := strings.ToLower(input)
@@ -463,8 +467,30 @@ func instrumentationPreparationCommands(appPackage, testPackage string) []instru
 }
 
 func prepareInstrumentationRuntime(ctx context.Context, client adbClient, appPackage, testPackage string) error {
-	for _, command := range instrumentationPreparationCommands(appPackage, testPackage) {
-		if _, err := client.capture(ctx, command.evidence, command.args...); err != nil {
+	return prepareInstrumentationRuntimeWith(
+		ctx,
+		instrumentationPreparationCommands(appPackage, testPackage),
+		client.capture,
+		func(prefix string) error { return waitForAndroidFramework(ctx, client, prefix) },
+	)
+}
+
+func prepareInstrumentationRuntimeWith(
+	ctx context.Context,
+	commands []instrumentationPreparationCommand,
+	capture func(context.Context, string, ...string) (string, error),
+	waitForFramework func(string) error,
+) error {
+	for _, command := range commands {
+		output, err := capture(ctx, command.evidence, command.args...)
+		if err != nil && transientPackageServiceFailure(output) {
+			stem := strings.TrimSuffix(command.evidence, filepath.Ext(command.evidence))
+			if waitErr := waitForFramework(stem + "-retry"); waitErr != nil {
+				return fmt.Errorf("prepare instrumentation runtime package service recovery (%s): %w", command.evidence, waitErr)
+			}
+			_, err = capture(ctx, stem+"-retry.txt", command.args...)
+		}
+		if err != nil {
 			return fmt.Errorf("prepare instrumentation runtime (%s): %w", command.evidence, err)
 		}
 	}

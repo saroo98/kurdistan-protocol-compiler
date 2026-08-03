@@ -4,10 +4,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -331,6 +333,13 @@ func TestInstrumentationSummaryRecordsOnlySafeProgressIdentities(t *testing.T) {
 	}
 }
 
+func TestGeneralDiagnosticLogcatExcludesDebugNoise(t *testing.T) {
+	want := []string{"logcat", "-b", "all", "-d", "-v", "brief", "*:W"}
+	if got := diagnosticLogcatArgs("all"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("diagnosticLogcatArgs() = %v, want %v", got, want)
+	}
+}
+
 func TestInstrumentationPreparationDisablesAnimationsAndCompilesExactPackages(t *testing.T) {
 	commands := instrumentationPreparationCommands("org.example.app", "org.example.app.test")
 	if len(commands) != 5 {
@@ -351,6 +360,66 @@ func TestInstrumentationPreparationDisablesAnimationsAndCompilesExactPackages(t 
 		if !strings.Contains(actual, expected) {
 			t.Fatalf("preparation commands omitted %q: %q", expected, actual)
 		}
+	}
+}
+
+func TestTransientPackageServiceFailureMatchesPreparationRestart(t *testing.T) {
+	if !transientPackageServiceFailure("cmd: Failure calling service package: Broken pipe (32)") {
+		t.Fatal("transientPackageServiceFailure rejected the package compilation restart observed on API 36")
+	}
+}
+
+func TestInstrumentationPreparationRetriesTransientPackageServiceRestart(t *testing.T) {
+	commands := []instrumentationPreparationCommand{{
+		evidence: "04g-compile-application.txt",
+		args:     []string{"shell", "cmd", "package", "compile", "example"},
+	}}
+	var evidence []string
+	waitPrefix := ""
+	calls := 0
+	err := prepareInstrumentationRuntimeWith(
+		context.Background(),
+		commands,
+		func(_ context.Context, name string, _ ...string) (string, error) {
+			calls++
+			evidence = append(evidence, name)
+			if calls == 1 {
+				return "cmd: Failure calling service package: Broken pipe (32)", errors.New("exit status 224")
+			}
+			return "Success", nil
+		},
+		func(prefix string) error {
+			waitPrefix = prefix
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("prepareInstrumentationRuntimeWith transient retry: %v", err)
+	}
+	if calls != 2 || waitPrefix != "04g-compile-application-retry" {
+		t.Fatalf("retry calls=%d waitPrefix=%q", calls, waitPrefix)
+	}
+	wantEvidence := []string{"04g-compile-application.txt", "04g-compile-application-retry.txt"}
+	if !reflect.DeepEqual(evidence, wantEvidence) {
+		t.Fatalf("retry evidence = %v, want %v", evidence, wantEvidence)
+	}
+}
+
+func TestInstrumentationPreparationDoesNotRetryPermanentFailure(t *testing.T) {
+	waited := false
+	err := prepareInstrumentationRuntimeWith(
+		context.Background(),
+		[]instrumentationPreparationCommand{{evidence: "04g-compile-application.txt"}},
+		func(context.Context, string, ...string) (string, error) {
+			return "Error: package is unknown", errors.New("exit status 1")
+		},
+		func(string) error {
+			waited = true
+			return nil
+		},
+	)
+	if err == nil || waited {
+		t.Fatalf("permanent failure err=%v waited=%t", err, waited)
 	}
 }
 
