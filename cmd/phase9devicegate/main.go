@@ -302,7 +302,7 @@ func run(value options) error {
 		value.testPackage+"/"+value.runner,
 	)
 	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
-	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, "logcat", "-b", "crash", "-d", "-v", "brief")
+	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("crash")...)
 	if logcatErr != nil {
 		return fmt.Errorf("capture logcat: %w", logcatErr)
 	}
@@ -369,7 +369,14 @@ func (client adbClient) captureInstrumentation(ctx context.Context, name string,
 }
 
 func diagnosticLogcatArgs(buffer string) []string {
-	return []string{"logcat", "-b", buffer, "-d", "-v", "brief", "*:W"}
+	// Query a bounded recent window at the source. A complete API 36 device
+	// suite can legitimately produce more than the diagnostic input ceiling;
+	// asking logcat for its entire buffer would turn ordinary framework noise
+	// into a false gate failure before the redacted summary is evaluated.
+	// Instrumentation output independently preserves per-test completion and
+	// crash markers, while this tail retains the most recent app-attributed
+	// Java, native, and ANR evidence.
+	return []string{"logcat", "-b", buffer, "-t", "4096", "-v", "brief", "*:W"}
 }
 
 func summarizeInstrumentation(input string) string {
@@ -763,13 +770,13 @@ func prepareLogcatBaseline(ctx context.Context, client adbClient, evidenceName, 
 		ctx,
 		stem+"-baseline-main.txt",
 		appPackage,
-		"logcat", "-b", "all", "-d", "-v", "brief",
+		diagnosticLogcatArgs("all")...,
 	)
 	crashSummary, crashErr := client.captureDiagnostic(
 		ctx,
 		stem+"-baseline-crash.txt",
 		appPackage,
-		"logcat", "-b", "crash", "-d", "-v", "brief",
+		diagnosticLogcatArgs("crash")...,
 	)
 	if mainErr != nil || crashErr != nil {
 		return fmt.Errorf("log buffers cannot be cleared or safely baselined: main=%v crash=%v", mainErr, crashErr)

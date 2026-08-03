@@ -144,12 +144,12 @@
     {
       "path": "cmd/phase9devicegate/main.go",
       "pre_sha256": "dd4f3ec0ef8b6951a0c6c28879d6b8f8b126432d0cbd186a0c5bff69f302cf25",
-      "post_sha256": "23797d531ed4679d54b829dd023540395e4afafb32b8bb65354565a81199389a"
+      "post_sha256": "398ff06de9f89a38a598635df2e539a11fa67f67f89bd26fd09580d2daf0a986"
     },
     {
       "path": "cmd/phase9devicegate/main_test.go",
       "pre_sha256": "ef2d548a9e304470e91dbc77b6281fa791894776464e22b8e1080ab9acdfd41e",
-      "post_sha256": "ba15433cc89a4bae52620424a5f8d9ab0ee6b138437f1455964f993f084366a3"
+      "post_sha256": "dc66838303e24265cdbbafd90711906661d72c58d99d7e1597027f51d0b7c6f2"
     },
     {
       "path": "cmd/playrelease/main.go",
