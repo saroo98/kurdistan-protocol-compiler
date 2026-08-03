@@ -11,7 +11,7 @@ Last updated: 2026-08-02
 ## Decision
 
 Phase 13 and Phase 14 are integrated on `main` at
-`1fcfeab111cf64f1295f10d788e4977ab4666a7a`. Candidate CI run
+`bd7fb851bdc5103fb77310839e1cdeebfe8ffda1`. Candidate CI run
 `30739580424` and merged-main CI run `30740549679` both passed the Linux and
 Windows Go and Android assurance jobs. This digest is the only Phase 15 input
 baseline.

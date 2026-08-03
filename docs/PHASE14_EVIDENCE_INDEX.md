@@ -58,7 +58,7 @@ alias, scope, result, limitations, expiry, and revalidation condition:
   missing item keeps the decision at `NO_GO`.
 
 The local candidate is integrated on `main` at
-`1fcfeab111cf64f1295f10d788e4977ab4666a7a`. The external evidence classes are
+`bd7fb851bdc5103fb77310839e1cdeebfe8ffda1`. The external evidence classes are
 carried forward to Phases 16-22. Phase 15 freezes this integrated baseline but
 cannot substitute repository or emulator evidence for production, field,
 signing, distribution, or independent observation.

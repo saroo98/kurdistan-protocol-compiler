@@ -22,11 +22,11 @@ tags, GitHub releases, public infrastructure, pilots, or production traffic.
 
 ## Baseline
 
-- Phase 15 main commit: `8fe2d59034deea215c45734f4bb8582bff004d9b`.
+- Phase 15 main commit: `83e262921d3ae8ecd8c04a2a440699b6cccace7b`.
 - Phase 15 branch CI: run `30747188157`, all four jobs passed.
 - Phase 15 main CI: run `30748296232`, all four jobs passed.
 - Historical Phase 15 input remains commit
-  `1fcfeab111cf64f1295f10d788e4977ab4666a7a` and its recorded workflow bytes.
+  `bd7fb851bdc5103fb77310839e1cdeebfe8ffda1` and its recorded workflow bytes.
 - Current release decision remains `NO_GO`.
 
 ## Proof model

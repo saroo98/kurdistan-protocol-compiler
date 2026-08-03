@@ -32,7 +32,7 @@ Phase 14 work begins only after:
 
 These entry checks passed on 2026-08-02. The reviewed Phase 13-14 candidate was
 subsequently integrated into `main` at
-`1fcfeab111cf64f1295f10d788e4977ab4666a7a`. That integration preserves the
+`bd7fb851bdc5103fb77310839e1cdeebfe8ffda1`. That integration preserves the
 local-assurance scope and does not change the release decision from `NO_GO`.
 
 ## Mandatory evidence classes

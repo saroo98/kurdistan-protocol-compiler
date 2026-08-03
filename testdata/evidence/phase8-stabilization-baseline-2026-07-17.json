@@ -1,6 +1,6 @@
 {
   "schema": "kurdistan.phase8-stabilization-baseline.v1",
-  "base_commit": "1d5d53c75fdf084689cf089a2ee9a363ea4f84f4",
+  "base_commit": "b3a634662f37c4987e9c0caebf0b5fcaab8d8034",
   "hash_algorithm": "sha256",
   "paths": [
     {

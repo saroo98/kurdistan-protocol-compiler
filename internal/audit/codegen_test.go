@@ -408,7 +408,7 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Schema != "kurdistan.phase1-m0.committed-sha256.v1" || manifest.HashAlgorithm != "sha256" || manifest.SourceCandidate != "cad48bb4be28a09a6293944f78724d7026de4c12" {
+	if manifest.Schema != "kurdistan.phase1-m0.committed-sha256.v1" || manifest.HashAlgorithm != "sha256" || manifest.SourceCandidate != "68d50f3bca0f1839dd7b04a1551e5fcce47b1b71" {
 		t.Fatalf("invalid committed evidence manifest identity: %+v", manifest)
 	}
 	historicalHashes, err := validateEvidenceOverlaysV1(root, manifest)

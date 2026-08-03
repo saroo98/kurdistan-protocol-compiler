@@ -97,7 +97,7 @@ func TestVerifyRoadmapAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
 	value := validContractForTest()
 	root := t.TempDir()
 	writeTestFile(t, root, "ROADMAP.md", strings.Join([]string{
-		"Phases 1-15 are integrated on `main` at `8fe2d59034deea215c45734f4bb8582bff004d9b`.",
+		"Phases 1-15 are integrated on `main` at `83e262921d3ae8ecd8c04a2a440699b6cccace7b`.",
 		"Phase 16 is active on `engineering/ci-release-acceleration`.",
 		value.Baseline.SourceCommit,
 		"| 13 | Integrated |",
@@ -118,7 +118,7 @@ func validContractForTest() contract {
 		Status:          "FROZEN_FOR_IMPLEMENTATION",
 		ReleaseDecision: "NO_GO",
 		Baseline: baseline{
-			SourceCommit:          "1fcfeab111cf64f1295f10d788e4977ab4666a7a",
+			SourceCommit:          "bd7fb851bdc5103fb77310839e1cdeebfe8ffda1",
 			CandidateCIRun:        "30739580424",
 			MainCIRun:             "30740549679",
 			CandidateCIConclusion: "SUCCESS",

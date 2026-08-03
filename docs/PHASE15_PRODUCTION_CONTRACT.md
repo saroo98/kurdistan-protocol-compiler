@@ -11,7 +11,7 @@ phases, not evidence that the deployed service already meets them.
 
 | Item | Frozen value |
 |---|---|
-| Source baseline | `1fcfeab111cf64f1295f10d788e4977ab4666a7a` |
+| Source baseline | `bd7fb851bdc5103fb77310839e1cdeebfe8ffda1` |
 | Candidate CI | GitHub Actions run `30739580424`, success |
 | Integrated-main CI | GitHub Actions run `30740549679`, success |
 | Baseline workflow | `.github/workflows/ci.yml`, SHA-256 `e249f212339ca93429465db678ddd108190fd19f393b9cdc3e37976f8b280809` |
