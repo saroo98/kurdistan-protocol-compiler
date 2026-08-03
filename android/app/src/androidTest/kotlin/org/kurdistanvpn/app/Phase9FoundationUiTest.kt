@@ -248,10 +248,13 @@ class Phase9FoundationUiTest {
             .performScrollTo()
             .performClick()
 
-        instrumentation.uiAutomation.grantRuntimePermission(
-            activity.packageName,
-            Manifest.permission.CAMERA,
-        )
+        instrumentation.uiAutomation.executeShellCommand(
+            "pm grant ${activity.packageName} ${Manifest.permission.CAMERA}",
+        ).close()
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
         compose.onNodeWithTag("primary_profiles")
             .performClick()
         compose.onNodeWithText(activity.getString(UiR.string.scan_offline_qr))

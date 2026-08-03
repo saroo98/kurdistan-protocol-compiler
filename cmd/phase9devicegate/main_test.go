@@ -308,6 +308,52 @@ func TestInstrumentationSummaryKeepsOnlyBoundedTestIdentity(t *testing.T) {
 	}
 }
 
+func TestInstrumentationSummaryRecordsOnlySafeProgressIdentities(t *testing.T) {
+	raw := strings.Join([]string{
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.FirstTest",
+		"INSTRUMENTATION_STATUS: test=completedCase",
+		"INSTRUMENTATION_STATUS_CODE: 1",
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.FirstTest",
+		"INSTRUMENTATION_STATUS: test=completedCase",
+		"INSTRUMENTATION_STATUS_CODE: 0",
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.SecondTest",
+		"INSTRUMENTATION_STATUS: test=runningCase",
+		"INSTRUMENTATION_STATUS_CODE: 1",
+	}, "\n")
+	summary := summarizeInstrumentation(raw)
+	for _, expected := range []string{
+		"last_started_test=org.kurdistanvpn.app.SecondTest#runningCase",
+		"last_completed_test=org.kurdistanvpn.app.FirstTest#completedCase",
+	} {
+		if !strings.Contains(summary, expected) {
+			t.Fatalf("summary omitted %q: %q", expected, summary)
+		}
+	}
+}
+
+func TestInstrumentationPreparationDisablesAnimationsAndCompilesExactPackages(t *testing.T) {
+	commands := instrumentationPreparationCommands("org.example.app", "org.example.app.test")
+	if len(commands) != 5 {
+		t.Fatalf("preparation command count = %d, want 5", len(commands))
+	}
+	joined := make([]string, 0, len(commands))
+	for _, command := range commands {
+		joined = append(joined, command.evidence+":"+strings.Join(command.args, " "))
+	}
+	actual := strings.Join(joined, "\n")
+	for _, expected := range []string{
+		"settings put global window_animation_scale 0",
+		"settings put global transition_animation_scale 0",
+		"settings put global animator_duration_scale 0",
+		"cmd package compile -m speed -f org.example.app",
+		"cmd package compile -m speed -f org.example.app.test",
+	} {
+		if !strings.Contains(actual, expected) {
+			t.Fatalf("preparation commands omitted %q: %q", expected, actual)
+		}
+	}
+}
+
 func TestBoundedBufferRetainsPrefixAndSignalsOverflow(t *testing.T) {
 	buffer := boundedBuffer{limit: 4}
 	if written, err := buffer.Write([]byte("abcdef")); err != nil || written != 6 {

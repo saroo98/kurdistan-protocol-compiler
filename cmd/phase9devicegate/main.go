@@ -31,6 +31,7 @@ const (
 	maxCommandEvidence = 2 << 20
 	maxLogcatInput     = 4 << 20
 	maxDiagnosticBytes = 16 << 10
+	deviceGateTimeout  = 35 * time.Minute
 )
 
 var deviceEvidenceProperties = []struct {
@@ -161,7 +162,7 @@ func run(value options) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), deviceGateTimeout)
 	defer cancel()
 	client := adbClient{path: adb, serial: value.serial, evidenceDir: value.evidenceDir}
 	if _, err := client.capture(ctx, "01-device-state.txt", "get-state"); err != nil {
@@ -211,6 +212,12 @@ func run(value options) error {
 		return fmt.Errorf("install instrumentation: %w", err)
 	}
 	if err := captureInstalledIdentity(ctx, client, value); err != nil {
+		return err
+	}
+	if err := prepareInstrumentationRuntime(ctx, client, value.appPackage, value.testPackage); err != nil {
+		return err
+	}
+	if err := waitForAndroidFramework(ctx, client, "04i"); err != nil {
 		return err
 	}
 	if value.conflictingAppPackage != "" {
@@ -401,10 +408,67 @@ func summarizeInstrumentation(input string) string {
 		failure = failure || strings.Contains(lower, marker)
 	}
 	summary := fmt.Sprintf("schema=kurdistan-instrumentation-summary-v1\ncompleted_tests=%d\njunit_success=%t\nfailure_marker=%t\n", tests, strings.Contains(input, "OK ("), failure)
+	started, completed := instrumentationProgress(input)
+	if started != "" {
+		summary += "last_started_test=" + started + "\n"
+	}
+	if completed != "" {
+		summary += "last_completed_test=" + completed + "\n"
+	}
 	for _, test := range failedInstrumentationTests(input, 64) {
 		summary += "failed_test=" + test + "\n"
 	}
 	return summary
+}
+
+func instrumentationProgress(input string) (string, string) {
+	var className, testName, lastStarted, lastCompleted string
+	for _, raw := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(raw)
+		switch {
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: class="):
+			className = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: class="))
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: test="):
+			testName = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: test="))
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS_CODE:"):
+			code, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS_CODE:")))
+			identity := className + "#" + testName
+			if err == nil && safeTestIdentity(identity) {
+				if code == 1 {
+					lastStarted = identity
+				}
+				if code == 0 {
+					lastCompleted = identity
+				}
+			}
+			className, testName = "", ""
+		}
+	}
+	return lastStarted, lastCompleted
+}
+
+type instrumentationPreparationCommand struct {
+	evidence string
+	args     []string
+}
+
+func instrumentationPreparationCommands(appPackage, testPackage string) []instrumentationPreparationCommand {
+	return []instrumentationPreparationCommand{
+		{evidence: "04d-disable-window-animations.txt", args: []string{"shell", "settings", "put", "global", "window_animation_scale", "0"}},
+		{evidence: "04e-disable-transition-animations.txt", args: []string{"shell", "settings", "put", "global", "transition_animation_scale", "0"}},
+		{evidence: "04f-disable-animator-duration.txt", args: []string{"shell", "settings", "put", "global", "animator_duration_scale", "0"}},
+		{evidence: "04g-compile-application.txt", args: []string{"shell", "cmd", "package", "compile", "-m", "speed", "-f", appPackage}},
+		{evidence: "04h-compile-instrumentation.txt", args: []string{"shell", "cmd", "package", "compile", "-m", "speed", "-f", testPackage}},
+	}
+}
+
+func prepareInstrumentationRuntime(ctx context.Context, client adbClient, appPackage, testPackage string) error {
+	for _, command := range instrumentationPreparationCommands(appPackage, testPackage) {
+		if _, err := client.capture(ctx, command.evidence, command.args...); err != nil {
+			return fmt.Errorf("prepare instrumentation runtime (%s): %w", command.evidence, err)
+		}
+	}
+	return nil
 }
 
 func failedInstrumentationTests(input string, limit int) []string {
