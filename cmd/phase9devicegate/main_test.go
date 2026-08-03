@@ -377,7 +377,7 @@ func TestInstrumentationPreparationRetriesTransientPackageServiceRestart(t *test
 	var evidence []string
 	waitPrefix := ""
 	calls := 0
-	err := prepareInstrumentationRuntimeWith(
+	recovered, err := prepareInstrumentationRuntimeWith(
 		context.Background(),
 		commands,
 		func(_ context.Context, name string, _ ...string) (string, error) {
@@ -396,6 +396,9 @@ func TestInstrumentationPreparationRetriesTransientPackageServiceRestart(t *test
 	if err != nil {
 		t.Fatalf("prepareInstrumentationRuntimeWith transient retry: %v", err)
 	}
+	if !recovered {
+		t.Fatal("prepareInstrumentationRuntimeWith did not report package service recovery")
+	}
 	if calls != 2 || waitPrefix != "04g-compile-application-retry" {
 		t.Fatalf("retry calls=%d waitPrefix=%q", calls, waitPrefix)
 	}
@@ -407,7 +410,7 @@ func TestInstrumentationPreparationRetriesTransientPackageServiceRestart(t *test
 
 func TestInstrumentationPreparationDoesNotRetryPermanentFailure(t *testing.T) {
 	waited := false
-	err := prepareInstrumentationRuntimeWith(
+	recovered, err := prepareInstrumentationRuntimeWith(
 		context.Background(),
 		[]instrumentationPreparationCommand{{evidence: "04g-compile-application.txt"}},
 		func(context.Context, string, ...string) (string, error) {
@@ -418,8 +421,20 @@ func TestInstrumentationPreparationDoesNotRetryPermanentFailure(t *testing.T) {
 			return nil
 		},
 	)
-	if err == nil || waited {
-		t.Fatalf("permanent failure err=%v waited=%t", err, waited)
+	if err == nil || waited || recovered {
+		t.Fatalf("permanent failure err=%v waited=%t recovered=%t", err, waited, recovered)
+	}
+}
+
+func TestInstrumentationPreparationReportsNoRecoveryOnCleanSuccess(t *testing.T) {
+	recovered, err := prepareInstrumentationRuntimeWith(
+		context.Background(),
+		[]instrumentationPreparationCommand{{evidence: "04g-compile-application.txt"}},
+		func(context.Context, string, ...string) (string, error) { return "Success", nil },
+		func(string) error { return errors.New("unexpected wait") },
+	)
+	if err != nil || recovered {
+		t.Fatalf("clean preparation err=%v recovered=%t", err, recovered)
 	}
 }
 
