@@ -12,11 +12,14 @@ between phases.
 ## Current truth
 
 - Phases 1-15 are integrated on `main` at
-  `83e262921d3ae8ecd8c04a2a440699b6cccace7b` with green Linux and Windows Go
+  `2f54515e3cb4527a7a90b92f4b94842f165d6ab8` with green Linux and Windows Go
   and Android assurance CI. The Phase 15 frozen input remains
   `bd7fb851bdc5103fb77310839e1cdeebfe8ffda1`.
-- Phase 16 is active on `engineering/ci-release-acceleration`; this bounded
-  workstream implements evidence-preserving CI and inactive release tooling.
+- Phase 16 is active. Its evidence-preserving CI, exact-subject receipts,
+  aggregate certificates, device-artifact fan-out, inactive release tooling,
+  and cache-independent Linux/Windows assurance foundation are integrated on
+  `main`. Production identity, HSM/KMS custody, trusted time, external durable
+  services, key ceremonies, and disaster-recovery evidence remain open.
 - The current release decision is `NO_GO`.
 - Production authority, non-loopback relays, a deployed provider service,
   production Android networking, signing, distribution, physical-device proof,
@@ -57,7 +60,7 @@ production, field, privacy, reliability, or censorship-resilience claims.
 | 13 | Integrated | Android product surface, validated settings, routing, diagnostics, recovery, and operator projections. |
 | 14 | Integrated | Candidate-local assurance, coverage reconciliation, reproducibility, and production-program readiness. |
 | 15 | Integrated | Freeze the Phase 13-14 production contract and authorize bounded infrastructure engineering. |
-| 16 | Active | Production trust, identity, key custody, control-plane foundations, and evidence-preserving CI/release tooling. |
+| 16 | Active | CI/release foundation integrated; production trust, identity, key custody, and external control-plane evidence remain open. |
 | 17 | Future | Owned provider, relay fleet, and live Kurd data plane. |
 | 18 | Future | Production Android integration and complete accepted product surface. |
 | 19 | Future | Secure release engineering and operational platform. |
@@ -151,6 +154,21 @@ identity, network, key, deployment, pilot, or release work begins.
 - No production phase starts from an uncommitted or ambiguous baseline.
 
 ## Phase 16: production trust, identity, key custody, and control plane
+
+**State:** active; evidence-preserving CI and inactive release foundations are
+integrated. Production trust and external-service exit gates remain open.
+
+### Integrated CI and release foundation
+
+- Exact-subject proof policy, strict typed receipts, aggregate assurance
+  certificates, and deny-by-default impact analysis.
+- Cache-independent Linux and Windows Go/Android assurance plus shared exact
+  APK/test-APK execution on API 26, 34, and 36 emulators.
+- Pinned tool and workflow authority, release-product metadata, unsigned
+  engineering-candidate interfaces, and inactive signing/Play/promotion tools.
+- Certified commit `2f54515e3cb4527a7a90b92f4b94842f165d6ab8`, followed by a green
+  main-branch validation run. No signing, publishing, tag, release, Play, or
+  production-service authority was activated.
 
 ### Required implementation
 

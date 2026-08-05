@@ -235,7 +235,7 @@ func verifyRoadmap(root string, value contract) error {
 	for _, required := range []string{
 		"Phases 1-15 are integrated on `main` at",
 		value.Baseline.SourceCommit,
-		"Phase 16 is active on `engineering/ci-release-acceleration`",
+		"Phase 16 is active. Its evidence-preserving CI",
 		"| 13 | Integrated |",
 		"| 14 | Integrated |",
 		"| 15 | Integrated |",

@@ -39,7 +39,7 @@
     {
       "path": "ROADMAP.md",
       "pre_sha256": "da9e73bcd41c5045e38b17e06b23db853ea0a15fb7fa46b91b7db9813ec3274f",
-      "post_sha256": "767ca1af402c767a712eaafcd15c82ce54a4ca4b008e5f0257743c5894eb5b5b"
+      "post_sha256": "f148c0a7314116b7cb69945f7ffc8f6d872e241de109d34ef282dbb824960f1c"
     },
     {
       "path": "android/app/build.gradle.kts",
@@ -134,12 +134,12 @@
     {
       "path": "cmd/phase15verify/main.go",
       "pre_sha256": "9fd4f8718bbedfed90dd9aa21f0456177943fce4414ba995323fe3fa3af83d75",
-      "post_sha256": "f1a65bf095a71d6118e3ed14400f7a9da8bb3fc54e01487ae39d012a69cbc913"
+      "post_sha256": "66ca184b8c5f0b86df31afaa228a394a105eba126a18850358802d9f8a73e31e"
     },
     {
       "path": "cmd/phase15verify/main_test.go",
       "pre_sha256": "e14f87dd6de118dabcb54b2f3e63289cdf893cdd051f7b1266409e5eb7682235",
-      "post_sha256": "a2f79d41e20760cb79b51692cfedf2f3ff571ada30a0f1286e7e7d3df9e5bd34"
+      "post_sha256": "cdaf7b97a01b97887ed86e62f1bda51a6ca1645601e96e195bbb5b3a42934881"
     },
     {
       "path": "cmd/phase9devicegate/main.go",
