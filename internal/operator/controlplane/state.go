@@ -254,6 +254,7 @@ func validateOperationAuditLinks(entries []AuditEntry, operation Operation) erro
 	target := DigestLabel(operation.ID)
 	requests := 0
 	executions := 0
+	rejections := 0
 	approvals := make(map[string]int, len(operation.ApproverIDs))
 	for _, approver := range operation.ApproverIDs {
 		approvals[DigestLabel(approver)] = 0
@@ -285,6 +286,14 @@ func validateOperationAuditLinks(entries []AuditEntry, operation Operation) erro
 				entry.At != operation.ExecutedAt || entry.Result != "executed" {
 				return ErrInvalidInput
 			}
+		case "reject-" + string(operation.Action):
+			rejections++
+			count, exists := approvals[entry.ActorDigest]
+			if rejections != 1 || operation.State != OperationRejected || !exists || count != 0 ||
+				entry.At < operation.CreatedAt || entry.At >= operation.ExpiresAt || entry.Result != string(OperationRejected) {
+				return ErrInvalidInput
+			}
+			approvals[entry.ActorDigest] = 1
 		default:
 			return ErrInvalidInput
 		}
@@ -298,7 +307,9 @@ func validateOperationAuditLinks(entries []AuditEntry, operation Operation) erro
 		}
 	}
 	if (operation.State == OperationExecuted && executions != 1) ||
-		(operation.State != OperationExecuted && executions != 0) {
+		(operation.State != OperationExecuted && executions != 0) ||
+		(operation.State == OperationRejected && rejections != 1) ||
+		(operation.State != OperationRejected && rejections != 0) {
 		return ErrInvalidInput
 	}
 	return nil
