@@ -98,7 +98,7 @@ func TestVerifyRoadmapAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "ROADMAP.md", strings.Join([]string{
 		"Phases 1-15 are integrated on `main` at `83e262921d3ae8ecd8c04a2a440699b6cccace7b`.",
-		"Phase 16 is active on `engineering/ci-release-acceleration`.",
+		"Phase 16 is active. Its evidence-preserving CI foundation is integrated.",
 		value.Baseline.SourceCommit,
 		"| 13 | Integrated |",
 		"| 14 | Integrated |",
