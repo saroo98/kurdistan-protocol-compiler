@@ -1,0 +1,243 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Saro
+openapi: 3.1.0
+info:
+  title: Kurdistan Production Operator API
+  version: 1.0.0
+  description: >-
+    Internal, identity-aware, dual-control API for Phase 16 production authority.
+    It never returns profile payloads, raw identity claims, credentials, or key material.
+servers:
+  - url: https://operator.invalid/v1
+    description: Documentation sentinel only. Production endpoints are private owner inputs.
+security:
+  - bearerIdentity: []
+paths:
+  /version:
+    get:
+      operationId: version
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Version" }
+  /health/live:
+    get:
+      operationId: live
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Health" }
+  /health/ready:
+    get:
+      operationId: ready
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Health" }
+        "503": { $ref: "#/components/responses/Error" }
+  /operations:
+    post:
+      operationId: createOperation
+      parameters:
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Mutation" }
+      responses:
+        "202": { $ref: "#/components/responses/Operation" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /operations/{operation_id}:
+    parameters:
+      - $ref: "#/components/parameters/OperationID"
+    get:
+      operationId: getOperation
+      responses:
+        "200": { $ref: "#/components/responses/Operation" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /operations/{operation_id}:approve:
+    post:
+      operationId: approveOperation
+      parameters:
+        - $ref: "#/components/parameters/OperationID"
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Decision" }
+      responses: { "200": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /operations/{operation_id}:reject:
+    post:
+      operationId: rejectOperation
+      parameters:
+        - $ref: "#/components/parameters/OperationID"
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Decision" }
+      responses: { "200": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /operations/{operation_id}:execute:
+    post:
+      operationId: executeOperation
+      parameters:
+        - $ref: "#/components/parameters/OperationID"
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Decision" }
+      responses: { "200": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /profiles/{profile_id}:
+    get:
+      operationId: getProfile
+      parameters:
+        - name: profile_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/Identifier" }
+      responses: { "200": { $ref: "#/components/responses/Profile" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "404": { $ref: "#/components/responses/Error" } }
+  /publications/current:
+    get:
+      operationId: currentPublication
+      responses: { "200": { $ref: "#/components/responses/Publication" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" } }
+  /revocations/current:
+    get:
+      operationId: currentRevocation
+      responses: { "200": { $ref: "#/components/responses/Publication" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" } }
+  /emergency:deny:
+    post:
+      operationId: emergencyDeny
+      parameters:
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Mutation" }
+      responses: { "202": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /keys/{key_id}:rotate:
+    post:
+      operationId: rotateKey
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/Identifier" }
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Mutation" }
+      responses: { "202": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /recovery:prepare:
+    post:
+      operationId: prepareRecovery
+      parameters:
+        - $ref: "#/components/parameters/APIVersion"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody: { $ref: "#/components/requestBodies/Mutation" }
+      responses: { "202": { $ref: "#/components/responses/Operation" }, "400": { $ref: "#/components/responses/Error" }, "401": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+components:
+  securitySchemes:
+    bearerIdentity:
+      type: http
+      scheme: bearer
+      bearerFormat: Google ID token through IAP or service identity
+  parameters:
+    APIVersion:
+      name: Kurdistan-API-Version
+      in: header
+      required: true
+      schema: { const: v1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { $ref: "#/components/schemas/Identifier" }
+    OperationID:
+      name: operation_id
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Identifier" }
+  requestBodies:
+    Mutation:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/MutationRequest" }
+    Decision:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/DecisionRequest" }
+  responses:
+    Version:
+      description: Exact API version.
+      content: { application/json: { schema: { type: object, additionalProperties: false, required: [api_version], properties: { api_version: { const: v1 } } } } }
+    Health:
+      description: Categorical health only.
+      content: { application/json: { schema: { type: object, additionalProperties: false, required: [status], properties: { status: { enum: [live, ready] } } } } }
+    Error:
+      description: Stable redacted error.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Operation:
+      description: Redacted operation state.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Operation" } } }
+    Profile:
+      description: Redacted profile state.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Profile" } } }
+    Publication:
+      description: Monotonic publication metadata.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Publication" } } }
+  schemas:
+    Identifier: { type: string, minLength: 3, maxLength: 128, pattern: "^[a-z0-9][a-z0-9._-]{2,127}$" }
+    Digest: { type: string, pattern: "^[0-9a-f]{64}$" }
+    MutationRequest:
+      type: object
+      additionalProperties: false
+      required: [action, target_id, subject_digest, scope_digest, expected_revision, expected_epoch, result_epoch, expires_at]
+      properties:
+        action: { $ref: "#/components/schemas/Identifier" }
+        target_id: { $ref: "#/components/schemas/Identifier" }
+        subject_digest: { $ref: "#/components/schemas/Digest" }
+        scope_digest: { $ref: "#/components/schemas/Digest" }
+        expected_revision: { type: integer, minimum: 0 }
+        expected_epoch: { type: integer, minimum: 0 }
+        result_epoch: { type: integer, minimum: 0 }
+        expires_at: { type: integer, minimum: 1 }
+    DecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_revision, expected_epoch]
+      properties:
+        expected_revision: { type: integer, minimum: 0 }
+        expected_epoch: { type: integer, minimum: 0 }
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [operation_id, action, state, revision, epoch, approvals]
+      properties:
+        operation_id: { $ref: "#/components/schemas/Identifier" }
+        action: { $ref: "#/components/schemas/Identifier" }
+        state: { enum: [PENDING, APPROVED, COMMITTED, EFFECT_PENDING, ANCHORED, PUBLISHED, FINALIZED, REJECTED, FAILED_RETRYABLE, FAILED_TERMINAL] }
+        revision: { type: integer, minimum: 0 }
+        epoch: { type: integer, minimum: 0 }
+        approvals: { type: integer, minimum: 0, maximum: 16 }
+        requester_actor_alias: { $ref: "#/components/schemas/Identifier" }
+        approver_actor_aliases: { type: array, maxItems: 16, uniqueItems: true, items: { $ref: "#/components/schemas/Identifier" } }
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [profile_id, state, generation, artifact_digest, expiration_class]
+      properties:
+        profile_id: { $ref: "#/components/schemas/Identifier" }
+        state: { enum: [ISSUED, REVOKED, EXPIRED] }
+        generation: { type: integer, minimum: 1 }
+        artifact_digest: { $ref: "#/components/schemas/Digest" }
+        expiration_class: { enum: [CURRENT, EXPIRING_SOON, EXPIRED] }
+    Publication:
+      type: object
+      additionalProperties: false
+      required: [version, root_version, snapshot_digest, targets_digest]
+      properties:
+        version: { type: integer, minimum: 1 }
+        root_version: { type: integer, minimum: 1 }
+        snapshot_digest: { $ref: "#/components/schemas/Digest" }
+        targets_digest: { $ref: "#/components/schemas/Digest" }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, correlation_alias]
+      properties:
+        code: { enum: [UNAUTHENTICATED, FORBIDDEN, INVALID_REQUEST, API_VERSION_REQUIRED, NOT_FOUND, CONFLICT, RATE_LIMITED, UNAVAILABLE] }
+        correlation_alias: { type: string, pattern: "^corr-[0-9a-f]{16}$" }
