@@ -127,6 +127,32 @@ func (service *Service) Approve(actor Actor, operationID, idempotencyKey string,
 	return result.Receipt, nil
 }
 
+func (service *Service) Reject(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, now int64) (Receipt, error) {
+	trusted, err := NewTrustedInstant(now, "phase12-compatibility", expectedRevision+1)
+	if err != nil {
+		return Receipt{}, err
+	}
+	command, err := NewRejectCommand(actor, operationID, idempotencyKey, expectedRevision, trusted)
+	if err != nil {
+		return Receipt{}, err
+	}
+	if result, replay, err := commandReplay(service.store.Snapshot(), command); err != nil {
+		return Receipt{}, err
+	} else if replay {
+		return result.Receipt, nil
+	}
+	var result CommandResult
+	next, err := service.store.Update(expectedRevision, func(state *State) error {
+		result, err = applyCommandMutation(state, command)
+		return err
+	})
+	if err != nil {
+		return Receipt{}, err
+	}
+	result.Receipt.Revision = next.Revision
+	return result.Receipt, nil
+}
+
 func (service *Service) Execute(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, now int64) (Receipt, error) {
 	trusted, err := NewTrustedInstant(now, "phase12-compatibility", expectedRevision+1)
 	if err != nil {

@@ -101,6 +101,37 @@ func TestCommandRejectsRevisionConflict(t *testing.T) {
 	}
 }
 
+func TestRejectCommandIsDurableIdempotentAndCannotBeExecuted(t *testing.T) {
+	requester, approver, _, executor := testActors()
+	input := testRequest("operation-command-reject", ActionIssueProfile, 0, 0)
+	state, _, err := ApplyCommand(NewState(), mustRequestCommand(t, requester, input, 100, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	trusted, err := NewTrustedInstant(101, "test-authority-database", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command, err := NewRejectCommand(approver, input.ID, "reject-command", 1, trusted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected, result, err := ApplyCommand(state, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejected.Operations[input.ID].State != OperationRejected || result.Receipt.State != OperationRejected {
+		t.Fatal("rejection did not become durable")
+	}
+	replayed, replay, err := ApplyCommand(rejected, command)
+	if err != nil || !replay.Noop || !reflect.DeepEqual(replayed, rejected) {
+		t.Fatalf("rejection replay changed state: result=%+v err=%v", replay, err)
+	}
+	if _, _, err := ApplyCommand(rejected, mustExecuteCommand(t, executor, input.ID, "execute-rejected", 2, 102, 3)); !errors.Is(err, ErrInsufficientQuorum) {
+		t.Fatalf("rejected operation executed: %v", err)
+	}
+}
+
 func TestProductionOperationTransitionsFailClosed(t *testing.T) {
 	allowed := [][2]ProductionOperationState{
 		{ProductionPending, ProductionApproved},

@@ -10,6 +10,7 @@ type CommandKind string
 const (
 	CommandRequest CommandKind = "request"
 	CommandApprove CommandKind = "approve"
+	CommandReject  CommandKind = "reject"
 	CommandExecute CommandKind = "execute"
 )
 
@@ -60,6 +61,17 @@ func NewApproveCommand(actor Actor, operationID, idempotencyKey string, expected
 	return command, nil
 }
 
+func NewRejectCommand(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, trusted TrustedInstant) (Command, error) {
+	command := Command{
+		Kind: CommandReject, Actor: actor, OperationID: operationID,
+		IdempotencyKey: idempotencyKey, ExpectedRevision: expectedRevision, TrustedAt: trusted,
+	}
+	if err := command.Validate(); err != nil {
+		return Command{}, err
+	}
+	return command, nil
+}
+
 func NewExecuteCommand(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, trusted TrustedInstant) (Command, error) {
 	command := Command{
 		Kind: CommandExecute, Actor: actor, OperationID: operationID,
@@ -81,7 +93,7 @@ func (command Command) Validate() error {
 			command.ExpectedRevision != command.Request.ExpectedRevision {
 			return ErrInvalidInput
 		}
-	case CommandApprove, CommandExecute:
+	case CommandApprove, CommandReject, CommandExecute:
 		if command.Request != nil || !validID(command.OperationID) || !validID(command.IdempotencyKey) {
 			return ErrInvalidInput
 		}
@@ -126,7 +138,7 @@ func commandReplay(state State, command Command) (CommandResult, bool, error) {
 	switch command.Kind {
 	case CommandRequest:
 		key = command.Request.IdempotencyKey
-	case CommandApprove, CommandExecute:
+	case CommandApprove, CommandReject, CommandExecute:
 		key = command.IdempotencyKey
 	default:
 		return CommandResult{}, false, ErrInvalidInput
@@ -164,11 +176,50 @@ func applyCommandMutation(state *State, command Command) (CommandResult, error) 
 		return applyRequestCommand(state, command.Actor, *command.Request)
 	case CommandApprove:
 		return applyApproveCommand(state, command.Actor, command.OperationID, command.IdempotencyKey, command.TrustedAt.UnixSeconds)
+	case CommandReject:
+		return applyRejectCommand(state, command.Actor, command.OperationID, command.IdempotencyKey, command.TrustedAt.UnixSeconds)
 	case CommandExecute:
 		return applyExecuteCommand(state, command.Actor, command.OperationID, command.IdempotencyKey, command.TrustedAt.UnixSeconds)
 	default:
 		return CommandResult{}, ErrInvalidInput
 	}
+}
+
+func applyRejectCommand(state *State, actor Actor, operationID, idempotencyKey string, now int64) (CommandResult, error) {
+	if err := ValidateActor(actor); err != nil || !actor.has(DutyApprove) {
+		return CommandResult{}, ErrUnauthorized
+	}
+	if !validID(operationID) || !validID(idempotencyKey) || now <= 0 {
+		return CommandResult{}, ErrInvalidInput
+	}
+	if receipt, ok := state.Idempotency[idempotencyKey]; ok {
+		if receipt.OperationID != operationID {
+			return CommandResult{}, ErrIdempotency
+		}
+		return commandResult(*state, receipt, len(state.Outbox)), nil
+	}
+	operation, ok := state.Operations[operationID]
+	if !ok || operation.State != OperationPending {
+		return CommandResult{}, ErrConflict
+	}
+	if now >= operation.ExpiresAt {
+		return CommandResult{}, ErrExpired
+	}
+	if actor.ID == operation.RequesterID {
+		return CommandResult{}, ErrUnauthorized
+	}
+	if !mutationCapacityAvailable(*state, operation.Action, 0, 1, 1, 0, 0) {
+		return CommandResult{}, ErrConflict
+	}
+	operation.ApproverIDs = canonicalApprovers(append(operation.ApproverIDs, actor.ID))
+	operation.State = OperationRejected
+	state.Operations[operationID] = operation
+	if err := appendAudit(state, now, actor.ID, "reject-"+string(operation.Action), operation.ID, string(operation.State)); err != nil {
+		return CommandResult{}, err
+	}
+	receipt := Receipt{OperationID: operation.ID, State: operation.State, Revision: state.Revision + 1, Sequence: state.NextSequence - 1}
+	state.Idempotency[idempotencyKey] = receipt
+	return commandResult(*state, receipt, len(state.Outbox)), nil
 }
 
 func commandResult(state State, receipt Receipt, outboxStart int) CommandResult {
