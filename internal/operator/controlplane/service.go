@@ -54,66 +54,29 @@ func (service *Service) State() State {
 }
 
 func (service *Service) Request(actor Actor, input RequestInput) (Receipt, error) {
-	if err := ValidateActor(actor); err != nil || !actor.has(DutyRequest) {
-		return Receipt{}, ErrUnauthorized
-	}
-	if err := validateRequestProof(input); err != nil {
+	trusted, err := NewTrustedInstant(input.CreatedAt, "phase12-compatibility", input.ExpectedRevision+1)
+	if err != nil {
 		return Receipt{}, err
 	}
-	if !validID(input.IdempotencyKey) {
-		return Receipt{}, ErrInvalidInput
-	}
-	operation := Operation{
-		ID:                     input.ID,
-		Action:                 input.Action,
-		TargetID:               input.TargetID,
-		SubjectDigest:          input.SubjectDigest,
-		ScopeDigest:            input.ScopeDigest,
-		AuthorityScopeDigest:   input.AuthorityScopeDigest,
-		AuthorityRootDigest:    input.AuthorityRootDigest,
-		ExpectedArtifactDigest: input.ExpectedArtifactDigest,
-		RequesterID:            actor.ID,
-		State:                  OperationPending,
-		ExpectedRevision:       input.ExpectedRevision,
-		ExpectedEpoch:          input.ExpectedEpoch,
-		ResultEpoch:            input.ResultEpoch,
-		CreatedAt:              input.CreatedAt,
-		ExpiresAt:              input.ExpiresAt,
-		Publication:            clonePublicationInput(input.Publication),
-	}
-	if err := ValidateOperation(operation); err != nil {
+	command, err := NewRequestCommand(actor, input, trusted)
+	if err != nil {
 		return Receipt{}, err
 	}
-	current := service.store.Snapshot()
-	if receipt, ok := current.Idempotency[input.IdempotencyKey]; ok {
-		existing, found := current.Operations[receipt.OperationID]
-		if !found || !sameRequestIntent(existing, operation) {
-			return Receipt{}, ErrIdempotency
-		}
-		return receipt, nil
+	if result, replay, err := commandReplay(service.store.Snapshot(), command); err != nil {
+		return Receipt{}, err
+	} else if replay {
+		return result.Receipt, nil
 	}
+	var result CommandResult
 	next, err := service.store.Update(input.ExpectedRevision, func(state *State) error {
-		if _, exists := state.Operations[operation.ID]; exists ||
-			!mutationCapacityAvailable(*state, operation.Action, 1, 1, 1, 0, 0) {
-			return ErrConflict
-		}
-		state.Operations[operation.ID] = operation
-		if err := appendAudit(state, input.CreatedAt, actor.ID, "request-"+string(input.Action), operation.ID, "accepted"); err != nil {
-			return err
-		}
-		receipt := Receipt{
-			OperationID: operation.ID,
-			State:       operation.State,
-			Revision:    state.Revision + 1,
-			Sequence:    state.NextSequence - 1,
-		}
-		state.Idempotency[input.IdempotencyKey] = receipt
-		return nil
+		result, err = applyCommandMutation(state, command)
+		return err
 	})
 	if err != nil {
 		return Receipt{}, err
 	}
-	return next.Idempotency[input.IdempotencyKey], nil
+	result.Receipt.Revision = next.Revision
+	return result.Receipt, nil
 }
 
 func sameRequestIntent(existing, requested Operation) bool {
@@ -139,108 +102,55 @@ func sameRequestIntent(existing, requested Operation) bool {
 }
 
 func (service *Service) Approve(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, now int64) (Receipt, error) {
-	if err := ValidateActor(actor); err != nil || !actor.has(DutyApprove) {
-		return Receipt{}, ErrUnauthorized
+	trusted, err := NewTrustedInstant(now, "phase12-compatibility", expectedRevision+1)
+	if err != nil {
+		return Receipt{}, err
 	}
-	if !validID(operationID) || !validID(idempotencyKey) || now <= 0 {
-		return Receipt{}, ErrInvalidInput
+	command, err := NewApproveCommand(actor, operationID, idempotencyKey, expectedRevision, trusted)
+	if err != nil {
+		return Receipt{}, err
 	}
-	current := service.store.Snapshot()
-	if receipt, ok := current.Idempotency[idempotencyKey]; ok {
-		if receipt.OperationID != operationID {
-			return Receipt{}, ErrIdempotency
-		}
-		return receipt, nil
+	if result, replay, err := commandReplay(service.store.Snapshot(), command); err != nil {
+		return Receipt{}, err
+	} else if replay {
+		return result.Receipt, nil
 	}
+	var result CommandResult
 	next, err := service.store.Update(expectedRevision, func(state *State) error {
-		operation, ok := state.Operations[operationID]
-		if !ok || operation.State == OperationExecuted || operation.State == OperationRejected {
-			return ErrConflict
-		}
-		if now >= operation.ExpiresAt {
-			return ErrExpired
-		}
-		if actor.ID == operation.RequesterID {
-			return ErrUnauthorized
-		}
-		for _, approver := range operation.ApproverIDs {
-			if approver == actor.ID {
-				return ErrConflict
-			}
-		}
-		if !mutationCapacityAvailable(*state, operation.Action, 0, 1, 1, 0, 0) {
-			return ErrConflict
-		}
-		operation.ApproverIDs = canonicalApprovers(append(operation.ApproverIDs, actor.ID))
-		if len(operation.ApproverIDs) >= MinApprovalQuorum {
-			operation.State = OperationApproved
-		}
-		state.Operations[operationID] = operation
-		if err := appendAudit(state, now, actor.ID, "approve-"+string(operation.Action), operation.ID, string(operation.State)); err != nil {
-			return err
-		}
-		receipt := Receipt{OperationID: operation.ID, State: operation.State, Revision: state.Revision + 1, Sequence: state.NextSequence - 1}
-		state.Idempotency[idempotencyKey] = receipt
-		return nil
+		result, err = applyCommandMutation(state, command)
+		return err
 	})
 	if err != nil {
 		return Receipt{}, err
 	}
-	return next.Idempotency[idempotencyKey], nil
+	result.Receipt.Revision = next.Revision
+	return result.Receipt, nil
 }
 
 func (service *Service) Execute(actor Actor, operationID, idempotencyKey string, expectedRevision uint64, now int64) (Receipt, error) {
-	if err := ValidateActor(actor); err != nil || !actor.has(DutyExecute) {
-		return Receipt{}, ErrUnauthorized
+	trusted, err := NewTrustedInstant(now, "phase12-compatibility", expectedRevision+1)
+	if err != nil {
+		return Receipt{}, err
 	}
-	if !validID(operationID) || !validID(idempotencyKey) || now <= 0 {
-		return Receipt{}, ErrInvalidInput
+	command, err := NewExecuteCommand(actor, operationID, idempotencyKey, expectedRevision, trusted)
+	if err != nil {
+		return Receipt{}, err
 	}
-	current := service.store.Snapshot()
-	if receipt, ok := current.Idempotency[idempotencyKey]; ok {
-		if receipt.OperationID != operationID {
-			return Receipt{}, ErrIdempotency
-		}
-		return receipt, nil
+	if result, replay, err := commandReplay(service.store.Snapshot(), command); err != nil {
+		return Receipt{}, err
+	} else if replay {
+		return result.Receipt, nil
 	}
+	var result CommandResult
 	next, err := service.store.Update(expectedRevision, func(state *State) error {
-		operation, ok := state.Operations[operationID]
-		if !ok || operation.State != OperationApproved {
-			return ErrInsufficientQuorum
-		}
-		if now >= operation.ExpiresAt {
-			return ErrExpired
-		}
-		if len(operation.ApproverIDs) < MinApprovalQuorum ||
-			actor.ID == operation.RequesterID || contains(operation.ApproverIDs, actor.ID) {
-			return ErrUnauthorized
-		}
-		if err := authorizeExecution(actor, operation.Action); err != nil {
-			return err
-		}
-		if !mutationCapacityAvailable(*state, operation.Action, 0, 1, 1, 1, MaxEffectAttempts) {
-			return ErrConflict
-		}
-		if err := applyOperation(state, operation, now); err != nil {
-			return err
-		}
-		operation.State = OperationExecuted
-		operation.ExecutedAt = now
-		state.Operations[operationID] = operation
-		if err := appendOutbox(state, now, operation.ID, string(operation.Action), operation.SubjectDigest); err != nil {
-			return err
-		}
-		if err := appendAudit(state, now, actor.ID, "execute-"+string(operation.Action), operation.ID, "executed"); err != nil {
-			return err
-		}
-		receipt := Receipt{OperationID: operation.ID, State: operation.State, Revision: state.Revision + 1, Sequence: state.NextSequence - 1}
-		state.Idempotency[idempotencyKey] = receipt
-		return nil
+		result, err = applyCommandMutation(state, command)
+		return err
 	})
 	if err != nil {
 		return Receipt{}, err
 	}
-	return next.Idempotency[idempotencyKey], nil
+	result.Receipt.Revision = next.Revision
+	return result.Receipt, nil
 }
 
 func (service *Service) markDelivered(actor Actor, capability effectOutcomeCapability, expectedRevision uint64, now int64) (Receipt, error) {

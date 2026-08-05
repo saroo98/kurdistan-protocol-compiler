@@ -1182,6 +1182,7 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 			delete(changed, path)
 		}
 		delete(changed, evidenceoverlay.Phase16SuccessorPath)
+		delete(changed, evidenceoverlay.Phase16ProductionTrustSuccessorPath)
 	}
 	if len(changed) == 0 {
 		if hadPhysicalChanges {
