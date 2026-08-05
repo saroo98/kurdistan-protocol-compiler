@@ -39,6 +39,8 @@ android/**/generated/
 android/keystore.properties
 android/*.jks
 android/*.keystore
+.terraform/
+*.tfplan
 !profiles/examples/.gitkeep
 !testdata/corpus/.gitkeep
 !testdata/audit/.gitkeep

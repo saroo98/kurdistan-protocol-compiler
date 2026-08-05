@@ -18,7 +18,8 @@
     {"class":"retention-lock","approverActorRefs":["actor-retention-a","actor-retention-b"],"executorActorRef":"actor-retention-executor"},
     {"class":"key-destruction","approverActorRefs":["actor-destruction-a","actor-destruction-b"],"executorActorRef":"actor-destruction-executor"}
   ],
-  "wif": {"poolRef":"ref-wif-pool","providerRef":"ref-wif-provider","repository":"saroo98/kurdistan-protocol-compiler","ref":"refs/heads/main","workflowPaths":[".github/workflows/phase16-production-plan.yml",".github/workflows/phase16-production-apply.yml"],"environment":"phase16-production"},
+  "deployment": {"bootstrapIdentityRef":"ref-bootstrap-identity","terraformStateBucketRef":"ref-terraform-state-bucket","privatePlanBucketRef":"ref-private-plan-bucket"},
+  "wif": {"poolRef":"ref-wif-pool","providerRef":"ref-wif-provider","repository":"saroo98/kurdistan-protocol-compiler","ref":"refs/heads/main","workflowPaths":[".github/workflows/phase16-production-plan.yml",".github/workflows/phase16-production-apply.yml",".github/workflows/phase16-drill.yml"],"environments":["phase16-production-plan","phase16-production","phase16-drill"]},
   "secretResourceRefs": ["ref-secret-resource"],
   "alertChannelRefs": ["ref-alert-channel"],
   "budget": {"qualificationMonthlyMinorUnits":10000,"productionMonthlyMinorUnits":100000,"currency":"GBP","automaticQualificationTeardownHours":24},

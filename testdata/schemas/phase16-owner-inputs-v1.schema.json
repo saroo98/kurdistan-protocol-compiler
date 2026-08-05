@@ -4,7 +4,7 @@
   "title": "Phase 16 private owner input references",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema","organizationRef","billingAccountRef","qualificationProjects","productionProjects","region","spannerConfiguration","domainZoneRef","identityTenantRef","approvalClasses","wif","secretResourceRefs","alertChannelRefs","budget","retention","backup","authorizations"],
+  "required": ["schema","organizationRef","billingAccountRef","qualificationProjects","productionProjects","region","spannerConfiguration","domainZoneRef","identityTenantRef","approvalClasses","deployment","wif","secretResourceRefs","alertChannelRefs","budget","retention","backup","authorizations"],
   "properties": {
     "schema": {"const":"phase16-owner-inputs-v1"},
     "organizationRef": {"$ref":"#/$defs/ref"},
@@ -16,6 +16,7 @@
     "domainZoneRef": {"$ref":"#/$defs/ref"},
     "identityTenantRef": {"$ref":"#/$defs/ref"},
     "approvalClasses": {"type":"array","minItems":8,"maxItems":16,"uniqueItems":true,"items":{"$ref":"#/$defs/approval"}},
+    "deployment": {"$ref":"#/$defs/deployment"},
     "wif": {"$ref":"#/$defs/wif"},
     "secretResourceRefs": {"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},
     "alertChannelRefs": {"type":"array","minItems":1,"maxItems":16,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},
@@ -38,9 +39,10 @@
     },
     "wif": {
       "type":"object","additionalProperties":false,
-      "required":["poolRef","providerRef","repository","ref","workflowPaths","environment"],
-      "properties":{"poolRef":{"$ref":"#/$defs/ref"},"providerRef":{"$ref":"#/$defs/ref"},"repository":{"const":"saroo98/kurdistan-protocol-compiler"},"ref":{"const":"refs/heads/main"},"workflowPaths":{"type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string","pattern":"^\\.github/workflows/[A-Za-z0-9._-]+\\.yml$"}},"environment":{"const":"phase16-production"}}
+      "required":["poolRef","providerRef","repository","ref","workflowPaths","environments"],
+      "properties":{"poolRef":{"$ref":"#/$defs/ref"},"providerRef":{"$ref":"#/$defs/ref"},"repository":{"const":"saroo98/kurdistan-protocol-compiler"},"ref":{"const":"refs/heads/main"},"workflowPaths":{"type":"array","minItems":3,"maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":[".github/workflows/phase16-production-plan.yml",".github/workflows/phase16-production-apply.yml",".github/workflows/phase16-drill.yml"]}},"environments":{"type":"array","minItems":3,"maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":["phase16-production-plan","phase16-production","phase16-drill"]}}}
     },
+    "deployment": {"type":"object","additionalProperties":false,"required":["bootstrapIdentityRef","terraformStateBucketRef","privatePlanBucketRef"],"properties":{"bootstrapIdentityRef":{"$ref":"#/$defs/ref"},"terraformStateBucketRef":{"$ref":"#/$defs/ref"},"privatePlanBucketRef":{"$ref":"#/$defs/ref"}}},
     "budget": {"type":"object","additionalProperties":false,"required":["qualificationMonthlyMinorUnits","productionMonthlyMinorUnits","currency","automaticQualificationTeardownHours"],"properties":{"qualificationMonthlyMinorUnits":{"type":"integer","minimum":1,"maximum":10000000},"productionMonthlyMinorUnits":{"type":"integer","minimum":1,"maximum":100000000},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"automaticQualificationTeardownHours":{"type":"integer","minimum":1,"maximum":72}}},
     "retention": {"type":"object","additionalProperties":false,"required":["auditDays","publicationDays","backupDays","legalOwnerRef","incidentOwnerRef"],"properties":{"auditDays":{"type":"integer","minimum":2555,"maximum":36500},"publicationDays":{"type":"integer","minimum":365,"maximum":36500},"backupDays":{"type":"integer","minimum":35,"maximum":3650},"legalOwnerRef":{"$ref":"#/$defs/ref"},"incidentOwnerRef":{"$ref":"#/$defs/ref"}}},
     "backup": {"type":"object","additionalProperties":false,"required":["targetProjectRef","recoveryOwnerRefs"],"properties":{"targetProjectRef":{"$ref":"#/$defs/ref"},"recoveryOwnerRefs":{"type":"array","minItems":2,"maxItems":4,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}},

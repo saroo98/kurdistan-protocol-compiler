@@ -13,8 +13,12 @@ variable "bucket_names" { type = map(string) }
 variable "images" {
   type = map(string)
   validation {
-    condition     = alltrue([for image in values(var.images) : can(regex("@sha256:[0-9a-f]{64}$", image))])
-    error_message = "Every image must be digest pinned."
+    condition = (
+      length(setsubtract(toset(keys(var.images)), toset(["koperator-api", "koperator-worker", "koperator-publication", "koperator-audit", "koperator-emergency", "koperator-ceremony", "koperator-drill"]))) == 0 &&
+      length(setsubtract(toset(["koperator-api", "koperator-worker", "koperator-publication", "koperator-audit", "koperator-emergency", "koperator-ceremony", "koperator-drill"]), toset(keys(var.images)))) == 0 &&
+      alltrue([for image in values(var.images) : can(regex("@sha256:[0-9a-f]{64}$", image))])
+    )
+    error_message = "Every required service image, and no unknown image, must be digest pinned."
   }
 }
 

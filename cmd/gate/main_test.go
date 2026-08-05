@@ -55,7 +55,7 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 	}{
 		{name: "full audit", proof: "go-audit", want: []string{"audit"}, arg: "--full"},
 		{name: "executable evidence", proof: "go-executable-evidence", want: []string{"executable-evidence"}, arg: "./cmd/executableevidence"},
-		{name: "operator", proof: "operator", want: []string{"phase12-control-plane"}},
+		{name: "operator", proof: "operator", want: []string{"phase12-control-plane", "phase16-offline-authority", "phase16-production-modules", "phase16-production-tests", "phase16-production-vet"}},
 		{name: "documentation evidence", proof: "docs-evidence", want: []string{"phase15-evidence", "release-metadata"}},
 		{name: "dependency freshness", proof: "dependency-freshness", want: []string{"build-govulncheck", "go-vulnerability-analysis", "fetch-osv-scanner", "android-runtime-vulnerability-analysis"}},
 		{name: "Android host", proof: "android-host", want: []string{"android-assurance-host"}, arg: "ciAssuranceHostGate"},
@@ -153,11 +153,11 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 		options gateOptions
 		want    []string
 	}{
-		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane"}},
-		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane"}},
-		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "android-assurance-host"}},
+		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-production-modules", "phase16-production-tests", "phase16-production-vet"}},
+		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-production-modules", "phase16-production-tests", "phase16-production-vet"}},
+		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-production-modules", "phase16-production-tests", "phase16-production-vet", "android-assurance-host"}},
 		{name: "Android only", options: gateOptions{androidOnly: true}, want: []string{"android-assurance-host"}},
-		{name: "proof", options: gateOptions{proof: "operator"}, want: []string{"phase12-control-plane"}},
+		{name: "proof", options: gateOptions{proof: "operator"}, want: []string{"phase12-control-plane", "phase16-offline-authority", "phase16-production-modules", "phase16-production-tests", "phase16-production-vet"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -347,7 +347,7 @@ func containsString(values []string, target string) bool {
 
 func TestGateStepsRemainCacheProof(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
-	if len(steps) != 7 {
+	if len(steps) != 11 {
 		t.Fatalf("got %d Go gate steps", len(steps))
 	}
 	if got := steps[0].args; len(got) != 2 || got[0] != "mod" || got[1] != "verify" {

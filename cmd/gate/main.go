@@ -140,6 +140,10 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"executable-evidence", "go", []string{"run", "./cmd/executableevidence"}, ""},
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
 		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
+		{"phase16-offline-authority", "go", []string{"run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"}, ""},
+		{"phase16-production-modules", "go", []string{"-C", "production", "mod", "verify"}, ""},
+		{"phase16-production-tests", "go", []string{"-C", "production", "test", "-count=1", "./..."}, ""},
+		{"phase16-production-vet", "go", []string{"-C", "production", "vet", "./..."}, ""},
 	}
 }
 
@@ -157,7 +161,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 		audit.args = []string{"run", "./cmd/kcheck", "--full"}
 		return []step{audit}, nil
 	case "operator":
-		return steps[6:7], nil
+		return steps[6:], nil
 	case "docs-evidence":
 		return []step{
 			{name: "phase15-evidence", program: "go", args: []string{"run", "./cmd/phase15verify", "-root", "."}},

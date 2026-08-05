@@ -10,16 +10,25 @@
     "retention": "73abb0d0ec1cf7ce4f488a901af6e92285536d471ff798e3ac9fe6a2764a9e8b",
     "roles": "392915fdbb29c428f68ee03ca6c0965f186efa81b5498f4ebeb14c68be8fde8c",
     "services": "1757366163b0eb10800653ae7fcd5f9e5c0716c0b07ece2d52f387acb096ca59",
-    "tools": "9660a3494106f414e3c3a42576a4abd7c522473242f24d2f45703fa7fd92e519"
+    "tools": "365e5728823b6fe3ccee4bffb94665d52d2a83ef3625fa8ca911d6b5ed3e59d9"
   },
   "localAuthority": [
     "action-role-policy",
+    "audit-anchor-chain",
+    "disaster-recovery-verifier",
     "evidence-schema",
+    "fenced-outbox-worker",
+    "hsm-kms-adapter",
+    "immutable-publication",
     "key-custody-policy",
+    "profile-issuance-adapter",
+    "reproducible-terraform-stack",
     "region-policy",
     "retention-policy",
     "service-separation-policy",
+    "spanner-serializable-store",
     "strict-offline-verifier",
+    "trusted-time-reservation",
     "threat-model"
   ],
   "externalEvidence": [
@@ -34,7 +43,9 @@
   "limitations": [
     "No production Google Cloud resources are evidenced by this local status.",
     "No production key ceremony or external recovery drill has been executed.",
+    "Production runtime images and verified-intent admission remain unavailable pending local deployability closure.",
+    "The least-privilege runtime IAM graph and exact plan-policy receipt are not yet implemented.",
     "Live relays and Internet egress remain Phase 17 responsibilities."
   ],
-  "findings": {"critical":0,"high":0}
+  "findings": {"critical":0,"high":3}
 }

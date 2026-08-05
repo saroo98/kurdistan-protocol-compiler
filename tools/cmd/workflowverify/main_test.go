@@ -78,6 +78,29 @@ jobs:
 	}
 }
 
+func TestVerifyWorkflowAllowsOIDCWriteOnlyForProtectedPhase16Workflows(t *testing.T) {
+	for name, wantPass := range map[string]bool{"phase16-production-plan.yml": true, "phase16-production-apply.yml": true, "phase16-drill.yml": true, "ordinary.yml": false} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeWorkflow(t, root, name, `name: oidc
+on: [workflow_dispatch]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+`)
+			err := verifyRoot(root)
+			if (err == nil) != wantPass {
+				t.Fatalf("pass=%v error=%v", wantPass, err)
+			}
+		})
+	}
+}
+
 func TestVerifyKnownWorkflowContractRejectsAttemptAmbiguityAndUnboundDeviceBytes(t *testing.T) {
 	for name, content := range map[string]string{
 		"assurance.yml": "name: incomplete assurance",

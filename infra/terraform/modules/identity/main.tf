@@ -9,3 +9,4 @@ resource "google_service_account" "service" {
 }
 
 output "emails" { value = { for key, value in google_service_account.service : key => value.email } }
+output "names" { value = { for key, value in google_service_account.service : key => value.name } }
