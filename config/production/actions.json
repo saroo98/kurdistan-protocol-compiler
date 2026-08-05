@@ -1,0 +1,24 @@
+{
+  "schema": "phase16-action-policy-v1",
+  "actions": [
+    {"id":"audit.anchor","requestRoles":["auditor"],"approvalRoles":["approver"],"executeRole":"auditor","approvals":2,"requiresAnchor":true,"requiresPublication":false},
+    {"id":"emergency.deny","requestRoles":["emergency"],"approvalRoles":["approver"],"executeRole":"emergency","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"key.destroy.schedule","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"key.issuer.rotate","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"key.root.rotate","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"profile.issue","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"profile.revoke","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"profile.rotate","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"executor","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"publication.publish","requestRoles":["publisher"],"approvalRoles":["approver"],"executeRole":"publisher","approvals":2,"requiresAnchor":true,"requiresPublication":true},
+    {"id":"recovery.prepare","requestRoles":["recovery"],"approvalRoles":["approver"],"executeRole":"recovery","approvals":2,"requiresAnchor":true,"requiresPublication":false},
+    {"id":"retention.lock","requestRoles":["requester"],"approvalRoles":["approver"],"executeRole":"deployer","approvals":2,"requiresAnchor":true,"requiresPublication":false}
+  ],
+  "mutationRequirements": {
+    "idempotencyKey": true,
+    "expectedRevision": true,
+    "expectedEpoch": true,
+    "boundedBodyBytes": 65536,
+    "contentType": "application/json",
+    "apiVersion": "v1"
+  }
+}

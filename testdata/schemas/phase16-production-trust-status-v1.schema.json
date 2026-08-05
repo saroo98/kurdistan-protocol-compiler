@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistan.invalid/schemas/phase16-production-trust-status-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","phase","baselineCommit","state","policyDigests","localAuthority","externalEvidence","releaseDecision","limitations","findings"],
+  "properties": {
+    "schema": {"const":"phase16-production-trust-status-v1"},
+    "phase": {"const":16},
+    "baselineCommit": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "state": {"enum":["IMPLEMENTATION_ACTIVE","EXTERNAL_VALIDATION_PENDING","COMPLETE"]},
+    "policyDigests": {"type":"object","additionalProperties":false,"required":["actions","keyPolicy","regions","retention","roles","services","tools"],"properties":{"actions":{"$ref":"#/$defs/digest"},"keyPolicy":{"$ref":"#/$defs/digest"},"regions":{"$ref":"#/$defs/digest"},"retention":{"$ref":"#/$defs/digest"},"roles":{"$ref":"#/$defs/digest"},"services":{"$ref":"#/$defs/digest"},"tools":{"$ref":"#/$defs/digest"}}},
+    "localAuthority": {"type":"array","minItems":1,"maxItems":64,"uniqueItems":true,"items":{"type":"string","minLength":3,"maxLength":96}},
+    "externalEvidence": {"type":"array","minItems":1,"maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["id","status","evidenceDigest"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{2,63}$"},"status":{"enum":["UNVERIFIED","PASS","FAIL"]},"evidenceDigest":{"type":"string","pattern":"^(UNVERIFIED|[0-9a-f]{64})$"}}}},
+    "releaseDecision": {"const":"NO_GO"},
+    "limitations": {"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":8,"maxLength":256}},
+    "findings": {"type":"object","additionalProperties":false,"required":["critical","high"],"properties":{"critical":{"type":"integer","minimum":0},"high":{"type":"integer","minimum":0}}}
+  },
+  "$defs": {"digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}
+}

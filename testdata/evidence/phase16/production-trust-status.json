@@ -1,0 +1,40 @@
+{
+  "schema": "phase16-production-trust-status-v1",
+  "phase": 16,
+  "baselineCommit": "62ceaf982bf557a437b5cc7c16878c2c820c80eb",
+  "state": "IMPLEMENTATION_ACTIVE",
+  "policyDigests": {
+    "actions": "817826c093daead345e15e04a76f2157f65e458e80e18a670564978c9f9b86a9",
+    "keyPolicy": "7adb819ef754e234b90143380c34e95f9fe78ff4fabe8556b4321018056e9a68",
+    "regions": "44081218ad5e1930257e3b4bef8039a5473884ce20163294aeb91f424b952eaf",
+    "retention": "73abb0d0ec1cf7ce4f488a901af6e92285536d471ff798e3ac9fe6a2764a9e8b",
+    "roles": "392915fdbb29c428f68ee03ca6c0965f186efa81b5498f4ebeb14c68be8fde8c",
+    "services": "1757366163b0eb10800653ae7fcd5f9e5c0716c0b07ece2d52f387acb096ca59",
+    "tools": "9660a3494106f414e3c3a42576a4abd7c522473242f24d2f45703fa7fd92e519"
+  },
+  "localAuthority": [
+    "action-role-policy",
+    "evidence-schema",
+    "key-custody-policy",
+    "region-policy",
+    "retention-policy",
+    "service-separation-policy",
+    "strict-offline-verifier",
+    "threat-model"
+  ],
+  "externalEvidence": [
+    {"id":"cloud-identity-readback","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"},
+    {"id":"hsm-custody-readback","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"},
+    {"id":"production-infrastructure-readback","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"},
+    {"id":"production-lifecycle-exit-gate","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"},
+    {"id":"recovery-and-compromise-drills","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"},
+    {"id":"targeted-kms-adapter-review","status":"UNVERIFIED","evidenceDigest":"UNVERIFIED"}
+  ],
+  "releaseDecision": "NO_GO",
+  "limitations": [
+    "No production Google Cloud resources are evidenced by this local status.",
+    "No production key ceremony or external recovery drill has been executed.",
+    "Live relays and Internet egress remain Phase 17 responsibilities."
+  ],
+  "findings": {"critical":0,"high":0}
+}

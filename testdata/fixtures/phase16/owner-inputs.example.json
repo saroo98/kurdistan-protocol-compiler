@@ -1,0 +1,28 @@
+{
+  "schema": "phase16-owner-inputs-v1",
+  "organizationRef": "ref-org-owner-supplied",
+  "billingAccountRef": "ref-billing-owner-supplied",
+  "qualificationProjects": {"trust":"ref-qual-trust","control":"ref-qual-control","publication":"ref-qual-publication","audit":"ref-qual-audit","ops":"ref-qual-ops"},
+  "productionProjects": {"trust":"ref-prod-trust","control":"ref-prod-control","publication":"ref-prod-publication","audit":"ref-prod-audit","ops":"ref-prod-ops"},
+  "region": "europe-west2",
+  "spannerConfiguration": "eur6",
+  "domainZoneRef": "ref-domain-zone-owner-supplied",
+  "identityTenantRef": "ref-identity-tenant-owner-supplied",
+  "approvalClasses": [
+    {"class":"root","approverActorRefs":["actor-root-a","actor-root-b"],"executorActorRef":"actor-root-executor"},
+    {"class":"issuer","approverActorRefs":["actor-issuer-a","actor-issuer-b"],"executorActorRef":"actor-issuer-executor"},
+    {"class":"publication","approverActorRefs":["actor-publication-a","actor-publication-b"],"executorActorRef":"actor-publication-executor"},
+    {"class":"revocation","approverActorRefs":["actor-revocation-a","actor-revocation-b"],"executorActorRef":"actor-revocation-executor"},
+    {"class":"recovery","approverActorRefs":["actor-recovery-a","actor-recovery-b"],"executorActorRef":"actor-recovery-executor"},
+    {"class":"emergency","approverActorRefs":["actor-emergency-a","actor-emergency-b"],"executorActorRef":"actor-emergency-executor"},
+    {"class":"retention-lock","approverActorRefs":["actor-retention-a","actor-retention-b"],"executorActorRef":"actor-retention-executor"},
+    {"class":"key-destruction","approverActorRefs":["actor-destruction-a","actor-destruction-b"],"executorActorRef":"actor-destruction-executor"}
+  ],
+  "wif": {"poolRef":"ref-wif-pool","providerRef":"ref-wif-provider","repository":"saroo98/kurdistan-protocol-compiler","ref":"refs/heads/main","workflowPaths":[".github/workflows/phase16-production-plan.yml",".github/workflows/phase16-production-apply.yml"],"environment":"phase16-production"},
+  "secretResourceRefs": ["ref-secret-resource"],
+  "alertChannelRefs": ["ref-alert-channel"],
+  "budget": {"qualificationMonthlyMinorUnits":10000,"productionMonthlyMinorUnits":100000,"currency":"GBP","automaticQualificationTeardownHours":24},
+  "retention": {"auditDays":2555,"publicationDays":365,"backupDays":35,"legalOwnerRef":"ref-legal-owner","incidentOwnerRef":"ref-incident-owner"},
+  "backup": {"targetProjectRef":"ref-backup-project","recoveryOwnerRefs":["ref-recovery-owner-a","ref-recovery-owner-b"]},
+  "authorizations": {"productionMutation":"ref-auth-production-mutation","retentionLock":"ref-auth-retention-lock","keyDestruction":"ref-auth-key-destruction","productionDNS":"ref-auth-production-dns"}
+}

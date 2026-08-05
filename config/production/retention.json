@@ -1,0 +1,10 @@
+{
+  "schema": "phase16-retention-policy-v1",
+  "auditMinimumDays": 2555,
+  "publicationMinimumDays": 365,
+  "backupMinimumDays": 35,
+  "spannerPitrMinimumHours": 168,
+  "lockRequiresDisposableQualification": true,
+  "lockRequiresTwoApprovers": true,
+  "normalAuthorityHistoryDeletionAllowed": false
+}

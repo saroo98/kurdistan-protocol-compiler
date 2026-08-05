@@ -1,0 +1,9 @@
+{
+  "schema": "phase16-region-policy-v1",
+  "cloud": "google-cloud",
+  "authorityBoundary": "EU",
+  "defaultRegion": "europe-west2",
+  "spannerConfiguration": "eur6",
+  "allowedRegionalPrefixes": ["europe-"],
+  "crossBoundaryAuthorityDataAllowed": false
+}

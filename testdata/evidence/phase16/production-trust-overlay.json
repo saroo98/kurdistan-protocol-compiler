@@ -1,0 +1,26 @@
+{
+  "version": "phase16-production-trust-v1",
+  "entries": [
+    {"path":"cmd/phase16verify/main.go","pre_evidence":"ABSENT","post_sha256":"ba28ef3aedf5e51697853fd53d87b082cac6ee60e43b7b06b82e2c0b72c13b14"},
+    {"path":"cmd/phase16verify/main_test.go","pre_evidence":"ABSENT","post_sha256":"34679ba78a4517e7d913df338c9cdbfbd662f0785a1f6b52cb96ea29840a054b"},
+    {"path":"config/production/actions.json","pre_evidence":"ABSENT","post_sha256":"817826c093daead345e15e04a76f2157f65e458e80e18a670564978c9f9b86a9"},
+    {"path":"config/production/key-policy.json","pre_evidence":"ABSENT","post_sha256":"7adb819ef754e234b90143380c34e95f9fe78ff4fabe8556b4321018056e9a68"},
+    {"path":"config/production/regions.json","pre_evidence":"ABSENT","post_sha256":"44081218ad5e1930257e3b4bef8039a5473884ce20163294aeb91f424b952eaf"},
+    {"path":"config/production/retention.json","pre_evidence":"ABSENT","post_sha256":"73abb0d0ec1cf7ce4f488a901af6e92285536d471ff798e3ac9fe6a2764a9e8b"},
+    {"path":"config/production/roles.json","pre_evidence":"ABSENT","post_sha256":"392915fdbb29c428f68ee03ca6c0965f186efa81b5498f4ebeb14c68be8fde8c"},
+    {"path":"config/production/services.json","pre_evidence":"ABSENT","post_sha256":"1757366163b0eb10800653ae7fcd5f9e5c0716c0b07ece2d52f387acb096ca59"},
+    {"path":"config/production/tools.json","pre_evidence":"ABSENT","post_sha256":"9660a3494106f414e3c3a42576a4abd7c522473242f24d2f45703fa7fd92e519"},
+    {"path":"docs/KIP-0092-phase16-production-trust.md","pre_evidence":"ABSENT","post_sha256":"f7bf0e27e8b6692b05edd573ae5c16eaf156a80fb609e6c8963d394d9c72622f"},
+    {"path":"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md","pre_evidence":"ABSENT","post_sha256":"6dd90bd9acca28588f66971e5d25af5411d9985f9e99a789762f69b2a269b75d"},
+    {"path":"docs/PHASE16_THREAT_MODEL.md","pre_evidence":"ABSENT","post_sha256":"0ed962b48a296b9a484d4f8b90c4aedca00a481a2912d9f0f36c438145450b9d"},
+    {"path":"internal/audit/security.go","pre_sha256":"220af4b79c5ef88d4f83d316b143268b791487a0b8d558eb01dda10e96dce7d2","post_sha256":"dd444e2f0bdb94e25f55afe116e6c228d81b5c6269378593decd487c10331ff8"},
+    {"path":"internal/testkit/evidenceoverlay/successor.go","pre_sha256":"78bca274f7ad9ac4a6acdcc21f54b47a2ea337f8ea8b5886bc253642a591d91b","post_sha256":"0fb268b53111c2941c364bd428d30c2e7eef5ec158289be4447f2aa0da1de9b2"},
+    {"path":"internal/testkit/evidenceoverlay/successor_test.go","pre_sha256":"ea7c96bcd7fca7d2fb93ba24fd40808dff3e03fc0da763b7146a6b4e0226e3a3","post_sha256":"ff5a3fb453975e34ecdc819cd8a299edfb81f6c1187ef651803bc1ab0f954b32"},
+    {"path":"testdata/evidence/phase16/production-trust-status.json","pre_evidence":"ABSENT","post_sha256":"092fc231903fdca6ef44213d0863f91cd342974a8e5c68c6e5f9ef7795caa4ef"},
+    {"path":"testdata/fixtures/phase16/owner-inputs.example.json","pre_evidence":"ABSENT","post_sha256":"2b791a4035962ba5799fc8a7f4ef9a21d334c8e866b1801efe9d6dd43cda55bf"},
+    {"path":"testdata/schemas/phase16-external-receipt-v1.schema.json","pre_evidence":"ABSENT","post_sha256":"723e9315105cc12faf4232dac902b65a554b86de2252a6942b66e193b14a9e96"},
+    {"path":"testdata/schemas/phase16-operation-v1.schema.json","pre_evidence":"ABSENT","post_sha256":"273b6bef1bea42fbe0b49ba64916725c8c811dc425adc83cbf70c7955e1a64a1"},
+    {"path":"testdata/schemas/phase16-owner-inputs-v1.schema.json","pre_evidence":"ABSENT","post_sha256":"04fb19b2afc7be16317e97392b0c6487b81ab935abfadca38108d4b4cb48429b"},
+    {"path":"testdata/schemas/phase16-production-trust-status-v1.schema.json","pre_evidence":"ABSENT","post_sha256":"1ba0f023c51afc930e47d35c8a9f3ba9f41b4b503daba0b3e2587a36f9f0c1f7"}
+  ]
+}

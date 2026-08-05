@@ -1,0 +1,14 @@
+{
+  "schema": "phase16-service-policy-v1",
+  "services": [
+    {"id":"koperator-api","ingress":"internal-and-cloud-load-balancing","iap":true,"directRunAppDisabled":true,"canSign":false,"canPublish":false,"canAnchor":false,"canRecover":false},
+    {"id":"koperator-worker","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":true,"canPublish":false,"canAnchor":false,"canRecover":false},
+    {"id":"koperator-publication","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":false,"canPublish":true,"canAnchor":false,"canRecover":false},
+    {"id":"koperator-audit","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":false,"canPublish":false,"canAnchor":true,"canRecover":false},
+    {"id":"koperator-emergency","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":true,"canPublish":true,"canAnchor":false,"canRecover":false},
+    {"id":"koperator-ceremony","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":true,"canPublish":false,"canAnchor":false,"canRecover":true},
+    {"id":"koperator-drill","ingress":"internal","iap":false,"directRunAppDisabled":true,"canSign":false,"canPublish":false,"canAnchor":false,"canRecover":true}
+  ],
+  "anonymousIngressAllowed": false,
+  "publicOperatorApiAllowed": false
+}
