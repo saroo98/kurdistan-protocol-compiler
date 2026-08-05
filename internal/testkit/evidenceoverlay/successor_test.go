@@ -78,6 +78,32 @@ func TestLoadSuccessorChainsPhase16IntoPhase15(t *testing.T) {
 	}
 }
 
+func TestLoadSuccessorChainsProductionTrustIntoCIAndPhase15(t *testing.T) {
+	root := t.TempDir()
+	path := "ROADMAP.md"
+	phase14 := strings.Repeat("1", 64)
+	phase15Bytes := []byte("phase 15\n")
+	phase16CIBytes := []byte("phase 16 CI\n")
+	phase16TrustBytes := []byte("phase 16 trust\n")
+	phase15Digest := sha256.Sum256(phase15Bytes)
+	phase16CIDigest := sha256.Sum256(phase16CIBytes)
+	phase16TrustDigest := sha256.Sum256(phase16TrustBytes)
+	if err := os.WriteFile(filepath.Join(root, path), phase16TrustBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
+
+	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pre[path]; got != phase14 {
+		t.Fatalf("oldest predecessor = %q, want %q", got, phase14)
+	}
+}
+
 func TestResolveCurrentSHA256UsesValidatedPredecessorOrWorkingTree(t *testing.T) {
 	root := t.TempDir()
 	overlaidPath := "ROADMAP.md"

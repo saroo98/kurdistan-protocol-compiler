@@ -1,0 +1,31 @@
+{
+  "schema": "phase16-role-policy-v1",
+  "roles": [
+    "approver",
+    "auditor",
+    "deployer",
+    "emergency",
+    "executor",
+    "publisher",
+    "recovery",
+    "requester",
+    "viewer"
+  ],
+  "forbiddenRoleCombinations": [
+    ["approver", "emergency"],
+    ["approver", "executor"],
+    ["approver", "recovery"],
+    ["auditor", "publisher"],
+    ["deployer", "publisher"],
+    ["deployer", "recovery"]
+  ],
+  "identityRules": {
+    "opaqueActorsOnly": true,
+    "rawEmailForbidden": true,
+    "requesterSelfApprovalForbidden": true,
+    "executorApprovalForbidden": true,
+    "minimumDistinctApprovers": 2,
+    "privilegedAuthenticationMaximumAgeSeconds": 900,
+    "breakGlassMaximumSeconds": 1800
+  }
+}

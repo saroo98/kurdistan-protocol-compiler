@@ -1,0 +1,20 @@
+{
+  "schema": "phase16-key-policy-v1",
+  "algorithm": "EC_SIGN_P256_SHA256",
+  "protectionLevel": "HSM",
+  "privateKeyExportAllowed": false,
+  "roles": [
+    {"id":"audit-anchor","online":true,"separateIdentity":true},
+    {"id":"emergency-deny","online":true,"separateIdentity":true},
+    {"id":"issuer","online":true,"separateIdentity":true},
+    {"id":"publication-metadata","online":true,"separateIdentity":true},
+    {"id":"recovery-root","online":false,"separateIdentity":true},
+    {"id":"root-authority","online":false,"separateIdentity":true}
+  ],
+  "rotationStates": ["CREATED","STAGED","DUAL_APPROVED","PRIMARY","RETIRING","DISABLED","DESTROY_SCHEDULED","DESTROYED"],
+  "signatureBoundary": {
+    "kmsEncoding": "ASN1_DER_ECDSA",
+    "artifactEncoding": "RAW_FIXED_WIDTH_LOW_S_ES256",
+    "immediatePublicKeyVerification": true
+  }
+}

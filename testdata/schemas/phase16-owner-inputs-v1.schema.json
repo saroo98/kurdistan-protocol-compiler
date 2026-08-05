@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistan.invalid/schemas/phase16-owner-inputs-v1.schema.json",
+  "title": "Phase 16 private owner input references",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","organizationRef","billingAccountRef","qualificationProjects","productionProjects","region","spannerConfiguration","domainZoneRef","identityTenantRef","approvalClasses","wif","secretResourceRefs","alertChannelRefs","budget","retention","backup","authorizations"],
+  "properties": {
+    "schema": {"const":"phase16-owner-inputs-v1"},
+    "organizationRef": {"$ref":"#/$defs/ref"},
+    "billingAccountRef": {"$ref":"#/$defs/ref"},
+    "qualificationProjects": {"$ref":"#/$defs/projects"},
+    "productionProjects": {"$ref":"#/$defs/projects"},
+    "region": {"const":"europe-west2"},
+    "spannerConfiguration": {"const":"eur6"},
+    "domainZoneRef": {"$ref":"#/$defs/ref"},
+    "identityTenantRef": {"$ref":"#/$defs/ref"},
+    "approvalClasses": {"type":"array","minItems":8,"maxItems":16,"uniqueItems":true,"items":{"$ref":"#/$defs/approval"}},
+    "wif": {"$ref":"#/$defs/wif"},
+    "secretResourceRefs": {"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},
+    "alertChannelRefs": {"type":"array","minItems":1,"maxItems":16,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},
+    "budget": {"$ref":"#/$defs/budget"},
+    "retention": {"$ref":"#/$defs/retention"},
+    "backup": {"$ref":"#/$defs/backup"},
+    "authorizations": {"$ref":"#/$defs/authorizations"}
+  },
+  "$defs": {
+    "ref": {"type":"string","minLength":8,"maxLength":256,"pattern":"^[A-Za-z0-9][A-Za-z0-9_./:@-]+$"},
+    "projects": {
+      "type":"object","additionalProperties":false,
+      "required":["trust","control","publication","audit","ops"],
+      "properties":{"trust":{"$ref":"#/$defs/ref"},"control":{"$ref":"#/$defs/ref"},"publication":{"$ref":"#/$defs/ref"},"audit":{"$ref":"#/$defs/ref"},"ops":{"$ref":"#/$defs/ref"}}
+    },
+    "approval": {
+      "type":"object","additionalProperties":false,
+      "required":["class","approverActorRefs","executorActorRef"],
+      "properties":{"class":{"type":"string","enum":["root","issuer","publication","revocation","recovery","emergency","retention-lock","key-destruction"]},"approverActorRefs":{"type":"array","minItems":2,"maxItems":2,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"executorActorRef":{"$ref":"#/$defs/ref"}}
+    },
+    "wif": {
+      "type":"object","additionalProperties":false,
+      "required":["poolRef","providerRef","repository","ref","workflowPaths","environment"],
+      "properties":{"poolRef":{"$ref":"#/$defs/ref"},"providerRef":{"$ref":"#/$defs/ref"},"repository":{"const":"saroo98/kurdistan-protocol-compiler"},"ref":{"const":"refs/heads/main"},"workflowPaths":{"type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string","pattern":"^\\.github/workflows/[A-Za-z0-9._-]+\\.yml$"}},"environment":{"const":"phase16-production"}}
+    },
+    "budget": {"type":"object","additionalProperties":false,"required":["qualificationMonthlyMinorUnits","productionMonthlyMinorUnits","currency","automaticQualificationTeardownHours"],"properties":{"qualificationMonthlyMinorUnits":{"type":"integer","minimum":1,"maximum":10000000},"productionMonthlyMinorUnits":{"type":"integer","minimum":1,"maximum":100000000},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"automaticQualificationTeardownHours":{"type":"integer","minimum":1,"maximum":72}}},
+    "retention": {"type":"object","additionalProperties":false,"required":["auditDays","publicationDays","backupDays","legalOwnerRef","incidentOwnerRef"],"properties":{"auditDays":{"type":"integer","minimum":2555,"maximum":36500},"publicationDays":{"type":"integer","minimum":365,"maximum":36500},"backupDays":{"type":"integer","minimum":35,"maximum":3650},"legalOwnerRef":{"$ref":"#/$defs/ref"},"incidentOwnerRef":{"$ref":"#/$defs/ref"}}},
+    "backup": {"type":"object","additionalProperties":false,"required":["targetProjectRef","recoveryOwnerRefs"],"properties":{"targetProjectRef":{"$ref":"#/$defs/ref"},"recoveryOwnerRefs":{"type":"array","minItems":2,"maxItems":4,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}},
+    "authorizations": {"type":"object","additionalProperties":false,"required":["productionMutation","retentionLock","keyDestruction","productionDNS"],"properties":{"productionMutation":{"$ref":"#/$defs/ref"},"retentionLock":{"$ref":"#/$defs/ref"},"keyDestruction":{"$ref":"#/$defs/ref"},"productionDNS":{"$ref":"#/$defs/ref"}}}
+  }
+}

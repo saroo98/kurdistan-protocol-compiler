@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistan.invalid/schemas/phase16-operation-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","operationId","action","idempotencyKey","expectedRevision","expectedEpoch","requesterActor","state"],
+  "properties": {
+    "schema": {"const":"phase16-operation-v1"},
+    "operationId": {"type":"string","pattern":"^[a-z0-9][a-z0-9-]{15,63}$"},
+    "action": {"type":"string","minLength":3,"maxLength":64},
+    "idempotencyKey": {"type":"string","pattern":"^[A-Za-z0-9_-]{16,96}$"},
+    "expectedRevision": {"type":"integer","minimum":0},
+    "expectedEpoch": {"type":"integer","minimum":0},
+    "requesterActor": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "state": {"enum":["PENDING","APPROVED","COMMITTED","EFFECT_PENDING","ANCHORED","PUBLISHED","FINALIZED","FAILED_RETRYABLE","FAILED_TERMINAL"]}
+  }
+}

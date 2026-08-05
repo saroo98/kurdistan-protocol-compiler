@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	SuccessorPath        = "testdata/evidence/phase15/production-contract-overlay.json"
-	Phase16SuccessorPath = "testdata/evidence/phase16/ci-release-acceleration-overlay.json"
+	SuccessorPath                       = "testdata/evidence/phase15/production-contract-overlay.json"
+	Phase16SuccessorPath                = "testdata/evidence/phase16/ci-release-acceleration-overlay.json"
+	Phase16ProductionTrustSuccessorPath = "testdata/evidence/phase16/production-trust-overlay.json"
 )
 
 type overlay struct {
@@ -39,16 +40,18 @@ type entry struct {
 // predecessor state that the historical overlay validators must evaluate.
 func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 	layers := []struct {
-		path    string
-		version string
+		path     string
+		version  string
+		optional bool
 	}{
-		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1"},
-		{SuccessorPath, expectedVersion},
+		{Phase16ProductionTrustSuccessorPath, "phase16-production-trust-v1", true},
+		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1", true},
+		{SuccessorPath, expectedVersion, false},
 	}
 	pre := map[string]string{}
 	for _, layer := range layers {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(layer.path))); err != nil {
-			if errors.Is(err, os.ErrNotExist) && layer.path == Phase16SuccessorPath {
+			if errors.Is(err, os.ErrNotExist) && layer.optional {
 				continue
 			}
 			if errors.Is(err, os.ErrNotExist) && layer.path == SuccessorPath {
