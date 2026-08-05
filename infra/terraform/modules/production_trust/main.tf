@@ -9,7 +9,9 @@ variable "repository" { type = string }
 variable "schema_ddl" { type = list(string) }
 
 locals {
-  services = toset(["koperator-api", "koperator-worker", "koperator-ceremony", "koperator-drill"])
+  runtime_services    = toset(["koperator-api", "koperator-worker", "koperator-publication", "koperator-audit", "koperator-emergency", "koperator-ceremony", "koperator-drill"])
+  deployment_services = toset(["koperator-tf-plan", "koperator-tf-apply", "koperator-drill-runner"])
+  services            = setunion(local.runtime_services, local.deployment_services)
 }
 
 module "identity" {
@@ -76,7 +78,7 @@ module "control_plane" {
   project_id       = var.projects.control
   region           = var.region
   images           = var.images
-  service_accounts = module.identity.emails
+  service_accounts = { for key, value in module.identity.emails : key => value if contains(local.runtime_services, key) }
   network          = module.network.network
   subnetwork       = module.network.subnetwork
 }
@@ -87,12 +89,17 @@ module "workload_identity" {
   pool_id     = "kvpn-github"
   provider_id = "kvpn-main"
   repository  = var.repository
+  service_accounts = {
+    phase16-production-plan = module.identity.names["koperator-tf-plan"]
+    phase16-production      = module.identity.names["koperator-tf-apply"]
+    phase16-drill           = module.identity.names["koperator-drill-runner"]
+  }
 }
 
 module "monitoring" {
   source        = "../monitoring"
   project_id    = var.projects.ops
-  service_names = local.services
+  service_names = local.runtime_services
 }
 
 output "kms_keys" { value = module.kms.key_names }

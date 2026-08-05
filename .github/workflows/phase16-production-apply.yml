@@ -1,0 +1,104 @@
+name: Phase 16 production apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      subject_sha:
+        description: Exact main commit used for the plan
+        required: true
+        type: string
+      plan_run_id:
+        description: Successful production-plan workflow run ID
+        required: true
+        type: string
+      plan_run_attempt:
+        description: Successful production-plan workflow run attempt
+        required: true
+        type: string
+      plan_generation:
+        description: Immutable private plan object generation
+        required: true
+        type: string
+      plan_sha256:
+        description: Reviewed binary plan SHA-256
+        required: true
+        type: string
+      authorization_id:
+        description: Exact protected production-apply authorization
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: phase16-production-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    environment: phase16-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.subject_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.PHASE16_WIF_PROVIDER }}
+          service_account: ${{ vars.PHASE16_APPLY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: '579.0.0'
+      - name: Fetch and verify exact private plan
+        shell: bash
+        env:
+          PLAN_GENERATION: ${{ inputs.plan_generation }}
+          PLAN_RUN_ATTEMPT: ${{ inputs.plan_run_attempt }}
+          PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+          PLAN_SHA256: ${{ inputs.plan_sha256 }}
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse origin/main)" = "$SUBJECT_SHA"
+          test -n "${{ inputs.authorization_id }}"
+          [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$PLAN_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$PLAN_GENERATION" =~ ^[1-9][0-9]*$ ]]
+          [[ "$PLAN_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          object="phase16/plans/$SUBJECT_SHA/$PLAN_RUN_ID-$PLAN_RUN_ATTEMPT.tfplan"
+          read -r observed_generation remote_sha remote_subject < <(
+            gcloud storage objects describe "gs://${{ vars.PHASE16_PLAN_BUCKET }}/$object" \
+              --format='value(generation,metadata.sha256,metadata.subject-sha)'
+          )
+          test "$observed_generation" = "$PLAN_GENERATION"
+          test "$remote_sha" = "$PLAN_SHA256"
+          test "$remote_subject" = "$SUBJECT_SHA"
+          mkdir -p .tools/phase16
+          if ! gcloud storage cp "gs://${{ vars.PHASE16_PLAN_BUCKET }}/$object" .tools/phase16/production.tfplan \
+            --if-generation-match="$PLAN_GENERATION" \
+            >.tools/phase16/plan-download.log 2>&1; then
+            echo "private plan download failed" >&2
+            exit 1
+          fi
+          observed="$(sha256sum .tools/phase16/production.tfplan | cut -d' ' -f1)"
+          test "$observed" = "$PLAN_SHA256"
+      - name: Apply reviewed plan without rebuilding
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=1.15.8
+          base="https://releases.hashicorp.com/terraform/${version}"
+          curl --fail --silent --show-error --location --output terraform.zip "${base}/terraform_${version}_linux_amd64.zip"
+          curl --fail --silent --show-error --location --output SHA256SUMS "${base}/terraform_${version}_SHA256SUMS"
+          grep " terraform_${version}_linux_amd64.zip$" SHA256SUMS | sha256sum --check --strict
+          unzip -q terraform.zip -d .tools/phase16/bin
+          .tools/phase16/bin/terraform -chdir=infra/terraform/environments/production init -lockfile=readonly \
+            -backend-config="bucket=${{ vars.PHASE16_TERRAFORM_STATE_BUCKET }}" \
+            -backend-config="prefix=production-trust"
+          .tools/phase16/bin/terraform -chdir=infra/terraform/environments/production apply -input=false "$PWD/.tools/phase16/production.tfplan"

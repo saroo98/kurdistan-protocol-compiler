@@ -58,6 +58,25 @@ func TestValidateOwnerRejectsProjectReuseAndApprovalCollision(t *testing.T) {
 	}
 }
 
+func TestValidateOwnerRequiresExactProtectedWorkflowAndEnvironmentSet(t *testing.T) {
+	var value ownerInputs
+	root := repositoryRoot(t)
+	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
+		t.Fatal(err)
+	}
+	value.WIF.Environments[0] = "phase16-production"
+	if err := validateOwner(value); err == nil {
+		t.Fatal("duplicate protected environment accepted")
+	}
+	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
+		t.Fatal(err)
+	}
+	value.WIF.WorkflowPaths[0] = ".github/workflows/ordinary.yml"
+	if err := validateOwner(value); err == nil {
+		t.Fatal("unapproved production workflow accepted")
+	}
+}
+
 func TestValidateStatusRejectsFalseCompletion(t *testing.T) {
 	var value status
 	root := repositoryRoot(t)
@@ -75,6 +94,22 @@ func TestRejectSecretCanaries(t *testing.T) {
 		if err := rejectSecretMaterial([]byte(value)); err == nil {
 			t.Fatalf("secret canary accepted: %q", value)
 		}
+	}
+}
+
+func TestRejectPrivateTerraformPlanInGitHubArtifacts(t *testing.T) {
+	root := copyRepositoryAuthority(t)
+	path := filepath.Join(root, filepath.FromSlash(".github/workflows/phase16-production-plan.yml"))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("\n# actions/upload-artifact must remain forbidden here\n")...)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyImplementationAuthority(root); err == nil {
+		t.Fatal("private Terraform plan artifact exposure accepted")
 	}
 }
 

@@ -141,7 +141,8 @@ func verifyWorkflow(path, name string) error {
 	if mappingValue(root, "on") == nil || mappingValue(root, "permissions") == nil || mappingValue(root, "jobs") == nil {
 		return errors.New("workflow requires on, permissions, and jobs")
 	}
-	if err := validatePermissionNodes(root); err != nil {
+	allowOIDC := name == "phase16-production-plan.yml" || name == "phase16-production-apply.yml" || name == "phase16-drill.yml"
+	if err := validatePermissionNodes(root, allowOIDC); err != nil {
 		return err
 	}
 	if containsScalar(root, "pull_request_target") {
@@ -236,7 +237,7 @@ func verifyKnownWorkflowContract(name, content string) error {
 	return nil
 }
 
-func validatePermissionNodes(node *yaml.Node) error {
+func validatePermissionNodes(node *yaml.Node, allowOIDC bool) error {
 	if node.Kind == yaml.MappingNode {
 		for index := 0; index < len(node.Content); index += 2 {
 			key, value := node.Content[index].Value, node.Content[index+1]
@@ -246,19 +247,20 @@ func validatePermissionNodes(node *yaml.Node) error {
 				}
 				for permission := 0; permission < len(value.Content); permission += 2 {
 					level := value.Content[permission+1]
-					if level.Kind != yaml.ScalarNode || (level.Value != "read" && level.Value != "none") {
+					allowed := level.Value == "read" || level.Value == "none" || (allowOIDC && value.Content[permission].Value == "id-token" && level.Value == "write")
+					if level.Kind != yaml.ScalarNode || !allowed {
 						return fmt.Errorf("Phase 16 workflow permission %q must be read or none", value.Content[permission].Value)
 					}
 				}
 			}
-			if err := validatePermissionNodes(value); err != nil {
+			if err := validatePermissionNodes(value, allowOIDC); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 	for _, child := range node.Content {
-		if err := validatePermissionNodes(child); err != nil {
+		if err := validatePermissionNodes(child, allowOIDC); err != nil {
 			return err
 		}
 	}

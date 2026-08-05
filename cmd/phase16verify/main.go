@@ -37,6 +37,10 @@ var requiredFiles = []string{
 	"config/production/services.json",
 	"config/production/tools.json",
 	"docs/KIP-0092-phase16-production-trust.md",
+	"docs/PHASE16_CEREMONIES.md",
+	"docs/PHASE16_DISASTER_RECOVERY.md",
+	"docs/PHASE16_EVIDENCE_INDEX.md",
+	"docs/PHASE16_OPERATIONS.md",
 	"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
 	"docs/PHASE16_THREAT_MODEL.md",
 	"testdata/fixtures/phase16/owner-inputs.example.json",
@@ -45,6 +49,15 @@ var requiredFiles = []string{
 	"testdata/schemas/phase16-owner-inputs-v1.schema.json",
 	"testdata/schemas/phase16-production-trust-status-v1.schema.json",
 	statusPath,
+	"production/go.mod",
+	"production/migrations/manifest.json",
+	"infra/terraform/environments/qualification/.terraform.lock.hcl",
+	"infra/terraform/environments/production/.terraform.lock.hcl",
+	"infra/terraform/policies/phase16.rego",
+	".github/workflows/phase16-qualification.yml",
+	".github/workflows/phase16-production-plan.yml",
+	".github/workflows/phase16-production-apply.yml",
+	".github/workflows/phase16-drill.yml",
 }
 
 var expectedRoles = []string{"approver", "auditor", "deployer", "emergency", "executor", "publisher", "recovery", "requester", "viewer"}
@@ -141,10 +154,15 @@ type ownerInputs struct {
 	DomainZoneRef         string          `json:"domainZoneRef"`
 	IdentityTenantRef     string          `json:"identityTenantRef"`
 	ApprovalClasses       []approvalClass `json:"approvalClasses"`
-	WIF                   wifInputs       `json:"wif"`
-	SecretResourceRefs    []string        `json:"secretResourceRefs"`
-	AlertChannelRefs      []string        `json:"alertChannelRefs"`
-	Budget                struct {
+	Deployment            struct {
+		BootstrapIdentityRef    string `json:"bootstrapIdentityRef"`
+		TerraformStateBucketRef string `json:"terraformStateBucketRef"`
+		PrivatePlanBucketRef    string `json:"privatePlanBucketRef"`
+	} `json:"deployment"`
+	WIF                wifInputs `json:"wif"`
+	SecretResourceRefs []string  `json:"secretResourceRefs"`
+	AlertChannelRefs   []string  `json:"alertChannelRefs"`
+	Budget             struct {
 		QualificationMonthlyMinorUnits      int64  `json:"qualificationMonthlyMinorUnits"`
 		ProductionMonthlyMinorUnits         int64  `json:"productionMonthlyMinorUnits"`
 		Currency                            string `json:"currency"`
@@ -187,7 +205,7 @@ type wifInputs struct {
 	Repository    string   `json:"repository"`
 	Ref           string   `json:"ref"`
 	WorkflowPaths []string `json:"workflowPaths"`
-	Environment   string   `json:"environment"`
+	Environments  []string `json:"environments"`
 }
 
 func main() {
@@ -236,6 +254,9 @@ func verify(root, mode, ownerPath string) error {
 		return err
 	}
 	if err := verifySchemas(root); err != nil {
+		return err
+	}
+	if err := verifyImplementationAuthority(root); err != nil {
 		return err
 	}
 	if mode == "external" {
@@ -374,8 +395,13 @@ func validateOwner(value ownerInputs) error {
 			return fmt.Errorf("missing approval class %s", required)
 		}
 	}
-	if value.WIF.Repository != "saroo98/kurdistan-protocol-compiler" || value.WIF.Ref != "refs/heads/main" || value.WIF.Environment != "phase16-production" {
+	if value.WIF.Repository != "saroo98/kurdistan-protocol-compiler" || value.WIF.Ref != "refs/heads/main" ||
+		!sameSet(value.WIF.Environments, []string{"phase16-production-plan", "phase16-production", "phase16-drill"}) ||
+		!sameSet(value.WIF.WorkflowPaths, []string{".github/workflows/phase16-production-plan.yml", ".github/workflows/phase16-production-apply.yml", ".github/workflows/phase16-drill.yml"}) {
 		return errors.New("WIF claims are not sufficiently restricted")
+	}
+	if duplicates([]string{value.Deployment.BootstrapIdentityRef, value.Deployment.TerraformStateBucketRef, value.Deployment.PrivatePlanBucketRef}) {
+		return errors.New("deployment bootstrap references are absent or reused")
 	}
 	if value.Budget.QualificationMonthlyMinorUnits <= 0 || value.Budget.ProductionMonthlyMinorUnits <= 0 || value.Budget.AutomaticQualificationTeardownHours < 1 || value.Budget.AutomaticQualificationTeardownHours > 72 {
 		return errors.New("budget is absent or unbounded")
@@ -388,6 +414,10 @@ func verifyDocuments(root string) error {
 		"docs/KIP-0092-phase16-production-trust.md":        {"Spanner", "Cloud KMS HSM", "NO_GO", "two distinct approvers"},
 		"docs/PHASE16_THREAT_MODEL.md":                     {"Fail-closed", "Spanner commit time", "split brain", "Explicit non-claims"},
 		"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md": {"Anything less is progress, not Phase 16 completion.", "Do not invent credentials", "Phase 17"},
+		"docs/PHASE16_DISASTER_RECOVERY.md":                {"zero acknowledged authority transitions", "Reject an older epoch", "production drill receipt"},
+		"docs/PHASE16_CEREMONIES.md":                       {"two distinct approvers", "separate executor", "destruction needs a separate irreversible-action authorization"},
+		"docs/PHASE16_OPERATIONS.md":                       {"at least once", "authority state backward", "Freeze ordinary mutations"},
+		"docs/PHASE16_EVIDENCE_INDEX.md":                   {"implementation readiness only", "Missing external evidence", "NO_GO"},
 	}
 	for path, needles := range required {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
@@ -399,6 +429,53 @@ func verifyDocuments(root string) error {
 			if !strings.Contains(text, needle) {
 				return fmt.Errorf("%s missing authority text %q", path, needle)
 			}
+		}
+	}
+	for _, path := range []string{".github/workflows/phase16-production-plan.yml", ".github/workflows/phase16-production-apply.yml"} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(raw), "actions/upload-artifact") || strings.Contains(string(raw), "actions/download-artifact") {
+			return fmt.Errorf("%s exposes the private binary Terraform plan through GitHub artifacts", path)
+		}
+	}
+	return nil
+}
+
+func verifyImplementationAuthority(root string) error {
+	required := map[string][]string{
+		"production/internal/spannerstore/store.go":         {"controlplane.ApplyCommand", "ErrTrustedTimeMismatch", "ReserveCommitTime"},
+		"production/internal/kmsprovider/provider.go":       {"EC_SIGN_P256_SHA256", "ProtectionLevel_HSM", "VerifiedDigestCrc32C", "EncodeRawES256Signature"},
+		"production/internal/publication/google_store.go":   {"DoesNotExist: true", "Generation(generation)", "sha256"},
+		"production/internal/outbox/worker.go":              {"LeaseToken", "MaxAttempts", "Emergency"},
+		"production/internal/auditanchor/anchor.go":         {"PreviousDigest", "RoleAudit", "PutIfAbsent"},
+		"production/internal/backup/verify.go":              {"ErrRollback", "ErrFork", "ExternalAudit", "ExternalPublic"},
+		"infra/terraform/modules/kms_hsm/main.tf":           {"EC_SIGN_P256_SHA256", "protection_level = \"HSM\"", "prevent_destroy"},
+		"infra/terraform/modules/control_plane/main.tf":     {"INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER", "service_account", "deletion_protection = true"},
+		"infra/terraform/modules/workload_identity/main.tf": {"token.actions.githubusercontent.com", "refs/heads/main", "attribute.repository"},
+		".github/workflows/phase16-production-apply.yml":    {"id-token: write", "plan_sha256", "cancel-in-progress: false", "terraform -chdir=infra/terraform/environments/production apply"},
+		".github/workflows/phase16-production-plan.yml":     {"PHASE16_OWNER_INPUTS_JSON", "phase16verify -root . -mode external", "PHASE16_PLAN_BUCKET", "--if-generation-match=0"},
+	}
+	for path, needles := range required {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return err
+		}
+		for _, needle := range needles {
+			if !strings.Contains(string(raw), needle) {
+				return fmt.Errorf("%s missing authority marker %q", path, needle)
+			}
+		}
+	}
+	for _, path := range []string{"infra/terraform/environments/qualification/.terraform.lock.hcl", "infra/terraform/environments/production/.terraform.lock.hcl"} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return err
+		}
+		text := string(raw)
+		if !strings.Contains(text, `version     = "7.43.0"`) || !strings.Contains(text, "h1:") || !strings.Contains(text, "zh:") {
+			return fmt.Errorf("provider lock is incomplete: %s", path)
 		}
 	}
 	return nil
@@ -536,6 +613,22 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	want := make(map[string]bool, len(b))
+	for _, value := range b {
+		want[value] = true
+	}
+	for _, value := range a {
+		if !want[value] {
+			return false
+		}
+		delete(want, value)
+	}
+	return len(want) == 0
 }
 func projectValues(p projects) []string {
 	return []string{p.Trust, p.Control, p.Publication, p.Audit, p.Ops}
