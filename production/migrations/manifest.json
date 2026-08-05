@@ -1,0 +1,11 @@
+{
+  "schema": "phase16-spanner-migrations-v1",
+  "migrations": [
+    {
+      "version": 1,
+      "name": "initial",
+      "file": "001_initial.sql",
+      "sha256": "bb43b44358f1b6320a55e5b965d88d5a164067df722850c29da31a1647f094d1"
+    }
+  ]
+}
