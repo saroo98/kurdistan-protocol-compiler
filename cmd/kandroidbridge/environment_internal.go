@@ -8,11 +8,14 @@ package main
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"kurdistan/internal/androidbridge"
 	"kurdistan/internal/product/backup"
 	"kurdistan/internal/product/envelope"
+	"kurdistan/internal/product/lifecycle"
 	"kurdistan/internal/product/profile"
+	"kurdistan/internal/selfhost"
 	"kurdistan/internal/testkit/phase8issuance"
 )
 
@@ -68,15 +71,22 @@ func (internalBridgeEnvironment) Verify(artifact []byte, class envelope.Artifact
 		MinimumRootEpoch:       spec.Profile.RootEpoch,
 		MinimumRevocationEpoch: spec.Profile.RevocationEpoch,
 	}
-	return profile.VerifyOffline(
+	verified, err := profile.VerifyOffline(
 		request,
 		phase8issuance.NewIndependentVerifier(),
 		phase8issuance.NewResolver(class),
 		phase8issuance.NewIndependentRecipientOpener(),
 	)
+	if err == nil {
+		return verified, nil
+	}
+	return selfHostedBridgeEnvironment{}.Verify(artifact, class)
 }
 
 func (internalBridgeEnvironment) NewActivationSession(preview androidbridge.VerifyPreview) (*profile.ActivationSession, error) {
+	if session, err := selfhost.NewAndroidActivationSession(preview.Verified.ExactArtifact, time.Now().UTC(), lifecycle.VerifiedState{}); err == nil {
+		return session, nil
+	}
 	value := preview.Verified.Profile
 	if value.ValidFrom >= value.ValidUntil || value.RootEpoch == 0 || value.RevocationEpoch == 0 {
 		return nil, errors.New("phase9 internal activation: invalid verified profile")

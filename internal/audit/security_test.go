@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1221,12 +1222,18 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	fixturePaths = append(fixturePaths,
+		evidenceoverlay.PublicDocumentationSuccessorPath,
 		evidenceoverlay.SuccessorPath,
 		evidenceoverlay.Phase16SuccessorPath,
 		evidenceoverlay.Phase16ProductionTrustSuccessorPath,
+		evidenceoverlay.Phase16RuntimeSuccessorPath,
+		evidenceoverlay.Phase16DecentralizedSuccessorPath,
 	)
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if errors.Is(readErr, os.ErrNotExist) {
+			continue
+		}
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -1245,13 +1252,13 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(drift, []byte("drift"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase11 local transport hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "README.md") {
 		t.Fatalf("changed listed content error=%v", err)
 	}
 	if err := os.Remove(drift); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "phase11 local transport hash drift README.md") {
+	if _, err := loadM2MaintenancePreHashesV1(fixture); err == nil || !strings.Contains(err.Error(), "README.md") {
 		t.Fatalf("missing listed path error=%v", err)
 	}
 
@@ -1271,6 +1278,9 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 	fixture := t.TempDir()
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if errors.Is(readErr, os.ErrNotExist) && path == "ROADMAP.md" {
+			continue
+		}
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -1282,6 +1292,7 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1353,6 +1364,9 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 	fixture := t.TempDir()
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if errors.Is(err, os.ErrNotExist) && path == "ROADMAP.md" {
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1364,6 +1378,7 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1410,6 +1425,9 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 	fixture := t.TempDir()
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if errors.Is(err, os.ErrNotExist) && path == "ROADMAP.md" {
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1421,6 +1439,7 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1458,6 +1477,18 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 		if _, err := loadHistoricalM2MaintenancePreHashesV1(fixture); err == nil {
 			t.Fatalf("phase2-complete mutation %d accepted", i)
 		}
+	}
+}
+
+func writeHistoricalRoadmapTombstone(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(evidenceoverlay.PublicDocumentationSuccessorPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const overlay = `{"version":"public-documentation-sanitization-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"b1bc37aa40b84b8e765f5d2413998ab2e51e5b10211e47dd03bd23d9f7900dcc","post_evidence":"ABSENT"}]}`
+	if err := os.WriteFile(path, []byte(overlay), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

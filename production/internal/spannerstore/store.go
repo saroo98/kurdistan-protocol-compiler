@@ -11,9 +11,11 @@ import (
 	"regexp"
 
 	"kurdistan/internal/operator/controlplane"
+	"kurdistan/production/internal/authoritysource"
 )
 
 var environmentRE = regexp.MustCompile(`^[a-z][a-z0-9-]{2,31}$`)
+var recordIDRE = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,127}$`)
 
 var (
 	ErrInvalidConfiguration = errors.New("spannerstore: invalid configuration")
@@ -41,6 +43,18 @@ func (store *Store) Snapshot(ctx context.Context) (controlplane.State, error) {
 }
 
 func (store *Store) Execute(ctx context.Context, command controlplane.Command) (controlplane.TransactionResult, error) {
+	return store.execute(ctx, command, nil)
+}
+
+func (store *Store) ExecuteAdmitted(ctx context.Context, command controlplane.Command, source authoritysource.Protected) (controlplane.TransactionResult, error) {
+	if command.Kind != controlplane.CommandRequest || source.Schema != authoritysource.Schema ||
+		source.OperationID != command.Request.ID || source.SubjectDigest != command.Request.SubjectDigest {
+		return controlplane.TransactionResult{}, ErrInvalidConfiguration
+	}
+	return store.execute(ctx, command, &source)
+}
+
+func (store *Store) execute(ctx context.Context, command controlplane.Command, source *authoritysource.Protected) (controlplane.TransactionResult, error) {
 	if err := command.Validate(); err != nil {
 		return controlplane.TransactionResult{}, err
 	}
@@ -63,7 +77,7 @@ func (store *Store) Execute(ctx context.Context, command controlplane.Command) (
 		if err != nil {
 			return err
 		}
-		writes, err := buildWriteSet(store.environment, head, current, next, command, commandResult)
+		writes, err := buildWriteSet(store.environment, head, current, next, command, commandResult, source)
 		if err != nil {
 			return err
 		}
@@ -85,6 +99,25 @@ func (store *Store) Execute(ctx context.Context, command controlplane.Command) (
 		Sequence: result.Receipt.Sequence, TrustedCommitTime: trusted,
 		AuditHash: result.AuditHash, OutboxIDs: append([]string(nil), result.OutboxIDs...),
 	}, nil
+}
+
+func (store *Store) ReadAuthoritySource(ctx context.Context, operationID string) (authoritysource.Protected, error) {
+	reader, ok := store.client.(interface {
+		StrongReadRecord(context.Context, string, string, string) (JSONRecord, error)
+	})
+	if !ok || !environmentRE.MatchString(store.environment) || !recordIDRE.MatchString(operationID) {
+		return authoritysource.Protected{}, ErrInvalidConfiguration
+	}
+	record, err := reader.StrongReadRecord(ctx, "AuthoritySources", store.environment, operationID)
+	if err != nil {
+		return authoritysource.Protected{}, err
+	}
+	var source authoritysource.Protected
+	if err := json.Unmarshal(record.Payload, &source); err != nil || source.Schema != authoritysource.Schema ||
+		source.OperationID != operationID || source.SubjectDigest != record.Parent {
+		return authoritysource.Protected{}, ErrInvalidConfiguration
+	}
+	return source, nil
 }
 
 func (store *Store) Reserve(ctx context.Context, minimumExclusive int64) (controlplane.TrustedInstant, error) {
@@ -142,7 +175,7 @@ func encodeJSON(value any) ([]byte, error) {
 	return raw, nil
 }
 
-func buildWriteSet(environment string, head Head, current, next controlplane.State, command controlplane.Command, result controlplane.CommandResult) (WriteSet, error) {
+func buildWriteSet(environment string, head Head, current, next controlplane.State, command controlplane.Command, result controlplane.CommandResult, source *authoritysource.Protected) (WriteSet, error) {
 	rawState, err := encodeJSON(next)
 	if err != nil {
 		return WriteSet{}, err
@@ -152,6 +185,19 @@ func buildWriteSet(environment string, head Head, current, next controlplane.Sta
 		TrustedSequence: head.TrustedSequence, LastTrustedAt: head.LastTrustedAt,
 		StateJSON: rawState, SchemaVersion: SchemaVersion,
 	}, ReserveCommitTime: true}
+	if source != nil {
+		if source.Schema != authoritysource.Schema || source.OperationID != result.Receipt.OperationID ||
+			source.SubjectDigest != command.Request.SubjectDigest {
+			return WriteSet{}, ErrInvalidConfiguration
+		}
+		raw, err := encodeJSON(*source)
+		if err != nil {
+			return WriteSet{}, err
+		}
+		writes.AuthoritySources = append(writes.AuthoritySources, JSONRecord{
+			ID: source.OperationID, Parent: source.SubjectDigest, State: "STAGED", Payload: raw,
+		})
+	}
 
 	operationID := result.Receipt.OperationID
 	operation, exists := next.Operations[operationID]

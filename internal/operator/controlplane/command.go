@@ -150,7 +150,8 @@ func commandReplay(state State, command Command) (CommandResult, bool, error) {
 	if command.Kind == CommandRequest {
 		operation := Operation{
 			ID: command.Request.ID, Action: command.Request.Action, TargetID: command.Request.TargetID,
-			SubjectDigest: command.Request.SubjectDigest, ScopeDigest: command.Request.ScopeDigest,
+			ParentOperationID: command.Request.ParentOperationID,
+			SubjectDigest:     command.Request.SubjectDigest, ScopeDigest: command.Request.ScopeDigest,
 			AuthorityScopeDigest: command.Request.AuthorityScopeDigest, AuthorityRootDigest: command.Request.AuthorityRootDigest,
 			ExpectedArtifactDigest: command.Request.ExpectedArtifactDigest, RequesterID: command.Actor.ID,
 			State: OperationPending, ExpectedRevision: command.Request.ExpectedRevision,
@@ -245,7 +246,8 @@ func applyRequestCommand(state *State, actor Actor, input RequestInput) (Command
 	}
 	operation := Operation{
 		ID: input.ID, Action: input.Action, TargetID: input.TargetID,
-		SubjectDigest: input.SubjectDigest, ScopeDigest: input.ScopeDigest,
+		ParentOperationID: input.ParentOperationID,
+		SubjectDigest:     input.SubjectDigest, ScopeDigest: input.ScopeDigest,
 		AuthorityScopeDigest: input.AuthorityScopeDigest, AuthorityRootDigest: input.AuthorityRootDigest,
 		ExpectedArtifactDigest: input.ExpectedArtifactDigest, RequesterID: actor.ID,
 		State: OperationPending, ExpectedRevision: input.ExpectedRevision,

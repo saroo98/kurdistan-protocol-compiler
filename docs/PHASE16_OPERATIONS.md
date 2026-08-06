@@ -1,5 +1,10 @@
 # Phase 16 Production Operations
 
+> **Realignment notice:** KIP-0093 replaces the centrally operated production
+> plane with independent owner-operated Kurd nodes. This document must be
+> reconciled before use and does not authorize a Kurdistan-operated provider,
+> fleet, directory, account system, or shutdown path.
+
 ## Deployment
 
 Terraform is the infrastructure authority. Production plan and apply are

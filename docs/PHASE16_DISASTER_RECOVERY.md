@@ -1,5 +1,10 @@
 # Phase 16 Disaster Recovery
 
+> **Realignment notice:** KIP-0093 requires owner-controlled encrypted backup,
+> migration to a replacement VPS, and monotonic deployment-local recovery.
+> Cloud-specific recovery steps in this historical document are not current
+> deployment authority.
+
 ## Authority
 
 This runbook covers the production trust control plane. It does not authorize

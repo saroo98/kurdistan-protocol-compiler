@@ -2638,12 +2638,37 @@ var allowedImporterPrefixes = []string{
 func phase8ProductConsumerV1(pkgPath string) bool {
 	return pkgPath == modulePath+"/cmd/kprofile" ||
 		pkgPath == modulePath+"/cmd/kandroidbridge" ||
+		pkgPath == modulePath+"/cmd/phase16androidverify" ||
 		pkgPath == modulePath+"/internal/androidbridge" ||
+		pkgPath == modulePath+"/internal/selfhost" ||
 		pkgPath == modulePath+"/internal/testkit/phase8issuance" ||
 		pkgPath == modulePath+"/internal/testkit/phase8issuancefixture" ||
 		strings.HasPrefix(pkgPath, modulePath+"/cmd/kprofile/") ||
+		strings.HasPrefix(pkgPath, modulePath+"/cmd/phase16androidverify/") ||
+		strings.HasPrefix(pkgPath, modulePath+"/internal/selfhost/") ||
 		strings.HasPrefix(pkgPath, modulePath+"/internal/testkit/phase8issuance/") ||
 		strings.HasPrefix(pkgPath, modulePath+"/internal/testkit/phase8issuancefixture/")
+}
+
+func TestPhase16SelfHostProductConsumerBoundaryV1(t *testing.T) {
+	for _, pkgPath := range []string{
+		modulePath + "/cmd/phase16androidverify",
+		modulePath + "/internal/selfhost",
+		modulePath + "/internal/selfhost/adapter",
+	} {
+		if !phase8ProductConsumerV1(pkgPath) {
+			t.Fatalf("Phase 16 product consumer rejected: %s", pkgPath)
+		}
+	}
+	for _, pkgPath := range []string{
+		modulePath + "/cmd/phase16androidverify-helper",
+		modulePath + "/internal/runtime",
+		modulePath + "/internal/selfhoster",
+	} {
+		if phase8ProductConsumerV1(pkgPath) {
+			t.Fatalf("Phase 16 product consumer boundary widened: %s", pkgPath)
+		}
+	}
 }
 
 func repoRoot(t *testing.T) string {

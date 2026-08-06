@@ -1,7 +1,7 @@
 {
   "schema": "kurdistan.phase8.wo807-recovery-report.v2",
   "scope": "deterministic recovery drills through production profile activation boundaries",
-  "activation_source_sha256": "2ccf69c7a3935c6e20d1a7ec28c52532f1e77303cdcad2b35b12cfbb484e955b",
+  "activation_source_sha256": "adb78b210bbf7409e5c20f3cac74b533f56bc8bb4412e90979177439b9e66779",
   "local_activation_source_sha256": "8021cee9fa41131005159a0a97bf92fd826897afc24678f0b397688ab775ad97",
   "test_source_sha256": "42f9a89777c8c87dc5d1a24749d3e45399e231d18a38c154a52f507197cd0ec5",
   "scenarios": [

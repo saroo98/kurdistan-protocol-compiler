@@ -22,6 +22,9 @@ const (
 	SuccessorPath                       = "testdata/evidence/phase15/production-contract-overlay.json"
 	Phase16SuccessorPath                = "testdata/evidence/phase16/ci-release-acceleration-overlay.json"
 	Phase16ProductionTrustSuccessorPath = "testdata/evidence/phase16/production-trust-overlay.json"
+	Phase16RuntimeSuccessorPath         = "testdata/evidence/phase16/production-runtime-overlay.json"
+	Phase16DecentralizedSuccessorPath   = "testdata/evidence/phase16/decentralized-self-hosted-overlay.json"
+	PublicDocumentationSuccessorPath    = "testdata/evidence/public-documentation-sanitization-overlay.json"
 )
 
 type overlay struct {
@@ -30,10 +33,11 @@ type overlay struct {
 }
 
 type entry struct {
-	Path        string `json:"path"`
-	PreSHA256   string `json:"pre_sha256,omitempty"`
-	PreEvidence string `json:"pre_evidence,omitempty"`
-	PostSHA256  string `json:"post_sha256"`
+	Path         string `json:"path"`
+	PreSHA256    string `json:"pre_sha256,omitempty"`
+	PreEvidence  string `json:"pre_evidence,omitempty"`
+	PostSHA256   string `json:"post_sha256,omitempty"`
+	PostEvidence string `json:"post_evidence,omitempty"`
 }
 
 // LoadSuccessor verifies the exact current post-state and returns the
@@ -44,6 +48,9 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		version  string
 		optional bool
 	}{
+		{PublicDocumentationSuccessorPath, "public-documentation-sanitization-v1", true},
+		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true},
+		{Phase16RuntimeSuccessorPath, "phase16-production-runtime-v1", true},
 		{Phase16ProductionTrustSuccessorPath, "phase16-production-trust-v1", true},
 		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1", true},
 		{SuccessorPath, expectedVersion, false},
@@ -55,7 +62,7 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 				continue
 			}
 			if errors.Is(err, os.ErrNotExist) && layer.path == SuccessorPath {
-				return map[string]string{}, nil
+				return pre, nil
 			}
 			return nil, err
 		}
@@ -66,14 +73,24 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		for index, item := range value.Entries {
 			observed, ok := pre[item.Path]
 			if !ok {
-				content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(item.Path)))
-				if err != nil {
-					return nil, fmt.Errorf("read successor path %s: %w", item.Path, err)
+				path := filepath.Join(root, filepath.FromSlash(item.Path))
+				if item.PostEvidence == "ABSENT" {
+					if _, err := os.Lstat(path); err == nil {
+						return nil, fmt.Errorf("successor deletion path still exists: %s", item.Path)
+					} else if !errors.Is(err, os.ErrNotExist) {
+						return nil, fmt.Errorf("inspect successor deletion path %s: %w", item.Path, err)
+					}
+					observed = "ABSENT"
+				} else {
+					content, err := os.ReadFile(path)
+					if err != nil {
+						return nil, fmt.Errorf("read successor path %s: %w", item.Path, err)
+					}
+					digest := sha256.Sum256(content)
+					observed = hex.EncodeToString(digest[:])
 				}
-				digest := sha256.Sum256(content)
-				observed = hex.EncodeToString(digest[:])
 			}
-			if observed != item.PostSHA256 {
+			if observed != postState(item) {
 				return nil, fmt.Errorf("successor evidence drift in %s entry %d: %s", layer.path, index, item.Path)
 			}
 			pre[item.Path] = predecessor(item)
@@ -127,15 +144,22 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 		if clean != item.Path || item.Path <= last || filepath.IsAbs(item.Path) || strings.HasPrefix(item.Path, "../") || strings.HasPrefix(item.Path, ".tools/") || strings.HasPrefix(item.Path, "planning/") {
 			return overlay{}, fmt.Errorf("invalid successor overlay path %d in %s", index, relative)
 		}
-		if !validDigest(item.PostSHA256) {
-			return overlay{}, fmt.Errorf("invalid successor post digest %d in %s", index, relative)
+		if item.PostEvidence == "ABSENT" {
+			if item.PostSHA256 != "" {
+				return overlay{}, fmt.Errorf("invalid absent successor %d in %s", index, relative)
+			}
+		} else if item.PostEvidence != "" || !validDigest(item.PostSHA256) {
+			return overlay{}, fmt.Errorf("invalid successor post state %d in %s", index, relative)
 		}
 		if item.PreEvidence == "ABSENT" {
 			if item.PreSHA256 != "" {
 				return overlay{}, fmt.Errorf("invalid absent predecessor %d in %s", index, relative)
 			}
-		} else if item.PreEvidence != "" || !validDigest(item.PreSHA256) || item.PreSHA256 == item.PostSHA256 {
+		} else if item.PreEvidence != "" || !validDigest(item.PreSHA256) {
 			return overlay{}, fmt.Errorf("invalid existing predecessor %d in %s", index, relative)
+		}
+		if predecessor(item) == postState(item) {
+			return overlay{}, fmt.Errorf("successor entry does not change state %d in %s", index, relative)
 		}
 		last = item.Path
 	}
@@ -147,6 +171,13 @@ func predecessor(item entry) string {
 		return "ABSENT"
 	}
 	return item.PreSHA256
+}
+
+func postState(item entry) string {
+	if item.PostEvidence == "ABSENT" {
+		return "ABSENT"
+	}
+	return item.PostSHA256
 }
 
 func validDigest(value string) bool {

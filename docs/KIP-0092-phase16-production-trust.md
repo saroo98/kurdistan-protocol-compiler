@@ -1,6 +1,11 @@
 # KIP-0092: Phase 16 production trust authority
 
-**Status:** accepted for implementation
+**Status:** superseded by
+[`KIP-0093`](KIP-0093-decentralized-self-hosted-kurd-network.md)
+
+> Historical record only. The mandatory Google Cloud topology, centralized
+> provider plane, and global-root assumptions below are not implementation
+> authority. Do not deploy or complete Phase 16 from this KIP.
 
 **Phase:** 16
 
@@ -66,4 +71,3 @@ remains `NO_GO`.
   protected environment approvals, and readback-bound receipts.
 - Restore uses a new database and rejects any state older than the last
   externally acknowledged audit/publication head.
-

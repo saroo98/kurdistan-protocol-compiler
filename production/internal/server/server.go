@@ -25,7 +25,6 @@ var (
 	ErrConflict    = errors.New("server: conflict")
 	ErrUnavailable = errors.New("server: unavailable")
 	identifierRE   = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,127}$`)
-	digestRE       = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 type Handler struct {
@@ -136,10 +135,11 @@ func (handler *Handler) createNamedOperation(response http.ResponseWriter, reque
 		return
 	}
 	input.Action = action
-	if pathTarget != "" && (!identifierRE.MatchString(pathTarget) || input.TargetID != pathTarget) {
+	if pathTarget != "" && !identifierRE.MatchString(pathTarget) {
 		handler.writeError(response, http.StatusBadRequest, "INVALID_REQUEST", correlation)
 		return
 	}
+	input.PathTarget = pathTarget
 	if err := handler.authorizer.Authorize(identity, action, authz.PhaseRequest, authz.OperationContext{}); err != nil {
 		handler.writeError(response, http.StatusForbidden, "FORBIDDEN", correlation)
 		return
@@ -278,13 +278,12 @@ func decodeMutation[T any](request *http.Request, destination *T) error {
 	}
 	switch value := any(destination).(type) {
 	case *MutationRequest:
-		if !hasExactFields(fields, "action", "target_id", "subject_digest", "scope_digest", "expected_revision", "expected_epoch", "result_epoch", "expires_at") {
+		if !hasExactFields(fields, "action", "operation_id", "authority_source", "expected_revision", "expected_epoch") {
 			return errors.New("missing mutation field")
 		}
 		value.IdempotencyKey = idempotency
-		if value.ResultEpoch < value.ExpectedEpoch || value.ExpiresAt <= 0 ||
-			!identifierRE.MatchString(value.Action) || !identifierRE.MatchString(value.TargetID) ||
-			!digestRE.MatchString(value.SubjectDigest) || !digestRE.MatchString(value.ScopeDigest) {
+		if !identifierRE.MatchString(value.Action) || !identifierRE.MatchString(value.OperationID) ||
+			len(value.AuthoritySource) < 2 || len(value.AuthoritySource) > MaxRequestBody/2 {
 			return errors.New("invalid mutation")
 		}
 	case *DecisionRequest:

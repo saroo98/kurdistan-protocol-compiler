@@ -3,6 +3,12 @@
 
 # KIP-0091: evidence-preserving CI and release acceleration
 
+> **KIP-0093 amendment:** the receipt and build-reuse model remains authority.
+> Google Play is an optional Android distribution channel, and Google Cloud is
+> not a runtime, signing, profile, relay, or release prerequisite. Direct signed
+> APK and self-hosted node packages must remain first-class, independently
+> verifiable release products.
+
 **Status:** active Phase 16 implementation authority
 **Last verified:** 2026-08-02
 **Work orders:** CI-001 through CI-012
@@ -85,8 +91,10 @@ SBOM, so a dependency change cannot retain a stale runtime scan receipt.
   `main` commit, and its certificate must authenticate one successful assurance
   run attempt, workflow source commit, policy, inventory, and complete receipt
   set before either clean builder starts.
-- Signing, Play, production promotion, and post-release workflows remain absent
-  or inert until their named phases and external controls authorize activation.
+- Signing, optional store publication, production promotion, and post-release
+  workflows remain absent or inert until their named phases and external
+  controls authorize activation. Direct signed APK and node-package release
+  must not require a store account.
 
 ## Security and privacy invariants
 

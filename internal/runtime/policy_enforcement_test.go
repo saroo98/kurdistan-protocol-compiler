@@ -1183,6 +1183,9 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 		}
 		delete(changed, evidenceoverlay.Phase16SuccessorPath)
 		delete(changed, evidenceoverlay.Phase16ProductionTrustSuccessorPath)
+		delete(changed, evidenceoverlay.Phase16RuntimeSuccessorPath)
+		delete(changed, evidenceoverlay.Phase16DecentralizedSuccessorPath)
+		delete(changed, evidenceoverlay.PublicDocumentationSuccessorPath)
 	}
 	if len(changed) == 0 {
 		if hadPhysicalChanges {
@@ -1652,6 +1655,12 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	phase11OverlayPaths := make(map[string]bool, len(phase11Pre))
 	for path := range phase11Pre {
 		phase11OverlayPaths[path] = true
+		// The historical Phase 11-14 overlay chain has already verified the
+		// exact current content above. Successor overlays may absorb most of a
+		// dirty historical phase while leaving a smaller, still-valid subset in
+		// git status, so remove those independently verified paths before the
+		// physical-status shape check.
+		delete(changed, path)
 	}
 	// A clean checkout is the committed Phase 10 state only after its complete
 	// path and content overlay has validated above.

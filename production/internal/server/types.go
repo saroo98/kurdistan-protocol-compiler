@@ -5,8 +5,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 
+	"kurdistan/internal/operator/controlplane"
 	"kurdistan/production/internal/authn"
+	"kurdistan/production/internal/authoritysource"
 )
 
 const (
@@ -16,15 +19,13 @@ const (
 )
 
 type MutationRequest struct {
-	Action           string `json:"action"`
-	TargetID         string `json:"target_id"`
-	SubjectDigest    string `json:"subject_digest"`
-	ScopeDigest      string `json:"scope_digest"`
-	ExpectedRevision uint64 `json:"expected_revision"`
-	ExpectedEpoch    uint64 `json:"expected_epoch"`
-	ResultEpoch      uint64 `json:"result_epoch"`
-	ExpiresAt        int64  `json:"expires_at"`
-	IdempotencyKey   string `json:"-"`
+	Action           string          `json:"action"`
+	OperationID      string          `json:"operation_id"`
+	AuthoritySource  json.RawMessage `json:"authority_source"`
+	ExpectedRevision uint64          `json:"expected_revision"`
+	ExpectedEpoch    uint64          `json:"expected_epoch"`
+	IdempotencyKey   string          `json:"-"`
+	PathTarget       string          `json:"-"`
 }
 
 type DecisionRequest struct {
@@ -69,6 +70,23 @@ type Backend interface {
 	GetProfile(ctx context.Context, profileID string) (ProfileView, error)
 	CurrentPublication(ctx context.Context) (PublicationView, error)
 	CurrentRevocation(ctx context.Context) (PublicationView, error)
+}
+
+// AuthorityAdmitter must rerun the authoritative Phase 8 or Phase 11 verifier
+// over the complete bounded source. Its output is a proof-sealed RequestInput;
+// caller-provided digests can never cross this boundary.
+type AuthorityAdmitter interface {
+	Admit(ctx context.Context, request MutationRequest, snapshot controlplane.State, trusted controlplane.TrustedInstant) (controlplane.RequestInput, error)
+}
+
+type AuthorityExecutionStore interface {
+	controlplane.ProductionTransactionStore
+	ExecuteAdmitted(context.Context, controlplane.Command, authoritysource.Protected) (controlplane.TransactionResult, error)
+	ReadAuthoritySource(context.Context, string) (authoritysource.Protected, error)
+}
+
+type AuthoritySourceProtector interface {
+	Protect(context.Context, string, string, []byte) (authoritysource.Protected, error)
 }
 
 type RateLimiter interface {

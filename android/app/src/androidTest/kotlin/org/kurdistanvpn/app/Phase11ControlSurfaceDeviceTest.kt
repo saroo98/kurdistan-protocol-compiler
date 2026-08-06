@@ -30,12 +30,14 @@ import org.kurdistanvpn.core.model.Phase9Settings
 import org.kurdistanvpn.core.model.ProfileSummary
 import org.kurdistanvpn.core.model.ProfileTrust
 import org.kurdistanvpn.core.model.ProfilePreferences
+import org.kurdistanvpn.core.model.RedactedProfilePreview
 import org.kurdistanvpn.core.model.ResetScope
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.ui.R as UiR
 import org.kurdistanvpn.feature.diagnosticsabout.DiagnosticsAboutScreen
 import org.kurdistanvpn.feature.home.HomeScreen
 import org.kurdistanvpn.feature.profiles.ProfilesScreen
+import org.kurdistanvpn.feature.profiles.ImportPreviewScreen
 import org.kurdistanvpn.feature.settingsrecovery.SettingsRecoveryScreen
 import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
@@ -235,6 +237,51 @@ class Phase11ControlSurfaceDeviceTest {
                 ),
                 invoked,
             )
+        }
+    }
+
+    @Test
+    fun selfHostedFirstTrustShowsDeploymentAuthorityBeforeConfirmation() {
+        var confirmed = 0
+        var cancelled = 0
+        val fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        compose.setContent {
+            ImportPreviewScreen(
+                preview = RedactedProfilePreview(
+                    artifactClass = "signed-public",
+                    audienceClass = "public",
+                    contentFingerprint = "abcdef0123456789",
+                    lineageFingerprint = "lineage-01234567",
+                    generation = 7u,
+                    validUntilEpochSeconds = 2_000_000_000,
+                    sealed = false,
+                    deploymentFingerprint = fingerprint,
+                    relayEndpointSummary = "owner-node.example:443",
+                    authorityScope = "deployment-local",
+                    updateLocation = "",
+                    ownerControlled = true,
+                    updatesEnabled = false,
+                ),
+                onConfirm = { confirmed++ },
+                onCancel = { cancelled++ },
+            )
+        }
+
+        compose.onNodeWithTag("deployment_fingerprint")
+            .assertIsDisplayed()
+        compose.onNodeWithTag("owner_controlled_source_warning")
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(UiR.string.profile_updates_disabled))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(UiR.string.confirm_encrypted_storage))
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText(context.getString(UiR.string.cancel))
+            .performScrollTo()
+            .performClick()
+        compose.runOnIdle {
+            assertEquals(1, confirmed)
+            assertEquals(1, cancelled)
         }
     }
 

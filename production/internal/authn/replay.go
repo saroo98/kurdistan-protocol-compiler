@@ -4,6 +4,7 @@
 package authn
 
 import (
+	"context"
 	"sync"
 )
 
@@ -19,7 +20,7 @@ func NewMemoryReplayGuard(clock Clock) *MemoryReplayGuard {
 	return &MemoryReplayGuard{clock: clock, entries: make(map[string]int64)}
 }
 
-func (guard *MemoryReplayGuard) UseOnce(actorID, tokenID string, expiresAt int64) error {
+func (guard *MemoryReplayGuard) UseOnce(_ context.Context, actorID, tokenID string, expiresAt int64) error {
 	guard.mu.Lock()
 	defer guard.mu.Unlock()
 	if guard.clock == nil {

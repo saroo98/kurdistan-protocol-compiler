@@ -1,62 +1,103 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright 2026 Saro -->
+
 # Phase 16 Evidence Index
 
-## Local evidence
+**Authority:** KIP-0093 decentralized self-hosting
 
-- Production API and identity boundary: `production/internal/authn`, `authz`,
-  `server`. The HTTP boundary is tested, but no deployable API binary may be
-  claimed until mutation inputs are converted into the existing unforgeable
-  Phase 8/11 request proofs by a concrete verifier-backed backend.
-- Serializable authority and trusted time: `production/internal/spannerstore`.
-- Schema migration: `production/migrations`.
-- HSM adapter and DER/raw-low-S boundary: `production/internal/kmsprovider`.
-- Profile issuance and immediate reverification: `production/internal/lifecycle`.
-- Immutable publication: `production/internal/publication`.
-- Fenced effects: `production/internal/outbox`.
-- Chained HSM audit anchors: `production/internal/auditanchor`.
-- Restore rollback/fork verifier: `production/internal/backup`.
-- Reproducible infrastructure: `infra/terraform`.
+**Phase state:** complete for the portable authority, provisioning, recovery,
+and owner-VPS scope
 
-These artifacts establish implementation readiness only. They do not prove a
-production Google Cloud deployment.
+**Product release decision:** `NO_GO`
 
-## Open local high-severity findings
+## Self-hosted qualification
 
-The current digest-only HTTP mutation document is insufficient to create the
-unforgeable `controlplane.RequestInput` required by profile, relay, and
-emergency operations. Treating those digests as proof would create a forgeable
-authority bypass. Therefore no production runtime image is authorized yet.
-The API must accept or resolve complete bounded source material and rerun the
-existing Phase 8/11 verifier before a request can enter the serializable store.
-Profile issuance also needs a reviewed two-stage authorization/finalization
-design because the final KMS-signed artifact digest does not exist before the
-operation is approved. This blocks deployable runtime commands and images.
+The machine-readable record is
+`testdata/evidence/phase16/self-hosted-vps-qualification.json`, validated by
+`cmd/phase16verify` against the strict
+`phase16-self-hosted-vps-qualification-v1` schema and portable implementation
+boundary. It contains only redacted or one-way values. The owner VPS address,
+provider UUID, passphrases, private keys, exact local paths, and SSH material
+are not tracked.
 
-The Terraform graph creates separated runtime identities but does not yet grant
-the exact per-resource IAM required for Spanner, KMS, publication, audit,
-backup, Secret Manager, monitoring, or protected deployment. No broad project
-role may substitute for this missing least-privilege graph.
+The recorded owner-VPS exercise proved:
 
-The protected production-plan workflow creates a private, generation-locked
-binary plan, but it does not yet run and bind the required policy-as-code report
-to that plan. Production apply must remain unavailable until plan policy,
-receipt, approval expiry, and drift reconciliation are enforced.
+- two independent deterministic x86_64 and arm64 engineering-package builds
+  produced matching bytes;
+- the x86_64 archive was checksum-verified, installed on a fresh supported
+  owner-controlled VPS, upgraded, rolled back, and re-upgraded;
+- `kurdctl init` created deployment-local authority and a separately encrypted
+  recovery artifact;
+- recovery confirmation, profile issue, profile rotation, profile revocation,
+  deployment disable/enable, issuer rotation, and relay-identity rotation
+  advanced the authenticated monotonic state;
+- encrypted backup verification rejected wrong passphrases, modified bytes,
+  and an older authority snapshot;
+- a destructive total-host-state-loss drill restored the encrypted backup into
+  quarantine and then reactivated it without authority rollback;
+- the native systemd service runs as the dedicated `kurd-node` user with an
+  empty capability bounding set, `NoNewPrivileges`, strict filesystem
+  protection, and `AF_UNIX` as its only permitted address family;
+- the host firewall defaults to deny and exposes only rate-limited key-only
+  SSH during Phase 16;
+- the optional container adapter ran non-root, read-only, without a network or
+  Linux capabilities, using the same verified binaries;
+- the Android KVP2 bridge independently verified the exact owner-issued outer
+  profile bytes, exposed the deployment fingerprint for explicit first trust,
+  and completed the activation state machine without replacing those bytes;
+- 100 issue, Android-verify, and revoke cycles completed without generation,
+  profile-count, or revocation-epoch drift;
+- temporary VPS packages, recovery copies, backup copies, and container test
+  images were removed after their digests matched the offline owner copies.
 
-These are three high-severity local findings and must be closed before
-production planning or Phase 16 completion.
+No known critical or high Phase 16 finding remains in the KIP-0093 portable
+self-hosted scope.
 
-## Required external evidence
+## Local implementation evidence
 
-The authoritative status remains `IMPLEMENTATION_ACTIVE` and `NO_GO` until all
-of these exact-subject records pass:
+- Deployment authority, state, recovery, profile issuance, QR, publication,
+  audit chain, and backup: `internal/selfhost`.
+- Owner administration: `cmd/kurdctl`.
+- Authority publication supervisor: `cmd/kurd-node`.
+- Deterministic native packages and strict verifier: `cmd/kurdpackage`.
+- Native and container deployment: `deploy/selfhost`.
+- Android exact-profile verifier and first-trust preview:
+  `cmd/phase16androidverify`, `internal/androidbridge`, and
+  `android/core/native-jni`.
+- Privacy and architecture verifier: `cmd/phase16verify`.
+- Operator documentation: `docs/self-hosting`.
 
-- owner-input validation and protected production authorization;
-- IAP, WIF, IAM, ingress, residency, budget, and ownership readbacks;
-- HSM key/version, algorithm, state, protection, and public-key readbacks;
-- independent targeted review of the KMS adapter;
-- qualification create/test/destroy and production plan/apply/readback;
-- three issue/publish/rotate/revoke/emergency-deny lifecycle runs;
-- database-loss, recovery, compromise, trusted-time, and audit-continuity drills;
-- CLI and Android verification against the exact production-authority artifacts.
+The portable dependency gate rejects `net/http`, RPC, Google/cloud SDKs,
+OpenTelemetry, and the superseded centralized `production` tree from the
+`kurd-node`, `kurdctl`, and `internal/selfhost` dependency closure. Static gates
+also reject Internet address families or network capabilities in the Phase 16
+service and reject privileged, host-networked, or Docker-socket container
+configuration.
 
-Missing external evidence is a release blocker, not a local test failure, and
-must never be replaced by a simulated or self-authored PASS receipt.
+## Honest capability boundary
+
+- Engineering archives are checksum-bound and reproducible but are not public
+  signed release artifacts.
+- `kurd-node` reports `READY_AUTHORITY_ONLY` and
+  `UNAVAILABLE_PHASE_16` for the relay data plane. A real non-loopback Kurd
+  listener, DNS, egress, and Android traffic proof are not established by this
+  evidence set.
+- Emulator and physical-device traffic evidence cannot be inferred from an
+  offline profile activation. Device/OEM breadth and distributed VPS field
+  validation require separate evidence.
+
+The full VPN remains `NO_GO` until these separate product and release claims
+are supported by their own evidence.
+
+## Historical KIP-0092 experiment
+
+The Google-specific operator API, Spanner, KMS, Terraform, multi-role, and
+workflow artifacts were developed under KIP-0092. KIP-0093 supersedes them as
+mandatory product authority. Their historical status remains in
+`testdata/evidence/phase16/production-trust-status.json` and must not be
+rewritten into a PASS.
+
+Those artifacts are excluded from the portable completion gate and from the
+runtime dependency closure. They may be retained only as isolated optional
+adapter research. Missing Google Cloud evidence is not a blocker for the
+decentralized Phase 16 architecture.

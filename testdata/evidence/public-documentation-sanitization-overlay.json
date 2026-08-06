@@ -1,0 +1,100 @@
+{
+  "version": "public-documentation-sanitization-v1",
+  "entries": [
+    {
+      "path": "README.md",
+      "pre_sha256": "62b170a5b5459f24edc130c1f500a5a19ed290d18850014b1997fc16f7b2f28c",
+      "post_sha256": "a739d0e7295aed5553bfce45810fed0f3871db887b5b5e2cbda2cdfb09c6fbae"
+    },
+    {
+      "path": "ROADMAP.md",
+      "pre_sha256": "b1bc37aa40b84b8e765f5d2413998ab2e51e5b10211e47dd03bd23d9f7900dcc",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "STATUS.md",
+      "pre_sha256": "d81800864628bd092e9dccfe94b3a6720f200dc0e1e1306bbd2fb95cbf1f0ae3",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "cmd/koperator/evidence_test.go",
+      "pre_sha256": "37d61dbeb57c6027ca3a7926ee112493e3a14ab8e12bf450ff37df581f41456c",
+      "post_sha256": "4bbafbd3e847a333d167267d2857b8a8a5ece695bdee3132496b70884a248fce"
+    },
+    {
+      "path": "cmd/phase15verify/main.go",
+      "pre_sha256": "66ca184b8c5f0b86df31afaa228a394a105eba126a18850358802d9f8a73e31e",
+      "post_sha256": "13df978b89bb4a8068c48866e58f710ef58e06da87e6628f9b2d8c703adad203"
+    },
+    {
+      "path": "cmd/phase16verify/main.go",
+      "pre_sha256": "5e285aaff789e634ebe45555b3cef319992d5292d600d992841c4ef6ff6ca429",
+      "post_sha256": "03076b17d17c7df0b3a680a162fd2f76e0dd05f42e8e9a215e6a69bbd42d60f6"
+    },
+    {
+      "path": "cmd/phase16verify/main_test.go",
+      "pre_sha256": "6f5d54c00e8608ee57082a227c8780b304004172ef1220018bc6e920948ad13b",
+      "post_sha256": "30d4ab13703475e8d8ed70ebdc9957e24cf24edb8683f707f19d721c908e6ba8"
+    },
+    {
+      "path": "docs/GITHUB_REPO_PROFILE.md",
+      "pre_sha256": "e7a5e0f262e47a2017107566e8a483916cc95d7e47ad08c71fef6a5f1e4e684f",
+      "post_sha256": "e6e3e868d59a37e8c0856023584d4b91bc9efdd8e225af94f295813ad32c8395"
+    },
+    {
+      "path": "docs/PHASE16_DIRTY_WORKTREE_DISPOSITION.md",
+      "pre_sha256": "34e742efa00f5130b090b7bc0c86651d1d49872aa2b601880629af1449eef1e7",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "docs/PHASE16_EVIDENCE_INDEX.md",
+      "pre_sha256": "d4a27a8928b0a8abb9923dc4ce9d287acf9d277f9c0b6664c42958db6d8f937c",
+      "post_sha256": "e231d77611a6314ec637805a2dafc1d34b0e43763d861bad5c8a4e352595f47d"
+    },
+    {
+      "path": "docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
+      "pre_sha256": "c01140e3bb0ea030eb6d02c9934683f0b8632e540d87c30d2422084578255018",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "docs/PHASE16_SELF_HOSTED_VPS_COMPLETION_PLAN.md",
+      "pre_sha256": "985d3d2db70744c7b91621d3644d24bc3dde26e5ede111f2a6e7a3a2683e9ac5",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "docs/index.html",
+      "pre_sha256": "d7d4e329d84d3fca7817261b58fdcfcddbcd039174515c287f6771f62290f44e",
+      "post_sha256": "96b36cc8f5f73be49392438b9b63da456efecc4c7628ef795d14d3be279a21ab"
+    },
+    {
+      "path": "internal/audit/adaptivepath.go",
+      "pre_sha256": "1bb9fe30d1cd219f9d6ade8f6f4677ec9da01339dded76dc59402702347bcae1",
+      "post_sha256": "e4f9c0721f9476a7a3361cb5d639726cbd24cc5d44ba3bbfb54b754ca91e20bb"
+    },
+    {
+      "path": "internal/audit/security.go",
+      "pre_sha256": "b812eddcb7298d43b4f1cb0c6da71317e84589cdb6276f6d35223663bf1c6eb1",
+      "post_sha256": "c646e806b3bc958e287ddcead3a244906a0ba59c40c3ce96b8261e8978ae3d98"
+    },
+    {
+      "path": "internal/audit/security_test.go",
+      "pre_sha256": "403eb8446d70382aaf5fe222829d17139ee4bf8f842c5f4bae820e8aa6d9fcc9",
+      "post_sha256": "d2022c7de0615e3dc5b6cb60bb64b1650900aba22bea493fa7ee842ebfced87b"
+    },
+    {
+      "path": "internal/runtime/policy_enforcement_test.go",
+      "pre_sha256": "b4705e6eb4676f77a6c90261e24d1dfed90f8610e2669877e916b4151d989d6f",
+      "post_sha256": "b9b82911443414516745b3a9ca5e682877de35f97f40c67dff563047ef0c545f"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor.go",
+      "pre_sha256": "12fc5cce79e05fb6cfbc640c3a4c36cfe35bcd01e84c063f86ee43a7dfc7e3c9",
+      "post_sha256": "35df2f8388e4740470c57845625cce80573fa38acc23396216696679d9924bbf"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor_test.go",
+      "pre_sha256": "fe0596f758d626e0b7b80fd9016a6420a6ebd9d2620cc76a8fe4221a1ddf01ea",
+      "post_sha256": "f24eeab091ec1022aa358bf54b1e8f65e5e66ba55d8141eb8ab8dd4f293fb2bc"
+    }
+  ]
+}

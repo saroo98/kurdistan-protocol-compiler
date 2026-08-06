@@ -3,6 +3,12 @@
 
 # KIP-0090: Phase 15 production contract freeze
 
+> **KIP-0093 amendment:** the frozen profile and protocol safety invariants
+> remain valid, but production ownership is now deployment-local and
+> self-hosted. Provider adapters are optional, no cloud vendor is mandatory,
+> and `emergency deny` is scoped to the deployment root that authorized the
+> affected profile. There is no global authority or universal shutdown path.
+
 Status: active; production-infrastructure engineering authorized within the
 boundaries below; deployment and release remain prohibited
 
@@ -73,7 +79,8 @@ plan, and explicit execution authorization.
 - Telemetry remains off by default. Payloads, destinations, credentials,
   secrets, keys, raw frames, package inventories, and reusable device
   identifiers are never diagnostic fields.
-- Emergency deny is root-bound, monotonic, auditable, and fail-closed.
+- Deployment-scoped disable and revocation are root-bound, monotonic,
+  auditable, and fail-closed. No root can affect another deployment.
 - Production and release claims remain prohibited until Phases 16-22 provide
   their declared evidence.
 

@@ -22,6 +22,12 @@
     <string name="back">گەڕانەوە</string>
     <string name="verify_profile">پشتڕاستکردنەوەی پرۆفایل</string>
     <string name="artifact_class">پۆل: %1$s</string><string name="audience">ئامانج: %1$s</string><string name="generation">نەوە: %1$s</string><string name="fingerprint">پەنجەمۆر: %1$s…</string>
+    <string name="deployment_fingerprint">پەنجەمۆری دامەزراندن: %1$s</string>
+    <string name="relay_endpoint_summary">ناونیشانی ڕێلەی: %1$s</string>
+    <string name="authority_scope">مەودای دەسەڵات: %1$s</string>
+    <string name="profile_updates_enabled">نوێکردنەوەی واژۆکراوی پرۆفایل: %1$s</string>
+    <string name="profile_updates_disabled">نوێکردنەوەی واژۆکراوی پرۆفایل بۆ ئەم پرۆفایلە ناچالاکە.</string>
+    <string name="owner_controlled_source_warning">ئەم نۆدە و کلیلەکانی لەلایەن ئەو کەسەوە کۆنترۆڵ دەکرێن کە پرۆفایلەکەی پێداویت، نەک Kurdistan VPN. پێش متمانەکردن پەنجەمۆری دامەزراندن لەگەڵیدا بەراورد بکە.</string>
     <string name="encrypted_profile">پرۆفایلی نهێنیکراو</string><string name="signed_public_profile">پرۆفایلی گشتی واژۆکراو</string>
     <string name="confirm_encrypted_storage">پشتڕاستکردنەوەی هەڵگرتنی نهێنیکراو</string><string name="cancel">هەڵوەشاندنەوە</string>
     <string name="telemetry_off">تەلەمەتری: کوژاوە</string><string name="crash_reporting_off">ڕاپۆرتی دوورەوەی هەڵە: کوژاوە</string><string name="profiles_encrypted">پرۆفایلەکان: ناوخۆیی نهێنیکراون</string><string name="cloud_backup_disabled">پاڵپشتی هەور: ناچالاکە</string>

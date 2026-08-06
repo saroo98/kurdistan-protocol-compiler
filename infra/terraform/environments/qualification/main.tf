@@ -5,11 +5,39 @@ variable "projects" {
     error_message = "Qualification projects must be distinct."
   }
 }
-variable "region" { type = string }
-variable "spanner_configuration" { type = string }
-variable "kms_location" { type = string }
-variable "bucket_location" { type = string }
+variable "region" {
+  type = string
+  validation {
+    condition     = can(regex("^europe-", var.region))
+    error_message = "Qualification control-plane resources must remain in an approved EU region."
+  }
+}
+variable "spanner_configuration" {
+  type = string
+  validation {
+    condition     = var.spanner_configuration == "eur6"
+    error_message = "Qualification Spanner is frozen to eur6."
+  }
+}
+variable "kms_location" {
+  type = string
+  validation {
+    condition     = can(regex("^(europe-|eu$|EU$)", var.kms_location))
+    error_message = "Qualification KMS must remain in the approved EU boundary."
+  }
+}
+variable "bucket_location" {
+  type = string
+  validation {
+    condition     = can(regex("^(europe-|eu$|EU$)", var.bucket_location))
+    error_message = "Qualification buckets must remain in the approved EU boundary."
+  }
+}
 variable "bucket_names" { type = map(string) }
+variable "billing_account" { type = string }
+variable "budget_currency_code" { type = string }
+variable "budget_monthly_units" { type = number }
+variable "notification_channels" { type = list(string) }
 variable "images" {
   type = map(string)
   validation {
@@ -32,5 +60,12 @@ module "production_trust" {
   bucket_names          = var.bucket_names
   images                = var.images
   repository            = "saroo98/kurdistan-protocol-compiler"
-  schema_ddl            = compact([for statement in split(";", file("${path.module}/../../../../production/migrations/001_initial.sql")) : trimspace(statement)])
+  schema_ddl = flatten([
+    for migration in sort(fileset("${path.module}/../../../../production/migrations", "*.sql")) :
+    compact([for statement in split(";", file("${path.module}/../../../../production/migrations/${migration}")) : trimspace(statement)])
+  ])
+  billing_account       = var.billing_account
+  budget_currency_code  = var.budget_currency_code
+  budget_monthly_units  = var.budget_monthly_units
+  notification_channels = var.notification_channels
 }

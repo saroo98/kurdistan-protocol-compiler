@@ -61,18 +61,20 @@ func (actor Actor) has(duty Duty) bool {
 type Action string
 
 const (
-	ActionIssueProfile    Action = "issue-profile"
-	ActionRotateProfile   Action = "rotate-profile"
-	ActionRevokeProfile   Action = "revoke-profile"
-	ActionPublishSnapshot Action = "publish-snapshot"
-	ActionEnrollRelay     Action = "enroll-relay"
-	ActionPromoteRelay    Action = "promote-relay"
-	ActionDrainRelay      Action = "drain-relay"
-	ActionRetireRelay     Action = "retire-relay"
-	ActionQuarantineRelay Action = "quarantine-relay"
-	ActionRevokeRelay     Action = "revoke-relay"
-	ActionEmergencyDeny   Action = "emergency-deny"
-	ActionEmergencyNarrow Action = "emergency-narrow"
+	ActionPrepareProfileIssue  Action = "prepare-profile-issue"
+	ActionPrepareProfileRotate Action = "prepare-profile-rotate"
+	ActionIssueProfile         Action = "issue-profile"
+	ActionRotateProfile        Action = "rotate-profile"
+	ActionRevokeProfile        Action = "revoke-profile"
+	ActionPublishSnapshot      Action = "publish-snapshot"
+	ActionEnrollRelay          Action = "enroll-relay"
+	ActionPromoteRelay         Action = "promote-relay"
+	ActionDrainRelay           Action = "drain-relay"
+	ActionRetireRelay          Action = "retire-relay"
+	ActionQuarantineRelay      Action = "quarantine-relay"
+	ActionRevokeRelay          Action = "revoke-relay"
+	ActionEmergencyDeny        Action = "emergency-deny"
+	ActionEmergencyNarrow      Action = "emergency-narrow"
 )
 
 type OperationState string
@@ -96,6 +98,7 @@ type Operation struct {
 	ID                     string
 	Action                 Action
 	TargetID               string
+	ParentOperationID      string
 	SubjectDigest          string
 	ScopeDigest            string
 	AuthorityScopeDigest   string
@@ -209,6 +212,7 @@ type OutboxEvent struct {
 	Attempts      uint32
 	LastAttemptAt int64
 	FailedAt      int64
+	OutcomeDigest string
 }
 
 type Receipt struct {
@@ -346,8 +350,11 @@ func ValidateOperation(operation Operation) error {
 		operation.CreatedAt <= 0 || operation.ExpiresAt <= operation.CreatedAt {
 		return ErrInvalidInput
 	}
+	if operation.ParentOperationID != "" && !validID(operation.ParentOperationID) {
+		return ErrInvalidInput
+	}
 	switch operation.Action {
-	case ActionIssueProfile, ActionRotateProfile, ActionRevokeProfile,
+	case ActionPrepareProfileIssue, ActionPrepareProfileRotate, ActionIssueProfile, ActionRotateProfile, ActionRevokeProfile,
 		ActionPublishSnapshot, ActionEnrollRelay, ActionPromoteRelay,
 		ActionDrainRelay, ActionRetireRelay, ActionQuarantineRelay,
 		ActionRevokeRelay, ActionEmergencyDeny, ActionEmergencyNarrow:
@@ -403,11 +410,11 @@ func ValidateOperation(operation Operation) error {
 		return ErrInvalidInput
 	}
 	switch operation.Action {
-	case ActionIssueProfile:
+	case ActionPrepareProfileIssue, ActionIssueProfile:
 		if operation.ExpectedArtifactDigest != "" {
 			return ErrInvalidInput
 		}
-	case ActionRotateProfile, ActionRevokeProfile:
+	case ActionPrepareProfileRotate, ActionRotateProfile, ActionRevokeProfile:
 		if !validDigest(operation.ExpectedArtifactDigest) {
 			return ErrInvalidInput
 		}
@@ -423,6 +430,9 @@ func ValidateOperation(operation Operation) error {
 			operation.ExpectedArtifactDigest != "" {
 			return ErrInvalidInput
 		}
+	}
+	if operation.Action != ActionIssueProfile && operation.Action != ActionRotateProfile && operation.ParentOperationID != "" {
+		return ErrInvalidInput
 	}
 	if operation.Action == ActionPublishSnapshot {
 		if operation.ResultEpoch != 0 {

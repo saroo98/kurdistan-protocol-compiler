@@ -70,6 +70,12 @@
     <string name="audience">Audience: %1$s</string>
     <string name="generation">Generation: %1$s</string>
     <string name="fingerprint">Fingerprint: %1$s…</string>
+    <string name="deployment_fingerprint">Deployment fingerprint: %1$s</string>
+    <string name="relay_endpoint_summary">Relay endpoint: %1$s</string>
+    <string name="authority_scope">Authority scope: %1$s</string>
+    <string name="profile_updates_enabled">Signed profile updates: %1$s</string>
+    <string name="profile_updates_disabled">Signed profile updates are disabled for this profile.</string>
+    <string name="owner_controlled_source_warning">This node and its keys are controlled by the person who gave you this profile, not by Kurdistan VPN. Compare the deployment fingerprint with them before trusting it.</string>
     <string name="encrypted_profile">Encrypted profile</string>
     <string name="signed_public_profile">Signed public profile</string>
     <string name="confirm_encrypted_storage">Confirm encrypted storage</string>

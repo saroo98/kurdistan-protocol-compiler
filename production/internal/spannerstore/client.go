@@ -30,6 +30,7 @@ type JSONRecord struct {
 
 type WriteSet struct {
 	Head              Head
+	AuthoritySources  []JSONRecord
 	Operations        []JSONRecord
 	Approvals         []JSONRecord
 	Profiles          []JSONRecord

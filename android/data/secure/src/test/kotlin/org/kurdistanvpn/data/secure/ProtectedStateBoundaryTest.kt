@@ -4,6 +4,8 @@
 package org.kurdistanvpn.data.secure
 
 import java.security.SecureRandom
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -74,8 +76,22 @@ class ProtectedStateBoundaryTest {
         for (length in 0 until encoded.size) {
             assertFails { ProfilePreviewCodec.decode(encoded.copyOf(length)) }
         }
-        val invalidSealed = encoded.clone().also { it[it.size - 17] = 2 }
+        val invalidSealed = encoded.clone().also { it[it.size - 17] = 8 }
         assertFails { ProfilePreviewCodec.decode(invalidSealed) }
+    }
+
+    @Test
+    fun previewCodecMigratesLegacyKpr1WithoutInventingDeploymentTrust() {
+        val legacy = legacyPreviewEncoding(preview(), "Legacy Kurd profile")
+        val (decoded, alias) = ProfilePreviewCodec.decode(legacy)
+        assertEquals("Legacy Kurd profile", alias)
+        assertEquals(preview(), decoded)
+        assertEquals("", decoded.deploymentFingerprint)
+        assertEquals("", decoded.relayEndpointSummary)
+        assertEquals("", decoded.authorityScope)
+        assertEquals("", decoded.updateLocation)
+        assertFalse(decoded.ownerControlled)
+        assertFalse(decoded.updatesEnabled)
     }
 
     @Test
@@ -302,6 +318,28 @@ class ProtectedStateBoundaryTest {
         validUntilEpochSeconds = 2_000_000_000,
         sealed = false,
     )
+
+    private fun legacyPreviewEncoding(preview: RedactedProfilePreview, alias: String): ByteArray {
+        val fields = listOf(
+            preview.artifactClass,
+            preview.audienceClass,
+            preview.contentFingerprint,
+            preview.lineageFingerprint,
+            alias,
+        ).map { it.encodeToByteArray() }
+        return ByteBuffer.allocate(4 + fields.sumOf { 1 + it.size } + 1 + 8 + 8)
+            .order(ByteOrder.BIG_ENDIAN)
+            .apply {
+                putInt(0x4B505231)
+                fields.forEach { bytes ->
+                    put(bytes.size.toByte())
+                    put(bytes)
+                }
+                put((if (preview.sealed) 1 else 0).toByte())
+                putLong(preview.generation.toLong())
+                putLong(preview.validUntilEpochSeconds)
+            }.array()
+    }
 
     private fun assertFails(block: () -> Unit) {
         var failed = false

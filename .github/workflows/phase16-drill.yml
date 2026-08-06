@@ -1,57 +1,43 @@
-name: Phase 16 protected drills
+name: Phase 16 portable recovery drills
 
 on:
   workflow_dispatch:
     inputs:
       drill:
-        description: Authorized drill identifier
+        description: Deterministic local drill
         required: true
         type: choice
-        options: [database-loss, outbox-backlog, audit-outage, publication-outage, issuer-disabled, trusted-time-rollback, identity-outage]
-      authorization_id:
-        description: Exact protected drill authorization
-        required: true
-        type: string
+        options: [state-loss, interrupted-write, authority-rollback, issuer-loss, backup-tamper]
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: phase16-drill
+  group: phase16-portable-drill
   cancel-in-progress: false
 
 jobs:
   drill:
-    environment: phase16-drill
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.PHASE16_WIF_PROVIDER }}
-          service_account: ${{ vars.PHASE16_DRILL_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-        with:
-          version: '579.0.0'
-      - name: Execute the protected Cloud Run drill job
-        shell: bash
+      - uses: ./.github/actions/setup-go
+      - name: Execute isolated self-hosting drill
         env:
-          AUTHORIZATION_ID: ${{ inputs.authorization_id }}
           DRILL: ${{ inputs.drill }}
-          PROJECT_ID: ${{ vars.PHASE16_CONTROL_PROJECT }}
-          REGION: europe-west2
+        shell: bash
         run: |
-          set -euo pipefail
-          [[ "$AUTHORIZATION_ID" =~ ^[A-Za-z0-9._:-]{8,128}$ ]]
-          [[ "$PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
-          authorization_digest="$(printf '%s' "$AUTHORIZATION_ID" | sha256sum | cut -d' ' -f1)"
-          gcloud run jobs execute koperator-drill \
-            --project="$PROJECT_ID" \
-            --region="$REGION" \
-            --wait \
-            --args="--drill=$DRILL,--authorization-digest=$authorization_digest"
+          case "$DRILL" in
+            state-loss) TEST='TestEncryptedBackupRestoreAndRollbackProtection' ;;
+            interrupted-write) TEST='TestInterruptedStateWriteResidueCannotReplaceCommittedState' ;;
+            authority-rollback) TEST='TestClockRollbackAndLargeForwardJumpFailClosed' ;;
+            issuer-loss) TEST='TestIssuerAndRelayRotationRevokePriorProfiles' ;;
+            backup-tamper) TEST='TestBackupRejectsWrongPassphraseTamperAndUnsafePaths' ;;
+            *) echo "unsupported drill" >&2; exit 2 ;;
+          esac
+          LISTED=$(go test ./internal/selfhost -list "^${TEST}$")
+          [ "$LISTED" = "$TEST" ] || { echo "expected drill test is absent: $TEST" >&2; exit 1; }
+          go test -count=1 ./internal/selfhost -run "^${TEST}$"

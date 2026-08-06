@@ -17,6 +17,7 @@ const (
 	ProductionAnchored        ProductionOperationState = "ANCHORED"
 	ProductionPublished       ProductionOperationState = "PUBLISHED"
 	ProductionFinalized       ProductionOperationState = "FINALIZED"
+	ProductionRejected        ProductionOperationState = "REJECTED"
 	ProductionFailedRetryable ProductionOperationState = "FAILED_RETRYABLE"
 	ProductionFailedTerminal  ProductionOperationState = "FAILED_TERMINAL"
 )
@@ -24,7 +25,7 @@ const (
 func ValidProductionStateTransition(from, to ProductionOperationState) bool {
 	switch from {
 	case ProductionPending:
-		return to == ProductionApproved
+		return to == ProductionApproved || to == ProductionRejected
 	case ProductionApproved:
 		return to == ProductionCommitted
 	case ProductionCommitted:

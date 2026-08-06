@@ -1,5 +1,10 @@
 # Phase 16 Key Ceremonies
 
+> **Realignment notice:** KIP-0093 replaces mandatory centralized roles and
+> cloud-HSM ceremonies with a single-owner deployment root, encrypted recovery
+> artifact, bounded online issuer, and optional hardware-key adapters. This
+> historical procedure is not current deployment authority.
+
 Every root, recovery, issuer, emergency, publication, audit, and destruction
 ceremony requires two distinct approvers and a separate executor. Actor aliases
 are opaque. Names, email addresses, token claims, private keys, and credentials

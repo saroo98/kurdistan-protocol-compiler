@@ -15,7 +15,7 @@ import (
 
 const (
 	verifyRequestMagic    = "KVI1"
-	verifyPreviewMagic    = "KVP1"
+	verifyPreviewMagic    = "KVP2"
 	verifyRequestHeader   = 8
 	MaxVerifySegments     = envelope.MaxIngressQRChunks
 	MaxVerifyRequestBytes = envelope.MaxIngressEncodedChars +
@@ -24,6 +24,23 @@ const (
 
 type VerificationEnvironment interface {
 	Verify(artifact []byte, class envelope.ArtifactClass) (profile.OfflineVerifiedArtifact, error)
+}
+
+// TrustPreviewEnvironment optionally supplies redacted, independently
+// verified deployment information for an explicit first-trust decision. It
+// must derive every field from the exact artifact already admitted by Verify
+// and must not perform a network request.
+type TrustPreviewEnvironment interface {
+	TrustPreview(artifact []byte, class envelope.ArtifactClass) (TrustPreview, error)
+}
+
+type TrustPreview struct {
+	DeploymentFingerprint string
+	RelayEndpoint         string
+	AuthorityScope        string
+	UpdateLocation        string
+	OwnerControlled       bool
+	UpdatesEnabled        bool
 }
 
 type VerifyRequest struct {
@@ -35,6 +52,7 @@ type VerifyRequest struct {
 type VerifyPreview struct {
 	Inspection profile.RedactedInspection
 	Verified   profile.OfflineVerifiedArtifact
+	Trust      TrustPreview
 }
 
 func (preview *VerifyPreview) Destroy() {
@@ -167,9 +185,17 @@ func VerifyAndPreview(encoded []byte, environment VerificationEnvironment) (Veri
 	if err != nil {
 		return VerifyPreview{}, CodeVerificationRejected
 	}
+	var trust TrustPreview
+	if provider, ok := environment.(TrustPreviewEnvironment); ok {
+		trust, err = provider.TrustPreview(artifact, request.Class)
+		if err != nil {
+			return VerifyPreview{}, CodeVerificationRejected
+		}
+	}
 	return VerifyPreview{
 		Inspection: profile.InspectRedacted(verified),
 		Verified:   verified,
+		Trust:      trust,
 	}, CodeOK
 }
 
@@ -199,10 +225,22 @@ func EncodeVerifyPreview(preview VerifyPreview) ([]byte, error) {
 		preview.Inspection.ContentSHA256,
 		lineageFingerprint(preview.Verified.Profile.ProviderID, preview.Verified.Profile.LineageID),
 	}
+	optionalFields := []string{
+		preview.Trust.DeploymentFingerprint,
+		preview.Trust.RelayEndpoint,
+		preview.Trust.AuthorityScope,
+		preview.Trust.UpdateLocation,
+	}
 	size := 4 + 1 + 8 + 8
 	for _, field := range fields {
 		if len(field) == 0 || len(field) > 255 {
 			return nil, errors.New("androidbridge: invalid preview field")
+		}
+		size += 1 + len(field)
+	}
+	for _, field := range optionalFields {
+		if len(field) > 255 {
+			return nil, errors.New("androidbridge: invalid optional preview field")
 		}
 		size += 1 + len(field)
 	}
@@ -218,9 +256,23 @@ func EncodeVerifyPreview(preview VerifyPreview) ([]byte, error) {
 		copy(out[offset:], field)
 		offset += len(field)
 	}
-	if preview.Inspection.Sealed {
-		out[offset] = 1
+	for _, field := range optionalFields {
+		out[offset] = byte(len(field))
+		offset++
+		copy(out[offset:], field)
+		offset += len(field)
 	}
+	var flags byte
+	if preview.Inspection.Sealed {
+		flags |= 1
+	}
+	if preview.Trust.OwnerControlled {
+		flags |= 2
+	}
+	if preview.Trust.UpdatesEnabled {
+		flags |= 4
+	}
+	out[offset] = flags
 	offset++
 	binary.BigEndian.PutUint64(out[offset:], preview.Inspection.Generation)
 	offset += 8

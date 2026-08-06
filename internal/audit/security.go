@@ -1651,6 +1651,11 @@ func m0LineEndingHistoricalHashesV1(root string, overlays map[string]m0LineEndin
 		if !validSHA256V1(overlay.CanonicalSHA256) || !validSHA256V1(overlay.HistoricalSHA256) {
 			return nil, fmt.Errorf("invalid M0 line-ending overlay hash: %s", path)
 		}
+		effective, err := evidenceoverlay.ResolveCurrentSHA256(root, path)
+		if err == nil && effective == overlay.CanonicalSHA256 {
+			historical[path] = overlay.HistoricalSHA256
+			continue
+		}
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
 			return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
@@ -1845,6 +1850,9 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes[evidenceoverlay.SuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16SuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16ProductionTrustSuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.Phase16RuntimeSuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.Phase16DecentralizedSuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.PublicDocumentationSuccessorPath] = "ABSENT"
 	return m0CandidateManifestFromPathsWithPreHashesV1(root, parts, preHashes)
 }
 

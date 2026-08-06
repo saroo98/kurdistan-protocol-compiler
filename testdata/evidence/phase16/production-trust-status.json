@@ -10,7 +10,7 @@
     "retention": "73abb0d0ec1cf7ce4f488a901af6e92285536d471ff798e3ac9fe6a2764a9e8b",
     "roles": "392915fdbb29c428f68ee03ca6c0965f186efa81b5498f4ebeb14c68be8fde8c",
     "services": "1757366163b0eb10800653ae7fcd5f9e5c0716c0b07ece2d52f387acb096ca59",
-    "tools": "365e5728823b6fe3ccee4bffb94665d52d2a83ef3625fa8ca911d6b5ed3e59d9"
+    "tools": "9c5eae87c6617387ef7749955d8035aa21dfbcb29267c8819e0a1395400d71a7"
   },
   "localAuthority": [
     "action-role-policy",
@@ -29,6 +29,8 @@
     "spanner-serializable-store",
     "strict-offline-verifier",
     "trusted-time-reservation",
+	"verifier-backed-production-api",
+	"encrypted-authority-source-staging",
     "threat-model"
   ],
   "externalEvidence": [
@@ -43,9 +45,11 @@
   "limitations": [
     "No production Google Cloud resources are evidenced by this local status.",
     "No production key ceremony or external recovery drill has been executed.",
-    "Production runtime images and verified-intent admission remain unavailable pending local deployability closure.",
-    "The least-privilege runtime IAM graph and exact plan-policy receipt are not yet implemented.",
+	"The operator API command is deployable locally, but the separated effect, publication, audit, emergency, ceremony, and drill command binaries are not implemented.",
+	"Key-rotation and recovery source admission, durable transitions, and protected executors remain locally incomplete and fail closed.",
+	"The complete sign, verify, anchor, immutable publish/readback, and final acknowledgement chain has not been exercised by a deployable effect coordinator.",
+	"The least-privilege runtime IAM graph and exact plan-policy receipt are implemented locally but have no authorized cloud readback.",
     "Live relays and Internet egress remain Phase 17 responsibilities."
   ],
-  "findings": {"critical":0,"high":3}
+  "findings": {"critical":0,"high":4}
 }

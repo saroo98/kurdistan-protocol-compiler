@@ -1,0 +1,74 @@
+{
+  "schema": "phase16-self-hosted-vps-qualification-v1",
+  "phase": 16,
+  "authority": "KIP-0093",
+  "recordedAt": "2026-08-06T12:36:16Z",
+  "source": {
+    "branch": "product/phase16-production-trust",
+    "baselineCommit": "b33cf7ed31bdc5aa8cd45e438054f9fdde1c0176",
+    "packageSourceCommit": "b33cf7ed31bdc5aa8cd45e438054f9fdde1c0176",
+    "packageBuiltFromDirtyTree": true
+  },
+  "packages": {
+    "version": "0.16.3-phase16",
+    "amd64Sha256": "9b69687c3255da8f51c9e61cf8fc08b69131d5712b2ff0b2ff6b1853daacd67d",
+    "arm64Sha256": "51edb129820a6e6241e14f395c1d703bb4406277fe2769ed3c394f95bf706d35",
+    "independentBuildsMatched": true,
+    "signed": false,
+    "relayDataPlane": false
+  },
+  "vps": {
+    "providerClass": "owner-controlled-vps",
+    "regionClass": "external-european",
+    "operatingSystem": "Ubuntu Server 26.04 LTS",
+    "architecture": "amd64",
+    "cpuCores": 1,
+    "memoryMiB": 2048,
+    "storageGiB": 20,
+    "endpointSha256": "664b44d9b42e2378a22dcbc4d0595084b48b10c930ad24b26ff2bb0991bdcbc9"
+  },
+  "deployment": {
+    "rootFingerprint": "ce98a4ac5a37ff75db69d45cb8b49e9db17dca588ed2e1c2868afe82b898de4f",
+    "revision": 23,
+    "generation": 5,
+    "rootEpoch": 1,
+    "revocationEpoch": 7,
+    "profileCount": 4,
+    "revokedProfileCount": 3,
+    "recoveryConfirmed": true,
+    "drained": false,
+    "disabled": false
+  },
+  "artifacts": {
+    "recoverySha256": "1ddb8d0944bd3911b513847a7ba85d871182e9c0969d88ec048b9a2e6b2063c2",
+    "backupSha256": "5427f0bf4946cb9683c601c28ee4e4e8d4ffb10b0ee90857825c265032bc63f8",
+    "postUpgradeBackupSha256": "87c74b78f9dcd7d74db4714e9057cb031f7bca2a64729e892149f9f14320d21b",
+    "profileSha256": "d104524ebd12421555b2253b8c75011547efc88c6c801ec7cb8add7cd02f94b4",
+    "backupAuditHead": "72697a5b4b3b79a6c1f40bae69b15440dfafd5b48cb80e8870b32201a7a973f5"
+  },
+  "checks": {
+    "freshNativeInstall": true,
+    "upgradeRollbackReupgrade": true,
+    "totalHostLossRestore": true,
+    "oldBackupRejected": true,
+    "wrongPassphraseRejected": true,
+    "corruptBackupRejected": true,
+    "doctorPassed": true,
+    "publicationCursorAuthenticated": true,
+    "systemdSandboxed": true,
+    "onlySshPublicListener": true,
+    "defaultDenyFirewall": true,
+    "containerConformance": true,
+    "androidKvp2ExactActivation": true,
+    "hundredCycleSoak": true,
+    "deterministicPackages": true,
+    "temporaryArtifactsRemoved": true
+  },
+  "limitations": [
+    "Phase 16 engineering packages are checksum-bound but unsigned; protected public signing is a Phase 19 gate.",
+    "The Kurd relay data plane and Internet egress are intentionally unavailable until Phase 17.",
+    "Physical Android traffic, DNS, and public-egress proof are Phase 17 and Phase 21 responsibilities."
+  ],
+  "findings": {"critical":0,"high":0},
+  "releaseDecision": "NO_GO"
+}

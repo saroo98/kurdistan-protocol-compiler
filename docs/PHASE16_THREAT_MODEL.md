@@ -1,5 +1,10 @@
 # Phase 16 production trust threat model
 
+> **Realignment notice:** KIP-0093 changes the deployment and trust model to
+> independent self-hosted nodes. The threats below remain useful input, but
+> Google-specific and centralized-control assumptions are superseded and must
+> not be treated as current architecture.
+
 ## Protected assets
 
 - root, recovery, issuer, emergency, publication, and audit signing authority;
@@ -54,4 +59,3 @@ final success.
 Local tests do not prove HSM custody, cloud residency, operator identity,
 physical recovery, field resilience, or production readiness. Phase 16 does not
 prove live VPN connectivity. Those claims require later exact external evidence.
-

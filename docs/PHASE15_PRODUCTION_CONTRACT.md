@@ -104,9 +104,11 @@ and can halt or roll back without changing profile authority.
 | Client support evidence | user-confirmed redacted bundle, expiring support code | Purpose-limited, encrypted, access logged, automatically expires |
 | Prohibited data | payloads, destination histories, credentials, private keys, raw frames, package inventories, stable hardware IDs | Must not be collected or logged |
 
-Every later provider selection must document residency, retention, deletion,
-backup, restore, access review, breach response, and lawful ownership before it
-may receive production data.
+Every deployment owner selects and controls their own VPS or server. The
+self-hosted node must document local retention, deletion, backup, restore,
+access, and breach-response behavior. No Kurdistan-operated provider receives
+production profile or traffic data. Optional hosting adapters must state their
+own provider-specific behavior without becoming product prerequisites.
 
 ## 6. Availability and recovery targets
 
@@ -114,15 +116,15 @@ These are Phase 16-22 **targets**, not current claims.
 
 | Capability | Target |
 |---|---|
-| Signed publication availability | 99.95% monthly |
-| Relay fleet session establishment | 99.9% monthly across supported owned regions |
-| Emergency-deny propagation | p95 within 5 minutes after dual-controlled approval |
-| Routine revocation publication | p95 within 10 minutes after approval |
-| Control-plane recovery time objective | 4 hours |
-| Publication and emergency-control recovery time objective | 30 minutes |
-| Relay regional recovery time objective | 60 minutes |
+| Deployment-local profile publication | Measured per self-hosted node; no global availability claim |
+| Kurd session establishment | Measured across the supported VPS and Android matrices |
+| Deployment disable propagation | p95 within 5 minutes when the affected node is reachable |
+| Routine profile revocation | p95 within 10 minutes when the affected node is reachable |
+| Single-node recovery time objective | 4 hours from an owner-controlled encrypted backup |
+| Profile-publication recovery time objective | 30 minutes after node recovery |
+| Node migration objective | 60 minutes after replacement infrastructure is ready |
 | Authority/audit recovery point objective | zero acknowledged authority transitions lost |
-| Operational metrics recovery point objective | at most 15 minutes, with no authority impact |
+| Local operational metrics recovery point objective | at most 15 minutes, with no authority impact |
 
 Breaching an authority, privacy, or emergency-control invariant is never traded
 against an availability target. The system fails closed and the incident owner
@@ -143,15 +145,17 @@ by assertion. Later phases must state measured protections and residual risk.
 
 ## 8. Infrastructure implementation authorization
 
-Phase 16 may implement and test the interfaces and infrastructure modules named
-by this contract. Default execution uses disposable, isolated, non-production
-homes/accounts, synthetic data, non-production keys, owned test endpoints, cost
-limits, and automatic teardown.
+Phase 16 may implement and test the interfaces and self-hosting modules named
+by this contract as amended by KIP-0093. Default execution uses disposable,
+isolated VMs or authorized VPSs, synthetic data, non-production keys, cost
+limits, and automatic teardown. No Google Cloud organization, billing account,
+managed database, hosted identity product, or managed key product is required.
 
 The authorization does not by itself permit:
 
-- creating or changing production cloud, identity, DNS, certificate, HSM/KMS,
-  database, signing, monitoring, or distribution resources;
+- creating or changing an owner's production VPS, DNS, certificate, hardware
+  key, database, signing, monitoring, or distribution resources without that
+  owner's explicit execution authorization;
 - placing a secret, credential, endpoint inventory, private key, or personal
   record in source control, logs, artifacts, or issue trackers;
 - accepting public or user traffic;
@@ -171,6 +175,6 @@ before the action occurs.
 - Add no secret value or real endpoint to Git.
 - Define provider-neutral interfaces before binding a provider.
 - Require deterministic validation, negative tests, rollback, evidence schemas,
-  and a cleanup path for every infrastructure module.
+  and a cleanup path for every self-hosted deployment module.
 - Stop before any live production activation that lacks the explicit external
   authorization described above.
