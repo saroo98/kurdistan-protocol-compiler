@@ -28,7 +28,6 @@ import (
 const contractPath = "testdata/evidence/phase15/production-contract.json"
 
 var requiredFiles = []string{
-	"ROADMAP.md",
 	"docs/KIP-0090-phase15-production-contract-freeze.md",
 	"docs/PHASE15_PRODUCTION_CONTRACT.md",
 	contractPath,
@@ -228,6 +227,16 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 
 func verifyRoadmap(root string, value contract) error {
 	raw, err := os.ReadFile(filepath.Join(root, "ROADMAP.md"))
+	if errors.Is(err, os.ErrNotExist) {
+		predecessors, overlayErr := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+		if overlayErr != nil {
+			return overlayErr
+		}
+		if predecessors["ROADMAP.md"] == "" {
+			return errors.New("retired public ROADMAP.md lacks authenticated predecessor evidence")
+		}
+		return nil
+	}
 	if err != nil {
 		return err
 	}

@@ -9,11 +9,157 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestVerifyRepositoryOffline(t *testing.T) {
 	if err := verify(repositoryRoot(t), "offline", ownerInputDefault); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestVerifySelfHostedQualification(t *testing.T) {
+	if err := verifySelfHostedQualification(repositoryRoot(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPortableServiceAndContainerHardeningRejectAuthorityWidening(t *testing.T) {
+	root := t.TempDir()
+	servicePath := filepath.Join(root, filepath.FromSlash("deploy/selfhost/native/kurd-node.service"))
+	containerPath := filepath.Join(root, filepath.FromSlash("deploy/selfhost/container/compose.yml"))
+	if err := os.MkdirAll(filepath.Dir(servicePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(containerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	service, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash("deploy/selfhost/native/kurd-node.service")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash("deploy/selfhost/container/compose.yml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(servicePath, service, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(containerPath, container, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyServiceUnit(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyContainerDefinition(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(servicePath, append(service, []byte("\nAmbientCapabilities=CAP_NET_ADMIN\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyServiceUnit(root); err == nil {
+		t.Fatal("network-capable Phase 16 service accepted")
+	}
+	if err := os.WriteFile(containerPath, append(container, []byte("\n    privileged: true\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyContainerDefinition(root); err == nil {
+		t.Fatal("privileged Phase 16 container accepted")
+	}
+}
+
+func TestVerifyDecentralizedAuthority(t *testing.T) {
+	if err := verifyDecentralizedAuthority(repositoryRoot(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyDecentralizedAuthorityRejectsMandatoryCloud(t *testing.T) {
+	root := copyDecentralizedAuthority(t)
+	path := filepath.Join(root, "README.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("\nGoogle Cloud is mandatory for every deployment.\n")...)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyDecentralizedAuthority(root); err == nil {
+		t.Fatal("mandatory cloud dependency accepted")
+	}
+}
+
+func TestVerifyPrivatePlanningAbsentRejectsPublicRoadmap(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "ROADMAP.md"), []byte("private roadmap\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyPrivatePlanningAbsent(root); err == nil {
+		t.Fatal("public roadmap accepted")
+	}
+}
+
+func TestVerifyDecentralizedAuthorityRejectsGlobalRoot(t *testing.T) {
+	root := copyDecentralizedAuthority(t)
+	path := filepath.Join(root, filepath.FromSlash("docs/KIP-0093-decentralized-self-hosted-kurd-network.md"))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("\nKurdistan VPN requires a global Kurdistan root.\n")...)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyDecentralizedAuthority(root); err == nil {
+		t.Fatal("global authority dependency accepted")
+	}
+}
+
+func TestMandatoryPhase16AuthorityExcludesSupersededCloudTopology(t *testing.T) {
+	for _, path := range requiredFiles {
+		path = filepath.ToSlash(path)
+		for _, forbidden := range []string{
+			"production/",
+			"infra/terraform/",
+			"phase16-production-plan.yml",
+			"phase16-production-apply.yml",
+		} {
+			if strings.Contains(path, forbidden) {
+				t.Fatalf("mandatory Phase 16 authority still requires superseded cloud path %q", path)
+			}
+		}
+	}
+}
+
+func TestPhase16WorkflowsCannotRequireCloudIdentityOrMutationTools(t *testing.T) {
+	if err := verifyNoMandatoryCloudWorkflows(repositoryRoot(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPortableDrillWorkflowCannotPassWithZeroSelectedTests(t *testing.T) {
+	root := repositoryRoot(t)
+	path := filepath.Join(root, filepath.FromSlash(".github/workflows/phase16-drill.yml"))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := strings.Replace(string(raw),
+		"LISTED=$(go test ./internal/selfhost -list",
+		"LISTED=$(printf '%s\\n' \"$TEST\") # hollow selector",
+		1,
+	)
+	temporary := t.TempDir()
+	temporaryPath := filepath.Join(temporary, filepath.FromSlash(".github/workflows/phase16-drill.yml"))
+	if err := os.MkdirAll(filepath.Dir(temporaryPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(temporaryPath, []byte(broken), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyPortableDrillWorkflow(temporary); err == nil {
+		t.Fatal("drill workflow without an executable test-inventory guard was accepted")
 	}
 }
 
@@ -84,7 +230,7 @@ func TestValidateStatusRejectsFalseCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	value.State = "COMPLETE"
-	if err := validateStatus(root, value); err == nil {
+	if err := validateStatus(root, value, "offline"); err == nil {
 		t.Fatal("local-only completion accepted")
 	}
 }
@@ -97,19 +243,52 @@ func TestRejectSecretCanaries(t *testing.T) {
 	}
 }
 
-func TestRejectPrivateTerraformPlanInGitHubArtifacts(t *testing.T) {
-	root := copyRepositoryAuthority(t)
-	path := filepath.Join(root, filepath.FromSlash(".github/workflows/phase16-production-plan.yml"))
-	raw, err := os.ReadFile(path)
-	if err != nil {
+func TestLegacyCloudMutationWorkflowsRemainDisabled(t *testing.T) {
+	root := repositoryRoot(t)
+	for _, relative := range []string{
+		".github/workflows/phase16-production-plan.yml",
+		".github/workflows/phase16-production-apply.yml",
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := strings.ToLower(string(raw))
+		if !strings.Contains(text, "phase16-cloud-experiment-disabled") ||
+			strings.Contains(text, "id-token: write") || strings.Contains(text, "google-github-actions/") {
+			t.Fatalf("legacy workflow is not safely disabled: %s", relative)
+		}
+	}
+}
+
+func TestValidateExternalReceiptBindsExactSubjectPolicyAndFreshness(t *testing.T) {
+	now := time.Date(2026, 8, 6, 12, 0, 0, 0, time.UTC)
+	receipt := externalReceipt{
+		Schema: "phase16-external-receipt-v1", Kind: "CLOUD_IDENTITY_READBACK",
+		SubjectCommit: strings.Repeat("a", 40), SubjectTree: strings.Repeat("b", 40), PolicyDigest: strings.Repeat("c", 64),
+		StartedAt: now.Add(-time.Hour).Format(time.RFC3339), FinishedAt: now.Add(-time.Minute).Format(time.RFC3339), Result: "PASS",
+		ArtifactDigests: []string{strings.Repeat("d", 64)},
+	}
+	if err := validateExternalReceipt("cloud-identity-readback", receipt, receipt.SubjectCommit, receipt.SubjectTree, receipt.PolicyDigest, now); err != nil {
 		t.Fatal(err)
 	}
-	raw = append(raw, []byte("\n# actions/upload-artifact must remain forbidden here\n")...)
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyImplementationAuthority(root); err == nil {
-		t.Fatal("private Terraform plan artifact exposure accepted")
+	for name, mutate := range map[string]func(*externalReceipt){
+		"wrong subject": func(value *externalReceipt) { value.SubjectTree = strings.Repeat("e", 40) },
+		"wrong policy":  func(value *externalReceipt) { value.PolicyDigest = strings.Repeat("e", 64) },
+		"failed":        func(value *externalReceipt) { value.Result = "FAIL" },
+		"stale":         func(value *externalReceipt) { value.FinishedAt = now.Add(-15 * 24 * time.Hour).Format(time.RFC3339) },
+		"duplicate": func(value *externalReceipt) {
+			value.ArtifactDigests = append(value.ArtifactDigests, value.ArtifactDigests[0])
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := receipt
+			candidate.ArtifactDigests = append([]string(nil), receipt.ArtifactDigests...)
+			mutate(&candidate)
+			if err := validateExternalReceipt("cloud-identity-readback", candidate, receipt.SubjectCommit, receipt.SubjectTree, receipt.PolicyDigest, now); err == nil {
+				t.Fatal("invalid external receipt accepted")
+			}
+		})
 	}
 }
 
@@ -148,5 +327,26 @@ func copyRepositoryAuthority(t *testing.T) string {
 	// tests that do not need baseline validation by replacing the status commit
 	// check through a worktree file would weaken production behavior, so this
 	// helper is used only to exercise strict decode before that point.
+	return root
+}
+
+func copyDecentralizedAuthority(t *testing.T) string {
+	t.Helper()
+	source := repositoryRoot(t)
+	root := t.TempDir()
+	for _, path := range decentralizedAuthorityFiles {
+		from := filepath.Join(source, filepath.FromSlash(path))
+		to := filepath.Join(root, filepath.FromSlash(path))
+		raw, err := os.ReadFile(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(to, raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return root
 }

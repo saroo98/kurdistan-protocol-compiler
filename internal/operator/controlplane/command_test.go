@@ -135,6 +135,7 @@ func TestRejectCommandIsDurableIdempotentAndCannotBeExecuted(t *testing.T) {
 func TestProductionOperationTransitionsFailClosed(t *testing.T) {
 	allowed := [][2]ProductionOperationState{
 		{ProductionPending, ProductionApproved},
+		{ProductionPending, ProductionRejected},
 		{ProductionApproved, ProductionCommitted},
 		{ProductionCommitted, ProductionEffectPending},
 		{ProductionEffectPending, ProductionAnchored},

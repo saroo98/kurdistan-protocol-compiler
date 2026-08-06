@@ -5,4 +5,4 @@
 
 package main
 
-func newBridgeEnvironment() bridgeEnvironment { return nil }
+func newBridgeEnvironment() bridgeEnvironment { return selfHostedBridgeEnvironment{} }

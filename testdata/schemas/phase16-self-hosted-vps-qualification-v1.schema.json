@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistan.invalid/schemas/phase16-self-hosted-vps-qualification-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","phase","authority","recordedAt","source","packages","vps","deployment","artifacts","checks","limitations","findings","releaseDecision"],
+  "properties": {
+    "schema": {"const":"phase16-self-hosted-vps-qualification-v1"},
+    "phase": {"const":16},
+    "authority": {"const":"KIP-0093"},
+    "recordedAt": {"type":"string","format":"date-time"},
+    "source": {
+      "type":"object","additionalProperties":false,
+      "required":["branch","baselineCommit","packageSourceCommit","packageBuiltFromDirtyTree"],
+      "properties": {
+        "branch":{"const":"product/phase16-production-trust"},
+        "baselineCommit":{"$ref":"#/$defs/commit"},
+        "packageSourceCommit":{"$ref":"#/$defs/commit"},
+        "packageBuiltFromDirtyTree":{"const":true}
+      }
+    },
+    "packages": {
+      "type":"object","additionalProperties":false,
+      "required":["version","amd64Sha256","arm64Sha256","independentBuildsMatched","signed","relayDataPlane"],
+      "properties": {
+        "version":{"const":"0.16.3-phase16"},
+        "amd64Sha256":{"$ref":"#/$defs/digest"},
+        "arm64Sha256":{"$ref":"#/$defs/digest"},
+        "independentBuildsMatched":{"const":true},
+        "signed":{"const":false},
+        "relayDataPlane":{"const":false}
+      }
+    },
+    "vps": {
+      "type":"object","additionalProperties":false,
+      "required":["providerClass","regionClass","operatingSystem","architecture","cpuCores","memoryMiB","storageGiB","endpointSha256"],
+      "properties": {
+        "providerClass":{"const":"owner-controlled-vps"},
+        "regionClass":{"const":"external-european"},
+        "operatingSystem":{"const":"Ubuntu Server 26.04 LTS"},
+        "architecture":{"const":"amd64"},
+        "cpuCores":{"type":"integer","minimum":1,"maximum":256},
+        "memoryMiB":{"type":"integer","minimum":1024,"maximum":1048576},
+        "storageGiB":{"type":"integer","minimum":10,"maximum":1048576},
+        "endpointSha256":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "deployment": {
+      "type":"object","additionalProperties":false,
+      "required":["rootFingerprint","revision","generation","rootEpoch","revocationEpoch","profileCount","revokedProfileCount","recoveryConfirmed","drained","disabled"],
+      "properties": {
+        "rootFingerprint":{"$ref":"#/$defs/digest"},
+        "revision":{"type":"integer","minimum":1},
+        "generation":{"type":"integer","minimum":1},
+        "rootEpoch":{"type":"integer","minimum":1},
+        "revocationEpoch":{"type":"integer","minimum":1},
+        "profileCount":{"type":"integer","minimum":1},
+        "revokedProfileCount":{"type":"integer","minimum":1},
+        "recoveryConfirmed":{"const":true},
+        "drained":{"const":false},
+        "disabled":{"const":false}
+      }
+    },
+    "artifacts": {
+      "type":"object","additionalProperties":false,
+      "required":["recoverySha256","backupSha256","postUpgradeBackupSha256","profileSha256","backupAuditHead"],
+      "properties": {
+        "recoverySha256":{"$ref":"#/$defs/digest"},
+        "backupSha256":{"$ref":"#/$defs/digest"},
+        "postUpgradeBackupSha256":{"$ref":"#/$defs/digest"},
+        "profileSha256":{"$ref":"#/$defs/digest"},
+        "backupAuditHead":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "checks": {
+      "type":"object","additionalProperties":false,
+      "required":["freshNativeInstall","upgradeRollbackReupgrade","totalHostLossRestore","oldBackupRejected","wrongPassphraseRejected","corruptBackupRejected","doctorPassed","publicationCursorAuthenticated","systemdSandboxed","onlySshPublicListener","defaultDenyFirewall","containerConformance","androidKvp2ExactActivation","hundredCycleSoak","deterministicPackages","temporaryArtifactsRemoved"],
+      "properties": {
+        "freshNativeInstall":{"const":true},
+        "upgradeRollbackReupgrade":{"const":true},
+        "totalHostLossRestore":{"const":true},
+        "oldBackupRejected":{"const":true},
+        "wrongPassphraseRejected":{"const":true},
+        "corruptBackupRejected":{"const":true},
+        "doctorPassed":{"const":true},
+        "publicationCursorAuthenticated":{"const":true},
+        "systemdSandboxed":{"const":true},
+        "onlySshPublicListener":{"const":true},
+        "defaultDenyFirewall":{"const":true},
+        "containerConformance":{"const":true},
+        "androidKvp2ExactActivation":{"const":true},
+        "hundredCycleSoak":{"const":true},
+        "deterministicPackages":{"const":true},
+        "temporaryArtifactsRemoved":{"const":true}
+      }
+    },
+    "limitations": {
+      "type":"array","minItems":3,"maxItems":8,"uniqueItems":true,
+      "items":{"type":"string","minLength":12,"maxLength":256}
+    },
+    "findings": {
+      "type":"object","additionalProperties":false,"required":["critical","high"],
+      "properties":{"critical":{"const":0},"high":{"const":0}}
+    },
+    "releaseDecision":{"const":"NO_GO"}
+  },
+  "$defs": {
+    "digest":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "commit":{"type":"string","pattern":"^[0-9a-f]{40}$"}
+  }
+}

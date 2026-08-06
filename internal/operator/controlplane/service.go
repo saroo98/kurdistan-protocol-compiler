@@ -5,6 +5,7 @@ package controlplane
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -15,6 +16,7 @@ type RequestInput struct {
 	ID                     string
 	Action                 Action
 	TargetID               string
+	ParentOperationID      string
 	SubjectDigest          string
 	ScopeDigest            string
 	AuthorityScopeDigest   string
@@ -82,6 +84,7 @@ func (service *Service) Request(actor Actor, input RequestInput) (Receipt, error
 func sameRequestIntent(existing, requested Operation) bool {
 	if existing.ID != requested.ID || existing.Action != requested.Action ||
 		existing.TargetID != requested.TargetID ||
+		existing.ParentOperationID != requested.ParentOperationID ||
 		existing.SubjectDigest != requested.SubjectDigest ||
 		existing.ScopeDigest != requested.ScopeDigest ||
 		existing.AuthorityScopeDigest != requested.AuthorityScopeDigest ||
@@ -201,6 +204,7 @@ func (service *Service) markDelivered(actor Actor, capability effectOutcomeCapab
 			return ErrConflict
 		}
 		event.DeliveredAt = now
+		event.OutcomeDigest = hex.EncodeToString(capability.effectDigest[:])
 		if err := appendAudit(state, now, actor.ID, "acknowledge-outbox", event.ID, "delivered"); err != nil {
 			return err
 		}
@@ -261,7 +265,7 @@ func (service *Service) markEffectFailed(actor Actor, capability effectOutcomeCa
 func authorizeExecution(actor Actor, action Action) error {
 	var operation profile.AuthorityOperation
 	switch action {
-	case ActionIssueProfile, ActionRotateProfile:
+	case ActionPrepareProfileIssue, ActionPrepareProfileRotate, ActionIssueProfile, ActionRotateProfile:
 		operation = profile.OperationIssueProfile
 	case ActionRevokeProfile:
 		operation = profile.OperationRevokeGroup
@@ -288,6 +292,8 @@ func authorizeExecution(actor Actor, action Action) error {
 
 func applyOperation(state *State, operation Operation, now int64) error {
 	switch operation.Action {
+	case ActionPrepareProfileIssue, ActionPrepareProfileRotate:
+		return applyProfileIssuanceIntent(state, operation)
 	case ActionIssueProfile, ActionRotateProfile, ActionRevokeProfile:
 		return applyProfile(state, operation, now)
 	case ActionPublishSnapshot:
@@ -302,6 +308,28 @@ func applyOperation(state *State, operation Operation, now int64) error {
 	}
 }
 
+func applyProfileIssuanceIntent(state *State, operation Operation) error {
+	current, exists := state.Profiles[operation.TargetID]
+	switch operation.Action {
+	case ActionPrepareProfileIssue:
+		if exists || operation.ExpectedEpoch != 0 || operation.ResultEpoch == 0 ||
+			operation.ExpectedArtifactDigest != "" {
+			return ErrConflict
+		}
+	case ActionPrepareProfileRotate:
+		if !exists || current.State != ProfileIssued ||
+			current.Generation != operation.ExpectedEpoch ||
+			operation.ResultEpoch != current.Generation+1 ||
+			current.ArtifactDigest != operation.ExpectedArtifactDigest ||
+			current.ScopeDigest != operation.ScopeDigest {
+			return ErrConflict
+		}
+	default:
+		return ErrInvalidInput
+	}
+	return nil
+}
+
 func applyProfile(state *State, operation Operation, now int64) error {
 	current, exists := state.Profiles[operation.TargetID]
 	switch operation.Action {
@@ -309,6 +337,18 @@ func applyProfile(state *State, operation Operation, now int64) error {
 		if exists || operation.ExpectedEpoch != 0 || operation.ResultEpoch == 0 ||
 			operation.ExpectedArtifactDigest != "" {
 			return ErrConflict
+		}
+		if operation.ParentOperationID != "" {
+			parent, ok := state.Operations[operation.ParentOperationID]
+			if !ok || parent.Action != ActionPrepareProfileIssue ||
+				parent.State != OperationExecuted || parent.TargetID != operation.TargetID ||
+				parent.SubjectDigest == operation.SubjectDigest ||
+				parent.ScopeDigest != operation.ScopeDigest ||
+				parent.ResultEpoch != operation.ResultEpoch ||
+				parent.ExpiresAt < operation.ExpiresAt ||
+				!operationEffectDelivered(*state, parent.ID, string(ActionPrepareProfileIssue), parent.SubjectDigest) {
+				return ErrConflict
+			}
 		}
 		state.Profiles[operation.TargetID] = ProfileRecord{
 			ID: operation.TargetID, State: ProfileIssued, Generation: operation.ResultEpoch,
@@ -324,6 +364,20 @@ func applyProfile(state *State, operation Operation, now int64) error {
 			current.ArtifactDigest == operation.SubjectDigest ||
 			current.ScopeDigest != operation.ScopeDigest {
 			return ErrConflict
+		}
+		if operation.ParentOperationID != "" {
+			parent, ok := state.Operations[operation.ParentOperationID]
+			if !ok || parent.Action != ActionPrepareProfileRotate ||
+				parent.State != OperationExecuted || parent.TargetID != operation.TargetID ||
+				parent.SubjectDigest == operation.SubjectDigest ||
+				parent.ScopeDigest != operation.ScopeDigest ||
+				parent.ExpectedArtifactDigest != operation.ExpectedArtifactDigest ||
+				parent.ExpectedEpoch != operation.ExpectedEpoch ||
+				parent.ResultEpoch != operation.ResultEpoch ||
+				parent.ExpiresAt < operation.ExpiresAt ||
+				!operationEffectDelivered(*state, parent.ID, string(ActionPrepareProfileRotate), parent.SubjectDigest) {
+				return ErrConflict
+			}
 		}
 		current.Generation = operation.ResultEpoch
 		current.ArtifactDigest = operation.SubjectDigest
@@ -347,6 +401,16 @@ func applyProfile(state *State, operation Operation, now int64) error {
 	default:
 		return ErrInvalidInput
 	}
+}
+
+func operationEffectDelivered(state State, operationID, kind, subjectDigest string) bool {
+	for _, event := range state.Outbox {
+		if event.OperationID == operationID && event.Kind == kind &&
+			event.SubjectDigest == subjectDigest && event.DeliveredAt != 0 && event.FailedAt == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func applyPublication(state *State, input PublicationInput, now int64) error {

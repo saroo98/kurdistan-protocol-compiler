@@ -1,0 +1,515 @@
+{
+  "version": "phase16-decentralized-self-hosted-v1",
+  "entries": [
+    {
+      "path": ".github/workflows/phase16-drill.yml",
+      "pre_sha256": "bceda5816d80cf179db44e99707585afa81623704f57588fa5dfd41e4c05d59e",
+      "post_sha256": "fbc0f189e92994d01c0b66b96c6db96c6fcebefe0c737bf336037de423036304"
+    },
+    {
+      "path": ".github/workflows/phase16-production-apply.yml",
+      "pre_sha256": "82595330df8d1b76f0fd6e78c5b3e17742482e29b07d1a2eaf237e4ddb7933c3",
+      "post_sha256": "c1e92a777932c6f7d948479239579bc9fc81479e047157154d34382c144d63f3"
+    },
+    {
+      "path": ".github/workflows/phase16-production-plan.yml",
+      "pre_sha256": "216e8a66f515576786dd7b91cd5f51bcafd6c9950fa75d0f33382ecbcfaa694d",
+      "post_sha256": "389f446a10f445d9c0bd0d5617885c01f77a45ebfff4aebf985a58e84ec8ff9b"
+    },
+    {
+      "path": ".github/workflows/phase16-qualification.yml",
+      "pre_sha256": "be4193cb714feb19b7d3c00a364b7c109e212eb265b59c8ce8005c97cb4d1c81",
+      "post_sha256": "30d1b4cbe176c90e5824afc8c3a144b11d170c1ed19deeb5c8b96dc747d68120"
+    },
+    {
+      "path": "ROADMAP.md",
+      "pre_sha256": "f148c0a7314116b7cb69945f7ffc8f6d872e241de109d34ef282dbb824960f1c",
+      "post_sha256": "b1bc37aa40b84b8e765f5d2413998ab2e51e5b10211e47dd03bd23d9f7900dcc"
+    },
+    {
+      "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt",
+      "pre_sha256": "8e33622eaaaa20c58b5b8233ca4246cb271141857ab853b98a74ff55974f03d5",
+      "post_sha256": "4774aa58da7c8c9740c2e8c676dc89813f54d4169fcd026d3dd96b008df7b78f"
+    },
+    {
+      "path": "android/config/phase14-required-device-tests.txt",
+      "pre_sha256": "4a04a59a3a08a4124e36c893b85831e239840feae256d2ff15f5fb627b1afcb7",
+      "post_sha256": "d83fbef116bbfdf1d6ede4aba3480fd850c4b9e5d35d31cef32053c0584aa5f8"
+    },
+    {
+      "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
+      "pre_sha256": "d7653cb4c27eeeebb1de4b547e8ea5ee43cd2f95d6460ef807df471a6a981720",
+      "post_sha256": "a986e48a20165360fa0b7e73aa38761cb1b27a19aad8edcd140c4fb88c37b9aa"
+    },
+    {
+      "path": "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
+      "pre_sha256": "437a33a345669f30eab2cdb1f1cb73e7d433680b94ae8d4d8f558cf5f82d83ba",
+      "post_sha256": "e36cea22ac27c2b1a92a8e0690d68fa5846bb7f7df8b1e4af56d0d32862b5f27"
+    },
+    {
+      "path": "android/core/ui/src/main/res/values-ar/strings.xml",
+      "pre_sha256": "d44b725f4f5e9a5ebb3be362f4bac1797763cff433ab385fd58dd88a501bcb0b",
+      "post_sha256": "44eacf00dae30c32317906aea127cfaf39af522da63d0ec7d8cd52dead4980b1"
+    },
+    {
+      "path": "android/core/ui/src/main/res/values-b+ku+Latn/strings.xml",
+      "pre_sha256": "41454638c9e33a8360a95028c35bb95734580589bb5c6d8ad5bb4b6ea32ead57",
+      "post_sha256": "402b91714c8ffbc39d532d927b9aff4d33d8c9c3d8fcb102c8b9fa842dd70363"
+    },
+    {
+      "path": "android/core/ui/src/main/res/values-ckb/strings.xml",
+      "pre_sha256": "9722ed74e355b829658bc015e3fb0ba5a996ad76566cd6db083bd5f51c54c75b",
+      "post_sha256": "386cba044443a8f31a8d485cd2d390e03397a5c9e59f134687b179fce2a19bf7"
+    },
+    {
+      "path": "android/core/ui/src/main/res/values-fa/strings.xml",
+      "pre_sha256": "a7eee88912635a86d77cc88c5f586e77c306771535786b77d6fce2299aad729c",
+      "post_sha256": "5b5d814fe185e74235254fe8f9d9a0f9945461199f94c2282e0f54c42d207107"
+    },
+    {
+      "path": "android/core/ui/src/main/res/values/strings.xml",
+      "pre_sha256": "f28985b338494d23a85304272cd67cc00764c7c522fec0728962ae917c61beb1",
+      "post_sha256": "5b24676e9be9838675e763264c4a17946a8f2beccc1fe5e398f5dd0a9b8d7cbe"
+    },
+    {
+      "path": "android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/ProfilePreviewCodec.kt",
+      "pre_sha256": "a9f5671e623651d3c2b5f501a0f13578744ccab866685813652c02319430e489",
+      "post_sha256": "b3c0a462abc4db08707d52932e1775557f3bcd281afd9332532df4c01a7039b9"
+    },
+    {
+      "path": "android/data/secure/src/test/kotlin/org/kurdistanvpn/data/secure/ProtectedStateBoundaryTest.kt",
+      "pre_sha256": "762c66fda39d3a6106f6fc87b812e65185bed556ee19c1ef6e924e03979186cd",
+      "post_sha256": "da10145e4333be7033156937a1f1ba44ac6c5a0fc2ddac91fb3ed29fbffc71c2"
+    },
+    {
+      "path": "android/feature/profiles/src/main/kotlin/org/kurdistanvpn/feature/profiles/ProfilesScreen.kt",
+      "pre_sha256": "bdfa65190238ca4b9d9a2112a7bdff3d18d83749b0f2f46120421f6b27157e83",
+      "post_sha256": "4d7b6cf3bc90990f1f79be803a6e07d248400e52f02a4369c910cb94a008e33d"
+    },
+    {
+      "path": "cmd/gate/main.go",
+      "pre_sha256": "d02691eca2cee2f817295c9126dbc94f02c83011dfe662a150580b5ae210999b",
+      "post_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1"
+    },
+    {
+      "path": "cmd/gate/main_test.go",
+      "pre_sha256": "9461cee65152f7008b5d816f98d58c4801cfd9003d98a35508b70eb793d378a5",
+      "post_sha256": "cbafc176e870e6dc32884d3ccd825f2831565a969d5cd9763a3365950ea10a0e"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_internal.go",
+      "pre_sha256": "2bb97584543492cb6597c1ca1195da72bb6cc11e61c4caff621c6865f356789e",
+      "post_sha256": "289c69d8e64c24770e6b896ad974619cfe2f3e6f01be609f2f42bdee54b1bb68"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_release.go",
+      "pre_sha256": "5a54491b660eee4ba2664b8e1fa195f9d4afdd3a855e9c8caa41518684ff6f4a",
+      "post_sha256": "064b93caec8ec9f4cd9bcf99f0ca523a5a0d7a64707f681f6f0c6fb9efc0f334"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_selfhost.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "317686243f9ea34f2221dfa583f2c1235400e83d9d6db1de0db1fa241428b976"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_selfhost_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1938b9e1a22f646ee2a32d74f7af1ef85593b3e66328e4c6308e208a8e188125"
+    },
+    {
+      "path": "cmd/kurd-node/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "337f68b25512a7dbb8fcd5e977779abf452e099d1f90df7202600ee7e3edb3c0"
+    },
+    {
+      "path": "cmd/kurd-node/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "34f6981590f375b19f435997c4609738f3866f89cabf7299496a7226b45b0b33"
+    },
+    {
+      "path": "cmd/kurdctl/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b7f7581ff05765511e76a9a6e8ebe30ee8e22b4bdbd1eb0c1a64ba09ea687540"
+    },
+    {
+      "path": "cmd/kurdctl/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "956ebf319f5124eb0e415b063ae732441b6ffbf475f3464faf78b059725798db"
+    },
+    {
+      "path": "cmd/kurdpackage/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "716df0a669591a1bd609f5f7f63cdf682869bdd721660d6c496bde116f0f39e1"
+    },
+    {
+      "path": "cmd/kurdpackage/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a8bb87f03fc506667606b39a2fc4139858cf9aeb7c8400e00ad58884a707bfdd"
+    },
+    {
+      "path": "cmd/phase16androidverify/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e011806fee946a7b08a2bdb7fcd44ba387e4c65d70a6e0f2922ee17b7bf7fec1"
+    },
+    {
+      "path": "cmd/phase16androidverify/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f038707e71c0569967c4e4cabf33f8890a2c209492fa3f39f39c04eebff32eb0"
+    },
+    {
+      "path": "cmd/phase16verify/main.go",
+      "pre_sha256": "e8e3bcb98f1242f861e2bb2f6ed7de8dbffe9a1c12113b09cadf735ba785ba26",
+      "post_sha256": "5e285aaff789e634ebe45555b3cef319992d5292d600d992841c4ef6ff6ca429"
+    },
+    {
+      "path": "cmd/phase16verify/main_test.go",
+      "pre_sha256": "9c8e561a4d22d31845d8686c486640255d35915ae304226d7f6ee992a8086543",
+      "post_sha256": "6f5d54c00e8608ee57082a227c8780b304004172ef1220018bc6e920948ad13b"
+    },
+    {
+      "path": "deploy/selfhost/container/Dockerfile",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "14189ae65d52c0994d51abb2b7a0086c9f2eabf7801d6beb12f926f71f158884"
+    },
+    {
+      "path": "deploy/selfhost/container/compose.yml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "dbf4e09cadccfeb10b86b4155938be605326f1cfd57d0ae52575f26de57ce30c"
+    },
+    {
+      "path": "deploy/selfhost/native/install.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9acb1e95674f3e4178268a79b840a4ef4317d631ef23bf46483382ff3843125d"
+    },
+    {
+      "path": "deploy/selfhost/native/kurd-node.service",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "6dab693f6cc84e65e0e56c986cec0766baf679d1b4181b9ad2116e01e5ae2247"
+    },
+    {
+      "path": "deploy/selfhost/native/kurd-node.sysusers.conf",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fa6cc4dc938767d29a81ed2051c5e40375b64badd9d172d57cb2cea396b58dfc"
+    },
+    {
+      "path": "deploy/selfhost/native/kurd-node.tmpfiles.conf",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "988128e54b24920d66963eeed5f51ee226f551e02d443f93997a9d581980524b"
+    },
+    {
+      "path": "deploy/selfhost/native/preflight.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7b7c4f008163fa5993b99c44e7a82ef36379755390a0cec8d7d282b3baac16b8"
+    },
+    {
+      "path": "deploy/selfhost/native/rollback.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "37c689e9d2bca3ccb0ea6583c1446bd175d9942868181eb41915558524649f69"
+    },
+    {
+      "path": "deploy/selfhost/native/uninstall.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f7c30e94b6d2a766f19c7c3e20d8af4d49f5ca071f185a6c42a51bd13582c336"
+    },
+    {
+      "path": "deploy/selfhost/native/upgrade.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91"
+    },
+    {
+      "path": "docs/KIP-0090-phase15-production-contract-freeze.md",
+      "pre_sha256": "c7d92dad24c95bc9c9ab8aa6e7335ea5936216f6e512dc8ef310abd0bef79b9e",
+      "post_sha256": "b6225c263807a3dc23aa5487466494269a0576f6332e87feafd4e572a5374bd5"
+    },
+    {
+      "path": "docs/KIP-0091-assurance-release-acceleration.md",
+      "pre_sha256": "0eefd4ffb99f69b099d5450e9fea4b51c9d811eca334c33a1e41780d40ae3852",
+      "post_sha256": "a2ceacbd580df8ce3ad9ab58c0878b3e8d94fdb684c0b41311ce95ac872f31cc"
+    },
+    {
+      "path": "docs/KIP-0092-phase16-production-trust.md",
+      "pre_sha256": "f7bf0e27e8b6692b05edd573ae5c16eaf156a80fb609e6c8963d394d9c72622f",
+      "post_sha256": "3fe605c0b28566205b1387b17704332cd37be3ce970f588259254e55a2ce1715"
+    },
+    {
+      "path": "docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9bfee97ff1bd47daab7bca029b13cbe5b3c41ee1f96077ba461cf1d88208d285"
+    },
+    {
+      "path": "docs/PHASE15_PRODUCTION_CONTRACT.md",
+      "pre_sha256": "c3563b819420af38aac5e91b108d5d841438f8e7c8a94fbba4d17cd2f92b2d59",
+      "post_sha256": "60e65b7e283eb8c74e3bf16b367391857521ff60d07ca9b5a9400083e7c687ce"
+    },
+    {
+      "path": "docs/PHASE16_API.md",
+      "pre_sha256": "c7012500054fae1797a4e684725da9c706eb5a2eda4166f52a993e4603cf0565",
+      "post_sha256": "059f4af49612ea0dc8b215bd85a0ef5692cb7b1191455c10bf6b4552de9c484b"
+    },
+    {
+      "path": "docs/PHASE16_CEREMONIES.md",
+      "pre_sha256": "bcaa6efec6ad848bac6261f1ca6facaa141413e588252a4c48db1a977907d0c5",
+      "post_sha256": "38b678085e4fba792f2bbf671694c4b3ccb11d68cb9892f5921ec17b04a40316"
+    },
+    {
+      "path": "docs/PHASE16_DIRTY_WORKTREE_DISPOSITION.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "34e742efa00f5130b090b7bc0c86651d1d49872aa2b601880629af1449eef1e7"
+    },
+    {
+      "path": "docs/PHASE16_DISASTER_RECOVERY.md",
+      "pre_sha256": "89c509431dcd3560b0c826b4fe8eb3073136022f0f5154ecffb299d2f226b62e",
+      "post_sha256": "18710feb09fc3e671ab845cb453bc37bbd33eb2c510c87b30499cba5b68e14df"
+    },
+    {
+      "path": "docs/PHASE16_EVIDENCE_INDEX.md",
+      "pre_sha256": "95bde2bf99efb470e31176c559a6222ad3644ddef626f54066e1488824845460",
+      "post_sha256": "d4a27a8928b0a8abb9923dc4ce9d287acf9d277f9c0b6664c42958db6d8f937c"
+    },
+    {
+      "path": "docs/PHASE16_OPERATIONS.md",
+      "pre_sha256": "c85f7bad1dd4b16d5451f96fd4f14623a73adc5ac1c1f08fef7139e7778def43",
+      "post_sha256": "aeb178f52b0f0ea0fdf0e25190f4de1db5bcae0de99fe1743ca3c5d2c10d5b0d"
+    },
+    {
+      "path": "docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
+      "pre_sha256": "6dd90bd9acca28588f66971e5d25af5411d9985f9e99a789762f69b2a269b75d",
+      "post_sha256": "c01140e3bb0ea030eb6d02c9934683f0b8632e540d87c30d2422084578255018"
+    },
+    {
+      "path": "docs/PHASE16_SELF_HOSTED_VPS_COMPLETION_PLAN.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "985d3d2db70744c7b91621d3644d24bc3dde26e5ede111f2a6e7a3a2683e9ac5"
+    },
+    {
+      "path": "docs/PHASE16_THREAT_MODEL.md",
+      "pre_sha256": "0ed962b48a296b9a484d4f8b90c4aedca00a481a2912d9f0f36c438145450b9d",
+      "post_sha256": "c5e2c5fa4053b5dd31ddac08736edf2dce4e25bb9deef22cace8d36b35a59b03"
+    },
+    {
+      "path": "docs/self-hosting/BACKUP-RESTORE.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "14a5dc8f6dd6192510aebfe1f78ec45a73ca7e1917b6e8486377c582412859ae"
+    },
+    {
+      "path": "docs/self-hosting/CONTAINER.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a7deb98d04f32d96deadc2350425a39a1e8400405ad9d67c2c30641cf54fce5a"
+    },
+    {
+      "path": "docs/self-hosting/INSTALL.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "46feb399f85f4d0f070f953883428e1f45bc073746531ddc86692174644732a8"
+    },
+    {
+      "path": "docs/self-hosting/QUICKSTART.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3fb9900ce1937080b99cc67c5dc33027bb6fe76a73278f8ba983f9a9705fe3e8"
+    },
+    {
+      "path": "docs/self-hosting/SECURITY.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "16afdd707d9b3e6150deb62c04dc995060722a6b7de3682ce5a6c15e1cdc8550"
+    },
+    {
+      "path": "docs/self-hosting/TROUBLESHOOTING.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "af99d2d562e1d225449bbf063effe653c8bbc9518f75086c317ad2b385a15c38"
+    },
+    {
+      "path": "docs/self-hosting/UPGRADE-ROLLBACK.md",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "07d1efa1f48fb3d1f530dec7c986027536b99e8f804c76047a3668753e6681ca"
+    },
+    {
+      "path": "go.mod",
+      "pre_sha256": "378d1cf7032ca53b1650d151fd94b688b6db1a1217a17bd08a38c6f7eb53f69e",
+      "post_sha256": "eb395171fa822c678e4313cba9efa9d619c2c6cc6c8adf26891ab610e7dba742"
+    },
+    {
+      "path": "go.sum",
+      "pre_sha256": "3f92ed07b107f5cb0675b5fcbef709fd5d9ffde0cc41bdadddace58d31c2f162",
+      "post_sha256": "431c5b16b183aae5781337312c69877c90c22473cdd0af21b541b5dc78ce7793"
+    },
+    {
+      "path": "internal/androidbridge/verify.go",
+      "pre_sha256": "abf65652a449a988a468973a8a66cba3f700a3e5a496de8d981ec1c5619c6c05",
+      "post_sha256": "2b933f02cc489fb1b1f18eefb6c35af5ab920a1f6b6d01314e7f6b0fb58ea1dc"
+    },
+    {
+      "path": "internal/androidbridge/verify_test.go",
+      "pre_sha256": "b55bc423346d1f9a21bbda10767075aadfca26cb9d3f04c1d5a8e8e78870b0e6",
+      "post_sha256": "1938a7e1e91bb4b11f4590abb7d9cd0da50b9b95d15af6df0f1c47184ea096e1"
+    },
+    {
+      "path": "internal/audit/security.go",
+      "pre_sha256": "5d63ed92a7b0663fcfba549a72448bf6c2dc0439f122884fff305225b8e25ba9",
+      "post_sha256": "b812eddcb7298d43b4f1cb0c6da71317e84589cdb6276f6d35223663bf1c6eb1"
+    },
+    {
+      "path": "internal/audit/security_test.go",
+      "pre_sha256": "b205caebb78e57fe36cb78864a5b7e81c7338732457475060c9b8fc825677264",
+      "post_sha256": "403eb8446d70382aaf5fe222829d17139ee4bf8f842c5f4bae820e8aa6d9fcc9"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/activation-crash-report.json",
+      "pre_sha256": "2da595914c1383b757f3029f4ea59bcbbaa415976570d002bf553a66da957ec8",
+      "post_sha256": "b07678d6ece63668a41567a7d5f9c3c2abf1b1bc11f12818d37440b28032d5d8"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/authenticated-hint-mismatch-report.json",
+      "pre_sha256": "eabd81b35805a98991cfcedbb42f387a7ce2079596f398fb6789ea2cccc85b03",
+      "post_sha256": "ca14824c5e5435de77cf3e344d81313be46fcedd64a3a8b4b4072c8398e1e637"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/last-known-good-negative-report.json",
+      "pre_sha256": "2da595914c1383b757f3029f4ea59bcbbaa415976570d002bf553a66da957ec8",
+      "post_sha256": "b07678d6ece63668a41567a7d5f9c3c2abf1b1bc11f12818d37440b28032d5d8"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/policy-bypass-report.json",
+      "pre_sha256": "ea28aa38922ca0e6f6d51ffb4dded1a437fccfbe69c1d9e760eab6a0f635a472",
+      "post_sha256": "98eb6f920ad59c1202989e629aa0dbd75ac004c003fce112deae8544cb76fe9d"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/revocation-generation-report.json",
+      "pre_sha256": "dc04058909ffae097cb4b66be67f24e43600956c74d9839851ffa5d8dc53be17",
+      "post_sha256": "7d7dacf2b3de734d2009e33573514c5bbdf5caa91d0e3dd2caf40839d92fb7e2"
+    },
+    {
+      "path": "internal/product/profile/testdata/phase8-activation/verify-before-semantics-report.json",
+      "pre_sha256": "914dbfcaf9bf531f6c6c308bbc09f3ab616dc8952c1355f44184a075d1aca74a",
+      "post_sha256": "d98aaf3840c3dae78a2c1da55628e72ef5c7defcaff2c92441994b45f9739faa"
+    },
+    {
+      "path": "internal/runtime/policy_enforcement_test.go",
+      "pre_sha256": "5ea5156980595b648e2254cb8317885d96a15f8a72f8974b8a442803f2259a3b",
+      "post_sha256": "b4705e6eb4676f77a6c90261e24d1dfed90f8610e2669877e916b4151d989d6f"
+    },
+    {
+      "path": "internal/selfhost/admin.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f51515fcdcbb82b5ece0d5fbd7bc9b5f76e1f558cc33079c33630514dff8619f"
+    },
+    {
+      "path": "internal/selfhost/admin_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "06932395cae4ffc562de4b1ca5b636ad82e9a2ab3b8ecfbc110999c1dad6a47a"
+    },
+    {
+      "path": "internal/selfhost/backup.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a8ef664a34a59688384cb8c44d0b79b81e192681618a0317f438b4c35efa2e30"
+    },
+    {
+      "path": "internal/selfhost/backup_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b5978d324c81cd2f950ae852594fa9a74fc5a843d64feeb9ed2a1b637b1d54d3"
+    },
+    {
+      "path": "internal/selfhost/bundle.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c50cbe68d2730e33f92491a6dcaf69bf2480e4082f4d1c3c18f9cd4f6f46deac"
+    },
+    {
+      "path": "internal/selfhost/codec.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ad6d88b1a469c379222e265bfe1ca140b419ed2524d82ad0b3528db0739f385c"
+    },
+    {
+      "path": "internal/selfhost/crypto.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "aa5c1dbdbc46ba84bb3b2cdb5bdef2edb65e47a391696353137059ad228c5541"
+    },
+    {
+      "path": "internal/selfhost/model.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5951d6524f24c28979f76c255ad203f6dc70fbcf7d14ed8baab85db1ddc21575"
+    },
+    {
+      "path": "internal/selfhost/ownership_unix.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9fcc4c889fce68cd722d43b5c388c2782145236a1b373f34b3cbb0ba8d320ca8"
+    },
+    {
+      "path": "internal/selfhost/ownership_windows.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "43e29c431f26ff9102bf69d9f02f7129fe173ba2edc650bf447c0558936116cd"
+    },
+    {
+      "path": "internal/selfhost/publication.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "318e1818e74cd32e7f090867e3c701e6f766b682058edebf92abd5d2dbaa81bf"
+    },
+    {
+      "path": "internal/selfhost/publication_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "598e8419f4538c83c31d031976a0c1f360fdf79efb249efc1911fc108642b8bc"
+    },
+    {
+      "path": "internal/selfhost/qr.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "625a14164d27ddfab7bf70b13278b25c5628c77d1dff7dd0c11f27fcd6c184f0"
+    },
+    {
+      "path": "internal/selfhost/qr_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "12040dd1e079fb9475c945ab7487a76ca17dc32f32d8184a8401833bd8890461"
+    },
+    {
+      "path": "internal/selfhost/service.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a121c83ef386a7e3b312ec3591dd12c9b53618baa54dbcfd30f6561bbf2a3bfb"
+    },
+    {
+      "path": "internal/selfhost/service_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "2ff7715121c7925b852696ff9fc14f690af640cf90b1c2e1551986e5c3bdcdc1"
+    },
+    {
+      "path": "internal/selfhost/soak_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "251f2641664a4e2264513b8be53dd55ca89ef88b3bd3818d98ac2c781fae497b"
+    },
+    {
+      "path": "internal/selfhost/store.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ed4dce66246ca58060133de738d99843c312364ba7dda71fb0def4f65040d6fe"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor.go",
+      "pre_sha256": "f41fb9df986af7a04e67d43872739cbcfd16ef61a88c5159e04227bf84f2ff70",
+      "post_sha256": "12fc5cce79e05fb6cfbc640c3a4c36cfe35bcd01e84c063f86ee43a7dfc7e3c9"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor_test.go",
+      "pre_sha256": "bea82a72b827cb01e37110924d9bfe3a5b9fcd930b6d3ecdb65f7468042c4a3c",
+      "post_sha256": "fe0596f758d626e0b7b80fd9016a6420a6ebd9d2620cc76a8fe4221a1ddf01ea"
+    },
+    {
+      "path": "internal/testkit/importrules/importrules_test.go",
+      "pre_sha256": "bb931c4ba3006fd64f7a4f452497d91efea01b6ad5e3d543c97264b81525e3af",
+      "post_sha256": "98c361579df546d3d2326b68164fc1570fbd55e69a71536795ac7253a23fc513"
+    },
+    {
+      "path": "testdata/evidence/phase1-m0-committed-sha256.json",
+      "pre_sha256": "86782763f1c0f0e8b8dac89f061abcfafaaaf03e3daf7e35c1dbab90a49b5cc6",
+      "post_sha256": "c4206951b06e920a0762ce0331716600b5dc99abd5465377106e22d27ee9e350"
+    },
+    {
+      "path": "testdata/evidence/phase16/self-hosted-vps-qualification.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1f05944d3400cfb9ea5b2ceb918204c858260bdb280f222de4fc3f8cdccb5829"
+    },
+    {
+      "path": "testdata/evidence/phase8-wo807-recovery-report.json",
+      "pre_sha256": "f3876e82c7d484b40686fd3dfbfe859d7780ff3f03f41534183b6221c138cd16",
+      "post_sha256": "b4b14ec31a0e37e37dd08f9bd942bd1f7044c5d624a072f15aab5876ee93dde4"
+    },
+    {
+      "path": "testdata/schemas/phase16-self-hosted-vps-qualification-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d5bb03a76821e69231133198c6345757da994ff9d2700e2d72ef2c935291fe49"
+    }
+  ]
+}

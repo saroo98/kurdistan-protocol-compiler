@@ -119,6 +119,8 @@ func (state State) Validate() error {
 			event.Attempts > MaxEffectAttempts ||
 			(event.Attempts == MaxEffectAttempts && event.FailedAt == 0) ||
 			(event.DeliveredAt != 0 && event.FailedAt != 0) ||
+			(event.DeliveredAt != 0 && !validDigest(event.OutcomeDigest)) ||
+			(event.DeliveredAt == 0 && event.OutcomeDigest != "") ||
 			(event.DeliveredAt != 0 && event.DeliveredAt < event.CreatedAt) ||
 			(event.Attempts == 0 && (event.LastAttemptAt != 0 || event.FailedAt != 0)) ||
 			(event.Attempts != 0 && event.LastAttemptAt < event.CreatedAt) ||
@@ -211,6 +213,27 @@ func (state State) Validate() error {
 	for _, operation := range state.Operations {
 		if err := validateOperationAuditLinks(state.Audit, operation); err != nil {
 			return err
+		}
+		if operation.ParentOperationID != "" {
+			parent, exists := state.Operations[operation.ParentOperationID]
+			expectedParentAction := ActionPrepareProfileIssue
+			if operation.Action == ActionRotateProfile {
+				expectedParentAction = ActionPrepareProfileRotate
+			}
+			if !exists || parent.Action != expectedParentAction ||
+				parent.State != OperationExecuted || parent.TargetID != operation.TargetID ||
+				parent.ScopeDigest != operation.ScopeDigest ||
+				parent.ResultEpoch != operation.ResultEpoch ||
+				parent.SubjectDigest == operation.SubjectDigest ||
+				parent.ExpiresAt < operation.ExpiresAt ||
+				parent.ExpectedEpoch != operation.ExpectedEpoch ||
+				parent.ExpectedArtifactDigest != operation.ExpectedArtifactDigest {
+				return ErrInvalidInput
+			}
+			if operation.State == OperationExecuted &&
+				!operationEffectDelivered(state, parent.ID, string(expectedParentAction), parent.SubjectDigest) {
+				return ErrInvalidInput
+			}
 		}
 		_, hasOutbox := outboxByOperation[operation.ID]
 		if (operation.State == OperationExecuted) != hasOutbox {

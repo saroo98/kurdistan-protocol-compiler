@@ -3,6 +3,12 @@
   "terraform": {"version":"1.15.8","source":"https://releases.hashicorp.com/terraform/1.15.8/"},
   "googleProvider": {"version":"7.43.0","source":"https://github.com/hashicorp/terraform-provider-google/releases/tag/v7.43.0"},
   "googleCloudCLI": {"version":"579.0.0","source":"https://dl.google.com/dl/cloudsdk/channels/rapid/components-2.json"},
+  "openPolicyAgent": {
+    "version":"1.19.0",
+    "source":"https://github.com/open-policy-agent/opa/releases/tag/v1.19.0",
+    "linuxAMD64StaticSHA256":"1dd5c5591ff856f5e20a1d66bafae9511ddf3c5552ed3b5070c70b2b6580ee3f",
+    "windowsAMD64SHA256":"ed4ee673b2182352af3a9d5f0de4a74d23a063cbbb447723fb21ac5ead8cd599"
+  },
   "googleGitHubAuthAction": {"commit":"7c6bc770dae815cd3e89ee6cdf493a5fab2cc093","repository":"google-github-actions/auth"},
   "googleGitHubSetupGcloudAction": {"commit":"aa5489c8933f4cc7a4f7d45035b3b1440c9c10db","repository":"google-github-actions/setup-gcloud"},
   "preReleaseAllowed": false,

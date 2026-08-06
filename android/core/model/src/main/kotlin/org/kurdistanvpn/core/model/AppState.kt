@@ -93,6 +93,12 @@ data class RedactedProfilePreview(
     val generation: ULong,
     val validUntilEpochSeconds: Long,
     val sealed: Boolean,
+    val deploymentFingerprint: String = "",
+    val relayEndpointSummary: String = "",
+    val authorityScope: String = "",
+    val updateLocation: String = "",
+    val ownerControlled: Boolean = false,
+    val updatesEnabled: Boolean = false,
 )
 
 enum class OperationError {

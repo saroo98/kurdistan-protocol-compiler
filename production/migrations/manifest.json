@@ -6,6 +6,18 @@
       "name": "initial",
       "file": "001_initial.sql",
       "sha256": "bb43b44358f1b6320a55e5b965d88d5a164067df722850c29da31a1647f094d1"
+    },
+    {
+      "version": 2,
+      "name": "token_replay",
+      "file": "002_token_replay.sql",
+      "sha256": "6f62ae01ff9556a85b2441a350ae4a8ceef77f5598dcccefc8fed8d293f2fbc4"
+    },
+    {
+      "version": 3,
+      "name": "authority_sources",
+      "file": "003_authority_sources.sql",
+      "sha256": "a1150a0b7e5983061aeb6c038e8761e8746d8221856780d14898ef5460c7cac6"
     }
   ]
 }

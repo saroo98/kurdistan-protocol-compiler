@@ -1,97 +1,18 @@
-name: Phase 16 production plan
+name: Legacy Phase 16 cloud plan (disabled)
 
 on:
   workflow_dispatch:
-    inputs:
-      subject_sha:
-        description: Exact main commit to plan
-        required: true
-        type: string
-      authorization_id:
-        description: Exact protected production-mutation authorization
-        required: true
-        type: string
 
 permissions:
   contents: read
-  id-token: write
-
-concurrency:
-  group: phase16-production-plan
-  cancel-in-progress: false
 
 jobs:
-  plan:
-    environment: phase16-production-plan
+  disabled:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ inputs.subject_sha }}
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Require exact main subject
+      - name: Superseded architecture
         shell: bash
         run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${{ inputs.subject_sha }}"
-          test "$(git rev-parse origin/main)" = "${{ inputs.subject_sha }}"
-          test -n "${{ inputs.authorization_id }}"
-      - uses: ./.github/actions/setup-go
-      - name: Verify private owner input contract
-        shell: bash
-        env:
-          OWNER_INPUTS: ${{ secrets.PHASE16_OWNER_INPUTS_JSON }}
-        run: |
-          set -euo pipefail
-          install -d -m 700 .tools/phase16/private
-          printf '%s' "$OWNER_INPUTS" > .tools/phase16/private/owner-inputs.json
-          go run ./cmd/phase16verify -root . -mode external
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.PHASE16_WIF_PROVIDER }}
-          service_account: ${{ vars.PHASE16_PLAN_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-        with:
-          version: '579.0.0'
-      - name: Install pinned Terraform and create plan
-        shell: bash
-        env:
-          TFVARS: ${{ secrets.PHASE16_TFVARS_JSON }}
-        run: |
-          set -euo pipefail
-          version=1.15.8
-          base="https://releases.hashicorp.com/terraform/${version}"
-          curl --fail --silent --show-error --location --output terraform.zip "${base}/terraform_${version}_linux_amd64.zip"
-          curl --fail --silent --show-error --location --output SHA256SUMS "${base}/terraform_${version}_SHA256SUMS"
-          grep " terraform_${version}_linux_amd64.zip$" SHA256SUMS | sha256sum --check --strict
-          unzip -q terraform.zip -d .tools/phase16/bin
-          printf '%s' "$TFVARS" > .tools/phase16/private/production.tfvars.json
-          tf="$PWD/.tools/phase16/bin/terraform"
-          "$tf" -chdir=infra/terraform/environments/production init -lockfile=readonly \
-            -backend-config="bucket=${{ vars.PHASE16_TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="prefix=production-trust"
-          "$tf" -chdir=infra/terraform/environments/production plan -input=false -out="$PWD/.tools/phase16/production.tfplan" -var-file="$PWD/.tools/phase16/private/production.tfvars.json"
-          plan_sha256="$(sha256sum .tools/phase16/production.tfplan | cut -d' ' -f1)"
-          object="phase16/plans/${{ inputs.subject_sha }}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan"
-          if ! gcloud storage cp .tools/phase16/production.tfplan "gs://${{ vars.PHASE16_PLAN_BUCKET }}/$object" \
-            --if-generation-match=0 \
-            --custom-metadata="sha256=$plan_sha256,subject-sha=${{ inputs.subject_sha }}" \
-            >.tools/phase16/private/plan-upload.log 2>&1; then
-            echo "private plan upload failed" >&2
-            exit 1
-          fi
-          read -r generation remote_sha remote_subject < <(
-            gcloud storage objects describe "gs://${{ vars.PHASE16_PLAN_BUCKET }}/$object" \
-              --format='value(generation,metadata.sha256,metadata.subject-sha)'
-          )
-          test "$generation" -gt 0
-          test "$remote_sha" = "$plan_sha256"
-          test "$remote_subject" = "${{ inputs.subject_sha }}"
-          {
-            echo "plan_sha256=$plan_sha256"
-            echo "plan_generation=$generation"
-            echo "plan_run_id=$GITHUB_RUN_ID"
-            echo "plan_run_attempt=$GITHUB_RUN_ATTEMPT"
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "phase16-cloud-experiment-disabled"
+          echo "KIP-0093 replaced the centralized cloud plan with owner-managed self-hosting."
+          exit 1

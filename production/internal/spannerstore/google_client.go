@@ -28,6 +28,22 @@ func (client *GoogleClient) StrongReadHead(ctx context.Context, environment stri
 	return decodeHeadRow(row)
 }
 
+func (client *GoogleClient) StrongReadRecord(ctx context.Context, table, environment, recordID string) (JSONRecord, error) {
+	row, err := client.client.Single().ReadRow(ctx, table, spanner.Key{environment, recordID}, []string{"RecordID", "ParentID", "Ordinal", "State", "PayloadJSON"})
+	if err != nil {
+		return JSONRecord{}, err
+	}
+	var value JSONRecord
+	var ordinal int64
+	var payload string
+	if err := row.Columns(&value.ID, &value.Parent, &ordinal, &value.State, &payload); err != nil || ordinal < 0 {
+		return JSONRecord{}, ErrInvalidConfiguration
+	}
+	value.Ordinal = uint64(ordinal)
+	value.Payload = []byte(payload)
+	return value, nil
+}
+
 func (client *GoogleClient) ReadWrite(ctx context.Context, callback func(context.Context, Transaction) error) (time.Time, error) {
 	return client.client.ReadWriteTransaction(ctx, func(transactionContext context.Context, transaction *spanner.ReadWriteTransaction) error {
 		return callback(transactionContext, &googleTransaction{transaction: transaction})
@@ -85,6 +101,9 @@ func googleMutations(writes WriteSet) ([]*spanner.Mutation, error) {
 		"LastTrustedAt": lastTrustedAt, "StateJSON": string(writes.Head.StateJSON), "SchemaVersion": writes.Head.SchemaVersion,
 		"UpdatedAt": spanner.CommitTimestamp,
 	})}
+	for _, record := range writes.AuthoritySources {
+		mutations = append(mutations, spanner.InsertMap("AuthoritySources", recordMap(writes.Head.Environment, record)))
+	}
 	appendRecords := func(table string, records []JSONRecord) {
 		for _, record := range records {
 			mutations = append(mutations, spanner.InsertOrUpdateMap(table, recordMap(writes.Head.Environment, record)))

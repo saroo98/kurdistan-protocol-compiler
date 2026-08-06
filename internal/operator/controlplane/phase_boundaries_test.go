@@ -5,6 +5,7 @@ package controlplane
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -53,6 +54,230 @@ func TestPhase8VerifiedArtifactFeedsProfileLifecycleWithoutRawRetention(t *testi
 		service.State().Revision, "idem-phase8-tamper",
 	); err == nil {
 		t.Fatal("tampered Phase 8 artifact entered the control plane")
+	}
+}
+
+func TestVerifiedIssuanceIntentCreatesSigningObligationWithoutIssuingProfile(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactSignedPublic)
+	verified, err := profile.VerifyIssuanceIntent(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, inspection, err := NewVerifiedProfileIssuanceIntentRequest(
+		"operation-profile-intent", verified, 0, "idem-profile-intent",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inspection.Generation != spec.Profile.Generation || input.SubjectDigest != verified.SigningInputSHA256() {
+		t.Fatalf("intent request lost verified authority: %#v %#v", input, inspection)
+	}
+
+	service := newTestService(t, NewMemoryStore())
+	requester, approverA, approverB, issuer := testActors()
+	executeApproved(t, service, requester, approverA, approverB, issuer, input)
+	state := service.State()
+	if _, issued := state.Profiles[spec.Profile.ProfileID]; issued {
+		t.Fatal("pre-signing approval marked a profile issued")
+	}
+	if len(state.Outbox) != 1 || state.Outbox[0].Kind != string(ActionPrepareProfileIssue) ||
+		state.Outbox[0].SubjectDigest != verified.SigningInputSHA256() {
+		t.Fatalf("missing exact signing obligation: %#v", state.Outbox)
+	}
+}
+
+func TestProfileIssuanceIntentCannotBeForgedOrMutatedAfterVerification(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactSignedPublic)
+	verified, err := profile.VerifyIssuanceIntent(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, _, err := NewVerifiedProfileIssuanceIntentRequest(
+		"operation-profile-intent-proof", verified, 0, "idem-profile-intent-proof",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requester, _, _, _ := testActors()
+
+	forged := input
+	forged.proof = requestProof{}
+	if _, err := newTestService(t, NewMemoryStore()).Request(requester, forged); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("unverified issuance intent accepted: %v", err)
+	}
+
+	mutated := input
+	mutated.ResultEpoch++
+	if _, err := newTestService(t, NewMemoryStore()).Request(requester, mutated); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("mutated issuance intent accepted: %v", err)
+	}
+}
+
+type successfulEffectHandler struct{}
+
+func (successfulEffectHandler) Apply(context.Context, Effect) error { return nil }
+
+func TestProfileFinalizationRequiresDeliveredMatchingIntentAndSecondDualControl(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactSignedPublic)
+	intent, err := profile.VerifyIssuanceIntent(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := profile.IssueOffline(spec, phase8issuance.NewIssuer(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified, err := profile.VerifyIssuedArtifact(intent, artifact, phase8issuance.NewIndependentVerifier(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepare, _, err := NewVerifiedProfileIssuanceIntentRequest(
+		"operation-profile-prepare", intent, 0, "idem-profile-prepare",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := newTestService(t, NewMemoryStore())
+	requester, approverA, approverB, issuer := testActors()
+	executeApproved(t, service, requester, approverA, approverB, issuer, prepare)
+
+	finalize, _, err := NewVerifiedProfileFinalizationRequest(
+		"operation-profile-finalize", service.State().Operations[prepare.ID], verified,
+		service.State().Revision, "idem-profile-finalize", spec.Now+10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustRequestAndApprove(t, service, requester, approverA, approverB, finalize)
+	if _, err := service.Execute(
+		issuer, finalize.ID, finalize.IdempotencyKey+"-execute",
+		service.State().Revision, spec.Now+13,
+	); !errors.Is(err, ErrConflict) {
+		t.Fatalf("finalization executed before signing effect delivery: %v", err)
+	}
+
+	recoverer := Actor{ID: "operator-recoverer", AuthorityRole: profile.RoleOperator, Duties: []Duty{DutyRecover}}
+	if applied, err := ReconcileNext(context.Background(), service, recoverer, successfulEffectHandler{}, spec.Now+5); err != nil || !applied {
+		t.Fatalf("signing effect delivery failed: applied=%v err=%v", applied, err)
+	}
+	if _, err := service.Execute(
+		issuer, finalize.ID, finalize.IdempotencyKey+"-execute",
+		service.State().Revision, spec.Now+14,
+	); err != nil {
+		t.Fatal(err)
+	}
+	record, ok := service.State().Profiles[spec.Profile.ProfileID]
+	if !ok || record.ArtifactDigest != verified.ArtifactSHA256() || record.Generation != spec.Profile.Generation {
+		t.Fatalf("exact verified artifact was not finalized: %#v", record)
+	}
+	if err := service.State().Validate(); err != nil {
+		t.Fatalf("finalized state rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(*State){
+		"missing-parent": func(state *State) {
+			operation := state.Operations[finalize.ID]
+			operation.ParentOperationID = "operation-missing-parent"
+			state.Operations[finalize.ID] = operation
+		},
+		"mismatched-parent-scope": func(state *State) {
+			operation := state.Operations[finalize.ID]
+			operation.ScopeDigest = DigestLabel("different-finalization-scope")
+			state.Operations[finalize.ID] = operation
+		},
+	} {
+		t.Run("recovered-state-rejects-"+name, func(t *testing.T) {
+			state := service.State()
+			mutate(&state)
+			if err := state.Validate(); err == nil {
+				t.Fatal("forged finalization relationship was accepted")
+			}
+		})
+	}
+}
+
+func TestProfileRotationRequiresCurrentArtifactAndTwoStageAuthorization(t *testing.T) {
+	service := newTestService(t, NewMemoryStore())
+	requester, approverA, approverB, issuer := testActors()
+	recoverer := Actor{ID: "operator-recoverer-rotation", AuthorityRole: profile.RoleOperator, Duties: []Duty{DutyRecover}}
+
+	initial := phase8issuance.ValidSpec(envelope.ArtifactSignedPublic)
+	initialIntent, err := profile.VerifyIssuanceIntent(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialArtifact, err := profile.IssueOffline(initial, phase8issuance.NewIssuer(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialVerified, err := profile.VerifyIssuedArtifact(initialIntent, initialArtifact, phase8issuance.NewIndependentVerifier(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepareIssue, _, err := NewVerifiedProfileIssuanceIntentRequest("operation-rotation-initial-prepare", initialIntent, 0, "idem-rotation-initial-prepare")
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeApproved(t, service, requester, approverA, approverB, issuer, prepareIssue)
+	if applied, err := ReconcileNext(context.Background(), service, recoverer, successfulEffectHandler{}, initial.Now+5); err != nil || !applied {
+		t.Fatalf("initial signing effect delivery: applied=%v err=%v", applied, err)
+	}
+	finalizeIssue, _, err := NewVerifiedProfileFinalizationRequest("operation-rotation-initial-finalize", service.State().Operations[prepareIssue.ID], initialVerified, service.State().Revision, "idem-rotation-initial-finalize", initial.Now+10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeApproved(t, service, requester, approverA, approverB, issuer, finalizeIssue)
+	current := service.State().Profiles[initial.Profile.ProfileID]
+
+	replacement := initial
+	replacement.Now = initial.Now + 20
+	replacement.Profile.ContentID = "content.0002"
+	replacement.Profile.UpdateKind = "replacement"
+	replacement.Profile.Generation = initial.Profile.Generation + 1
+	replacement.MinimumGeneration = replacement.Profile.Generation
+	replacementIntent, err := profile.VerifyIssuanceIntent(replacement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepareRotation, _, err := NewVerifiedProfileRotationIntentRequest(
+		"operation-rotation-prepare", current, replacementIntent, service.State().Revision, "idem-rotation-prepare",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepareRotation.ExpectedArtifactDigest != current.ArtifactDigest || prepareRotation.ExpectedEpoch != current.Generation {
+		t.Fatalf("rotation intent is not bound to current artifact: %#v", prepareRotation)
+	}
+	executeApproved(t, service, requester, approverA, approverB, issuer, prepareRotation)
+	for attempt := 0; attempt < 2; attempt++ {
+		if applied, err := ReconcileNext(context.Background(), service, recoverer, successfulEffectHandler{}, replacement.Now+5+int64(attempt)); err != nil || !applied {
+			t.Fatalf("rotation signing effect delivery %d: applied=%v err=%v", attempt, applied, err)
+		}
+	}
+	replacementArtifact, err := profile.IssueOffline(replacement, phase8issuance.NewIssuer(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementVerified, err := profile.VerifyIssuedArtifact(replacementIntent, replacementArtifact, phase8issuance.NewIndependentVerifier(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalizeRotation, _, err := NewVerifiedProfileFinalizationRequest(
+		"operation-rotation-finalize", service.State().Operations[prepareRotation.ID], replacementVerified,
+		service.State().Revision, "idem-rotation-finalize", replacement.Now+10,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finalizeRotation.Action != ActionRotateProfile || finalizeRotation.ParentOperationID != prepareRotation.ID {
+		t.Fatalf("rotation finalization lost its authority chain: %#v", finalizeRotation)
+	}
+	executeApproved(t, service, requester, approverA, approverB, issuer, finalizeRotation)
+	rotated := service.State().Profiles[replacement.Profile.ProfileID]
+	if rotated.Generation != replacement.Profile.Generation || rotated.ArtifactDigest != replacementVerified.ArtifactSHA256() {
+		t.Fatalf("rotation did not install exact final artifact: %#v", rotated)
+	}
+	if err := service.State().Validate(); err != nil {
+		t.Fatalf("rotated state rejected: %v", err)
 	}
 }
 

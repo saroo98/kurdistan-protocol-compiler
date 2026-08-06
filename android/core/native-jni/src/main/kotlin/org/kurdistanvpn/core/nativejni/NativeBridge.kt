@@ -387,15 +387,31 @@ class NativeBridge : KurdNativeCore {
         private fun decodePreview(encoded: ByteArray): NativeResult<RedactedProfilePreview> =
             runCatching {
                 val reader = BinaryReader(encoded)
-                require(reader.ascii(4) == "KVP1")
+                require(reader.ascii(4) == "KVP2")
+                val artifactClass = reader.boundedString()
+                val audienceClass = reader.boundedString()
+                val contentFingerprint = reader.boundedString()
+                val lineageFingerprint = reader.boundedString()
+                val deploymentFingerprint = reader.boundedString()
+                val relayEndpointSummary = reader.boundedString()
+                val authorityScope = reader.boundedString()
+                val updateLocation = reader.boundedString()
+                val flags = reader.u8()
+                require(flags and 0xf8 == 0)
                 RedactedProfilePreview(
-                    artifactClass = reader.boundedString(),
-                    audienceClass = reader.boundedString(),
-                    contentFingerprint = reader.boundedString(),
-                    lineageFingerprint = reader.boundedString(),
-                    sealed = reader.u8() == 1,
+                    artifactClass = artifactClass,
+                    audienceClass = audienceClass,
+                    contentFingerprint = contentFingerprint,
+                    lineageFingerprint = lineageFingerprint,
+                    sealed = flags and 1 != 0,
                     generation = reader.u64().toULong(),
                     validUntilEpochSeconds = reader.i64(),
+                    deploymentFingerprint = deploymentFingerprint,
+                    relayEndpointSummary = relayEndpointSummary,
+                    authorityScope = authorityScope,
+                    updateLocation = updateLocation,
+                    ownerControlled = flags and 2 != 0,
+                    updatesEnabled = flags and 4 != 0,
                 ).also { require(reader.exhausted()) }
             }.fold(
                 onSuccess = { NativeResult.Success(it) },

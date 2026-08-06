@@ -141,9 +141,8 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
 		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
 		{"phase16-offline-authority", "go", []string{"run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"}, ""},
-		{"phase16-production-modules", "go", []string{"-C", "production", "mod", "verify"}, ""},
-		{"phase16-production-tests", "go", []string{"-C", "production", "test", "-count=1", "./..."}, ""},
-		{"phase16-production-vet", "go", []string{"-C", "production", "vet", "./..."}, ""},
+		{"phase16-selfhost-tests", "go", []string{"test", "-count=1", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
+		{"phase16-selfhost-vet", "go", []string{"vet", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
 	}
 }
 

@@ -75,7 +75,7 @@ type SystemClock struct{}
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
 type ReplayGuard interface {
-	UseOnce(actorID, tokenID string, expiresAt int64) error
+	UseOnce(context.Context, string, string, int64) error
 }
 
 type Entitlement struct {
@@ -173,7 +173,7 @@ func (authenticator *Authenticator) authenticatePayload(ctx context.Context, pay
 		if !ok || len(tokenID) < 8 || len(tokenID) > MaxClaimStringBytes {
 			return Identity{}, ErrInvalidCredential
 		}
-		if err := authenticator.config.Replay.UseOnce(actorID, tokenID, payload.Expires); err != nil {
+		if err := authenticator.config.Replay.UseOnce(ctx, actorID, tokenID, payload.Expires); err != nil {
 			return Identity{}, ErrReplay
 		}
 	}

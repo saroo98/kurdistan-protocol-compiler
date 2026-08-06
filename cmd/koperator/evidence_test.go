@@ -181,11 +181,9 @@ func TestPhase12DocumentsRecordSecondReviewWithoutClosingExternalBoundaries(t *t
 	}
 	kip := read(filepath.Join("docs", "KIP-0087-phase12-operator-provisioning-relay-fleet.md"))
 	index := read(filepath.Join("docs", "PHASE12_EVIDENCE_INDEX.md"))
-	roadmap := read("ROADMAP.md")
 	for name, document := range map[string]string{
 		"KIP-0087":       kip,
 		"evidence index": index,
-		"roadmap":        roadmap,
 	} {
 		if !strings.Contains(document, "**[UNVERIFIED]**") {
 			t.Fatalf("%s lost its external evidence boundary", name)
@@ -218,9 +216,5 @@ func TestPhase12DocumentsRecordSecondReviewWithoutClosingExternalBoundaries(t *t
 		if !strings.Contains(kip, required) {
 			t.Fatalf("KIP-0087 missing corrected boundary %q", required)
 		}
-	}
-	if !strings.Contains(roadmap, "Two\nnine-finding security reviews") ||
-		!strings.Contains(roadmap, "trusted-time operation") {
-		t.Fatal("roadmap does not preserve the scoped second-review status")
 	}
 }

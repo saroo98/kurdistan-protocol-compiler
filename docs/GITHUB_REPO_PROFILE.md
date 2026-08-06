@@ -7,7 +7,7 @@ Use these values in the GitHub repository About box.
 
 ## Description
 
-`Kurdistan is a polymorphic relay transport compiler for censorship resistance, generating profile-specific protocols for adversarial networks and censored environments such as Iran.`
+`Kurdistan is a profile-driven, self-hosted relay transport compiler and Android VPN project with signed native profiles, independent node authority, and adversarial validation.`
 
 ## Website
 
@@ -18,29 +18,26 @@ Use these values in the GitHub repository About box.
 ```text
 censorship-resistance
 anti-censorship
+android-vpn
 protocol-compiler
 polymorphic-transport
 relay-transport
 pluggable-transport
 internet-censorship
-iran
-network-research
+self-hosted
 traffic-analysis
 protocol-fingerprinting
 golang
 adversarial-testing
-privacy-research
+privacy
+qr-code
 multistream
 ```
 
 ## Social Preview Text
 
-`A polymorphic relay transport compiler for censorship-resistant networking, protocol fingerprint diversity, and adversarial network research.`
+`A decentralized relay transport compiler, self-hosted node toolkit, and Android VPN application built around signed Kurd profiles.`
 
 ## Pinned README Tagline
 
-`Generated relay transports for censorship-resistance and adversarial network research.`
-
-## Note
-
-If the repository is private, public discovery and SEO benefits apply only after the repository is made public.
+`Self-hosted Kurd nodes, signed profiles, generated relay transports, and an Android VPN client.`

@@ -16,11 +16,82 @@ import (
 type requestProofKind string
 
 const (
-	requestProofProfile    requestProofKind = "phase8-profile"
-	requestProofRevocation requestProofKind = "phase8-revocation"
-	requestProofRelay      requestProofKind = "phase11-relay"
-	requestProofEmergency  requestProofKind = "phase8-emergency"
+	requestProofIssuanceIntent requestProofKind = "phase8-issuance-intent"
+	requestProofProfile        requestProofKind = "phase8-profile"
+	requestProofRevocation     requestProofKind = "phase8-revocation"
+	requestProofRelay          requestProofKind = "phase11-relay"
+	requestProofEmergency      requestProofKind = "phase8-emergency"
 )
+
+// NewVerifiedProfileIssuanceIntentRequest admits an exact Phase 8 pre-signing
+// intent for approval before an HSM produces randomized signature or sealing
+// output. Executing this request creates only a durable signing obligation. A
+// profile is not issued until a separately verified exact artifact is
+// finalized.
+func NewVerifiedProfileIssuanceIntentRequest(
+	id string,
+	verified profile.VerifiedIssuanceIntent,
+	expectedRevision uint64,
+	idempotencyKey string,
+) (RequestInput, profile.RedactedInspection, error) {
+	spec := verified.Specification()
+	if !validID(spec.Profile.ProfileID) || spec.Profile.Generation == 0 ||
+		!validDigest(verified.SigningInputSHA256()) {
+		return RequestInput{}, profile.RedactedInspection{}, ErrInvalidInput
+	}
+	input := RequestInput{
+		ID: id, Action: ActionPrepareProfileIssue, TargetID: spec.Profile.ProfileID,
+		SubjectDigest:    verified.SigningInputSHA256(),
+		ScopeDigest:      DigestLabel(spec.Profile.ProviderID + "|" + spec.Profile.LineageID + "|" + spec.Profile.RevocationScope),
+		ExpectedRevision: expectedRevision,
+		ExpectedEpoch:    0,
+		ResultEpoch:      spec.Profile.Generation,
+		CreatedAt:        spec.Now,
+		ExpiresAt:        spec.Profile.ValidUntil,
+		IdempotencyKey:   idempotencyKey,
+	}
+	if input.ExpiresAt <= input.CreatedAt {
+		return RequestInput{}, profile.RedactedInspection{}, ErrExpired
+	}
+	return sealRequestInput(input, requestProofIssuanceIntent), verified.Inspection(), nil
+}
+
+// NewVerifiedProfileRotationIntentRequest binds a replacement signing input
+// to the exact current durable profile before any randomized HSM output is
+// produced. The replacement still requires a separately verified artifact
+// and a second dual-control operation before it becomes current.
+func NewVerifiedProfileRotationIntentRequest(
+	id string,
+	current ProfileRecord,
+	verified profile.VerifiedIssuanceIntent,
+	expectedRevision uint64,
+	idempotencyKey string,
+) (RequestInput, profile.RedactedInspection, error) {
+	spec := verified.Specification()
+	scopeDigest := DigestLabel(spec.Profile.ProviderID + "|" + spec.Profile.LineageID + "|" + spec.Profile.RevocationScope)
+	if current.State != ProfileIssued || !validID(spec.Profile.ProfileID) ||
+		spec.Profile.ProfileID != current.ID || spec.Profile.UpdateKind != "replacement" ||
+		spec.Profile.Generation != current.Generation+1 || scopeDigest != current.ScopeDigest ||
+		!validDigest(current.ArtifactDigest) || !validDigest(verified.SigningInputSHA256()) {
+		return RequestInput{}, profile.RedactedInspection{}, ErrInvalidInput
+	}
+	input := RequestInput{
+		ID: id, Action: ActionPrepareProfileRotate, TargetID: spec.Profile.ProfileID,
+		SubjectDigest:          verified.SigningInputSHA256(),
+		ScopeDigest:            scopeDigest,
+		ExpectedArtifactDigest: current.ArtifactDigest,
+		ExpectedRevision:       expectedRevision,
+		ExpectedEpoch:          current.Generation,
+		ResultEpoch:            spec.Profile.Generation,
+		CreatedAt:              spec.Now,
+		ExpiresAt:              spec.Profile.ValidUntil,
+		IdempotencyKey:         idempotencyKey,
+	}
+	if input.ExpiresAt <= input.CreatedAt {
+		return RequestInput{}, profile.RedactedInspection{}, ErrExpired
+	}
+	return sealRequestInput(input, requestProofIssuanceIntent), verified.Inspection(), nil
+}
 
 type requestProof struct {
 	kind   requestProofKind
@@ -32,6 +103,7 @@ type requestProofMaterial struct {
 	ID                     string            `json:"id"`
 	Action                 Action            `json:"action"`
 	TargetID               string            `json:"target_id"`
+	ParentOperationID      string            `json:"parent_operation_id"`
 	SubjectDigest          string            `json:"subject_digest"`
 	ScopeDigest            string            `json:"scope_digest"`
 	AuthorityScopeDigest   string            `json:"authority_scope_digest"`
@@ -44,6 +116,53 @@ type requestProofMaterial struct {
 	ExpiresAt              int64             `json:"expires_at"`
 	IdempotencyKey         string            `json:"idempotency_key"`
 	Publication            *PublicationInput `json:"publication"`
+}
+
+// NewVerifiedProfileFinalizationRequest binds exact independently verified
+// artifact bytes to a delivered pre-signing operation. It deliberately creates
+// a second dual-control operation over the final randomized bytes before the
+// profile can become issued.
+func NewVerifiedProfileFinalizationRequest(
+	id string,
+	parent Operation,
+	verified profile.VerifiedIssuedArtifact,
+	expectedRevision uint64,
+	idempotencyKey string,
+	now int64,
+) (RequestInput, profile.RedactedInspection, error) {
+	if (parent.Action != ActionPrepareProfileIssue && parent.Action != ActionPrepareProfileRotate) || parent.State != OperationExecuted ||
+		parent.SubjectDigest != verified.SigningInputSHA256() ||
+		parent.TargetID != verified.ProfileID() ||
+		parent.ScopeDigest != DigestLabel(verified.ScopeDigestInput()) ||
+		parent.ResultEpoch != verified.Generation() ||
+		!validDigest(verified.ArtifactSHA256()) || now <= 0 {
+		return RequestInput{}, profile.RedactedInspection{}, ErrInvalidInput
+	}
+	expiresAt := parent.ExpiresAt
+	if verified.ValidUntil() < expiresAt {
+		expiresAt = verified.ValidUntil()
+	}
+	action := ActionIssueProfile
+	if parent.Action == ActionPrepareProfileRotate {
+		action = ActionRotateProfile
+	}
+	input := RequestInput{
+		ID: id, Action: action, TargetID: verified.ProfileID(),
+		ParentOperationID:      parent.ID,
+		SubjectDigest:          verified.ArtifactSHA256(),
+		ScopeDigest:            parent.ScopeDigest,
+		ExpectedArtifactDigest: parent.ExpectedArtifactDigest,
+		ExpectedRevision:       expectedRevision,
+		ExpectedEpoch:          parent.ExpectedEpoch,
+		ResultEpoch:            verified.Generation(),
+		CreatedAt:              now,
+		ExpiresAt:              expiresAt,
+		IdempotencyKey:         idempotencyKey,
+	}
+	if input.ExpiresAt <= input.CreatedAt {
+		return RequestInput{}, profile.RedactedInspection{}, ErrExpired
+	}
+	return sealRequestInput(input, requestProofProfile), verified.Inspection(), nil
 }
 
 // NewVerifiedProfileIssueRequest admits only an initial Phase 8 artifact
@@ -278,11 +397,36 @@ func (service *Service) NewVerifiedEmergencyRequest(
 	idempotencyKey string,
 	now int64,
 ) (RequestInput, error) {
+	if service == nil {
+		return RequestInput{}, ErrInvalidInput
+	}
+	return NewVerifiedEmergencyRequestFromState(
+		service.store.Snapshot(), id, trusted, signed, verifier,
+		expectedRevision, currentEpoch, idempotencyKey, now,
+	)
+}
+
+// NewVerifiedEmergencyRequestFromState is the production transaction-store
+// boundary for an exact root-bound emergency deny. The caller must supply the
+// strongly read durable state; this function reruns the complete signed-action
+// verification and binds it to the currently installed delegation.
+func NewVerifiedEmergencyRequestFromState(
+	current State,
+	id string,
+	trusted profile.VerifiedEmergencyAuthority,
+	signed profile.SignedEmergencyAction,
+	verifier profile.Verifier,
+	expectedRevision, currentEpoch uint64,
+	idempotencyKey string,
+	now int64,
+) (RequestInput, error) {
+	if err := current.Validate(); err != nil {
+		return RequestInput{}, ErrInvalidInput
+	}
 	binding, err := trusted.CurrentBinding(now)
 	if err != nil {
 		return RequestInput{}, fmt.Errorf("%w: emergency authority is not current", ErrInvalidInput)
 	}
-	current := service.store.Snapshot()
 	authority, exists := current.EmergencyAuthorities[emergencyScopeDigest(binding.Scope)]
 	if expectedRevision != current.Revision || !exists || !recordMatchesBinding(authority, binding) {
 		return RequestInput{}, fmt.Errorf("%w: emergency authority is not the durable current authority", ErrInvalidInput)
@@ -335,6 +479,8 @@ func validateRequestProof(input RequestInput) error {
 
 func requiredRequestProof(action Action) (requestProofKind, bool) {
 	switch action {
+	case ActionPrepareProfileIssue, ActionPrepareProfileRotate:
+		return requestProofIssuanceIntent, true
 	case ActionIssueProfile, ActionRotateProfile:
 		return requestProofProfile, true
 	case ActionRevokeProfile:
@@ -355,6 +501,7 @@ func requestProofDigest(input RequestInput, kind requestProofKind) [sha256.Size]
 		ID:                     input.ID,
 		Action:                 input.Action,
 		TargetID:               input.TargetID,
+		ParentOperationID:      input.ParentOperationID,
 		SubjectDigest:          input.SubjectDigest,
 		ScopeDigest:            input.ScopeDigest,
 		AuthorityScopeDigest:   input.AuthorityScopeDigest,

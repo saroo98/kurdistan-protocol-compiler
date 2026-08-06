@@ -48,7 +48,7 @@ func (backend *testBackend) CreateOperation(_ context.Context, identity authn.Id
 	if backend.err != nil {
 		return OperationView{}, backend.err
 	}
-	backend.operation = OperationView{OperationID: request.TargetID + "-operation", Action: request.Action, State: "PENDING", Revision: request.ExpectedRevision + 1, Epoch: request.ResultEpoch, Requester: identity.ActorID}
+	backend.operation = OperationView{OperationID: request.OperationID, Action: request.Action, State: "PENDING", Revision: request.ExpectedRevision + 1, Epoch: request.ExpectedEpoch, Requester: identity.ActorID}
 	return backend.operation, nil
 }
 func (backend *testBackend) GetOperation(context.Context, string) (OperationView, error) {
@@ -88,7 +88,7 @@ func TestHandlerHealthAndMutationBoundary(t *testing.T) {
 		t.Fatalf("ready status=%d body=%s", health.Code, health.Body.String())
 	}
 
-	body := `{"action":"profile.issue","target_id":"profile-alpha","subject_digest":"` + strings.Repeat("a", 64) + `","scope_digest":"` + strings.Repeat("b", 64) + `","expected_revision":1,"expected_epoch":0,"result_epoch":1,"expires_at":2000000300}`
+	body := `{"action":"profile.issue","operation_id":"operation-profile-alpha","authority_source":{"schema":"test-authority-source-v1"},"expected_revision":1,"expected_epoch":0}`
 	request := authenticatedRequest(http.MethodPost, "/v1/operations", body)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -125,7 +125,7 @@ func TestHandlerRejectsAmbiguousAndUnboundedInput(t *testing.T) {
 
 func TestHandlerAcceptsExplicitZeroRevision(t *testing.T) {
 	handler := newTestHandler(t, &testBackend{}, []string{"requester"})
-	body := `{"action":"profile.issue","target_id":"profile-alpha","subject_digest":"` + strings.Repeat("a", 64) + `","scope_digest":"` + strings.Repeat("b", 64) + `","expected_revision":0,"expected_epoch":0,"result_epoch":1,"expires_at":2000000300}`
+	body := `{"action":"profile.issue","operation_id":"operation-profile-alpha","authority_source":{"schema":"test-authority-source-v1"},"expected_revision":0,"expected_epoch":0}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authenticatedRequest(http.MethodPost, "/v1/operations", body))
 	if response.Code != http.StatusAccepted {
@@ -135,7 +135,7 @@ func TestHandlerAcceptsExplicitZeroRevision(t *testing.T) {
 
 func TestHandlerRejectsMissingExplicitRevision(t *testing.T) {
 	handler := newTestHandler(t, &testBackend{}, []string{"requester"})
-	body := `{"action":"profile.issue","target_id":"profile-alpha","subject_digest":"` + strings.Repeat("a", 64) + `","scope_digest":"` + strings.Repeat("b", 64) + `","expected_epoch":0,"result_epoch":1,"expires_at":2000000300}`
+	body := `{"action":"profile.issue","operation_id":"operation-profile-alpha","authority_source":{"schema":"test-authority-source-v1"},"expected_epoch":0}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authenticatedRequest(http.MethodPost, "/v1/operations", body))
 	if response.Code != http.StatusBadRequest {

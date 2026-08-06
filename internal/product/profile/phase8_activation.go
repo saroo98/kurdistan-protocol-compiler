@@ -98,7 +98,12 @@ type TransactionalActivationProvider interface {
 }
 
 type ActivationRequest struct {
-	Artifact           []byte
+	Artifact []byte
+	// UnwrapSignedObject verifies an application-owned outer envelope and
+	// returns its exact signed profile object. The persisted activation record
+	// remains bound to Artifact, so reopen verification repeats this callback
+	// over the exact outer bytes. Nil preserves the native Phase 8 envelope path.
+	UnwrapSignedObject func([]byte) ([]byte, error)
 	Dispatch           envelope.ArtifactMetadata
 	Now                int64
 	Root               RootSetArtifact
@@ -168,9 +173,19 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 	}
 	var signedObject []byte
+	var err error
 	var outer *envelope.SealProtectedContextV1
 	var recipient *RecipientBinding
-	if request.Dispatch.Class == envelope.ArtifactSignedPublic {
+	if request.UnwrapSignedObject != nil {
+		if request.Dispatch.Class != envelope.ArtifactSignedPublic || request.Resolver != nil || request.Opener != nil {
+			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+		}
+		signedObject, err = request.UnwrapSignedObject(bytes.Clone(artifact))
+		if err != nil || len(signedObject) == 0 || len(signedObject) > envelope.MaxTotalInputBytes {
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		observe(request, StageOuterParsed)
+	} else if request.Dispatch.Class == envelope.ArtifactSignedPublic {
 		signedObject = bytes.Clone(artifact)
 		observe(request, StageOuterParsed)
 	} else {

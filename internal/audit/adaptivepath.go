@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"kurdistan/internal/transport/adaptivepath"
 	"kurdistan/internal/testkit/mutant"
+	"kurdistan/internal/transport/adaptivepath"
 )
 
 type AdaptivePathAuditSummary struct {
@@ -298,14 +298,12 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	if strings.Contains(index, "Current Status") || strings.Contains(index, `id="milestones"`) || strings.Contains(index, "<h2>Milestones</h2>") || strings.Contains(index, "| Milestone | Status |") {
 		failures = append(failures, "docs site still contains public milestone/status table")
 	}
-	for _, required := range []string{
-		"M27: adaptive path model and candidate taxonomy",
-		"M28: generated transport bundle compiler",
-		"M33: local proxy egress and relay bridge model",
-		"M36: concrete local socket adapter",
-	} {
-		if !strings.Contains(readme, required) && !strings.Contains(index, required) {
-			failures = append(failures, "roadmap missing "+required)
+	for _, document := range []struct {
+		name string
+		text string
+	}{{"README.md", readme}, {"docs/index.html", index}} {
+		if strings.Contains(strings.ToLower(document.text), "roadmap") {
+			failures = append(failures, document.name+" exposes private roadmap material")
 		}
 	}
 	for _, required := range []string{
@@ -324,11 +322,6 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 	if !strings.Contains(index, "KIP-0034-generated-transport-bundle-compiler.md") {
 		failures = append(failures, "docs site missing KIP-0034-generated-transport-bundle-compiler.md")
 	}
-	for _, required := range []string{"M27", "M28", "M29", "M30", "M31", "M32", "M33", "M34", "M35", "M36"} {
-		if !strings.Contains(index, required) {
-			failures = append(failures, "docs site missing roadmap marker "+required)
-		}
-	}
 	for _, required := range []string{
 		"generated transport bundle compiler",
 		"transportbundle_policy_validation",
@@ -337,9 +330,6 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 		if !strings.Contains(kip34Lower, required) {
 			failures = append(failures, "KIP-0034 missing "+required)
 		}
-	}
-	if strings.Contains(readme, "M27: local proxy egress") || strings.Contains(index, "M27: local proxy egress") {
-		failures = append(failures, "old M27 local proxy egress roadmap remains")
 	}
 	failures = append(failures, publicClaimFailures("README.md", readme)...)
 	failures = append(failures, publicClaimFailures("docs/index.html", index)...)
@@ -357,7 +347,7 @@ func AdaptivePathRoadmapPublicDocsGate() GateResult {
 			failures = append(failures, "public site includes unsafe fixture-like term "+forbidden)
 		}
 	}
-	return gate("adaptivepath_roadmap_public_docs", len(failures) == 0, "required", "public adaptive site, roadmap, links, and claim-safety checked", nil, failures)
+	return gate("adaptivepath_roadmap_public_docs", len(failures) == 0, "required", "public capability site, links, privacy boundary, and claim safety checked", nil, failures)
 }
 
 func publicClaimFailures(name, content string) []string {

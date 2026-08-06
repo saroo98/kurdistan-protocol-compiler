@@ -23,4 +23,22 @@ resource "google_kms_crypto_key" "authority" {
   lifecycle { prevent_destroy = true }
 }
 
-output "key_names" { value = { for key, value in google_kms_crypto_key.authority : key => value.id } }
+resource "google_kms_crypto_key" "staging" {
+  name     = "kvpn-authority-source-staging"
+  key_ring = google_kms_key_ring.authority.id
+  purpose  = "ENCRYPT_DECRYPT"
+
+  version_template {
+    algorithm        = "GOOGLE_SYMMETRIC_ENCRYPTION"
+    protection_level = "HSM"
+  }
+
+  lifecycle { prevent_destroy = true }
+}
+
+output "key_names" {
+  value = merge(
+    { for key, value in google_kms_crypto_key.authority : key => value.id },
+    { staging = google_kms_crypto_key.staging.id },
+  )
+}

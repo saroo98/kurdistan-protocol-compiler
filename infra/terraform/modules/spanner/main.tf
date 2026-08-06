@@ -24,4 +24,20 @@ resource "google_spanner_database" "authority" {
   lifecycle { prevent_destroy = true }
 }
 
+resource "google_spanner_backup_schedule" "authority_daily" {
+  project            = var.project_id
+  instance           = google_spanner_instance.authority.name
+  database           = google_spanner_database.authority.name
+  name               = "authority-daily-full"
+  retention_duration = "2592000s"
+
+  spec {
+    cron_spec { text = "0 2 * * *" }
+  }
+  full_backup_spec {}
+  encryption_config { encryption_type = "USE_DATABASE_ENCRYPTION" }
+}
+
 output "database" { value = google_spanner_database.authority.id }
+output "instance_name" { value = google_spanner_instance.authority.name }
+output "database_name" { value = google_spanner_database.authority.name }

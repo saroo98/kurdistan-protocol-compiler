@@ -7,6 +7,18 @@ variable "bucket_names" { type = map(string) }
 variable "images" { type = map(string) }
 variable "repository" { type = string }
 variable "schema_ddl" { type = list(string) }
+variable "billing_account" { type = string }
+variable "budget_currency_code" { type = string }
+variable "budget_monthly_units" { type = number }
+variable "notification_channels" { type = list(string) }
+variable "enable_ceremony_access" {
+  type    = bool
+  default = false
+}
+variable "ceremony_access_expires_at" {
+  type    = string
+  default = "1970-01-01T00:00:00Z"
+}
 
 locals {
   runtime_services    = toset(["koperator-api", "koperator-worker", "koperator-publication", "koperator-audit", "koperator-emergency", "koperator-ceremony", "koperator-drill"])
@@ -59,6 +71,12 @@ module "audit" {
   retention_seconds = 220752000
 }
 
+module "audit_sinks" {
+  source             = "../audit_sinks"
+  source_project_ids = var.projects
+  audit_bucket       = module.audit.name
+}
+
 module "backup" {
   source            = "../backup"
   project_id        = var.projects.ops
@@ -71,16 +89,32 @@ module "secrets" {
   source       = "../secrets"
   project_id   = var.projects.control
   secret_names = toset(["operator-runtime-config"])
+  location     = var.region
 }
 
 module "control_plane" {
-  source           = "../control_plane"
-  project_id       = var.projects.control
-  region           = var.region
-  images           = var.images
-  service_accounts = { for key, value in module.identity.emails : key => value if contains(local.runtime_services, key) }
-  network          = module.network.network
-  subnetwork       = module.network.subnetwork
+  source            = "../control_plane"
+  project_id        = var.projects.control
+  region            = var.region
+  images            = var.images
+  service_accounts  = { for key, value in module.identity.emails : key => value if contains(local.runtime_services, key) }
+  network           = module.network.network
+  subnetwork        = module.network.subnetwork
+  runtime_secret_id = module.secrets.ids["operator-runtime-config"]
+}
+
+module "runtime_iam" {
+  source                     = "../runtime_iam"
+  project_ids                = { trust = var.projects.trust, control = var.projects.control, publication = var.projects.publication, audit = var.projects.audit }
+  service_accounts           = module.identity.emails
+  spanner_instance           = module.spanner.instance_name
+  spanner_database           = module.spanner.database_name
+  kms_keys                   = module.kms.key_names
+  publication_bucket         = module.publication.name
+  audit_bucket               = module.audit.name
+  runtime_secret_id          = module.secrets.ids["operator-runtime-config"]
+  enable_ceremony_access     = var.enable_ceremony_access
+  ceremony_access_expires_at = var.ceremony_access_expires_at
 }
 
 module "workload_identity" {
@@ -97,9 +131,19 @@ module "workload_identity" {
 }
 
 module "monitoring" {
-  source        = "../monitoring"
-  project_id    = var.projects.ops
-  service_names = local.runtime_services
+  source                = "../monitoring"
+  project_id            = var.projects.ops
+  service_names         = local.runtime_services
+  notification_channels = var.notification_channels
+}
+
+module "budget" {
+  source                = "../budget"
+  billing_account       = var.billing_account
+  project_ids           = var.projects
+  currency_code         = var.budget_currency_code
+  monthly_units         = var.budget_monthly_units
+  notification_channels = var.notification_channels
 }
 
 output "kms_keys" { value = module.kms.key_names }

@@ -256,6 +256,40 @@ fun ImportPreviewScreen(
                 BidiFormatter.getInstance().unicodeWrap(preview.contentFingerprint.take(16)),
             ),
         )
+        if (preview.deploymentFingerprint.isNotEmpty()) {
+            Text(
+                stringResource(
+                    UiR.string.deployment_fingerprint,
+                    BidiFormatter.getInstance().unicodeWrap(preview.deploymentFingerprint),
+                ),
+                modifier = Modifier.testTag("deployment_fingerprint"),
+            )
+        }
+        if (preview.relayEndpointSummary.isNotEmpty()) {
+            Text(
+                stringResource(
+                    UiR.string.relay_endpoint_summary,
+                    BidiFormatter.getInstance().unicodeWrap(preview.relayEndpointSummary),
+                ),
+            )
+        }
+        if (preview.authorityScope.isNotEmpty()) {
+            Text(stringResource(UiR.string.authority_scope, preview.authorityScope))
+        }
+        Text(
+            if (preview.updatesEnabled) {
+                stringResource(UiR.string.profile_updates_enabled, preview.updateLocation)
+            } else {
+                stringResource(UiR.string.profile_updates_disabled)
+            },
+        )
+        if (preview.ownerControlled) {
+            Text(
+                stringResource(UiR.string.owner_controlled_source_warning),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.testTag("owner_controlled_source_warning"),
+            )
+        }
         Text(
             stringResource(
                 if (preview.sealed) UiR.string.encrypted_profile

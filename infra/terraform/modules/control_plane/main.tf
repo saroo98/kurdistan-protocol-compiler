@@ -4,6 +4,7 @@ variable "images" { type = map(string) }
 variable "service_accounts" { type = map(string) }
 variable "network" { type = string }
 variable "subnetwork" { type = string }
+variable "runtime_secret_id" { type = string }
 
 locals {
   service_names = toset([
@@ -34,7 +35,21 @@ resource "google_cloud_run_v2_service" "service" {
     service_account                  = var.service_accounts[each.key]
     timeout                          = "30s"
     max_instance_request_concurrency = 20
-    containers { image = each.value }
+    containers {
+      image = each.value
+      dynamic "env" {
+        for_each = contains(["koperator-api", "koperator-worker"], each.key) ? [1] : []
+        content {
+          name = "KURDISTAN_OPERATOR_CONFIG"
+          value_source {
+            secret_key_ref {
+              secret  = var.runtime_secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+    }
     scaling {
       min_instance_count = 0
       max_instance_count = 10
@@ -64,7 +79,21 @@ resource "google_cloud_run_v2_job" "job" {
       service_account = var.service_accounts[each.key]
       timeout         = "3600s"
       max_retries     = 0
-      containers { image = each.value }
+      containers {
+        image = each.value
+        dynamic "env" {
+          for_each = contains(["koperator-api", "koperator-worker"], each.key) ? [1] : []
+          content {
+            name = "KURDISTAN_OPERATOR_CONFIG"
+            value_source {
+              secret_key_ref {
+                secret  = var.runtime_secret_id
+                version = "latest"
+              }
+            }
+          }
+        }
+      }
       vpc_access {
         network_interfaces {
           network    = var.network

@@ -16,9 +16,9 @@ func TestManifestIsChecksumBoundAndComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"Approvals", "AuditAnchors", "AuditEvents", "AuthorityHead", "Ceremonies",
+		"Approvals", "AuditAnchors", "AuditEvents", "AuthorityHead", "AuthoritySources", "Ceremonies",
 		"EmergencyAuthorities", "EmergencyRestrictions", "IdempotencyReceipts", "KeyVersions",
-		"Operations", "OutboxEvents", "Profiles", "Publications", "Relays", "SchemaMigrations",
+		"Operations", "OutboxEvents", "Profiles", "Publications", "Relays", "SchemaMigrations", "TokenReplay",
 	}
 	if got := RequiredTables(migrations); !reflect.DeepEqual(got, want) {
 		t.Fatalf("tables=%v", got)

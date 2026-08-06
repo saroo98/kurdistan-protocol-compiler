@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-// Command phase16verify validates the local Phase 16 production-trust
-// authority and, when explicitly requested, the private owner input contract.
-// It never calls a cloud API and never treats local evidence as production
-// evidence.
+// Command phase16verify validates the local Phase 16 evidence boundary and the
+// current decentralized self-hosting authority. Its external mode remains a
+// legacy validator for the superseded cloud experiment until that code is
+// removed or isolated. It never calls a cloud API and never treats local
+// evidence as production evidence.
 package main
 
 import (
@@ -20,44 +21,51 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 )
 
 const (
-	statusPath        = "testdata/evidence/phase16/production-trust-status.json"
-	ownerInputDefault = ".tools/phase16/private/owner-inputs.json"
+	statusPath                  = "testdata/evidence/phase16/production-trust-status.json"
+	selfHostedQualificationPath = "testdata/evidence/phase16/self-hosted-vps-qualification.json"
+	ownerInputDefault           = ".tools/phase16/private/owner-inputs.json"
 )
 
 var requiredFiles = []string{
-	"config/production/actions.json",
-	"config/production/key-policy.json",
-	"config/production/regions.json",
-	"config/production/retention.json",
-	"config/production/roles.json",
-	"config/production/services.json",
-	"config/production/tools.json",
+	"README.md",
+	"docs/KIP-0090-phase15-production-contract-freeze.md",
+	"docs/KIP-0091-assurance-release-acceleration.md",
 	"docs/KIP-0092-phase16-production-trust.md",
-	"docs/PHASE16_CEREMONIES.md",
-	"docs/PHASE16_DISASTER_RECOVERY.md",
+	"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+	"docs/PHASE15_PRODUCTION_CONTRACT.md",
 	"docs/PHASE16_EVIDENCE_INDEX.md",
-	"docs/PHASE16_OPERATIONS.md",
-	"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
-	"docs/PHASE16_THREAT_MODEL.md",
-	"testdata/fixtures/phase16/owner-inputs.example.json",
-	"testdata/schemas/phase16-external-receipt-v1.schema.json",
-	"testdata/schemas/phase16-operation-v1.schema.json",
-	"testdata/schemas/phase16-owner-inputs-v1.schema.json",
 	"testdata/schemas/phase16-production-trust-status-v1.schema.json",
+	"testdata/schemas/phase16-self-hosted-vps-qualification-v1.schema.json",
 	statusPath,
-	"production/go.mod",
-	"production/migrations/manifest.json",
-	"infra/terraform/environments/qualification/.terraform.lock.hcl",
-	"infra/terraform/environments/production/.terraform.lock.hcl",
-	"infra/terraform/policies/phase16.rego",
-	".github/workflows/phase16-qualification.yml",
-	".github/workflows/phase16-production-plan.yml",
-	".github/workflows/phase16-production-apply.yml",
-	".github/workflows/phase16-drill.yml",
+	selfHostedQualificationPath,
+	"cmd/kurd-node/main.go",
+	"cmd/kurdctl/main.go",
+	"cmd/kurdpackage/main.go",
+	"cmd/kandroidbridge/environment_selfhost.go",
+	"cmd/phase16androidverify/main.go",
+	"internal/selfhost/model.go",
+	"deploy/selfhost/native/kurd-node.service",
+	"deploy/selfhost/container/compose.yml",
+}
+
+var decentralizedAuthorityFiles = []string{
+	"README.md",
+	"docs/KIP-0092-phase16-production-trust.md",
+	"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+}
+
+var privatePlanningFiles = []string{
+	"ROADMAP.md",
+	"STATUS.md",
+	"docs/PHASE16_DIRTY_WORKTREE_DISPOSITION.md",
+	"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
+	"docs/PHASE16_SELF_HOSTED_VPS_COMPLETION_PLAN.md",
 }
 
 var expectedRoles = []string{"approver", "auditor", "deployer", "emergency", "executor", "publisher", "recovery", "requester", "viewer"}
@@ -103,6 +111,93 @@ type externalEvidence struct {
 	ID             string `json:"id"`
 	Status         string `json:"status"`
 	EvidenceDigest string `json:"evidenceDigest"`
+}
+
+type selfHostedQualification struct {
+	Schema     string `json:"schema"`
+	Phase      int    `json:"phase"`
+	Authority  string `json:"authority"`
+	RecordedAt string `json:"recordedAt"`
+	Source     struct {
+		Branch                    string `json:"branch"`
+		BaselineCommit            string `json:"baselineCommit"`
+		PackageSourceCommit       string `json:"packageSourceCommit"`
+		PackageBuiltFromDirtyTree bool   `json:"packageBuiltFromDirtyTree"`
+	} `json:"source"`
+	Packages struct {
+		Version                  string `json:"version"`
+		AMD64SHA256              string `json:"amd64Sha256"`
+		ARM64SHA256              string `json:"arm64Sha256"`
+		IndependentBuildsMatched bool   `json:"independentBuildsMatched"`
+		Signed                   bool   `json:"signed"`
+		RelayDataPlane           bool   `json:"relayDataPlane"`
+	} `json:"packages"`
+	VPS struct {
+		ProviderClass   string `json:"providerClass"`
+		RegionClass     string `json:"regionClass"`
+		OperatingSystem string `json:"operatingSystem"`
+		Architecture    string `json:"architecture"`
+		CPUCores        int    `json:"cpuCores"`
+		MemoryMiB       int    `json:"memoryMiB"`
+		StorageGiB      int    `json:"storageGiB"`
+		EndpointSHA256  string `json:"endpointSha256"`
+	} `json:"vps"`
+	Deployment struct {
+		RootFingerprint     string `json:"rootFingerprint"`
+		Revision            uint64 `json:"revision"`
+		Generation          uint64 `json:"generation"`
+		RootEpoch           uint64 `json:"rootEpoch"`
+		RevocationEpoch     uint64 `json:"revocationEpoch"`
+		ProfileCount        int    `json:"profileCount"`
+		RevokedProfileCount int    `json:"revokedProfileCount"`
+		RecoveryConfirmed   bool   `json:"recoveryConfirmed"`
+		Drained             bool   `json:"drained"`
+		Disabled            bool   `json:"disabled"`
+	} `json:"deployment"`
+	Artifacts struct {
+		RecoverySHA256          string `json:"recoverySha256"`
+		BackupSHA256            string `json:"backupSha256"`
+		PostUpgradeBackupSHA256 string `json:"postUpgradeBackupSha256"`
+		ProfileSHA256           string `json:"profileSha256"`
+		BackupAuditHead         string `json:"backupAuditHead"`
+	} `json:"artifacts"`
+	Checks struct {
+		FreshNativeInstall             bool `json:"freshNativeInstall"`
+		UpgradeRollbackReupgrade       bool `json:"upgradeRollbackReupgrade"`
+		TotalHostLossRestore           bool `json:"totalHostLossRestore"`
+		OldBackupRejected              bool `json:"oldBackupRejected"`
+		WrongPassphraseRejected        bool `json:"wrongPassphraseRejected"`
+		CorruptBackupRejected          bool `json:"corruptBackupRejected"`
+		DoctorPassed                   bool `json:"doctorPassed"`
+		PublicationCursorAuthenticated bool `json:"publicationCursorAuthenticated"`
+		SystemdSandboxed               bool `json:"systemdSandboxed"`
+		OnlySSHPublicListener          bool `json:"onlySshPublicListener"`
+		DefaultDenyFirewall            bool `json:"defaultDenyFirewall"`
+		ContainerConformance           bool `json:"containerConformance"`
+		AndroidKVP2ExactActivation     bool `json:"androidKvp2ExactActivation"`
+		HundredCycleSoak               bool `json:"hundredCycleSoak"`
+		DeterministicPackages          bool `json:"deterministicPackages"`
+		TemporaryArtifactsRemoved      bool `json:"temporaryArtifactsRemoved"`
+	} `json:"checks"`
+	Limitations []string `json:"limitations"`
+	Findings    struct {
+		Critical int `json:"critical"`
+		High     int `json:"high"`
+	} `json:"findings"`
+	ReleaseDecision string `json:"releaseDecision"`
+}
+
+type externalReceipt struct {
+	Schema          string   `json:"schema"`
+	Kind            string   `json:"kind"`
+	SubjectCommit   string   `json:"subjectCommit"`
+	SubjectTree     string   `json:"subjectTree"`
+	PolicyDigest    string   `json:"policyDigest"`
+	StartedAt       string   `json:"startedAt"`
+	FinishedAt      string   `json:"finishedAt"`
+	Result          string   `json:"result"`
+	ArtifactDigests []string `json:"artifactDigests"`
+	Limitations     []string `json:"limitations"`
 }
 
 type rolePolicy struct {
@@ -229,49 +324,131 @@ func verify(root, mode, ownerPath string) error {
 			return fmt.Errorf("required file unavailable: %s", rel)
 		}
 	}
+	if err := verifyPrivatePlanningAbsent(root); err != nil {
+		return err
+	}
 	var value status
 	if err := decodeFile(root, statusPath, &value); err != nil {
 		return err
 	}
-	if err := validateStatus(root, value); err != nil {
+	if err := validateStatus(root, value, mode); err != nil {
 		return err
 	}
-	var roles rolePolicy
-	if err := decodeFile(root, "config/production/roles.json", &roles); err != nil {
-		return err
-	}
-	if err := validateRoles(roles); err != nil {
-		return err
-	}
-	var actions actionPolicy
-	if err := decodeFile(root, "config/production/actions.json", &actions); err != nil {
-		return err
-	}
-	if err := validateActions(actions); err != nil {
+	if err := verifySelfHostedQualification(root); err != nil {
 		return err
 	}
 	if err := verifyDocuments(root); err != nil {
 		return err
 	}
+	if err := verifyDecentralizedAuthority(root); err != nil {
+		return err
+	}
+	if err := verifyNoMandatoryCloudWorkflows(root); err != nil {
+		return err
+	}
 	if err := verifySchemas(root); err != nil {
 		return err
 	}
-	if err := verifyImplementationAuthority(root); err != nil {
+	if err := verifyPortableImplementation(root); err != nil {
 		return err
 	}
 	if mode == "external" {
-		var owner ownerInputs
-		if err := decodeFile(root, ownerPath, &owner); err != nil {
-			return fmt.Errorf("private owner inputs: %w", err)
+		return errors.New("legacy centralized external mode is superseded; use the self-hosted VPS acceptance verifier")
+	}
+	return nil
+}
+
+func verifyExternalReceipts(root string, value status, now time.Time) error {
+	commit, err := gitValue(root, "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
+	tree, err := gitValue(root, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		return err
+	}
+	policyDigest := statusPolicyDigest(value)
+	for _, evidence := range value.ExternalEvidence {
+		if evidence.Status != "PASS" {
+			continue
 		}
-		if err := validateOwner(owner); err != nil {
-			return err
+		path := filepath.ToSlash(filepath.Join(".tools/phase16/private/evidence", evidence.ID+".json"))
+		observedDigest, err := fileDigest(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
+		}
+		if observedDigest != evidence.EvidenceDigest {
+			return fmt.Errorf("external evidence digest mismatch: %s", evidence.ID)
+		}
+		var receipt externalReceipt
+		if err := decodeFile(root, path, &receipt); err != nil {
+			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
+		}
+		if err := validateExternalReceipt(evidence.ID, receipt, commit, tree, policyDigest, now); err != nil {
+			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
 		}
 	}
 	return nil
 }
 
-func validateStatus(root string, value status) error {
+func validateExternalReceipt(id string, receipt externalReceipt, commit, tree, policyDigest string, now time.Time) error {
+	wantKind := strings.ToUpper(strings.ReplaceAll(id, "-", "_"))
+	if receipt.Schema != "phase16-external-receipt-v1" || receipt.Kind != wantKind ||
+		receipt.SubjectCommit != commit || receipt.SubjectTree != tree || receipt.PolicyDigest != policyDigest ||
+		receipt.Result != "PASS" || len(receipt.ArtifactDigests) == 0 || len(receipt.ArtifactDigests) > 64 || len(receipt.Limitations) > 32 {
+		return errors.New("receipt identity, subject, policy, or result mismatch")
+	}
+	started, err := time.Parse(time.RFC3339, receipt.StartedAt)
+	if err != nil {
+		return errors.New("invalid receipt start time")
+	}
+	finished, err := time.Parse(time.RFC3339, receipt.FinishedAt)
+	if err != nil || finished.Before(started) || finished.Sub(started) > 24*time.Hour || finished.After(now.Add(5*time.Minute)) || now.Sub(finished) > 14*24*time.Hour {
+		return errors.New("receipt time window is invalid or stale")
+	}
+	digests := append([]string(nil), receipt.ArtifactDigests...)
+	sort.Strings(digests)
+	for index, digest := range digests {
+		if !validDigest(digest) || index > 0 && digest == digests[index-1] {
+			return errors.New("receipt artifact digest inventory is invalid")
+		}
+	}
+	limitations := append([]string(nil), receipt.Limitations...)
+	sort.Strings(limitations)
+	for index, limitation := range limitations {
+		if len(limitation) < 3 || len(limitation) > 256 || index > 0 && limitation == limitations[index-1] {
+			return errors.New("receipt limitations are invalid")
+		}
+	}
+	return nil
+}
+
+func statusPolicyDigest(value status) string {
+	material := strings.Join([]string{
+		"phase16-production-policy-bundle-v1",
+		"actions=" + value.PolicyDigests.Actions,
+		"keyPolicy=" + value.PolicyDigests.KeyPolicy,
+		"regions=" + value.PolicyDigests.Regions,
+		"retention=" + value.PolicyDigests.Retention,
+		"roles=" + value.PolicyDigests.Roles,
+		"services=" + value.PolicyDigests.Services,
+		"tools=" + value.PolicyDigests.Tools,
+	}, "\n") + "\n"
+	digest := sha256.Sum256([]byte(material))
+	return hex.EncodeToString(digest[:])
+}
+
+func gitValue(root string, args ...string) (string, error) {
+	command := exec.Command("git", args...)
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(string(output)))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func validateStatus(root string, value status, mode string) error {
 	if value.Schema != "phase16-production-trust-status-v1" || value.Phase != 16 {
 		return errors.New("invalid status identity")
 	}
@@ -286,8 +463,8 @@ func validateStatus(root string, value status) error {
 	if value.ReleaseDecision != "NO_GO" {
 		return errors.New("Phase 16 cannot widen the full VPN release decision")
 	}
-	if value.State == "COMPLETE" {
-		return errors.New("local status cannot mark Phase 16 complete without external verification")
+	if value.State == "COMPLETE" && mode != "external" {
+		return errors.New("offline verification cannot establish Phase 16 completion")
 	}
 	if value.Findings.Critical < 0 || value.Findings.High < 0 || len(value.Limitations) < 1 {
 		return errors.New("invalid findings or limitations")
@@ -324,6 +501,16 @@ func validateStatus(root string, value status) error {
 			return fmt.Errorf("invalid external evidence state: %s", item.ID)
 		} else if !validDigest(item.EvidenceDigest) {
 			return fmt.Errorf("invalid evidence digest: %s", item.ID)
+		}
+	}
+	if value.State == "COMPLETE" {
+		if value.Findings.Critical != 0 || value.Findings.High != 0 {
+			return errors.New("complete status retains blocking findings")
+		}
+		for _, item := range value.ExternalEvidence {
+			if item.Status != "PASS" {
+				return fmt.Errorf("complete status lacks external evidence: %s", item.ID)
+			}
 		}
 	}
 	return nil
@@ -411,13 +598,10 @@ func validateOwner(value ownerInputs) error {
 
 func verifyDocuments(root string) error {
 	required := map[string][]string{
-		"docs/KIP-0092-phase16-production-trust.md":        {"Spanner", "Cloud KMS HSM", "NO_GO", "two distinct approvers"},
-		"docs/PHASE16_THREAT_MODEL.md":                     {"Fail-closed", "Spanner commit time", "split brain", "Explicit non-claims"},
-		"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md": {"Anything less is progress, not Phase 16 completion.", "Do not invent credentials", "Phase 17"},
-		"docs/PHASE16_DISASTER_RECOVERY.md":                {"zero acknowledged authority transitions", "Reject an older epoch", "production drill receipt"},
-		"docs/PHASE16_CEREMONIES.md":                       {"two distinct approvers", "separate executor", "destruction needs a separate irreversible-action authorization"},
-		"docs/PHASE16_OPERATIONS.md":                       {"at least once", "authority state backward", "Freeze ordinary mutations"},
-		"docs/PHASE16_EVIDENCE_INDEX.md":                   {"implementation readiness only", "Missing external evidence", "NO_GO"},
+		"README.md": {"profile-driven, self-hosted relay transport system", "Each operator controls", "no telemetry", "pre-release software"},
+		"docs/KIP-0092-phase16-production-trust.md":               {"superseded", "Historical record only", "NO_GO"},
+		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md": {"accepted for implementation", "There is no global root", "kurd-node", "kurdctl", "NO_GO"},
+		"docs/PHASE16_EVIDENCE_INDEX.md":                          {"Self-hosted qualification", "No known critical or high Phase 16 finding remains", "NO_GO"},
 	}
 	for path, needles := range required {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
@@ -431,31 +615,170 @@ func verifyDocuments(root string) error {
 			}
 		}
 	}
-	for _, path := range []string{".github/workflows/phase16-production-plan.yml", ".github/workflows/phase16-production-apply.yml"} {
+	return nil
+}
+
+func verifyDecentralizedAuthority(root string) error {
+	required := map[string][]string{
+		"README.md": {
+			"profile-driven, self-hosted relay transport system",
+			"Each operator controls",
+			"does not require a Kurdistan account",
+			"one deployment cannot revoke or disable another independent deployment",
+		},
+		"docs/KIP-0092-phase16-production-trust.md": {
+			"superseded by",
+			"Historical record only",
+		},
+		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md": {
+			"decentralized, self-hosted VPN product",
+			"no vendor account",
+			"There is no global root",
+			"kurd-node",
+			"kurdctl",
+		},
+	}
+	for path, needles := range required {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(raw), "actions/upload-artifact") || strings.Contains(string(raw), "actions/download-artifact") {
-			return fmt.Errorf("%s exposes the private binary Terraform plan through GitHub artifacts", path)
+		text := string(raw)
+		for _, needle := range needles {
+			if !strings.Contains(text, needle) {
+				return fmt.Errorf("%s missing decentralized authority text %q", path, needle)
+			}
+		}
+	}
+
+	for _, path := range []string{
+		"README.md",
+		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return err
+		}
+		text := strings.ToLower(string(raw))
+		for _, forbidden := range []string{
+			"google cloud is mandatory",
+			"google cloud account is required",
+			"requires a google cloud account",
+			"must use google cloud",
+			"spanner is mandatory",
+			"cloud kms is mandatory",
+			"requires a global kurdistan root",
+			"kurdistan-operated global shutdown switch",
+		} {
+			if strings.Contains(text, forbidden) {
+				return fmt.Errorf("%s reintroduces prohibited centralized authority %q", path, forbidden)
+			}
 		}
 	}
 	return nil
 }
 
-func verifyImplementationAuthority(root string) error {
+func verifyPrivatePlanningAbsent(root string) error {
+	for _, path := range privatePlanningFiles {
+		_, err := os.Lstat(filepath.Join(root, filepath.FromSlash(path)))
+		if err == nil {
+			return fmt.Errorf("private planning file is present in the public repository tree: %s", path)
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("inspect private planning path %s: %w", path, err)
+		}
+	}
+	return nil
+}
+
+func verifyNoMandatoryCloudWorkflows(root string) error {
+	paths := []string{
+		".github/workflows/phase16-qualification.yml",
+		".github/workflows/phase16-drill.yml",
+		".github/workflows/phase16-production-plan.yml",
+		".github/workflows/phase16-production-apply.yml",
+	}
+	for _, path := range paths {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return err
+		}
+		text := strings.ToLower(string(raw))
+		if strings.Contains(text, "phase16-cloud-experiment-disabled") {
+			continue
+		}
+		for _, forbidden := range []string{
+			"id-token: write",
+			"google-github-actions/",
+			"gcloud ",
+			"terraform",
+			"spanner",
+			"cloud kms",
+		} {
+			if strings.Contains(text, forbidden) {
+				return fmt.Errorf("%s retains mandatory cloud workflow authority %q", path, forbidden)
+			}
+		}
+	}
+	return verifyPortableDrillWorkflow(root)
+}
+
+func verifyPortableDrillWorkflow(root string) error {
+	path := filepath.Join(root, filepath.FromSlash(".github/workflows/phase16-drill.yml"))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	requiredTests := []string{
+		"TestEncryptedBackupRestoreAndRollbackProtection",
+		"TestInterruptedStateWriteResidueCannotReplaceCommittedState",
+		"TestClockRollbackAndLargeForwardJumpFailClosed",
+		"TestIssuerAndRelayRotationRevokePriorProfiles",
+		"TestBackupRejectsWrongPassphraseTamperAndUnsafePaths",
+	}
+	text := string(raw)
+	for _, required := range append([]string{
+		"case \"$DRILL\" in",
+		"LISTED=$(go test ./internal/selfhost -list",
+		"expected drill test is absent",
+	}, requiredTests...) {
+		if !strings.Contains(text, required) {
+			return fmt.Errorf("phase16 drill workflow missing zero-test guard %q", required)
+		}
+	}
+	pattern := "^(" + strings.Join(requiredTests, "|") + ")$"
+	command := exec.Command("go", "test", "./internal/selfhost", "-list", pattern)
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("phase16 drill test inventory: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	found := map[string]bool{}
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		for _, expected := range requiredTests {
+			if line == expected {
+				found[expected] = true
+			}
+		}
+	}
+	for _, expected := range requiredTests {
+		if !found[expected] {
+			return fmt.Errorf("phase16 drill test inventory omits %s", expected)
+		}
+	}
+	return nil
+}
+
+func verifyPortableImplementation(root string) error {
 	required := map[string][]string{
-		"production/internal/spannerstore/store.go":         {"controlplane.ApplyCommand", "ErrTrustedTimeMismatch", "ReserveCommitTime"},
-		"production/internal/kmsprovider/provider.go":       {"EC_SIGN_P256_SHA256", "ProtectionLevel_HSM", "VerifiedDigestCrc32C", "EncodeRawES256Signature"},
-		"production/internal/publication/google_store.go":   {"DoesNotExist: true", "Generation(generation)", "sha256"},
-		"production/internal/outbox/worker.go":              {"LeaseToken", "MaxAttempts", "Emergency"},
-		"production/internal/auditanchor/anchor.go":         {"PreviousDigest", "RoleAudit", "PutIfAbsent"},
-		"production/internal/backup/verify.go":              {"ErrRollback", "ErrFork", "ExternalAudit", "ExternalPublic"},
-		"infra/terraform/modules/kms_hsm/main.tf":           {"EC_SIGN_P256_SHA256", "protection_level = \"HSM\"", "prevent_destroy"},
-		"infra/terraform/modules/control_plane/main.tf":     {"INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER", "service_account", "deletion_protection = true"},
-		"infra/terraform/modules/workload_identity/main.tf": {"token.actions.githubusercontent.com", "refs/heads/main", "attribute.repository"},
-		".github/workflows/phase16-production-apply.yml":    {"id-token: write", "plan_sha256", "cancel-in-progress: false", "terraform -chdir=infra/terraform/environments/production apply"},
-		".github/workflows/phase16-production-plan.yml":     {"PHASE16_OWNER_INPUTS_JSON", "phase16verify -root . -mode external", "PHASE16_PLAN_BUCKET", "--if-generation-match=0"},
+		"cmd/kurd-node/main.go":                      {"selfhost.PublishSnapshot", "READY_AUTHORITY_ONLY", "UNAVAILABLE_PHASE_16"},
+		"cmd/kurdctl/main.go":                        {"profile", "backup", "restore", "upgrade", "rollback"},
+		"cmd/kurdpackage/main.go":                    {"kurd-node-native-package-v1", "Signed", "RelayDataPlane"},
+		"cmd/kandroidbridge/environment_selfhost.go": {"selfhost.VerifyBundle", "deployment-local", "OwnerControlled"},
+		"cmd/phase16androidverify/main.go":           {"phase16-android-exact-profile-verification-v1", "selfhost.VerifyBundle"},
+		"internal/selfhost/model.go":                 {"kurd-selfhost-state-v1", "maxProfiles", "maxStateBytes"},
+		"android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt": {"KVP2", "deploymentFingerprint", "ownerControlled"},
 	}
 	for path, needles := range required {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
@@ -468,14 +791,131 @@ func verifyImplementationAuthority(root string) error {
 			}
 		}
 	}
-	for _, path := range []string{"infra/terraform/environments/qualification/.terraform.lock.hcl", "infra/terraform/environments/production/.terraform.lock.hcl"} {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			return err
+	if err := verifyServiceUnit(root); err != nil {
+		return err
+	}
+	if err := verifyContainerDefinition(root); err != nil {
+		return err
+	}
+	command := exec.Command("go", "list", "-deps", "./cmd/kurd-node", "./cmd/kurdctl", "./internal/selfhost")
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("portable dependency inventory: %s", strings.TrimSpace(string(output)))
+	}
+	dependencies := "\n" + strings.ToLower(string(output)) + "\n"
+	for _, forbidden := range []string{"\nnet/http\n", "\nnet/rpc\n", "\ncloud.google.com/", "\ngoogle.golang.org/", "\ngo.opentelemetry.io/", "\nkurdistan/production/"} {
+		if strings.Contains(dependencies, forbidden) {
+			return fmt.Errorf("portable self-hosting runtime imports prohibited dependency %q", strings.TrimSpace(forbidden))
 		}
-		text := string(raw)
-		if !strings.Contains(text, `version     = "7.43.0"`) || !strings.Contains(text, "h1:") || !strings.Contains(text, "zh:") {
-			return fmt.Errorf("provider lock is incomplete: %s", path)
+	}
+	return nil
+}
+
+func verifySelfHostedQualification(root string) error {
+	var value selfHostedQualification
+	if err := decodeFile(root, selfHostedQualificationPath, &value); err != nil {
+		return err
+	}
+	if value.Schema != "phase16-self-hosted-vps-qualification-v1" || value.Phase != 16 || value.Authority != "KIP-0093" || value.ReleaseDecision != "NO_GO" {
+		return errors.New("invalid self-hosted qualification identity or release boundary")
+	}
+	recorded, err := time.Parse(time.RFC3339, value.RecordedAt)
+	if err != nil || recorded.Before(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)) || recorded.After(time.Now().UTC().Add(5*time.Minute)) {
+		return errors.New("invalid self-hosted qualification time")
+	}
+	if value.Source.Branch != "product/phase16-production-trust" || !value.Source.PackageBuiltFromDirtyTree ||
+		value.Source.BaselineCommit != value.Source.PackageSourceCommit || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(value.Source.BaselineCommit) {
+		return errors.New("self-hosted qualification source identity mismatch")
+	}
+	if _, err := gitValue(root, "cat-file", "-e", value.Source.BaselineCommit+"^{commit}"); err != nil {
+		return fmt.Errorf("self-hosted qualification baseline: %w", err)
+	}
+	if value.Packages.Version != "0.16.3-phase16" || !validDigest(value.Packages.AMD64SHA256) || !validDigest(value.Packages.ARM64SHA256) ||
+		value.Packages.AMD64SHA256 == value.Packages.ARM64SHA256 || !value.Packages.IndependentBuildsMatched || value.Packages.Signed || value.Packages.RelayDataPlane {
+		return errors.New("self-hosted package qualification is incomplete or widens Phase 16 authority")
+	}
+	if value.VPS.ProviderClass != "owner-controlled-vps" || value.VPS.RegionClass != "external-european" ||
+		value.VPS.OperatingSystem != "Ubuntu Server 26.04 LTS" || value.VPS.Architecture != "amd64" ||
+		value.VPS.CPUCores < 1 || value.VPS.MemoryMiB < 1024 || value.VPS.StorageGiB < 10 || !validDigest(value.VPS.EndpointSHA256) {
+		return errors.New("self-hosted VPS qualification is invalid")
+	}
+	deployment := value.Deployment
+	if !validDigest(deployment.RootFingerprint) || deployment.Revision == 0 || deployment.Generation == 0 || deployment.RootEpoch == 0 || deployment.RevocationEpoch == 0 ||
+		deployment.ProfileCount < 1 || deployment.RevokedProfileCount < 1 || deployment.RevokedProfileCount >= deployment.ProfileCount ||
+		!deployment.RecoveryConfirmed || deployment.Drained || deployment.Disabled {
+		return errors.New("self-hosted deployment qualification is incomplete")
+	}
+	for name, digest := range map[string]string{
+		"recovery":            value.Artifacts.RecoverySHA256,
+		"backup":              value.Artifacts.BackupSHA256,
+		"post-upgrade backup": value.Artifacts.PostUpgradeBackupSHA256,
+		"profile":             value.Artifacts.ProfileSHA256,
+		"backup audit head":   value.Artifacts.BackupAuditHead,
+	} {
+		if !validDigest(digest) {
+			return fmt.Errorf("invalid %s digest in self-hosted qualification", name)
+		}
+	}
+	checks := value.Checks
+	if !checks.FreshNativeInstall || !checks.UpgradeRollbackReupgrade || !checks.TotalHostLossRestore || !checks.OldBackupRejected ||
+		!checks.WrongPassphraseRejected || !checks.CorruptBackupRejected || !checks.DoctorPassed || !checks.PublicationCursorAuthenticated ||
+		!checks.SystemdSandboxed || !checks.OnlySSHPublicListener || !checks.DefaultDenyFirewall || !checks.ContainerConformance ||
+		!checks.AndroidKVP2ExactActivation || !checks.HundredCycleSoak || !checks.DeterministicPackages || !checks.TemporaryArtifactsRemoved {
+		return errors.New("self-hosted qualification has an incomplete acceptance check")
+	}
+	if value.Findings.Critical != 0 || value.Findings.High != 0 || len(value.Limitations) < 3 || len(value.Limitations) > 8 {
+		return errors.New("self-hosted qualification findings or limitations are invalid")
+	}
+	limitations := strings.ToLower(strings.Join(value.Limitations, "\n"))
+	for _, required := range []string{"unsigned", "phase 19", "relay data plane", "phase 17", "physical android"} {
+		if !strings.Contains(limitations, required) {
+			return fmt.Errorf("self-hosted qualification omits limitation %q", required)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(selfHostedQualificationPath)))
+	if err != nil {
+		return err
+	}
+	if regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`).Match(raw) {
+		return errors.New("self-hosted qualification exposes a raw IPv4 endpoint")
+	}
+	return nil
+}
+
+func verifyServiceUnit(root string) error {
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash("deploy/selfhost/native/kurd-node.service")))
+	if err != nil {
+		return err
+	}
+	text := string(raw)
+	for _, required := range []string{"User=kurd-node", "Group=kurd-node", "NoNewPrivileges=yes", "CapabilityBoundingSet=", "RestrictAddressFamilies=AF_UNIX", "ProtectSystem=strict", "PrivateTmp=yes"} {
+		if !strings.Contains(text, required) {
+			return fmt.Errorf("native service missing hardening marker %q", required)
+		}
+	}
+	for _, forbidden := range []string{"CAP_NET_ADMIN", "CAP_NET_BIND_SERVICE", "AF_INET", "AF_INET6"} {
+		if strings.Contains(text, forbidden) {
+			return fmt.Errorf("Phase 16 service widens into Phase 17 authority %q", forbidden)
+		}
+	}
+	return nil
+}
+
+func verifyContainerDefinition(root string) error {
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash("deploy/selfhost/container/compose.yml")))
+	if err != nil {
+		return err
+	}
+	text := strings.ToLower(string(raw))
+	for _, required := range []string{"network_mode: none", "read_only: true", "cap_drop:", "- all", "no-new-privileges:true", "65532:65532"} {
+		if !strings.Contains(text, required) {
+			return fmt.Errorf("container definition missing hardening marker %q", required)
+		}
+	}
+	for _, forbidden := range []string{"privileged: true", "network_mode: host", "/var/run/docker.sock"} {
+		if strings.Contains(text, forbidden) {
+			return fmt.Errorf("container definition enables prohibited authority %q", forbidden)
 		}
 	}
 	return nil

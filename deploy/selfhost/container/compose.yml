@@ -1,0 +1,20 @@
+services:
+  kurd-node:
+    image: kurd-node-local:phase16
+    read_only: true
+    user: "65532:65532"
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - kurd-node-state:/var/lib/kurd-node
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+
+volumes:
+  kurd-node-state: {}

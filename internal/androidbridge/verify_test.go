@@ -38,6 +38,15 @@ func (fixtureVerificationEnvironment) Verify(artifact []byte, class envelope.Art
 	)
 }
 
+func (fixtureVerificationEnvironment) TrustPreview([]byte, envelope.ArtifactClass) (TrustPreview, error) {
+	return TrustPreview{
+		DeploymentFingerprint: "0123456789abcdef",
+		RelayEndpoint:         "203.0.113.7:443",
+		AuthorityScope:        "deployment-local",
+		OwnerControlled:       true,
+	}, nil
+}
+
 func TestVerifyAndPreviewUsesRealPhase8VerifierAcrossIngressKinds(t *testing.T) {
 	spec := phase8issuance.ValidSpec(envelope.ArtifactSignedPublic)
 	artifact, err := profile.IssueOffline(spec, phase8issuance.NewIssuer(), nil)
@@ -77,7 +86,10 @@ func TestVerifyAndPreviewUsesRealPhase8VerifierAcrossIngressKinds(t *testing.T) 
 			preview.Inspection.ContentSHA256 == "" {
 			t.Fatalf("%s preview=%+v", request.Ingress, preview.Inspection)
 		}
-		if encodedPreview, err := EncodeVerifyPreview(preview); err != nil || len(encodedPreview) == 0 {
+		if preview.Trust.DeploymentFingerprint == "" || !preview.Trust.OwnerControlled {
+			t.Fatalf("%s missing trust preview: %+v", request.Ingress, preview.Trust)
+		}
+		if encodedPreview, err := EncodeVerifyPreview(preview); err != nil || len(encodedPreview) == 0 || string(encodedPreview[:4]) != verifyPreviewMagic {
 			t.Fatalf("%s encoded preview bytes=%d err=%v", request.Ingress, len(encodedPreview), err)
 		}
 	}
