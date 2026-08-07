@@ -332,6 +332,57 @@ func TestLiveDataPlaneVerifierRejectsAffirmativeLoggingReadinessAndHostClaims(t 
 	}
 }
 
+func TestLiveDataPlaneVerifierRejectsContradictoryPublicProse(t *testing.T) {
+	mutations := []string{
+		"\nThe service logs payload contents and retains packet 5-tuples.\n",
+		"\nThe live service is available for operation.\n",
+		"\nThe owner endpoint is maintained separately.\n",
+	}
+	for _, mutation := range mutations {
+		t.Run(strings.TrimSpace(mutation), func(t *testing.T) {
+			root := copyAuthority(t)
+			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
+			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := verify(root); err == nil {
+				t.Fatal("contradictory public documentation accepted despite the required negative markers")
+			}
+		})
+	}
+}
+
+func TestLiveDataPlaneVerifierRequiresExactNormalizedPrivacyStatement(t *testing.T) {
+	root := copyAuthority(t)
+	if err := replaceFile(
+		root,
+		"docs/self-hosting/LIVE-DATA-PLANE.md",
+		"The service does not log payload contents or a packet 5-tuple, and it does not\npersist either; telemetry is off by default, and public resolvers are not\npermitted.",
+		"The service does not log payload contents or persist a packet 5-tuple; telemetry is off by default, and public resolvers are not permitted.",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := verify(root); err == nil {
+		t.Fatal("documentation accepted a non-approved privacy paraphrase")
+	}
+}
+
+func TestLiveDataPlaneVerifierRejectsPublicIPLiteralOutsideAuthority(t *testing.T) {
+	for _, literal := range []string{"198.51.100.7", "198.51.100.7:443", "2001:db8::7"} {
+		t.Run(literal, func(t *testing.T) {
+			root := copyAuthority(t)
+			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
+			mutation := "\n`" + literal + "`\n"
+			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := verify(root); err == nil {
+				t.Fatal("public IP literal outside machine authority accepted")
+			}
+		})
+	}
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	_, source, _, ok := runtime.Caller(0)
