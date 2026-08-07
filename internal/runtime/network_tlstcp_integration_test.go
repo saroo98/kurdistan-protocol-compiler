@@ -21,6 +21,7 @@ import (
 	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/lab/hardening/loopbackharness"
 	"kurdistan/internal/lab/hardening/loopbackresolver"
+	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/protocol/wirev1"
 	"kurdistan/internal/transport/tlstcp"
 )
@@ -220,6 +221,83 @@ func TestAuthenticatedKurdRecordAcrossTLSCarrierV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	clear(ackFrame.Payload)
+}
+
+func TestProcessTLSTCPDuplexCarrierV1PreservesExactWireRecords(t *testing.T) {
+	var digest [32]byte
+	for index := range digest {
+		digest[index] = byte(index + 41)
+	}
+	client, relay := phase11TLSPairV1(t, digest)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	clientAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	relayAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, relay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := wirev1.Encode(wirev1.Frame{Type: wirev1.TypeReliableData, Flags: wirev1.FlagCritical, StreamID: 9, PlanDigest: digest, Payload: []byte("duplex-adapter")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDone := make(chan error, 1)
+	go func() { writeDone <- writeBoundedRecordV1(clientAdapter, encoded) }()
+	got, err := readBoundedCarrierRecordV1(relayAdapter, len(encoded))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-writeDone; err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, encoded) {
+		t.Fatal("TLS adapter changed the wire record")
+	}
+	clear(got)
+	clear(encoded)
+}
+
+func TestProcessDuplexOperationAcrossTLSCarrierV1(t *testing.T) {
+	fixture := newStrictSupportFixtureV1(t, security.TranscriptCanonicalV1, "strict_suite_and_capabilities", "strict_required")
+	config, err := auth.NewProcessHandshakeConfigV1(fixture.input.Client, fixture.input.Server, fixture.input.SelectedPolicy, fixture.input.SelectedCapabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var digest [32]byte
+	for index := range digest {
+		digest[index] = byte(index + 71)
+	}
+	clientCarrier, relayCarrier := phase11TLSPairV1(t, digest)
+	replay, err := auth.NewHandshakeReplayCache(64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientHandshake, err := NewProcessWireClientHandshakeV1(config, fixture.input.ClientDependencies, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	relayHandshake, err := NewProcessWireRelayHandshakeV1(config, fixture.input.ServerDependencies, replay, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	sink := &phase11RuntimeSinkV1{}
+	serverDone := make(chan error, 1)
+	go func() {
+		serverDone <- RunProcessRelayDuplexOperationV1(ctx, relayCarrier, relayHandshake, digest, testDuplexProgramV1(), sink)
+	}()
+	payload := []byte("profile-shaped-duplex-tls")
+	clientErr := RunProcessClientDuplexOperationV1(ctx, clientCarrier, clientHandshake, digest, testDuplexProgramV1(), framing.Operation{Semantic: "data", StreamID: 17, Sequence: 1, Payload: payload})
+	serverErr := <-serverDone
+	if clientErr != nil || serverErr != nil {
+		t.Fatalf("client=%v relay=%v", clientErr, serverErr)
+	}
+	if !bytes.Equal(sink.payload, payload) {
+		t.Fatalf("sink=%x", sink.payload)
+	}
 }
 
 func TestRealProtectedPairThroughLoopbackHarnessV1(t *testing.T) {

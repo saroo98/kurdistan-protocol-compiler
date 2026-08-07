@@ -22,10 +22,112 @@ import (
 
 	"kurdistan/internal/crypto/auth"
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/transport/tlstcp"
 )
 
 const phase11RelaySubprocessMarkerV1 = "KURD_PHASE11_RELAY_SUBPROCESS_V1"
+const phase17RelaySubprocessMarkerV1 = "KURD_PHASE17_RELAY_SUBPROCESS_V1"
+
+func TestPhase17RelayDuplexSubprocessV1(t *testing.T) {
+	if os.Getenv(phase17RelaySubprocessMarkerV1) == "1" {
+		phase17RunRelayDuplexSubprocessV1(t)
+		return
+	}
+	command := exec.Command(os.Args[0], "-test.run=^TestPhase17RelayDuplexSubprocessV1$")
+	command.Env = append(os.Environ(), phase17RelaySubprocessMarkerV1+"=1")
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr strings.Builder
+	command.Stderr = &stderr
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	scanner := bufio.NewScanner(stdout)
+	if !scanner.Scan() {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+		t.Fatalf("relay process did not publish address: %s", stderr.String())
+	}
+	address := strings.TrimSpace(scanner.Text())
+	host, _, err := net.SplitHostPort(address)
+	if err != nil || !net.ParseIP(host).IsLoopback() {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+		t.Fatal("relay process published non-loopback address")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	raw, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := phase11SubprocessDigestV1()
+	clientTLS, _ := phase11SubprocessTLSConfigsV1(t)
+	carrier, err := tlstcp.Client(ctx, raw, clientTLS, digest, 128<<10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := phase11SubprocessFixtureV1(t)
+	config, err := auth.NewProcessHandshakeConfigV1(fixture.input.Client, fixture.input.Server, fixture.input.SelectedPolicy, fixture.input.SelectedCapabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handshake, err := NewProcessWireClientHandshakeV1(config, fixture.input.ClientDependencies, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation := framing.Operation{Semantic: "data", StreamID: 23, Sequence: 1, Payload: []byte("phase17-os-process-duplex")}
+	if err := RunProcessClientDuplexOperationV1(ctx, carrier, handshake, digest, testDuplexProgramV1(), operation); err != nil {
+		t.Fatal(err)
+	}
+	if err := command.Wait(); err != nil {
+		t.Fatalf("relay process failed: %v: %s", err, stderr.String())
+	}
+}
+
+func phase17RunRelayDuplexSubprocessV1(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	fmt.Fprintln(os.Stdout, listener.Addr().String())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	raw, err := listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := phase11SubprocessDigestV1()
+	_, relayTLS := phase11SubprocessTLSConfigsV1(t)
+	carrier, err := tlstcp.Server(ctx, raw, relayTLS, digest, 128<<10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := phase11SubprocessFixtureV1(t)
+	config, err := auth.NewProcessHandshakeConfigV1(fixture.input.Client, fixture.input.Server, fixture.input.SelectedPolicy, fixture.input.SelectedCapabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replay, err := auth.NewHandshakeReplayCache(64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handshake, err := NewProcessWireRelayHandshakeV1(config, fixture.input.ServerDependencies, replay, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink := &phase11RuntimeSinkV1{}
+	if err := RunProcessRelayDuplexOperationV1(ctx, carrier, handshake, digest, testDuplexProgramV1(), sink); err != nil {
+		t.Fatal(err)
+	}
+	if string(sink.payload) != "phase17-os-process-duplex" {
+		t.Fatal("relay process received unexpected application bytes")
+	}
+}
 
 func TestPhase11RelaySubprocessV1(t *testing.T) {
 	if os.Getenv(phase11RelaySubprocessMarkerV1) == "1" {

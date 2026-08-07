@@ -313,9 +313,64 @@
       "post_sha256": "aabcd7acb6212d00a56976088e0422ca6c74ae3b8b6da160e191654ab61331ad"
     },
     {
+      "path": "internal/runtime/ip_packet_v1.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fdf831b66104236287acd3e036adfa69bae15a1119e9bc472bd628b9f7b023af"
+    },
+    {
+      "path": "internal/runtime/ip_packet_v1_fuzz_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "05486dca4c7a07d0b94f1990a6d2fa0e6d663170d74a852b62894612b9eaaf66"
+    },
+    {
+      "path": "internal/runtime/ip_packet_v1_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "0f8456a70571d363e38c656c25e21b570358addd2f6a38644b6630e9caa248ff"
+    },
+    {
+      "path": "internal/runtime/ip_tunnel_v1.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fb22551675069be8585d797d30671f000073970cae625cc2ef07bf658c3aeabe"
+    },
+    {
+      "path": "internal/runtime/ip_tunnel_v1_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "22221e87833695f07352ce7f78b24fd32f36476da318af812d95f22c44528c4a"
+    },
+    {
+      "path": "internal/runtime/network_tlstcp_integration_test.go",
+      "pre_sha256": "3fb7889d4045e05f581c208a474ae33ddcdb3ea3ec43a6e4af9511531a2e2842",
+      "post_sha256": "3010263ce8db3d1b7ed74f811ad9f14200b3414cfa8c48a2f8efede4e2afddb2"
+    },
+    {
       "path": "internal/runtime/policy_enforcement_test.go",
       "pre_sha256": "ee84a7b6b0208650679b8d22eb0dbac38779527adf30d1be3fbb8ed018167880",
       "post_sha256": "08339d430538ed210dc884e201bbb246280cac814e9585e88ed673748435f0c5"
+    },
+    {
+      "path": "internal/runtime/process_duplex_record_v1.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e6e83a831e313ff88cecd062548dd3f52eb59df9e586285a7c24740b0eef3e67"
+    },
+    {
+      "path": "internal/runtime/process_duplex_record_v1_fuzz_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "398b24e3d71a40e1990ff6b227920dfd583f28b6bd1f1d9a6d2935d20db433be"
+    },
+    {
+      "path": "internal/runtime/process_duplex_record_v1_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "32c161e3b6241c194d0d4f5e4efe51e73f27b79b94cf4c868a3c49b21aea82d8"
+    },
+    {
+      "path": "internal/runtime/process_subprocess_integration_test.go",
+      "pre_sha256": "87623aaae9158eddf6bbe868ce2359dc43b0ea6832ef32bd9c10c88d0352cf78",
+      "post_sha256": "71e501f9ce4321df9f6294b5a7e3a50664e351e5d659864b179f35dd63b5cafb"
+    },
+    {
+      "path": "internal/runtime/process_tlstcp_v1.go",
+      "pre_sha256": "8d4ef0761b573707539c4b5d805e688ef3be9f6729dab8732d88ebfe40215dcc",
+      "post_sha256": "d5e3f3681a8dde66b8422d096e29a947bca6ac2fe39dba4840f6b2c7e08d70f4"
     },
     {
       "path": "internal/selfhost/address_pool.go",
@@ -470,7 +525,7 @@
     {
       "path": "internal/testkit/importrules/importrules_test.go",
       "pre_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1",
-      "post_sha256": "38acfef478eab7779d08dc550e65d93855272a1eef99d5557082fe50d081c8a5"
+      "post_sha256": "fcebc58567d8f9c1d2a3e084a2508c2b1ebd69e60b06be05912f04b0e0003618"
     },
     {
       "path": "internal/testkit/phase8assurance/manifest.go",
