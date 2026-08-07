@@ -7,8 +7,10 @@
 package liveprogram
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
+	"math"
 	"sort"
 	"strings"
 )
@@ -157,7 +159,7 @@ func ValidateV1(p ProgramV1) error {
 		!exactSet(p.Frame.HeaderOrder, []string{"length", "type", "stream", "flags"}) {
 		return fail(ErrorInvalid)
 	}
-	if len(p.Frame.Compiled.DataTypeTag) == 0 || len(p.Frame.Compiled.DataTypeTag) > 255 || len(p.Frame.Compiled.PaddingTypeTag) == 0 || len(p.Frame.Compiled.PaddingTypeTag) > 255 {
+	if len(p.Frame.Compiled.DataTypeTag) == 0 || len(p.Frame.Compiled.DataTypeTag) > 255 || len(p.Frame.Compiled.PaddingTypeTag) == 0 || len(p.Frame.Compiled.PaddingTypeTag) > 255 || bytes.Equal(p.Frame.Compiled.DataTypeTag, p.Frame.Compiled.PaddingTypeTag) {
 		return fail(ErrorInvalid)
 	}
 	if !oneOf(p.Scheduler.Mode, "max_speed", "balanced", "interactive_first", "bulk_first") || p.Scheduler.MaxBatchBytes < 1 || p.Scheduler.MaxBatchBytes > 32<<10 ||
@@ -167,7 +169,7 @@ func ValidateV1(p ProgramV1) error {
 	if !oneOf(p.Stream.IDEncodingMode, "fixed32_be", "profile_xor32", "table_mapped32_le", "varint") || !oneOfInt(p.Stream.MaxConcurrentStreams, 2, 4, 8, 16) {
 		return fail(ErrorInvalid)
 	}
-	if !oneOf(p.Padding.Mode, "none", "bounded", "probabilistic", "fixed", "inter_frame") || p.Padding.MinPaddingBytes < 0 || p.Padding.MaxPaddingBytes < p.Padding.MinPaddingBytes || p.Padding.Probability < 0 || p.Padding.Probability > 1 ||
+	if !oneOf(p.Padding.Mode, "none", "bounded", "probabilistic", "fixed", "inter_frame") || p.Padding.MinPaddingBytes < 0 || p.Padding.MaxPaddingBytes < p.Padding.MinPaddingBytes || math.IsNaN(p.Padding.Probability) || math.IsInf(p.Padding.Probability, 0) || p.Padding.Probability < 0 || p.Padding.Probability > 1 ||
 		(p.Padding.Mode == "none" && (p.Padding.MinPaddingBytes != 0 || p.Padding.MaxPaddingBytes != 0 || p.Padding.Probability != 0)) {
 		return fail(ErrorInvalid)
 	}
