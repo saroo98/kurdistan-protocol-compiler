@@ -92,64 +92,95 @@ func (p PlanV2) Clone() PlanV2 {
 }
 
 func BuildV2(request RequestV2) (PlanV2, error) {
-	now := time.Now()
+	return BuildV2At(request, time.Now())
+}
+
+// BuildV2At constructs client authority using the caller's trusted time.
+func BuildV2At(request RequestV2, now time.Time) (PlanV2, error) {
 	if _, err := envelope.EncodeCanonicalProfileV1(request.Profile); err != nil ||
-		request.Profile.Generation == 0 || now.Unix() < request.Profile.ValidFrom || now.Unix() > request.Profile.ValidUntil {
+		now.IsZero() || request.Profile.Generation == 0 || now.Unix() < request.Profile.ValidFrom || now.Unix() >= request.Profile.ValidUntil {
 		return PlanV2{}, ErrInvalidV2
 	}
 	if !receiptMatchesProfileV2(request.ActivationReceipt, request.Profile) {
 		return PlanV2{}, ErrReceiptV2
 	}
-	policy := request.RuntimePolicy.Clone()
+	if request.RuntimePolicy.ValidateAgainstEnvelopeAt(request.Profile, now) != nil {
+		return PlanV2{}, ErrInvalidV2
+	}
+	return buildAuthorityV2(authorityV2{
+		profileContentID:        request.Profile.ContentID,
+		profileGeneration:       request.Profile.Generation,
+		activationReceiptDigest: digestReceiptV2(request.ActivationReceipt),
+		policy:                  request.RuntimePolicy,
+		strategyIDs:             request.Profile.StrategyIDs,
+		relayIDs:                request.Profile.RelayIDs,
+	}, request.Requested, now)
+}
+
+type authorityV2 struct {
+	profileContentID        string
+	profileGeneration       uint64
+	activationReceiptDigest [32]byte
+	policy                  runtimepolicy.PolicyV2
+	strategyIDs             []string
+	relayIDs                []string
+}
+
+func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now time.Time) (PlanV2, error) {
+	if now.IsZero() || !boundedV2(authority.profileContentID, 128) || authority.profileGeneration == 0 ||
+		authority.activationReceiptDigest == ([32]byte{}) || len(authority.strategyIDs) == 0 || len(authority.relayIDs) == 0 {
+		return PlanV2{}, ErrInvalidV2
+	}
+	policy := authority.policy.Clone()
 	if err := runtimepolicy.ValidateV2At(policy, now); err != nil ||
-		policy.ValidateAgainstEnvelopeAt(request.Profile, now) != nil {
+		len(policy.LiveProgram) == 0 {
 		return PlanV2{}, ErrInvalidV2
 	}
 	policyBytes, err := runtimepolicy.EncodeV2At(policy, now)
 	if err != nil {
 		return PlanV2{}, ErrInvalidV2
 	}
-	authority, err := livecarrier.ResolveV2At(policy, now)
-	if err != nil || !authority.Networked || authority.EndpointCount != len(policy.Endpoints) {
+	carrierAuthority, err := livecarrier.ResolveV2At(policy, now)
+	if err != nil || !carrierAuthority.Networked || carrierAuthority.EndpointCount != len(policy.Endpoints) {
 		return PlanV2{}, ErrUnsupportedV2
 	}
 
-	strategyID, err := selectStrategyV2(request.Profile.StrategyIDs, request.Requested.StrategyID)
+	strategyID, err := selectStrategyV2(authority.strategyIDs, requested.StrategyID)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	if !slices.Contains(request.Profile.RelayIDs, policy.RelayAuthKeyID) {
+	if !slices.Contains(authority.relayIDs, policy.RelayAuthKeyID) {
 		return PlanV2{}, ErrWideningV2
 	}
-	endpointIndexes, err := selectEndpointIndexesV2(policy.Fallback.EndpointIndexes, request.Requested.EndpointIndexes)
+	endpointIndexes, err := selectEndpointIndexesV2(policy.Fallback.EndpointIndexes, requested.EndpointIndexes)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	mode, err := selectIPModeV2(policy.AllowedIPModes, request.Requested.IPMode)
+	mode, err := selectIPModeV2(policy.AllowedIPModes, requested.IPMode)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	routes, _, client4, dns4, client6, dns6, err := selectNetworkV2(policy, mode, request.Requested.Routes, request.Requested.DNSServers)
+	routes, _, client4, dns4, client6, dns6, err := selectNetworkV2(policy, mode, requested.Routes, requested.DNSServers)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	protocols, err := selectProtocolsV2(policy.AllowedProtocols, request.Requested.PayloadProtocols)
+	protocols, err := selectProtocolsV2(policy.AllowedProtocols, requested.PayloadProtocols)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	queue, incomplete, reconnects, err := selectLimitsV2(policy, request.Requested)
+	queue, incomplete, reconnects, err := selectLimitsV2(policy, requested)
 	if err != nil {
 		return PlanV2{}, err
 	}
-	if request.Requested.AllowLAN || request.Requested.MTU != 0 && request.Requested.MTU != policy.MTU || policy.MTU != 1280 {
+	if requested.AllowLAN || requested.MTU != 0 && requested.MTU != policy.MTU || policy.MTU != 1280 {
 		return PlanV2{}, ErrWideningV2
 	}
 
 	plan := PlanV2{
-		Version: VersionV2, ProfileContentID: request.Profile.ContentID, ProfileGeneration: request.Profile.Generation,
-		ActivationReceiptDigest: digestReceiptV2(request.ActivationReceipt), RuntimePolicyDigest: sha256.Sum256(policyBytes),
+		Version: VersionV2, ProfileContentID: authority.profileContentID, ProfileGeneration: authority.profileGeneration,
+		ActivationReceiptDigest: authority.activationReceiptDigest, RuntimePolicyDigest: sha256.Sum256(policyBytes),
 		LiveProgramDigest: policy.LiveProgramSHA256, StrategyID: strategyID, RelayKeyID: policy.RelayAuthKeyID,
-		CarrierFamily: authority.CarrierFamily, ALPN: authority.ALPN, Endpoints: selectEndpointsV2(policy.Endpoints, endpointIndexes),
+		CarrierFamily: carrierAuthority.CarrierFamily, ALPN: carrierAuthority.ALPN, Endpoints: selectEndpointsV2(policy.Endpoints, endpointIndexes),
 		ClientIPv4: client4, DNSIPv4: dns4, ClientIPv6: client6, DNSIPv6: dns6, Routes: routes, IPMode: mode, MTU: policy.MTU,
 		PayloadProtocols: protocols, MaxQueuePackets: queue, MaxIncompleteOps: incomplete, MaxReconnectAttempts: reconnects,
 		DialTimeout:        time.Duration(policy.Fallback.AttemptTimeoutSeconds) * time.Second,
@@ -157,13 +188,18 @@ func BuildV2(request RequestV2) (PlanV2, error) {
 		runtimePolicyBytes: bytes.Clone(policyBytes),
 	}
 	plan.Digest = digestPlanV2(plan)
-	if err := ValidateV2(plan); err != nil {
+	if err := ValidateV2At(plan, now); err != nil {
 		return PlanV2{}, err
 	}
 	return plan.Clone(), nil
 }
 
 func ValidateV2(plan PlanV2) error {
+	return ValidateV2At(plan, time.Now())
+}
+
+// ValidateV2At validates a plan using the caller's trusted time.
+func ValidateV2At(plan PlanV2, now time.Time) error {
 	if plan.Version != VersionV2 || !boundedV2(plan.ProfileContentID, 128) || plan.ProfileGeneration == 0 ||
 		plan.ActivationReceiptDigest == ([32]byte{}) || plan.RuntimePolicyDigest == ([32]byte{}) ||
 		plan.LiveProgramDigest == ([32]byte{}) || plan.StrategyID != supportedStrategyTLS13TCP ||
@@ -175,7 +211,7 @@ func ValidateV2(plan PlanV2) error {
 		sha256.Sum256(plan.runtimePolicyBytes) != plan.RuntimePolicyDigest {
 		return ErrInvalidV2
 	}
-	policy, err := runtimepolicy.DecodeV2(plan.runtimePolicyBytes)
+	policy, err := runtimepolicy.DecodeV2At(plan.runtimePolicyBytes, now)
 	if err != nil || policy.LiveProgramSHA256 != plan.LiveProgramDigest || policy.RelayAuthKeyID != plan.RelayKeyID ||
 		plan.MaxQueuePackets > uint16(policy.Limits.MaxQueuedPackets) || plan.MaxIncompleteOps > uint16(policy.Limits.MaxQueuedPackets) ||
 		uint32(plan.MaxReconnectAttempts) > policy.Limits.MaxReconnectAttempts ||
