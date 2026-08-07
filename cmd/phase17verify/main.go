@@ -663,29 +663,58 @@ func verifyPublicDocumentation(root string, value contract) error {
 			return fmt.Errorf("self-hosting documentation disagrees with authority: missing %q", required)
 		}
 	}
+	privacyStatement, err := requiredPrivacyStatement(value.Privacy)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(selfHosting, privacyStatement) {
+		return errors.New("self-hosting documentation is missing the approved normalized privacy statement")
+	}
+	nonReadinessStatement, err := requiredNonReadinessStatement(value.Relay)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(selfHosting, nonReadinessStatement) {
+		return errors.New("self-hosting documentation is missing the approved normalized non-readiness statement")
+	}
 	for _, document := range []string{protocol, selfHosting} {
-		if err := rejectPrivateOrReadinessClaims(document); err != nil {
+		if err := rejectPrivateOrReadinessClaims(document, value.Network); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func rejectPrivateOrReadinessClaims(document string) error {
+func requiredPrivacyStatement(value privacyAuthority) (string, error) {
+	if value.LogPayloadContents || value.LogFiveTuple || value.PersistFiveTuple || value.TelemetryDefault != "off" || value.PublicResolversAllowed {
+		return "", errors.New("privacy authority cannot supply an approved negative statement")
+	}
+	return "The service does not log payload contents or a packet 5-tuple, and it does not persist either; telemetry is off by default, and public resolvers are not permitted.", nil
+}
+
+func requiredNonReadinessStatement(value relayAuthority) (string, error) {
+	if value.RequiredLiveUnitState != "not-applied" || value.CurrentPredecessorUnit.LiveDataPlaneAuthorized {
+		return "", errors.New("relay authority cannot supply an approved non-readiness statement")
+	}
+	return "It does not assert that a running service is available or that a particular network environment has been validated.", nil
+}
+
+func rejectPrivateOrReadinessClaims(document string, network networkAuthority) error {
 	lower := strings.ToLower(document)
 	for _, forbidden := range []string{
 		"roadmap", "private plan", "future phase", "phase 18", "phase 19", "phase 20", "phase 21",
 		"pull request", "current pr", "production-ready", "ready for production", "deployed", "deployment status",
-		"owner host", "owner vps", "host identifier",
+		"owner host", "owner vps", "host identifier", "owner endpoint", "owner server", "owner address", "owner ip",
+		"external endpoint", "external host", "external address", "vps address",
 	} {
 		if strings.Contains(lower, forbidden) {
 			return fmt.Errorf("public documentation contains forbidden content %q", forbidden)
 		}
 	}
 	for _, affirmative := range []string{
-		"payload logging is enabled", "payload logging is allowed", "payload contents are logged",
-		"5-tuple logging is enabled", "5-tuple logging is allowed", "5-tuple persistence is allowed", "5-tuple is persisted",
-		"live service is ready", "live-ready", "ready to operate",
+		"payload logging is enabled", "payload logging is allowed", "payload contents are logged", "logs payload contents",
+		"5-tuple logging is enabled", "5-tuple logging is allowed", "5-tuple persistence is allowed", "5-tuple is persisted", "retains packet 5-tuples", "retains a packet 5-tuple", "retains 5-tuples", "retains a 5-tuple",
+		"live service is ready", "live-ready", "ready to operate", "live service is available", "service is available for operation", "service is operational",
 	} {
 		if strings.Contains(lower, affirmative) {
 			return fmt.Errorf("public documentation contains affirmative unsafe claim %q", affirmative)
@@ -694,7 +723,58 @@ func rejectPrivateOrReadinessClaims(document string) error {
 	if containsPublicHostLiteral(lower) {
 		return errors.New("public documentation contains a host literal")
 	}
+	if err := rejectPublicIPLiteralOutsideAuthority(document, network); err != nil {
+		return err
+	}
 	return nil
+}
+
+func rejectPublicIPLiteralOutsideAuthority(document string, network networkAuthority) error {
+	allowed, err := allowedPublicIPLiterals(network)
+	if err != nil {
+		return err
+	}
+	for _, token := range strings.FieldsFunc(document, func(r rune) bool {
+		return !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f' || r >= 'A' && r <= 'F' || r == '.' || r == ':' || r == '/')
+	}) {
+		literal, ok := normalizedIPLiteral(token)
+		if !ok {
+			continue
+		}
+		if _, ok := allowed[literal]; !ok {
+			return fmt.Errorf("public documentation contains IP literal outside authority %q", literal)
+		}
+	}
+	return nil
+}
+
+func allowedPublicIPLiterals(network networkAuthority) (map[string]struct{}, error) {
+	allowed := make(map[string]struct{}, 4+len(network.FullTunnelRoutes))
+	for _, value := range append([]string{network.IPv4Pool, network.IPv4ServerDNS, network.IPv6Pool, network.IPv6ServerDNS}, network.FullTunnelRoutes...) {
+		literal, ok := normalizedIPLiteral(value)
+		if !ok {
+			return nil, fmt.Errorf("network authority contains invalid public documentation IP literal %q", value)
+		}
+		allowed[literal] = struct{}{}
+	}
+	return allowed, nil
+}
+
+func normalizedIPLiteral(value string) (string, bool) {
+	value = strings.Trim(value, ".")
+	if prefix, err := netip.ParsePrefix(value); err == nil {
+		return prefix.String(), true
+	}
+	if strings.HasSuffix(value, "/") {
+		value = strings.TrimSuffix(value, "/")
+	}
+	if address, err := netip.ParseAddr(value); err == nil {
+		return address.String(), true
+	}
+	if addressPort, err := netip.ParseAddrPort(value); err == nil {
+		return addressPort.Addr().String(), true
+	}
+	return "", false
 }
 
 var publicHostLiteral = regexp.MustCompile(`(?i)(?:(?:https?|ssh)://)?\b[a-z0-9][a-z0-9.-]*\.[a-z]{2,63}\b`)
