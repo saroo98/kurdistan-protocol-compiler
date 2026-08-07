@@ -88,7 +88,8 @@ func TestPayloadContentsNeverAppearInLogs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() { _ = ServeEcho(ctx, ln, log.New(&logs, "", 0)) }()
+	done := make(chan error, 1)
+	go func() { done <- ServeEcho(ctx, ln, log.New(&logs, "", 0)) }()
 	conn, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +104,14 @@ func TestPayloadContentsNeverAppearInLogs(t *testing.T) {
 	}
 	_ = conn.Close()
 	cancel()
-	time.Sleep(10 * time.Millisecond)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("echo server shutdown: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("echo server did not stop")
+	}
 	if strings.Contains(logs.String(), string(payload)) {
 		t.Fatal("payload appeared in logs")
 	}

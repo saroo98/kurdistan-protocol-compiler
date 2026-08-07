@@ -177,6 +177,22 @@ func (registry *SessionRegistry) StopProfile(profileID string) int {
 	return 1
 }
 
+func (registry *SessionRegistry) StopAll() int {
+	if registry == nil {
+		return 0
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	if registry.closed {
+		return 0
+	}
+	stopped := len(registry.sessions)
+	for _, record := range registry.sessions {
+		registry.stopLocked(record)
+	}
+	return stopped
+}
+
 func (registry *SessionRegistry) Snapshot() RegistrySnapshot {
 	if registry == nil {
 		return RegistrySnapshot{}
@@ -277,10 +293,16 @@ func (device *SessionDevice) Write(packet []byte) (int, error) {
 		device.registry.mu.RUnlock()
 		return 0, io.EOF
 	}
-	device.registry.tunWriteMu.Lock()
-	count, err := device.registry.tun.Write(packet)
-	device.registry.tunWriteMu.Unlock()
 	device.registry.mu.RUnlock()
+	device.registry.tunWriteMu.Lock()
+	defer device.registry.tunWriteMu.Unlock()
+	device.registry.mu.RLock()
+	active := !device.registry.closed && device.registry.sessions[spec.ID] == device.session
+	device.registry.mu.RUnlock()
+	if !active {
+		return 0, io.EOF
+	}
+	count, err := device.registry.tun.Write(packet)
 	if err != nil || count != len(packet) {
 		return 0, ErrPacketRejected
 	}

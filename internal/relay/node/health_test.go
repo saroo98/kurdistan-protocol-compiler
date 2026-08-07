@@ -17,17 +17,24 @@ func TestConfigV1RejectsUnsafeOrUnboundedValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*Config){
-		"relative data":      func(c *Config) { c.DataDir = "relative" },
-		"wrong tun":          func(c *Config) { c.TUNName = "tun0" },
-		"zero port":          func(c *Config) { c.ListenerPort = 0 },
-		"workers":            func(c *Config) { c.MaxHandshakeWorkers = 0 },
-		"sessions":           func(c *Config) { c.MaxSessions = c.MaxHandshakeWorkers - 1 },
-		"queue":              func(c *Config) { c.SessionQueuePackets = 0 },
-		"short handshake":    func(c *Config) { c.HandshakeTimeout = 100 * time.Millisecond },
-		"long idle":          func(c *Config) { c.SessionIdleTimeout = 25 * time.Hour },
-		"short reload":       func(c *Config) { c.ReloadInterval = 100 * time.Millisecond },
-		"small buffer":       func(c *Config) { c.SessionBufferBudget = 1024 },
-		"missing dns health": func(c *Config) { c.DNSReady = nil },
+		"relative data":       func(c *Config) { c.DataDir = "relative" },
+		"wrong tun":           func(c *Config) { c.TUNName = "tun0" },
+		"zero port":           func(c *Config) { c.ListenerPort = 0 },
+		"workers":             func(c *Config) { c.MaxHandshakeWorkers = 0 },
+		"sessions":            func(c *Config) { c.MaxSessions = c.MaxHandshakeWorkers - 1 },
+		"queue":               func(c *Config) { c.SessionQueuePackets = 0 },
+		"source entries":      func(c *Config) { c.MaxSourceEntries = 0 },
+		"source attempts":     func(c *Config) { c.MaxSourceAttempts = 0 },
+		"control workers":     func(c *Config) { c.ControlWorkers = 0 },
+		"short handshake":     func(c *Config) { c.HandshakeTimeout = 100 * time.Millisecond },
+		"long idle":           func(c *Config) { c.SessionIdleTimeout = 25 * time.Hour },
+		"short reload":        func(c *Config) { c.ReloadInterval = 100 * time.Millisecond },
+		"short source window": func(c *Config) { c.SourceWindow = 100 * time.Millisecond },
+		"short control":       func(c *Config) { c.ControlTimeout = 10 * time.Millisecond },
+		"small buffer":        func(c *Config) { c.SessionBufferBudget = 1024 },
+		"missing dns health":  func(c *Config) { c.DNSReady = nil },
+		"missing loader":      func(c *Config) { c.LoadSnapshot = nil },
+		"missing entropy":     func(c *Config) { c.Entropy = nil },
 	} {
 		t.Run(name, func(t *testing.T) {
 			candidate := valid
