@@ -181,7 +181,7 @@ func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 		{
 			name: "general evidence invalidates Go proof and audit",
 			path: "testdata/evidence/phase16/example.json",
-			want: []string{"docs-evidence", "go-audit", "go-core"},
+			want: []string{"docs-evidence", "go-audit", "go-core", "operator"},
 		},
 		{
 			name: "operator evidence also invalidates operator proof",

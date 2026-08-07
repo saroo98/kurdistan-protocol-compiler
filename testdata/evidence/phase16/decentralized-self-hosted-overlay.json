@@ -529,6 +529,11 @@
       "post_sha256": "d2c12028bb4701357d701fedd63a2877b9c7d3959c9687a57f044c955213f934"
     },
     {
+      "path": "cmd/assure/main_test.go",
+      "pre_sha256": "8376a9de2804b20e3f3097f0e6f0d6f4b7f0ea5424bf0adb3b28737c4ce3ac0c",
+      "post_sha256": "b0a988695418cd7476facaa05aa560b81b49ddc6dde5c8dcbde4dc3c8ebf8a11"
+    },
+    {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "cbafc176e870e6dc32884d3ccd825f2831565a969d5cd9763a3365950ea10a0e",
       "post_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc"
