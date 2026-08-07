@@ -76,24 +76,7 @@ func CompileOffline(spec OfflineIssuanceSpec) ([]byte, error) {
 }
 
 func IssueOffline(spec OfflineIssuanceSpec, signer Signer, sealer OfflineRecipientSealer) ([]byte, error) {
-	payload, err := CompileOffline(spec)
-	if err != nil || signer == nil {
-		return nil, ErrOfflineIssuance
-	}
-	metadata := issuanceMetadata(spec)
-	protected, err := envelope.BuildSignedProtectedHeaders([]byte(spec.IssuerKey.KeyID), metadata)
-	if err != nil {
-		return nil, ErrOfflineIssuance
-	}
-	sigStructure, err := envelope.BuildCOSESigStructure(protected, payload)
-	if err != nil {
-		return nil, ErrOfflineIssuance
-	}
-	signature, err := signer.Sign(spec.IssuerKey, sigStructure)
-	if err != nil {
-		return nil, ErrOfflineIssuance
-	}
-	signed, err := envelope.BuildTaggedCOSESign1(protected, payload, signature)
+	_, metadata, signed, err := signOffline(spec, signer)
 	if err != nil {
 		return nil, ErrOfflineIssuance
 	}
@@ -116,6 +99,31 @@ func IssueOffline(spec OfflineIssuanceSpec, signer Signer, sealer OfflineRecipie
 		return nil, ErrOfflineIssuance
 	}
 	return framed, nil
+}
+
+func signOffline(spec OfflineIssuanceSpec, signer Signer) ([]byte, envelope.ArtifactMetadata, []byte, error) {
+	payload, err := CompileOffline(spec)
+	if err != nil || signer == nil {
+		return nil, envelope.ArtifactMetadata{}, nil, ErrOfflineIssuance
+	}
+	metadata := issuanceMetadata(spec)
+	protected, err := envelope.BuildSignedProtectedHeaders([]byte(spec.IssuerKey.KeyID), metadata)
+	if err != nil {
+		return nil, envelope.ArtifactMetadata{}, nil, ErrOfflineIssuance
+	}
+	sigStructure, err := envelope.BuildCOSESigStructure(protected, payload)
+	if err != nil {
+		return nil, envelope.ArtifactMetadata{}, nil, ErrOfflineIssuance
+	}
+	signature, err := signer.Sign(spec.IssuerKey, sigStructure)
+	if err != nil {
+		return nil, envelope.ArtifactMetadata{}, nil, ErrOfflineIssuance
+	}
+	signed, err := envelope.BuildTaggedCOSESign1(protected, payload, signature)
+	if err != nil {
+		return nil, envelope.ArtifactMetadata{}, nil, ErrOfflineIssuance
+	}
+	return sigStructure, metadata, signed, nil
 }
 
 func VerifyOffline(request OfflineVerifyRequest, verifier Verifier, resolver RecipientResolver, opener OfflineRecipientOpener) (OfflineVerifiedArtifact, error) {

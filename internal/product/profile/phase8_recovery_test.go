@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/product/envelope"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 func TestWO807IssuerReplacementRecoveryDrill(t *testing.T) {
@@ -233,7 +234,7 @@ func assertWO807RecoveryEvidence(t *testing.T, name, observedBy string, observat
 	if report.Schema != "kurdistan.phase8.wo807-recovery-report.v2" || len(report.Scenarios) != 4 {
 		t.Fatalf("invalid recovery evidence identity/cardinality: %+v", report)
 	}
-	if report.ActivationSourceSHA256 != wo807FileSHA256(t, "phase8_activation.go") || report.LocalActivationSourceSHA256 != wo807FileSHA256(t, "phase8_local_activation.go") || report.TestSourceSHA256 != wo807FileSHA256(t, "phase8_recovery_test.go") {
+	if report.ActivationSourceSHA256 != wo807EffectiveSHA256(t, root, "internal/product/profile/phase8_activation.go") || report.LocalActivationSourceSHA256 != wo807EffectiveSHA256(t, root, "internal/product/profile/phase8_local_activation.go") || report.TestSourceSHA256 != wo807EffectiveSHA256(t, root, "internal/product/profile/phase8_recovery_test.go") {
 		t.Fatal("recovery evidence source hash mismatch")
 	}
 	for _, scenario := range report.Scenarios {
@@ -259,6 +260,15 @@ func wo807FileSHA256(t *testing.T, name string) string {
 	}
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])
+}
+
+func wo807EffectiveSHA256(t *testing.T, root, name string) string {
+	t.Helper()
+	digest, err := evidenceoverlay.ResolveCurrentSHA256(root, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest
 }
 
 func wo807ObservedExecutionSHA256(observations []string) string {

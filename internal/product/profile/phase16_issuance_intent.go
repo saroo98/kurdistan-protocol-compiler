@@ -38,6 +38,20 @@ type VerifiedIssuedArtifact struct {
 	inspection         RedactedInspection
 }
 
+// IssuerSealedReceipt proves that the authorized signing input was signed by
+// the expected issuer and that the resulting object was placed into a strict,
+// canonical recipient-sealed frame. It deliberately does not claim that the
+// issuer opened or decrypted the device-bound ciphertext.
+type IssuerSealedReceipt struct {
+	exactArtifact      []byte
+	artifactSHA256     string
+	signingInputSHA256 string
+	profileID          string
+	generation         uint64
+	validUntil         int64
+	inspection         RedactedInspection
+}
+
 // VerifyIssuanceIntent validates and compiles the exact signing input without
 // invoking a signer or recipient sealer.
 func VerifyIssuanceIntent(spec OfflineIssuanceSpec) (VerifiedIssuanceIntent, error) {
@@ -137,6 +151,86 @@ func VerifyIssuedArtifact(
 	}, nil
 }
 
+// IssueOfflineChecked verifies the exact signer output before invoking the
+// recipient sealer, then structurally verifies the exact sealed artifact.
+// Recipient-side VerifyIssuedArtifact remains responsible for opening HPKE and
+// verifying the ciphertext plaintext with the device private key.
+func IssueOfflineChecked(
+	intent VerifiedIssuanceIntent,
+	signer Signer,
+	verifier Verifier,
+	sealer OfflineRecipientSealer,
+) (IssuerSealedReceipt, error) {
+	spec := cloneOfflineIssuanceSpec(intent.spec)
+	signingInput, metadata, signed, err := signOffline(spec, signer)
+	if err != nil || verifier == nil {
+		return IssuerSealedReceipt{}, ErrOfflineIssuance
+	}
+	defer clear(signingInput)
+	defer clear(signed)
+	digest := sha256.Sum256(signingInput)
+	signingDigest := hex.EncodeToString(digest[:])
+	if signingDigest != intent.signingInputSHA256 {
+		return IssuerSealedReceipt{}, ErrOfflineIssuance
+	}
+	verifiedSigned, err := verifyOfflineSigned(OfflineVerifyRequest{
+		Class: spec.Class, Audience: spec.Audience, Suite: spec.Suite,
+		IssuerRole: spec.IssuerRole, IssuerScope: spec.IssuerScope, IssuerKey: spec.IssuerKey,
+		Now: spec.Now, MinimumGeneration: spec.MinimumGeneration,
+		MinimumSafetyFloor: spec.Profile.RequiredSafetyFloor, MinimumRootEpoch: spec.Profile.RootEpoch,
+		MinimumRevocationEpoch: spec.Profile.RevocationEpoch,
+	}, metadata, signed, verifier, spec.Recipient)
+	if err != nil {
+		return IssuerSealedReceipt{}, ErrOfflineIssuance
+	}
+	expectedPayload, err := CompileOffline(spec)
+	if err != nil || !bytes.Equal(verifiedSigned.Profile.Policy, spec.Profile.Policy) {
+		return IssuerSealedReceipt{}, ErrOfflineIssuance
+	}
+	parsedSigned, err := envelope.ParseSignedProfileOpaque(verifiedSigned.ExactSignedObject)
+	if err != nil || !bytes.Equal(parsedSigned.Payload, expectedPayload) {
+		return IssuerSealedReceipt{}, ErrOfflineIssuance
+	}
+	artifact := bytes.Clone(signed)
+	if spec.Class != envelope.ArtifactSignedPublic {
+		if sealer == nil || spec.Recipient == nil {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+		outer, err := envelope.BuildSealProtected(metadata)
+		if err != nil {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+		encapsulation, ciphertext, err := sealer.SealOffline(*spec.Recipient, outer, signed)
+		if err != nil {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+		artifact, err = envelope.BuildSealedFrame(outer, encapsulation, ciphertext)
+		if err != nil {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+		sealed, err := envelope.ParseSealedProfileOpaque(artifact)
+		if err != nil || !bytes.Equal(sealed.ExactFrame, artifact) || !bytes.Equal(sealed.Protected, outer) ||
+			!bytes.Equal(sealed.Encapsulation, encapsulation) || !bytes.Equal(sealed.Ciphertext, ciphertext) {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+		context, err := envelope.DecodeSealProtectedContextV1(sealed.Protected)
+		if err != nil || context.SuiteID != spec.Suite || context.ContentType != envelope.SignedObjectContentType || context.Metadata != metadata {
+			return IssuerSealedReceipt{}, ErrOfflineIssuance
+		}
+	}
+	artifactDigest := sha256.Sum256(artifact)
+	artifactDigestText := hex.EncodeToString(artifactDigest[:])
+	return IssuerSealedReceipt{
+		exactArtifact: bytes.Clone(artifact), artifactSHA256: artifactDigestText, signingInputSHA256: signingDigest,
+		profileID: spec.Profile.ProfileID, generation: spec.Profile.Generation, validUntil: spec.Profile.ValidUntil,
+		inspection: RedactedInspection{
+			Class: string(metadata.Class), Audience: metadata.AudienceClass, ContentSHA256: artifactDigestText,
+			Suite: spec.Suite, Generation: spec.Profile.Generation, ValidUntil: spec.Profile.ValidUntil,
+			Sealed: spec.Class != envelope.ArtifactSignedPublic,
+		},
+	}, nil
+}
+
 func (verified VerifiedIssuedArtifact) ExactArtifact() []byte {
 	return bytes.Clone(verified.exactArtifact)
 }
@@ -162,6 +256,22 @@ func (verified VerifiedIssuedArtifact) ValidUntil() int64 { return verified.vali
 func (verified VerifiedIssuedArtifact) Inspection() RedactedInspection {
 	return verified.inspection
 }
+
+func (receipt IssuerSealedReceipt) ExactArtifact() []byte {
+	return bytes.Clone(receipt.exactArtifact)
+}
+
+func (receipt IssuerSealedReceipt) ArtifactSHA256() string { return receipt.artifactSHA256 }
+
+func (receipt IssuerSealedReceipt) SigningInputSHA256() string { return receipt.signingInputSHA256 }
+
+func (receipt IssuerSealedReceipt) ProfileID() string { return receipt.profileID }
+
+func (receipt IssuerSealedReceipt) Generation() uint64 { return receipt.generation }
+
+func (receipt IssuerSealedReceipt) ValidUntil() int64 { return receipt.validUntil }
+
+func (receipt IssuerSealedReceipt) Inspection() RedactedInspection { return receipt.inspection }
 
 func cloneOfflineIssuanceSpec(spec OfflineIssuanceSpec) OfflineIssuanceSpec {
 	cloned := spec

@@ -111,6 +111,33 @@ func TestValidateIssuerDelegationAcceptsCanonicalDotNamespace(t *testing.T) {
 	}
 }
 
+func TestEncodeScopedAuthorityV1IsCanonicalAndRoleBound(t *testing.T) {
+	authority := validScopedAuthority(RoleRecipientRegistrar)
+	first, err := EncodeScopedAuthorityV1(authority)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := EncodeScopedAuthorityV1(authority)
+	if err != nil || !bytes.Equal(first, second) {
+		t.Fatalf("scoped authority encoding is not canonical: err=%v", err)
+	}
+	changed := authority
+	changed.Role = RoleProvider
+	changed.SubjectKey.KeyID = "provider-key-1"
+	other, err := EncodeScopedAuthorityV1(changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(first, other) {
+		t.Fatal("scoped authority encoding did not bind the authority role")
+	}
+	invalid := authority
+	invalid.Role = RoleIssuer
+	if _, err := EncodeScopedAuthorityV1(invalid); err == nil {
+		t.Fatal("issuer role encoded as a scoped recipient authority")
+	}
+}
+
 func TestWO804EmergencyAuthorityIsDenyOnly(t *testing.T) {
 	authority := validEmergencyAuthority()
 	deny := EmergencyAction{Kind: EmergencyDeny, Scope: validScope(), Epoch: 4, ValidFrom: trustTestNow - 1, ValidUntil: trustTestNow + 10}

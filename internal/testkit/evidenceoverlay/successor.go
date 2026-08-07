@@ -140,6 +140,69 @@ func ResolveCurrentSHA256(root, path string) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
+// ResolvePhase17PredecessorSHA256 returns the hash at the Phase 17 boundary.
+// It validates and unwinds only the Phase 17 overlay, leaving the established
+// Phase 16 state intact. Historical generators that were already reconciled
+// during Phase 16 use this boundary while Phase 17 advances their source files.
+func ResolvePhase17PredecessorSHA256(root, path string) (string, error) {
+	predecessors, err := loadPhase17Predecessors(root)
+	if err != nil {
+		return "", err
+	}
+	if digest, ok := predecessors[path]; ok {
+		return digest, nil
+	}
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func loadPhase17Predecessors(root string) (map[string]string, error) {
+	overlayPath := filepath.Join(root, filepath.FromSlash(Phase17SuccessorPath))
+	if _, err := os.Stat(overlayPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return map[string]string{}, nil
+		}
+		return nil, err
+	}
+	value, err := readOverlay(root, Phase17SuccessorPath, "phase17-live-data-plane-v1")
+	if err != nil {
+		return nil, err
+	}
+	pre := make(map[string]string, len(value.Entries)+len(value.SuccessorEntries))
+	for _, entries := range [][]entry{value.SuccessorEntries, value.Entries} {
+		for index, item := range entries {
+			observed, ok := pre[item.Path]
+			if !ok {
+				path := filepath.Join(root, filepath.FromSlash(item.Path))
+				if item.PostEvidence == "ABSENT" {
+					if _, err := os.Lstat(path); err == nil {
+						return nil, fmt.Errorf("successor deletion path still exists: %s", item.Path)
+					} else if !errors.Is(err, os.ErrNotExist) {
+						return nil, fmt.Errorf("inspect successor deletion path %s: %w", item.Path, err)
+					}
+					observed = "ABSENT"
+				} else {
+					content, err := os.ReadFile(path)
+					if err != nil {
+						return nil, fmt.Errorf("read successor path %s: %w", item.Path, err)
+					}
+					digest := sha256.Sum256(content)
+					observed = hex.EncodeToString(digest[:])
+				}
+			}
+			if observed != postState(item) {
+				return nil, fmt.Errorf("successor evidence drift in %s entry %d: %s", Phase17SuccessorPath, index, item.Path)
+			}
+			pre[item.Path] = predecessor(item)
+		}
+	}
+	return pre, nil
+}
+
 func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/envelope"
 	"kurdistan/internal/product/profile"
 )
@@ -126,7 +127,11 @@ func Initialize(options InitOptions) (InitResult, error) {
 		RelayEpoch: 1, RelayKeyID: relayID, RelayPublic: relayPublic, RelaySecret: relaySecret, TLS: tlsIdentity,
 		Delegation: delegation, DelegationPayload: delegationPayload, DelegationSig: delegationSignature,
 		Revocations: revocations, RevocationPayload: revocationPayload, RevocationSig: revocationSignature,
-		LastObservedAt: now.Unix(), IPv4Pool: ipv4Pool, IPv6Pool: ipv6Pool, Profiles: []profileRecord{}, Assignments: []addressAssignmentV1{}, Audit: []auditEntry{},
+		LastObservedAt: now.Unix(), IPv4Pool: ipv4Pool, IPv6Pool: ipv6Pool, Profiles: []profileRecord{}, Assignments: []addressAssignmentV1{}, RecipientUses: recipientUseLedgerV1{}, Audit: []auditEntry{},
+	}
+	recipientAuthority, err := encodeSignedRecipientAuthority(state, rootPrivate)
+	if err != nil {
+		return InitResult{}, err
 	}
 	rootPrivateDER, err := x509.MarshalECPrivateKey(rootPrivate)
 	if err != nil {
@@ -143,7 +148,7 @@ func Initialize(options InitOptions) (InitResult, error) {
 	if err := writeExclusive(options.RecoveryPath, recovery, 0o600); err != nil {
 		return InitResult{}, err
 	}
-	if err := initializeStore(options.DataDir, master, state); err != nil {
+	if err := initializeStore(options.DataDir, master, state, recipientAuthority); err != nil {
 		_ = os.Remove(options.RecoveryPath)
 		return InitResult{}, err
 	}
@@ -171,14 +176,24 @@ func ConfirmRecovery(dataDir, recoveryPath string, passphrase []byte, now time.T
 	if err != nil {
 		return ErrRecoveryRejected
 	}
-	return withStateTransaction(dataDir, "confirm-recovery", payload.DeploymentID, now.UTC().Unix(), func(state *persistedState, _ []byte) error {
+	var recipientAuthority []byte
+	err = withStateTransaction(dataDir, "confirm-recovery", payload.DeploymentID, now.UTC().Unix(), func(state *persistedState, _ []byte) error {
 		if payload.DeploymentID != state.DeploymentID || payload.RootFingerprint != state.RootFingerprint ||
 			!bytes.Equal(publicDER, state.RootPublicDER) || fingerprint(publicDER) != state.RootFingerprint {
 			return ErrRecoveryRejected
 		}
+		var encodeErr error
+		recipientAuthority, encodeErr = encodeSignedRecipientAuthority(*state, rootPrivate)
+		if encodeErr != nil {
+			return encodeErr
+		}
 		state.RecoveryConfirmed = true
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	return installRecipientAuthority(dataDir, recipientAuthority, false)
 }
 
 func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile, error) {
@@ -186,8 +201,16 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 	if !validName(options.Name) || now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity {
 		return IssuedProfile{}, ErrInvalidInput
 	}
+	var recipientRequest enrollment.PublicRequestV1
+	var err error
+	if len(options.RecipientRequest) != 0 {
+		recipientRequest, err = enrollment.DecodeAndVerifyRequestV1(options.RecipientRequest, now)
+		if err != nil || options.RegistryDir == "" {
+			return IssuedProfile{}, ErrInvalidInput
+		}
+	}
 	var result IssuedProfile
-	err := withStateTransaction(dataDir, "create-profile", "profile."+options.Name, now.Unix(), func(state *persistedState, master []byte) error {
+	err = withStateTransaction(dataDir, "create-profile", "profile."+options.Name, now.Unix(), func(state *persistedState, master []byte) error {
 		if !state.RecoveryConfirmed {
 			return ErrRecoveryUnconfirmed
 		}
@@ -201,14 +224,29 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 		if err != nil {
 			return err
 		}
-		issued, record, err := issueProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, now)
+		var issued IssuedProfile
+		var record profileRecord
+		if len(options.RecipientRequest) != 0 {
+			authority, err := loadRecipientRegistrarAuthority(dataDir, *state, now.Unix())
+			if err != nil {
+				return err
+			}
+			nextRecord, _, _, _, err := recipientCapabilityFromRequest(*state, recipientRequest, 1)
+			if err != nil || profile.ValidateRecipientTransition(state.Root, authority, nil, nextRecord.binding(), profile.RecipientEnroll, now.Unix()) != nil {
+				return ErrInvalidInput
+			}
+			reservation, err := reserveOwnerRecipientUse(options.RegistryDir, state.RecipientUses.RegistryID, state.DeploymentID, profileID, recipientRequest, now.Unix(), options.ConfirmRecipientReuse)
+			if err != nil {
+				return err
+			}
+			issued, record, err = issueLiveProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, options.LiveProgram, now, recipientRequest, 1, &reservation)
+		} else {
+			issued, record, err = issueProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, now)
+		}
 		if err != nil {
 			return err
 		}
-		state.Profiles = append(state.Profiles, profileRecord{
-			Name: record.Name, ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation,
-			Artifact: record.Artifact, CreatedAt: record.CreatedAt, ValidUntil: record.ValidUntil, Mode: profileModeAuthorityOnly,
-		})
+		state.Profiles = append(state.Profiles, record)
 		result = issued
 		return nil
 	})
@@ -221,8 +259,16 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 		now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity {
 		return IssuedProfile{}, ErrInvalidInput
 	}
+	var recipientRequest enrollment.PublicRequestV1
+	var err error
+	if len(options.RecipientRequest) != 0 {
+		recipientRequest, err = enrollment.DecodeAndVerifyRequestV1(options.RecipientRequest, now)
+		if err != nil || options.RegistryDir == "" {
+			return IssuedProfile{}, ErrInvalidInput
+		}
+	}
 	var result IssuedProfile
-	err := withStateTransaction(dataDir, "rotate-profile", options.ProfileID, now.Unix(), func(state *persistedState, master []byte) error {
+	err = withStateTransaction(dataDir, "rotate-profile", options.ProfileID, now.Unix(), func(state *persistedState, master []byte) error {
 		if !state.RecoveryConfirmed {
 			return ErrRecoveryUnconfirmed
 		}
@@ -242,7 +288,45 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 		if err := updateRevocations(state, rootPrivate, now, append(state.Revocations.RevokedContentIDs, previous.ContentID), state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
-		issued, record, err := issueProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, now)
+		var issued IssuedProfile
+		var record profileRecord
+		if len(options.RecipientRequest) != 0 {
+			candidateUse := recipientUseRecord(recipientRequest, previous.ProfileID, now.Unix())
+			if recipientUseConflicts(state.RecipientUses, candidateUse) {
+				return ErrRecipientReplay
+			}
+			epoch := uint64(1)
+			var current *profile.RecipientBinding
+			transition := profile.RecipientEnroll
+			if previous.Mode == profileModeLive {
+				if previous.Recipient.Epoch == ^uint64(0) {
+					return ErrInvalidInput
+				}
+				epoch = previous.Recipient.Epoch + 1
+				value := previous.Recipient.binding()
+				current = &value
+				transition = profile.RecipientRotate
+			}
+			nextRecord, _, _, _, err := recipientCapabilityFromRequest(*state, recipientRequest, epoch)
+			authority, authorityErr := loadRecipientRegistrarAuthority(dataDir, *state, now.Unix())
+			if err != nil || authorityErr != nil || profile.ValidateRecipientTransition(state.Root, authority, current, nextRecord.binding(), transition, now.Unix()) != nil {
+				return ErrInvalidInput
+			}
+			reservation, err := reserveOwnerRecipientUse(options.RegistryDir, state.RecipientUses.RegistryID, state.DeploymentID, previous.ProfileID, recipientRequest, now.Unix(), options.ConfirmRecipientReuse)
+			if err != nil {
+				return err
+			}
+			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, now, recipientRequest, epoch, &reservation)
+		} else if previous.Mode == profileModeLive {
+			reused := enrollment.PublicRequestV1{
+				RequestID: previous.Recipient.Hint, RecipientKeyID: previous.Recipient.KeyID,
+				RecipientPublic: bytes.Clone(previous.RecipientPublic), ClientAuthKeyID: previous.ClientAuthKeyID,
+				ClientAuthPublic: bytes.Clone(previous.ClientAuthPublic),
+			}
+			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, now, reused, previous.Recipient.Epoch, nil)
+		} else {
+			issued, record, err = issueProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, now)
+		}
 		if err != nil {
 			return err
 		}
@@ -476,6 +560,46 @@ func VerifyBundleAgainstCurrentState(dataDir string, artifact []byte, now time.T
 	return verified, nil
 }
 
+// VerifyLiveBundleAgainstCurrentState confirms that an issuer-verifiable live
+// owner bundle is the exact current non-revoked artifact retained by this
+// deployment. Recipient decryptability is verified separately on the device.
+func VerifyLiveBundleAgainstCurrentState(dataDir string, artifact []byte, now time.Time) (VerifiedBundle, error) {
+	if now.IsZero() {
+		return VerifiedBundle{}, ErrInvalidInput
+	}
+	bundle, _, err := verifyLiveBundleAuthority(artifact, now.UTC(), 1)
+	if err != nil {
+		return VerifiedBundle{}, err
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		return VerifiedBundle{}, err
+	}
+	zero(master)
+	if state.Drained {
+		return VerifiedBundle{}, ErrDrained
+	}
+	digest := artifactDigest(artifact)
+	for _, record := range state.Profiles {
+		if record.Mode != profileModeLive || artifactDigest(record.Artifact) != digest {
+			continue
+		}
+		if record.Revoked || record.Generation == 0 || record.ContentID == "" ||
+			bundle.DeploymentID != state.DeploymentID || bundle.RootFingerprint != state.RootFingerprint ||
+			bundle.Root.Epoch != state.Root.Epoch || bundle.IssuerKey != state.IssuerKey ||
+			bundle.Revocations.Epoch != state.Revocations.Epoch || contains(state.Revocations.RevokedContentIDs, record.ContentID) {
+			return VerifiedBundle{}, ErrRollback
+		}
+		return VerifiedBundle{
+			DeploymentID: state.DeploymentID, ProfileID: record.ProfileID, ContentID: record.ContentID,
+			RootFingerprint: state.RootFingerprint, IssuerFingerprint: fingerprint(state.IssuerPublicDER),
+			RelayKeyID: state.RelayKeyID, Generation: record.Generation, RootEpoch: state.Root.Epoch,
+			RevocationEpoch: state.Revocations.Epoch, ValidUntil: record.ValidUntil,
+		}, nil
+	}
+	return VerifiedBundle{}, ErrRollback
+}
+
 func issueProfile(state *persistedState, master []byte, name, profileID, previousContentID, updateKind string, validFor time.Duration, now time.Time) (IssuedProfile, profileRecord, error) {
 	issuerDER, err := openWithKey(master, state.IssuerSecret, []byte(state.DeploymentID+"|"+state.IssuerKey.KeyID))
 	if err != nil {
@@ -688,7 +812,11 @@ func LoadProfile(dataDir, profileID string) (IssuedProfile, error) {
 	if err != nil {
 		return IssuedProfile{}, ErrStateCorrupt
 	}
-	return IssuedProfile{ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation, Artifact: append([]byte(nil), record.Artifact...), URI: uri, QRChunks: chunks}, nil
+	return IssuedProfile{
+		ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation, ValidUntil: record.ValidUntil,
+		Mode: record.Mode, Sealed: record.Mode == profileModeLive, Connectable: record.Mode == profileModeLive && !record.Revoked, Revoked: record.Revoked,
+		Artifact: append([]byte(nil), record.Artifact...), URI: uri, QRChunks: chunks,
+	}, nil
 }
 
 func encodePolicy(endpoint string) ([]byte, error) {

@@ -13,6 +13,30 @@ import (
 
 func TestStateV2RoundTripDoesNotAliasMutableData(t *testing.T) {
 	dataDir, _, _ := initializedV2TestState(t)
+	masterBeforeLoad, err := loadMasterKey(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dataDir, stateFileName))
+	if err != nil {
+		zero(masterBeforeLoad)
+		t.Fatal(err)
+	}
+	var envelope stateEnvelope
+	if err := decodeCanonical(raw, &envelope, maxStateBytes); err != nil {
+		zero(masterBeforeLoad)
+		t.Fatalf("state envelope is not canonical: %v", err)
+	}
+	var decoded persistedState
+	if err := decodeCanonical(envelope.Payload, &decoded, maxStateBytes); err != nil {
+		zero(masterBeforeLoad)
+		t.Fatalf("state v2 payload is not canonical: %v", err)
+	}
+	if err := validateRecipientUseLedger(decoded.RecipientUses); err != nil {
+		zero(masterBeforeLoad)
+		t.Fatalf("empty recipient-use ledger did not survive state v2 round trip: %v", err)
+	}
+	zero(masterBeforeLoad)
 	state, master, err := loadState(dataDir)
 	if err != nil {
 		t.Fatal(err)

@@ -1040,7 +1040,7 @@ func TestM3ProfileLifecycleBoundaryV1(t *testing.T) {
 	}
 	allowedTests := map[string]map[string]bool{
 		"internal/product/envelope":  {"bytes": true, "crypto/ecdh": true, "crypto/ecdsa": true, "crypto/elliptic": true, "crypto/hpke": true, "crypto/rand": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "github.com/fxamacker/cbor/v2": true, "io": true, "math/big": true, "os": true, "os/exec": true, "path/filepath": true, "runtime": true, "strings": true, "sync": true, "testing": true, "testing/cryptotest": true, "time": true, modulePath + "/internal/testkit/phase8assurance": true},
-		"internal/product/profile":   {"bytes": true, "crypto/ecdh": true, "crypto/elliptic": true, "crypto/hmac": true, "crypto/hpke": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "math/big": true, "os": true, "path/filepath": true, "reflect": true, "sort": true, "strings": true, "testing": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true, modulePath + "/internal/product/profile": true, modulePath + "/internal/testkit/phase8issuance": true, modulePath + "/internal/testkit/phase8issuancefixture": true},
+		"internal/product/profile":   {"bytes": true, "crypto/ecdh": true, "crypto/elliptic": true, "crypto/hmac": true, "crypto/hpke": true, "crypto/sha256": true, "encoding/hex": true, "encoding/json": true, "errors": true, "fmt": true, "math/big": true, "os": true, "path/filepath": true, "reflect": true, "sort": true, "strings": true, "testing": true, "time": true, modulePath + "/internal/product/envelope": true, modulePath + "/internal/product/lifecycle": true, modulePath + "/internal/product/profile": true, modulePath + "/internal/testkit/evidenceoverlay": true, modulePath + "/internal/testkit/phase8issuance": true, modulePath + "/internal/testkit/phase8issuancefixture": true},
 		"internal/product/lifecycle": {"testing": true},
 	}
 	for pkg, imports := range allowed {
@@ -3192,6 +3192,20 @@ func phase17ProfileHPKEImportAllowedV1(file, importPath string) bool {
 	return phase17ProfileHPKEImportAllowlistV1[file][importPath]
 }
 
+var phase17KurdctlProductImportAllowlistV1 = map[string]map[string]bool{
+	"cmd/kurdctl/main.go": {
+		modulePath + "/internal/product/enrollment": true,
+		modulePath + "/internal/product/envelope":   true,
+	},
+	"cmd/kurdctl/main_test.go": {
+		modulePath + "/internal/product/enrollment": true,
+	},
+}
+
+func phase17KurdctlProductImportAllowedV1(file, importPath string) bool {
+	return phase17KurdctlProductImportAllowlistV1[file][importPath]
+}
+
 func TestPhase17ProfileHPKEImportExceptionsV1(t *testing.T) {
 	want := map[string][]string{
 		"internal/crypto/profilehpke/provider.go": {
@@ -3242,6 +3256,40 @@ func TestPhase17ProfileHPKEImportExceptionsV1(t *testing.T) {
 				t.Fatalf("Phase 17 profile HPKE boundary accepted mutant %s -> %s", mutant.file, mutant.importPath)
 			}
 		})
+	}
+}
+
+func TestPhase17KurdctlProductImportExceptionsV1(t *testing.T) {
+	want := map[string][]string{
+		"cmd/kurdctl/main.go": {
+			modulePath + "/internal/product/enrollment",
+			modulePath + "/internal/product/envelope",
+		},
+		"cmd/kurdctl/main_test.go": {
+			modulePath + "/internal/product/enrollment",
+		},
+	}
+	wantCount := 0
+	for file, imports := range want {
+		wantCount += len(imports)
+		for _, importPath := range imports {
+			if !phase17KurdctlProductImportAllowedV1(file, importPath) {
+				t.Fatalf("missing exact kurdctl product exception %s -> %s", file, importPath)
+			}
+		}
+	}
+	actualCount := 0
+	for file, imports := range phase17KurdctlProductImportAllowlistV1 {
+		actualCount += len(imports)
+		if _, ok := want[file]; !ok {
+			t.Fatalf("unexpected kurdctl product exception file %s", file)
+		}
+	}
+	if actualCount != wantCount {
+		t.Fatalf("kurdctl product exception count=%d want=%d", actualCount, wantCount)
+	}
+	if phase17KurdctlProductImportAllowedV1("cmd/kurdctl/liveprogram.go", modulePath+"/internal/product/profile") {
+		t.Fatal("unlisted kurdctl product import was accepted")
 	}
 }
 
@@ -3733,7 +3781,7 @@ func contractImportViolationsV1(root string) ([]string, error) {
 			file := filepath.ToSlash(relFile)
 			for _, imp := range f.Imports {
 				ip := strings.Trim(imp.Path.Value, `"`)
-				if phase17ProfileHPKEImportAllowedV1(file, ip) {
+				if phase17ProfileHPKEImportAllowedV1(file, ip) || phase17KurdctlProductImportAllowedV1(file, ip) {
 					continue
 				}
 				if strings.HasPrefix(pkgPath, modulePath+"/internal/product/") &&
