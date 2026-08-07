@@ -11,7 +11,6 @@ import (
 	"crypto/ed25519"
 	"crypto/hpke"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -131,7 +130,11 @@ func Generate(now time.Time, validity time.Duration, random io.Reader) (PublicRe
 	}
 	request.RecipientKeyID = recipientKeyID(request.RecipientPublic)
 	request.ClientAuthKeyID = clientAuthKeyID(request.ClientAuthPublic)
-	request.RequestID = deriveRequestID(request)
+	request.RequestID, err = deriveRequestID(request)
+	if err != nil {
+		clear(request.Nonce)
+		return PublicRequestV1{}, PrivateBundleV1{}, fail(ErrorInvalidValue)
+	}
 	unsigned, err := encodeUnsignedRequest(request)
 	if err != nil {
 		clear(request.Nonce)
@@ -267,7 +270,8 @@ func validateRequest(request PublicRequestV1, current *int64) error {
 	if request.CreatedAt <= 0 || request.ExpiresAt <= request.CreatedAt || request.ExpiresAt-request.CreatedAt > MaxValiditySeconds || !validRecipientPublic(request.RecipientPublic) || !validClientPublic(request.ClientAuthPublic) || len(request.Nonce) != keyMaterialBytes || zero(request.Nonce) || len(request.Signature) != ed25519.SignatureSize {
 		return fail(ErrorInvalidValue)
 	}
-	if request.RecipientKeyID != recipientKeyID(request.RecipientPublic) || request.ClientAuthKeyID != clientAuthKeyID(request.ClientAuthPublic) || request.RequestID != deriveRequestID(request) {
+	expectedRequestID, err := deriveRequestID(request)
+	if err != nil || request.RecipientKeyID != recipientKeyID(request.RecipientPublic) || request.ClientAuthKeyID != clientAuthKeyID(request.ClientAuthPublic) || request.RequestID != expectedRequestID {
 		return fail(ErrorKeyID)
 	}
 	unsigned, err := encodeUnsignedRequest(request)
@@ -334,17 +338,23 @@ func clientAuthKeyID(public []byte) string {
 	return hex.EncodeToString(digest[:16])
 }
 
-func deriveRequestID(request PublicRequestV1) string {
+func deriveRequestID(request PublicRequestV1) (string, error) {
+	identity, err := marshal(requestIdentityMap(request))
+	if err != nil {
+		return "", err
+	}
 	hash := sha256.New()
 	_, _ = hash.Write([]byte(requestIDDomain))
-	var times [16]byte
-	binary.BigEndian.PutUint64(times[:8], uint64(request.CreatedAt))
-	binary.BigEndian.PutUint64(times[8:], uint64(request.ExpiresAt))
-	_, _ = hash.Write(times[:])
-	_, _ = hash.Write(request.RecipientPublic)
-	_, _ = hash.Write(request.ClientAuthPublic)
-	_, _ = hash.Write(request.Nonce)
-	return hex.EncodeToString(hash.Sum(nil))
+	_, _ = hash.Write(identity)
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func requestIdentityMap(request PublicRequestV1) map[uint64]any {
+	return map[uint64]any{
+		1: RequestVersionV1, 3: request.CreatedAt, 4: request.ExpiresAt,
+		5: uint64(envelope.SuiteClassicalV1), 6: uint64(envelope.HPKEKEMP256SHA256), 7: uint64(envelope.HPKEKDFSHA256), 8: uint64(envelope.HPKEAEADAES256GCM), 9: ClientAuthAlgorithmEd25519,
+		10: bytes.Clone(request.RecipientPublic), 11: request.RecipientKeyID, 12: bytes.Clone(request.ClientAuthPublic), 13: request.ClientAuthKeyID, 14: bytes.Clone(request.Nonce),
+	}
 }
 
 func encodeUnsignedRequest(request PublicRequestV1) ([]byte, error) {
