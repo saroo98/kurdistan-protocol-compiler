@@ -6,10 +6,11 @@ or operational readiness.
 
 ## Carrier and outer record
 
-The carrier is TLS 1.3 over TCP with ALPN `kurd/1`. Certificate validation is
-strict, and the TLS exporter binds the authenticated Kurd session to the exact
-profile digest. TCP keepalive is only secondary transport liveness; it is not
-Kurd authentication.
+The carrier is TLS 1.3 over TCP with ALPN `kurd/1`. Both the TLS minimum and
+maximum are 1.3; session tickets, client session caching, and resumption are
+disabled. Certificate validation is strict, and the TLS exporter binds the
+authenticated Kurd session to the exact session-plan digest. TCP keepalive is
+only secondary transport liveness; it is not Kurd authentication.
 
 Each carrier message contains exactly one Kurd outer record. The outer record
 uses the `KURD` magic, major version 1, minor version 0, and a 48-byte header.
@@ -17,6 +18,14 @@ The header binds the record to the plan digest. The profile bind record is
 `TypeProfileBind` and is type 3,
 `TypeEngineReady` is type 4, `TypeReliableData` is type 5, and `TypeClose` is
 type 7. The existing authenticated envelope remains the only outer envelope.
+Carrier framing uses a 4-byte length prefix. The outer record permits the
+critical flag only, limits control records to 65536 bytes and payload records
+to 1048576 bytes, and rejects inconsistent lengths.
+
+The 72-byte profile bind body is exactly: `KRDBND01`, followed by the
+32-byte TLS exporter at bytes 8 through 39 and the 32-byte session-plan digest
+at bytes 40 through 71. Engine-ready and close remain their existing protected
+control record types.
 
 ## Packet path
 
@@ -54,7 +63,7 @@ protocols, MTU, carrier, strategy, or resource limits.
 The TLS server name is a DNS name or canonical IP literal no longer than 253
 bytes. The pinned self-signed leaf is 1 through 4096 bytes, parseable,
 currently valid, valid for server authentication, and contains that name as a
-SAN. Live programs are 1 through 48 KiB after canonical processing. Canonical
+SAN. Live programs are 1 byte through 48 KiB after canonical processing. Canonical
 policy decoding rejects duplicate map keys, tags, indefinite-length values,
 unknown or missing labels, noncanonical CBOR, invalid UTF-8, excessive
 nesting, unsorted or duplicate lists, and re-encoding mismatches.

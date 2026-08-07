@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -79,69 +80,103 @@ type runtimePolicyAuthority struct {
 }
 
 type wireAuthority struct {
-	HeaderMagic                        string   `json:"headerMagic"`
-	HeaderBytes                        int      `json:"headerBytes"`
-	MajorVersion                       int      `json:"majorVersion"`
-	MinorVersion                       int      `json:"minorVersion"`
-	CarrierTLSVersion                  string   `json:"carrierTLSVersion"`
-	ALPN                               string   `json:"alpn"`
-	ExporterLabel                      string   `json:"exporterLabel"`
-	ReliableDataRecordType             int      `json:"reliableDataRecordType"`
-	ProfileBindRecordType              int      `json:"profileBindRecordType"`
-	EngineReadyRecordType              int      `json:"engineReadyRecordType"`
-	CloseRecordType                    int      `json:"closeRecordType"`
-	ApplicationSlotMinimum             int      `json:"applicationSlotMinimum"`
-	ApplicationSlotMaximum             int      `json:"applicationSlotMaximum"`
-	PaddingKeepaliveSlot               int      `json:"paddingKeepaliveSlot"`
-	ControlSlot                        int      `json:"controlSlot"`
-	PacketSemantic                     string   `json:"packetSemantic"`
-	PacketPerOperation                 bool     `json:"packetPerOperation"`
-	SlotSelection                      string   `json:"slotSelection"`
-	SlotHMAC                           string   `json:"slotHmac"`
-	InnerFraming                       string   `json:"innerFraming"`
-	OuterAuthentication                string   `json:"outerAuthentication"`
-	PaddingKeepaliveSeconds            int      `json:"paddingKeepaliveSeconds"`
-	UnauthenticatedPeerIdleSeconds     int      `json:"unauthenticatedPeerIdleSeconds"`
-	ReplayCommit                       string   `json:"replayCommit"`
-	ReplayFailure                      string   `json:"replayFailure"`
-	TCPKeepaliveRole                   string   `json:"tcpKeepaliveRole"`
-	PacketAcknowledgements             bool     `json:"packetAcknowledgements"`
-	LegacyAdapters                     []string `json:"legacyAdapters"`
-	LiveFramingNoProfileReconstruction bool     `json:"liveFramingNoProfileReconstruction"`
+	HeaderMagic                               string               `json:"headerMagic"`
+	HeaderBytes                               int                  `json:"headerBytes"`
+	MajorVersion                              int                  `json:"majorVersion"`
+	MinorVersion                              int                  `json:"minorVersion"`
+	CarrierTLSVersion                         string               `json:"carrierTLSVersion"`
+	ALPN                                      string               `json:"alpn"`
+	ExporterLabel                             string               `json:"exporterLabel"`
+	SessionBinding                            string               `json:"sessionBinding"`
+	ExporterContext                           string               `json:"exporterContext"`
+	TLSMinimumVersion                         string               `json:"tlsMinimumVersion"`
+	TLSMaximumVersion                         string               `json:"tlsMaximumVersion"`
+	TLSSessionResumption                      string               `json:"tlsSessionResumption"`
+	ProfileBind                               profileBindAuthority `json:"profileBind"`
+	CarrierLengthPrefixBytes                  int                  `json:"carrierLengthPrefixBytes"`
+	KnownOuterFlags                           []string             `json:"knownOuterFlags"`
+	MaxControlBytes                           int                  `json:"maxControlBytes"`
+	MaxPayloadBytes                           int                  `json:"maxPayloadBytes"`
+	ReliableDataRecordType                    int                  `json:"reliableDataRecordType"`
+	ProfileBindRecordType                     int                  `json:"profileBindRecordType"`
+	EngineReadyRecordType                     int                  `json:"engineReadyRecordType"`
+	CloseRecordType                           int                  `json:"closeRecordType"`
+	ApplicationSlotMinimum                    int                  `json:"applicationSlotMinimum"`
+	ApplicationSlotMaximum                    int                  `json:"applicationSlotMaximum"`
+	PaddingKeepaliveSlot                      int                  `json:"paddingKeepaliveSlot"`
+	ControlSlot                               int                  `json:"controlSlot"`
+	PacketSemantic                            string               `json:"packetSemantic"`
+	PacketPerOperation                        bool                 `json:"packetPerOperation"`
+	SlotSelection                             string               `json:"slotSelection"`
+	SlotHMAC                                  string               `json:"slotHmac"`
+	InnerFraming                              string               `json:"innerFraming"`
+	OuterAuthentication                       string               `json:"outerAuthentication"`
+	PaddingKeepaliveSeconds                   int                  `json:"paddingKeepaliveSeconds"`
+	NoAuthenticatedPeerActivityTimeoutSeconds int                  `json:"noAuthenticatedPeerActivityTimeoutSeconds"`
+	ReplayCommit                              string               `json:"replayCommit"`
+	ReplayFailure                             string               `json:"replayFailure"`
+	TCPKeepaliveRole                          string               `json:"tcpKeepaliveRole"`
+	PacketAcknowledgements                    bool                 `json:"packetAcknowledgements"`
+	LegacyAdapters                            []string             `json:"legacyAdapters"`
+	LiveFramingNoProfileReconstruction        bool                 `json:"liveFramingNoProfileReconstruction"`
+}
+
+type profileBindAuthority struct {
+	Magic                   string `json:"magic"`
+	BodyBytes               int    `json:"bodyBytes"`
+	TLSExporterOffset       int    `json:"tlsExporterOffset"`
+	SessionPlanDigestOffset int    `json:"sessionPlanDigestOffset"`
+	ComponentBytes          int    `json:"componentBytes"`
 }
 
 type androidAuthority struct {
-	NativeOnly         bool     `json:"nativeOnly"`
-	ProtectMustSucceed bool     `json:"protectMustSucceed"`
-	Lifecycle          []string `json:"lifecycle"`
+	NativeOnly                         bool     `json:"nativeOnly"`
+	ProtectMustSucceed                 bool     `json:"protectMustSucceed"`
+	Lifecycle                          []string `json:"lifecycle"`
+	RuntimeStatusScope                 string   `json:"runtimeStatusScope"`
+	RuntimeStatusPlanDigestField       string   `json:"runtimeStatusPlanDigestField"`
+	RuntimeStatusMTUMin                int      `json:"runtimeStatusMtuMin"`
+	RuntimeStatusMTUMax                int      `json:"runtimeStatusMtuMax"`
+	NativeBridgeSessionPlanDigestBytes int      `json:"nativeBridgeSessionPlanDigestBytes"`
+	NativeBridgeMTUMin                 int      `json:"nativeBridgeMtuMin"`
+	NativeBridgeMTUMax                 int      `json:"nativeBridgeMtuMax"`
 }
 
 type relayAuthority struct {
-	ListenerFileDescriptor     int      `json:"listenerFileDescriptor"`
-	ServiceUser                string   `json:"serviceUser"`
-	ServiceGroup               string   `json:"serviceGroup"`
-	TUNName                    string   `json:"tunName"`
-	TUNPacketInfo              bool     `json:"tunPacketInfo"`
-	TUNKeepCarrier             bool     `json:"tunKeepCarrier"`
-	PrivateDevices             bool     `json:"privateDevices"`
-	DevicePolicy               string   `json:"devicePolicy"`
-	TUNDeviceAccess            string   `json:"tunDeviceAccess"`
-	NoAmbientCapabilities      bool     `json:"noAmbientCapabilities"`
-	EmptyCapabilityBoundingSet bool     `json:"emptyCapabilityBoundingSet"`
-	AddressFamilies            []string `json:"addressFamilies"`
-	FirewallOwner              string   `json:"firewallOwner"`
-	SysctlOwner                string   `json:"sysctlOwner"`
-	DNSService                 string   `json:"dnsService"`
-	DNSSEC                     bool     `json:"dnssec"`
-	DNSQueryLogging            bool     `json:"dnsQueryLogging"`
-	DNSBind                    string   `json:"dnsBind"`
-	DNSClients                 string   `json:"dnsClients"`
-	DNSMinimiseQueryNames      bool     `json:"dnsMinimiseQueryNames"`
-	DNSHideIdentityVersion     bool     `json:"dnsHideIdentityVersion"`
-	ControlSocketDirectory     string   `json:"controlSocketDirectory"`
-	ControlOperations          []string `json:"controlOperations"`
-	ControlSocketAccess        string   `json:"controlSocketAccess"`
-	PublicListener             string   `json:"publicListener"`
+	ListenerFileDescriptor     int                      `json:"listenerFileDescriptor"`
+	ServiceUser                string                   `json:"serviceUser"`
+	ServiceGroup               string                   `json:"serviceGroup"`
+	TUNName                    string                   `json:"tunName"`
+	TUNPacketInfo              bool                     `json:"tunPacketInfo"`
+	TUNKeepCarrier             bool                     `json:"tunKeepCarrier"`
+	PrivateDevices             bool                     `json:"privateDevices"`
+	DevicePolicy               string                   `json:"devicePolicy"`
+	TUNDeviceAccess            string                   `json:"tunDeviceAccess"`
+	NoAmbientCapabilities      bool                     `json:"noAmbientCapabilities"`
+	EmptyCapabilityBoundingSet bool                     `json:"emptyCapabilityBoundingSet"`
+	AddressFamilies            []string                 `json:"addressFamilies"`
+	FirewallOwner              string                   `json:"firewallOwner"`
+	SysctlOwner                string                   `json:"sysctlOwner"`
+	DNSService                 string                   `json:"dnsService"`
+	DNSSEC                     bool                     `json:"dnssec"`
+	DNSQueryLogging            bool                     `json:"dnsQueryLogging"`
+	DNSBind                    string                   `json:"dnsBind"`
+	DNSClients                 string                   `json:"dnsClients"`
+	DNSMinimiseQueryNames      bool                     `json:"dnsMinimiseQueryNames"`
+	DNSHideIdentityVersion     bool                     `json:"dnsHideIdentityVersion"`
+	ControlSocketDirectory     string                   `json:"controlSocketDirectory"`
+	ControlOperations          []string                 `json:"controlOperations"`
+	ControlSocketAccess        string                   `json:"controlSocketAccess"`
+	PublicListener             string                   `json:"publicListener"`
+	RequiredLiveUnitState      string                   `json:"requiredLiveUnitState"`
+	CurrentPredecessorUnit     predecessorUnitAuthority `json:"currentPredecessorUnit"`
+}
+
+type predecessorUnitAuthority struct {
+	ServicePath             string   `json:"servicePath"`
+	LiveDataPlaneAuthorized bool     `json:"liveDataPlaneAuthorized"`
+	PrivateDevices          bool     `json:"privateDevices"`
+	AddressFamilies         []string `json:"addressFamilies"`
 }
 
 type limitsAuthority struct {
@@ -168,6 +203,8 @@ type limitsAuthority struct {
 	RateLimitExpirySeconds                     int    `json:"rateLimitExpirySeconds"`
 	CeilingUseMustRemainMateriallyBelowMaximum bool   `json:"ceilingUseMustRemainMateriallyBelowMaximum"`
 	SignedProgramMayNarrowFragmentLimit        bool   `json:"signedProgramMayNarrowFragmentLimit"`
+	LegacyProtectedRecordIncompleteOperations  int    `json:"legacyProtectedRecordIncompleteOperations"`
+	LiveIncompleteInnerOperationsAreSeparate   bool   `json:"liveIncompleteInnerOperationsAreSeparate"`
 }
 
 type networkAuthority struct {
@@ -259,6 +296,9 @@ func decodeContract(raw []byte) (contract, error) {
 }
 
 func requireJSONFields(raw []byte, typ reflect.Type) error {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return errors.New("null is not permitted")
+	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return err
@@ -272,6 +312,9 @@ func requireJSONFields(raw []byte, typ reflect.Type) error {
 		encoded, present := fields[name]
 		if !present {
 			return fmt.Errorf("missing required field %q", name)
+		}
+		if bytes.Equal(bytes.TrimSpace(encoded), []byte("null")) {
+			return fmt.Errorf("field %q must not be null", name)
 		}
 		fieldType := field.Type
 		for fieldType.Kind() == reflect.Pointer {
@@ -378,15 +421,26 @@ func validateContract(value contract) error {
 		return errors.New("runtime policy fields are incomplete")
 	}
 	if value.Wire.HeaderBytes < 1 || value.Wire.MajorVersion < 1 || value.Wire.MinorVersion < 0 ||
+		value.Wire.SessionBinding == "" || value.Wire.ExporterContext == "" || value.Wire.TLSMinimumVersion == "" ||
+		value.Wire.TLSMaximumVersion == "" || value.Wire.TLSMinimumVersion != value.Wire.TLSMaximumVersion ||
+		value.Wire.TLSSessionResumption != "disabled" || value.Wire.CarrierLengthPrefixBytes != 4 ||
+		value.Wire.MaxControlBytes < 1 || value.Wire.MaxPayloadBytes < value.Wire.MaxControlBytes ||
+		value.Wire.ProfileBind.Magic == "" || value.Wire.ProfileBind.BodyBytes < 1 || value.Wire.ProfileBind.ComponentBytes < 1 ||
+		value.Wire.ProfileBind.TLSExporterOffset < 0 || value.Wire.ProfileBind.SessionPlanDigestOffset < value.Wire.ProfileBind.TLSExporterOffset+value.Wire.ProfileBind.ComponentBytes ||
+		value.Wire.ProfileBind.SessionPlanDigestOffset+value.Wire.ProfileBind.ComponentBytes != value.Wire.ProfileBind.BodyBytes ||
 		value.Wire.ReliableDataRecordType < 1 || value.Wire.ProfileBindRecordType < 1 || value.Wire.EngineReadyRecordType < 1 || value.Wire.CloseRecordType < 1 ||
 		value.Wire.ApplicationSlotMinimum < 1 || value.Wire.ApplicationSlotMinimum > value.Wire.ApplicationSlotMaximum ||
 		value.Wire.ApplicationSlotMaximum >= value.Wire.PaddingKeepaliveSlot || value.Wire.PaddingKeepaliveSlot >= value.Wire.ControlSlot ||
 		!value.Wire.PacketPerOperation || value.Wire.PacketAcknowledgements || value.Wire.PaddingKeepaliveSeconds < 1 ||
-		value.Wire.UnauthenticatedPeerIdleSeconds < value.Wire.PaddingKeepaliveSeconds || !value.Wire.LiveFramingNoProfileReconstruction ||
-		!uniqueNonEmpty(value.Wire.LegacyAdapters) {
+		value.Wire.NoAuthenticatedPeerActivityTimeoutSeconds < value.Wire.PaddingKeepaliveSeconds || !value.Wire.LiveFramingNoProfileReconstruction ||
+		!uniqueNonEmpty(value.Wire.KnownOuterFlags) || !uniqueNonEmpty(value.Wire.LegacyAdapters) {
 		return errors.New("wire authority is unsafe or incomplete")
 	}
-	if !value.Android.NativeOnly || !value.Android.ProtectMustSucceed || len(value.Android.Lifecycle) != 8 || !uniqueNonEmpty(value.Android.Lifecycle) {
+	if !value.Android.NativeOnly || !value.Android.ProtectMustSucceed || len(value.Android.Lifecycle) != 8 || !uniqueNonEmpty(value.Android.Lifecycle) ||
+		value.Android.RuntimeStatusScope == "" || value.Android.RuntimeStatusPlanDigestField == "" ||
+		value.Android.RuntimeStatusMTUMin != value.RuntimePolicy.MinimumMTU || value.Android.RuntimeStatusMTUMax != value.RuntimePolicy.MaximumMTU ||
+		value.Android.NativeBridgeSessionPlanDigestBytes < 1 || value.Android.NativeBridgeMTUMin != value.RuntimePolicy.MinimumMTU ||
+		value.Android.NativeBridgeMTUMax != value.RuntimePolicy.MaximumMTU {
 		return errors.New("android ownership authority is incomplete")
 	}
 	if value.Relay.ListenerFileDescriptor < 3 || value.Relay.ServiceUser == "" || value.Relay.ServiceGroup == "" || value.Relay.TUNName == "" ||
@@ -394,7 +448,10 @@ func validateContract(value contract) error {
 		value.Relay.TUNDeviceAccess != "rw" || !value.Relay.NoAmbientCapabilities || !value.Relay.EmptyCapabilityBoundingSet ||
 		value.Relay.FirewallOwner != "root" || value.Relay.SysctlOwner != "root" || value.Relay.DNSService == "" || !value.Relay.DNSSEC ||
 		value.Relay.DNSQueryLogging || !value.Relay.DNSMinimiseQueryNames || !value.Relay.DNSHideIdentityVersion || value.Relay.ControlSocketDirectory == "" ||
-		value.Relay.ControlSocketAccess == "" || !uniqueNonEmpty(value.Relay.AddressFamilies) || !uniqueNonEmpty(value.Relay.ControlOperations) {
+		value.Relay.ControlSocketAccess == "" || value.Relay.RequiredLiveUnitState != "not-applied" ||
+		value.Relay.CurrentPredecessorUnit.ServicePath == "" || value.Relay.CurrentPredecessorUnit.LiveDataPlaneAuthorized ||
+		!value.Relay.CurrentPredecessorUnit.PrivateDevices || !uniqueNonEmpty(value.Relay.CurrentPredecessorUnit.AddressFamilies) ||
+		!uniqueNonEmpty(value.Relay.AddressFamilies) || !uniqueNonEmpty(value.Relay.ControlOperations) {
 		return errors.New("relay privilege authority is unsafe or incomplete")
 	}
 	if value.Limits.ReferenceVCPU < 1 || value.Limits.ReferenceMemoryMiB < 1 || value.Limits.PreAuthenticationConnections < value.Limits.AuthenticatedSessions ||
@@ -405,7 +462,8 @@ func validateContract(value contract) error {
 		value.Limits.SystemdLimitNOFILE < 1 || value.Limits.ReconnectAttempts < 1 || len(value.Limits.ReconnectDelaysSeconds) != value.Limits.ReconnectAttempts ||
 		!strictlyIncreasing(value.Limits.ReconnectDelaysSeconds) || value.Limits.ReconnectDelayCapSeconds < value.Limits.ReconnectDelaysSeconds[len(value.Limits.ReconnectDelaysSeconds)-1] ||
 		value.Limits.AuthenticatedIdleSeconds < 1 || value.Limits.RateLimitExpirySeconds < 1 || !value.Limits.CeilingUseMustRemainMateriallyBelowMaximum ||
-		!value.Limits.SignedProgramMayNarrowFragmentLimit {
+		!value.Limits.SignedProgramMayNarrowFragmentLimit || value.Limits.LegacyProtectedRecordIncompleteOperations < 1 ||
+		!value.Limits.LiveIncompleteInnerOperationsAreSeparate {
 		return errors.New("runtime limit authority is unsafe or incomplete")
 	}
 	if err := validateNetwork(value.Network); err != nil {
@@ -448,31 +506,81 @@ func verifyGoCopies(root string, value contract) error {
 	if err != nil {
 		return err
 	}
-	for _, required := range []string{fmt.Sprintf("ALPN          = %q", value.Wire.ALPN), fmt.Sprintf("exporterLabel = %q", value.Wire.ExporterLabel), "tls.VersionTLS13"} {
-		if !strings.Contains(carrier, required) {
-			return fmt.Errorf("carrier implementation disagrees with authority: missing %q", required)
-		}
+	if err := requireSnippets("carrier implementation", carrier, []string{
+		fmt.Sprintf("ALPN          = %q", value.Wire.ALPN),
+		fmt.Sprintf("exporterLabel = %q", value.Wire.ExporterLabel),
+		"cfg.MinVersion = tls.VersionTLS13", "cfg.MaxVersion = tls.VersionTLS13",
+		"cfg.NextProtos = []string{ALPN}", "cfg.SessionTicketsDisabled = true", "cfg.ClientSessionCache = nil",
+		"state.ExportKeyingMaterial(exporterLabel, planDigest[:], 32)",
+		"var length [4]byte", "binary.BigEndian.PutUint32(length[:], uint32(len(encoded)))",
+	}); err != nil {
+		return err
 	}
 	wire, err := readRequired(root, "internal/protocol/wirev1/codec.go")
 	if err != nil {
 		return err
 	}
-	for _, required := range []string{
+	if err := requireSnippets("wire implementation", wire, []string{
 		fmt.Sprintf("HeaderBytes           = %d", value.Wire.HeaderBytes),
 		fmt.Sprintf("MajorVersion    uint8 = %d", value.Wire.MajorVersion),
 		fmt.Sprintf("MinorVersion    uint8 = %d", value.Wire.MinorVersion),
 		"var magic = [4]byte{'K', 'U', 'R', 'D'}",
+		"MaxControlBytes       = 64 << 10", "MaxPayloadBytes       = 1 << 20",
+		fmt.Sprintf("TypeProfileBind  uint8 = %d", value.Wire.ProfileBindRecordType),
+		fmt.Sprintf("TypeEngineReady  uint8 = %d", value.Wire.EngineReadyRecordType),
+		fmt.Sprintf("TypeClose        uint8 = %d", value.Wire.CloseRecordType),
 		fmt.Sprintf("TypeReliableData uint8 = %d", value.Wire.ReliableDataRecordType),
-	} {
-		if !strings.Contains(wire, required) {
-			return fmt.Errorf("wire implementation disagrees with authority: missing %q", required)
-		}
+		"knownFlags         = FlagCritical", "binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))",
+	}); err != nil {
+		return err
+	}
+	processRecords, err := readRequired(root, "internal/runtime/process_record_v1.go")
+	if err != nil {
+		return err
+	}
+	if err := requireSnippets("process record implementation", processRecords, []string{
+		"processBindMagicV1  = [8]byte{'K', 'R', 'D', 'B', 'N', 'D', '0', '1'}",
+		fmt.Sprintf("body := make([]byte, %d)", value.Wire.ProfileBind.BodyBytes),
+		"copy(body[0:8], processBindMagicV1[:])", "copy(body[8:40], tlsExporter[:])", "copy(body[40:72], client.digest[:])",
+		"wirev1.TypeProfileBind, 0, processControlSlotV1, body", "wirev1.TypeEngineReady, 0, processControlSlotV1, ready",
+		"wirev1.TypeClose, 0, processControlSlotV1, body",
+	}); err != nil {
+		return err
+	}
+	legacyProtectedChannel, err := readRequired(root, "internal/runtime/protected_channel.go")
+	if err != nil {
+		return err
+	}
+	if err := requireSnippets("legacy protected-record implementation", legacyProtectedChannel, []string{
+		fmt.Sprintf("strictFragmentMaxOperationsV1 = %d", value.Limits.LegacyProtectedRecordIncompleteOperations),
+	}); err != nil {
+		return err
+	}
+	runtimeStatus, err := readRequired(root, "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt")
+	if err != nil {
+		return err
+	}
+	if err := requireSnippets("Kotlin RuntimeStatus predecessor surface", runtimeStatus, []string{
+		"ACTIVE_KURD_LOOPBACK", "validatedForLoopbackTransport", "val planDigest: String? = null",
+		fmt.Sprintf("require(mtu in %d..%d)", value.Android.RuntimeStatusMTUMin, value.Android.RuntimeStatusMTUMax),
+	}); err != nil {
+		return err
+	}
+	nativeBridge, err := readRequired(root, "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt")
+	if err != nil {
+		return err
+	}
+	if err := requireSnippets("Kotlin NativeBridge predecessor surface", nativeBridge, []string{
+		fmt.Sprintf("require(mtu in %d..%d)", value.Android.NativeBridgeMTUMin, value.Android.NativeBridgeMTUMax),
+		fmt.Sprintf("val planDigest = reader.fixedBytes(%d)", value.Android.NativeBridgeSessionPlanDigestBytes),
+	}); err != nil {
+		return err
 	}
 	return nil
 }
 
 func verifyDeploymentCopies(root string, value contract) error {
-	service, err := readRequired(root, "deploy/selfhost/native/kurd-node.service")
+	service, err := readRequired(root, value.Relay.CurrentPredecessorUnit.ServicePath)
 	if err != nil {
 		return err
 	}
@@ -480,12 +588,23 @@ func verifyDeploymentCopies(root string, value contract) error {
 		fmt.Sprintf("LimitNOFILE=%d", value.Limits.SystemdLimitNOFILE),
 		fmt.Sprintf("TasksMax=%d", value.Limits.SystemdTasksMax),
 		fmt.Sprintf("MemoryMax=%dM", value.Limits.SystemdMemoryMaxMiB),
+		fmt.Sprintf("PrivateDevices=%s", systemdBoolean(value.Relay.CurrentPredecessorUnit.PrivateDevices)),
+		"RestrictAddressFamilies=" + strings.Join(value.Relay.CurrentPredecessorUnit.AddressFamilies, " "),
+		"CapabilityBoundingSet=", "AmbientCapabilities=",
+		"ExecStart=/usr/local/bin/kurd-node run --data-dir /var/lib/kurd-node",
 	} {
 		if !strings.Contains(service, required) {
 			return fmt.Errorf("native deployment copy disagrees with authority: missing %q", required)
 		}
 	}
 	return nil
+}
+
+func systemdBoolean(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 func verifyPublicDocumentation(root string, value contract) error {
@@ -504,8 +623,10 @@ func verifyPublicDocumentation(root string, value contract) error {
 		fmt.Sprintf("%d-byte", value.Wire.HeaderBytes), fmt.Sprintf("type %d", value.Wire.ReliableDataRecordType),
 		fmt.Sprintf("`%d..%d`", value.Wire.ApplicationSlotMinimum, value.Wire.ApplicationSlotMaximum),
 		fmt.Sprintf("`%d`", value.Wire.PaddingKeepaliveSlot), fmt.Sprintf("`%d`", value.Wire.ControlSlot),
-		fmt.Sprintf("%d seconds", value.Wire.PaddingKeepaliveSeconds), fmt.Sprintf("%d seconds", value.Wire.UnauthenticatedPeerIdleSeconds),
-		"profile bind", "TLS exporter", "no per-packet acknowledgements",
+		fmt.Sprintf("%d seconds", value.Wire.PaddingKeepaliveSeconds), fmt.Sprintf("%d seconds", value.Wire.NoAuthenticatedPeerActivityTimeoutSeconds),
+		"profile bind", "TLS exporter", "session-plan digest", "no per-packet acknowledgements",
+		fmt.Sprintf("`%s`", value.Wire.ProfileBind.Magic), fmt.Sprintf("%d-byte", value.Wire.ProfileBind.BodyBytes),
+		fmt.Sprintf("%d-byte length prefix", value.Wire.CarrierLengthPrefixBytes), "critical flag", fmt.Sprintf("%d", value.Wire.MaxControlBytes), fmt.Sprintf("%d", value.Wire.MaxPayloadBytes),
 	} {
 		if !strings.Contains(protocol, required) {
 			return fmt.Errorf("protocol documentation disagrees with authority: missing %q", required)
@@ -531,6 +652,12 @@ func verifyPublicDocumentation(root string, value contract) error {
 		fmt.Sprintf("LimitNOFILE=%d", value.Limits.SystemdLimitNOFILE), fmt.Sprintf("%d reconnect attempts", value.Limits.ReconnectAttempts),
 		fmt.Sprintf("%d-second authenticated idle-session maximum", value.Limits.AuthenticatedIdleSeconds),
 		"payload contents", "5-tuple", "telemetry is off by default", "public resolvers are not permitted",
+		"KURD-LIVE-CONTRACT: PRIVACY_PAYLOAD_LOGGING=PROHIBITED",
+		"KURD-LIVE-CONTRACT: PRIVACY_FIVE_TUPLE_LOGGING_AND_PERSISTENCE=PROHIBITED",
+		"KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED",
+		"KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=NOT_LIVE",
+		"KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=NOT_APPLIED",
+		"loopback-only predecessor", fmt.Sprintf("%d legacy protected-record incomplete operations", value.Limits.LegacyProtectedRecordIncompleteOperations),
 	} {
 		if !strings.Contains(selfHosting, required) {
 			return fmt.Errorf("self-hosting documentation disagrees with authority: missing %q", required)
@@ -553,6 +680,39 @@ func rejectPrivateOrReadinessClaims(document string) error {
 	} {
 		if strings.Contains(lower, forbidden) {
 			return fmt.Errorf("public documentation contains forbidden content %q", forbidden)
+		}
+	}
+	for _, affirmative := range []string{
+		"payload logging is enabled", "payload logging is allowed", "payload contents are logged",
+		"5-tuple logging is enabled", "5-tuple logging is allowed", "5-tuple persistence is allowed", "5-tuple is persisted",
+		"live service is ready", "live-ready", "ready to operate",
+	} {
+		if strings.Contains(lower, affirmative) {
+			return fmt.Errorf("public documentation contains affirmative unsafe claim %q", affirmative)
+		}
+	}
+	if containsPublicHostLiteral(lower) {
+		return errors.New("public documentation contains a host literal")
+	}
+	return nil
+}
+
+var publicHostLiteral = regexp.MustCompile(`(?i)(?:(?:https?|ssh)://)?\b[a-z0-9][a-z0-9.-]*\.[a-z]{2,63}\b`)
+
+func containsPublicHostLiteral(document string) bool {
+	for _, literal := range publicHostLiteral.FindAllString(document, -1) {
+		if literal == "kurd-node.service" {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func requireSnippets(scope, text string, required []string) error {
+	for _, snippet := range required {
+		if !strings.Contains(text, snippet) {
+			return fmt.Errorf("%s disagrees with authority: missing %q", scope, snippet)
 		}
 	}
 	return nil
