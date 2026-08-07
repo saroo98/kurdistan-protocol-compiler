@@ -33,6 +33,7 @@ enum class SecureDataClass(val wireValue: Int) {
     RESTORE_BATCH(10),
     ROUTING_POLICY(11),
     DIAGNOSTIC_EVENTS(12),
+    RECIPIENT_KEY_INDEX(13),
 }
 
 data class WrappedKey(
