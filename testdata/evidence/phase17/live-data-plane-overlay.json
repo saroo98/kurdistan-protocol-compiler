@@ -228,6 +228,16 @@
       "post_sha256": "32284643158d04102d0ed76a718da910fc84a640259f9d67d9e007cbea00a52d"
     },
     {
+      "path": "internal/product/livecarrier/livecarrier_v2.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "67fe8cb48f59393ffc76775f689ccde4c4e8265f2d099315be7804f29a5ebac1"
+    },
+    {
+      "path": "internal/product/livecarrier/livecarrier_v2_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "af1659f4e4d5a27d91185df453ecc42de0b8430026c3370f79bb0081113e3daa"
+    },
+    {
       "path": "internal/product/profile/phase16_issuance_intent.go",
       "pre_sha256": "62f4abd1af1d0b3610cdd504c0c53364a0df0b455b934fc42abb6fdb9533956e",
       "post_sha256": "041c80dc7eacb681205604222a20aa93359900deb3c1136b8dd1a84318ffa534"
@@ -276,6 +286,16 @@
       "path": "internal/product/runtimepolicy/policy_v2_test.go",
       "pre_sha256": "6c596d622dbf373d5289349b31719c408c787f5c8307134848c5ca89547d2edb",
       "post_sha256": "630fd2fac1f4b47bf15af5e85ca03feefefb497c12ae78e08fd571c44820c9e0"
+    },
+    {
+      "path": "internal/product/sessionplan/sessionplan_v2.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f3d925a482480df99f4ee1268c204396e801ef617d8a2e23b8f4afc77627420d"
+    },
+    {
+      "path": "internal/product/sessionplan/sessionplan_v2_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f3bda24a36d55669738489245ddab87b8f03f5eec2c0e265fd80005026274052"
     },
     {
       "path": "internal/protocol/framing/codec_test.go",
