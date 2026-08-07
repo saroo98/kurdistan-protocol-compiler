@@ -135,6 +135,8 @@
     <string name="disconnected">Disconnected</string>
     <string name="connecting">Connecting…</string>
     <string name="connected_local">Connected to owned loopback</string>
+    <string name="connected_relay">Connected through verified Kurd relay</string>
+    <string name="phase17_live_notice">Traffic is routed through the authenticated Kurd session to the relay imported in the active profile. DNS remains inside the tunnel.</string>
     <string name="disconnecting">Disconnecting…</string>
     <string name="permission_revoked">VPN permission revoked</string>
     <string name="connection_failed">Connection failed safely</string>

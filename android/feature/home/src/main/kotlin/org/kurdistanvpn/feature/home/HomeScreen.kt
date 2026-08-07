@@ -55,7 +55,8 @@ fun HomeScreen(
         it.localRecordId == settings.profiles.activeLocalRecordId
     } ?: profiles.firstOrNull()
     val active = vpnRuntime.state == VpnRuntimeState.ACTIVE_LOCAL_ONLY ||
-        vpnRuntime.state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK
+        vpnRuntime.state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK ||
+        vpnRuntime.state == VpnRuntimeState.ACTIVE_KURD_LIVE
     val busy = vpnRuntime.state == VpnRuntimeState.PREPARING ||
         vpnRuntime.state == VpnRuntimeState.AWAITING_VPN_CONSENT ||
         vpnRuntime.state == VpnRuntimeState.CONNECTING ||
@@ -286,6 +287,7 @@ private fun connectionTitle(state: VpnRuntimeState): String = when (state) {
     -> stringResource(UiR.string.connecting)
     VpnRuntimeState.ACTIVE_LOCAL_ONLY, VpnRuntimeState.ACTIVE_KURD_LOOPBACK ->
         stringResource(UiR.string.connected_local)
+    VpnRuntimeState.ACTIVE_KURD_LIVE -> stringResource(UiR.string.connected_relay)
     VpnRuntimeState.STOPPING -> stringResource(UiR.string.disconnecting)
     VpnRuntimeState.DEGRADED -> stringResource(UiR.string.connection_degraded)
     VpnRuntimeState.FALLING_BACK -> stringResource(UiR.string.connection_falling_back)
@@ -299,6 +301,7 @@ private fun connectionTitle(state: VpnRuntimeState): String = when (state) {
 @Composable
 private fun connectionExplanation(snapshot: VpnRuntimeSnapshot): String = when (snapshot.state) {
     VpnRuntimeState.ACTIVE_KURD_LOOPBACK -> stringResource(UiR.string.phase11_local_notice)
+    VpnRuntimeState.ACTIVE_KURD_LIVE -> stringResource(UiR.string.phase17_live_notice)
     VpnRuntimeState.BLOCKED,
     VpnRuntimeState.REVOKED,
     VpnRuntimeState.FAILED -> stringResource(UiR.string.failure_explanation)

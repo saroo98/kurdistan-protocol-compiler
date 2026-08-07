@@ -66,9 +66,13 @@ class VpnRuntimeConfigTest {
     fun runtimeStartWireIsBoundedCanonicalAndConsumesAuthorityBytes() {
         val verify = byteArrayOf(1, 2, 3)
         val activation = byteArrayOf(4, 5, 6, 7)
+        val recipientRequest = byteArrayOf(8, 9)
+        val recipientPrivate = byteArrayOf(10, 11)
         val encoded = RuntimeStartWire.encode(
             verifyRequest = verify,
             activationRecord = activation,
+            recipientRequest = recipientRequest,
+            recipientPrivate = recipientPrivate,
             config = VpnRuntimeConfig(
                 routingPolicy = VpnRoutingPolicy(
                     PerAppRoutingMode.INCLUDE_ONLY,
@@ -78,9 +82,8 @@ class VpnRuntimeConfigTest {
                 mtu = 1400,
             ),
         )
-        assertEquals("KRS1", encoded.copyOfRange(0, 4).decodeToString())
-        assertEquals(verify.size + activation.size, encoded.size - 26 - 2 * 2 -
-            "org.example.alpha".length - "org.example.zulu".length)
+        assertEquals("KRV2", encoded.copyOfRange(0, 4).decodeToString())
+        assertEquals(encoded.size, java.nio.ByteBuffer.wrap(encoded, 20, 4).int)
         assertEquals(listOf(1, 2, 3), verify.map(Byte::toInt))
         assertEquals(listOf(4, 5, 6, 7), activation.map(Byte::toInt))
     }
@@ -91,6 +94,8 @@ class VpnRuntimeConfigTest {
             RuntimeStartWire.encode(
                 byteArrayOf(),
                 byteArrayOf(1),
+                byteArrayOf(2),
+                byteArrayOf(3),
                 VpnRuntimeConfig(VpnRoutingPolicy()),
             )
         }
@@ -98,8 +103,30 @@ class VpnRuntimeConfigTest {
             RuntimeStartWire.encode(
                 byteArrayOf(1),
                 byteArrayOf(2),
+                byteArrayOf(3),
+                byteArrayOf(4),
                 VpnRuntimeConfig(VpnRoutingPolicy(), allowLan = true),
             )
+        }
+    }
+
+    @Test
+    fun liveRuntimeAcceptsOnlyStrictNumericCustomDns() {
+        listOf("1.1.1.1", "2606:4700:4700::1111").forEach { address ->
+            VpnRuntimeConfig(
+                routingPolicy = VpnRoutingPolicy(),
+                dnsMode = DnsMode.CUSTOM,
+                customDns = address,
+            ).validatedForLiveTransport()
+        }
+        listOf("1", "001.1.1.1", "256.1.1.1", "resolver.example", "fe80::1%wlan0").forEach { address ->
+            assertThrows(IllegalArgumentException::class.java) {
+                VpnRuntimeConfig(
+                    routingPolicy = VpnRoutingPolicy(),
+                    dnsMode = DnsMode.CUSTOM,
+                    customDns = address,
+                ).validatedForLiveTransport()
+            }
         }
     }
 }

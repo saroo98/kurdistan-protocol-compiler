@@ -49,6 +49,8 @@
     <string name="disconnected">Disconnected</string>
     <string name="connecting">Connecting…</string>
     <string name="connected_local">Connected to owned loopback</string>
+    <string name="connected_relay">Bi relaya Kurd a piştrastkirî ve girêdayî ye</string>
+    <string name="phase17_live_notice">Trafîk di nav danişîna Kurd a nasnamekirî re ber bi relaya ku di profîla çalak de hatiye têxistin ve tê birin. DNS di nav tunelê de dimîne.</string>
     <string name="disconnecting">Disconnecting…</string>
     <string name="permission_revoked">VPN permission revoked</string>
     <string name="connection_failed">Connection failed safely</string>

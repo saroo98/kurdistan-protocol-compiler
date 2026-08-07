@@ -73,6 +73,8 @@
     <string name="disconnected">Disconnected</string>
     <string name="connecting">Connecting…</string>
     <string name="connected_local">Connected to owned loopback</string>
+    <string name="connected_relay">لە ڕێگەی ڕێلەی پشتڕاستکراوی کوردەوە پەیوەستە</string>
+    <string name="phase17_live_notice">هاتووچۆ لە ناو دانیشتنی ناسێنراوی کوردەوە بۆ ئەو ڕێلەیە دەچێت کە لە پرۆفایلی چالاکدا هاوردە کراوە. DNS لە ناو تونێلەکەدا دەمێنێتەوە.</string>
     <string name="disconnecting">Disconnecting…</string>
     <string name="permission_revoked">VPN permission revoked</string>
     <string name="connection_failed">Connection failed safely</string>
