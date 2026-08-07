@@ -52,9 +52,10 @@ type ControlResponseV1 struct {
 }
 
 type ControlActionsV1 struct {
-	Health   *HealthMachine
-	Registry *SessionRegistry
-	Reload   func() error
+	Health      *HealthMachine
+	Registry    *SessionRegistry
+	Reload      func() error
+	StopProfile func(string) int
 }
 
 var (
@@ -155,7 +156,9 @@ func (actions ControlActionsV1) Execute(request ControlRequestV1) (ControlRespon
 			response.OK, response.Code = false, ControlCodeReloadFailedV1
 		}
 	case ControlStopProfileV1:
-		if actions.Registry == nil {
+		if actions.StopProfile != nil {
+			response.Stopped = uint16(actions.StopProfile(request.ProfileID))
+		} else if actions.Registry == nil {
 			response.OK, response.Code = false, ControlCodeUnavailableV1
 		} else {
 			response.Stopped = uint16(actions.Registry.StopProfile(request.ProfileID))

@@ -9,11 +9,56 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"kurdistan/internal/selfhost"
 )
+
+func TestVersionReportsNativeLinuxDataPlane(t *testing.T) {
+	var output, errorOutput bytes.Buffer
+	if code := run(context.Background(), []string{"version"}, &output, &errorOutput); code != 0 || errorOutput.Len() != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errorOutput.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["version"] != version || result["dataPlane"] != "NATIVE_LINUX_ONLY" {
+		t.Fatalf("version=%v", result)
+	}
+}
+
+func TestServeRejectsDirectLaunchWithoutSystemdActivation(t *testing.T) {
+	t.Setenv("LISTEN_PID", "")
+	t.Setenv("LISTEN_FDS", "")
+	t.Setenv("LISTEN_FDNAMES", "")
+	dataDir := filepath.Join(t.TempDir(), "node")
+	control := filepath.Join(t.TempDir(), "control.sock")
+	var output, errorOutput bytes.Buffer
+	code := run(context.Background(), []string{"serve", "--data-dir", dataDir, "--port", "443", "--control-socket", control}, &output, &errorOutput)
+	if code != 1 || output.Len() != 0 || errorOutput.String() != "kurd-node serve: unavailable\n" {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, output.String(), errorOutput.String())
+	}
+	if strings.Contains(errorOutput.String(), dataDir) || strings.Contains(errorOutput.String(), control) {
+		t.Fatal("serve failure exposed an owner-local path")
+	}
+}
+
+func TestServeRejectsInvalidArgumentsBeforeOpeningResources(t *testing.T) {
+	for _, args := range [][]string{
+		{"serve"},
+		{"serve", "--data-dir", t.TempDir(), "--port", "0"},
+		{"serve", "--data-dir", t.TempDir(), "--port", "65536"},
+		{"serve", "--data-dir", t.TempDir(), "--port", "443", "unexpected"},
+	} {
+		var output, errorOutput bytes.Buffer
+		if code := run(context.Background(), args, &output, &errorOutput); code != 2 {
+			t.Fatalf("args=%v code=%d stdout=%q stderr=%q", args, code, output.String(), errorOutput.String())
+		}
+	}
+}
 
 func TestRunOncePublishesValidatedAuthoritySnapshot(t *testing.T) {
 	base := t.TempDir()
