@@ -1222,6 +1222,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	fixturePaths = append(fixturePaths,
+		evidenceoverlay.Phase16P0RepairSuccessorPath,
 		evidenceoverlay.PublicDocumentationSuccessorPath,
 		evidenceoverlay.SuccessorPath,
 		evidenceoverlay.Phase16SuccessorPath,
@@ -1882,5 +1883,35 @@ func TestPhase8ExistingFileOverlayPreservesHistoricalCandidateBindingV1(t *testi
 	}
 	if candidate.OutsideScopeSHA256 != "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a" || candidate.OutsideScopeFileCount != 1329 {
 		t.Fatalf("existing-file overlay replaced historical candidate binding: %s/%d", candidate.OutsideScopeSHA256, candidate.OutsideScopeFileCount)
+	}
+}
+
+func TestM0CandidateManifestIgnoresUntrackedFilesV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := m0CandidateOutsideScopeManifestV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe, err := os.CreateTemp(root, "m0-candidate-untracked-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := probe.Close(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(probe.Name()); err != nil {
+			t.Error(err)
+		}
+	})
+	after, err := m0CandidateOutsideScopeManifestV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.OutsideScopeSHA256 != before.OutsideScopeSHA256 || after.OutsideScopeFileCount != before.OutsideScopeFileCount {
+		t.Fatalf("untracked file changed historical candidate: before=%s/%d after=%s/%d", before.OutsideScopeSHA256, before.OutsideScopeFileCount, after.OutsideScopeSHA256, after.OutsideScopeFileCount)
 	}
 }

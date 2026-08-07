@@ -1684,7 +1684,7 @@ type m0CandidateManifestV1 struct {
 }
 
 func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, error) {
-	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd := exec.Command("git", "ls-files", "-z", "--cached")
 	cmd.Dir = root
 	raw, err := cmd.Output()
 	if err != nil {
@@ -1852,7 +1852,13 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes[evidenceoverlay.Phase16ProductionTrustSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16RuntimeSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16DecentralizedSuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.Phase16P0RepairSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.PublicDocumentationSuccessorPath] = "ABSENT"
+	for path, predecessor := range preHashes {
+		if predecessor != "ABSENT" {
+			parts = append(parts, path)
+		}
+	}
 	return m0CandidateManifestFromPathsWithPreHashesV1(root, parts, preHashes)
 }
 
