@@ -529,9 +529,24 @@
       "post_sha256": "d2c12028bb4701357d701fedd63a2877b9c7d3959c9687a57f044c955213f934"
     },
     {
+      "path": "cmd/gate/main_test.go",
+      "pre_sha256": "cbafc176e870e6dc32884d3ccd825f2831565a969d5cd9763a3365950ea10a0e",
+      "post_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc"
+    },
+    {
       "path": "cmd/phase16verify/main_test.go",
       "pre_sha256": "30d4ab13703475e8d8ed70ebdc9957e24cf24edb8683f707f19d721c908e6ba8",
       "post_sha256": "fba28200e3695364e623d5caab2db35d9af3bf052d5c990ca0bd978d65008ae6"
+    },
+    {
+      "path": "config/ci/impact-policy.json",
+      "pre_sha256": "ddd8301e54cb6e60ecb581a125081247d350e258cd9144efb04e5c21978238c1",
+      "post_sha256": "1251aef3d1e7f7ba6dcc9875d0cf95c1795d8e00c6729c6ef1467419769d3044"
+    },
+    {
+      "path": "config/ci/proof-policy.json",
+      "pre_sha256": "fa158b49548f25e7b93a0be6a7f18a125d89b763b1afb7ae234110006244a8d2",
+      "post_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e"
     },
     {
       "path": "docs/GITHUB_REPO_PROFILE.md",
