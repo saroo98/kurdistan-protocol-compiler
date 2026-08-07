@@ -79,6 +79,9 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		return nil, err
 	}
 	defer zero(master)
+	if state.Revocations.EmergencyDenied {
+		return nil, ErrRelayRuntimeUnavailable
+	}
 	if state.Drained {
 		return nil, ErrDrained
 	}

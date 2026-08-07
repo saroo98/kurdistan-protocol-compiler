@@ -8,11 +8,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,10 +25,13 @@ import (
 
 	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/envelope"
+	"kurdistan/internal/relay/node"
 	"kurdistan/internal/selfhost"
 )
 
 const version = "kurdctl-phase17-v1"
+
+const defaultControlSocketV1 = "/run/kurd-node/control.sock"
 
 var (
 	errCLIInvalidInput  = selfhost.ErrInvalidInput
@@ -35,6 +40,7 @@ var (
 	errOutputIncomplete = errors.New("output incomplete")
 	migrateStateToV2    = selfhost.MigrateToV2
 	rollbackStateV2     = selfhost.RollbackMigrationV2
+	notifyRelayRuntime  = notifyRelayRuntimeV1
 )
 
 type committedOutputError struct {
@@ -45,6 +51,13 @@ type committedOutputError struct {
 
 func (e committedOutputError) Error() string { return "committed profile output incomplete" }
 func (e committedOutputError) Unwrap() error { return e.cause }
+
+type committedRuntimeControlError struct{ cause error }
+
+func (e committedRuntimeControlError) Error() string {
+	return "committed state awaits runtime notification"
+}
+func (e committedRuntimeControlError) Unwrap() error { return e.cause }
 
 type profileOutputFilesV2 struct {
 	Artifact string                  `json:"artifact"`
@@ -165,7 +178,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 func categorizeCLIError(err error) (string, int) {
 	var committed committedOutputError
+	var runtimePending committedRuntimeControlError
 	switch {
+	case errors.As(err, &runtimePending):
+		return "state committed; runtime notification pending; run kurdctl node reload", 7
 	case errors.As(err, &committed):
 		category := "output incomplete"
 		if errors.Is(committed.cause, errOutputExists) {
@@ -231,6 +247,7 @@ Profiles:
 
 Node and maintenance:
   node drain
+  node reload
   node resume
   backup create
   backup verify
@@ -249,13 +266,14 @@ Passphrases are read from standard input and are never accepted as arguments.
 }
 
 func runKeys(args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) < 2 || args[0] != "rotate" || args[1] != "issuer" && args[1] != "relay" && args[1] != "tls" || rejectDuplicateFlags(args[2:], "data-dir", "recovery-file", "confirm") {
+	if len(args) < 2 || args[0] != "rotate" || args[1] != "issuer" && args[1] != "relay" && args[1] != "tls" || rejectDuplicateFlags(args[2:], "data-dir", "recovery-file", "confirm", "control-socket") {
 		return selfhost.ErrInvalidInput
 	}
 	set := newFlags("keys rotate " + args[1])
 	dataDir := set.String("data-dir", "", "state directory")
 	recovery := set.String("recovery-file", "", "recovery artifact")
 	confirm := set.String("confirm", "", "must equal key type")
+	controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
 	if set.Parse(args[2:]) != nil || set.NArg() != 0 || *confirm != args[1] {
 		return selfhost.ErrInvalidInput
 	}
@@ -275,6 +293,9 @@ func runKeys(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	if err != nil {
 		return err
+	}
+	if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+		return committedRuntimeControlError{cause: err}
 	}
 	return writeJSON(stdout, keyRotationResponseV2{
 		Schema: "kurdctl-key-rotation-v2", Kind: result.Kind, DelegationEpoch: result.DelegationEpoch,
@@ -369,7 +390,8 @@ func runProfile(args []string, stdin io.Reader, stdout io.Writer) error {
 		confirmRecipientReuse := set.String("confirm-recipient-reuse", "", "must equal recipient-reuse for cross-deployment reuse")
 		authorityOnly := set.Bool("authority-only", false, "issue a non-connectable authority-only artifact")
 		outputDir := set.String("output-dir", "", "exclusive output directory")
-		if rejectDuplicateFlags(args[1:], "data-dir", "name", "valid-for", "recipient-request", "recipient-registry-dir", "confirm-recipient-reuse", "authority-only", "output-dir") ||
+		controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
+		if rejectDuplicateFlags(args[1:], "data-dir", "name", "valid-for", "recipient-request", "recipient-registry-dir", "confirm-recipient-reuse", "authority-only", "output-dir", "control-socket") ||
 			set.Parse(args[1:]) != nil || set.NArg() != 0 || *dataDir == "" || *name == "" || *outputDir == "" || *authorityOnly == (*recipientRequest != "") ||
 			*authorityOnly && (*registryDir != "" || *confirmRecipientReuse != "") {
 			return selfhost.ErrInvalidInput
@@ -407,6 +429,11 @@ func runProfile(args []string, stdin io.Reader, stdout io.Writer) error {
 		paths, err := writeIssued(*outputDir, issued)
 		if err != nil {
 			return committedOutputError{cause: err, profileID: issued.ProfileID, generation: issued.Generation}
+		}
+		if issued.Connectable {
+			if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+				return committedRuntimeControlError{cause: err}
+			}
 		}
 		return writeJSON(stdout, profileMutationResponse("kurdctl-profile-create-v2", issued, paths))
 	case "list":
@@ -524,7 +551,8 @@ func runProfileRotate(args []string, stdin io.Reader, stdout io.Writer) error {
 	registryDir := set.String("recipient-registry-dir", "", "owner-local recipient-use registry")
 	confirmRecipientReuse := set.String("confirm-recipient-reuse", "", "must equal recipient-reuse for cross-deployment reuse")
 	outputDir := set.String("output-dir", "", "exclusive output directory")
-	if rejectDuplicateFlags(args, "data-dir", "id", "profile-id", "recovery-file", "valid-for", "recipient-request", "recipient-registry-dir", "confirm-recipient-reuse", "output-dir") ||
+	controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
+	if rejectDuplicateFlags(args, "data-dir", "id", "profile-id", "recovery-file", "valid-for", "recipient-request", "recipient-registry-dir", "confirm-recipient-reuse", "output-dir", "control-socket") ||
 		set.Parse(args) != nil || set.NArg() != 0 || *dataDir == "" || *outputDir == "" || *recovery == "" || *id != "" && *profileID != "" {
 		return selfhost.ErrInvalidInput
 	}
@@ -569,6 +597,11 @@ func runProfileRotate(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return committedOutputError{cause: err, profileID: issued.ProfileID, generation: issued.Generation}
 	}
+	if issued.Connectable {
+		if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+			return committedRuntimeControlError{cause: err}
+		}
+	}
 	return writeJSON(stdout, profileMutationResponse("kurdctl-profile-rotate-v2", issued, paths))
 }
 
@@ -580,7 +613,8 @@ func runProfileRevoke(args []string, stdin io.Reader, stdout io.Writer) error {
 	recovery := set.String("recovery-file", "", "recovery artifact")
 	confirm := set.String("confirm", "", "must equal profile ID")
 	confirmProfile := set.String("confirm-profile", "", "must equal profile ID")
-	if rejectDuplicateFlags(args, "data-dir", "id", "profile-id", "recovery-file", "confirm", "confirm-profile") || set.Parse(args) != nil || set.NArg() != 0 ||
+	controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
+	if rejectDuplicateFlags(args, "data-dir", "id", "profile-id", "recovery-file", "confirm", "confirm-profile", "control-socket") || set.Parse(args) != nil || set.NArg() != 0 ||
 		*id != "" && *profileID != "" || *confirm != "" && *confirmProfile != "" {
 		return selfhost.ErrInvalidInput
 	}
@@ -601,21 +635,38 @@ func runProfileRevoke(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := selfhost.RevokeProfile(*dataDir, selfhost.RevokeProfileOptions{ProfileID: *id, RecoveryPath: *recovery, RecoveryPassphrase: passphrase, Now: time.Now().UTC()}); err != nil {
 		return err
 	}
+	if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+		return committedRuntimeControlError{cause: err}
+	}
 	return writeJSON(stdout, map[string]any{"schema": "kurdctl-profile-revoke-v1", "profileId": *id, "revoked": true})
 }
 
 func runNode(args []string, stdout io.Writer) error {
-	if len(args) == 0 || args[0] != "drain" && args[0] != "resume" {
+	if len(args) == 0 || args[0] != "drain" && args[0] != "resume" && args[0] != "reload" {
 		return selfhost.ErrInvalidInput
 	}
 	set := newFlags("node " + args[0])
 	dataDir := set.String("data-dir", "", "state directory")
-	if set.Parse(args[1:]) != nil || set.NArg() != 0 {
+	controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
+	if rejectDuplicateFlags(args[1:], "data-dir", "control-socket") || set.Parse(args[1:]) != nil || set.NArg() != 0 {
 		return selfhost.ErrInvalidInput
+	}
+	if args[0] == "reload" {
+		if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, true); err != nil {
+			return err
+		}
+		return writeJSON(stdout, map[string]any{"schema": "kurdctl-node-reload-v1", "reloaded": true})
 	}
 	drained := args[0] == "drain"
 	if err := selfhost.SetDrained(*dataDir, drained, time.Now().UTC()); err != nil {
 		return err
+	}
+	command := node.ControlResumeV1
+	if drained {
+		command = node.ControlDrainV1
+	}
+	if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: command}, false); err != nil {
+		return committedRuntimeControlError{cause: err}
 	}
 	return writeJSON(stdout, map[string]any{"schema": "kurdctl-node-state-v1", "drained": drained})
 }
@@ -628,7 +679,8 @@ func runDeployment(args []string, stdin io.Reader, stdout io.Writer) error {
 	dataDir := set.String("data-dir", "", "state directory")
 	recovery := set.String("recovery-file", "", "recovery artifact")
 	confirm := set.String("confirm", "", "must equal deployment action")
-	if set.Parse(args[1:]) != nil || set.NArg() != 0 || *confirm != args[0] {
+	controlSocket := set.String("control-socket", defaultControlSocketV1, "owner-local relay control socket")
+	if rejectDuplicateFlags(args[1:], "data-dir", "recovery-file", "confirm", "control-socket") || set.Parse(args[1:]) != nil || set.NArg() != 0 || *confirm != args[0] {
 		return selfhost.ErrInvalidInput
 	}
 	passphrase, err := readPassphrase(stdin)
@@ -639,7 +691,37 @@ func runDeployment(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := selfhost.SetDeploymentDisabled(*dataDir, args[0] == "disable", selfhost.RecoveryActionOptions{RecoveryPath: *recovery, RecoveryPassphrase: passphrase, Now: time.Now().UTC()}); err != nil {
 		return err
 	}
+	if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+		return committedRuntimeControlError{cause: err}
+	}
 	return writeJSON(stdout, map[string]any{"schema": "kurdctl-deployment-state-v1", "disabled": args[0] == "disable"})
+}
+
+func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, required bool) error {
+	if path == "" {
+		return node.ErrControlConfig
+	}
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) && !required {
+		return nil
+	}
+	if err != nil || info == nil || info.Mode()&os.ModeSocket == 0 {
+		return errors.Join(node.ErrControlConfig, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	connection, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", path)
+	if err != nil {
+		return errors.Join(node.ErrControlConfig, err)
+	}
+	response, err := node.ExchangeControlV1(ctx, connection, request, time.Second)
+	if err != nil {
+		return err
+	}
+	if !response.OK {
+		return node.ErrControlProtocol
+	}
+	return nil
 }
 
 func runClock(args []string, stdin io.Reader, stdout io.Writer) error {

@@ -286,6 +286,7 @@ func TestLiveDataPlaneVerifierRejectsCarrierWireRuntimeAndKotlinDrift(t *testing
 		{"Kotlin runtime MTU", "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt", "mtu in 1280..1500", "mtu in 1279..1500"},
 		{"Kotlin native plan digest", "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt", "reader.fixedBytes(32)", "reader.fixedBytes(31)"},
 		{"live unit device boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=no", "PrivateDevices=yes"},
+		{"live unit authenticated reload", "deploy/selfhost/native/kurd-node.service", "ExecReload=/usr/local/bin/kurdctl node reload", "ExecReload=/bin/true"},
 	}
 	for _, mutation := range mutations {
 		t.Run(mutation.name, func(t *testing.T) {
@@ -297,6 +298,13 @@ func TestLiveDataPlaneVerifierRejectsCarrierWireRuntimeAndKotlinDrift(t *testing
 				t.Fatalf("accepted %s drift", mutation.name)
 			}
 		})
+	}
+}
+
+func TestLiveUnitSupportsAuthenticatedOwnerLocalReload(t *testing.T) {
+	service := string(mustReadFile(t, filepath.Join(repositoryRoot(t), filepath.FromSlash("deploy/selfhost/native/kurd-node.service"))))
+	if !strings.Contains(service, "ExecReload=/usr/local/bin/kurdctl node reload --data-dir /var/lib/kurd-node --control-socket /run/kurd-node/control.sock") {
+		t.Fatal("live unit lacks the bounded owner-local reload operation")
 	}
 }
 

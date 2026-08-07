@@ -4,6 +4,7 @@
 package org.kurdistanvpn.runtime.android
 
 import java.net.InetAddress
+import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
@@ -51,7 +52,7 @@ internal class NativeTunnelController(
         val socket = when (val prepared = session.prepareSocket()) {
             is NativeResult.Failure -> return@synchronized fail(
                 session,
-                LiveTunnelFailure.SOCKET_PREPARE_FAILED,
+                prepared.error.toLiveTunnelFailure(LiveTunnelFailure.SOCKET_PREPARE_FAILED),
             )
             is NativeResult.Success -> prepared.value
         }
@@ -62,8 +63,12 @@ internal class NativeTunnelController(
             return@synchronized fail(session, LiveTunnelFailure.SOCKET_PROTECT_FAILED)
         }
         onStage(LiveTunnelStage.SOCKET_PROTECTED)
-        if (session.commitProtected(true) is NativeResult.Failure) {
-            return@synchronized fail(session, LiveTunnelFailure.NETWORK_AUTHENTICATION_FAILED)
+        when (val committed = session.commitProtected(true)) {
+            is NativeResult.Failure -> return@synchronized fail(
+                session,
+                committed.error.toLiveTunnelFailure(LiveTunnelFailure.NETWORK_AUTHENTICATION_FAILED),
+            )
+            is NativeResult.Success -> Unit
         }
         if (session.status() != NativeResult.Success(NativeRuntimeState.KURD_AUTHENTICATED)) {
             return@synchronized fail(session, LiveTunnelFailure.NATIVE_STATE_MISMATCH)
@@ -87,9 +92,15 @@ internal class NativeTunnelController(
             return@synchronized fail(session, LiveTunnelFailure.TUN_ESTABLISH_FAILED)
         }
         onStage(LiveTunnelStage.TUN_ESTABLISHED)
-        if (session.attachTun(tunFileDescriptor) is NativeResult.Failure) {
-            runCatching { detachedCloser.close(tunFileDescriptor) }
-            return@synchronized fail(session, LiveTunnelFailure.TUN_ATTACH_FAILED)
+        when (val attached = session.attachTun(tunFileDescriptor)) {
+            is NativeResult.Failure -> {
+                runCatching { detachedCloser.close(tunFileDescriptor) }
+                return@synchronized fail(
+                    session,
+                    attached.error.toLiveTunnelFailure(LiveTunnelFailure.TUN_ATTACH_FAILED),
+                )
+            }
+            is NativeResult.Success -> Unit
         }
         if (session.status() != NativeResult.Success(NativeRuntimeState.RUNNING)) {
             return@synchronized fail(session, LiveTunnelFailure.NATIVE_STATE_MISMATCH)
@@ -120,6 +131,36 @@ internal class NativeTunnelController(
         return LiveTunnelStartResult.Failure(failure)
     }
 }
+
+private fun OperationError.toLiveTunnelFailure(fallback: LiveTunnelFailure): LiveTunnelFailure =
+    when (this) {
+        OperationError.TRUST_REJECTED,
+        OperationError.POLICY_REJECTED,
+        OperationError.INCOMPATIBLE_NATIVE_CORE
+        -> LiveTunnelFailure.AUTHORITY_REJECTED
+        OperationError.CANCELLED -> LiveTunnelFailure.CANCELLED
+        OperationError.ENDPOINT_UNAVAILABLE -> LiveTunnelFailure.ENDPOINT_UNAVAILABLE
+        OperationError.TLS_REJECTED -> LiveTunnelFailure.TLS_REJECTED
+        OperationError.KURD_AUTH_REJECTED -> LiveTunnelFailure.KURD_AUTH_REJECTED
+        OperationError.TUN_IO_FAILED -> LiveTunnelFailure.TUN_IO_FAILED
+        OperationError.DNS_UNAVAILABLE -> LiveTunnelFailure.DNS_UNAVAILABLE
+        OperationError.NETWORK_LOST -> LiveTunnelFailure.NETWORK_LOST
+        OperationError.FALLBACK_EXHAUSTED -> LiveTunnelFailure.FALLBACK_EXHAUSTED
+        OperationError.NODE_DRAINED -> LiveTunnelFailure.NODE_DRAINED
+        OperationError.DEPLOYMENT_DISABLED -> LiveTunnelFailure.DEPLOYMENT_DISABLED
+        OperationError.RESOURCE_LIMIT -> LiveTunnelFailure.RESOURCE_LIMIT
+        OperationError.STATE_CORRUPT -> LiveTunnelFailure.STATE_CORRUPT
+        OperationError.RECOVERY_REQUIRED,
+        OperationError.KEY_INVALIDATED,
+        OperationError.STORAGE_FAILURE,
+        OperationError.QUARANTINED
+        -> LiveTunnelFailure.RECOVERY_REQUIRED
+        OperationError.INTERNAL_FAILURE -> LiveTunnelFailure.INTERNAL_FAILURE
+        OperationError.INVALID_INPUT,
+        OperationError.SIZE_LIMIT,
+        OperationError.DUPLICATE
+        -> fallback
+    }
 
 internal fun NativeLiveRuntimeSessionSnapshot.toLiveTunConfiguration(): LiveTunConfiguration {
     require(mtu == 1280) { "INVALID_LIVE_MTU" }

@@ -676,7 +676,10 @@ func boundedDurationMillisV2(value time.Duration) uint32 {
 
 func normalizeRuntimeNetworkCode(code ErrorCode) ErrorCode {
 	switch code {
-	case CodeOK, CodeInvalidArgument, CodeSizeLimit, CodeCancelled, CodeVerificationRejected, CodePolicyRejected, CodeIncompatible, CodeInternalFailure:
+	case CodeOK, CodeInvalidArgument, CodeSizeLimit, CodeCancelled, CodeVerificationRejected, CodePolicyRejected,
+		CodeIncompatible, CodeInternalFailure, CodeEndpointUnavailable, CodeTLSRejected, CodeKurdAuthRejected,
+		CodeTUNIOFailed, CodeDNSUnavailable, CodeNetworkLost, CodeFallbackExhausted, CodeNodeDrained,
+		CodeDeploymentDisabled, CodeResourceLimit, CodeStateCorrupt:
 		return code
 	default:
 		return CodeInternalFailure
