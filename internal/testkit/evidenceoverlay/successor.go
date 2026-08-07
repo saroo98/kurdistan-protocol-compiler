@@ -24,13 +24,18 @@ const (
 	Phase16ProductionTrustSuccessorPath = "testdata/evidence/phase16/production-trust-overlay.json"
 	Phase16RuntimeSuccessorPath         = "testdata/evidence/phase16/production-runtime-overlay.json"
 	Phase16DecentralizedSuccessorPath   = "testdata/evidence/phase16/decentralized-self-hosted-overlay.json"
+	Phase17SuccessorPath                = "testdata/evidence/phase17/live-data-plane-overlay.json"
 	PublicDocumentationSuccessorPath    = "testdata/evidence/public-documentation-sanitization-overlay.json"
 )
 
 type overlay struct {
-	Version          string  `json:"version"`
-	Entries          []entry `json:"entries"`
-	SuccessorEntries []entry `json:"successor_entries,omitempty"`
+	Version                  string  `json:"version"`
+	SelfPath                 string  `json:"self_path,omitempty"`
+	SelfPreEvidence          string  `json:"self_pre_evidence,omitempty"`
+	SelfPreSHA256            string  `json:"self_pre_sha256,omitempty"`
+	PredecessorBindingSHA256 string  `json:"predecessor_binding_sha256,omitempty"`
+	Entries                  []entry `json:"entries"`
+	SuccessorEntries         []entry `json:"successor_entries,omitempty"`
 }
 
 type entry struct {
@@ -44,12 +49,21 @@ type entry struct {
 // LoadSuccessor verifies the exact current post-state and returns the
 // predecessor state that the historical overlay validators must evaluate.
 func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
+	return LoadSuccessorAtPost(root, nil, expectedVersion)
+}
+
+// LoadSuccessorAtPost verifies the successor chain using currentAtPost for
+// paths advanced by a later in-manifest overlay. This keeps the append-only
+// external chain verifiable while the caller reconstructs an earlier phase.
+func LoadSuccessorAtPost(root string, currentAtPost map[string]string, expectedVersion string) (map[string]string, error) {
 	layers := []struct {
 		path     string
 		version  string
 		optional bool
 		entries  func(overlay) []entry
 	}{
+		{Phase17SuccessorPath, "phase17-live-data-plane-v1", true, func(value overlay) []entry { return value.SuccessorEntries }},
+		{Phase17SuccessorPath, "phase17-live-data-plane-v1", true, func(value overlay) []entry { return value.Entries }},
 		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true, func(value overlay) []entry { return value.SuccessorEntries }},
 		{PublicDocumentationSuccessorPath, "public-documentation-sanitization-v1", true, func(value overlay) []entry { return value.Entries }},
 		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true, func(value overlay) []entry { return value.Entries }},
@@ -58,7 +72,10 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1", true, func(value overlay) []entry { return value.Entries }},
 		{SuccessorPath, expectedVersion, false, func(value overlay) []entry { return value.Entries }},
 	}
-	pre := map[string]string{}
+	pre := make(map[string]string, len(currentAtPost))
+	for path, digest := range currentAtPost {
+		pre[path] = digest
+	}
 	for _, layer := range layers {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(layer.path))); err != nil {
 			if errors.Is(err, os.ErrNotExist) && layer.optional {
@@ -141,7 +158,7 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > 128 {
 		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)
 	}
-	if relative != Phase16DecentralizedSuccessorPath && len(value.SuccessorEntries) != 0 {
+	if relative != Phase16DecentralizedSuccessorPath && relative != Phase17SuccessorPath && len(value.SuccessorEntries) != 0 {
 		return overlay{}, fmt.Errorf("successor entries are only valid in %s", Phase16DecentralizedSuccessorPath)
 	}
 	if err := validateEntries(value.Entries, relative, "entries"); err != nil {

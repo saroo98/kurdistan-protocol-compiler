@@ -131,6 +131,7 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 
 	required := []string{
 		"go.mod",
+		"go.sum",
 		"README.md",
 		"manifest.json",
 		"protocol/profile_static.go",
@@ -330,6 +331,21 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 	}
 	if len(goDirectives) != 1 || goDirectives[0] != "go 1.26.5" {
 		t.Fatalf("generated go.mod directives = %q, want exactly [go 1.26.5]", goDirectives)
+	}
+	goSumRaw, err := os.ReadFile(filepath.Join(out, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantGoSumRaw, err := os.ReadFile(filepath.Join(repoRoot, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(goSumRaw) != string(wantGoSumRaw) {
+		t.Fatal("generated go.sum must match the repository dependency checksums")
 	}
 
 	manifestRaw, err := os.ReadFile(filepath.Join(out, "manifest.json"))

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -205,6 +206,9 @@ func loadM2MaintenancePreHashesWithSuccessorV1(root string, validateSuccessor bo
 	}
 	var currentAtPhase8, currentAtWO800 map[string]string
 	if validateSuccessor {
+		if _, err := validateM17LiveDataPlaneOverlayV1(root); err != nil {
+			return nil, err
+		}
 		phase14Pre, err := validateM14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
 		if err != nil {
 			return nil, err
@@ -862,6 +866,149 @@ func validateM14AssuranceOverlayV1(root string, overlays map[string]m2Maintenanc
 	}
 	if fmt.Sprintf("%x", binding.Sum(nil)) != predecessorBinding {
 		return nil, fmt.Errorf("invalid phase14 predecessor binding")
+	}
+	return pre, nil
+}
+
+type m17LiveDataPlaneOverlayV1 struct {
+	Version                  string                 `json:"version"`
+	SelfPath                 string                 `json:"self_path"`
+	SelfPreEvidence          string                 `json:"self_pre_evidence"`
+	SelfPreSHA256            string                 `json:"self_pre_sha256"`
+	PredecessorBindingSHA256 string                 `json:"predecessor_binding_sha256"`
+	Entries                  []m2MaintenanceEntryV1 `json:"entries"`
+	SuccessorEntries         []m2MaintenanceEntryV1 `json:"successor_entries"`
+}
+
+var m17LiveDataPlanePathsV1 = []string{
+	"cmd/phase17verify/main.go",
+	"cmd/phase17verify/main_test.go",
+	"config/runtime/live-data-plane-v1.json",
+	"docs/protocol/KURD-WIRE-V1-LIVE.md",
+	"docs/self-hosting/LIVE-DATA-PLANE.md",
+	"internal/product/runtimepolicy/policy_v2.go",
+	"internal/product/runtimepolicy/policy_v2_fuzz_test.go",
+	"internal/product/runtimepolicy/policy_v2_test.go",
+	"internal/protocol/framing/codec.go",
+	"internal/protocol/framing/codec_spec_v1.go",
+	"internal/protocol/framing/codec_test.go",
+	"internal/protocol/ir/effective_projection_v1.go",
+	"internal/protocol/ir/effective_projection_v1_test.go",
+	"internal/protocol/liveprogram/codec_v1.go",
+	"internal/protocol/liveprogram/codec_v1_fuzz_test.go",
+	"internal/protocol/liveprogram/program_v1.go",
+	"internal/protocol/liveprogram/program_v1_test.go",
+	"internal/protocol/liveprogramcompile/compile_v1.go",
+	"internal/protocol/liveprogramcompile/compile_v1_test.go",
+	"internal/protocol/scheduler/scheduler.go",
+	"internal/protocol/scheduler/scheduler_test.go",
+}
+
+func loadM17LiveDataPlaneOverlayV1(root string) (m17LiveDataPlaneOverlayV1, error) {
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(evidenceoverlay.Phase17SuccessorPath)))
+	if err != nil {
+		return m17LiveDataPlaneOverlayV1{}, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var overlay m17LiveDataPlaneOverlayV1
+	if err := decoder.Decode(&overlay); err != nil {
+		return m17LiveDataPlaneOverlayV1{}, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("phase17 live-data-plane trailing JSON")
+	}
+	return overlay, nil
+}
+
+func validateM17LiveDataPlaneOverlayV1(root string) (m17LiveDataPlaneOverlayV1, error) {
+	overlay, err := loadM17LiveDataPlaneOverlayV1(root)
+	if err != nil {
+		return m17LiveDataPlaneOverlayV1{}, err
+	}
+	return validateM17LiveDataPlaneOverlayAtPostV1(root, nil, overlay)
+}
+
+func validateM17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[string]string, overlay m17LiveDataPlaneOverlayV1) (m17LiveDataPlaneOverlayV1, error) {
+	const name = "phase17-live-data-plane-v1"
+	const predecessorBinding = "77772a0daab7ba1bd148fcd437ee1c18be535bb0c4272cbc0f84d5dc0b764cf4"
+	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(m17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > 128 {
+		return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 live-data-plane overlay identity/cardinality")
+	}
+	baseAtPost, err := m17SuccessorPreAtPostV1(root, currentAtPost, overlay.SuccessorEntries)
+	if err != nil {
+		return m17LiveDataPlaneOverlayV1{}, err
+	}
+	binding := sha256.New()
+	_, _ = fmt.Fprintf(binding, "%s\x00ABSENT\n", overlay.SelfPath)
+	last := ""
+	for index, path := range m17LiveDataPlanePathsV1 {
+		entry := overlay.Entries[index]
+		if entry.Path != path || path <= last || strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") || !validSHA256V1(entry.PostSHA256) {
+			return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 live-data-plane entry %d", index)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 absent predecessor %d", index)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 predecessor %d", index)
+		}
+		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
+		actual, present := baseAtPost[path]
+		if !present {
+			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if err != nil {
+				return m17LiveDataPlaneOverlayV1{}, err
+			}
+			actual = fmt.Sprintf("%x", sha256.Sum256(content))
+		}
+		if actual != entry.PostSHA256 {
+			return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("phase17 live-data-plane hash drift %s=%s want %s", path, actual, entry.PostSHA256)
+		}
+		last = path
+	}
+	if fmt.Sprintf("%x", binding.Sum(nil)) != predecessorBinding {
+		return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 predecessor binding")
+	}
+	return overlay, nil
+}
+
+func m17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, entries []m2MaintenanceEntryV1) (map[string]string, error) {
+	pre := make(map[string]string, len(currentAtPost)+len(entries))
+	for path, hash := range currentAtPost {
+		pre[path] = hash
+	}
+	last := ""
+	for index, entry := range entries {
+		if entry.Path <= last || strings.HasPrefix(entry.Path, ".tools/") || strings.HasPrefix(entry.Path, "planning/") || !validSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase17 successor entry %d", index)
+		}
+		predecessor := entry.PreSHA256
+		if entry.PreEvidence == "ABSENT" {
+			if entry.PreSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase17 absent successor %d", index)
+			}
+			predecessor = "ABSENT"
+		} else if entry.PreEvidence != "" || !validSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+			return nil, fmt.Errorf("invalid phase17 successor predecessor %d", index)
+		}
+		actual, found := pre[entry.Path]
+		if !found {
+			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+			if err != nil {
+				return nil, err
+			}
+			actual = fmt.Sprintf("%x", sha256.Sum256(content))
+		}
+		if actual != entry.PostSHA256 {
+			return nil, fmt.Errorf("phase17 successor hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
+		}
+		pre[entry.Path] = predecessor
+		last = entry.Path
 	}
 	return pre, nil
 }
@@ -1852,6 +1999,7 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes[evidenceoverlay.Phase16ProductionTrustSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16RuntimeSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16DecentralizedSuccessorPath] = "ABSENT"
+	preHashes[evidenceoverlay.Phase17SuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.PublicDocumentationSuccessorPath] = "ABSENT"
 	for path, predecessor := range preHashes {
 		if predecessor != "ABSENT" {

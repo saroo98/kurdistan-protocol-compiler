@@ -152,7 +152,12 @@ func (p PolicyV2) Clone() PolicyV2 {
 }
 
 func EncodeV2(policy PolicyV2) ([]byte, error) {
-	if err := validatePolicy(policy, true); err != nil {
+	return EncodeV2At(policy, time.Now())
+}
+
+// EncodeV2At validates policy time bounds against the caller's trusted time.
+func EncodeV2At(policy PolicyV2, now time.Time) ([]byte, error) {
+	if err := validatePolicyAt(policy, true, now); err != nil {
 		return nil, err
 	}
 	encoded, err := marshal(policyMap(policy, true))
@@ -163,6 +168,12 @@ func EncodeV2(policy PolicyV2) ([]byte, error) {
 }
 
 func DecodeV2(encoded []byte) (PolicyV2, error) {
+	return DecodeV2At(encoded, time.Now())
+}
+
+// DecodeV2At decodes policy bytes using the caller's trusted time for TLS
+// validity checks. Restore and migration callers must supply their own clock.
+func DecodeV2At(encoded []byte, now time.Time) (PolicyV2, error) {
 	if len(encoded) == 0 || len(encoded) > MaxEncodedBytes {
 		return PolicyV2{}, fail(ErrorSize)
 	}
@@ -177,10 +188,10 @@ func DecodeV2(encoded []byte) (PolicyV2, error) {
 	if err := decodePolicy(fields, &policy); err != nil {
 		return PolicyV2{}, err
 	}
-	if err := validatePolicy(policy, true); err != nil {
+	if err := validatePolicyAt(policy, true, now); err != nil {
 		return PolicyV2{}, err
 	}
-	reencoded, err := EncodeV2(policy)
+	reencoded, err := EncodeV2At(policy, now)
 	if err != nil || !bytes.Equal(encoded, reencoded) {
 		return PolicyV2{}, fail(ErrorNonCanonical)
 	}
@@ -190,7 +201,12 @@ func DecodeV2(encoded []byte) (PolicyV2, error) {
 // RelayAdmissionDigestV2 recomputes the digest for labels 1 through 24.
 // Callers use it during issuance before assigning RelayAdmissionDigest.
 func RelayAdmissionDigestV2(policy PolicyV2) ([32]byte, error) {
-	if err := validatePolicy(policy, false); err != nil {
+	return RelayAdmissionDigestV2At(policy, time.Now())
+}
+
+// RelayAdmissionDigestV2At recomputes admission data using trusted time.
+func RelayAdmissionDigestV2At(policy PolicyV2, now time.Time) ([32]byte, error) {
+	if err := validatePolicyAt(policy, false, now); err != nil {
 		return [32]byte{}, err
 	}
 	encoded, err := marshal(policyMap(policy, false))
@@ -203,7 +219,12 @@ func RelayAdmissionDigestV2(policy PolicyV2) ([32]byte, error) {
 // ValidateAgainstEnvelope confirms the exact deterministic policy bytes are
 // the bytes authenticated by the enclosing canonical profile.
 func (p PolicyV2) ValidateAgainstEnvelope(profile envelope.CanonicalProfileV1) error {
-	encoded, err := EncodeV2(p)
+	return p.ValidateAgainstEnvelopeAt(profile, time.Now())
+}
+
+// ValidateAgainstEnvelopeAt confirms envelope binding at caller-supplied time.
+func (p PolicyV2) ValidateAgainstEnvelopeAt(profile envelope.CanonicalProfileV1, now time.Time) error {
+	encoded, err := EncodeV2At(p, now)
 	if err != nil || !bytes.Equal(encoded, profile.Policy) {
 		return fail(ErrorBinding)
 	}
@@ -211,6 +232,23 @@ func (p PolicyV2) ValidateAgainstEnvelope(profile envelope.CanonicalProfileV1) e
 }
 
 func validatePolicy(p PolicyV2, requireDigest bool) error {
+	return validatePolicyAt(p, requireDigest, time.Now())
+}
+
+// ValidateV2 confirms all policy invariants at the local system time.
+func ValidateV2(policy PolicyV2) error {
+	return ValidateV2At(policy, time.Now())
+}
+
+// ValidateV2At confirms all policy invariants at caller-supplied trusted time.
+func ValidateV2At(policy PolicyV2, now time.Time) error {
+	return validatePolicyAt(policy, true, now)
+}
+
+func validatePolicyAt(p PolicyV2, requireDigest bool, now time.Time) error {
+	if now.IsZero() {
+		return fail(ErrorInvalid)
+	}
 	if p.SchemaVersion != SchemaVersionV2 || p.WireProtocol != WireProtocolV1 || p.CarrierFamily != CarrierFamilyTLS13TCP {
 		return fail(ErrorInvalid)
 	}
@@ -218,10 +256,11 @@ func validatePolicy(p PolicyV2, requireDigest bool) error {
 	if err != nil {
 		return err
 	}
-	if !keyIDMatches(p.ClientAuthKeyID, p.ClientAuthPublic) || !boundedRelayKeyID(p.RelayAuthKeyID) {
+	if allZero(p.ClientAuthPublic[:]) || allZero(p.RelayAuthPublic[:]) ||
+		!keyIDMatches(p.ClientAuthKeyID, p.ClientAuthPublic) || !relayKeyIDMatches(p.RelayAuthKeyID, p.RelayAuthPublic) {
 		return fail(ErrorBinding)
 	}
-	if err := validateTLS(p.TLSServerName, p.TLSLeafDER, p.TLSLeafSHA256); err != nil {
+	if err := validateTLSAt(p.TLSServerName, p.TLSLeafDER, p.TLSLeafSHA256, now); err != nil {
 		return err
 	}
 	if err := validateAddresses(p); err != nil {
@@ -236,11 +275,11 @@ func validatePolicy(p PolicyV2, requireDigest bool) error {
 	if err := validateLimits(p.Limits, program); err != nil {
 		return err
 	}
-	if err := validateFallback(p.Fallback, len(p.Endpoints)); err != nil {
+	if err := validateFallback(p.Fallback, len(p.Endpoints), p.Limits.MaxReconnectAttempts); err != nil {
 		return err
 	}
 	if requireDigest {
-		digest, err := RelayAdmissionDigestV2(p)
+		digest, err := RelayAdmissionDigestV2At(p, now)
 		if err != nil || digest != p.RelayAdmissionDigest {
 			return fail(ErrorBinding)
 		}
@@ -274,28 +313,53 @@ func keyIDMatches(id string, public [32]byte) bool {
 	return id == hex.EncodeToString(digest[:16])
 }
 
-func boundedRelayKeyID(value string) bool {
-	if len(value) == 0 || len(value) > 128 || value != strings.TrimSpace(value) {
+func relayKeyIDMatches(id string, public [32]byte) bool {
+	const prefix = "relay."
+	if !strings.HasPrefix(id, prefix) || len(id) != len(prefix)+16 {
 		return false
 	}
-	for _, r := range value {
-		if !(r == '-' || r == '_' || r == '.' || r == ':' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
-			return false
-		}
+	encoded := strings.TrimPrefix(id, prefix)
+	if strings.ToLower(encoded) != encoded {
+		return false
 	}
-	return true
+	if _, err := hex.DecodeString(encoded); err != nil {
+		return false
+	}
+	digest := sha256.Sum256(public[:])
+	return encoded == hex.EncodeToString(digest[:8])
 }
 
 func validateTLS(serverName string, der []byte, expected [32]byte) error {
+	return validateTLSAt(serverName, der, expected, time.Now())
+}
+
+func validateTLSAt(serverName string, der []byte, expected [32]byte, now time.Time) error {
 	if !validServerName(serverName) || len(der) == 0 || len(der) > 4096 || sha256.Sum256(der) != expected {
 		return fail(ErrorInvalid)
 	}
 	leaf, err := x509.ParseCertificate(der)
-	if err != nil || time.Now().Before(leaf.NotBefore) || time.Now().After(leaf.NotAfter) || leaf.CheckSignatureFrom(leaf) != nil || leaf.VerifyHostname(serverName) != nil {
+	if err != nil || now.IsZero() || now.Before(leaf.NotBefore) || now.After(leaf.NotAfter) || !bytes.Equal(leaf.RawIssuer, leaf.RawSubject) || leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) != nil || leaf.VerifyHostname(serverName) != nil {
 		return fail(ErrorBinding)
 	}
+	if ip := net.ParseIP(serverName); ip != nil {
+		for _, candidate := range leaf.IPAddresses {
+			if candidate.String() == serverName {
+				return validateServerAuthUsage(leaf)
+			}
+		}
+		return fail(ErrorBinding)
+	}
+	for _, candidate := range leaf.DNSNames {
+		if candidate == serverName {
+			return validateServerAuthUsage(leaf)
+		}
+	}
+	return fail(ErrorBinding)
+}
+
+func validateServerAuthUsage(leaf *x509.Certificate) error {
 	for _, usage := range leaf.ExtKeyUsage {
-		if usage == x509.ExtKeyUsageServerAuth || usage == x509.ExtKeyUsageAny {
+		if usage == x509.ExtKeyUsageServerAuth {
 			return nil
 		}
 	}
@@ -359,7 +423,13 @@ func validAddress(value []byte, family uint8) bool {
 		return false
 	}
 	address, ok := netip.AddrFromSlice(value)
-	return ok && address.IsValid() && !address.IsUnspecified() && !address.IsMulticast()
+	if !ok || !address.IsValid() || address.IsUnspecified() || address.IsMulticast() || address.Is4In6() {
+		return false
+	}
+	if family == 4 {
+		return address.Is4()
+	}
+	return address.Is6()
 }
 
 func validateRoutes(routes []PrefixV2, ipv4, ipv6 []byte) error {
@@ -409,10 +479,19 @@ func validateModesAndProtocols(modes []IPModeV2, protocols []PayloadProtocolV2, 
 	if len(modes) == 0 || !sortedUniqueModes(modes) || len(protocols) < 2 || !sortedUniqueProtocols(protocols) {
 		return fail(ErrorInvalid)
 	}
+	authorizesIPv4, authorizesIPv6 := false, false
 	for _, mode := range modes {
-		if mode == IPModeIPv4Only && len(ipv4) == 0 || mode == IPModeIPv6Only && len(ipv6) == 0 || mode == IPModeDualStack && (len(ipv4) == 0 || len(ipv6) == 0) {
-			return fail(ErrorInvalid)
+		switch mode {
+		case IPModeIPv4Only:
+			authorizesIPv4 = true
+		case IPModeIPv6Only:
+			authorizesIPv6 = true
+		case IPModeDualStack:
+			authorizesIPv4, authorizesIPv6 = true, true
 		}
+	}
+	if (len(ipv4) != 0) != authorizesIPv4 || (len(ipv6) != 0) != authorizesIPv6 {
+		return fail(ErrorInvalid)
 	}
 	haveTCP, haveUDP := false, false
 	for _, protocol := range protocols {
@@ -445,15 +524,16 @@ func sortedUniqueProtocols(values []PayloadProtocolV2) bool {
 
 func validateLimits(l LimitsV2, program liveprogram.ProgramV1) error {
 	if l.MaxPackets == 0 || l.MaxQueuedPackets == 0 || l.MaxFrames == 0 || l.MaxMessages == 0 || l.MaxIdleSeconds == 0 || l.MaxReconnectAttempts == 0 ||
-		l.MaxPackets > 1<<24 || l.MaxQueuedPackets > 1<<16 || l.MaxFrames > 1<<24 || l.MaxMessages > uint32(program.Limits.MaxSessionMessages) || l.MaxFrames > uint32(program.Limits.MaxSessionMessages) ||
-		uint64(l.MaxIdleSeconds)*1000 > uint64(program.Limits.MaxSessionMillis) || l.MaxReconnectAttempts > 64 {
+		l.MaxPackets > 1<<24 || l.MaxQueuedPackets > 256 || l.MaxFrames > 1<<24 || l.MaxMessages > uint32(program.Limits.MaxSessionMessages) || l.MaxFrames > uint32(program.Limits.MaxSessionMessages) ||
+		l.MaxPackets > l.MaxFrames || l.MaxFrames > l.MaxMessages || l.MaxQueuedPackets > l.MaxPackets ||
+		uint64(l.MaxIdleSeconds)*1000 > uint64(program.Limits.MaxSessionMillis) || l.MaxReconnectAttempts > 5 {
 		return fail(ErrorInvalid)
 	}
 	return nil
 }
 
-func validateFallback(f FallbackV2, endpointCount int) error {
-	if len(f.EndpointIndexes) == 0 || len(f.EndpointIndexes) > endpointCount || f.TotalAttempts == 0 || f.TotalAttempts > 16 || f.AttemptTimeoutSeconds == 0 || f.AttemptTimeoutSeconds > 60 || f.MaxBackoffSeconds < f.AttemptTimeoutSeconds || f.MaxBackoffSeconds > 600 {
+func validateFallback(f FallbackV2, endpointCount int, maxReconnectAttempts uint32) error {
+	if len(f.EndpointIndexes) == 0 || len(f.EndpointIndexes) > endpointCount || f.TotalAttempts == 0 || f.TotalAttempts > maxReconnectAttempts || f.AttemptTimeoutSeconds == 0 || f.AttemptTimeoutSeconds > 10 || f.MaxBackoffSeconds < f.AttemptTimeoutSeconds || f.MaxBackoffSeconds > 30 {
 		return fail(ErrorInvalid)
 	}
 	for i, index := range f.EndpointIndexes {

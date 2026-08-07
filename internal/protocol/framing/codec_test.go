@@ -100,6 +100,9 @@ func TestCompiledFramingConstantsInfluenceLiveFrames(t *testing.T) {
 		}{
 			{"data_type_tag", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.DataTypeTag[0] ^= 0xff }},
 			{"padding_type_tag", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.PaddingTypeTag[0] ^= 0xff }},
+			{"equal_type_tags", func(p *liveprogram.ProgramV1) {
+				p.Frame.Compiled.DataTypeTag = append([]byte(nil), p.Frame.Compiled.PaddingTypeTag...)
+			}},
 		}
 		if program.Stream.IDEncodingMode == "profile_xor32" {
 			mutations = append(mutations, struct {
@@ -141,6 +144,22 @@ func TestCompiledFramingConstantsInfluenceLiveFrames(t *testing.T) {
 		if !covered[name] {
 			t.Fatalf("corpus did not cover compiled %s", name)
 		}
+	}
+}
+
+func TestEncodeLiveOperationRejectsEqualCompiledTypeTags(t *testing.T) {
+	profile, err := compiler.Generate(47)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities := ir.SecurityCapabilities()
+	program, err := liveprogramcompile.CompileV1(liveprogramcompile.InputV1{Profile: profile, ClientMandatoryFeatures: capabilities[:2], RelayMandatoryFeatures: capabilities[:2], SelectedFeatures: capabilities})
+	if err != nil {
+		t.Fatal(err)
+	}
+	program.Frame.Compiled.DataTypeTag = append([]byte(nil), program.Frame.Compiled.PaddingTypeTag...)
+	if _, err := EncodeLiveOperation(program, Operation{Semantic: ir.SemanticData, StreamID: 7, Payload: []byte("ambiguous")}, 1); err == nil {
+		t.Fatal("live framing accepted equal compiled data and padding type tags")
 	}
 }
 
