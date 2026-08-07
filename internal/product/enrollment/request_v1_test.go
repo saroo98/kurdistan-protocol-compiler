@@ -10,7 +10,6 @@ import (
 	"crypto/hpke"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"go/ast"
 	"go/parser"
@@ -155,7 +154,7 @@ func TestDeterministicEnrollmentVectorV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := hex.EncodeToString(requestBytes), "af010102784033333962393832383562383562663838623431633531303936643330643231313136383039653036373033343261363432653932653634613834656533316133031a6553f100041a6553ff10050106100701080209270a584104e3da718b2efbffd3090f42975151c18429c8071f14918336d1c92805fd8b2fbf323fd6144b2a3f9b49288635094aa06d7e4570007fcc7f1f9b238ca198a2d5e10b781a726563697069656e742e326666316662363930363662666334630c5820e7f162a10bec559afea195e4dce84b69568d5d2cb0963eb446c0685e2b17f2f00d782063393435636266326135363032303032313431653266623964313730353464360e58204142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f600f5840b5c5af784e794740aa8f86e2419463ffa2a4c721730c3db632c60eb6cec978f06e4d005f23f538ae7bbbde62e970af175f4390a9d2048a19797c086233799202"; got != want {
+	if got, want := hex.EncodeToString(requestBytes), "af010102784035643131316132386663343765326131643230313833633031633764653064633461333034396537643535646464613430353664353065663934643933383537031a6553f100041a6553ff10050106100701080209270a584104e3da718b2efbffd3090f42975151c18429c8071f14918336d1c92805fd8b2fbf323fd6144b2a3f9b49288635094aa06d7e4570007fcc7f1f9b238ca198a2d5e10b781a726563697069656e742e326666316662363930363662666334630c5820e7f162a10bec559afea195e4dce84b69568d5d2cb0963eb446c0685e2b17f2f00d782063393435636266326135363032303032313431653266623964313730353464360e58204142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f600f58407667ae6363b484582a12c8e7f4942706867d64495f2a29863414ffef94fe6331cacd775b2cda85488c1bd0061e9173865b4295de5e76d56b428fbfad5a63fd05"; got != want {
 		t.Fatalf("request vector = %s", got)
 	}
 	if got, want := hex.EncodeToString(bundleBytes), "a301010258200491568cbed1b140219c72c4ba2d94f59568059012f62bf6951dc91aaebf5ea60358202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40"; got != want {
@@ -406,15 +405,21 @@ func clientKeyIDForTest(public []byte) string {
 }
 
 func requestIDForTest(request PublicRequestV1) string {
+	mode, err := cbor.CoreDetEncOptions().EncMode()
+	if err != nil {
+		panic(err)
+	}
+	identity, err := mode.Marshal(map[uint64]any{
+		1: RequestVersionV1, 3: request.CreatedAt, 4: request.ExpiresAt,
+		5: uint64(envelope.SuiteClassicalV1), 6: uint64(envelope.HPKEKEMP256SHA256), 7: uint64(envelope.HPKEKDFSHA256), 8: uint64(envelope.HPKEAEADAES256GCM), 9: ClientAuthAlgorithmEd25519,
+		10: bytes.Clone(request.RecipientPublic), 11: request.RecipientKeyID, 12: bytes.Clone(request.ClientAuthPublic), 13: request.ClientAuthKeyID, 14: bytes.Clone(request.Nonce),
+	})
+	if err != nil {
+		panic(err)
+	}
 	hash := sha256.New()
 	_, _ = hash.Write([]byte("kurdistan-vpn/enrollment/request-id/v1\x00"))
-	var times [16]byte
-	binary.BigEndian.PutUint64(times[:8], uint64(request.CreatedAt))
-	binary.BigEndian.PutUint64(times[8:], uint64(request.ExpiresAt))
-	_, _ = hash.Write(times[:])
-	_, _ = hash.Write(request.RecipientPublic)
-	_, _ = hash.Write(request.ClientAuthPublic)
-	_, _ = hash.Write(request.Nonce)
+	_, _ = hash.Write(identity)
 	return hex.EncodeToString(hash.Sum(nil))
 }
 

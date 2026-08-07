@@ -3177,6 +3177,74 @@ func phase12BoundaryImportAllowedV1(file, importPath string) bool {
 	return phase12BoundaryImportAllowlistV1[file][importPath]
 }
 
+var phase17ProfileHPKEImportAllowlistV1 = map[string]map[string]bool{
+	"internal/crypto/profilehpke/provider.go": {
+		modulePath + "/internal/product/envelope": true,
+		modulePath + "/internal/product/profile":  true,
+	},
+	"internal/crypto/profilehpke/provider_test.go": {
+		modulePath + "/internal/product/envelope": true,
+		modulePath + "/internal/product/profile":  true,
+	},
+}
+
+func phase17ProfileHPKEImportAllowedV1(file, importPath string) bool {
+	return phase17ProfileHPKEImportAllowlistV1[file][importPath]
+}
+
+func TestPhase17ProfileHPKEImportExceptionsV1(t *testing.T) {
+	want := map[string][]string{
+		"internal/crypto/profilehpke/provider.go": {
+			modulePath + "/internal/product/envelope",
+			modulePath + "/internal/product/profile",
+		},
+		"internal/crypto/profilehpke/provider_test.go": {
+			modulePath + "/internal/product/envelope",
+			modulePath + "/internal/product/profile",
+		},
+	}
+	wantCount := 0
+	for file, imports := range want {
+		wantCount += len(imports)
+		for _, importPath := range imports {
+			if !phase17ProfileHPKEImportAllowedV1(file, importPath) {
+				t.Fatalf("Phase 17 profile HPKE boundary rejected intended import %s -> %s", file, importPath)
+			}
+		}
+	}
+	gotCount := 0
+	for _, imports := range phase17ProfileHPKEImportAllowlistV1 {
+		gotCount += len(imports)
+	}
+	if len(phase17ProfileHPKEImportAllowlistV1) != len(want) || gotCount != wantCount {
+		t.Fatalf("Phase 17 profile HPKE boundary cardinality files=%d imports=%d want files=%d imports=%d",
+			len(phase17ProfileHPKEImportAllowlistV1), gotCount, len(want), wantCount)
+	}
+	for name, mutant := range map[string]struct {
+		file       string
+		importPath string
+	}{
+		"extra production file": {
+			file:       "internal/crypto/profilehpke/helper.go",
+			importPath: modulePath + "/internal/product/profile",
+		},
+		"extra test file": {
+			file:       "internal/crypto/profilehpke/provider_fuzz_test.go",
+			importPath: modulePath + "/internal/product/envelope",
+		},
+		"dependency expansion": {
+			file:       "internal/crypto/profilehpke/provider.go",
+			importPath: modulePath + "/internal/product/lifecycle",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if phase17ProfileHPKEImportAllowedV1(mutant.file, mutant.importPath) {
+				t.Fatalf("Phase 17 profile HPKE boundary accepted mutant %s -> %s", mutant.file, mutant.importPath)
+			}
+		})
+	}
+}
+
 func TestPhase12BoundaryImportExceptionsV1(t *testing.T) {
 	allowed := map[string][]string{
 		"internal/operator/controlplane/authority_state.go": {
@@ -3665,6 +3733,9 @@ func contractImportViolationsV1(root string) ([]string, error) {
 			file := filepath.ToSlash(relFile)
 			for _, imp := range f.Imports {
 				ip := strings.Trim(imp.Path.Value, `"`)
+				if phase17ProfileHPKEImportAllowedV1(file, ip) {
+					continue
+				}
 				if strings.HasPrefix(pkgPath, modulePath+"/internal/product/") &&
 					(ip == modulePath+"/internal/operator" || strings.HasPrefix(ip, modulePath+"/internal/operator/")) {
 					if !phase12BoundaryImportAllowedV1(file, ip) {
