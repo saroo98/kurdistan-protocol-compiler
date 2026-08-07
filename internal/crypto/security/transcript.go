@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 
 	"kurdistan/internal/protocol/ir"
@@ -78,10 +79,7 @@ func CanonicalHandshakeModeBinding(mode string, binding HandshakeModeBinding) ([
 		if err := validateASCII(binding.LocalAdapterClass); err != nil {
 			return err
 		}
-		knownCarrier := false
-		for _, family := range ir.CarrierFamilies() {
-			knownCarrier = knownCarrier || binding.CarrierFamily == family
-		}
+		knownCarrier := knownCarrierFamilyV1(binding.CarrierFamily)
 		knownAdapter := false
 		for _, adapter := range []string{"one_flow_one_stream", "priority_mapped_stream", "metadata_bound_stream", "state_derived_mapping"} {
 			knownAdapter = knownAdapter || binding.LocalAdapterClass == adapter
@@ -131,6 +129,10 @@ func CanonicalHandshakeModeBinding(mode string, binding HandshakeModeBinding) ([
 		return nil, fmt.Errorf("%w: unknown transcript mode", ErrInvalidTranscript)
 	}
 	return out.Bytes(), nil
+}
+
+func knownCarrierFamilyV1(value string) bool {
+	return value == "tls13-tcp" || slices.Contains(ir.CarrierFamilies(), value)
 }
 
 // EncodePolicyV1 returns the exact frozen PolicyV1 field order.

@@ -307,7 +307,7 @@ func CanonicalAuthenticatedModeBindingV1(mode string, binding HandshakeModeBindi
 	if err := validateASCII(binding.LocalAdapterClass); err != nil {
 		return nil, err
 	}
-	knownCarrier := slices.Contains(ir.CarrierFamilies(), binding.CarrierFamily)
+	knownCarrier := knownCarrierFamilyV1(binding.CarrierFamily)
 	knownAdapter := slices.Contains([]string{"one_flow_one_stream", "priority_mapped_stream", "metadata_bound_stream", "state_derived_mapping"}, binding.LocalAdapterClass)
 	if len(binding.FeatureVectors) == 0 || binding.EnvelopeLimit == 0 || binding.MaxFrameBytes == 0 ||
 		binding.EnvelopeLimit > binding.MaxFrameBytes || binding.MaxFrameBytes > 1<<20 || !knownCarrier || !knownAdapter {
