@@ -600,6 +600,7 @@ func verifyDeploymentCopies(root string, value contract) error {
 		"Requires=kurd-node.socket",
 		"ExecStart=/usr/local/bin/kurd-node serve --data-dir /var/lib/kurd-node",
 		fmt.Sprintf("--control-socket %scontrol.sock", value.Relay.ControlSocketDirectory),
+		"ExecReload=/usr/local/bin/kurdctl node reload --data-dir /var/lib/kurd-node --control-socket /run/kurd-node/control.sock",
 	} {
 		if !strings.Contains(service, required) {
 			return fmt.Errorf("native deployment copy disagrees with authority: missing %q", required)

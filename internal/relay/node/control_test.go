@@ -58,7 +58,11 @@ func TestControlActionsV1MutateOnlyAuthorizedLocalState(t *testing.T) {
 	health := NewHealthMachine()
 	health.Update(HealthRequirements{Listener: true, Tunnel: true, VerifiedState: true, TLSIdentity: true, RelayIdentity: true, DNS: true})
 	reloads := 0
-	actions := ControlActionsV1{Health: health, Registry: registry, Reload: func() error { reloads++; return nil }}
+	actions := ControlActionsV1{Health: health, Registry: registry, Reload: func() error {
+		reloads++
+		health.SetDrain(false)
+		return nil
+	}}
 
 	for _, test := range []struct {
 		request ControlRequestV1
@@ -87,8 +91,53 @@ func TestControlActionsV1MutateOnlyAuthorizedLocalState(t *testing.T) {
 			t.Fatalf("response round trip decoded=%+v want=%+v err=%v", decoded, response, err)
 		}
 	}
-	if reloads != 1 || registry.Snapshot().ActiveSessions != 0 {
+	if reloads != 2 || registry.Snapshot().ActiveSessions != 0 {
 		t.Fatalf("reloads=%d registry=%+v", reloads, registry.Snapshot())
+	}
+}
+
+func TestControlResumeV1FailsClosedUntilReloadRestoresHealthyState(t *testing.T) {
+	health := NewHealthMachine()
+	health.Update(HealthRequirements{Listener: true, Tunnel: true, VerifiedState: true, TLSIdentity: true, RelayIdentity: true, DNS: true})
+	health.SetDrain(true)
+	actions := ControlActionsV1{
+		Health: health,
+		Reload: func() error { return errors.New("state remains unavailable") },
+	}
+	response, err := actions.Execute(ControlRequestV1{Command: ControlResumeV1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.OK || response.Code != ControlCodeReloadFailedV1 || response.Health.State != HealthDraining || response.Health.AcceptingSessions {
+		t.Fatalf("resume response=%+v", response)
+	}
+}
+
+func TestExchangeControlV1RoundTripsOneBoundedRequest(t *testing.T) {
+	client, server := net.Pipe()
+	health := NewHealthMachine()
+	health.Update(HealthRequirements{Listener: true, Tunnel: true, VerifiedState: true, TLSIdentity: true, RelayIdentity: true, DNS: true})
+	go handleControlConnectionV1(server, func(net.Conn) error { return nil }, ControlActionsV1{Health: health}, time.Second)
+
+	response, err := ExchangeControlV1(context.Background(), client, ControlRequestV1{Command: ControlStatusV1}, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.OK || response.Code != ControlCodeOKV1 || response.Health.State != HealthReady || !response.Health.AcceptingSessions {
+		t.Fatalf("response=%+v", response)
+	}
+}
+
+func TestExchangeControlV1RejectsTruncatedResponse(t *testing.T) {
+	client, server := net.Pipe()
+	go func() {
+		defer server.Close()
+		request := make([]byte, 10)
+		_, _ = io.ReadFull(server, request)
+		_, _ = server.Write([]byte("truncated"))
+	}()
+	if _, err := ExchangeControlV1(context.Background(), client, ControlRequestV1{Command: ControlStatusV1}, time.Second); !errors.Is(err, ErrControlProtocol) {
+		t.Fatalf("truncated response err=%v", err)
 	}
 }
 

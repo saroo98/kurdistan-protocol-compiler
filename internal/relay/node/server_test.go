@@ -82,11 +82,18 @@ func TestServerReloadV1ClearsTemporaryTLSIdentity(t *testing.T) {
 }
 
 func TestServerReloadV1FailsClosedOnDrainedOrCorruptState(t *testing.T) {
-	for _, failure := range []error{selfhost.ErrDrained, selfhost.ErrStateCorrupt} {
-		t.Run(failure.Error(), func(t *testing.T) {
+	for _, test := range []struct {
+		failure error
+		want    HealthState
+	}{
+		{failure: selfhost.ErrDrained, want: HealthDraining},
+		{failure: selfhost.ErrRelayRuntimeUnavailable, want: HealthDisabled},
+		{failure: selfhost.ErrStateCorrupt, want: HealthDegraded},
+	} {
+		t.Run(test.failure.Error(), func(t *testing.T) {
 			config := DefaultConfig(filepath.Join(t.TempDir(), "node"), 443)
 			config.DNSReady = func(context.Context) bool { return true }
-			config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) { return nil, failure }
+			config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) { return nil, test.failure }
 			registry, err := NewSessionRegistry(newMemoryTunnelV1(), 1, 1)
 			if err != nil {
 				t.Fatal(err)
@@ -99,12 +106,8 @@ func TestServerReloadV1FailsClosedOnDrainedOrCorruptState(t *testing.T) {
 			if err := server.Reload(); err == nil || registry.Snapshot().ActiveSessions != 0 {
 				t.Fatalf("reload err=%v registry=%+v", err, registry.Snapshot())
 			}
-			want := HealthDegraded
-			if errors.Is(failure, selfhost.ErrDrained) {
-				want = HealthDisabled
-			}
-			if got := server.health.Snapshot().State; got != want {
-				t.Fatalf("health=%s want=%s", got, want)
+			if got := server.health.Snapshot().State; got != test.want {
+				t.Fatalf("health=%s want=%s", got, test.want)
 			}
 		})
 	}

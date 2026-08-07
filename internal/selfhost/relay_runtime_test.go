@@ -132,3 +132,19 @@ func TestOpenRelayRuntimeSnapshotRejectsDrainedOrExpiredState(t *testing.T) {
 		t.Fatalf("expired TLS runtime snapshot=%v err=%v", snapshot, err)
 	}
 }
+
+func TestOpenRelayRuntimeSnapshotRejectsEmergencyDisabledState(t *testing.T) {
+	dataDir, recoveryPath, passphrase := initializedV2TestState(t)
+	now := time.Unix(1_760_000_010, 0).UTC()
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDeploymentDisabled(dataDir, true, RecoveryActionOptions{
+		RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: now.Add(time.Second),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := OpenRelayRuntimeSnapshotV1(dataDir, now.Add(2*time.Second)); snapshot != nil || !errors.Is(err, ErrRelayRuntimeUnavailable) {
+		t.Fatalf("disabled runtime snapshot=%v err=%v", snapshot, err)
+	}
+}

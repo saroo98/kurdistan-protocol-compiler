@@ -87,7 +87,7 @@ func (network *platformRuntimeNetwork) ConnectProtected(ctx context.Context) and
 	connectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if releaseConnectFD(connectCtx, fd, endpoint) != nil {
-		return androidbridge.CodeVerificationRejected
+		return androidbridge.CodeEndpointUnavailable
 	}
 	file := os.NewFile(uintptr(fd), "kurd-protected-socket")
 	if file == nil {
@@ -108,7 +108,7 @@ func (network *platformRuntimeNetwork) ConnectProtected(ctx context.Context) and
 	}
 	if sessionplan.WriteRelayAdmissionPrefaceV1(raw, preface) != nil || raw.SetDeadline(time.Time{}) != nil {
 		_ = raw.Close()
-		return androidbridge.CodeVerificationRejected
+		return androidbridge.CodeEndpointUnavailable
 	}
 	network.mu.Lock()
 	if network.fd != fd || network.raw != nil || network.ctx.Err() != nil {
@@ -146,7 +146,7 @@ func (network *platformRuntimeNetwork) AuthenticateTLS(ctx context.Context) andr
 	defer cancel()
 	carrier, err := tlstcp.Client(handshakeCtx, raw, tlsConfig, plan.Digest, uint32(program.Limits.MaxFrameBytes))
 	if err != nil {
-		return androidbridge.CodeVerificationRejected
+		return androidbridge.CodeTLSRejected
 	}
 	network.mu.Lock()
 	if network.raw != raw || network.carrier != nil || network.ctx.Err() != nil {
@@ -180,7 +180,7 @@ func (network *platformRuntimeNetwork) AuthenticateKurd(ctx context.Context) and
 	defer cancel()
 	endpoint, err := kruntime.EstablishProcessClientDuplexEndpointV1(handshakeCtx, carrier, handshake, plan.Digest, program)
 	if err != nil {
-		return androidbridge.CodeVerificationRejected
+		return androidbridge.CodeKurdAuthRejected
 	}
 	network.mu.Lock()
 	if network.carrier != carrier || network.endpoint != nil || network.ctx.Err() != nil {
@@ -244,7 +244,7 @@ func (network *platformRuntimeNetwork) Start(ctx context.Context) androidbridge.
 	if err != nil {
 		network.mu.Unlock()
 		_ = duplex.Close()
-		return androidbridge.CodePolicyRejected
+		return androidbridge.CodeTUNIOFailed
 	}
 	network.pump = pump
 	network.mu.Unlock()

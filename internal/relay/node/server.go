@@ -182,7 +182,14 @@ func (server *ServerV1) Reload() error {
 	now := server.config.Now().UTC()
 	candidate, err := server.config.LoadSnapshot(server.config.DataDir, now)
 	if err != nil || candidate == nil {
-		server.failClosedStateV1(errors.Is(err, selfhost.ErrDrained))
+		state := HealthDegraded
+		switch {
+		case errors.Is(err, selfhost.ErrDrained):
+			state = HealthDraining
+		case errors.Is(err, selfhost.ErrRelayRuntimeUnavailable):
+			state = HealthDisabled
+		}
+		server.failClosedStateV1(state)
 		return errors.Join(ErrServerState, err)
 	}
 	status, ok := candidate.StatusV1()
@@ -194,13 +201,18 @@ func (server *ServerV1) Reload() error {
 	cancel()
 	if !ok || !validRelayRuntimeStatusV1(status) || !tlsValid || tlsErr != nil || !dnsReady {
 		candidate.Close()
-		server.failClosedStateV1(status.Drained)
+		state := HealthDegraded
+		if status.Drained {
+			state = HealthDraining
+		}
+		server.failClosedStateV1(state)
 		return ErrServerState
 	}
 	if server.snapshot != nil {
 		current, currentOK := server.snapshot.StatusV1()
 		if currentOK && current == status {
 			candidate.Close()
+			server.health.SetDrain(false)
 			server.health.SetDisabled(false)
 			server.health.Update(server.readyRequirementsV1())
 			return nil
@@ -210,6 +222,7 @@ func (server *ServerV1) Reload() error {
 		server.snapshot.Close()
 	}
 	server.snapshot = candidate
+	server.health.SetDrain(false)
 	server.health.SetDisabled(false)
 	server.health.Update(server.readyRequirementsV1())
 	return nil
@@ -523,16 +536,21 @@ func (server *ServerV1) shutdownV1() {
 	}
 }
 
-func (server *ServerV1) failClosedStateV1(disabled bool) {
+func (server *ServerV1) failClosedStateV1(state HealthState) {
 	server.stopAllTransientsV1()
 	server.registry.StopAll()
 	if server.snapshot != nil {
 		server.snapshot.Close()
 		server.snapshot = nil
 	}
-	server.health.SetDisabled(disabled)
-	if !disabled {
-		server.health.Update(HealthRequirements{Listener: server.listenerReady, Tunnel: server.tunnelReady})
+	server.health.SetDrain(false)
+	server.health.SetDisabled(false)
+	server.health.Update(HealthRequirements{Listener: server.listenerReady, Tunnel: server.tunnelReady})
+	switch state {
+	case HealthDraining:
+		server.health.SetDrain(true)
+	case HealthDisabled:
+		server.health.SetDisabled(true)
 	}
 }
 
