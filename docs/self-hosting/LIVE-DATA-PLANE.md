@@ -3,21 +3,17 @@
 <!-- KURD-LIVE-CONTRACT: PRIVACY_PAYLOAD_LOGGING=PROHIBITED -->
 <!-- KURD-LIVE-CONTRACT: PRIVACY_FIVE_TUPLE_LOGGING_AND_PERSISTENCE=PROHIBITED -->
 <!-- KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED -->
-<!-- KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=NOT_LIVE -->
-<!-- KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=NOT_APPLIED -->
+<!-- KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=SUPERSEDED -->
+<!-- KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=APPLIED_LOCAL_UNVERIFIED_EXTERNAL -->
 
-Native Linux deployment only. This document specifies the privileges, limits,
-and network boundary required by the live data plane. It does not assert that
-a running service is available or that a particular network environment has
-been validated.
+Native Linux deployment only. This document specifies the implemented local
+privileges, limits, and network boundary. It does not assert that a public
+deployment or external data path has passed the Phase 17 exit gate.
 
-The checked predecessor unit at `deploy/selfhost/native/kurd-node.service` is
-not live: it has `PrivateDevices=yes`, permits `AF_UNIX` only, and has no
-data-plane authorization. The required live unit is not applied to that
-predecessor artifact. The required live unit would instead use
+The authority-only predecessor unit is superseded. The current native unit uses
 `PrivateDevices=no`, `DevicePolicy=closed`, `/dev/net/tun rw`, and
-`AF_UNIX AF_INET AF_INET6`; those requirements are declared here without
-asserting present compliance.
+`AF_UNIX AF_INET AF_INET6`. Repository and Linux syntax checks establish local
+configuration compliance; owner-VPS and Android egress remain separate gates.
 
 ## Required host components and privileges
 

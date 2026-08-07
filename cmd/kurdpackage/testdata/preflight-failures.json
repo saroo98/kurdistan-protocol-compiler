@@ -1,0 +1,17 @@
+{
+  "schema": "kurd-node-preflight-failure-fixtures-v1",
+  "cases": [
+    {"name": "missing TUN device", "code": "NO_TUN"},
+    {"name": "system clock not synchronized", "code": "TIME_NOT_SYNCED"},
+    {"name": "missing IPv4 default route", "code": "NO_IPV4_ROUTE"},
+    {"name": "missing IPv6 default route", "code": "NO_IPV6_ROUTE"},
+    {"name": "ambiguous or mismatched egress interfaces", "code": "MULTIPLE_EGRESS"},
+    {"name": "relay listener port already owned", "code": "PORT_CONFLICT"},
+    {"name": "nftables unavailable", "code": "NFT_MISSING"},
+    {"name": "Unbound validator unavailable", "code": "UNBOUND_MISSING"},
+    {"name": "systemd-networkd unavailable", "code": "NETWORKD_MISSING"},
+    {"name": "kernel older than supported floor", "code": "KERNEL_UNSUPPORTED"},
+    {"name": "insufficient free storage", "code": "LOW_DISK"},
+    {"name": "insufficient memory", "code": "LOW_MEMORY"}
+  ]
+}

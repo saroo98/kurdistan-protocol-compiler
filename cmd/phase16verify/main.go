@@ -889,15 +889,22 @@ func verifyServiceUnit(root string) error {
 		return err
 	}
 	text := string(raw)
-	for _, required := range []string{"User=kurd-node", "Group=kurd-node", "NoNewPrivileges=yes", "CapabilityBoundingSet=", "RestrictAddressFamilies=AF_UNIX", "ProtectSystem=strict", "PrivateTmp=yes"} {
+	for _, required := range []string{"User=kurd-node", "Group=kurd-node", "NoNewPrivileges=yes", "CapabilityBoundingSet=", "ProtectSystem=strict", "PrivateTmp=yes"} {
 		if !strings.Contains(text, required) {
 			return fmt.Errorf("native service missing hardening marker %q", required)
 		}
 	}
-	for _, forbidden := range []string{"CAP_NET_ADMIN", "CAP_NET_BIND_SERVICE", "AF_INET", "AF_INET6"} {
+	for _, forbidden := range []string{"CAP_NET_ADMIN", "CAP_NET_BIND_SERVICE", "AmbientCapabilities=CAP"} {
 		if strings.Contains(text, forbidden) {
-			return fmt.Errorf("Phase 16 service widens into Phase 17 authority %q", forbidden)
+			return fmt.Errorf("native service widens process authority %q", forbidden)
 		}
+	}
+	authorityOnly := strings.Contains(text, "PrivateDevices=yes") && strings.Contains(text, "RestrictAddressFamilies=AF_UNIX")
+	liveUnprivileged := strings.Contains(text, "PrivateDevices=no") && strings.Contains(text, "DevicePolicy=closed") &&
+		strings.Contains(text, "DeviceAllow=/dev/net/tun rw") && strings.Contains(text, "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6") &&
+		strings.Contains(text, "Requires=kurd-node.socket")
+	if !authorityOnly && !liveUnprivileged {
+		return errors.New("native service is neither authority-only nor the bounded unprivileged live successor")
 	}
 	return nil
 }

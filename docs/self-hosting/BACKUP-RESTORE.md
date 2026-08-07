@@ -33,5 +33,13 @@ sudo chmod 0700 /var/lib/kurd-node
 
 After total-host recovery succeeds, verify the root fingerprint, generation,
 revocation epoch, audit head, and publication cursor before destroying the
-quarantined predecessor. An endpoint change belongs to Phase 17 because it
-changes the live relay descriptor.
+quarantined predecessor. An endpoint change invalidates the live relay
+descriptor and requires a newly issued profile. Restore never silently reuses
+a stale endpoint or lowers relay, revocation, generation, revision, or audit
+authority.
+
+Native upgrades require `KURD_BACKUP_PASSPHRASE_FILE` when state exists. The
+file must be root-owned, non-symlinked, and mode `0400` or `0600`. The upgrade
+creates and verifies an encrypted backup under `/var/backups/kurd-node` before
+installing the candidate. The passphrase is inherited on standard input and is
+never placed in argv, an environment value, or a log.
