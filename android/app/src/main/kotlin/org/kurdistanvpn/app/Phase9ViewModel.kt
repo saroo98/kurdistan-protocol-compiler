@@ -16,6 +16,8 @@ import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.CompatibilitySummary
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
+import org.kurdistanvpn.core.model.EnrollmentKeySummary
+import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.ImportSource
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.Phase9Settings
@@ -43,6 +45,9 @@ import org.kurdistanvpn.core.nativeapi.BackupPreviewHandle
 import org.kurdistanvpn.core.nativeapi.DiagnosticPreviewHandle
 import org.kurdistanvpn.data.secure.AdmissionResult
 import org.kurdistanvpn.data.secure.BackupPayloadCodec
+import org.kurdistanvpn.data.secure.ClientKeyRestoreResult
+import org.kurdistanvpn.data.secure.ClientKeyResult
+import org.kurdistanvpn.data.secure.ClientKeyStatus
 import org.kurdistanvpn.data.secure.RestoreResult
 import org.kurdistanvpn.data.secure.RuntimeAuthorityResult
 import org.kurdistanvpn.data.metadata.CatalogHealth
@@ -71,6 +76,9 @@ class ProductRootViewModel(
     val compatibility: StateFlow<CompatibilitySummary?> = mutableCompatibility.asStateFlow()
     private val mutableProbeState = MutableStateFlow<ProbeExecutionState>(ProbeExecutionState.Idle)
     val probeState: StateFlow<ProbeExecutionState> = mutableProbeState.asStateFlow()
+    private val mutableEnrollmentState =
+        MutableStateFlow<EnrollmentUiState>(EnrollmentUiState.NoEnrollmentKey)
+    val enrollmentState: StateFlow<EnrollmentUiState> = mutableEnrollmentState.asStateFlow()
     private val mutableDiagnosticEvents = MutableStateFlow<List<DiagnosticEvent>>(emptyList())
     val diagnosticEvents: StateFlow<List<DiagnosticEvent>> = mutableDiagnosticEvents.asStateFlow()
     private var diagnosticSequence = 0L
@@ -146,15 +154,20 @@ class ProductRootViewModel(
                         mutableState.value = AppState.ImportRejected(OperationError.INVALID_INPUT)
                         return@launch
                     }
-                    when (val result = coordinators.profiles.nativeCore.verifyPreview(request)) {
+                    when (val result = coordinators.profiles.resolvePreview(request)) {
                         is NativeResult.Failure -> {
                             finalError = result.error
                             request.fill(0)
                         }
                         is NativeResult.Success -> {
-                            val preview = result.value.preview
-                            coordinators.profiles.nativeCore.releaseVerified(result.value)
-                            pending = PendingImport(request, preview, source)
+                            val preview = result.value.verified.preview
+                            coordinators.profiles.nativeCore.releaseVerified(result.value.verified)
+                            pending = PendingImport(
+                                request = request,
+                                preview = preview,
+                                source = source,
+                                recipientKeyLocalId = result.value.recipientKeyLocalId,
+                            )
                             mutableState.value = AppState.ImportPreview(preview)
                             return@launch
                         }
@@ -162,6 +175,11 @@ class ProductRootViewModel(
                 }
                 clearPendingImport()
                 mutableState.value = AppState.ImportRejected(finalError)
+                if (finalError == OperationError.TRUST_REJECTED &&
+                    coordinators.profiles.enrollmentKeys().isEmpty()
+                ) {
+                    mutableEnrollmentState.value = EnrollmentUiState.MissingKey("unavailable")
+                }
                 recordDiagnostic(DiagnosticLogLevel.WARNING, DiagnosticComponent.PROFILE, "IMPORT_REJECTED")
             } finally {
                 candidate.parts.forEach { it.fill(0) }
@@ -180,13 +198,20 @@ class ProductRootViewModel(
                     mutableState.value = AppState.KeyInvalidated
                     return@launch
                 }
-                when (val result = journal.admit(value.request, value.preview)) {
+                when (
+                    val result = journal.admit(
+                        value.request,
+                        value.preview,
+                        value.recipientKeyLocalId,
+                    )
+                ) {
                     is AdmissionResult.Failure ->
                         mutableState.value = AppState.ImportRejected(result.error).also {
                             recordDiagnostic(DiagnosticLogLevel.ERROR, DiagnosticComponent.PROFILE, "ACTIVATION_REJECTED")
                         }
                     is AdmissionResult.Success -> {
                         recordDiagnostic(DiagnosticLogLevel.INFO, DiagnosticComponent.PROFILE, "PROFILE_ACTIVATED")
+                        refreshEnrollmentState()
                         refreshProfiles()
                     }
                 }
@@ -213,11 +238,80 @@ class ProductRootViewModel(
     fun deleteProfile(localRecordId: String) {
         viewModelScope.launch {
             if (coordinators.profiles.journalOrNull()?.delete(localRecordId) == true) {
+                val offered = runCatching { coordinators.profiles.unbindProfile(localRecordId) }
+                    .getOrNull()
+                if (offered != null) {
+                    mutableEnrollmentState.value = EnrollmentUiState.OfferKeyDeletion(
+                        offered.toUiSummary(),
+                    )
+                } else {
+                    refreshEnrollmentState()
+                }
                 refreshProfiles()
             } else {
                 mutableState.value = AppState.DegradedStorage
             }
         }
+    }
+
+    fun createEnrollmentRequest(validitySeconds: Int = 24 * 60 * 60) {
+        mutableEnrollmentState.value = EnrollmentUiState.Working
+        viewModelScope.launch(Dispatchers.IO) {
+            when (
+                val result = coordinators.profiles.createEnrollment(
+                    validitySeconds,
+                    System.currentTimeMillis() / 1000,
+                )
+            ) {
+                is ClientKeyResult.Failure -> mutableEnrollmentState.value =
+                    if (result.error == OperationError.KEY_INVALIDATED) {
+                        EnrollmentUiState.KeyInvalidated
+                    } else {
+                        EnrollmentUiState.Failed(result.error)
+                    }
+                is ClientKeyResult.Success -> refreshEnrollmentState()
+            }
+        }
+    }
+
+    fun exportEnrollmentRequest(localRecordId: String, onReady: (ByteArray) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = runCatching {
+                coordinators.profiles.enrollmentRequest(localRecordId)
+            }.getOrNull()
+            if (request == null) {
+                mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
+            } else {
+                try {
+                    withContext(Dispatchers.Main.immediate) { onReady(request) }
+                } catch (_: Throwable) {
+                    request.fill(0)
+                    mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
+                }
+            }
+        }
+    }
+
+    fun deleteEnrollmentKey(localRecordId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val deleted = runCatching {
+                coordinators.profiles.deleteEnrollmentKey(localRecordId)
+            }.getOrDefault(false)
+            if (deleted) refreshEnrollmentState()
+            else mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
+        }
+    }
+
+    fun markEnrollmentRequestExported(localRecordId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { coordinators.profiles.markEnrollmentRequestExported(localRecordId) }
+                .onSuccess { refreshEnrollmentState() }
+                .onFailure { mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired }
+        }
+    }
+
+    fun dismissEnrollmentAction() {
+        viewModelScope.launch(Dispatchers.IO) { refreshEnrollmentState() }
     }
 
     fun createBackup(passphrase: String, onReady: (ByteArray) -> Unit) {
@@ -324,7 +418,7 @@ class ProductRootViewModel(
             val restoredBytes = (result as NativeResult.Success).value
             val records = try {
                 runCatching {
-                    BackupPayloadCodec.decode(restoredBytes)
+                    BackupPayloadCodec.decodePayload(restoredBytes)
                 }.getOrElse {
                     mutableBackupState.value =
                         BackupWorkflowState.Failed(OperationError.INVALID_INPUT)
@@ -334,17 +428,31 @@ class ProductRootViewModel(
                 restoredBytes.fill(0)
             }
             val journal = coordinators.profiles.journalOrNull()
-            if (journal == null) {
+            val keyStore = coordinators.profiles.clientKeysOrNull()
+            if (journal == null || keyStore == null) {
+                records.clientKeys.forEach { it.destroy() }
+                records.profiles.forEach { it.verifyRequest.fill(0) }
                 mutableBackupState.value = BackupWorkflowState.Failed(OperationError.KEY_INVALIDATED)
                 return@launch
             }
+            val restoredKeyIds = when (val keyRestore = keyStore.restore(records.clientKeys)) {
+                is ClientKeyRestoreResult.Failure -> {
+                    records.clientKeys.forEach { it.destroy() }
+                    records.profiles.forEach { it.verifyRequest.fill(0) }
+                    mutableBackupState.value = BackupWorkflowState.Failed(keyRestore.error)
+                    return@launch
+                }
+                is ClientKeyRestoreResult.Success -> keyRestore.localRecordIds
+            }
             val restore = try {
-                journal.restore(records)
+                journal.restore(records.profiles)
             } finally {
-                records.forEach { it.verifyRequest.fill(0) }
+                records.clientKeys.forEach { it.destroy() }
+                records.profiles.forEach { it.verifyRequest.fill(0) }
             }
             when (restore) {
                 is RestoreResult.Failure -> {
+                    keyStore.rollbackRestored(restoredKeyIds)
                     mutableBackupState.value = BackupWorkflowState.Failed(restore.error)
                     return@launch
                 }
@@ -353,6 +461,7 @@ class ProductRootViewModel(
                         BackupWorkflowState.Completed(restore.restoredProfiles)
                 }
             }
+            refreshEnrollmentState()
             refreshProfiles()
         }
     }
@@ -818,7 +927,27 @@ class ProductRootViewModel(
             }
             is RestoreResult.Success, null -> Unit
         }
+        refreshEnrollmentState()
         refreshProfiles()
+    }
+
+    private fun refreshEnrollmentState() {
+        val keys = runCatching { coordinators.profiles.enrollmentKeys() }.getOrElse {
+            mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
+            return
+        }
+        if (keys.isEmpty()) {
+            mutableEnrollmentState.value = EnrollmentUiState.NoEnrollmentKey
+            return
+        }
+        val summaries = keys.map { it.toUiSummary() }
+        mutableEnrollmentState.value = when {
+            keys.any { it.status == ClientKeyStatus.PROFILE_VERIFIED } ->
+                EnrollmentUiState.ProfileVerified(summaries)
+            keys.any { it.status == ClientKeyStatus.AWAITING_PROFILE } ->
+                EnrollmentUiState.AwaitingProfile(summaries)
+            else -> EnrollmentUiState.RequestReady(summaries)
+        }
     }
 
     private suspend fun refreshProfiles() {
@@ -869,6 +998,7 @@ class ProductRootViewModel(
         val request: ByteArray,
         val preview: RedactedProfilePreview,
         val source: ImportSource,
+        val recipientKeyLocalId: String?,
     )
 
     private fun clearPendingImport() {
@@ -886,6 +1016,15 @@ class ProductRootViewModel(
         }
     }
 }
+
+private fun org.kurdistanvpn.data.secure.ClientKeySummary.toUiSummary(): EnrollmentKeySummary =
+    EnrollmentKeySummary(
+        localRecordId = localRecordId,
+        requestFingerprint = requestFingerprint,
+        createdAtEpochSeconds = createdAtEpochSeconds,
+        expiresAtEpochSeconds = expiresAtEpochSeconds,
+        boundProfileCount = boundProfileCount,
+    )
 
 private fun Phase9Settings.forLocalPhase13Runtime(): Phase9Settings = copy(
     connection = connection.copy(

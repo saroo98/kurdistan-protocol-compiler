@@ -16,16 +16,78 @@ import org.kurdistanvpn.core.model.TunnelPreferences
 import org.kurdistanvpn.core.model.UpdatePreferences
 import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.data.secure.EncryptedDiagnosticEventStore
+import org.kurdistanvpn.data.secure.ClientKeyBundleStore
+import org.kurdistanvpn.data.secure.ClientKeyResult
+import org.kurdistanvpn.data.secure.ClientKeySummary
+import org.kurdistanvpn.data.secure.RecipientCredentialLease
 import org.kurdistanvpn.data.secure.ProfileAdmissionJournal
 import org.kurdistanvpn.data.secure.RuntimeAuthorityResult
 import org.kurdistanvpn.data.secure.SecureRoutingPolicyStore
 import org.kurdistanvpn.data.settings.Phase9SettingsStore
+import org.kurdistanvpn.core.nativeapi.NativeResult
+import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
+
+internal data class ResolvedProfilePreview(
+    val verified: VerifiedPreviewHandle,
+    val recipientKeyLocalId: String?,
+)
 
 internal class ProfileAdmissionCoordinator(
     val nativeCore: KurdNativeCore,
     private val journal: () -> ProfileAdmissionJournal?,
+    private val clientKeys: () -> ClientKeyBundleStore?,
 ) {
     fun journalOrNull(): ProfileAdmissionJournal? = journal()
+
+    fun clientKeysOrNull(): ClientKeyBundleStore? = clientKeys()
+
+    fun createEnrollment(validitySeconds: Int, nowEpochSeconds: Long): ClientKeyResult =
+        clientKeys()?.create(validitySeconds, nowEpochSeconds)
+            ?: ClientKeyResult.Failure(org.kurdistanvpn.core.model.OperationError.KEY_INVALIDATED)
+
+    fun enrollmentKeys(): List<ClientKeySummary> = clientKeys()?.list().orEmpty()
+
+    fun enrollmentRequest(localRecordId: String): ByteArray? =
+        clientKeys()?.publicRequest(localRecordId)
+
+    fun markEnrollmentRequestExported(localRecordId: String) =
+        clientKeys()?.markRequestExported(localRecordId)
+
+    fun deleteEnrollmentKey(localRecordId: String): Boolean =
+        clientKeys()?.delete(localRecordId) == true
+
+    fun unbindProfile(localRecordId: String): ClientKeySummary? =
+        clientKeys()?.unbindProfile(localRecordId)
+
+    fun resolvePreview(request: ByteArray): NativeResult<ResolvedProfilePreview> {
+        when (val public = nativeCore.verifyPreview(request)) {
+            is NativeResult.Success -> return NativeResult.Success(
+                ResolvedProfilePreview(public.value, null),
+            )
+            is NativeResult.Failure -> Unit
+        }
+        val candidates = clientKeys()?.credentialCandidates().orEmpty()
+        var finalError = org.kurdistanvpn.core.model.OperationError.TRUST_REJECTED
+        try {
+            for (candidate in candidates) {
+                when (
+                    val result = nativeCore.verifyPreviewWithRecipient(
+                        request,
+                        candidate.publicRequest,
+                        candidate.privateBundle,
+                    )
+                ) {
+                    is NativeResult.Success -> return NativeResult.Success(
+                        ResolvedProfilePreview(result.value, candidate.localRecordId),
+                    )
+                    is NativeResult.Failure -> finalError = result.error
+                }
+            }
+        } finally {
+            candidates.forEach(RecipientCredentialLease::close)
+        }
+        return NativeResult.Failure(finalError)
+    }
 }
 
 internal class RuntimeSessionCoordinator(
@@ -127,7 +189,11 @@ internal data class Phase13Coordinators(
         fun create(root: Phase9CompositionRoot): Phase13Coordinators {
             val routing = EncryptedRoutingPolicyRepository { root.sensitiveRoutingStore }
             return Phase13Coordinators(
-                profiles = ProfileAdmissionCoordinator(root.nativeCore) { root.admissionJournal },
+                profiles = ProfileAdmissionCoordinator(
+                    root.nativeCore,
+                    { root.admissionJournal },
+                    { root.clientKeyStore },
+                ),
                 runtime = RuntimeSessionCoordinator(root.nativeCore) { root.admissionJournal },
                 settings = SettingsCoordinator(root.settingsStore, routing),
                 diagnostics = DiagnosticsCoordinator { root.diagnosticEventStore },

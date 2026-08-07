@@ -114,6 +114,17 @@ func DecodeRecipientCredentials(requestBytes, privateBytes []byte) (RecipientCre
 	return credentials, CodeOK
 }
 
+// ValidateRecipientCredentialsBytes proves that a canonical enrollment request
+// and private bundle are the matching pair without retaining either value.
+func ValidateRecipientCredentialsBytes(requestBytes, privateBytes []byte) ErrorCode {
+	credentials, code := DecodeRecipientCredentials(requestBytes, privateBytes)
+	if code != CodeOK {
+		return code
+	}
+	credentials.Destroy()
+	return CodeOK
+}
+
 func recipientState(registry *HandleRegistry, handle Handle) (*recipientHandle, ErrorCode) {
 	if registry == nil {
 		return nil, CodeInvalidHandle

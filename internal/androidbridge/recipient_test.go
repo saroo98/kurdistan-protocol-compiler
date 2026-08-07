@@ -102,6 +102,34 @@ func TestRecipientHandleRejectsWrongTypeCancellationAndMismatchedPrivateBundle(t
 	}
 }
 
+func TestValidateRecipientCredentialsBytesRejectsMismatchedAndMalformedBundles(t *testing.T) {
+	registry := HandleRegistry{}
+	now := time.Unix(1_800_000_000, 0).UTC()
+	first, code := CreateRecipient(&registry, now, time.Hour, rand.Reader)
+	if code != CodeOK {
+		t.Fatalf("first create code=%v", code)
+	}
+	second, code := CreateRecipient(&registry, now, time.Hour, rand.Reader)
+	if code != CodeOK {
+		t.Fatalf("second create code=%v", code)
+	}
+	defer registry.Free(first)
+	defer registry.Free(second)
+	request, _ := RecipientRequest(&registry, first)
+	private, _ := RecipientPrivateExport(&registry, first)
+	if code := ValidateRecipientCredentialsBytes(request, private); code != CodeOK {
+		t.Fatalf("matching pair code=%v", code)
+	}
+	wrong, _ := RecipientPrivateExport(&registry, second)
+	if code := ValidateRecipientCredentialsBytes(request, wrong); code != CodeVerificationRejected {
+		t.Fatalf("mismatched pair code=%v", code)
+	}
+	private[0] ^= 0xff
+	if code := ValidateRecipientCredentialsBytes(request, private); code != CodeVerificationRejected {
+		t.Fatalf("malformed pair code=%v", code)
+	}
+}
+
 func mustRecipientPrivate(t *testing.T, registry *HandleRegistry, handle Handle) []byte {
 	t.Helper()
 	encoded, code := RecipientPrivateExport(registry, handle)

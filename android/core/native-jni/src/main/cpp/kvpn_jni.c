@@ -229,6 +229,37 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientPrivateExport(
 }
 
 JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientValidate(
+    JNIEnv *env,
+    jobject receiver,
+    jbyteArray recipient_request,
+    jbyteArray recipient_private) {
+    (void)receiver;
+    if (recipient_request == NULL || recipient_private == NULL) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jbyte *request_elements = NULL;
+    jbyte *private_elements = NULL;
+    uint32_t request_length = 0;
+    uint32_t private_length = 0;
+    uint8_t *request_bytes = array_bytes(env, recipient_request, &request_elements, &request_length);
+    uint8_t *private_bytes = array_bytes(env, recipient_private, &private_elements, &private_length);
+    if (request_bytes == NULL || private_bytes == NULL) {
+        release_array(env, recipient_request, request_elements);
+        release_array(env, recipient_private, private_elements);
+        return KVPN_INVALID_ARGUMENT;
+    }
+    int32_t code = kvpn_recipient_validate(
+        request_bytes,
+        request_length,
+        private_bytes,
+        private_length);
+    release_array(env, recipient_request, request_elements);
+    release_array(env, recipient_private, private_elements);
+    return code;
+}
+
+JNIEXPORT jint JNICALL
 Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeVerifyPreviewWithRecipient(
     JNIEnv *env,
     jobject receiver,

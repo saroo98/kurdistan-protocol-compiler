@@ -16,6 +16,8 @@ import org.kurdistanvpn.data.metadata.KurdistanMetadataDatabase
 import org.kurdistanvpn.data.secure.AndroidKeystoreKek
 import org.kurdistanvpn.data.secure.KeyInvalidatedException
 import org.kurdistanvpn.data.secure.MissingKeyException
+import org.kurdistanvpn.data.secure.ClientKeyBundleStore
+import org.kurdistanvpn.data.secure.KurdRecipientKeyNative
 import org.kurdistanvpn.data.secure.ProfileAdmissionJournal
 import org.kurdistanvpn.data.secure.SecureBlobStore
 import org.kurdistanvpn.data.secure.SecureEnvelopeCodec
@@ -29,6 +31,7 @@ class Phase9CompositionRoot private constructor(
     val nativeCore: KurdNativeCore,
     private var database: KurdistanMetadataDatabase,
     admissionJournal: ProfileAdmissionJournal?,
+    clientKeyStore: ClientKeyBundleStore?,
     sensitiveRoutingStore: SecureRoutingPolicyStore?,
     diagnosticEventStore: EncryptedDiagnosticEventStore?,
     storageFailure: StorageFailure?,
@@ -36,6 +39,8 @@ class Phase9CompositionRoot private constructor(
     val settingsStore: Phase9SettingsStore,
 ) {
     var admissionJournal: ProfileAdmissionJournal? = admissionJournal
+        private set
+    var clientKeyStore: ClientKeyBundleStore? = clientKeyStore
         private set
     var sensitiveRoutingStore: SecureRoutingPolicyStore? = sensitiveRoutingStore
         private set
@@ -63,6 +68,7 @@ class Phase9CompositionRoot private constructor(
             val replacement = initializeProtectedStorage(context, nativeCore)
             database = replacement.database
             admissionJournal = replacement.journal
+            clientKeyStore = replacement.clientKeyStore
             sensitiveRoutingStore = replacement.routingStore
             diagnosticEventStore = replacement.diagnosticStore
             storageFailure = replacement.failure
@@ -76,6 +82,7 @@ class Phase9CompositionRoot private constructor(
             true
         } catch (_: Throwable) {
             admissionJournal = null
+            clientKeyStore = null
             sensitiveRoutingStore = null
             diagnosticEventStore = null
             storageFailure = StorageFailure.DEGRADED
@@ -104,6 +111,7 @@ class Phase9CompositionRoot private constructor(
                 nativeCore = nativeCore,
                 database = storage.database,
                 admissionJournal = storage.journal,
+                clientKeyStore = storage.clientKeyStore,
                 sensitiveRoutingStore = storage.routingStore,
                 diagnosticEventStore = storage.diagnosticStore,
                 storageFailure = storage.failure,
@@ -144,17 +152,22 @@ class Phase9CompositionRoot private constructor(
                 null
             }
             val blobStore = kek?.let { SecureBlobStore(context, SecureEnvelopeCodec(), it) }
+            val clientKeyStore = blobStore?.let {
+                ClientKeyBundleStore(it, KurdRecipientKeyNative(nativeCore))
+            }
             val journal = blobStore?.let {
                 ProfileAdmissionJournal(
                     nativeCore = nativeCore,
                     catalog = database.profileCatalog(),
                     blobs = it,
                     productionTrust = false,
+                    recipientKeys = clientKeyStore,
                 )
             }
             return ProtectedStorage(
                 database = database,
                 journal = journal,
+                clientKeyStore = clientKeyStore,
                 routingStore = blobStore?.let(::SecureRoutingPolicyStore),
                 diagnosticStore = blobStore?.let(::EncryptedDiagnosticEventStore),
                 failure = failure,
@@ -208,6 +221,7 @@ class Phase9CompositionRoot private constructor(
         private data class ProtectedStorage(
             val database: KurdistanMetadataDatabase,
             val journal: ProfileAdmissionJournal?,
+            val clientKeyStore: ClientKeyBundleStore?,
             val routingStore: SecureRoutingPolicyStore?,
             val diagnosticStore: EncryptedDiagnosticEventStore?,
             val failure: StorageFailure?,
