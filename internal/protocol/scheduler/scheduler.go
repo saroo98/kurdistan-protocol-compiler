@@ -165,20 +165,26 @@ func roundRobin(items []StreamItem) []StreamItem {
 }
 
 func FragmentSizes(p *ir.Profile, payloadLen int) []int {
+	return FragmentSizesFor(p.FrameGrammar.FragmentationMode, p.Scheduler.MaxBatchBytes, p.Limits.MaxFrameBytes, payloadLen)
+}
+
+// FragmentSizesFor is the bounded primitive shared by the legacy IR adapter
+// and product-safe live-program framing.
+func FragmentSizesFor(fragmentationMode string, maxBatchBytes, maxFrameBytes, payloadLen int) []int {
 	if payloadLen <= 0 {
 		return []int{0}
 	}
-	maxChunk := p.Scheduler.MaxBatchBytes
-	if maxChunk <= 0 || maxChunk > p.Limits.MaxFrameBytes-512 {
-		maxChunk = p.Limits.MaxFrameBytes - 512
+	maxChunk := maxBatchBytes
+	if maxChunk <= 0 || maxChunk > maxFrameBytes-512 {
+		maxChunk = maxFrameBytes - 512
 	}
-	switch p.FrameGrammar.FragmentationMode {
+	switch fragmentationMode {
 	case "fixed_size_chunks":
 		maxChunk = min(maxChunk, 4096)
 	case "bounded_variable_chunks":
 		maxChunk = min(maxChunk, 6144)
 	case "scheduler_controlled_chunks":
-		maxChunk = min(maxChunk, p.Scheduler.MaxBatchBytes)
+		maxChunk = min(maxChunk, maxBatchBytes)
 	default:
 		maxChunk = min(maxChunk, 16*1024)
 	}
