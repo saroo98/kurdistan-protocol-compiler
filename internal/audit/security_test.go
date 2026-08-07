@@ -909,6 +909,73 @@ func TestPhase14AssuranceOverlayRejectsMutationV1(t *testing.T) {
 	}
 }
 
+func TestPhase17LiveDataPlaneOverlayRejectsMutationV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := loadM17LiveDataPlaneOverlayV1(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clone := func() m17LiveDataPlaneOverlayV1 {
+		encoded, err := json.Marshal(overlay)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var copy m17LiveDataPlaneOverlayV1
+		if err := json.Unmarshal(encoded, &copy); err != nil {
+			t.Fatal(err)
+		}
+		return copy
+	}
+	if _, err := validateM17LiveDataPlaneOverlayAtPostV1(root, nil, clone()); err != nil {
+		t.Fatal(err)
+	}
+	if len(overlay.Entries) < 2 || overlay.Entries[0].PreEvidence != "ABSENT" {
+		t.Fatalf("invalid phase17 mutation fixture: %+v", overlay)
+	}
+	mutations := map[string]func(*m17LiveDataPlaneOverlayV1){
+		"missing-overlay": func(v *m17LiveDataPlaneOverlayV1) { *v = m17LiveDataPlaneOverlayV1{} },
+		"unknown-path": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[0].Path = "cmd/phase17verify/unknown.go"
+		},
+		"duplicate-path": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[1] = v.Entries[0]
+		},
+		"reordered-path": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[0], v.Entries[1] = v.Entries[1], v.Entries[0]
+		},
+		"pre-hash": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[len(v.Entries)-1].PreSHA256 = strings.Repeat("1", 64)
+		},
+		"absent-misuse": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[0].PreSHA256 = strings.Repeat("2", 64)
+		},
+		"post-hash": func(v *m17LiveDataPlaneOverlayV1) {
+			v.Entries[0].PostSHA256 = strings.Repeat("3", 64)
+		},
+		"predecessor-binding": func(v *m17LiveDataPlaneOverlayV1) {
+			v.PredecessorBindingSHA256 = strings.Repeat("4", 64)
+		},
+	}
+	for mutation, mutate := range mutations {
+		t.Run(mutation, func(t *testing.T) {
+			candidate := clone()
+			mutate(&candidate)
+			if _, err := validateM17LiveDataPlaneOverlayAtPostV1(root, nil, candidate); err == nil {
+				t.Fatal("mutation accepted")
+			}
+		})
+	}
+	t.Run("changed-added-file", func(t *testing.T) {
+		current := map[string]string{overlay.Entries[0].Path: strings.Repeat("4", 64)}
+		if _, err := validateM17LiveDataPlaneOverlayAtPostV1(root, current, clone()); err == nil {
+			t.Fatal("changed added file accepted")
+		}
+	})
+}
+
 func TestPhase13AndroidProductOverlayRejectsMutationV1(t *testing.T) {
 	root, err := repoRoot()
 	if err != nil {
@@ -1228,6 +1295,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		evidenceoverlay.Phase16ProductionTrustSuccessorPath,
 		evidenceoverlay.Phase16RuntimeSuccessorPath,
 		evidenceoverlay.Phase16DecentralizedSuccessorPath,
+		evidenceoverlay.Phase17SuccessorPath,
 	)
 	for _, path := range fixturePaths {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))

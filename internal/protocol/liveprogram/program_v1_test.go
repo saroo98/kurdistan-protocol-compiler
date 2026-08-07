@@ -6,6 +6,7 @@ package liveprogram
 import (
 	"bytes"
 	"crypto/sha256"
+	"math"
 	"testing"
 )
 
@@ -44,7 +45,9 @@ func TestProgramV1RejectsUnsafeShapeAndMalleableCBOR(t *testing.T) {
 		"invalid scheduler bound":        func(p *ProgramV1) { p.Scheduler.MaxBatchBytes = 0 },
 		"invalid stream bound":           func(p *ProgramV1) { p.Stream.MaxConcurrentStreams = 65 },
 		"invalid padding bound":          func(p *ProgramV1) { p.Padding.Probability = 2 },
+		"non-finite padding probability": func(p *ProgramV1) { p.Padding.Probability = math.NaN() },
 		"missing compiled data type tag": func(p *ProgramV1) { p.Frame.Compiled.DataTypeTag = nil },
+		"equal compiled type tags":       func(p *ProgramV1) { p.Frame.Compiled.DataTypeTag = bytes.Clone(p.Frame.Compiled.PaddingTypeTag) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			candidate := valid.Clone()
@@ -65,6 +68,22 @@ func TestProgramV1RejectsUnsafeShapeAndMalleableCBOR(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := DecodeV1(encoded); err == nil {
 				t.Fatal("malleable or oversized program was accepted")
+			}
+		})
+	}
+}
+
+func TestProgramV1DecodeRejectsNonFinitePaddingProbability(t *testing.T) {
+	for name, probability := range map[string]float64{"nan": math.NaN(), "positive infinity": math.Inf(1), "negative infinity": math.Inf(-1)} {
+		t.Run(name, func(t *testing.T) {
+			candidate := fixtureProgramV1()
+			candidate.Padding.Probability = probability
+			encoded, err := marshal(programMap(candidate))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := DecodeV1(encoded); err == nil {
+				t.Fatal("non-finite padding probability decoded")
 			}
 		})
 	}

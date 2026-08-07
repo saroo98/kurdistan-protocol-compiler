@@ -120,8 +120,13 @@ func messageBounds(messages []ir.MessageSymbol) string {
 	return b.String()
 }
 
-func goMod(modulePath, repoRoot string) string {
-	return fmt.Sprintf("module %s\n\ngo 1.26.5\n\nrequire kurdistan v0.0.0\n\nreplace kurdistan => %s\n", modulePath, filepathSlash(repoRoot))
+func goMod(modulePath, repoRoot, repositoryGoMod string) (string, error) {
+	repositoryGoMod = strings.ReplaceAll(repositoryGoMod, "\r\n", "\n")
+	if !strings.HasPrefix(repositoryGoMod, "module kurdistan\n") {
+		return "", fmt.Errorf("repository go.mod must declare module kurdistan")
+	}
+	repositoryGoMod = strings.Replace(repositoryGoMod, "module kurdistan\n", "module "+modulePath+"\n", 1)
+	return strings.TrimSpace(repositoryGoMod) + "\n\nrequire kurdistan v0.0.0\n\nreplace kurdistan => " + filepathSlash(repoRoot) + "\n", nil
 }
 
 func filepathSlash(path string) string {

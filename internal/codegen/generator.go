@@ -188,6 +188,7 @@ func prepareOutput(out string, force bool) error {
 func cleanGeneratedOutput(out string) error {
 	for _, rel := range []string{
 		"go.mod",
+		"go.sum",
 		"README.md",
 		"manifest.json",
 		"protocol",
@@ -205,6 +206,18 @@ func cleanGeneratedOutput(out string) error {
 }
 
 func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest, strict bool) ([]generatedFile, error) {
+	repoGoModRaw, err := os.ReadFile(filepath.Join(repoRoot, "go.mod"))
+	if err != nil {
+		return nil, fmt.Errorf("read repository go.mod: %w", err)
+	}
+	goSumRaw, err := os.ReadFile(filepath.Join(repoRoot, "go.sum"))
+	if err != nil {
+		return nil, fmt.Errorf("read repository go.sum: %w", err)
+	}
+	generatedGoMod, err := goMod(modulePath, repoRoot, string(repoGoModRaw))
+	if err != nil {
+		return nil, err
+	}
 	manifestRaw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return nil, err
@@ -215,7 +228,8 @@ func renderFiles(p *ir.Profile, modulePath, repoRoot string, manifest Manifest, 
 		return nil, err
 	}
 	files := []generatedFile{
-		{RelPath: "go.mod", Content: goMod(modulePath, repoRoot)},
+		{RelPath: "go.mod", Content: generatedGoMod},
+		{RelPath: "go.sum", Content: string(goSumRaw)},
 		{RelPath: "README.md", Content: readme(p)},
 		{RelPath: "manifest.json", Content: string(manifestRaw)},
 	}
