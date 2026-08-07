@@ -5,7 +5,9 @@ package sessionplan
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"io"
 	"slices"
 	"time"
 
@@ -182,6 +184,54 @@ func DecodeRelayAdmissionPrefaceV1(encoded []byte) (RelayAdmissionPrefaceV1, err
 		return RelayAdmissionPrefaceV1{}, ErrRelayAdmissionV1
 	}
 	return preface.Clone(), nil
+}
+
+func WriteRelayAdmissionPrefaceV1(writer io.Writer, preface RelayAdmissionPrefaceV1) error {
+	if writer == nil {
+		return ErrRelayAdmissionV1
+	}
+	encoded, err := EncodeRelayAdmissionPrefaceV1(preface)
+	if err != nil {
+		return ErrRelayAdmissionV1
+	}
+	defer clear(encoded)
+	var length [4]byte
+	binary.BigEndian.PutUint32(length[:], uint32(len(encoded)))
+	if writeRelayAdmissionBytesV1(writer, length[:]) != nil || writeRelayAdmissionBytesV1(writer, encoded) != nil {
+		return ErrRelayAdmissionV1
+	}
+	return nil
+}
+
+func ReadRelayAdmissionPrefaceV1(reader io.Reader) (RelayAdmissionPrefaceV1, error) {
+	if reader == nil {
+		return RelayAdmissionPrefaceV1{}, ErrRelayAdmissionV1
+	}
+	var length [4]byte
+	if _, err := io.ReadFull(reader, length[:]); err != nil {
+		return RelayAdmissionPrefaceV1{}, ErrRelayAdmissionV1
+	}
+	size := binary.BigEndian.Uint32(length[:])
+	if size == 0 || size > MaxRelayAdmissionPrefaceBytesV1 {
+		return RelayAdmissionPrefaceV1{}, ErrRelayAdmissionV1
+	}
+	encoded := make([]byte, size)
+	defer clear(encoded)
+	if _, err := io.ReadFull(reader, encoded); err != nil {
+		return RelayAdmissionPrefaceV1{}, ErrRelayAdmissionV1
+	}
+	return DecodeRelayAdmissionPrefaceV1(encoded)
+}
+
+func writeRelayAdmissionBytesV1(writer io.Writer, value []byte) error {
+	for len(value) > 0 {
+		count, err := writer.Write(value)
+		if err != nil || count <= 0 || count > len(value) {
+			return ErrRelayAdmissionV1
+		}
+		value = value[count:]
+	}
+	return nil
 }
 
 func validateRelayAdmissionPrefaceV1(preface RelayAdmissionPrefaceV1) error {
