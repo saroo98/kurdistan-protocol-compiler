@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"kurdistan/internal/product/enrollment"
+	"kurdistan/internal/relay/node"
 	"kurdistan/internal/selfhost"
 )
 
@@ -92,6 +93,105 @@ func TestCLIEndToEndUsesStdinPassphrasesAndExclusiveOutputs(t *testing.T) {
 		if err := json.Unmarshal(stdout.Bytes(), &shown); err != nil || !shown.Revoked || shown.Connectable {
 			t.Fatalf("revoked show=%s err=%v", stdout.String(), err)
 		}
+	}
+}
+
+func TestCommittedOperationsNotifyRunningRelayImmediately(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "recovery")
+	passphrase := "correct horse battery staple\n"
+	call := func(args []string, input string) (int, bytes.Buffer, bytes.Buffer) {
+		var stdout, stderr bytes.Buffer
+		code := run(args, bytes.NewBufferString(input), &stdout, &stderr)
+		return code, stdout, stderr
+	}
+	if code, _, stderr := call([]string{"init", "--data-dir", dataDir, "--name", "owner-node", "--endpoint", "203.0.113.7:443", "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("init code=%d stderr=%s", code, stderr.String())
+	}
+	if code, _, stderr := call([]string{"recovery", "confirm", "--data-dir", dataDir, "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("confirm code=%d stderr=%s", code, stderr.String())
+	}
+	outputDir := filepath.Join(base, "profile")
+	code, stdout, stderr := call([]string{"profile", "create", "--data-dir", dataDir, "--name", "phone", "--valid-for", "24h", "--output-dir", outputDir, "--authority-only"}, "")
+	if code != 0 {
+		t.Fatalf("create code=%d stderr=%s", code, stderr.String())
+	}
+	var created struct {
+		ProfileID string `json:"profileId"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &created); err != nil || created.ProfileID == "" {
+		t.Fatalf("create output=%s err=%v", stdout.String(), err)
+	}
+
+	previousNotify := notifyRelayRuntime
+	defer func() { notifyRelayRuntime = previousNotify }()
+	var commands []node.ControlCommandV1
+	notifyRelayRuntime = func(path string, request node.ControlRequestV1, required bool) error {
+		if path != filepath.Join(base, "run", "control.sock") || required {
+			t.Fatalf("notification path=%q required=%v", path, required)
+		}
+		commands = append(commands, request.Command)
+		return nil
+	}
+	control := filepath.Join(base, "run", "control.sock")
+	operations := []struct {
+		args  []string
+		input string
+	}{
+		{args: []string{"profile", "revoke", "--data-dir", dataDir, "--profile-id", created.ProfileID, "--recovery-file", recovery, "--confirm-profile", created.ProfileID, "--control-socket", control}, input: passphrase},
+		{args: []string{"keys", "rotate", "relay", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "relay", "--control-socket", control}, input: passphrase},
+		{args: []string{"node", "drain", "--data-dir", dataDir, "--control-socket", control}},
+		{args: []string{"node", "resume", "--data-dir", dataDir, "--control-socket", control}},
+		{args: []string{"deployment", "disable", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "disable", "--control-socket", control}, input: passphrase},
+		{args: []string{"deployment", "enable", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "enable", "--control-socket", control}, input: passphrase},
+	}
+	for _, operation := range operations {
+		if code, _, stderr := call(operation.args, operation.input); code != 0 {
+			t.Fatalf("operation=%v code=%d stderr=%s", operation.args[:2], code, stderr.String())
+		}
+	}
+	want := []node.ControlCommandV1{
+		node.ControlReloadV1, node.ControlReloadV1, node.ControlDrainV1,
+		node.ControlResumeV1, node.ControlReloadV1, node.ControlReloadV1,
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("commands=%v want=%v", commands, want)
+	}
+	for index := range want {
+		if commands[index] != want[index] {
+			t.Fatalf("commands[%d]=%d want=%d", index, commands[index], want[index])
+		}
+	}
+}
+
+func TestCommittedOperationReportsNotificationFailureWithoutRepeatingMutation(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "recovery")
+	passphrase := "correct horse battery staple\n"
+	call := func(args []string, input string) (int, bytes.Buffer, bytes.Buffer) {
+		var stdout, stderr bytes.Buffer
+		code := run(args, bytes.NewBufferString(input), &stdout, &stderr)
+		return code, stdout, stderr
+	}
+	if code, _, stderr := call([]string{"init", "--data-dir", dataDir, "--name", "owner-node", "--endpoint", "203.0.113.7:443", "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("init code=%d stderr=%s", code, stderr.String())
+	}
+
+	previousNotify := notifyRelayRuntime
+	defer func() { notifyRelayRuntime = previousNotify }()
+	notifyRelayRuntime = func(string, node.ControlRequestV1, bool) error {
+		return node.ErrControlConfig
+	}
+	control := filepath.Join(base, "run", "control.sock")
+	code, _, stderr := call([]string{"node", "drain", "--data-dir", dataDir, "--control-socket", control}, "")
+	if code != 7 || stderr.String() != "kurdctl: state committed; runtime notification pending; run kurdctl node reload\n" {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	status, err := selfhost.LoadStatus(dataDir)
+	if err != nil || !status.Drained {
+		t.Fatalf("committed drain status=%+v err=%v", status, err)
 	}
 }
 
@@ -299,6 +399,17 @@ func TestCLICreatesDeviceBoundLiveProfileAndRejectsRecipientReplay(t *testing.T)
 	if err := os.WriteFile(requestPath, requestBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	previousNotify := notifyRelayRuntime
+	defer func() { notifyRelayRuntime = previousNotify }()
+	control := filepath.Join(base, "run", "control.sock")
+	var reloads int
+	notifyRelayRuntime = func(path string, request node.ControlRequestV1, required bool) error {
+		if path != control || required || request.Command != node.ControlReloadV1 {
+			t.Fatalf("notification path=%q command=%d required=%v", path, request.Command, required)
+		}
+		reloads++
+		return nil
+	}
 	if code, _, _ := call([]string{"profile", "create", "--data-dir", dataDir, "--name", "missing-request", "--output-dir", filepath.Join(base, "missing")}, ""); code != 2 {
 		t.Fatalf("live create without recipient request code=%d", code)
 	}
@@ -306,6 +417,7 @@ func TestCLICreatesDeviceBoundLiveProfileAndRejectsRecipientReplay(t *testing.T)
 	code, stdout, stderr := call([]string{
 		"profile", "create", "--data-dir", dataDir, "--name", "phone", "--valid-for", "24h",
 		"--recipient-request", requestPath, "--recipient-registry-dir", registry, "--output-dir", outputDir,
+		"--control-socket", control,
 	}, "")
 	if code != 0 {
 		t.Fatalf("live create code=%d stderr=%s", code, stderr.String())
@@ -336,6 +448,30 @@ func TestCLICreatesDeviceBoundLiveProfileAndRejectsRecipientReplay(t *testing.T)
 		"--recipient-registry-dir", registry, "--output-dir", filepath.Join(base, "replayed"),
 	}, ""); code == 0 {
 		t.Fatal("recipient request replay was accepted")
+	}
+	rotatedRequest, rotatedPrivate, err := enrollment.Generate(time.Now().UTC(), time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(rotatedPrivate)
+	rotatedRequestBytes, err := enrollment.EncodeRequestV1(rotatedRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotatedRequestPath := filepath.Join(base, "rotated-device.kurd-enrollment")
+	if err := os.WriteFile(rotatedRequestPath, rotatedRequestBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := call([]string{
+		"profile", "rotate", "--data-dir", dataDir, "--profile-id", created.ProfileID,
+		"--recovery-file", recovery, "--valid-for", "24h", "--recipient-request", rotatedRequestPath,
+		"--recipient-registry-dir", registry, "--output-dir", filepath.Join(base, "rotated-profile"),
+		"--control-socket", control,
+	}, passphrase); code != 0 {
+		t.Fatalf("live rotate code=%d stderr=%s", code, stderr.String())
+	}
+	if reloads != 2 {
+		t.Fatalf("runtime reloads=%d want=2", reloads)
 	}
 }
 

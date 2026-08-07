@@ -135,6 +135,55 @@ func DecodeControlResponseV1(wire []byte) (ControlResponseV1, error) {
 	return response, nil
 }
 
+// ExchangeControlV1 performs one bounded request/response exchange over an
+// already authenticated owner-local connection. It owns and closes the
+// connection so a request cannot be replayed on a retained channel.
+func ExchangeControlV1(ctx context.Context, connection net.Conn, request ControlRequestV1, timeout time.Duration) (ControlResponseV1, error) {
+	if ctx == nil || connection == nil || timeout < 100*time.Millisecond || timeout > 10*time.Second {
+		return ControlResponseV1{}, ErrControlConfig
+	}
+	defer connection.Close()
+	if err := ctx.Err(); err != nil {
+		return ControlResponseV1{}, errors.Join(ErrControlConfig, err)
+	}
+	wire, err := EncodeControlRequestV1(request)
+	if err != nil {
+		return ControlResponseV1{}, err
+	}
+	deadline := time.Now().Add(timeout)
+	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
+		deadline = contextDeadline
+	}
+	if err := connection.SetDeadline(deadline); err != nil {
+		return ControlResponseV1{}, errors.Join(ErrControlConfig, err)
+	}
+	stopWatch := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = connection.SetDeadline(time.Now())
+		case <-stopWatch:
+		}
+	}()
+	defer close(stopWatch)
+	for len(wire) > 0 {
+		count, writeErr := connection.Write(wire)
+		if writeErr != nil || count <= 0 {
+			return ControlResponseV1{}, errors.Join(ErrControlProtocol, writeErr)
+		}
+		wire = wire[count:]
+	}
+	responseWire := make([]byte, controlResponseSizeV1)
+	if _, err := io.ReadFull(connection, responseWire); err != nil {
+		return ControlResponseV1{}, errors.Join(ErrControlProtocol, err)
+	}
+	response, err := DecodeControlResponseV1(responseWire)
+	if err != nil {
+		return ControlResponseV1{}, err
+	}
+	return response, nil
+}
+
 func (actions ControlActionsV1) Execute(request ControlRequestV1) (ControlResponseV1, error) {
 	if actions.Health == nil {
 		return ControlResponseV1{}, ErrControlConfig
@@ -148,7 +197,11 @@ func (actions ControlActionsV1) Execute(request ControlRequestV1) (ControlRespon
 	case ControlDrainV1:
 		actions.Health.SetDrain(true)
 	case ControlResumeV1:
-		actions.Health.SetDrain(false)
+		if actions.Reload == nil {
+			response.OK, response.Code = false, ControlCodeUnavailableV1
+		} else if actions.Reload() != nil {
+			response.OK, response.Code = false, ControlCodeReloadFailedV1
+		}
 	case ControlReloadV1:
 		if actions.Reload == nil {
 			response.OK, response.Code = false, ControlCodeUnavailableV1

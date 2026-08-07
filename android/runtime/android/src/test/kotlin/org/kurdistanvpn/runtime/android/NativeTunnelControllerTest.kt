@@ -75,8 +75,8 @@ class NativeTunnelControllerTest {
     @Test
     fun prepareAndAuthenticationFailuresNeverEstablishTun() {
         listOf(
-            FakeLiveSession.Options(failPrepare = true) to LiveTunnelFailure.SOCKET_PREPARE_FAILED,
-            FakeLiveSession.Options(failCommit = true) to LiveTunnelFailure.NETWORK_AUTHENTICATION_FAILED,
+            FakeLiveSession.Options(prepareError = OperationError.INTERNAL_FAILURE) to LiveTunnelFailure.INTERNAL_FAILURE,
+            FakeLiveSession.Options(commitError = OperationError.INTERNAL_FAILURE) to LiveTunnelFailure.INTERNAL_FAILURE,
             FakeLiveSession.Options(authenticatedState = NativeRuntimeState.TLS_AUTHENTICATED) to
                 LiveTunnelFailure.NATIVE_STATE_MISMATCH,
         ).forEach { (options, expected) ->
@@ -92,6 +92,37 @@ class NativeTunnelControllerTest {
                 controller.start(FakeLiveSession(events, options)),
             )
             assertFalse(events.contains("establish"))
+            assertTrue(events.contains("close"))
+        }
+    }
+
+    @Test
+    fun nativeFailureCategoriesRemainActionableAndFailClosed() {
+        val cases = listOf(
+            FakeLiveSession.Options(prepareError = OperationError.ENDPOINT_UNAVAILABLE) to LiveTunnelFailure.ENDPOINT_UNAVAILABLE,
+            FakeLiveSession.Options(commitError = OperationError.TLS_REJECTED) to LiveTunnelFailure.TLS_REJECTED,
+            FakeLiveSession.Options(commitError = OperationError.KURD_AUTH_REJECTED) to LiveTunnelFailure.KURD_AUTH_REJECTED,
+            FakeLiveSession.Options(commitError = OperationError.NODE_DRAINED) to LiveTunnelFailure.NODE_DRAINED,
+            FakeLiveSession.Options(commitError = OperationError.DEPLOYMENT_DISABLED) to LiveTunnelFailure.DEPLOYMENT_DISABLED,
+            FakeLiveSession.Options(attachError = OperationError.TUN_IO_FAILED) to LiveTunnelFailure.TUN_IO_FAILED,
+            FakeLiveSession.Options(attachError = OperationError.RESOURCE_LIMIT) to LiveTunnelFailure.RESOURCE_LIMIT,
+            FakeLiveSession.Options(prepareError = OperationError.STATE_CORRUPT) to LiveTunnelFailure.STATE_CORRUPT,
+            FakeLiveSession.Options(prepareError = OperationError.RECOVERY_REQUIRED) to LiveTunnelFailure.RECOVERY_REQUIRED,
+            FakeLiveSession.Options(prepareError = OperationError.CANCELLED) to LiveTunnelFailure.CANCELLED,
+        )
+        cases.forEach { (options, expected) ->
+            val events = mutableListOf<String>()
+            val controller = NativeTunnelController(
+                SocketProtector { true },
+                TunEstablisher { FakeTun(events) },
+                DetachedFileDescriptorCloser { events += "closed:$it" },
+            )
+
+            assertEquals(
+                LiveTunnelStartResult.Failure(expected),
+                controller.start(FakeLiveSession(events, options)),
+            )
+            assertFalse(controller.isRunning())
             assertTrue(events.contains("close"))
         }
     }
@@ -138,7 +169,7 @@ class NativeTunnelControllerTest {
         )
 
         assertEquals(
-            LiveTunnelStartResult.Failure(LiveTunnelFailure.TUN_ATTACH_FAILED),
+            LiveTunnelStartResult.Failure(LiveTunnelFailure.INTERNAL_FAILURE),
             controller.start(session),
         )
         assertTrue(events.contains("closed:71"))
@@ -200,13 +231,13 @@ private class FakeLiveSession(
 ) : NativeLiveRuntimeSession {
     constructor(events: MutableList<String>, failAttach: Boolean) : this(
         events,
-        Options(failAttach = failAttach),
+        Options(attachError = if (failAttach) OperationError.INTERNAL_FAILURE else null),
     )
 
     data class Options(
-        val failPrepare: Boolean = false,
-        val failCommit: Boolean = false,
-        val failAttach: Boolean = false,
+        val prepareError: OperationError? = null,
+        val commitError: OperationError? = null,
+        val attachError: OperationError? = null,
         val authenticatedState: NativeRuntimeState = NativeRuntimeState.KURD_AUTHENTICATED,
     )
 
@@ -215,7 +246,7 @@ private class FakeLiveSession(
 
     override fun prepareSocket(): NativeResult<Int> {
         events += "prepare"
-        if (options.failPrepare) return NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+        options.prepareError?.let { return NativeResult.Failure(it) }
         state = NativeRuntimeState.SOCKET_PREPARED
         return NativeResult.Success(37)
     }
@@ -226,14 +257,14 @@ private class FakeLiveSession(
             return NativeResult.Failure(OperationError.POLICY_REJECTED)
         }
         events += listOf("connect", "tls", "kurd")
-        if (options.failCommit) return NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+        options.commitError?.let { return NativeResult.Failure(it) }
         state = options.authenticatedState
         return NativeResult.Success(Unit)
     }
 
     override fun attachTun(fileDescriptor: Int): NativeResult<Unit> {
         events += "attach:$fileDescriptor"
-        if (options.failAttach) return NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+        options.attachError?.let { return NativeResult.Failure(it) }
         state = NativeRuntimeState.RUNNING
         return NativeResult.Success(Unit)
     }

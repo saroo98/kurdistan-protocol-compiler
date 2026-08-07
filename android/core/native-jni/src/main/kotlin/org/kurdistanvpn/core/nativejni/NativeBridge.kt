@@ -779,6 +779,17 @@ class NativeBridge : KurdNativeCore {
                 11 -> OperationError.RECOVERY_REQUIRED
                 12 -> OperationError.QUARANTINED
                 13 -> OperationError.INCOMPATIBLE_NATIVE_CORE
+                15 -> OperationError.ENDPOINT_UNAVAILABLE
+                16 -> OperationError.TLS_REJECTED
+                17 -> OperationError.KURD_AUTH_REJECTED
+                18 -> OperationError.TUN_IO_FAILED
+                19 -> OperationError.DNS_UNAVAILABLE
+                20 -> OperationError.NETWORK_LOST
+                21 -> OperationError.FALLBACK_EXHAUSTED
+                22 -> OperationError.NODE_DRAINED
+                23 -> OperationError.DEPLOYMENT_DISABLED
+                24 -> OperationError.RESOURCE_LIMIT
+                25 -> OperationError.STATE_CORRUPT
                 else -> OperationError.INTERNAL_FAILURE
             }
     }

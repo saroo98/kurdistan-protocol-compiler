@@ -51,6 +51,17 @@ const (
 	CodeQuarantined
 	CodeIncompatible
 	CodeInternalFailure
+	CodeEndpointUnavailable
+	CodeTLSRejected
+	CodeKurdAuthRejected
+	CodeTUNIOFailed
+	CodeDNSUnavailable
+	CodeNetworkLost
+	CodeFallbackExhausted
+	CodeNodeDrained
+	CodeDeploymentDisabled
+	CodeResourceLimit
+	CodeStateCorrupt
 )
 
 type ABIInfo struct {

@@ -187,6 +187,26 @@ func TestRuntimeSessionV2CancelClosesNetwork(t *testing.T) {
 	}
 }
 
+func TestNormalizeRuntimeNetworkCodePreservesActionableFailures(t *testing.T) {
+	for _, code := range []ErrorCode{
+		CodeEndpointUnavailable,
+		CodeTLSRejected,
+		CodeKurdAuthRejected,
+		CodeTUNIOFailed,
+		CodeDNSUnavailable,
+		CodeNetworkLost,
+		CodeFallbackExhausted,
+		CodeNodeDrained,
+		CodeDeploymentDisabled,
+		CodeResourceLimit,
+		CodeStateCorrupt,
+	} {
+		if got := normalizeRuntimeNetworkCode(code); got != code {
+			t.Fatalf("code=%v normalized=%v", code, got)
+		}
+	}
+}
+
 type recordingRuntimeNetworkFactory struct{ network recordingRuntimeNetwork }
 
 func (factory *recordingRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte) (RuntimeNetworkSession, ErrorCode) {
