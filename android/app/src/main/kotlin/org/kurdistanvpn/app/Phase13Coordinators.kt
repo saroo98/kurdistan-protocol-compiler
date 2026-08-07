@@ -94,7 +94,7 @@ internal class RuntimeSessionCoordinator(
     private val nativeCore: KurdNativeCore,
     private val journal: () -> ProfileAdmissionJournal?,
 ) {
-    suspend fun openAuthority(localRecordId: String): RuntimeAuthorityResult? =
+    suspend fun openLiveAuthority(localRecordId: String): RuntimeAuthorityResult? =
         journal()?.openRuntimeAuthority(localRecordId)
 
     fun probe(payload: ByteArray) = nativeCore.phase11RoundTrip(payload)

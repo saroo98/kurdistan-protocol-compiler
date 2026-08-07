@@ -78,6 +78,27 @@ class ClientKeyBundleStoreTest {
     }
 
     @Test
+    fun profileCredentialLookupReturnsOnlyTheBoundKeyAndWipesItsLease() {
+        val blobs = MemorySecureBlobs()
+        val native = FakeRecipientNative()
+        val store = ClientKeyBundleStore(blobs, native, deterministicIds())
+        val key = (store.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+
+        assertEquals(null, store.credentialsForProfile("profile-one"))
+        store.bindProfile(key.localRecordId, "profile-one")
+        val lease = requireNotNull(store.credentialsForProfile("profile-one"))
+        val requestReference = lease.publicRequest
+        val privateReference = lease.privateBundle
+        assertArrayEquals(native.publicRequest, requestReference)
+        assertArrayEquals(native.privateBundle, privateReference)
+
+        lease.close()
+        assertTrue(requestReference.all { it == 0.toByte() })
+        assertTrue(privateReference.all { it == 0.toByte() })
+        assertEquals(null, store.credentialsForProfile("profile-two"))
+    }
+
+    @Test
     fun backupRestoreRewrapsValidPairsRejectsTamperingAndAvoidsSourceIds() {
         val sourceBlobs = MemorySecureBlobs()
         val native = FakeRecipientNative()

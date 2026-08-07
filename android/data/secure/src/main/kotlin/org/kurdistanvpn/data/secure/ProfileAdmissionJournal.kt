@@ -38,10 +38,14 @@ sealed interface RestoreResult {
 class RuntimeAuthorityMaterial(
     val verifyRequest: ByteArray,
     val activationRecord: ByteArray,
+    val recipientRequest: ByteArray = byteArrayOf(),
+    val recipientPrivate: ByteArray = byteArrayOf(),
 ) : AutoCloseable {
     override fun close() {
         verifyRequest.fill(0)
         activationRecord.fill(0)
+        recipientRequest.fill(0)
+        recipientPrivate.fill(0)
     }
 }
 
@@ -259,6 +263,8 @@ class ProfileAdmissionJournal(
             }
             var verifyRequest: ByteArray? = null
             var activationRecord: ByteArray? = null
+            var recipientRequest: ByteArray? = null
+            var recipientPrivate: ByteArray? = null
             try {
                 verifyRequest = blobs.reopen(localRecordId, SecureDataClass.IMPORT_REQUEST)
                 activationRecord = blobs.reopen(
@@ -272,16 +278,41 @@ class ProfileAdmissionJournal(
                         OperationError.QUARANTINED,
                     )
                 }
+                val storedPreview = blobs.reopen(localRecordId, SecureDataClass.PROFILE_PREVIEW)
+                val sealed = try {
+                    ProfilePreviewCodec.decode(storedPreview).first.sealed
+                } finally {
+                    storedPreview.fill(0)
+                }
+                val recipient = recipientKeys?.credentialsForProfile(localRecordId)
+                if (sealed && recipient == null) {
+                    verifyRequest.fill(0)
+                    activationRecord.fill(0)
+                    return@withContext RuntimeAuthorityResult.Failure(OperationError.KEY_INVALIDATED)
+                }
+                recipient?.use {
+                    recipientRequest = it.publicRequest.clone()
+                    recipientPrivate = it.privateBundle.clone()
+                }
                 RuntimeAuthorityResult.Success(
-                    RuntimeAuthorityMaterial(verifyRequest, activationRecord),
+                    RuntimeAuthorityMaterial(
+                        verifyRequest,
+                        activationRecord,
+                        recipientRequest ?: byteArrayOf(),
+                        recipientPrivate ?: byteArrayOf(),
+                    ),
                 )
             } catch (_: KeyInvalidatedException) {
                 verifyRequest?.fill(0)
                 activationRecord?.fill(0)
+                recipientRequest?.fill(0)
+                recipientPrivate?.fill(0)
                 RuntimeAuthorityResult.Failure(OperationError.KEY_INVALIDATED)
             } catch (_: Throwable) {
                 verifyRequest?.fill(0)
                 activationRecord?.fill(0)
+                recipientRequest?.fill(0)
+                recipientPrivate?.fill(0)
                 RuntimeAuthorityResult.Failure(OperationError.STORAGE_FAILURE)
             }
         }

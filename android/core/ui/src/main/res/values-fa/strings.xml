@@ -49,6 +49,8 @@
     <string name="disconnected">Disconnected</string>
     <string name="connecting">Connecting…</string>
     <string name="connected_local">Connected to owned loopback</string>
+    <string name="connected_relay">از طریق رلهٔ تأییدشدهٔ کُرد متصل است</string>
+    <string name="phase17_live_notice">ترافیک در نشست احراز‌شدهٔ کُرد به رله‌ای هدایت می‌شود که در نمایهٔ فعال وارد شده است. DNS داخل تونل می‌ماند.</string>
     <string name="disconnecting">Disconnecting…</string>
     <string name="permission_revoked">VPN permission revoked</string>
     <string name="connection_failed">Connection failed safely</string>

@@ -766,13 +766,15 @@ class ProductRootViewModel(
             return
         }
         viewModelScope.launch {
-            when (val authority = coordinators.runtime.openAuthority(localRecordId)) {
+            when (val authority = coordinators.runtime.openLiveAuthority(localRecordId)) {
                 is RuntimeAuthorityResult.Success -> authority.material.use { material ->
                     val encoded = runCatching {
                         withContext(Dispatchers.Default) {
                             RuntimeStartWire.encode(
                                 verifyRequest = material.verifyRequest,
                                 activationRecord = material.activationRecord,
+                                recipientRequest = material.recipientRequest,
+                                recipientPrivate = material.recipientPrivate,
                                 config = config,
                             )
                         }

@@ -19,6 +19,7 @@ enum class VpnRuntimeState {
     CONNECTING,
     ACTIVE_LOCAL_ONLY,
     ACTIVE_KURD_LOOPBACK,
+    ACTIVE_KURD_LIVE,
     DEGRADED,
     FALLING_BACK,
     RECONNECTING,
@@ -60,14 +61,16 @@ data class VpnRuntimeConfig(
     val metered: Boolean = false,
     val allowLan: Boolean = false,
 ) {
-    fun validatedForLoopbackTransport(): VpnRuntimeConfig {
+    fun validatedForLiveTransport(): VpnRuntimeConfig {
         routingPolicy.validate()
         require(mtu in 1280..1500) { "INVALID_MTU" }
-        require(ipMode != IpMode.IPV6_ONLY && ipMode != IpMode.DUAL_STACK) {
-            "IPV6_NOT_AVAILABLE"
+        require(ipMode in setOf(IpMode.AUTO, IpMode.IPV4_ONLY, IpMode.IPV6_ONLY, IpMode.DUAL_STACK)) {
+            "INVALID_IP_MODE"
         }
-        require(dnsMode == DnsMode.INTERNAL_TUN && customDns.isBlank()) {
-            "EXTERNAL_DNS_REQUIRES_RELAY_EGRESS"
+        when (dnsMode) {
+            DnsMode.INTERNAL_TUN -> require(customDns.isBlank()) { "UNEXPECTED_CUSTOM_DNS" }
+            DnsMode.CUSTOM -> require(isNumericAddress(customDns)) { "INVALID_CUSTOM_DNS" }
+            else -> require(false) { "EXTERNAL_DNS_REQUIRES_PROFILE_AUTHORITY" }
         }
         require(!allowLan) { "LAN_POLICY_NOT_IMPLEMENTED" }
         if (selectionMode == SelectionMode.MANUAL_STRATEGY) {
@@ -80,7 +83,37 @@ data class VpnRuntimeConfig(
         return copy(
             routingPolicy = routingPolicy.validate(),
             manualStrategyId = manualStrategyId.trim(),
+            customDns = customDns.trim(),
         )
+    }
+
+    /** Historical Phase 11 compatibility. Current release code uses [validatedForLiveTransport]. */
+    fun validatedForLoopbackTransport(): VpnRuntimeConfig {
+        val validated = validatedForLiveTransport()
+        require(validated.ipMode != IpMode.IPV6_ONLY && validated.ipMode != IpMode.DUAL_STACK) {
+            "IPV6_NOT_AVAILABLE"
+        }
+        require(validated.dnsMode == DnsMode.INTERNAL_TUN && validated.customDns.isBlank()) {
+            "EXTERNAL_DNS_REQUIRES_RELAY_EGRESS"
+        }
+        return validated
+    }
+
+    private fun isNumericAddress(value: String): Boolean {
+        val candidate = value.trim()
+        if (candidate.isEmpty()) return false
+        if (':' in candidate) {
+            if (candidate.any { it !in '0'..'9' && it.lowercaseChar() !in 'a'..'f' && it != ':' }) {
+                return false
+            }
+            return runCatching { java.net.InetAddress.getByName(candidate).address.size == 16 }
+                .getOrDefault(false)
+        }
+        val parts = candidate.split('.')
+        return parts.size == 4 && parts.all { part ->
+            part.isNotEmpty() && part.length <= 3 && part.all(Char::isDigit) &&
+                (part == "0" || !part.startsWith('0')) && part.toIntOrNull() in 0..255
+        }
     }
 }
 
