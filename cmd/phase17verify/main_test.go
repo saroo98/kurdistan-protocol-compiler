@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -39,10 +40,10 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 			"server-tun-dns-ipv4", "client-ipv6", "server-tun-dns-ipv6", "routes", "dns-servers", "mtu",
 			"allowed-ip-modes", "allowed-payload-protocols", "resource-limits", "fallback-policy", "relay-admission-digest",
 		},
-		LiveProgramMinBytes:                 1024,
+		LiveProgramMinBytes:                 1,
 		LiveProgramMaxBytes:                 48 << 10,
 		LiveProgramDigest:                   "sha256",
-		LiveProgramForbiddenInputs:          []string{"model-only-authentication-key", "lab-carrier-label", "compiler-seed", "operator-only-metadata"},
+		LiveProgramForbiddenInputs:          []string{"model-only-authentication-key", "lab-carrier-label", "compiler-seed", "owner-only-metadata"},
 		LiveProgramCanonicalReencoding:      true,
 		LiveProgramIndependentValidation:    []string{"client", "relay"},
 		LiveProgramCannotWidenOuterPolicy:   true,
@@ -84,11 +85,14 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 	if got, want := value.Wire, (wireAuthority{
 		HeaderMagic: "KURD", HeaderBytes: 48, MajorVersion: 1, MinorVersion: 0,
 		CarrierTLSVersion: "1.3", ALPN: "kurd/1", ExporterLabel: "EXPORTER-Kurdistan-VPN-wire-v1",
+		SessionBinding: "session-plan-digest-plus-tls-exporter", ExporterContext: "session-plan-digest", TLSMinimumVersion: "1.3", TLSMaximumVersion: "1.3", TLSSessionResumption: "disabled",
+		ProfileBind:              profileBindAuthority{Magic: "KRDBND01", BodyBytes: 72, TLSExporterOffset: 8, SessionPlanDigestOffset: 40, ComponentBytes: 32},
+		CarrierLengthPrefixBytes: 4, KnownOuterFlags: []string{"critical"}, MaxControlBytes: 64 << 10, MaxPayloadBytes: 1 << 20,
 		ReliableDataRecordType: 5, ProfileBindRecordType: 3, EngineReadyRecordType: 4, CloseRecordType: 7,
 		ApplicationSlotMinimum: 1, ApplicationSlotMaximum: 64, PaddingKeepaliveSlot: 65534, ControlSlot: 65535,
 		PacketSemantic: "data", PacketPerOperation: true, SlotSelection: "session-keyed-hmac-sha256-5-tuple",
 		SlotHMAC: "hmac-sha256", InnerFraming: "signed-profile-shaped", OuterAuthentication: "authenticated-kurd-envelope",
-		PaddingKeepaliveSeconds: 30, UnauthenticatedPeerIdleSeconds: 90,
+		PaddingKeepaliveSeconds: 30, NoAuthenticatedPeerActivityTimeoutSeconds: 90,
 		ReplayCommit: "after-raw-ip-write", ReplayFailure: "discard-pending-replay-and-close",
 		TCPKeepaliveRole: "secondary-transport-liveness", PacketAcknowledgements: false, LegacyAdapters: []string{"encode-operation", "decode-frames", "one-shot-v1-record-api"},
 		LiveFramingNoProfileReconstruction: true,
@@ -96,11 +100,18 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 		t.Fatalf("wire authority = %#v, want %#v", got, want)
 	}
 	if got, want := value.Android, (androidAuthority{
-		NativeOnly:         true,
-		ProtectMustSucceed: true,
+		NativeOnly:                         true,
+		ProtectMustSucceed:                 true,
+		RuntimeStatusScope:                 "loopback-only-predecessor",
+		RuntimeStatusPlanDigestField:       "planDigest",
+		RuntimeStatusMTUMin:                1280,
+		RuntimeStatusMTUMax:                1500,
+		NativeBridgeSessionPlanDigestBytes: 32,
+		NativeBridgeMTUMin:                 1280,
+		NativeBridgeMTUMax:                 1500,
 		Lifecycle: []string{
 			"vpn-consent", "open-unconnected-tcp-socket", "protect-before-connect", "strict-tls13-and-kurd-handshake",
-			"bind-profile-digest-and-tls-exporter", "establish-tun-from-verified-snapshot", "transfer-tun-to-go-pump",
+			"bind-session-plan-digest-and-tls-exporter", "establish-tun-from-verified-snapshot", "transfer-tun-to-go-pump",
 			"bounded-close-on-revoke-network-change-profile-revocation-process-death-or-stop",
 		},
 	}); !reflect.DeepEqual(got, want) {
@@ -113,7 +124,8 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 		FirewallOwner: "root", SysctlOwner: "root", DNSService: "unbound", DNSSEC: true, DNSQueryLogging: false,
 		DNSBind: "tun-server-addresses-only", DNSClients: "tun-client-prefixes-only", DNSMinimiseQueryNames: true, DNSHideIdentityVersion: true,
 		ControlSocketDirectory: "/run/kurd-node/", ControlOperations: []string{"health", "drain", "resume", "reload"}, PublicListener: "authenticated-kurd-tls-only",
-		ControlSocketAccess: "root-local-owner-unix",
+		ControlSocketAccess: "root-local-owner-unix", RequiredLiveUnitState: "not-applied",
+		CurrentPredecessorUnit: predecessorUnitAuthority{ServicePath: "deploy/selfhost/native/kurd-node.service", LiveDataPlaneAuthorized: false, PrivateDevices: true, AddressFamilies: []string{"AF_UNIX"}},
 	}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("relay authority = %#v, want %#v", got, want)
 	}
@@ -124,7 +136,7 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 		ProcessPacketBufferMiB: 64, SystemdMemoryMaxMiB: 512, SystemdTasksMax: 128, SystemdLimitNOFILE: 4096,
 		ReconnectAttempts: 5, ReconnectDelaysSeconds: []int{1, 2, 4, 8, 16}, ReconnectDelayCapSeconds: 30,
 		AuthenticatedIdleSeconds: 300, PreAuthenticationRateLimit: "memory-only-per-process-secret-hash", RateLimitExpirySeconds: 600, CeilingUseMustRemainMateriallyBelowMaximum: true,
-		SignedProgramMayNarrowFragmentLimit: true,
+		SignedProgramMayNarrowFragmentLimit: true, LegacyProtectedRecordIncompleteOperations: 8, LiveIncompleteInnerOperationsAreSeparate: true,
 	}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("limits authority = %#v, want %#v", got, want)
 	}
@@ -143,7 +155,7 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 	}
 	if got, want := value.Privacy, (privacyAuthority{
 		LogPayloadContents: false, PersistFiveTuple: false, LogFiveTuple: false,
-		TelemetryDefault: "off", PublicResolversAllowed: false, LiveProgramForbiddenInputs: []string{"model-only-authentication-key", "lab-carrier-label", "compiler-seed", "operator-only-metadata"},
+		TelemetryDefault: "off", PublicResolversAllowed: false, LiveProgramForbiddenInputs: []string{"model-only-authentication-key", "lab-carrier-label", "compiler-seed", "owner-only-metadata"},
 	}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("privacy authority = %#v, want %#v", got, want)
 	}
@@ -203,6 +215,123 @@ func TestLiveDataPlaneVerifierRejectsAuthorityAndDocumentationDrift(t *testing.T
 	}
 }
 
+func TestLiveDataPlaneContractBindsSessionPlanAndExactSourceValues(t *testing.T) {
+	value := rawAuthority(t)
+	for name, want := range map[string]any{
+		"runtimePolicy.liveProgramMinBytes":                    float64(1),
+		"wire.sessionBinding":                                  "session-plan-digest-plus-tls-exporter",
+		"wire.exporterContext":                                 "session-plan-digest",
+		"wire.tlsSessionResumption":                            "disabled",
+		"wire.profileBind.magic":                               "KRDBND01",
+		"wire.profileBind.bodyBytes":                           float64(72),
+		"wire.profileBind.tlsExporterOffset":                   float64(8),
+		"wire.profileBind.sessionPlanDigestOffset":             float64(40),
+		"wire.carrierLengthPrefixBytes":                        float64(4),
+		"wire.knownOuterFlags":                                 []any{"critical"},
+		"wire.maxControlBytes":                                 float64(64 << 10),
+		"wire.maxPayloadBytes":                                 float64(1 << 20),
+		"wire.noAuthenticatedPeerActivityTimeoutSeconds":       float64(90),
+		"android.runtimeStatusScope":                           "loopback-only-predecessor",
+		"android.nativeBridgeSessionPlanDigestBytes":           float64(32),
+		"relay.requiredLiveUnitState":                          "not-applied",
+		"relay.currentPredecessorUnit.liveDataPlaneAuthorized": false,
+		"relay.currentPredecessorUnit.privateDevices":          true,
+		"relay.currentPredecessorUnit.addressFamilies":         []any{"AF_UNIX"},
+		"limits.legacyProtectedRecordIncompleteOperations":     float64(8),
+		"limits.liveIncompleteInnerOperationsAreSeparate":      true,
+	} {
+		if got := rawAuthorityPath(t, value, name); !reflect.DeepEqual(got, want) {
+			t.Fatalf("authority %s = %#v, want %#v", name, got, want)
+		}
+	}
+	forbidden := rawAuthorityPath(t, value, "runtimePolicy.liveProgramForbiddenInputs").([]any)
+	if !containsValue(forbidden, "owner-only-metadata") || containsValue(forbidden, "operator-only-metadata") {
+		t.Fatalf("live-program metadata boundary = %#v", forbidden)
+	}
+}
+
+func TestLiveDataPlaneAuthorityRejectsNullAtEveryJSONTypeBoundary(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(contractPath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, path := range map[string]string{
+		"string":  "schema",
+		"number":  "wire.headerBytes",
+		"boolean": "wire.packetPerOperation",
+		"list":    "wire.legacyAdapters",
+		"object":  "runtimePolicy",
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := withJSONNull(t, raw, path)
+			if _, err := decodeContract(candidate); err == nil {
+				t.Fatal("null accepted")
+			}
+		})
+	}
+}
+
+func TestLiveDataPlaneVerifierRejectsCarrierWireRuntimeAndKotlinDrift(t *testing.T) {
+	mutations := []struct {
+		name, path, old, new string
+	}{
+		{"TLS minimum", "internal/transport/tlstcp/carrier.go", "cfg.MinVersion = tls.VersionTLS13", "cfg.MinVersion = tls.VersionTLS12"},
+		{"TLS resumption", "internal/transport/tlstcp/carrier.go", "cfg.SessionTicketsDisabled = true", "cfg.SessionTicketsDisabled = false"},
+		{"exporter context", "internal/transport/tlstcp/carrier.go", "state.ExportKeyingMaterial(exporterLabel, planDigest[:], 32)", "state.ExportKeyingMaterial(exporterLabel, nil, 32)"},
+		{"profile-bind type", "internal/protocol/wirev1/codec.go", "TypeProfileBind  uint8 = 3", "TypeProfileBind  uint8 = 9"},
+		{"outer flags", "internal/protocol/wirev1/codec.go", "knownFlags         = FlagCritical", "knownFlags         = 0"},
+		{"control ceiling", "internal/protocol/wirev1/codec.go", "MaxControlBytes       = 64 << 10", "MaxControlBytes       = 65 << 10"},
+		{"profile-bind body", "internal/runtime/process_record_v1.go", "body := make([]byte, 72)", "body := make([]byte, 71)"},
+		{"legacy protected-record cap", "internal/runtime/protected_channel.go", "strictFragmentMaxOperationsV1 = 8", "strictFragmentMaxOperationsV1 = 9"},
+		{"Kotlin runtime MTU", "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt", "mtu in 1280..1500", "mtu in 1279..1500"},
+		{"Kotlin native plan digest", "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt", "reader.fixedBytes(32)", "reader.fixedBytes(31)"},
+		{"predecessor unit boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=yes", "PrivateDevices=no"},
+	}
+	for _, mutation := range mutations {
+		t.Run(mutation.name, func(t *testing.T) {
+			root := copyAuthority(t)
+			if err := replaceFile(root, mutation.path, mutation.old, mutation.new); err != nil {
+				t.Fatal(err)
+			}
+			if err := verify(root); err == nil {
+				t.Fatalf("accepted %s drift", mutation.name)
+			}
+		})
+	}
+}
+
+func TestLiveDataPlaneVerifierRequiresNormativePrivacyAndNonReadinessMarkers(t *testing.T) {
+	root := copyAuthority(t)
+	if err := replaceFile(root, "docs/self-hosting/LIVE-DATA-PLANE.md", "KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED", "KURD-LIVE-CONTRACT: READINESS=CLAIMED"); err != nil {
+		t.Fatal(err)
+	}
+	if err := verify(root); err == nil {
+		t.Fatal("documentation without the non-readiness marker accepted")
+	}
+}
+
+func TestLiveDataPlaneVerifierRejectsAffirmativeLoggingReadinessAndHostClaims(t *testing.T) {
+	mutations := []string{
+		"\nPayload logging is enabled.\n",
+		"\n5-tuple logging is allowed.\n",
+		"\nThe live service is ready for production.\n",
+		"\nhttps://node.example.invalid/\n",
+		"\nnode.example.invalid\n",
+	}
+	for _, mutation := range mutations {
+		t.Run(strings.TrimSpace(mutation), func(t *testing.T) {
+			root := copyAuthority(t)
+			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
+			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := verify(root); err == nil {
+				t.Fatal("affirmative claim accepted")
+			}
+		})
+	}
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	_, source, _, ok := runtime.Caller(0)
@@ -221,6 +350,10 @@ func copyAuthority(t *testing.T) string {
 		"docs/self-hosting/LIVE-DATA-PLANE.md",
 		"internal/transport/tlstcp/carrier.go",
 		"internal/protocol/wirev1/codec.go",
+		"internal/runtime/process_record_v1.go",
+		"internal/runtime/protected_channel.go",
+		"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",
+		"android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
 		"deploy/selfhost/native/kurd-node.service",
 	} {
 		destination := filepath.Join(root, filepath.FromSlash(relative))
@@ -232,6 +365,64 @@ func copyAuthority(t *testing.T) string {
 		}
 	}
 	return root
+}
+
+func rawAuthority(t *testing.T) map[string]any {
+	t.Helper()
+	var value map[string]any
+	if err := json.Unmarshal(mustReadFile(t, filepath.Join(repositoryRoot(t), filepath.FromSlash(contractPath))), &value); err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func rawAuthorityPath(t *testing.T, value map[string]any, path string) any {
+	t.Helper()
+	var current any = value
+	for _, part := range strings.Split(path, ".") {
+		object, ok := current.(map[string]any)
+		if !ok {
+			t.Fatalf("authority %s is not an object before %q", path, part)
+		}
+		var present bool
+		current, present = object[part]
+		if !present {
+			t.Fatalf("authority %s is missing", path)
+		}
+	}
+	return current
+}
+
+func containsValue(values []any, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func withJSONNull(t *testing.T, raw []byte, path string) []byte {
+	t.Helper()
+	var value map[string]any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(path, ".")
+	current := value
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			t.Fatalf("null path %q has non-object parent %q", path, part)
+		}
+		current = next
+	}
+	current[parts[len(parts)-1]] = nil
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }
 
 func replaceFile(root, relative, old, new string) error {

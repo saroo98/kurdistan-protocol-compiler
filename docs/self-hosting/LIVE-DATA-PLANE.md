@@ -1,9 +1,23 @@
 # Live data-plane self-hosting contract
 
+<!-- KURD-LIVE-CONTRACT: PRIVACY_PAYLOAD_LOGGING=PROHIBITED -->
+<!-- KURD-LIVE-CONTRACT: PRIVACY_FIVE_TUPLE_LOGGING_AND_PERSISTENCE=PROHIBITED -->
+<!-- KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED -->
+<!-- KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=NOT_LIVE -->
+<!-- KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=NOT_APPLIED -->
+
 Native Linux deployment only. This document specifies the privileges, limits,
 and network boundary required by the live data plane. It does not assert that
 a running service is available or that a particular network environment has
 been validated.
+
+The checked predecessor unit at `deploy/selfhost/native/kurd-node.service` is
+not live: it has `PrivateDevices=yes`, permits `AF_UNIX` only, and has no
+data-plane authorization. The required live unit is not applied to that
+predecessor artifact. The required live unit would instead use
+`PrivateDevices=no`, `DevicePolicy=closed`, `/dev/net/tun rw`, and
+`AF_UNIX AF_INET AF_INET6`; those requirements are declared here without
+asserting present compliance.
 
 ## Required host components and privileges
 
@@ -34,6 +48,9 @@ Each directional session queue holds at most 256 packets per directional
 session queue. A session holds at most 64 incomplete inner operations with a
 5-second reconstruction deadline. The issued MTU is 1280, and an operation
 uses at most 16 inner fragments in addition to the signed live-program limit.
+The existing legacy protected-record layer permits 8 legacy protected-record
+incomplete operations. That is a separate framing layer and does not replace
+the 64 incomplete inner operations bound above.
 
 The process has a 64 MiB total live packet-buffer budget. The service ceiling
 is `MemoryMax=512M`, `TasksMax=128`, and `LimitNOFILE=4096`; observed use must
@@ -67,7 +84,11 @@ external IPv6 test; otherwise assignment is IPv4-only.
 The service does not log payload contents or a packet 5-tuple, and it does not
 persist either; telemetry is off by default, and public resolvers are not
 permitted. The live program excludes model-only authentication keys, lab
-carrier labels, compiler seeds, and operator-only metadata.
+carrier labels, compiler seeds, and owner-only metadata.
+
+Android `RuntimeStatus` and `NativeBridge` are loopback-only predecessor
+surfaces. Their plan-digest field and 1280 through 1500 MTU checks are
+compatibility constraints, not an authorization to create a live tunnel.
 
 These constraints do not provide an availability guarantee, a universal host
 compatibility claim, an anonymity guarantee, or a claim of resistance to every
