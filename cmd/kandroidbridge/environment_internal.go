@@ -83,6 +83,14 @@ func (internalBridgeEnvironment) Verify(artifact []byte, class envelope.Artifact
 	return selfHostedBridgeEnvironment{}.Verify(artifact, class)
 }
 
+func (internalBridgeEnvironment) VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials androidbridge.RecipientCredentials) (profile.OfflineVerifiedArtifact, error) {
+	return selfHostedBridgeEnvironment{}.VerifyWithRecipient(artifact, class, credentials)
+}
+
+func (internalBridgeEnvironment) TrustPreviewWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials androidbridge.RecipientCredentials) (androidbridge.TrustPreview, error) {
+	return selfHostedBridgeEnvironment{}.TrustPreviewWithRecipient(artifact, class, credentials)
+}
+
 func (internalBridgeEnvironment) NewActivationSession(preview androidbridge.VerifyPreview) (*profile.ActivationSession, error) {
 	if session, err := selfhost.NewAndroidActivationSession(preview.Verified.ExactArtifact, time.Now().UTC(), lifecycle.VerifiedState{}); err == nil {
 		return session, nil
@@ -177,6 +185,10 @@ func (internalBridgeEnvironment) NewActivationSession(preview androidbridge.Veri
 		request.Opener = internalActivationOpener{next: phase8issuance.NewIndependentRecipientOpener()}
 	}
 	return profile.NewActivationSession(request), nil
+}
+
+func (internalBridgeEnvironment) NewRecipientActivationSession(preview androidbridge.VerifyPreview, credentials androidbridge.RecipientCredentials) (*profile.ActivationSession, error) {
+	return selfHostedBridgeEnvironment{}.NewRecipientActivationSession(preview, credentials)
 }
 
 func (environment internalBridgeEnvironment) VerifyBackupRecord(record backup.Record) error {

@@ -56,6 +56,66 @@ data class NativeRuntimeSessionSnapshot(
     val loopbackOnly: Boolean,
 )
 
+data class NativeRoute(
+    val address: ByteArray,
+    val prefixLength: Int,
+)
+
+enum class NativePayloadProtocol { ICMP, ICMPV6, TCP, UDP }
+
+enum class NativeRuntimeState {
+    VERIFIED,
+    SOCKET_PREPARED,
+    SOCKET_PROTECTED_COMMITTED,
+    TLS_AUTHENTICATED,
+    KURD_AUTHENTICATED,
+    TUN_ATTACHED,
+    RUNNING,
+    STOPPING,
+    CLOSED,
+}
+
+data class NativeLiveRuntimeSessionSnapshot(
+    val generation: Long,
+    val planDigest: ByteArray,
+    val profileFingerprint: ByteArray,
+    val strategyFingerprint: ByteArray,
+    val relayFingerprint: ByteArray,
+    val selectionMode: SelectionMode,
+    val perAppMode: PerAppSelectionMode,
+    val packages: List<String>,
+    val ipMode: IpMode,
+    val dnsMode: DnsMode,
+    val mtu: Int,
+    val metered: Boolean,
+    val clientIpv4: ByteArray,
+    val dnsIpv4: ByteArray,
+    val clientIpv6: ByteArray,
+    val dnsIpv6: ByteArray,
+    val routes: List<NativeRoute>,
+    val payloadProtocols: Set<NativePayloadProtocol>,
+    val maxQueuePackets: Int,
+    val maxIncompleteOperations: Int,
+    val maxReconnectAttempts: Int,
+    val dialTimeoutMillis: Long,
+    val idleTimeoutMillis: Long,
+)
+
+interface NativeRecipient : AutoCloseable {
+    fun publicRequest(): NativeResult<ByteArray>
+    fun privateBundle(): NativeResult<ByteArray>
+    fun cancel(): NativeResult<Unit>
+}
+
+interface NativeLiveRuntimeSession : AutoCloseable {
+    val snapshot: NativeLiveRuntimeSessionSnapshot
+    fun prepareSocket(): NativeResult<Int>
+    fun commitProtected(protectedSocket: Boolean): NativeResult<Unit>
+    fun attachTun(fileDescriptor: Int): NativeResult<Unit>
+    fun status(): NativeResult<NativeRuntimeState>
+    fun stop(): NativeResult<Unit>
+}
+
 interface NativeRuntimeSession : AutoCloseable {
     val snapshot: NativeRuntimeSessionSnapshot
     fun roundTrip(payload: ByteArray): NativeResult<ByteArray>
@@ -101,7 +161,13 @@ interface NativeActivationSession : AutoCloseable {
 
 interface KurdNativeCore {
     fun compatibility(): NativeResult<NativeCompatibility>
+    fun createRecipient(validitySeconds: Int): NativeResult<NativeRecipient>
     fun verifyPreview(request: ByteArray): NativeResult<VerifiedPreviewHandle>
+    fun verifyPreviewWithRecipient(
+        request: ByteArray,
+        recipientRequest: ByteArray,
+        recipientPrivate: ByteArray,
+    ): NativeResult<VerifiedPreviewHandle>
     fun openActivation(verified: VerifiedPreviewHandle): NativeResult<NativeActivationSession>
     fun releaseVerified(verified: VerifiedPreviewHandle): NativeResult<Unit>
     fun prepareDiagnostic(request: ByteArray): NativeResult<DiagnosticPreviewHandle>
@@ -111,6 +177,7 @@ interface KurdNativeCore {
     fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray>
     fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray>
     fun openRuntimeSession(request: ByteArray): NativeResult<NativeRuntimeSession>
+    fun openLiveRuntimeSession(request: ByteArray): NativeResult<NativeLiveRuntimeSession>
     fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit>
     fun releaseBackup(preview: BackupPreviewHandle): NativeResult<Unit>
 }

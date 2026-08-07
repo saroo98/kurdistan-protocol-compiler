@@ -29,6 +29,15 @@ func (selfHostedBridgeEnvironment) Verify(artifact []byte, class envelope.Artifa
 	return selfhost.VerifyAndroidArtifact(artifact, time.Now().UTC(), 1)
 }
 
+func (selfHostedBridgeEnvironment) VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials androidbridge.RecipientCredentials) (profile.OfflineVerifiedArtifact, error) {
+	defer credentials.Destroy()
+	if class != envelope.ArtifactDeviceRecipient {
+		return profile.OfflineVerifiedArtifact{}, errors.New("self-hosted bridge: unsupported recipient artifact class")
+	}
+	_, verified, err := selfhost.VerifyLiveBundleForRecipient(artifact, time.Now().UTC(), 1, credentials.Request, credentials.Private)
+	return verified, err
+}
+
 func (selfHostedBridgeEnvironment) TrustPreview(artifact []byte, class envelope.ArtifactClass) (androidbridge.TrustPreview, error) {
 	if class != envelope.ArtifactSignedPublic {
 		return androidbridge.TrustPreview{}, errors.New("self-hosted bridge: unsupported artifact class")
@@ -46,8 +55,31 @@ func (selfHostedBridgeEnvironment) TrustPreview(artifact []byte, class envelope.
 	}, nil
 }
 
+func (selfHostedBridgeEnvironment) TrustPreviewWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials androidbridge.RecipientCredentials) (androidbridge.TrustPreview, error) {
+	defer credentials.Destroy()
+	if class != envelope.ArtifactDeviceRecipient {
+		return androidbridge.TrustPreview{}, errors.New("self-hosted bridge: unsupported recipient artifact class")
+	}
+	verified, _, err := selfhost.VerifyLiveBundleForRecipient(artifact, time.Now().UTC(), 1, credentials.Request, credentials.Private)
+	if err != nil {
+		return androidbridge.TrustPreview{}, err
+	}
+	return androidbridge.TrustPreview{
+		DeploymentFingerprint: verified.RootFingerprint,
+		RelayEndpoint:         verified.Endpoint,
+		AuthorityScope:        "deployment-local",
+		OwnerControlled:       true,
+		UpdatesEnabled:        false,
+	}, nil
+}
+
 func (selfHostedBridgeEnvironment) NewActivationSession(preview androidbridge.VerifyPreview) (*profile.ActivationSession, error) {
 	return selfhost.NewAndroidActivationSession(preview.Verified.ExactArtifact, time.Now().UTC(), lifecycle.VerifiedState{})
+}
+
+func (selfHostedBridgeEnvironment) NewRecipientActivationSession(preview androidbridge.VerifyPreview, credentials androidbridge.RecipientCredentials) (*profile.ActivationSession, error) {
+	defer credentials.Destroy()
+	return selfhost.NewAndroidLiveActivationSessionForRecipient(preview.Verified.ExactArtifact, time.Now().UTC(), lifecycle.VerifiedState{}, credentials.Request, credentials.Private)
 }
 
 func (environment selfHostedBridgeEnvironment) VerifyBackupRecord(record backup.Record) error {

@@ -24,6 +24,8 @@ import org.kurdistanvpn.core.nativeapi.DiagnosticPreviewHandle
 import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.core.nativeapi.NativeActivationSession
 import org.kurdistanvpn.core.nativeapi.NativeCompatibility
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
+import org.kurdistanvpn.core.nativeapi.NativeRecipient
 import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
 import org.kurdistanvpn.data.metadata.CatalogHealth
@@ -443,8 +445,17 @@ private class FakeNativeCore(
     var preview: RedactedProfilePreview,
 ) : KurdNativeCore {
     var released = 0
+    override fun createRecipient(validitySeconds: Int): NativeResult<NativeRecipient> =
+        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+
     override fun verifyPreview(request: ByteArray): NativeResult<VerifiedPreviewHandle> =
         NativeResult.Success(VerifiedPreviewHandle(41, preview))
+
+    override fun verifyPreviewWithRecipient(
+        request: ByteArray,
+        recipientRequest: ByteArray,
+        recipientPrivate: ByteArray,
+    ): NativeResult<VerifiedPreviewHandle> = NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun openActivation(
         verified: VerifiedPreviewHandle,
@@ -484,6 +495,9 @@ private class FakeNativeCore(
     override fun openRuntimeSession(
         request: ByteArray,
     ): NativeResult<org.kurdistanvpn.core.nativeapi.NativeRuntimeSession> =
+        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+
+    override fun openLiveRuntimeSession(request: ByteArray): NativeResult<NativeLiveRuntimeSession> =
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =

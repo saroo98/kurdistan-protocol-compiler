@@ -172,6 +172,19 @@ func EncodeRequestV1(request PublicRequestV1) ([]byte, error) {
 }
 
 func DecodeAndVerifyRequestV1(encoded []byte, now time.Time) (PublicRequestV1, error) {
+	current := now.Unix()
+	return decodeAndVerifyRequestV1(encoded, &current)
+}
+
+// DecodeRequestV1 verifies the canonical request and its proof of possession
+// without reapplying the short-lived enrollment admission window. It is used
+// only after an issued profile is already bound to the exact request ID. New
+// profile issuance must continue to use DecodeAndVerifyRequestV1.
+func DecodeRequestV1(encoded []byte) (PublicRequestV1, error) {
+	return decodeAndVerifyRequestV1(encoded, nil)
+}
+
+func decodeAndVerifyRequestV1(encoded []byte, current *int64) (PublicRequestV1, error) {
 	if len(encoded) == 0 || len(encoded) > MaxRequestBytes {
 		return PublicRequestV1{}, fail(ErrorSizeLimit)
 	}
@@ -204,8 +217,7 @@ func DecodeAndVerifyRequestV1(encoded []byte, now time.Time) (PublicRequestV1, e
 			return PublicRequestV1{}, fail(ErrorSchema)
 		}
 	}
-	current := now.Unix()
-	if err := validateRequest(request, &current); err != nil {
+	if err := validateRequest(request, current); err != nil {
 		return PublicRequestV1{}, err
 	}
 	reencoded, err := EncodeRequestV1(request)
