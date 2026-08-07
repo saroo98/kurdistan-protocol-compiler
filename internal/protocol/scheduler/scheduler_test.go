@@ -1,8 +1,10 @@
 package scheduler
 
 import (
+	"reflect"
 	"testing"
 
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 )
 
@@ -38,6 +40,20 @@ func TestMaxBatchEnforced(t *testing.T) {
 	for _, flush := range flushes {
 		if flush.Bytes > 200 {
 			t.Fatal("batch exceeded max")
+		}
+	}
+}
+
+func TestFragmentSizesForIsTheLegacyAdapterPrimitive(t *testing.T) {
+	profile, err := compiler.Generate(53)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, payloadBytes := range []int{0, 1, 4096, 20 * 1024} {
+		legacy := FragmentSizes(profile, payloadBytes)
+		live := FragmentSizesFor(profile.FrameGrammar.FragmentationMode, profile.Scheduler.MaxBatchBytes, profile.Limits.MaxFrameBytes, payloadBytes)
+		if !reflect.DeepEqual(legacy, live) {
+			t.Fatalf("fragment primitive changed legacy adapter for %d bytes: got=%v want=%v", payloadBytes, live, legacy)
 		}
 	}
 }

@@ -161,6 +161,50 @@ func TestProductPathBoundaryV1(t *testing.T) {
 	}
 }
 
+func TestLiveProgramReleaseImportBoundariesV1(t *testing.T) {
+	root := repoRoot(t)
+	forbiddenCompiler := modulePath + "/internal/protocol/liveprogramcompile"
+	for _, releaseRoot := range []string{"internal/androidbridge", "internal/product", "internal/runtime", "cmd/kandroidbridge"} {
+		assertNoImportV1(t, root, releaseRoot, forbiddenCompiler)
+	}
+	for _, forbidden := range []string{
+		modulePath + "/internal/protocol/ir",
+		modulePath + "/internal/protocol/compiler",
+		modulePath + "/internal/testkit",
+		modulePath + "/internal/lab",
+	} {
+		assertNoImportV1(t, root, "internal/protocol/liveprogram", forbidden)
+	}
+}
+
+func assertNoImportV1(t *testing.T, root, sourceRoot, forbidden string) {
+	t.Helper()
+	base := filepath.Join(root, filepath.FromSlash(sourceRoot))
+	err := filepath.WalkDir(base, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imported := range file.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if importPath == forbidden || strings.HasPrefix(importPath, forbidden+"/") {
+				rel, _ := filepath.Rel(root, path)
+				t.Errorf("release boundary %s imports owner-only dependency %s", filepath.ToSlash(rel), importPath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGeneratedStrictBoundaryDiscoveredStrictPathsV1(t *testing.T) {
 	root := repoRoot(t)
 	strictDeclarations := 0
