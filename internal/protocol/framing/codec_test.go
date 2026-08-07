@@ -8,6 +8,8 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/protocol/liveprogram"
+	"kurdistan/internal/protocol/liveprogramcompile"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -44,6 +46,101 @@ func TestProfileABytesFailUnderProfileB(t *testing.T) {
 	framesA, _ := EncodeOperation(a, op, 1)
 	if _, err := DecodeFrame(b, framesA[0]); err == nil {
 		t.Fatal("profile A frame decoded under profile B")
+	}
+}
+
+func TestLiveProgramFramingPreservesLegacyBytesAcrossCompiledModes(t *testing.T) {
+	capabilities := ir.SecurityCapabilities()
+	seen := map[string]bool{}
+	for seed := int64(1); seed <= 96; seed++ {
+		profile, err := compiler.Generate(seed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		program, err := liveprogramcompile.CompileV1(liveprogramcompile.InputV1{Profile: profile, ClientMandatoryFeatures: capabilities[:2], RelayMandatoryFeatures: capabilities[:2], SelectedFeatures: capabilities})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, operation := range []Operation{{Semantic: ir.SemanticData, StreamID: 7, Sequence: 9, Payload: []byte("live-frame")}, {Semantic: ir.SemanticPadding, StreamID: 7, Sequence: 10, Payload: []byte("padding")}} {
+			legacy, err := EncodeOperation(profile, operation, 99)
+			if err != nil {
+				t.Fatal(err)
+			}
+			live, err := EncodeLiveOperation(program, operation, 99)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(live, legacy) {
+				t.Fatalf("live framing bytes differ for type=%s stream=%s checksum=%s", profile.FrameGrammar.TypeMode, profile.Stream.IDEncodingMode, profile.FrameGrammar.ChecksumMode)
+			}
+		}
+		seen[profile.FrameGrammar.TypeMode+"/"+profile.Stream.IDEncodingMode+"/"+profile.FrameGrammar.ChecksumMode] = true
+	}
+	if len(seen) < 12 {
+		t.Fatalf("compiled corpus did not cover enough applicable framing modes: %d", len(seen))
+	}
+}
+
+func TestCompiledFramingConstantsInfluenceLiveFrames(t *testing.T) {
+	capabilities := ir.SecurityCapabilities()
+	covered := map[string]bool{}
+	for seed := int64(1); seed <= 256; seed++ {
+		profile, err := compiler.Generate(seed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		program, err := liveprogramcompile.CompileV1(liveprogramcompile.InputV1{Profile: profile, ClientMandatoryFeatures: capabilities[:2], RelayMandatoryFeatures: capabilities[:2], SelectedFeatures: capabilities})
+		if err != nil {
+			t.Fatal(err)
+		}
+		operation := Operation{Semantic: ir.SemanticData, StreamID: 7, Sequence: 9, Payload: []byte("compiled-constant")}
+		mutations := []struct {
+			name  string
+			apply func(*liveprogram.ProgramV1)
+		}{
+			{"data_type_tag", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.DataTypeTag[0] ^= 0xff }},
+			{"padding_type_tag", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.PaddingTypeTag[0] ^= 0xff }},
+		}
+		if program.Stream.IDEncodingMode == "profile_xor32" {
+			mutations = append(mutations, struct {
+				name  string
+				apply func(*liveprogram.ProgramV1)
+			}{"profile_xor_mask", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.ProfileXORStreamMask ^= 1 }})
+		}
+		if program.Stream.IDEncodingMode == "table_mapped32_le" {
+			mutations = append(mutations, struct {
+				name  string
+				apply func(*liveprogram.ProgramV1)
+			}{"table_mask", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.TableStreamMask ^= 1 }})
+		}
+		if program.Frame.ChecksumMode == "crc32" {
+			mutations = append(mutations, struct {
+				name  string
+				apply func(*liveprogram.ProgramV1)
+			}{"crc_prefix", func(p *liveprogram.ProgramV1) { p.Frame.Compiled.CRC32PrefixState ^= 1 }})
+		}
+		for _, mutation := range mutations {
+			candidate := program.Clone()
+			mutation.apply(&candidate)
+			operationForMutation := operation
+			if mutation.name == "padding_type_tag" {
+				operationForMutation.Semantic, operationForMutation.Payload = ir.SemanticPadding, []byte("padding")
+			}
+			baseline, err := EncodeLiveOperation(program, operationForMutation, 9)
+			if err != nil {
+				t.Fatal(err)
+			}
+			changed, err := EncodeLiveOperation(candidate, operationForMutation, 9)
+			if err == nil && reflect.DeepEqual(baseline, changed) {
+				t.Fatalf("compiled %s did not affect live framing", mutation.name)
+			}
+			covered[mutation.name] = true
+		}
+	}
+	for _, name := range []string{"data_type_tag", "padding_type_tag", "profile_xor_mask", "table_mask", "crc_prefix"} {
+		if !covered[name] {
+			t.Fatalf("corpus did not cover compiled %s", name)
+		}
 	}
 }
 

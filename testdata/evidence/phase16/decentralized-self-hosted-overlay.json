@@ -582,6 +582,11 @@
       "path": "internal/testkit/evidenceoverlay/successor_test.go",
       "pre_sha256": "f24eeab091ec1022aa358bf54b1e8f65e5e66ba55d8141eb8ab8dd4f293fb2bc",
       "post_sha256": "ec8e66696fa9c07e4f867d65e5e5cba32890385f5101b537853c4fcb0aa1d9cb"
+    },
+    {
+      "path": "internal/testkit/importrules/importrules_test.go",
+      "pre_sha256": "98c361579df546d3d2326b68164fc1570fbd55e69a71536795ac7253a23fc513",
+      "post_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1"
     }
   ]
 }
