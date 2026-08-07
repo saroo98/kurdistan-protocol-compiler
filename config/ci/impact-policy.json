@@ -19,12 +19,13 @@
     {"pattern": "internal/protocol/**", "proofs": ["go-core", "go-audit", "go-executable-evidence", "operator", "android-host"]},
     {"pattern": "internal/operator/**", "proofs": ["go-core", "go-audit", "operator"]},
     {"pattern": "android/**", "proofs": ["android-host", "android-device-api26", "android-device-api34", "android-device-api36", "dependency-freshness"]},
-    {"pattern": "docs/**", "proofs": ["docs-evidence"]},
+    {"pattern": "docs/**", "proofs": ["docs-evidence", "operator"]},
     {"pattern": "ROADMAP.md", "proofs": ["docs-evidence"]},
     {"pattern": "config/release/**", "proofs": ["docs-evidence"]},
     {"pattern": "testdata/evidence/**", "proofs": ["docs-evidence", "go-audit", "go-core"]},
     {"pattern": "testdata/evidence/phase12/**", "proofs": ["docs-evidence", "go-audit", "go-core", "operator"]},
+    {"pattern": "testdata/evidence/phase16/**", "proofs": ["docs-evidence", "go-audit", "go-core", "operator"]},
     {"pattern": "testdata/evidence/phase9/android-sbom.cdx.json", "proofs": ["dependency-freshness", "docs-evidence", "go-audit", "go-core"]},
-    {"pattern": "README.md", "proofs": ["docs-evidence"]}
+    {"pattern": "README.md", "proofs": ["docs-evidence", "operator"]}
   ]
 }

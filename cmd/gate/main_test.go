@@ -80,6 +80,75 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 	}
 }
 
+func TestOperatorProofPolicyMatchesGateInventory(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy struct {
+		Proofs []struct {
+			ID            string     `json:"id"`
+			Commands      [][]string `json:"commands"`
+			InvalidatedBy []string   `json:"invalidatedBy"`
+		} `json:"proofs"`
+	}
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		t.Fatal(err)
+	}
+	var operator struct {
+		Commands      [][]string
+		InvalidatedBy []string
+	}
+	for _, proof := range policy.Proofs {
+		if proof.ID == "operator" {
+			operator.Commands = proof.Commands
+			operator.InvalidatedBy = proof.InvalidatedBy
+			break
+		}
+	}
+	if operator.Commands == nil {
+		t.Fatal("operator proof missing from policy")
+	}
+	steps, err := proofSteps("operator", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(operator.Commands) != len(steps) {
+		t.Fatalf("operator policy command count = %d, gate command count = %d", len(operator.Commands), len(steps))
+	}
+	for index, step := range steps {
+		want := append([]string{step.program}, step.args...)
+		if !equalStrings(operator.Commands[index], want) {
+			t.Fatalf("operator policy command %d = %v, gate command = %v", index, operator.Commands[index], want)
+		}
+	}
+	for _, required := range []string{
+		"README.md",
+		"cmd/gate/**",
+		"cmd/koperator/**",
+		"cmd/phase16verify/**",
+		"cmd/kurd-node/**",
+		"cmd/kurdctl/**",
+		"cmd/kurdpackage/**",
+		"cmd/kandroidbridge/**",
+		"cmd/phase16androidverify/**",
+		"deploy/selfhost/**",
+		"docs/**",
+		"go.mod",
+		"go.sum",
+		"internal/operator/**",
+		"internal/selfhost/**",
+		"testdata/evidence/phase12/**",
+		"testdata/evidence/phase16/**",
+		"testdata/schemas/phase16-production-trust-status-v1.schema.json",
+		"testdata/schemas/phase16-self-hosted-vps-qualification-v1.schema.json",
+	} {
+		if !containsString(operator.InvalidatedBy, required) {
+			t.Fatalf("operator policy invalidation paths missing %q: %v", required, operator.InvalidatedBy)
+		}
+	}
+}
+
 func TestDefaultGateRunsExecutableEvidenceExactlyOnce(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
 	count := 0

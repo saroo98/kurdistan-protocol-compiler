@@ -35,11 +35,16 @@
     },
     {
       "id": "operator",
-      "commands": [["go", "run", "./cmd/koperator", "verify"]],
+      "commands": [
+        ["go", "run", "./cmd/koperator", "verify"],
+        ["go", "run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"],
+        ["go", "test", "-count=1", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"],
+        ["go", "vet", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"]
+      ],
       "operatingSystems": ["linux", "windows"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": true,
-      "invalidatedBy": ["cmd/koperator/**", "internal/operator/**", "testdata/evidence/phase12/**"],
+      "invalidatedBy": ["README.md", "cmd/gate/**", "cmd/kandroidbridge/**", "cmd/koperator/**", "cmd/kurd-node/**", "cmd/kurdctl/**", "cmd/kurdpackage/**", "cmd/phase16androidverify/**", "cmd/phase16verify/**", "deploy/selfhost/**", "docs/**", "go.mod", "go.sum", "internal/operator/**", "internal/selfhost/**", "testdata/evidence/phase12/**", "testdata/evidence/phase16/**", "testdata/schemas/phase16-production-trust-status-v1.schema.json", "testdata/schemas/phase16-self-hosted-vps-qualification-v1.schema.json"],
       "authorizedPhase": 16
     },
     {
