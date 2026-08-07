@@ -91,6 +91,36 @@ func (p PlanV2) Clone() PlanV2 {
 	return p
 }
 
+// RuntimePolicyAt returns the exact signed runtime policy retained by this
+// plan after revalidating it at caller-supplied trusted time. The returned
+// value is an independent copy and cannot mutate plan authority.
+func (p PlanV2) RuntimePolicyAt(now time.Time) (runtimepolicy.PolicyV2, error) {
+	if err := ValidateV2At(p, now); err != nil {
+		return runtimepolicy.PolicyV2{}, ErrInvalidV2
+	}
+	policy, err := runtimepolicy.DecodeV2At(p.runtimePolicyBytes, now)
+	if err != nil {
+		return runtimepolicy.PolicyV2{}, ErrInvalidV2
+	}
+	return policy.Clone(), nil
+}
+
+// Destroy clears the plan's retained authority bytes and mutable projections.
+// It is intended for long-lived process boundaries such as the Android bridge.
+func (p *PlanV2) Destroy() {
+	if p == nil {
+		return
+	}
+	clear(p.runtimePolicyBytes)
+	for index := range p.Endpoints {
+		clear(p.Endpoints[index].Address)
+	}
+	for index := range p.Routes {
+		clear(p.Routes[index].Address)
+	}
+	*p = PlanV2{}
+}
+
 func BuildV2(request RequestV2) (PlanV2, error) {
 	return BuildV2At(request, time.Now())
 }

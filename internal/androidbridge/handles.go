@@ -13,6 +13,7 @@ const (
 	HandleDiagnostic
 	HandleBackup
 	HandleRuntimeSession
+	HandleRecipient
 )
 
 type Handle uint64
@@ -29,13 +30,17 @@ type handleDestroyer interface {
 	Destroy()
 }
 
+type handleCanceller interface {
+	Cancel()
+}
+
 type HandleRegistry struct {
 	mu    sync.Mutex
 	slots [MaxBridgeHandles]handleSlot
 }
 
 func (r *HandleRegistry) Open(kind HandleType, value any) (Handle, ErrorCode) {
-	if r == nil || kind < HandleVerifyPreview || kind > HandleRuntimeSession || value == nil {
+	if r == nil || kind < HandleVerifyPreview || kind > HandleRecipient || value == nil {
 		return 0, CodeInvalidArgument
 	}
 	r.mu.Lock()
@@ -90,15 +95,21 @@ func (r *HandleRegistry) Cancel(handle Handle) ErrorCode {
 		return CodeInvalidHandle
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	slot := &r.slots[index]
 	if !slot.occupied || slot.generation != generation {
+		r.mu.Unlock()
 		return CodeAlreadyClosed
 	}
 	if slot.kind != kind {
+		r.mu.Unlock()
 		return CodeWrongHandleType
 	}
 	slot.cancelled = true
+	value := slot.value
+	r.mu.Unlock()
+	if canceller, ok := value.(handleCanceller); ok {
+		canceller.Cancel()
+	}
 	return CodeOK
 }
 
@@ -111,12 +122,13 @@ func (r *HandleRegistry) Free(handle Handle) ErrorCode {
 		return CodeInvalidHandle
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	slot := &r.slots[index]
 	if !slot.occupied || slot.generation != generation {
+		r.mu.Unlock()
 		return CodeAlreadyClosed
 	}
 	if slot.kind != kind {
+		r.mu.Unlock()
 		return CodeWrongHandleType
 	}
 	value := slot.value
@@ -124,6 +136,7 @@ func (r *HandleRegistry) Free(handle Handle) ErrorCode {
 	slot.value = nil
 	slot.cancelled = false
 	slot.occupied = false
+	r.mu.Unlock()
 	if destroyer, ok := value.(handleDestroyer); ok {
 		destroyer.Destroy()
 	}
@@ -140,7 +153,7 @@ func decodeHandle(handle Handle) (uint16, uint32, HandleType, bool) {
 	generation := uint32(raw >> 16)
 	kind := HandleType(raw >> 56)
 	if indexPlusOne == 0 || int(indexPlusOne) > MaxBridgeHandles ||
-		generation == 0 || kind < HandleVerifyPreview || kind > HandleRuntimeSession {
+		generation == 0 || kind < HandleVerifyPreview || kind > HandleRecipient {
 		return 0, 0, 0, false
 	}
 	return indexPlusOne - 1, generation, kind, true

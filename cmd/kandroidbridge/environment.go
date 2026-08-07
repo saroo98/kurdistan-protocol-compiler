@@ -7,6 +7,8 @@ import "kurdistan/internal/androidbridge"
 
 type bridgeEnvironment interface {
 	androidbridge.VerificationEnvironment
+	androidbridge.RecipientVerificationEnvironment
 	androidbridge.ActivationEnvironment
+	androidbridge.RecipientActivationEnvironment
 	androidbridge.BackupEnvironment
 }

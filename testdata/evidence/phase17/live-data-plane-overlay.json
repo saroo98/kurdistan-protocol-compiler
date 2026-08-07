@@ -113,6 +113,76 @@
   ],
   "successor_entries": [
     {
+      "path": "android/core/native-api/src/main/kotlin/org/kurdistanvpn/core/nativeapi/KurdNativeCore.kt",
+      "pre_sha256": "71b7414b223e22671b1d909fc1bb7f116ed97a9e37c98aec308f6930e639c67d",
+      "post_sha256": "9828fd333d1636b467498ea42f0b6c8c43d7d3da31b0b8de0d6a6a0c8b9fe148"
+    },
+    {
+      "path": "android/core/native-jni/src/main/cpp/kvpn_abi.h",
+      "pre_sha256": "b35dfcbb9c79cacd2028952db146ee1565b87f0745011a993239955495057ca5",
+      "post_sha256": "0abb548c145402bfe75fca349e88bc2743e1c32042eca4f19efd9fdb588d3401"
+    },
+    {
+      "path": "android/core/native-jni/src/main/cpp/kvpn_jni.c",
+      "pre_sha256": "6dc6cb5b777105946e1bec5629ce84d1531b582e5391b4540926ba8dbcafe0e9",
+      "post_sha256": "12145f768a19a6c61644a6d6f81f19e8c750e6e3d42ac4239512536cbbc2a47c"
+    },
+    {
+      "path": "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
+      "pre_sha256": "e36cea22ac27c2b1a92a8e0690d68fa5846bb7f7df8b1e4af56d0d32862b5f27",
+      "post_sha256": "8fe8276d657f232ff4e867d416fad6f7aed3abda14352a76ddc4adf93412b792"
+    },
+    {
+      "path": "android/data/secure/src/test/kotlin/org/kurdistanvpn/data/secure/ProtectedStateBoundaryTest.kt",
+      "pre_sha256": "da10145e4333be7033156937a1f1ba44ac6c5a0fc2ddac91fbffc71c2",
+      "post_sha256": "a436ce91b7edc77b3487e374fa3154790e3a29d209452e91f8ad0ba1526f3c7f"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment.go",
+      "pre_sha256": "3dd00a5559f621bc92f7a198cba5ce7d83c48b6c4f3b2275ab2c90fcac184d96",
+      "post_sha256": "95ab7e34135cca3a29ae31fdef217871b955980673549cf1db47e6ea9e1d6632"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_internal.go",
+      "pre_sha256": "289c69d8e64c24770e6b896ad974619cfe2f3e6f01be609f2f42bdee54b1bb68",
+      "post_sha256": "b5195996b7c5b589b27dec5ff8a4f02548df42320e55c19ed1920b6c875700d1"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_selfhost.go",
+      "pre_sha256": "317686243f9ea34f2221dfa583f2c1235400e83d9d6db1de0db1fa241428b976",
+      "post_sha256": "7331a16cabbc1b289b9a6f626ba08389de57001a66ebca3ac5847a9207886f34"
+    },
+    {
+      "path": "cmd/kandroidbridge/environment_selfhost_test.go",
+      "pre_sha256": "1938b9e1a22f646ee2a32d74f7af1ef85593b3e66328e4c6308e208a8e188125",
+      "post_sha256": "54f54664fe8258900668b33e05caa4005aafd4bbd800d0940a2ef84bd57b8769"
+    },
+    {
+      "path": "cmd/kandroidbridge/main.go",
+      "pre_sha256": "f0d5244fefbd1a9aa6794486bd480ceea9e0af069471defb914a8ae8ca2ee8ee",
+      "post_sha256": "7f02fee99ce51b97a1ac99db6e32575f2e114f6f20c619741fe6710788f155ac"
+    },
+    {
+      "path": "cmd/kandroidbridge/phase17_release.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3ce2a250ac1847ffe046eaef16a6b94882108598b9c2314bd9896ecdfa612ef9"
+    },
+    {
+      "path": "cmd/kandroidbridge/phase17_release_stub.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c33b4fb83e322919451a4fe487d8ac983d39dfd39f6c12f94430eb0c3ae53435"
+    },
+    {
+      "path": "cmd/kandroidbridge/phase17_release_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8ac3ecb61b92b10477a66e396c556c672c8a60cc62498cdc229f3e8b14847700"
+    },
+    {
+      "path": "cmd/kandroidbridge/phase17_release_unix.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "da78ebcf044b9f6fac1abd9e5ac057650ae2b6500509c8e4da306d12c8f7abb0"
+    },
+    {
       "path": "cmd/kurdctl/liveprogram.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "596019e812a41d36a37a16351e6d7153bd4ff2a90493a387942f2b93627e30c2"
@@ -155,12 +225,22 @@
     {
       "path": "cmd/kurdctl/main.go",
       "pre_sha256": "b7f7581ff05765511e76a9a6e8ebe30ee8e22b4bdbd1eb0c1a64ba09ea687540",
-      "post_sha256": "fdac4b9fb1923cf20d5f9fc06d8e0a43c9ec140844b92d415ac757f737cc270b"
+      "post_sha256": "4ad02d346e23e92aefc4129a174dd70bc5caaec9c11aeb24f786bb58f1fbf316"
     },
     {
       "path": "cmd/kurdctl/main_test.go",
       "pre_sha256": "956ebf319f5124eb0e415b063ae732441b6ffbf475f3464faf78b059725798db",
-      "post_sha256": "c1ceda64747f8267aa7ceb8aa46d689a8ad5f60cf0495a5b349d122ff6ff4b20"
+      "post_sha256": "45976698bdd7863bb337630aae68b1502c73c514824815818b6c7c4f91e1f5e4"
+    },
+    {
+      "path": "cmd/phase17verify/main.go",
+      "pre_sha256": "ebd5cb489c690c0e875aee536ee75e8ba37d717cb3f5945db0ed345efa140e96",
+      "post_sha256": "a7be464e397d6324b13119911554fd232adc8b2e34434db757c8a96cd172e11b"
+    },
+    {
+      "path": "cmd/phase17verify/main_test.go",
+      "pre_sha256": "92eee6cd7d76309b8ee315e48f5d51af1fd726000e6b1ece5cfcec8d2f5dbb77",
+      "post_sha256": "b069db2b331af3b404038f1dc42133ac55313706127fb436bc69384af8efc6e2"
     },
     {
       "path": "go.mod",
@@ -171,6 +251,46 @@
       "path": "go.sum",
       "pre_sha256": "431c5b16b183aae5781337312c69877c90c22473cdd0af21b541b5dc78ce7793",
       "post_sha256": "549ee1e43aab21a3abedcee253ed96b2777f443f878872ad3bcdde87579e5118"
+    },
+    {
+      "path": "internal/androidbridge/activation.go",
+      "pre_sha256": "f56bf71187426a5a090b0879d917071bc4f4a51fe09ac935f95f625dcd2b9079",
+      "post_sha256": "a11748fbd4de6c52713a21a53b7e3ae718fe29a2aa35dc566bfbd6891f6d2534"
+    },
+    {
+      "path": "internal/androidbridge/handles.go",
+      "pre_sha256": "bbb799e44bbc2f69b0b698cead1385a3b5a5b835dad6dfe2114c8796cec3592d",
+      "post_sha256": "cc8fa9f29c4d27e20ec1458b6b421efae5317ac8b96ddf7b948d555a002b6375"
+    },
+    {
+      "path": "internal/androidbridge/recipient.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "015bedf68bec28ac2fc8b656f4627cbdc8504e7c345db3aa0ef65f72fdbe252a"
+    },
+    {
+      "path": "internal/androidbridge/recipient_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "aaf66a92e321494347d217482d2d3d385cc47c7e41f13575b00c115a282ad480"
+    },
+    {
+      "path": "internal/androidbridge/runtime_session_v2.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "04641952ce4e37c9e303dbfce3177bc6ebfb2bd5fb731350e3b65f5857289ddc"
+    },
+    {
+      "path": "internal/androidbridge/runtime_session_v2_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "77d7ac067033813a4d6be3838d2fcc3792c6fbcd0310acfac87781d294ef52da"
+    },
+    {
+      "path": "internal/androidbridge/verify.go",
+      "pre_sha256": "2b933f02cc489fb1b1f18eefb6c35af5ab920a1f6b6d01314e7f6b0fb58ea1dc",
+      "post_sha256": "07855eb5505842ff99eee7c1cf4aac3cedbe2f09e797833264834641c081ebb6"
+    },
+    {
+      "path": "internal/androidbridge/verify_test.go",
+      "pre_sha256": "1938a7e1e91bb4b11f4590abb7d9cd0da50b9b95d15af6df0f1c47184ea096e1",
+      "post_sha256": "cd5a934cd776c27b0487a2865d34e16728a20a5903c04989e24f00beae175491"
     },
     {
       "path": "internal/audit/security.go",
@@ -213,9 +333,14 @@
       "post_sha256": "0694c8934f25e89a31cae8f0ae18ce84713ec6b0771dcd0e8a6e0949bf5d93e2"
     },
     {
+      "path": "internal/product/enrollment/request_lifecycle_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "315c07a7753657d458dc9ca4ba634b04b53dfe163413f50e853fae8f6735b831"
+    },
+    {
       "path": "internal/product/enrollment/request_v1.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e489ceb748e22cb61b2b6206839d2ed107d04157466e155f3c4845ded763e914"
+      "post_sha256": "7d86352baee6e4888a496360a6bf76a264b9e928ab0f35360368f4da4cc38ae1"
     },
     {
       "path": "internal/product/enrollment/request_v1_fuzz_test.go",
@@ -278,6 +403,11 @@
       "post_sha256": "b78ef780c1dee3edf10496028a63c63c7d0f3a0b8ba1c63dabedf83df539de1c"
     },
     {
+      "path": "internal/product/profile/phase9_activation_session.go",
+      "pre_sha256": "4b671cc99895a9ce38092453ffa04540c51df21a878bb41b628da1628109d356",
+      "post_sha256": "dff1222bcaa3e7296408d8b128f018181b56666273e522343bfafc672df52d3b"
+    },
+    {
       "path": "internal/product/runtimepolicy/policy_v2.go",
       "pre_sha256": "3b128a62c0cc10b985afb5ca8dd3d36b2c3ab036fe58a5c6951bf95ca4b04a57",
       "post_sha256": "867aed47234eadb551f2f3ac49fb5fdc87ee476a79872755aa78c080dadca5a6"
@@ -290,12 +420,12 @@
     {
       "path": "internal/product/sessionplan/sessionplan_v2.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f3d925a482480df99f4ee1268c204396e801ef617d8a2e23b8f4afc77627420d"
+      "post_sha256": "8bafb6c40365334cfa278ab363ed2caf3db0bcaff9c76218eac106e5064721d2"
     },
     {
       "path": "internal/product/sessionplan/sessionplan_v2_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f3bda24a36d55669738489245ddab87b8f03f5eec2c0e265fd80005026274052"
+      "post_sha256": "71171c85660478b0fb2a2cf130399c967795882b993c32939865852df8f42bea"
     },
     {
       "path": "internal/protocol/framing/codec_test.go",
@@ -370,7 +500,7 @@
     {
       "path": "internal/runtime/process_tlstcp_v1.go",
       "pre_sha256": "8d4ef0761b573707539c4b5d805e688ef3be9f6729dab8732d88ebfe40215dcc",
-      "post_sha256": "d5e3f3681a8dde66b8422d096e29a947bca6ac2fe39dba4840f6b2c7e08d70f4"
+      "post_sha256": "633da32f55f4e3303cd3e27d5768b488eb54911d1f3d6894adfc87e2f108508c"
     },
     {
       "path": "internal/selfhost/address_pool.go",
@@ -395,7 +525,7 @@
     {
       "path": "internal/selfhost/bundle.go",
       "pre_sha256": "c50cbe68d2730e33f92491a6dcaf69bf2480e4082f4d1c3c18f9cd4f6f46deac",
-      "post_sha256": "791205d33c945bf9a3d096badce29e830eaac6f4c8ea667bab6db2c62bad69a1"
+      "post_sha256": "6f2174622d1736a9f10fd887bfa3adaa499eb63814ef59249920cf75751fc4b0"
     },
     {
       "path": "internal/selfhost/crypto.go",
@@ -415,7 +545,7 @@
     {
       "path": "internal/selfhost/model.go",
       "pre_sha256": "5951d6524f24c28979f76c255ad203f6dc70fbcf7d14ed8baab85db1ddc21575",
-      "post_sha256": "a2b1ab06c416852c144f9b770cbf139f8099ac7aac083e734e14864a747775d4"
+      "post_sha256": "3f77e505467661c627d5a1670280641efdcd9750421b103f4f6484545c43cb56"
     },
     {
       "path": "internal/selfhost/private_path_other.go",

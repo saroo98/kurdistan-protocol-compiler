@@ -285,7 +285,7 @@ func TestLiveDataPlaneVerifierRejectsCarrierWireRuntimeAndKotlinDrift(t *testing
 		{"legacy protected-record cap", "internal/runtime/protected_channel.go", "strictFragmentMaxOperationsV1 = 8", "strictFragmentMaxOperationsV1 = 9"},
 		{"Kotlin runtime MTU", "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt", "mtu in 1280..1500", "mtu in 1279..1500"},
 		{"Kotlin native plan digest", "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt", "reader.fixedBytes(32)", "reader.fixedBytes(31)"},
-		{"predecessor unit boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=yes", "PrivateDevices=no"},
+		{"live unit device boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=no", "PrivateDevices=yes"},
 	}
 	for _, mutation := range mutations {
 		t.Run(mutation.name, func(t *testing.T) {

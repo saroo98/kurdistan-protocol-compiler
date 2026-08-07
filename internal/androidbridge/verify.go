@@ -26,12 +26,22 @@ type VerificationEnvironment interface {
 	Verify(artifact []byte, class envelope.ArtifactClass) (profile.OfflineVerifiedArtifact, error)
 }
 
+// RecipientVerificationEnvironment verifies a device-recipient artifact with
+// the exact enrollment capability retained by the Android secure store.
+type RecipientVerificationEnvironment interface {
+	VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (profile.OfflineVerifiedArtifact, error)
+}
+
 // TrustPreviewEnvironment optionally supplies redacted, independently
 // verified deployment information for an explicit first-trust decision. It
 // must derive every field from the exact artifact already admitted by Verify
 // and must not perform a network request.
 type TrustPreviewEnvironment interface {
 	TrustPreview(artifact []byte, class envelope.ArtifactClass) (TrustPreview, error)
+}
+
+type RecipientTrustPreviewEnvironment interface {
+	TrustPreviewWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (TrustPreview, error)
 }
 
 type TrustPreview struct {
@@ -53,6 +63,7 @@ type VerifyPreview struct {
 	Inspection profile.RedactedInspection
 	Verified   profile.OfflineVerifiedArtifact
 	Trust      TrustPreview
+	recipient  *RecipientCredentials
 }
 
 func (preview *VerifyPreview) Destroy() {
@@ -62,6 +73,9 @@ func (preview *VerifyPreview) Destroy() {
 	clear(preview.Verified.ExactArtifact)
 	clear(preview.Verified.ExactSignedObject)
 	clear(preview.Verified.Profile.Policy)
+	if preview.recipient != nil {
+		preview.recipient.Destroy()
+	}
 	*preview = VerifyPreview{}
 }
 
@@ -150,36 +164,9 @@ func VerifyAndPreview(encoded []byte, environment VerificationEnvironment) (Veri
 	if environment == nil {
 		return VerifyPreview{}, CodeTrustUnavailable
 	}
-	request, err := DecodeVerifyRequest(encoded)
-	if err != nil {
-		return VerifyPreview{}, CodeInvalidArgument
-	}
-	ingress := envelope.ProfileIngress{Kind: request.Ingress}
-	switch request.Ingress {
-	case envelope.IngressFile, envelope.IngressSubscription:
-		if len(request.Parts) != 1 {
-			return VerifyPreview{}, CodeInvalidArgument
-		}
-		ingress.Bytes = request.Parts[0]
-	case envelope.IngressURI, envelope.IngressClipboard:
-		if len(request.Parts) != 1 {
-			return VerifyPreview{}, CodeInvalidArgument
-		}
-		ingress.Text = string(request.Parts[0])
-	case envelope.IngressQRChunks:
-		ingress.Chunks = make([]string, len(request.Parts))
-		for index, part := range request.Parts {
-			ingress.Chunks[index] = string(part)
-		}
-	default:
-		return VerifyPreview{}, CodeInvalidArgument
-	}
-	artifact, err := envelope.NormalizeProfileIngress(ingress)
-	if err != nil {
-		if envelope.IngressErrorIs(err, envelope.IngressSizeLimit) {
-			return VerifyPreview{}, CodeSizeLimit
-		}
-		return VerifyPreview{}, CodeVerificationRejected
+	request, artifact, code := decodeVerifyArtifact(encoded)
+	if code != CodeOK {
+		return VerifyPreview{}, code
 	}
 	verified, err := environment.Verify(artifact, request.Class)
 	if err != nil {
@@ -199,6 +186,77 @@ func VerifyAndPreview(encoded []byte, environment VerificationEnvironment) (Veri
 	}, CodeOK
 }
 
+func VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes []byte, environment RecipientVerificationEnvironment) (VerifyPreview, ErrorCode) {
+	if environment == nil {
+		return VerifyPreview{}, CodeTrustUnavailable
+	}
+	request, artifact, code := decodeVerifyArtifact(encoded)
+	if code != CodeOK {
+		return VerifyPreview{}, code
+	}
+	if request.Class != envelope.ArtifactDeviceRecipient {
+		return VerifyPreview{}, CodePolicyRejected
+	}
+	credentials, code := DecodeRecipientCredentials(requestBytes, privateBytes)
+	if code != CodeOK {
+		return VerifyPreview{}, code
+	}
+	verified, err := environment.VerifyWithRecipient(artifact, request.Class, credentials.Clone())
+	if err != nil {
+		credentials.Destroy()
+		return VerifyPreview{}, CodeVerificationRejected
+	}
+	var trust TrustPreview
+	if provider, ok := environment.(RecipientTrustPreviewEnvironment); ok {
+		trust, err = provider.TrustPreviewWithRecipient(artifact, request.Class, credentials.Clone())
+		if err != nil {
+			credentials.Destroy()
+			return VerifyPreview{}, CodeVerificationRejected
+		}
+	}
+	return VerifyPreview{
+		Inspection: profile.InspectRedacted(verified),
+		Verified:   verified,
+		Trust:      trust,
+		recipient:  &credentials,
+	}, CodeOK
+}
+
+func decodeVerifyArtifact(encoded []byte) (VerifyRequest, []byte, ErrorCode) {
+	request, err := DecodeVerifyRequest(encoded)
+	if err != nil {
+		return VerifyRequest{}, nil, CodeInvalidArgument
+	}
+	ingress := envelope.ProfileIngress{Kind: request.Ingress}
+	switch request.Ingress {
+	case envelope.IngressFile, envelope.IngressSubscription:
+		if len(request.Parts) != 1 {
+			return VerifyRequest{}, nil, CodeInvalidArgument
+		}
+		ingress.Bytes = request.Parts[0]
+	case envelope.IngressURI, envelope.IngressClipboard:
+		if len(request.Parts) != 1 {
+			return VerifyRequest{}, nil, CodeInvalidArgument
+		}
+		ingress.Text = string(request.Parts[0])
+	case envelope.IngressQRChunks:
+		ingress.Chunks = make([]string, len(request.Parts))
+		for index, part := range request.Parts {
+			ingress.Chunks[index] = string(part)
+		}
+	default:
+		return VerifyRequest{}, nil, CodeInvalidArgument
+	}
+	artifact, err := envelope.NormalizeProfileIngress(ingress)
+	if err != nil {
+		if envelope.IngressErrorIs(err, envelope.IngressSizeLimit) {
+			return VerifyRequest{}, nil, CodeSizeLimit
+		}
+		return VerifyRequest{}, nil, CodeVerificationRejected
+	}
+	return request, artifact, CodeOK
+}
+
 func OpenVerifyPreview(registry *HandleRegistry, encoded []byte, environment VerificationEnvironment) (Handle, []byte, ErrorCode) {
 	if registry == nil {
 		return 0, nil, CodeInvalidArgument
@@ -213,6 +271,27 @@ func OpenVerifyPreview(registry *HandleRegistry, encoded []byte, environment Ver
 	}
 	handle, code := registry.Open(HandleVerifyPreview, &preview)
 	if code != CodeOK {
+		return 0, nil, code
+	}
+	return handle, result, CodeOK
+}
+
+func OpenVerifyPreviewWithRecipient(registry *HandleRegistry, encoded, requestBytes, privateBytes []byte, environment RecipientVerificationEnvironment) (Handle, []byte, ErrorCode) {
+	if registry == nil {
+		return 0, nil, CodeInvalidArgument
+	}
+	preview, code := VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes, environment)
+	if code != CodeOK {
+		return 0, nil, code
+	}
+	result, err := EncodeVerifyPreview(preview)
+	if err != nil {
+		preview.Destroy()
+		return 0, nil, CodeInternalFailure
+	}
+	handle, code := registry.Open(HandleVerifyPreview, &preview)
+	if code != CodeOK {
+		preview.Destroy()
 		return 0, nil, code
 	}
 	return handle, result, CodeOK

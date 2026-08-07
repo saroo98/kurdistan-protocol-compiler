@@ -9,18 +9,22 @@ package main
 import "C"
 
 import (
+	"crypto/rand"
 	"runtime/debug"
+	"time"
 	"unsafe"
 
 	"kurdistan/internal/androidbridge"
 	"kurdistan/internal/product/backup"
 	"kurdistan/internal/product/diagnosticexport"
+	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/profile"
 )
 
 var (
-	registry    androidbridge.HandleRegistry
-	environment = newBridgeEnvironment()
+	registry              androidbridge.HandleRegistry
+	environment           = newBridgeEnvironment()
+	runtimeNetworkFactory = newReleaseRuntimeNetworkFactory()
 )
 
 func main() {}
@@ -89,6 +93,107 @@ func kvpn_verify_preview(
 	if code != androidbridge.CodeOK {
 		return C.int32_t(code)
 	}
+	if code = writeBytes(preview, output, capacity, outputLength); code != androidbridge.CodeOK {
+		_ = registry.Free(handle)
+		return C.int32_t(code)
+	}
+	*outputHandle = C.uint64_t(handle)
+	return C.int32_t(androidbridge.CodeOK)
+}
+
+//export kvpn_recipient_create
+func kvpn_recipient_create(validitySeconds C.uint32_t, outputHandle *C.uint64_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if outputHandle == nil || validitySeconds == 0 || uint32(validitySeconds) > androidbridge.MaxRecipientValiditySeconds {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	handle, code := androidbridge.CreateRecipient(
+		&registry,
+		time.Now().UTC(),
+		time.Duration(uint32(validitySeconds))*time.Second,
+		rand.Reader,
+	)
+	if code == androidbridge.CodeOK {
+		*outputHandle = C.uint64_t(handle)
+	}
+	return C.int32_t(code)
+}
+
+//export kvpn_recipient_request
+func kvpn_recipient_request(
+	handle C.uint64_t,
+	output *C.uint8_t,
+	capacity C.uint32_t,
+	outputLength *C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	encoded, code := androidbridge.RecipientRequest(&registry, androidbridge.Handle(handle))
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	defer clear(encoded)
+	return C.int32_t(writeBytes(encoded, output, capacity, outputLength))
+}
+
+//export kvpn_recipient_private_export
+func kvpn_recipient_private_export(
+	handle C.uint64_t,
+	output *C.uint8_t,
+	capacity C.uint32_t,
+	outputLength *C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	encoded, code := androidbridge.RecipientPrivateExport(&registry, androidbridge.Handle(handle))
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	defer clear(encoded)
+	return C.int32_t(writeBytes(encoded, output, capacity, outputLength))
+}
+
+//export kvpn_verify_preview_with_recipient
+func kvpn_verify_preview_with_recipient(
+	input *C.uint8_t,
+	inputLength C.uint32_t,
+	recipientRequest *C.uint8_t,
+	recipientRequestLength C.uint32_t,
+	recipientPrivate *C.uint8_t,
+	recipientPrivateLength C.uint32_t,
+	outputHandle *C.uint64_t,
+	output *C.uint8_t,
+	capacity C.uint32_t,
+	outputLength *C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	if outputHandle == nil || environment == nil {
+		return C.int32_t(androidbridge.CodeTrustUnavailable)
+	}
+	encoded, code := inputBytes(input, inputLength, androidbridge.MaxVerifyRequestBytes)
+	if code != androidbridge.CodeOK || len(encoded) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(encoded)
+	requestBytes, code := inputBytes(recipientRequest, recipientRequestLength, enrollment.MaxRequestBytes)
+	if code != androidbridge.CodeOK || len(requestBytes) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(requestBytes)
+	privateBytes, code := inputBytes(recipientPrivate, recipientPrivateLength, enrollment.MaxPrivateBundleBytes)
+	if code != androidbridge.CodeOK || len(privateBytes) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(privateBytes)
+	handle, preview, code := androidbridge.OpenVerifyPreviewWithRecipient(
+		&registry,
+		encoded,
+		requestBytes,
+		privateBytes,
+		environment,
+	)
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	defer clear(preview)
 	if code = writeBytes(preview, output, capacity, outputLength); code != androidbridge.CodeOK {
 		_ = registry.Free(handle)
 		return C.int32_t(code)
@@ -496,4 +601,100 @@ func kvpn_runtime_session_roundtrip(
 	}
 	defer clear(roundTripped)
 	return C.int32_t(writeBytes(roundTripped, output, capacity, outputLength))
+}
+
+//export kvpn_runtime_session_open_v2
+func kvpn_runtime_session_open_v2(
+	input *C.uint8_t,
+	inputLength C.uint32_t,
+	outputHandle *C.uint64_t,
+	output *C.uint8_t,
+	capacity C.uint32_t,
+	outputLength *C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	if outputHandle == nil || environment == nil || runtimeNetworkFactory == nil {
+		return C.int32_t(androidbridge.CodeTrustUnavailable)
+	}
+	encoded, code := inputBytes(input, inputLength, androidbridge.MaxRuntimeOpenV2Bytes)
+	if code != androidbridge.CodeOK || len(encoded) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(encoded)
+	handle, snapshot, code := androidbridge.OpenRuntimeSessionV2(
+		&registry,
+		encoded,
+		environment,
+		runtimeNetworkFactory,
+		time.Now().UTC(),
+	)
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	snapshotBytes, err := androidbridge.EncodeRuntimeSessionSnapshotV2(snapshot)
+	if err != nil {
+		_ = registry.Free(handle)
+		return C.int32_t(androidbridge.CodeInternalFailure)
+	}
+	defer clear(snapshotBytes)
+	if code = writeBytes(snapshotBytes, output, capacity, outputLength); code != androidbridge.CodeOK {
+		_ = registry.Free(handle)
+		return C.int32_t(code)
+	}
+	*outputHandle = C.uint64_t(handle)
+	return C.int32_t(androidbridge.CodeOK)
+}
+
+//export kvpn_runtime_socket_prepare
+func kvpn_runtime_socket_prepare(handle C.uint64_t, outputFD *C.int32_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if outputFD == nil {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	fd, code := androidbridge.RuntimeSocketPrepare(&registry, androidbridge.Handle(handle))
+	if code == androidbridge.CodeOK {
+		*outputFD = C.int32_t(fd)
+	}
+	return C.int32_t(code)
+}
+
+//export kvpn_runtime_socket_commit_protected
+func kvpn_runtime_socket_commit_protected(handle C.uint64_t, protected C.uint8_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if protected > 1 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	return C.int32_t(androidbridge.RuntimeSocketCommitProtected(
+		&registry,
+		androidbridge.Handle(handle),
+		protected == 1,
+	))
+}
+
+//export kvpn_runtime_tun_attach
+func kvpn_runtime_tun_attach(handle C.uint64_t, fd C.int32_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if fd < 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	return C.int32_t(androidbridge.RuntimeTUNAttach(&registry, androidbridge.Handle(handle), int(fd)))
+}
+
+//export kvpn_runtime_status
+func kvpn_runtime_status(handle C.uint64_t, outputState *C.uint32_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if outputState == nil {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	state, code := androidbridge.RuntimeStatus(&registry, androidbridge.Handle(handle))
+	if code == androidbridge.CodeOK {
+		*outputState = C.uint32_t(state)
+	}
+	return C.int32_t(code)
+}
+
+//export kvpn_runtime_stop
+func kvpn_runtime_stop(handle C.uint64_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	return C.int32_t(androidbridge.RuntimeStop(&registry, androidbridge.Handle(handle)))
 }
