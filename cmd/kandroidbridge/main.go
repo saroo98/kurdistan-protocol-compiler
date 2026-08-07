@@ -151,6 +151,27 @@ func kvpn_recipient_private_export(
 	return C.int32_t(writeBytes(encoded, output, capacity, outputLength))
 }
 
+//export kvpn_recipient_validate
+func kvpn_recipient_validate(
+	recipientRequest *C.uint8_t,
+	recipientRequestLength C.uint32_t,
+	recipientPrivate *C.uint8_t,
+	recipientPrivateLength C.uint32_t,
+) (result C.int32_t) {
+	defer recoverCode(&result)
+	requestBytes, code := inputBytes(recipientRequest, recipientRequestLength, enrollment.MaxRequestBytes)
+	if code != androidbridge.CodeOK || len(requestBytes) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(requestBytes)
+	privateBytes, code := inputBytes(recipientPrivate, recipientPrivateLength, enrollment.MaxPrivateBundleBytes)
+	if code != androidbridge.CodeOK || len(privateBytes) == 0 {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	defer clear(privateBytes)
+	return C.int32_t(androidbridge.ValidateRecipientCredentialsBytes(requestBytes, privateBytes))
+}
+
 //export kvpn_verify_preview_with_recipient
 func kvpn_verify_preview_with_recipient(
 	input *C.uint8_t,

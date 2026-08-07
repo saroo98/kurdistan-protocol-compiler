@@ -51,6 +51,19 @@ class NativeBridge : KurdNativeCore {
         }
     }
 
+    override fun validateRecipient(
+        recipientRequest: ByteArray,
+        recipientPrivate: ByteArray,
+    ): NativeResult<Unit> {
+        if (
+            recipientRequest.isEmpty() || recipientRequest.size > MAX_RECIPIENT_REQUEST_BYTES ||
+            recipientPrivate.isEmpty() || recipientPrivate.size > MAX_RECIPIENT_PRIVATE_BYTES
+        ) {
+            return NativeResult.Failure(OperationError.SIZE_LIMIT)
+        }
+        return unitResult(nativeRecipientValidate(recipientRequest, recipientPrivate))
+    }
+
     override fun verifyPreview(request: ByteArray): NativeResult<VerifiedPreviewHandle> {
         if (request.isEmpty() || request.size > MAX_VERIFY_REQUEST_BYTES) {
             return NativeResult.Failure(OperationError.SIZE_LIMIT)
@@ -446,6 +459,7 @@ class NativeBridge : KurdNativeCore {
     private external fun nativeRecipientCreate(validitySeconds: Int, outputHandle: LongArray): Int
     private external fun nativeRecipientRequest(handle: Long, output: ByteBuffer, outputLength: IntArray): Int
     private external fun nativeRecipientPrivateExport(handle: Long, output: ByteBuffer, outputLength: IntArray): Int
+    private external fun nativeRecipientValidate(recipientRequest: ByteArray, recipientPrivate: ByteArray): Int
     private external fun nativeVerifyPreview(input: ByteArray, output: ByteBuffer, metadata: LongArray): Int
     private external fun nativeVerifyPreviewWithRecipient(
         input: ByteArray,

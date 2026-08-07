@@ -25,6 +25,8 @@ import org.junit.Test
 import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
+import org.kurdistanvpn.core.model.EnrollmentKeySummary
+import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.Phase9Settings
 import org.kurdistanvpn.core.model.ProfileSummary
@@ -238,6 +240,60 @@ class Phase11ControlSurfaceDeviceTest {
                 invoked,
             )
         }
+    }
+
+    @Test
+    fun enrollmentRequiresExplicitPublicExportConfirmationAndNeverShowsPrivateMaterial() {
+        val key = EnrollmentKeySummary(
+            localRecordId = "recipient-local-1",
+            requestFingerprint = "0123456789abcdef0123456789abcdef",
+            createdAtEpochSeconds = 1_800_000_000,
+            expiresAtEpochSeconds = 1_800_086_400,
+            boundProfileCount = 0,
+        )
+        var state by mutableStateOf<EnrollmentUiState>(EnrollmentUiState.NoEnrollmentKey)
+        var created = 0
+        var exported = ""
+        var qr = ""
+        compose.setContent {
+            ProfilesScreen(
+                profiles = emptyList(),
+                enrollmentState = state,
+                onCreateEnrollment = {
+                    created++
+                    state = EnrollmentUiState.RequestReady(listOf(key))
+                },
+                onExportEnrollment = { exported = it },
+                onShowEnrollmentQr = { qr = it },
+                onImportFile = {},
+                onImportClipboard = {},
+                onImportLink = {},
+                onScanQr = {},
+                onExportProfile = { _, _ -> },
+                onDeleteProfile = {},
+                onBack = {},
+            )
+        }
+
+        compose.onNodeWithTag("create_enrollment_request").performClick()
+        compose.onNodeWithText(context.getString(UiR.string.device_enrollment_export_file))
+            .performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(UiR.string.device_enrollment_public_export_warning))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(UiR.string.confirm))
+            .performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(UiR.string.device_enrollment_show_qr))
+            .performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(UiR.string.confirm))
+            .performScrollTo().performClick()
+
+        compose.runOnIdle {
+            assertEquals(1, created)
+            assertEquals(key.localRecordId, exported)
+            assertEquals(key.localRecordId, qr)
+        }
+        compose.onNodeWithText("private-enrollment-canary", substring = true)
+            .assertDoesNotExist()
     }
 
     @Test

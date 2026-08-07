@@ -49,6 +49,7 @@ import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.CompatibilitySummary
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
+import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.ImportSource
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.OperatorClientProjection
@@ -61,6 +62,7 @@ import org.kurdistanvpn.core.model.ProbeExecutionState
 import org.kurdistanvpn.core.model.ResetScope
 import org.kurdistanvpn.core.model.ProjectionStatus
 import org.kurdistanvpn.core.model.ThemePreference
+import org.kurdistanvpn.core.model.QrDisplayMatrix
 import org.kurdistanvpn.core.ui.KurdistanTheme
 import org.kurdistanvpn.core.ui.KurdistanIcons
 import org.kurdistanvpn.core.ui.R as UiR
@@ -82,6 +84,7 @@ import org.kurdistanvpn.platform.importing.BoundedInputReader
 import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.MultipartQrAccumulator
 import org.kurdistanvpn.platform.importing.OfflineQrScanner
+import org.kurdistanvpn.platform.importing.OfflineQrEncoder
 import org.kurdistanvpn.data.secure.SensitiveAction
 import org.kurdistanvpn.data.secure.SensitiveActionAuthorizer
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
@@ -118,6 +121,7 @@ class MainActivity : FragmentActivity() {
             val settings = viewModel.settings.collectAsStateWithLifecycle().value
             val compatibility = viewModel.compatibility.collectAsStateWithLifecycle().value
             val probeState = viewModel.probeState.collectAsStateWithLifecycle().value
+            val enrollmentState = viewModel.enrollmentState.collectAsStateWithLifecycle().value
             val vpnRuntime = vpnController.snapshot.collectAsStateWithLifecycle().value
             val installedApplications by produceState(initialValue = emptyList<InstalledApplication>()) {
                 value = withContext(Dispatchers.IO) { discoverLaunchableApplications() }
@@ -148,6 +152,9 @@ class MainActivity : FragmentActivity() {
             }
             var pendingBackupBytes by remember { mutableStateOf<ByteArray?>(null) }
             var pendingDiagnosticBytes by remember { mutableStateOf<ByteArray?>(null) }
+            var pendingEnrollmentBytes by remember { mutableStateOf<ByteArray?>(null) }
+            var pendingEnrollmentLocalId by remember { mutableStateOf<String?>(null) }
+            var enrollmentQr by remember { mutableStateOf<QrDisplayMatrix?>(null) }
             var restorePassphrase by remember { mutableStateOf("") }
             val authorizer = remember { SensitiveActionAuthorizer(this@MainActivity) }
             val backupWriter = rememberLauncherForActivityResult(
@@ -177,6 +184,20 @@ class MainActivity : FragmentActivity() {
                     }
                 }
                 pendingDiagnosticBytes = null
+            }
+            val enrollmentWriter = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/vnd.kurdistan.recipient"),
+            ) { uri ->
+                pendingEnrollmentBytes?.let { bytes ->
+                    if (uri == null) bytes.fill(0)
+                    else runCatching { writeAndWipe(uri, bytes) }
+                        .onSuccess {
+                            pendingEnrollmentLocalId?.let(viewModel::markEnrollmentRequestExported)
+                        }
+                        .onFailure { viewModel.dismissEnrollmentAction() }
+                }
+                pendingEnrollmentBytes = null
+                pendingEnrollmentLocalId = null
             }
             val backupReader = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument(),
@@ -209,6 +230,8 @@ class MainActivity : FragmentActivity() {
                     settings = settings,
                     compatibility = compatibility,
                     probeState = probeState,
+                    enrollmentState = enrollmentState,
+                    enrollmentQr = enrollmentQr,
                     installedApplications = installedApplications,
                     capabilities = capabilities,
                     vpnRuntime = vpnRuntime,
@@ -225,6 +248,27 @@ class MainActivity : FragmentActivity() {
                         }
                         viewModel.deleteProfile(localRecordId)
                     },
+                    onCreateEnrollment = viewModel::createEnrollmentRequest,
+                    onExportEnrollment = { localRecordId ->
+                        viewModel.exportEnrollmentRequest(localRecordId) { bytes ->
+                            pendingEnrollmentLocalId = localRecordId
+                            pendingEnrollmentBytes = bytes
+                            enrollmentWriter.launch("kurd-device-request.kurd-recipient")
+                        }
+                    },
+                    onShowEnrollmentQr = { localRecordId ->
+                        viewModel.exportEnrollmentRequest(localRecordId) { bytes ->
+                            enrollmentQr = try {
+                                OfflineQrEncoder.recipientRequest(bytes)
+                            } finally {
+                                bytes.fill(0)
+                            }
+                            viewModel.markEnrollmentRequestExported(localRecordId)
+                        }
+                    },
+                    onDismissEnrollmentQr = { enrollmentQr = null },
+                    onDeleteEnrollmentKey = viewModel::deleteEnrollmentKey,
+                    onDismissEnrollmentAction = viewModel::dismissEnrollmentAction,
                     onExportProfile = { localRecordId, passphrase ->
                         authorizer.authorize(
                             SensitiveAction.EXPORT_PROFILE,
@@ -572,6 +616,8 @@ private fun KurdistanApp(
     settings: Phase9Settings,
     compatibility: CompatibilitySummary?,
     probeState: ProbeExecutionState,
+    enrollmentState: EnrollmentUiState,
+    enrollmentQr: QrDisplayMatrix?,
     installedApplications: List<InstalledApplication>,
     capabilities: ProductCapabilities,
     vpnRuntime: org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot,
@@ -583,6 +629,12 @@ private fun KurdistanApp(
     onRejectImport: () -> Unit,
     onClearError: () -> Unit,
     onDeleteProfile: (String) -> Unit,
+    onCreateEnrollment: () -> Unit,
+    onExportEnrollment: (String) -> Unit,
+    onShowEnrollmentQr: (String) -> Unit,
+    onDismissEnrollmentQr: () -> Unit,
+    onDeleteEnrollmentKey: (String) -> Unit,
+    onDismissEnrollmentAction: () -> Unit,
     onExportProfile: (String, String) -> Unit,
     onCreateBackup: (String) -> Unit,
     onOpenBackup: (String) -> Unit,
@@ -618,6 +670,8 @@ private fun KurdistanApp(
     val currentSettings by rememberUpdatedState(settings)
     val currentCompatibility by rememberUpdatedState(compatibility)
     val currentProbeState by rememberUpdatedState(probeState)
+    val currentEnrollmentState by rememberUpdatedState(enrollmentState)
+    val currentEnrollmentQr by rememberUpdatedState(enrollmentQr)
     val currentVpnRuntime by rememberUpdatedState(vpnRuntime)
     val documentPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -716,6 +770,14 @@ private fun KurdistanApp(
                     ProfilesScreen(
                         profiles = (currentState as? AppState.Ready)?.profiles.orEmpty(),
                         settings = currentSettings,
+                        enrollmentState = currentEnrollmentState,
+                        enrollmentQr = currentEnrollmentQr,
+                        onCreateEnrollment = onCreateEnrollment,
+                        onExportEnrollment = onExportEnrollment,
+                        onShowEnrollmentQr = onShowEnrollmentQr,
+                        onDismissEnrollmentQr = onDismissEnrollmentQr,
+                        onDeleteEnrollmentKey = onDeleteEnrollmentKey,
+                        onDismissEnrollmentAction = onDismissEnrollmentAction,
                         onSelectProfile = onSelectProfile,
                         onToggleFavorite = onToggleFavorite,
                         onOpenOperator = { backStack.add(AppDestination.OPERATOR_PROVIDER) },

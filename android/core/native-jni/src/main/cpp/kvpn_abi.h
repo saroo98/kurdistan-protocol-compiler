@@ -25,6 +25,11 @@ int32_t kvpn_recipient_private_export(
     uint8_t *output,
     uint32_t capacity,
     uint32_t *output_length);
+int32_t kvpn_recipient_validate(
+    uint8_t *recipient_request,
+    uint32_t recipient_request_length,
+    uint8_t *recipient_private,
+    uint32_t recipient_private_length);
 int32_t kvpn_verify_preview_with_recipient(
     uint8_t *input,
     uint32_t input_length,

@@ -101,6 +101,37 @@ data class RedactedProfilePreview(
     val updatesEnabled: Boolean = false,
 )
 
+data class EnrollmentKeySummary(
+    val localRecordId: String,
+    val requestFingerprint: String,
+    val createdAtEpochSeconds: Long,
+    val expiresAtEpochSeconds: Long,
+    val boundProfileCount: Int,
+)
+
+data class QrDisplayMatrix(
+    val width: Int,
+    val modules: BooleanArray,
+) {
+    init {
+        require(width in 21..177)
+        require(modules.size == width * width)
+    }
+}
+
+sealed interface EnrollmentUiState {
+    data object NoEnrollmentKey : EnrollmentUiState
+    data object Working : EnrollmentUiState
+    data class RequestReady(val keys: List<EnrollmentKeySummary>) : EnrollmentUiState
+    data class AwaitingProfile(val keys: List<EnrollmentKeySummary>) : EnrollmentUiState
+    data class ProfileVerified(val keys: List<EnrollmentKeySummary>) : EnrollmentUiState
+    data class MissingKey(val fingerprint: String) : EnrollmentUiState
+    data object KeyInvalidated : EnrollmentUiState
+    data object RecoveryRequired : EnrollmentUiState
+    data class OfferKeyDeletion(val key: EnrollmentKeySummary) : EnrollmentUiState
+    data class Failed(val error: OperationError) : EnrollmentUiState
+}
+
 enum class OperationError {
     INVALID_INPUT,
     SIZE_LIMIT,

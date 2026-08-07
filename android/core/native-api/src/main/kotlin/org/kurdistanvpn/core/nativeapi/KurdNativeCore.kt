@@ -162,6 +162,10 @@ interface NativeActivationSession : AutoCloseable {
 interface KurdNativeCore {
     fun compatibility(): NativeResult<NativeCompatibility>
     fun createRecipient(validitySeconds: Int): NativeResult<NativeRecipient>
+    fun validateRecipient(
+        recipientRequest: ByteArray,
+        recipientPrivate: ByteArray,
+    ): NativeResult<Unit> = NativeResult.Failure(OperationError.INTERNAL_FAILURE)
     fun verifyPreview(request: ByteArray): NativeResult<VerifiedPreviewHandle>
     fun verifyPreviewWithRecipient(
         request: ByteArray,

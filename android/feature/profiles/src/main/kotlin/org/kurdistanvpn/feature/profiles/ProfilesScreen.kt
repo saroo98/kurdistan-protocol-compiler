@@ -3,7 +3,13 @@
 
 package org.kurdistanvpn.feature.profiles
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,11 +26,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.res.pluralStringResource
@@ -32,7 +42,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import android.text.BidiFormatter
 import org.kurdistanvpn.core.model.ProfileSummary
+import org.kurdistanvpn.core.model.EnrollmentKeySummary
+import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.QrDisplayMatrix
 import org.kurdistanvpn.core.model.RedactedProfilePreview
 import org.kurdistanvpn.core.ui.R as UiR
 
@@ -42,6 +55,14 @@ private enum class SortMode { NAME, GENERATION, EXPIRY }
 fun ProfilesScreen(
     profiles: List<ProfileSummary>,
     settings: Phase9Settings = Phase9Settings(),
+    enrollmentState: EnrollmentUiState = EnrollmentUiState.NoEnrollmentKey,
+    enrollmentQr: QrDisplayMatrix? = null,
+    onCreateEnrollment: () -> Unit = {},
+    onExportEnrollment: (String) -> Unit = {},
+    onShowEnrollmentQr: (String) -> Unit = {},
+    onDismissEnrollmentQr: () -> Unit = {},
+    onDeleteEnrollmentKey: (String) -> Unit = {},
+    onDismissEnrollmentAction: () -> Unit = {},
     onSelectProfile: (String) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onOpenOperator: () -> Unit = {},
@@ -60,7 +81,10 @@ fun ProfilesScreen(
     var expandedProfile by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf<String?>(null) }
+    var pendingEnrollmentFile by remember { mutableStateOf<String?>(null) }
+    var pendingEnrollmentQr by remember { mutableStateOf<String?>(null) }
     var exportPassphrase by remember { mutableStateOf("") }
+    SecureScreenEffect(enabled = pendingExport != null)
     Column(
         modifier = Modifier.fillMaxSize().widthIn(max = 720.dp).verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -68,6 +92,30 @@ fun ProfilesScreen(
         Text(stringResource(UiR.string.kurd_profiles), style = MaterialTheme.typography.headlineMedium)
         Text(pluralStringResource(UiR.plurals.verified_profile_count, profiles.size, profiles.size))
         Text(stringResource(UiR.string.provider_local_authority))
+        EnrollmentSection(
+            state = enrollmentState,
+            qr = enrollmentQr,
+            pendingFile = pendingEnrollmentFile,
+            pendingQr = pendingEnrollmentQr,
+            onCreate = onCreateEnrollment,
+            onBeginFile = { pendingEnrollmentFile = it },
+            onConfirmFile = {
+                pendingEnrollmentFile = null
+                onExportEnrollment(it)
+            },
+            onBeginQr = { pendingEnrollmentQr = it },
+            onConfirmQr = {
+                pendingEnrollmentQr = null
+                onShowEnrollmentQr(it)
+            },
+            onCancelConfirmation = {
+                pendingEnrollmentFile = null
+                pendingEnrollmentQr = null
+            },
+            onDismissQr = onDismissEnrollmentQr,
+            onDeleteKey = onDeleteEnrollmentKey,
+            onDismissAction = onDismissEnrollmentAction,
+        )
         OutlinedTextField(
             value = search,
             onValueChange = { if (it.length <= 128) search = it },
@@ -234,6 +282,165 @@ fun ProfilesScreen(
         }
         TextButton(onClick = onBack) { Text(stringResource(UiR.string.back)) }
     }
+}
+
+@Composable
+private fun EnrollmentSection(
+    state: EnrollmentUiState,
+    qr: QrDisplayMatrix?,
+    pendingFile: String?,
+    pendingQr: String?,
+    onCreate: () -> Unit,
+    onBeginFile: (String) -> Unit,
+    onConfirmFile: (String) -> Unit,
+    onBeginQr: (String) -> Unit,
+    onConfirmQr: (String) -> Unit,
+    onCancelConfirmation: () -> Unit,
+    onDismissQr: () -> Unit,
+    onDeleteKey: (String) -> Unit,
+    onDismissAction: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth().testTag("device_enrollment")) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(UiR.string.device_enrollment_title),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(stringResource(UiR.string.device_enrollment_explanation))
+            val keys = state.enrollmentKeys()
+            when (state) {
+                EnrollmentUiState.NoEnrollmentKey ->
+                    Text(stringResource(UiR.string.device_enrollment_none))
+                EnrollmentUiState.Working ->
+                    Text(stringResource(UiR.string.device_enrollment_working))
+                is EnrollmentUiState.RequestReady ->
+                    Text(stringResource(UiR.string.device_enrollment_request_ready))
+                is EnrollmentUiState.AwaitingProfile ->
+                    Text(stringResource(UiR.string.device_enrollment_awaiting_profile))
+                is EnrollmentUiState.ProfileVerified ->
+                    Text(stringResource(UiR.string.device_enrollment_profile_verified))
+                is EnrollmentUiState.MissingKey ->
+                    Text(stringResource(UiR.string.device_enrollment_missing_key, state.fingerprint))
+                EnrollmentUiState.KeyInvalidated ->
+                    Text(stringResource(UiR.string.device_enrollment_key_invalidated))
+                EnrollmentUiState.RecoveryRequired ->
+                    Text(stringResource(UiR.string.device_enrollment_recovery_required))
+                is EnrollmentUiState.OfferKeyDeletion ->
+                    Text(stringResource(UiR.string.device_enrollment_delete_offer))
+                is EnrollmentUiState.Failed ->
+                    Text(stringResource(UiR.string.device_enrollment_failed, state.error.name))
+            }
+            keys.forEach { key ->
+                Text(
+                    stringResource(
+                        UiR.string.device_enrollment_fingerprint,
+                        BidiFormatter.getInstance().unicodeWrap(key.requestFingerprint.take(16)),
+                    ),
+                )
+                Text(stringResource(UiR.string.device_enrollment_expiry, key.expiresAtEpochSeconds))
+                Text(stringResource(UiR.string.device_enrollment_bound_profiles, key.boundProfileCount))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onBeginFile(key.localRecordId) }) {
+                        Text(stringResource(UiR.string.device_enrollment_export_file))
+                    }
+                    TextButton(onClick = { onBeginQr(key.localRecordId) }) {
+                        Text(stringResource(UiR.string.device_enrollment_show_qr))
+                    }
+                }
+            }
+            val confirmationId = pendingFile ?: pendingQr
+            if (confirmationId != null) {
+                Text(stringResource(UiR.string.device_enrollment_public_export_warning))
+                Button(
+                    onClick = {
+                        if (pendingFile != null) onConfirmFile(confirmationId)
+                        else onConfirmQr(confirmationId)
+                    },
+                ) {
+                    Text(stringResource(UiR.string.confirm))
+                }
+                TextButton(onClick = onCancelConfirmation) {
+                    Text(stringResource(UiR.string.cancel))
+                }
+            }
+            if (qr != null) {
+                RecipientQr(qr)
+                Text(stringResource(UiR.string.device_enrollment_qr_public_only))
+                TextButton(onClick = onDismissQr) { Text(stringResource(UiR.string.close)) }
+            }
+            if (state is EnrollmentUiState.OfferKeyDeletion) {
+                Button(onClick = { onDeleteKey(state.key.localRecordId) }) {
+                    Text(stringResource(UiR.string.device_enrollment_delete_key))
+                }
+                TextButton(onClick = onDismissAction) {
+                    Text(stringResource(UiR.string.keep_enrollment_key))
+                }
+            }
+            Button(
+                enabled = state !is EnrollmentUiState.Working,
+                onClick = onCreate,
+                modifier = Modifier.testTag("create_enrollment_request"),
+            ) {
+                Text(stringResource(UiR.string.create_device_enrollment_request))
+            }
+        }
+    }
+}
+
+private fun EnrollmentUiState.enrollmentKeys(): List<EnrollmentKeySummary> = when (this) {
+    is EnrollmentUiState.RequestReady -> keys
+    is EnrollmentUiState.AwaitingProfile -> keys
+    is EnrollmentUiState.ProfileVerified -> keys
+    is EnrollmentUiState.OfferKeyDeletion -> listOf(key)
+    else -> emptyList()
+}
+
+@Composable
+private fun RecipientQr(qr: QrDisplayMatrix) {
+    Canvas(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).aspectRatio(1f)
+            .testTag("enrollment_qr"),
+    ) {
+        drawQr(qr)
+    }
+}
+
+private fun DrawScope.drawQr(qr: QrDisplayMatrix) {
+    val side = size.minDimension
+    drawRect(Color.White, size = androidx.compose.ui.geometry.Size(side, side))
+    val cell = side / qr.width
+    qr.modules.forEachIndexed { index, enabled ->
+        if (enabled) {
+            drawRect(
+                color = Color.Black,
+                topLeft = androidx.compose.ui.geometry.Offset(
+                    (index % qr.width) * cell,
+                    (index / qr.width) * cell,
+                ),
+                size = androidx.compose.ui.geometry.Size(cell, cell),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SecureScreenEffect(enabled: Boolean) {
+    val activity = LocalContext.current.findActivity()
+    DisposableEffect(activity, enabled) {
+        if (enabled) activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            if (enabled) activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable

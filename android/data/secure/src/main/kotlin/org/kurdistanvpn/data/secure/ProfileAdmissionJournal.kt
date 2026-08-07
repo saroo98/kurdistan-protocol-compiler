@@ -61,6 +61,7 @@ class ProfileAdmissionJournal(
     private val catalog: ProfileCatalogDao,
     private val blobs: SecureBlobAccess,
     private val productionTrust: Boolean,
+    private val recipientKeys: ClientKeyBundleStore? = null,
     private val random: SecureRandom = SecureRandom(),
 ) {
     private companion object {
@@ -70,12 +71,14 @@ class ProfileAdmissionJournal(
     suspend fun admit(
         verifyRequest: ByteArray,
         expectedPreview: RedactedProfilePreview,
+        recipientKeyLocalId: String? = null,
     ): AdmissionResult = withContext(Dispatchers.IO) {
         admitInternal(
             verifyRequest = verifyRequest,
             expectedPreview = expectedPreview,
             finalHealth = CatalogHealth.AVAILABLE,
             publishSuperseded = true,
+            recipientKeyLocalId = recipientKeyLocalId,
         )
     }
 
@@ -112,11 +115,13 @@ class ProfileAdmissionJournal(
         expectedPreview: RedactedProfilePreview,
         finalHealth: CatalogHealth,
         publishSuperseded: Boolean,
+        recipientKeyLocalId: String? = null,
     ): AdmissionResult {
-        val verified = when (val result = nativeCore.verifyPreview(verifyRequest)) {
+        val resolved = when (val result = resolveVerified(verifyRequest, recipientKeyLocalId)) {
             is NativeResult.Failure -> return AdmissionResult.Failure(result.error)
             is NativeResult.Success -> result.value
         }
+        val verified = resolved.verified
         return try {
             if (verified.preview != expectedPreview) {
                 return AdmissionResult.Failure(OperationError.TRUST_REJECTED)
@@ -137,6 +142,15 @@ class ProfileAdmissionJournal(
                 return AdmissionResult.Failure(OperationError.STORAGE_FAILURE)
             }
             val result = activate(recordId, verified, finalHealth)
+            if (result is AdmissionResult.Success && resolved.recipientKeyLocalId != null) {
+                try {
+                    recipientKeys?.bindProfile(resolved.recipientKeyLocalId, result.outcome.localRecordId)
+                        ?: return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
+                } catch (_: Throwable) {
+                    delete(result.outcome.localRecordId)
+                    return AdmissionResult.Failure(OperationError.STORAGE_FAILURE)
+                }
+            }
             if (result is AdmissionResult.Success && publishSuperseded) {
                 conflict.superseded.forEach { row ->
                     catalog.upsert(row.copy(health = CatalogHealth.SUPERSEDED.name))
@@ -198,6 +212,7 @@ class ProfileAdmissionJournal(
 
     suspend fun backupPayload(localRecordId: String? = null): ByteArray = withContext(Dispatchers.IO) {
         val records = mutableListOf<BackupProfileRecord>()
+        var keyRecords = emptyList<ClientKeyBackupRecord>()
         try {
             catalog.listAll()
                 .filter {
@@ -221,9 +236,11 @@ class ProfileAdmissionJournal(
                     )
                 }
             require(localRecordId == null || records.size == 1)
-            BackupPayloadCodec.encode(records)
+            keyRecords = recipientKeys?.backupRecords(localRecordId).orEmpty()
+            BackupPayloadCodec.encode(DecodedBackupPayload(records, keyRecords))
         } finally {
             records.forEach { it.verifyRequest.fill(0) }
+            keyRecords.forEach(ClientKeyBackupRecord::destroy)
         }
     }
 
@@ -298,15 +315,21 @@ class ProfileAdmissionJournal(
             try {
                 clearActivationBlobs(recordId)
                 catalog.upsert(entity(recordId, TransactionState.PREPARED))
-                val verified = when (val result = nativeCore.verifyPreview(request)) {
+                val resolved = when (val result = resolveVerified(request, null)) {
                     is NativeResult.Failure -> {
                         quarantine(recordId)
                         return AdmissionResult.Failure(result.error)
                     }
                     is NativeResult.Success -> result.value
                 }
+                val verified = resolved.verified
                 try {
-                    activate(recordId, verified)
+                    val activated = activate(recordId, verified)
+                    if (activated is AdmissionResult.Success && resolved.recipientKeyLocalId != null) {
+                        recipientKeys?.bindProfile(resolved.recipientKeyLocalId, recordId)
+                            ?: return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
+                    }
+                    activated
                 } finally {
                     nativeCore.releaseVerified(verified)
                 }
@@ -529,13 +552,14 @@ class ProfileAdmissionJournal(
         }
         try {
             for (record in records) {
-                val verified = when (val result = nativeCore.verifyPreview(record.verifyRequest)) {
+                val resolved = when (val result = resolveVerified(record.verifyRequest, null)) {
                     is NativeResult.Failure -> {
                         rollbackPendingRestore()
                         return RestoreResult.Failure(result.error)
                     }
                     is NativeResult.Success -> result.value
                 }
+                val verified = resolved.verified
                 val preview = verified.preview
                 nativeCore.releaseVerified(verified)
                 when (
@@ -544,6 +568,7 @@ class ProfileAdmissionJournal(
                         expectedPreview = preview,
                         finalHealth = CatalogHealth.RESTORE_PENDING,
                         publishSuperseded = false,
+                        recipientKeyLocalId = resolved.recipientKeyLocalId,
                     )
                 ) {
                     is AdmissionResult.Success -> Unit
@@ -598,6 +623,49 @@ class ProfileAdmissionJournal(
         } finally {
             records.forEach { it.verifyRequest.fill(0) }
         }
+    }
+
+    private data class ResolvedVerified(
+        val verified: VerifiedPreviewHandle,
+        val recipientKeyLocalId: String?,
+    )
+
+    private fun resolveVerified(
+        verifyRequest: ByteArray,
+        preferredRecipientKeyLocalId: String?,
+    ): NativeResult<ResolvedVerified> {
+        if (preferredRecipientKeyLocalId == null) {
+            when (val public = nativeCore.verifyPreview(verifyRequest)) {
+                is NativeResult.Success -> return NativeResult.Success(ResolvedVerified(public.value, null))
+                is NativeResult.Failure -> Unit
+            }
+        }
+        val candidates = if (preferredRecipientKeyLocalId != null) {
+            listOf(recipientKeys?.credentials(preferredRecipientKeyLocalId)
+                ?: return NativeResult.Failure(OperationError.KEY_INVALIDATED))
+        } else {
+            recipientKeys?.credentialCandidates().orEmpty()
+        }
+        var finalError = OperationError.TRUST_REJECTED
+        try {
+            for (candidate in candidates) {
+                when (
+                    val result = nativeCore.verifyPreviewWithRecipient(
+                        verifyRequest,
+                        candidate.publicRequest,
+                        candidate.privateBundle,
+                    )
+                ) {
+                    is NativeResult.Success -> return NativeResult.Success(
+                        ResolvedVerified(result.value, candidate.localRecordId),
+                    )
+                    is NativeResult.Failure -> finalError = result.error
+                }
+            }
+        } finally {
+            candidates.forEach(RecipientCredentialLease::close)
+        }
+        return NativeResult.Failure(finalError)
     }
 
     private suspend fun rollbackPendingRestore() {
