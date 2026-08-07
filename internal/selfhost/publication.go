@@ -61,7 +61,7 @@ func PublishSnapshot(dataDir, destination string, now time.Time) (PublicationSum
 	if err != nil {
 		return PublicationSummary{}, err
 	}
-	cursor, err := encodeCanonical(publicationCursorEnvelope{Payload: payload, MAC: stateMAC(master, payload)})
+	cursor, err := encodeCanonical(publicationCursorEnvelope{Payload: payload, MAC: stateMACV1(master, payload)})
 	if err != nil {
 		return PublicationSummary{}, err
 	}
@@ -86,7 +86,7 @@ func PublicationDeliveryStatus(dataDir string) (PublicationDelivery, error) {
 		return PublicationDelivery{}, ErrStateCorrupt
 	}
 	var envelope publicationCursorEnvelope
-	if decodeCanonical(raw, &envelope, 4096) != nil || !verifyStateMAC(master, envelope.Payload, envelope.MAC) {
+	if decodeCanonical(raw, &envelope, 4096) != nil || !verifyStateMAC(stateMACV1(master, envelope.Payload), envelope.MAC) {
 		return PublicationDelivery{}, ErrStateCorrupt
 	}
 	var cursor publicationCursorPayload
@@ -201,7 +201,10 @@ func atomicWriteFile(destination string, value []byte, mode os.FileMode) error {
 			return err
 		}
 		_ = os.Remove(backup)
-		return nil
+		return syncDirectory(directory)
 	}
-	return os.Rename(temporary, destination)
+	if err := os.Rename(temporary, destination); err != nil {
+		return err
+	}
+	return syncDirectory(directory)
 }

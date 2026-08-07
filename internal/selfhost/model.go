@@ -18,10 +18,17 @@ const (
 	masterKeyFileName                = "master.key"
 	lockDirectoryName                = ".state.lock"
 	publicationCursorFileName        = "publication.cursor"
-	stateSchema                      = "kurd-selfhost-state-v1"
+	stateSchemaV1                    = "kurd-selfhost-state-v1"
+	stateSchemaV2                    = "kurd-selfhost-state-v2"
+	stateSchema                      = stateSchemaV2
 	recoverySchema                   = "kurd-selfhost-recovery-v1"
-	backupSchema                     = "kurd-selfhost-backup-v1"
+	backupSchemaV1                   = "kurd-selfhost-backup-v1"
+	backupSchemaV2                   = "kurd-selfhost-backup-v2"
+	backupSchema                     = backupSchemaV2
 	bundleVersion             uint64 = 1
+	stateVersionV1            uint64 = 1
+	stateVersionV2            uint64 = 2
+	migrationEpochV2          uint64 = 1
 	maxStateBytes                    = 8 << 20
 	maxBackupBytes                   = 16 << 20
 	maxProfiles                      = 4096
@@ -39,6 +46,11 @@ var (
 	ErrRollback            = errors.New("selfhost: rollback rejected")
 	ErrDrained             = errors.New("selfhost: node is drained")
 	ErrClockUnhealthy      = errors.New("selfhost: clock health rejected")
+	ErrNewerSchema         = errors.New("selfhost: newer schema rejected")
+	ErrMigration           = errors.New("selfhost: migration rejected")
+	ErrCommitUncertain     = errors.New("selfhost: commit outcome uncertain")
+	ErrAddressExhausted    = errors.New("selfhost: address pool exhausted")
+	ErrTLSUnavailable      = errors.New("selfhost: tls identity unavailable")
 )
 
 type InitOptions struct {
@@ -80,6 +92,7 @@ type RecoveryActionOptions struct {
 type KeyRotationResult struct {
 	Kind, PreviousKeyID, CurrentKeyID string
 	DelegationEpoch, RevocationEpoch  uint64
+	RelayEpoch, TLSEpoch              uint64
 	RevokedProfiles                   int
 }
 
@@ -182,6 +195,61 @@ type profileRecord struct {
 	Artifact              []byte
 	CreatedAt, ValidUntil int64
 	Revoked               bool
+	Mode                  string
+	Recipient             recipientBindingRecord
+	RecipientPublic       []byte
+	ClientAuthKeyID       string
+	ClientAuthPublic      []byte
+	RuntimePolicy         []byte
+	RelayAdmissionDigest  []byte
+	AssignedIPv4          []byte
+	AssignedIPv6          []byte
+}
+
+const (
+	profileModeAuthorityOnly = "authority-only"
+	profileModeLive          = "live"
+	addressStateActive       = "active"
+	addressStateQuarantined  = "quarantined"
+)
+
+type recipientBindingRecord struct {
+	_                                       struct{} `cbor:",toarray"`
+	Class, ProviderID, LineageID, Namespace string
+	Hint, KeyID                             string
+	Epoch                                   uint64
+	Revoked                                 bool
+}
+
+type tlsIdentityV1 struct {
+	_                   struct{} `cbor:",toarray"`
+	Epoch               uint64
+	KeyID               string
+	Serial              []byte
+	NotBefore, NotAfter int64
+	SAN                 string
+	LeafDER, LeafDigest []byte
+	SealedSeed          sealedSecret
+}
+
+type addressPoolV1 struct {
+	_              struct{} `cbor:",toarray"`
+	Family         uint8
+	Network        []byte
+	PrefixLength   uint8
+	ServerDNS      []byte
+	Enabled        bool
+	NextHostOffset uint64
+}
+
+type addressAssignmentV1 struct {
+	_                                        struct{} `cbor:",toarray"`
+	Family                                   uint8
+	Address                                  []byte
+	ProfileID, ContentID                     string
+	Generation                               uint64
+	State                                    string
+	AssignedAt, ProfileValidUntil, ReleaseAt int64
 }
 
 type auditEntry struct {
@@ -192,6 +260,50 @@ type auditEntry struct {
 }
 
 type persistedState struct {
+	_                                struct{} `cbor:",toarray"`
+	Schema                           string
+	Version, MigrationEpoch          uint64
+	Revision                         uint64
+	Generation                       uint64
+	LastObservedAt                   int64
+	DeploymentID, DeploymentName     string
+	Endpoint                         string
+	Root                             profile.RootSetArtifact
+	RootPublicDER                    []byte
+	RootFingerprint                  string
+	IssuerKey                        profile.KeyReference
+	IssuerPublicDER                  []byte
+	IssuerSecret                     sealedSecret
+	RelayEpoch                       uint64
+	RelayKeyID                       string
+	RelayPublic                      []byte
+	RelaySecret                      sealedSecret
+	TLS                              tlsIdentityV1
+	Delegation                       profile.IssuerDelegationArtifact
+	DelegationPayload, DelegationSig []byte
+	Revocations                      profile.RevocationSetV1
+	RevocationPayload, RevocationSig []byte
+	RecoveryConfirmed, Drained       bool
+	IPv4Pool, IPv6Pool               addressPoolV1
+	Profiles                         []profileRecord
+	Assignments                      []addressAssignmentV1
+	Audit                            []auditEntry
+	PublicationOutbox                []publicationOutboxEntry
+}
+
+// persistedStateV1 and profileRecordV1 freeze the exact Phase 16 array layouts.
+// They are decode-only migration inputs and must never gain fields.
+type profileRecordV1 struct {
+	_                     struct{} `cbor:",toarray"`
+	Name, ProfileID       string
+	ContentID             string
+	Generation            uint64
+	Artifact              []byte
+	CreatedAt, ValidUntil int64
+	Revoked               bool
+}
+
+type persistedStateV1 struct {
 	_                                struct{} `cbor:",toarray"`
 	Schema                           string
 	Revision                         uint64
@@ -213,7 +325,7 @@ type persistedState struct {
 	Generation                       uint64
 	LastObservedAt                   int64
 	RecoveryConfirmed, Drained       bool
-	Profiles                         []profileRecord
+	Profiles                         []profileRecordV1
 	Audit                            []auditEntry
 	PublicationOutbox                []publicationOutboxEntry
 }
@@ -240,11 +352,20 @@ type recoveryEnvelope struct {
 	Salt, Nonce, Ciphertext     []byte
 }
 
+type backupPayloadV1 struct {
+	_                               struct{} `cbor:",toarray"`
+	Schema, DeploymentID, AuditHead string
+	Revision, Generation            uint64
+	CreatedAt                       int64
+	MasterKey, StateFile            []byte
+}
+
 type backupPayload struct {
 	_                               struct{} `cbor:",toarray"`
 	Schema, DeploymentID, AuditHead string
 	Revision, Generation            uint64
 	CreatedAt                       int64
+	StateVersion, MigrationEpoch    uint64
 	MasterKey, StateFile            []byte
 }
 

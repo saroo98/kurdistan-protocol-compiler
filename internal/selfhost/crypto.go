@@ -244,15 +244,22 @@ func recoveryAAD(salt, nonce []byte) []byte {
 	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", recoverySchema, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
 }
 
-func stateMAC(key, payload []byte) []byte {
+func stateMACV1(key, payload []byte) []byte {
 	mac := hmac.New(sha256.New, key)
-	_, _ = mac.Write([]byte(stateSchema))
+	_, _ = mac.Write([]byte(stateSchemaV1))
 	_, _ = mac.Write(payload)
 	return mac.Sum(nil)
 }
 
-func verifyStateMAC(key, payload, observed []byte) bool {
-	expected := stateMAC(key, payload)
+func stateMACV2(key, payload []byte) []byte {
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte("kurd-selfhost/state-envelope/v2\x00"))
+	_, _ = mac.Write([]byte{0, 0, 0, 0, 0, 0, 0, byte(stateVersionV2)})
+	_, _ = mac.Write(payload)
+	return mac.Sum(nil)
+}
+
+func verifyStateMAC(expected, observed []byte) bool {
 	return len(observed) == len(expected) && subtle.ConstantTimeCompare(observed, expected) == 1
 }
 

@@ -80,28 +80,77 @@ func loadStateWithKey(dataDir string, master []byte) (persistedState, error) {
 
 func decodeStateFile(raw, master []byte) (persistedState, error) {
 	var envelope stateEnvelope
-	if decodeCanonical(raw, &envelope, maxStateBytes) != nil || envelope.Version != 1 || !verifyStateMAC(master, envelope.Payload, envelope.MAC) {
+	if decodeCanonical(raw, &envelope, maxStateBytes) != nil {
+		return persistedState{}, ErrStateCorrupt
+	}
+	if envelope.Version > stateVersionV2 {
+		return persistedState{}, ErrNewerSchema
+	}
+	if envelope.Version == stateVersionV1 {
+		return persistedState{}, ErrMigration
+	}
+	if envelope.Version != stateVersionV2 || !verifyStateMAC(stateMACV2(master, envelope.Payload), envelope.MAC) {
 		return persistedState{}, ErrStateCorrupt
 	}
 	var state persistedState
-	if decodeCanonical(envelope.Payload, &state, maxStateBytes) != nil || validateState(state) != nil {
+	if decodeCanonical(envelope.Payload, &state, maxStateBytes) != nil || validateState(state, master) != nil {
 		return persistedState{}, ErrStateCorrupt
 	}
 	return state, nil
 }
 
+func decodeStateFileV1(raw, master []byte) (persistedStateV1, error) {
+	var envelope stateEnvelope
+	if decodeCanonical(raw, &envelope, maxStateBytes) != nil || envelope.Version != stateVersionV1 ||
+		!verifyStateMAC(stateMACV1(master, envelope.Payload), envelope.MAC) {
+		return persistedStateV1{}, ErrStateCorrupt
+	}
+	var state persistedStateV1
+	if decodeCanonical(envelope.Payload, &state, maxStateBytes) != nil || validateStateV1(state) != nil {
+		return persistedStateV1{}, ErrStateCorrupt
+	}
+	return state, nil
+}
+
 func saveState(dataDir string, master []byte, state persistedState) error {
-	if err := validateState(state); err != nil {
+	return saveStateWithHooks(dataDir, master, state, nil)
+}
+
+type stateWritePhase string
+
+const (
+	stateWriteBeforeTemporary stateWritePhase = "before-temporary-write"
+	stateWriteDuringTemporary stateWritePhase = "during-temporary-write"
+	stateWriteBeforeSync      stateWritePhase = "before-temporary-sync"
+	stateWriteBeforeRename    stateWritePhase = "before-rename"
+	stateWriteAfterRename     stateWritePhase = "after-rename"
+	stateWriteBeforeDirSync   stateWritePhase = "before-directory-sync"
+)
+
+type stateWriteHooks struct{ Fail func(stateWritePhase) error }
+
+func (hooks *stateWriteHooks) check(phase stateWritePhase) error {
+	if hooks == nil || hooks.Fail == nil {
+		return nil
+	}
+	return hooks.Fail(phase)
+}
+
+func saveStateWithHooks(dataDir string, master []byte, state persistedState, hooks *stateWriteHooks) error {
+	if err := validateState(state, master); err != nil {
 		return err
 	}
 	payload, err := encodeCanonical(state)
 	if err != nil || len(payload) > maxStateBytes {
 		return ErrStateCorrupt
 	}
-	envelope := stateEnvelope{Version: 1, Payload: payload, MAC: stateMAC(master, payload)}
+	envelope := stateEnvelope{Version: stateVersionV2, Payload: payload, MAC: stateMACV2(master, payload)}
 	encoded, err := encodeCanonical(envelope)
 	if err != nil || len(encoded) > maxStateBytes {
 		return ErrStateCorrupt
+	}
+	if err := hooks.check(stateWriteBeforeTemporary); err != nil {
+		return err
 	}
 	temporary, err := os.CreateTemp(dataDir, ".state-*.tmp")
 	if err != nil {
@@ -124,7 +173,25 @@ func saveState(dataDir string, master []byte, state persistedState) error {
 		temporary.Close()
 		return err
 	}
-	if _, err := temporary.Write(encoded); err != nil {
+	if hooks != nil && hooks.Fail != nil {
+		middle := len(encoded) / 2
+		if _, err := temporary.Write(encoded[:middle]); err != nil {
+			temporary.Close()
+			return err
+		}
+		if err := hooks.check(stateWriteDuringTemporary); err != nil {
+			temporary.Close()
+			return err
+		}
+		if _, err := temporary.Write(encoded[middle:]); err != nil {
+			temporary.Close()
+			return err
+		}
+	} else if _, err := temporary.Write(encoded); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := hooks.check(stateWriteBeforeSync); err != nil {
 		temporary.Close()
 		return err
 	}
@@ -133,6 +200,9 @@ func saveState(dataDir string, master []byte, state persistedState) error {
 		return err
 	}
 	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := hooks.check(stateWriteBeforeRename); err != nil {
 		return err
 	}
 	destination := filepath.Join(dataDir, stateFileName)
@@ -148,10 +218,43 @@ func saveState(dataDir string, master []byte, state persistedState) error {
 			_ = os.Rename(backup, destination)
 			return err
 		}
+		if err := hooks.check(stateWriteAfterRename); err != nil {
+			return errors.Join(ErrCommitUncertain, err)
+		}
 		_ = os.Remove(backup)
+		if err := hooks.check(stateWriteBeforeDirSync); err != nil {
+			return errors.Join(ErrCommitUncertain, err)
+		}
+		if err := syncDirectory(dataDir); err != nil {
+			return errors.Join(ErrCommitUncertain, err)
+		}
 		return nil
 	}
-	return os.Rename(temporaryPath, destination)
+	if err := os.Rename(temporaryPath, destination); err != nil {
+		return err
+	}
+	if err := hooks.check(stateWriteAfterRename); err != nil {
+		return errors.Join(ErrCommitUncertain, err)
+	}
+	if err := hooks.check(stateWriteBeforeDirSync); err != nil {
+		return errors.Join(ErrCommitUncertain, err)
+	}
+	if err := syncDirectory(dataDir); err != nil {
+		return errors.Join(ErrCommitUncertain, err)
+	}
+	return nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return directory.Sync()
 }
 
 func withStateTransaction(dataDir string, action, subject string, at int64, update func(*persistedState, []byte) error) error {
@@ -192,8 +295,8 @@ func withStateTransactionClock(dataDir string, action, subject string, at int64,
 	return saveState(dataDir, master, state)
 }
 
-func validateState(state persistedState) error {
-	if state.Schema != stateSchema || state.Revision == 0 || !validName(state.DeploymentName) || !validID(state.DeploymentID) ||
+func validateState(state persistedState, master []byte) error {
+	if state.Schema != stateSchemaV2 || state.Version != stateVersionV2 || state.MigrationEpoch == 0 || state.RelayEpoch == 0 || state.Revision == 0 || !validName(state.DeploymentName) || !validID(state.DeploymentID) ||
 		!validEndpoint(state.Endpoint) || state.Generation > 1<<53 || state.LastObservedAt <= 0 || state.RootFingerprint != fingerprint(state.RootPublicDER) ||
 		len(state.Profiles) > maxProfiles || len(state.Audit) == 0 || len(state.Audit) > maxProfiles*8 || len(state.PublicationOutbox) != 1 ||
 		state.PublicationOutbox[0].Revision != state.Revision || state.PublicationOutbox[0].CreatedAt <= 0 || !validName(state.PublicationOutbox[0].Action) {
@@ -209,6 +312,9 @@ func validateState(state persistedState) error {
 	}
 	if requireDistinctKeys(state.Root.Keys[0].KeyID, state.IssuerKey.KeyID, state.RelayKeyID) != nil ||
 		state.RelayKeyID != keyID("relay", state.RelayPublic) || len(state.RelayPublic) != 32 {
+		return ErrStateCorrupt
+	}
+	if validateTLSIdentity(master, state.DeploymentID, state.TLS, state.RelayPublic) != nil || validateAddressPool(state.IPv4Pool) != nil || validateAddressPool(state.IPv6Pool) != nil || validateAssignments(state) != nil {
 		return ErrStateCorrupt
 	}
 	verifier := p256Verifier{keys: map[string]*ecdsa.PublicKey{
@@ -233,6 +339,9 @@ func validateState(state persistedState) error {
 			len(record.Artifact) == 0 || record.CreatedAt <= 0 || record.ValidUntil <= record.CreatedAt {
 			return ErrStateCorrupt
 		}
+		if err := validateProfileRecordV2(state, record); err != nil {
+			return ErrStateCorrupt
+		}
 		if _, duplicate := seenProfiles[record.ProfileID]; duplicate {
 			return ErrStateCorrupt
 		}
@@ -245,6 +354,54 @@ func validateState(state persistedState) error {
 		}
 		expected := auditDigest(entry.Sequence, entry.At, entry.Action, entry.Subject, entry.PreviousDigest)
 		if entry.Digest != expected {
+			return ErrStateCorrupt
+		}
+		previous = entry.Digest
+	}
+	return nil
+}
+
+func validateStateV1(state persistedStateV1) error {
+	if state.Schema != stateSchemaV1 || state.Revision == 0 || !validName(state.DeploymentName) || !validID(state.DeploymentID) ||
+		!validEndpoint(state.Endpoint) || state.Generation > 1<<53 || state.LastObservedAt <= 0 || state.RootFingerprint != fingerprint(state.RootPublicDER) ||
+		len(state.Profiles) > maxProfiles || len(state.Audit) == 0 || len(state.Audit) > maxProfiles*8 || len(state.PublicationOutbox) != 1 ||
+		state.PublicationOutbox[0].Revision != state.Revision || state.PublicationOutbox[0].CreatedAt <= 0 || !validName(state.PublicationOutbox[0].Action) {
+		return ErrStateCorrupt
+	}
+	rootPublic, err := parseP256Public(state.RootPublicDER)
+	if err != nil || state.Root.Keys == nil || len(state.Root.Keys) != 1 || state.Root.Keys[0].KeyID != keyID("root", state.RootPublicDER) {
+		return ErrStateCorrupt
+	}
+	issuerPublic, err := parseP256Public(state.IssuerPublicDER)
+	if err != nil || state.IssuerKey.KeyID != keyID("issuer", state.IssuerPublicDER) || requireDistinctKeys(state.Root.Keys[0].KeyID, state.IssuerKey.KeyID, state.RelayKeyID) != nil ||
+		state.RelayKeyID != keyID("relay", state.RelayPublic) || len(state.RelayPublic) != 32 {
+		return ErrStateCorrupt
+	}
+	verifier := p256Verifier{keys: map[string]*ecdsa.PublicKey{state.Root.Keys[0].KeyID: rootPublic, state.IssuerKey.KeyID: issuerPublic}}
+	if verifier.Verify(state.Root.Keys[0], state.DelegationPayload, state.DelegationSig) != nil || verifier.Verify(state.Root.Keys[0], state.RevocationPayload, state.RevocationSig) != nil {
+		return ErrStateCorrupt
+	}
+	delegationPayload, err := profile.EncodeIssuerDelegationV1(state.Delegation)
+	if err != nil || !bytes.Equal(delegationPayload, state.DelegationPayload) {
+		return ErrStateCorrupt
+	}
+	revocationPayload, err := profile.EncodeRevocationSetV1(state.Revocations)
+	if err != nil || !bytes.Equal(revocationPayload, state.RevocationPayload) {
+		return ErrStateCorrupt
+	}
+	seenProfiles := make(map[string]struct{}, len(state.Profiles))
+	for _, record := range state.Profiles {
+		if !validName(record.Name) || !validID(record.ProfileID) || !validID(record.ContentID) || record.Generation == 0 || len(record.Artifact) == 0 || record.CreatedAt <= 0 || record.ValidUntil <= record.CreatedAt {
+			return ErrStateCorrupt
+		}
+		if _, duplicate := seenProfiles[record.ProfileID]; duplicate {
+			return ErrStateCorrupt
+		}
+		seenProfiles[record.ProfileID] = struct{}{}
+	}
+	previous := ""
+	for index, entry := range state.Audit {
+		if entry.Sequence != uint64(index+1) || entry.PreviousDigest != previous || entry.At <= 0 || !validName(entry.Action) || !validID(entry.Subject) || entry.Digest != auditDigest(entry.Sequence, entry.At, entry.Action, entry.Subject, entry.PreviousDigest) {
 			return ErrStateCorrupt
 		}
 		previous = entry.Digest
