@@ -138,6 +138,24 @@ func TestPhase16WorkflowsCannotRequireCloudIdentityOrMutationTools(t *testing.T)
 	}
 }
 
+func TestQualificationWorkflowFetchesFullEvidenceHistory(t *testing.T) {
+	root := repositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "phase16-qualification.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+		"persist-credentials: false",
+		"fetch-depth: 0",
+		"go run ./cmd/phase16verify -root . -mode offline",
+	} {
+		if !strings.Contains(string(raw), required) {
+			t.Fatalf("qualification workflow missing %q", required)
+		}
+	}
+}
+
 func TestPortableDrillWorkflowCannotPassWithZeroSelectedTests(t *testing.T) {
 	root := repositoryRoot(t)
 	path := filepath.Join(root, filepath.FromSlash(".github/workflows/phase16-drill.yml"))

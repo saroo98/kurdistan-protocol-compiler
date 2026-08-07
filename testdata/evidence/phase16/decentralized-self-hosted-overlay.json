@@ -524,6 +524,16 @@
   ],
   "successor_entries": [
     {
+      "path": ".github/workflows/phase16-qualification.yml",
+      "pre_sha256": "30d1b4cbe176c90e5824afc8c3a144b11d170c1ed19deeb5c8b96dc747d68120",
+      "post_sha256": "d2c12028bb4701357d701fedd63a2877b9c7d3959c9687a57f044c955213f934"
+    },
+    {
+      "path": "cmd/phase16verify/main_test.go",
+      "pre_sha256": "30d4ab13703475e8d8ed70ebdc9957e24cf24edb8683f707f19d721c908e6ba8",
+      "post_sha256": "fba28200e3695364e623d5caab2db35d9af3bf052d5c990ca0bd978d65008ae6"
+    },
+    {
       "path": "docs/GITHUB_REPO_PROFILE.md",
       "pre_sha256": "e6e3e868d59a37e8c0856023584d4b91bc9efdd8e225af94f295813ad32c8395",
       "post_sha256": "20c9c960b20a5c8bc795419a812ce1832bad0bc35918d04fdd06f427e8b91b51"
