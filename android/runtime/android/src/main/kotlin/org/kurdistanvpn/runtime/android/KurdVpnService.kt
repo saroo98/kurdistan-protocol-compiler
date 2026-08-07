@@ -14,6 +14,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ComponentName
 import android.content.ServiceConnection
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.os.Handler
@@ -21,23 +23,18 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import android.system.Os
-import android.system.OsConstants
-import android.system.StructPollfd
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 import org.kurdistanvpn.core.nativeapi.NativeResult
-import org.kurdistanvpn.core.nativeapi.NativeRuntimeSession
-import org.kurdistanvpn.core.nativeapi.NativeRuntimeSessionSnapshot
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativejni.NativeBridge
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
+import org.kurdistanvpn.runtime.api.LiveTunConfiguration
+import org.kurdistanvpn.runtime.api.LiveTunnelStartResult
 import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
@@ -50,9 +47,10 @@ class KurdVpnService : VpnService() {
     }
     private val starting = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var tun: ParcelFileDescriptor? = null
-    private var packetLoop: TunPacketLoop? = null
-    private var nativeSession: NativeRuntimeSession? = null
+    private var tunnelController: NativeTunnelController? = null
+    private var networkMonitor: UnderlyingNetworkMonitor? = null
+    private var underlyingNetwork: Network? = null
+    private var underlyingNetworkBound = false
     private var pendingAuthorityRequest: String? = null
     private val authorityArrivalTimeout = Runnable {
         val requestId = pendingAuthorityRequest ?: return@Runnable
@@ -87,6 +85,10 @@ class KurdVpnService : VpnService() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(statusQueryReceiver, filter)
         }
+        networkMonitor = UnderlyingNetworkMonitor(
+            getSystemService(ConnectivityManager::class.java),
+            ::onUnderlyingNetworkTransition,
+        ).also(UnderlyingNetworkMonitor::start)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -138,6 +140,8 @@ class KurdVpnService : VpnService() {
         mainHandler.removeCallbacks(authorityArrivalTimeout)
         pendingAuthorityRequest?.let(RuntimeAuthorityBroker::cancel)
         pendingAuthorityRequest = null
+        networkMonitor?.close()
+        networkMonitor = null
         closeRuntime()
         terminalStateOnDestroy?.let(::publish)
         terminalStateOnDestroy = null
@@ -151,7 +155,7 @@ class KurdVpnService : VpnService() {
         if (requestId.length != 32 || requestId.any { it !in '0'..'9' && it !in 'a'..'f' }) {
             return false
         }
-        if (pendingAuthorityRequest != null || tun != null || starting.get()) return false
+        if (pendingAuthorityRequest != null || tunnelController?.isRunning() == true || starting.get()) return false
         pendingAuthorityRequest = requestId
         startForeground(NOTIFICATION_ID, notification("Awaiting verified Kurd session authority"))
         publish(VpnRuntimeState.PREPARING)
@@ -172,7 +176,7 @@ class KurdVpnService : VpnService() {
     }
 
     private fun startRuntime(authority: ParcelFileDescriptor, authorityLength: Int) {
-        if (tun != null) {
+        if (tunnelController?.isRunning() == true) {
             authority.close()
             publish(latestSnapshot.copy(failure = "POLICY_CHANGE_REQUIRES_STOP"))
             return
@@ -187,11 +191,11 @@ class KurdVpnService : VpnService() {
         executor.execute {
             var terminalFailure: String? = null
             var config = VpnRuntimeConfig(VpnRoutingPolicy())
-            var authoritySnapshot: NativeRuntimeSessionSnapshot? = null
+            var authoritySnapshot: NativeLiveRuntimeSessionSnapshot? = null
             try {
                 val authorityBytes = readAuthority(authority, authorityLength)
                 val opened = try {
-                    nativeCore.openRuntimeSession(authorityBytes)
+                    nativeCore.openLiveRuntimeSession(authorityBytes)
                 } finally {
                     authorityBytes.fill(0)
                 }
@@ -203,87 +207,35 @@ class KurdVpnService : VpnService() {
                     is NativeResult.Success -> opened.value
                 }
                 if (session == null) return@execute
-                nativeSession = session
                 authoritySnapshot = session.snapshot
                 config = configFrom(session.snapshot)
+                if (underlyingNetwork == null || !underlyingNetworkBound) {
+                    session.close()
+                    terminalFailure = "LIVE_NETWORK_UNAVAILABLE"
+                    return@execute
+                }
                 if (terminalStateOnDestroy != null) return@execute
-                val builder = Builder()
-                    .setSession("Kurdistan VPN local runtime")
-                    .setMtu(config.mtu)
-                    .addAddress(LOCAL_ADDRESS, 32)
-                    .addRoute(TEST_ROUTE, TEST_ROUTE_PREFIX)
-                    .addDnsServer(DNS_ADDRESS)
-                    .setBlocking(true)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    builder.setMetered(config.metered)
-                }
-                applyPerAppPolicy(builder, config.routingPolicy)
-                val descriptor = builder.establish()
-                    ?: error("VPN permission is not prepared")
-                tun = descriptor
-                activeConfig = config
-                val pollDescriptor = StructPollfd().apply {
-                    fd = descriptor.fileDescriptor
-                    events = OsConstants.POLLIN.toShort()
-                }
-                val loop = TunPacketLoop(
-                    FileInputStream(descriptor.fileDescriptor),
-                    FileOutputStream(descriptor.fileDescriptor),
-                    kurdRoundTrip = { payload ->
-                        when (val result = session.roundTrip(payload)) {
-                            is NativeResult.Success -> result.value
-                            is NativeResult.Failure -> null
-                        }
-                    },
-                    onPacketCount = { count, replies, disposition ->
-                        if (count <= 8L || replies in 1L..8L || count % 64L == 0L) {
-                            val reportedDisposition =
-                                if (replies > latestSnapshot.replies) {
-                                    disposition
-                                } else {
-                                    latestSnapshot.disposition
-                                }
-                            publish(
-                                VpnRuntimeState.ACTIVE_KURD_LOOPBACK,
-                                count,
-                                replies,
-                                disposition = reportedDisposition,
-                                config = config,
-                                authority = authoritySnapshot,
-                            )
-                        }
-                    },
-                    awaitReadable = {
-                        pollDescriptor.revents = 0
-                        val ready = Os.poll(arrayOf(pollDescriptor), TUN_POLL_MILLIS)
-                        if (ready == 0) {
-                            false
-                        } else {
-                            val events = pollDescriptor.revents.toInt()
-                            if (
-                                events and (
-                                    OsConstants.POLLERR or
-                                        OsConstants.POLLHUP or
-                                        OsConstants.POLLNVAL
-                                    ) != 0
-                            ) {
-                                throw IOException("TUN descriptor poll failed")
-                            }
-                            events and OsConstants.POLLIN != 0
-                        }
+                val controller = NativeTunnelController(
+                    protector = SocketProtector(::protect),
+                    tunEstablisher = TunEstablisher(::establishTun),
+                    detachedCloser = DetachedFileDescriptorCloser { fd ->
+                        runCatching { ParcelFileDescriptor.adoptFd(fd).close() }
                     },
                 )
-                packetLoop = loop
-                publish(
-                    VpnRuntimeState.ACTIVE_KURD_LOOPBACK,
-                    config = config,
-                    authority = authoritySnapshot,
-                )
-                updateNotification("Verified Kurd loopback session active")
-                terminalFailure = when (loop.run()) {
-                    TunPacketLoop.ExitReason.STOP_REQUESTED -> null
-                    TunPacketLoop.ExitReason.INPUT_EOF -> "TUN_INPUT_EOF"
-                    TunPacketLoop.ExitReason.INPUT_FAILURE -> "TUN_INPUT_FAILURE"
+                tunnelController = controller
+                when (val started = controller.start(session)) {
+                    is LiveTunnelStartResult.Failure -> {
+                        terminalFailure = "LIVE_${started.category.name}"
+                    }
+                    is LiveTunnelStartResult.Running -> {
+                        activeConfig = config
+                        publish(
+                            VpnRuntimeState.ACTIVE_KURD_LIVE,
+                            config = config,
+                            authority = authoritySnapshot,
+                        )
+                        updateNotification("Verified Kurd relay session active")
+                    }
                 }
             } catch (failure: AuthorityReadFailure) {
                 terminalFailure = failure.category
@@ -315,7 +267,7 @@ class KurdVpnService : VpnService() {
                     )
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
-                } else {
+                } else if (failure == null) {
                     starting.set(false)
                 }
             }
@@ -328,7 +280,7 @@ class KurdVpnService : VpnService() {
         pendingAuthorityRequest?.let(RuntimeAuthorityBroker::cancel)
         pendingAuthorityRequest = null
         terminalStateOnDestroy = finalState
-        packetLoop?.requestStop()
+        tunnelController?.stop()
         if (!starting.get()) {
             closeRuntime()
             terminalStateOnDestroy = null
@@ -340,25 +292,9 @@ class KurdVpnService : VpnService() {
 
     private fun closeRuntime() {
         starting.set(false)
-        val descriptor = tun
-        tun = null
-        closeTunDescriptor(descriptor)
-        val loop = packetLoop
-        packetLoop = null
-        loop?.close()
-        runCatching { nativeSession?.close() }
-        nativeSession = null
+        runCatching { tunnelController?.close() }
+        tunnelController = null
         activeConfig = null
-    }
-
-    private fun closeTunDescriptor(descriptor: ParcelFileDescriptor?) {
-        if (descriptor == null) return
-        val detached = runCatching { descriptor.detachFd() }.getOrNull()
-        if (detached != null) {
-            runCatching { ParcelFileDescriptor.adoptFd(detached).close() }
-        } else {
-            runCatching { descriptor.close() }
-        }
     }
 
     private fun publish(
@@ -368,7 +304,7 @@ class KurdVpnService : VpnService() {
         failure: String? = null,
         disposition: String? = null,
         config: VpnRuntimeConfig = VpnRuntimeConfig(VpnRoutingPolicy()),
-        authority: NativeRuntimeSessionSnapshot? = null,
+        authority: NativeLiveRuntimeSessionSnapshot? = null,
     ) {
         publish(
             PublishedSnapshot(
@@ -381,6 +317,7 @@ class KurdVpnService : VpnService() {
                 authority = authority,
                 startedAtElapsedRealtime = if (
                     state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK ||
+                    state == VpnRuntimeState.ACTIVE_KURD_LIVE ||
                     state == VpnRuntimeState.ACTIVE_LOCAL_ONLY
                 ) {
                     latestSnapshot.startedAtElapsedRealtime.takeIf { it > 0 }
@@ -436,7 +373,7 @@ class KurdVpnService : VpnService() {
         )
     }
 
-    private fun configFrom(snapshot: NativeRuntimeSessionSnapshot): VpnRuntimeConfig {
+    private fun configFrom(snapshot: NativeLiveRuntimeSessionSnapshot): VpnRuntimeConfig {
         val mode = when (snapshot.perAppMode) {
             PerAppSelectionMode.ALL_APPS -> PerAppRoutingMode.ALL_APPS
             PerAppSelectionMode.INCLUDE_ONLY -> PerAppRoutingMode.INCLUDE_ONLY
@@ -449,7 +386,46 @@ class KurdVpnService : VpnService() {
             dnsMode = snapshot.dnsMode,
             mtu = snapshot.mtu,
             metered = snapshot.metered,
-        ).validatedForLoopbackTransport()
+        ).validatedForLiveTransport()
+    }
+
+    private fun establishTun(configuration: LiveTunConfiguration): DetachableTun? {
+        val builder = Builder()
+            .setSession("Kurdistan VPN")
+            .setMtu(configuration.mtu)
+            .setBlocking(true)
+        configuration.addresses.forEach { builder.addAddress(it.address, it.prefixLength) }
+        configuration.routes.forEach { builder.addRoute(it.address, it.prefixLength) }
+        configuration.dnsServers.forEach(builder::addDnsServer)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(configuration.metered)
+        }
+        applyPerAppPolicy(builder, configuration.routingPolicy)
+        val descriptor = builder.establish() ?: return null
+        return object : DetachableTun {
+            override fun detachFileDescriptor(): Int = descriptor.detachFd()
+            override fun close() = descriptor.close()
+        }
+    }
+
+    private fun onUnderlyingNetworkTransition(transition: NetworkTransition<Network>) {
+        underlyingNetwork = transition.current
+        underlyingNetworkBound = transition.current != null && runCatching {
+            setUnderlyingNetworks(arrayOf(transition.current))
+        }.getOrDefault(false)
+        if (transition.current == null) {
+            runCatching { setUnderlyingNetworks(null) }
+        }
+        if (transition.previous == null || transition.previous == transition.current) return
+        if (tunnelController?.isRunning() == true) {
+            publish(
+                VpnRuntimeState.BLOCKED,
+                failure = if (transition.current == null) "NETWORK_UNAVAILABLE" else "NETWORK_CHANGED",
+                config = activeConfig ?: VpnRuntimeConfig(VpnRoutingPolicy()),
+                authority = latestSnapshot.authority,
+            )
+            stopRuntime(VpnRuntimeState.BLOCKED)
+        }
     }
 
     private fun applyPerAppPolicy(builder: Builder, policy: VpnRoutingPolicy) {
@@ -506,13 +482,8 @@ class KurdVpnService : VpnService() {
     companion object {
         private const val CHANNEL_ID = "kurdistan-vpn-runtime"
         private const val NOTIFICATION_ID = 1001
-        private const val LOCAL_ADDRESS = "198.18.0.1"
-        private const val TEST_ROUTE = "198.18.0.0"
-        private const val TEST_ROUTE_PREFIX = 15
-        private const val DNS_ADDRESS = "198.18.0.53"
         private const val MAX_RUNTIME_OPEN_BYTES = RuntimeStartWire.MAX_RUNTIME_OPEN_BYTES
         private const val AUTHORITY_TIMEOUT_SECONDS = 5L
-        private const val TUN_POLL_MILLIS = 250
 
         fun start(
             context: Context,
@@ -648,7 +619,7 @@ class KurdVpnService : VpnService() {
         val disposition: String? = null,
         val config: VpnRuntimeConfig = VpnRuntimeConfig(VpnRoutingPolicy()),
         val startedAtElapsedRealtime: Long = 0,
-        val authority: NativeRuntimeSessionSnapshot? = null,
+        val authority: NativeLiveRuntimeSessionSnapshot? = null,
     )
 
     private class AuthorityReadFailure(val category: String) : Exception()

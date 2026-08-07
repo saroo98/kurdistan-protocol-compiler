@@ -214,6 +214,19 @@ class ClientKeyBundleStore(
         )
     }
 
+    fun credentialsForProfile(profileRecordId: String): RecipientCredentialLease? = synchronized(lock) {
+        require(profileRecordId.matches(PROFILE_RECORD_ID))
+        recoverPreparedLocked()
+        val entry = readIndexLocked().singleOrNull { profileRecordId in it.boundProfiles }
+            ?: return@synchronized null
+        val bundle = openBundleLocked(entry)
+        RecipientCredentialLease(
+            localRecordId = entry.localRecordId,
+            publicRequest = bundle.publicRequest,
+            privateBundle = bundle.privateBundle,
+        )
+    }
+
     fun credentialCandidates(): List<RecipientCredentialLease> = synchronized(lock) {
         recoverPreparedLocked()
         val leases = mutableListOf<RecipientCredentialLease>()

@@ -68,6 +68,54 @@ class ProtectedStateBoundaryTest {
             (journal.openRuntimeAuthority("missing-record") as RuntimeAuthorityResult.Failure).error,
         )
     }
+
+    @Test
+    fun sealedRuntimeAuthorityRequiresItsBoundRecipientAndWipesEveryExactByte() = runBlocking {
+        val sealedPreview = preview().copy(
+            artifactClass = "sealed-device",
+            audienceClass = "device-recipient",
+            sealed = true,
+        )
+        val recipientNative = BoundaryRecipientNative()
+        val recipientKeys = ClientKeyBundleStore(
+            blobs = FakeBlobs(),
+            native = recipientNative,
+            newLocalRecordId = { "recipient-local-one" },
+        )
+        val key = (recipientKeys.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+        val catalog = FakeCatalog()
+        val journal = ProfileAdmissionJournal(
+            nativeCore = FakeNativeCore(
+                preview = sealedPreview,
+                recipientRequest = recipientNative.publicRequest,
+                recipientPrivate = recipientNative.privateBundle,
+            ),
+            catalog = catalog,
+            blobs = FakeBlobs(),
+            productionTrust = false,
+            recipientKeys = recipientKeys,
+            random = FixedSecureRandom(),
+        )
+        val verifyRequest = byteArrayOf(9, 8, 7)
+        val admitted = journal.admit(verifyRequest, sealedPreview, key.localRecordId) as AdmissionResult.Success
+
+        val opened = journal.openRuntimeAuthority(admitted.outcome.localRecordId)
+        val material = (opened as RuntimeAuthorityResult.Success).material
+        assertArrayEquals(recipientNative.publicRequest, material.recipientRequest)
+        assertArrayEquals(recipientNative.privateBundle, material.recipientPrivate)
+        val requestReference = material.recipientRequest
+        val privateReference = material.recipientPrivate
+        material.close()
+        assertTrue(requestReference.all { it == 0.toByte() })
+        assertTrue(privateReference.all { it == 0.toByte() })
+
+        recipientKeys.unbindProfile(admitted.outcome.localRecordId)
+        assertEquals(
+            OperationError.KEY_INVALIDATED,
+            (journal.openRuntimeAuthority(admitted.outcome.localRecordId) as RuntimeAuthorityResult.Failure).error,
+        )
+    }
+
     @Test
     fun previewCodecRejectsTruncationAndInvalidState() {
         val encoded = ProfilePreviewCodec.encode(preview(), "Kurd profile")
@@ -443,19 +491,28 @@ private class FakeCatalog : ProfileCatalogDao {
 
 private class FakeNativeCore(
     var preview: RedactedProfilePreview,
+    private val recipientRequest: ByteArray = byteArrayOf(),
+    private val recipientPrivate: ByteArray = byteArrayOf(),
 ) : KurdNativeCore {
     var released = 0
     override fun createRecipient(validitySeconds: Int): NativeResult<NativeRecipient> =
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun verifyPreview(request: ByteArray): NativeResult<VerifiedPreviewHandle> =
-        NativeResult.Success(VerifiedPreviewHandle(41, preview))
+        if (preview.sealed) NativeResult.Failure(OperationError.TRUST_REJECTED)
+        else NativeResult.Success(VerifiedPreviewHandle(41, preview))
 
     override fun verifyPreviewWithRecipient(
         request: ByteArray,
         recipientRequest: ByteArray,
         recipientPrivate: ByteArray,
-    ): NativeResult<VerifiedPreviewHandle> = NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+    ): NativeResult<VerifiedPreviewHandle> =
+        if (
+            preview.sealed &&
+            recipientRequest.contentEquals(this.recipientRequest) &&
+            recipientPrivate.contentEquals(this.recipientPrivate)
+        ) NativeResult.Success(VerifiedPreviewHandle(42, preview))
+        else NativeResult.Failure(OperationError.TRUST_REJECTED)
 
     override fun openActivation(
         verified: VerifiedPreviewHandle,
@@ -505,6 +562,30 @@ private class FakeNativeCore(
 
     override fun releaseBackup(preview: BackupPreviewHandle): NativeResult<Unit> =
         NativeResult.Success(Unit)
+}
+
+private class BoundaryRecipientNative : RecipientKeyNative {
+    val publicRequest = "sealed-public-request".encodeToByteArray()
+    val privateBundle = "sealed-private-bundle".encodeToByteArray()
+
+    override fun create(validitySeconds: Int): NativeResult<NativeRecipient> = NativeResult.Success(
+        object : NativeRecipient {
+            override fun publicRequest(): NativeResult<ByteArray> =
+                NativeResult.Success(this@BoundaryRecipientNative.publicRequest.clone())
+
+            override fun privateBundle(): NativeResult<ByteArray> =
+                NativeResult.Success(this@BoundaryRecipientNative.privateBundle.clone())
+
+            override fun cancel(): NativeResult<Unit> = NativeResult.Success(Unit)
+            override fun close() = Unit
+        },
+    )
+
+    override fun validate(publicRequest: ByteArray, privateBundle: ByteArray): NativeResult<Unit> =
+        if (
+            publicRequest.contentEquals(this.publicRequest) &&
+            privateBundle.contentEquals(this.privateBundle)
+        ) NativeResult.Success(Unit) else NativeResult.Failure(OperationError.TRUST_REJECTED)
 }
 
 private class FakeActivationSession : NativeActivationSession {
