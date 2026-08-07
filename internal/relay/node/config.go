@@ -28,7 +28,7 @@ type Config struct {
 
 func DefaultConfig(dataDir string, listenerPort uint16) Config {
 	return Config{
-		DataDir: dataDir, TUNName: "kurd0", ControlSocket: filepath.Join(dataDir, "relay.control.sock"), ListenerPort: listenerPort,
+		DataDir: dataDir, TUNName: "kurd0", ControlSocket: filepath.Join(dataDir, "control.sock"), ListenerPort: listenerPort,
 		MaxHandshakeWorkers: 32, MaxSessions: 256, SessionQueuePackets: 64,
 		HandshakeTimeout: 10 * time.Second, SessionIdleTimeout: 10 * time.Minute, ReloadInterval: 5 * time.Second,
 		SessionBufferBudget: 8 << 20, Now: func() time.Time { return time.Now().UTC() },
