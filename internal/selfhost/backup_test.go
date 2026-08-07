@@ -7,9 +7,90 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestPhase16BackupRemainsReadableAndRestoresAsV2(t *testing.T) {
+	backupPath := filepath.Join("testdata", "phase16-v1", "backup.kurd-backup")
+	passphrase := []byte("phase16 deterministic fixture passphrase")
+	summary, err := VerifyBackup(backupPath, passphrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Schema != backupSchemaV1 || summary.Digest != "bf4a3189044d73656aa964883f47e7bf69b77ba8d9530eca18955f869bf190ed" {
+		t.Fatalf("legacy backup summary=%+v", summary)
+	}
+	destination := filepath.Join(t.TempDir(), "restored")
+	now := time.Unix(summary.CreatedAt+60, 0)
+	preview, err := PreviewRestore(RestoreOptions{BackupPath: backupPath, DataDir: destination, Passphrase: passphrase, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyRestore(RestoreOptions{BackupPath: backupPath, DataDir: destination, ExpectedDigest: preview.Digest, Passphrase: passphrase, Now: now}); err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	if state.Version != stateVersionV2 || state.MigrationEpoch != migrationEpochV2 || !state.Drained || state.RecoveryConfirmed || state.Revision != summary.Revision+1 {
+		t.Fatalf("restored state=%+v", state)
+	}
+}
+
+func TestBackupSealerRejectsNonV2Payloads(t *testing.T) {
+	payload := backupPayload{
+		Schema: backupSchemaV1, DeploymentID: "deployment.fixture", AuditHead: "audit", Revision: 1, CreatedAt: 1,
+		StateVersion: stateVersionV1, MasterKey: make([]byte, 32), StateFile: []byte{1},
+	}
+	if _, err := sealBackup(payload, []byte("valid backup passphrase")); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("legacy payload sealed by v2 sealer: %v", err)
+	}
+}
+
+func TestV2BackupPreservesTLSAddressPoolsAndQuarantine(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	now := time.Unix(1_760_000_100, 0).UTC()
+	if err := withStateTransaction(dataDir, "fixture-quarantine", "profiles.fixture", now.Unix(), func(state *persistedState, _ []byte) error {
+		state.Assignments = []addressAssignmentV1{{
+			Family: addressFamilyIPv4, Address: []byte{10, 77, 0, 2}, ProfileID: "profiles.fixture", ContentID: "content.fixture",
+			Generation: 1, State: addressStateQuarantined, AssignedAt: now.Unix(), ProfileValidUntil: now.Add(time.Hour).Unix(),
+			ReleaseAt: now.Add(time.Hour + addressQuarantine).Unix(),
+		}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	backupPath := filepath.Join(t.TempDir(), "state-v2.kurd-backup")
+	passphrase := []byte("v2 backup test passphrase")
+	summary, err := CreateBackup(BackupOptions{DataDir: dataDir, Destination: backupPath, Passphrase: passphrase, Now: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(t.TempDir(), "restored")
+	restoreAt := now.Add(2 * time.Minute)
+	if err := ApplyRestore(RestoreOptions{BackupPath: backupPath, DataDir: destination, ExpectedDigest: summary.Digest, Passphrase: passphrase, Now: restoreAt}); err != nil {
+		t.Fatal(err)
+	}
+	original, originalMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(originalMaster)
+	restored, restoredMaster, err := loadState(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(restoredMaster)
+	if !reflect.DeepEqual(restored.TLS, original.TLS) || !reflect.DeepEqual(restored.IPv4Pool, original.IPv4Pool) ||
+		!reflect.DeepEqual(restored.IPv6Pool, original.IPv6Pool) || !reflect.DeepEqual(restored.Assignments, original.Assignments) ||
+		restored.Generation != original.Generation || restored.Revision != original.Revision+1 || !restored.Drained || restored.RecoveryConfirmed {
+		t.Fatal("v2 backup restore changed protected relay-capable state")
+	}
+}
 
 func TestEncryptedBackupRestoreAndRollbackProtection(t *testing.T) {
 	base := t.TempDir()

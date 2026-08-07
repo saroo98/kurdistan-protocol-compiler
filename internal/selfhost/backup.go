@@ -36,6 +36,7 @@ func CreateBackup(options BackupOptions) (BackupSummary, error) {
 	payload := backupPayload{
 		Schema: backupSchema, DeploymentID: state.DeploymentID, AuditHead: auditHead,
 		Revision: state.Revision, Generation: state.Generation, CreatedAt: now.Unix(),
+		StateVersion: state.Version, MigrationEpoch: state.MigrationEpoch,
 		MasterKey: append([]byte(nil), master...), StateFile: stateFile,
 	}
 	encoded, err := sealBackup(payload, options.Passphrase)
@@ -58,7 +59,7 @@ func VerifyBackup(path string, passphrase []byte) (BackupSummary, error) {
 		return BackupSummary{}, err
 	}
 	defer zero(payload.MasterKey)
-	return backupSummary(payload, encoded, len(state.Profiles)), nil
+	return backupSummary(payload, encoded, state.profileCount()), nil
 }
 
 func PreviewRestore(options RestoreOptions) (BackupSummary, error) {
@@ -80,13 +81,13 @@ func PreviewRestore(options RestoreOptions) (BackupSummary, error) {
 			return BackupSummary{}, ErrAlreadyInitialized
 		}
 		zero(master)
-		if current.DeploymentID != payload.DeploymentID || current.Revision >= payload.Revision || current.Generation > payload.Generation {
+		if current.DeploymentID != payload.DeploymentID || payload.StateVersion != stateVersionV2 || current.MigrationEpoch > payload.MigrationEpoch || current.Revision >= payload.Revision || current.Generation > payload.Generation {
 			return BackupSummary{}, ErrRollback
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return BackupSummary{}, err
 	}
-	return backupSummary(payload, encoded, len(state.Profiles)), nil
+	return backupSummary(payload, encoded, state.profileCount()), nil
 }
 
 func ApplyRestore(options RestoreOptions) error {
@@ -100,7 +101,7 @@ func ApplyRestore(options RestoreOptions) error {
 	if _, err := os.Stat(options.DataDir); err == nil || !errors.Is(err, os.ErrNotExist) {
 		return ErrAlreadyInitialized
 	}
-	payload, _, state, err := readBackup(options.BackupPath, options.Passphrase)
+	payload, _, backupState, err := readBackup(options.BackupPath, options.Passphrase)
 	if err != nil || payload.DeploymentID != preview.DeploymentID {
 		return ErrRecoveryRejected
 	}
@@ -117,18 +118,29 @@ func ApplyRestore(options RestoreOptions) error {
 	if err := os.Chmod(staging, 0o700); err != nil {
 		return err
 	}
-	state.RecoveryConfirmed = false
-	state.Drained = true
-	state.LastObservedAt = options.Now.UTC().Unix()
-	state.Revision++
-	if err := appendAudit(&state, state.LastObservedAt, "restore-quarantine", state.DeploymentID); err != nil {
-		return err
-	}
-	state.PublicationOutbox = []publicationOutboxEntry{{Revision: state.Revision, CreatedAt: state.LastObservedAt, Action: "restore-quarantine"}}
 	if err := os.WriteFile(filepath.Join(staging, masterKeyFileName), payload.MasterKey, 0o600); err != nil {
 		return err
 	}
-	if err := saveState(staging, payload.MasterKey, state); err != nil {
+	if backupState.v2 != nil {
+		if err := saveState(staging, payload.MasterKey, *backupState.v2); err != nil {
+			return err
+		}
+	} else {
+		if backupState.v1 == nil || payload.StateVersion != stateVersionV1 {
+			return ErrRecoveryRejected
+		}
+		if err := os.WriteFile(filepath.Join(staging, stateFileName), payload.StateFile, 0o600); err != nil {
+			return err
+		}
+		if err := MigrateToV2(staging, options.Now.UTC()); err != nil {
+			return err
+		}
+	}
+	if err := withStateTransaction(staging, "restore-quarantine", payload.DeploymentID, options.Now.UTC().Unix(), func(state *persistedState, _ []byte) error {
+		state.RecoveryConfirmed = false
+		state.Drained = true
+		return nil
+	}); err != nil {
 		return err
 	}
 	if _, err := loadStateWithKey(staging, payload.MasterKey); err != nil {
@@ -137,32 +149,60 @@ func ApplyRestore(options RestoreOptions) error {
 	if err := os.Rename(staging, options.DataDir); err != nil {
 		return err
 	}
-	return nil
+	return syncDirectory(parent)
 }
 
-func readBackup(path string, passphrase []byte) (backupPayload, []byte, persistedState, error) {
+type decodedBackupState struct {
+	v1 *persistedStateV1
+	v2 *persistedState
+}
+
+func (state decodedBackupState) profileCount() int {
+	if state.v2 != nil {
+		return len(state.v2.Profiles)
+	}
+	if state.v1 != nil {
+		return len(state.v1.Profiles)
+	}
+	return 0
+}
+
+func readBackup(path string, passphrase []byte) (backupPayload, []byte, decodedBackupState, error) {
 	encoded, err := os.ReadFile(path)
 	if err != nil || len(encoded) == 0 || len(encoded) > maxBackupBytes {
-		return backupPayload{}, nil, persistedState{}, ErrRecoveryRejected
+		return backupPayload{}, nil, decodedBackupState{}, ErrRecoveryRejected
 	}
 	payload, err := openBackup(encoded, passphrase)
 	if err != nil || len(payload.MasterKey) != 32 || len(payload.StateFile) == 0 || len(payload.StateFile) > maxStateBytes {
-		return backupPayload{}, nil, persistedState{}, ErrRecoveryRejected
+		return backupPayload{}, nil, decodedBackupState{}, ErrRecoveryRejected
+	}
+	if payload.StateVersion == stateVersionV1 {
+		state, decodeErr := decodeStateFileV1(payload.StateFile, payload.MasterKey)
+		if decodeErr != nil || state.DeploymentID != payload.DeploymentID || state.Revision != payload.Revision || state.Generation != payload.Generation || state.Audit[len(state.Audit)-1].Digest != payload.AuditHead {
+			zero(payload.MasterKey)
+			return backupPayload{}, nil, decodedBackupState{}, ErrRecoveryRejected
+		}
+		return payload, encoded, decodedBackupState{v1: &state}, nil
 	}
 	state, err := decodeStateFile(payload.StateFile, payload.MasterKey)
-	if err != nil || state.DeploymentID != payload.DeploymentID || state.Revision != payload.Revision || state.Generation != payload.Generation ||
-		state.Audit[len(state.Audit)-1].Digest != payload.AuditHead {
+	if err != nil || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch != state.MigrationEpoch || state.DeploymentID != payload.DeploymentID || state.Revision != payload.Revision || state.Generation != payload.Generation || state.Audit[len(state.Audit)-1].Digest != payload.AuditHead {
 		zero(payload.MasterKey)
-		return backupPayload{}, nil, persistedState{}, ErrRecoveryRejected
+		return backupPayload{}, nil, decodedBackupState{}, ErrRecoveryRejected
 	}
-	return payload, encoded, state, nil
+	return payload, encoded, decodedBackupState{v2: &state}, nil
 }
 
 func sealBackup(payload backupPayload, passphrase []byte) ([]byte, error) {
+	if payload.Schema != backupSchemaV2 || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch == 0 ||
+		!validID(payload.DeploymentID) || payload.Revision == 0 || payload.CreatedAt <= 0 || payload.AuditHead == "" ||
+		len(payload.MasterKey) != 32 || len(payload.StateFile) == 0 || len(payload.StateFile) > maxStateBytes || !validPassphrase(passphrase) {
+		return nil, ErrInvalidInput
+	}
 	plain, err := encodeCanonical(payload)
 	if err != nil || len(plain) > maxBackupBytes {
 		return nil, ErrInvalidInput
 	}
+	defer zero(plain)
 	salt, err := randomBytes(16)
 	if err != nil {
 		return nil, err
@@ -183,7 +223,7 @@ func sealBackup(payload backupPayload, passphrase []byte) ([]byte, error) {
 	}
 	envelope := backupEnvelope{
 		Schema: backupSchema, KDFMemoryKiB: recoveryMemoryKiB, KDFIterations: recoveryIterations, KDFParallelism: recoveryParallelism,
-		Salt: salt, Nonce: nonce, Ciphertext: aead.Seal(nil, nonce, plain, backupAAD(salt, nonce)),
+		Salt: salt, Nonce: nonce, Ciphertext: aead.Seal(nil, nonce, plain, backupAADV2(salt, nonce)),
 	}
 	return encodeCanonical(envelope)
 }
@@ -193,7 +233,7 @@ func openBackup(encoded, passphrase []byte) (backupPayload, error) {
 		return backupPayload{}, ErrRecoveryRejected
 	}
 	var envelope backupEnvelope
-	if decodeCanonical(encoded, &envelope, maxBackupBytes) != nil || envelope.Schema != backupSchema ||
+	if decodeCanonical(encoded, &envelope, maxBackupBytes) != nil || envelope.Schema != backupSchemaV1 && envelope.Schema != backupSchemaV2 ||
 		envelope.KDFMemoryKiB != recoveryMemoryKiB || envelope.KDFIterations != recoveryIterations || envelope.KDFParallelism != recoveryParallelism ||
 		len(envelope.Salt) != 16 || len(envelope.Nonce) != 12 {
 		return backupPayload{}, ErrRecoveryRejected
@@ -208,25 +248,44 @@ func openBackup(encoded, passphrase []byte) (backupPayload, error) {
 	if err != nil {
 		return backupPayload{}, ErrRecoveryRejected
 	}
-	plain, err := aead.Open(nil, envelope.Nonce, envelope.Ciphertext, backupAAD(envelope.Salt, envelope.Nonce))
+	aad := backupAADV2(envelope.Salt, envelope.Nonce)
+	if envelope.Schema == backupSchemaV1 {
+		aad = backupAADV1(envelope.Salt, envelope.Nonce)
+	}
+	plain, err := aead.Open(nil, envelope.Nonce, envelope.Ciphertext, aad)
 	if err != nil {
 		return backupPayload{}, ErrRecoveryRejected
 	}
+	defer zero(plain)
+	if envelope.Schema == backupSchemaV1 {
+		var legacy backupPayloadV1
+		if decodeCanonical(plain, &legacy, maxBackupBytes) != nil || legacy.Schema != backupSchemaV1 || !validID(legacy.DeploymentID) || legacy.Revision == 0 || legacy.CreatedAt <= 0 || legacy.AuditHead == "" {
+			return backupPayload{}, ErrRecoveryRejected
+		}
+		return backupPayload{
+			Schema: legacy.Schema, DeploymentID: legacy.DeploymentID, AuditHead: legacy.AuditHead, Revision: legacy.Revision, Generation: legacy.Generation,
+			CreatedAt: legacy.CreatedAt, StateVersion: stateVersionV1, MasterKey: legacy.MasterKey, StateFile: legacy.StateFile,
+		}, nil
+	}
 	var payload backupPayload
-	if decodeCanonical(plain, &payload, maxBackupBytes) != nil || payload.Schema != backupSchema || !validID(payload.DeploymentID) ||
-		payload.Revision == 0 || payload.CreatedAt <= 0 || payload.AuditHead == "" {
+	if decodeCanonical(plain, &payload, maxBackupBytes) != nil || payload.Schema != backupSchemaV2 || !validID(payload.DeploymentID) ||
+		payload.Revision == 0 || payload.CreatedAt <= 0 || payload.AuditHead == "" || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch == 0 {
 		return backupPayload{}, ErrRecoveryRejected
 	}
 	return payload, nil
 }
 
-func backupAAD(salt, nonce []byte) []byte {
-	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", backupSchema, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
+func backupAADV1(salt, nonce []byte) []byte {
+	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", backupSchemaV1, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
+}
+
+func backupAADV2(salt, nonce []byte) []byte {
+	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", backupSchemaV2, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
 }
 
 func backupSummary(payload backupPayload, encoded []byte, profileCount int) BackupSummary {
 	return BackupSummary{
-		Schema: backupSchema, DeploymentID: payload.DeploymentID, Digest: artifactDigest(encoded), AuditHead: payload.AuditHead,
+		Schema: payload.Schema, DeploymentID: payload.DeploymentID, Digest: artifactDigest(encoded), AuditHead: payload.AuditHead,
 		Revision: payload.Revision, Generation: payload.Generation, CreatedAt: payload.CreatedAt, ProfileCount: profileCount,
 	}
 }
