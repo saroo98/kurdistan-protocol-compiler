@@ -151,6 +151,17 @@ func TestPolicyV2RejectsUnauthorizedAddressFamilyMaterial(t *testing.T) {
 	}
 }
 
+func TestPolicyV2RejectsDuplicateEndpointTarget(t *testing.T) {
+	policy := fixturePolicyV2(t)
+	duplicate := policy.Endpoints[0]
+	duplicate.Priority++
+	duplicate.Address = bytes.Clone(duplicate.Address)
+	policy.Endpoints = append(policy.Endpoints, duplicate)
+	if err := validatePolicy(policy, false); err == nil {
+		t.Fatal("duplicate endpoint target with a different priority was accepted")
+	}
+}
+
 func TestPolicyV2RejectsZeroAuthenticationKeys(t *testing.T) {
 	for name, mutate := range map[string]func(*PolicyV2){
 		"client": func(p *PolicyV2) {

@@ -169,7 +169,7 @@ func ValidateV1(p ProgramV1) error {
 	if !oneOf(p.Stream.IDEncodingMode, "fixed32_be", "profile_xor32", "table_mapped32_le", "varint") || !oneOfInt(p.Stream.MaxConcurrentStreams, 2, 4, 8, 16) {
 		return fail(ErrorInvalid)
 	}
-	if !oneOf(p.Padding.Mode, "none", "bounded", "probabilistic", "fixed", "inter_frame") || p.Padding.MinPaddingBytes < 0 || p.Padding.MaxPaddingBytes < p.Padding.MinPaddingBytes || math.IsNaN(p.Padding.Probability) || math.IsInf(p.Padding.Probability, 0) || p.Padding.Probability < 0 || p.Padding.Probability > 1 ||
+	if !oneOf(p.Padding.Mode, "none", "bounded", "probabilistic", "fixed", "inter_frame") || p.Padding.MinPaddingBytes < 0 || p.Padding.MaxPaddingBytes < p.Padding.MinPaddingBytes || p.Padding.MaxPaddingBytes > p.Limits.MaxFrameBytes || math.IsNaN(p.Padding.Probability) || math.IsInf(p.Padding.Probability, 0) || p.Padding.Probability < 0 || p.Padding.Probability > 1 ||
 		(p.Padding.Mode == "none" && (p.Padding.MinPaddingBytes != 0 || p.Padding.MaxPaddingBytes != 0 || p.Padding.Probability != 0)) {
 		return fail(ErrorInvalid)
 	}

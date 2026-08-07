@@ -33,12 +33,12 @@
     {"path": "internal/codegen/generator.go", "pre_sha256": "fd599b9a8da6fbb6588b375a5d7823575d7f235a2bd51930e99a953fe81e94fa", "post_sha256": "5437833da05ecb0ca8033aab3ac378768e5963e250629f09ab16e99d557973d4"},
     {"path": "internal/codegen/generator_test.go", "pre_sha256": "4fb57b8c87cdb40809be2918ca8bc36e111eccd309e506cafe5d048adac1f625", "post_sha256": "8b8db637cb638657519c3e64efcf9552476641793cf8c14c6bc5adafc4f41327"},
     {"path": "internal/codegen/templates.go", "pre_sha256": "474b70641e97f8e18bb75066bcfce0a8ee4de9474c0bb66af93c3c992d17d1db", "post_sha256": "94a8b63aa1cbaf2f99166ed70dfaf2425776327eced2252240ad5cb755e438a5"},
-    {"path": "internal/product/runtimepolicy/policy_v2.go", "pre_sha256": "3b128a62c0cc10b985afb5ca8dd3d36b2c3ab036fe58a5c6951bf95ca4b04a57", "post_sha256": "ef78dee8e91e247cd899671dd2fa393d56f0712d6547db2f5c457a495d8e16d3"},
-    {"path": "internal/product/runtimepolicy/policy_v2_test.go", "pre_sha256": "6c596d622dbf373d5289349b31719c408c787f5c8307134848c5ca89547d2edb", "post_sha256": "bd0a294de0209982c2ab66e9cb9037996885807e8598ea4f20ed7f24bd593b25"},
+    {"path": "internal/product/runtimepolicy/policy_v2.go", "pre_sha256": "3b128a62c0cc10b985afb5ca8dd3d36b2c3ab036fe58a5c6951bf95ca4b04a57", "post_sha256": "867aed47234eadb551f2f3ac49fb5fdc87ee476a79872755aa78c080dadca5a6"},
+    {"path": "internal/product/runtimepolicy/policy_v2_test.go", "pre_sha256": "6c596d622dbf373d5289349b31719c408c787f5c8307134848c5ca89547d2edb", "post_sha256": "630fd2fac1f4b47bf15af5e85ca03feefefb497c12ae78e08fd571c44820c9e0"},
     {"path": "internal/protocol/framing/codec_test.go", "pre_sha256": "621eacfd556c3ec57e1694ab66a84a9dbaa821de61b41f839c56441ac296ddff", "post_sha256": "029f74395dd1cbc6484c30fff2f9fb875f38a96f14339bb330292bc12e9136d6"},
-    {"path": "internal/protocol/liveprogram/program_v1.go", "pre_sha256": "2aa869225b91a52de2e6c302f1320f7a172b63abaf85bd542f66f12221310442", "post_sha256": "2decc6e9f88d8d4df03d2cb95887b118175b24792f24bbffabe40bda1d531122"},
-    {"path": "internal/protocol/liveprogram/program_v1_test.go", "pre_sha256": "cdc0ac77310ed60c1ea267b6c61107dde0fa9dc7e16b3a1e8399a06e8e291498", "post_sha256": "4bce2c9cea641d7be9b4779bcff87492ec686681f1ef3cff402fdd25f66ba7b3"},
+    {"path": "internal/protocol/liveprogram/program_v1.go", "pre_sha256": "2aa869225b91a52de2e6c302f1320f7a172b63abaf85bd542f66f12221310442", "post_sha256": "525669fc6d915c83204788dba3a6307e547a5db026fea433a46dde78a2856c6d"},
+    {"path": "internal/protocol/liveprogram/program_v1_test.go", "pre_sha256": "cdc0ac77310ed60c1ea267b6c61107dde0fa9dc7e16b3a1e8399a06e8e291498", "post_sha256": "aabcd7acb6212d00a56976088e0422ca6c74ae3b8b6da160e191654ab61331ad"},
     {"path": "internal/testkit/evidenceoverlay/successor.go", "pre_sha256": "319f873812d3f439028101a7744bdde45bd01c24d1d6c738df54f136ac92cfa1", "post_sha256": "649b2c10aa6eb805e47106fdddcf1a7645752f1684e348bff4a7efe67e251127"},
-    {"path": "internal/testkit/importrules/importrules_test.go", "pre_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1", "post_sha256": "7290db3c2b4437ff5a58e9654e4eda70c38d3f36895caff76a44c5c96bb28720"}
+    {"path": "internal/testkit/importrules/importrules_test.go", "pre_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1", "post_sha256": "fbe357ff50e6a04ef0cc689ea92a152d1d96c2efaff63ef9de0dac32cce76532"}
   ]
 }

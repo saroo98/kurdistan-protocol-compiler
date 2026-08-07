@@ -182,13 +182,7 @@ func TestLiveProgramReleaseImportBoundariesV1(t *testing.T) {
 
 func TestLiveProgramConversionImportGraphV1(t *testing.T) {
 	root := repoRoot(t)
-	graph, err := loadImportGraphV1(root, []string{
-		"cmd/phase17verify",
-		"internal/product/runtimepolicy",
-		"internal/protocol/framing",
-		"internal/protocol/liveprogram",
-		"internal/protocol/liveprogramcompile",
-	})
+	graph, err := loadImportGraphV1(root, []string{"cmd", "internal"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,19 +197,68 @@ func TestLiveProgramConversionImportGraphV1(t *testing.T) {
 		return copy
 	}
 	for name, mutate := range map[string]func(map[string][]string){
-		"unlisted-release-command-direct": func(candidate map[string][]string) {
-			candidate["cmd/krelease"] = []string{"internal/protocol/compiler"}
+		"release-product-direct": func(candidate map[string][]string) {
+			candidate["internal/product/release"] = []string{"internal/protocol/liveprogramcompile"}
 		},
-		"unlisted-release-command-transitive": func(candidate map[string][]string) {
-			candidate["cmd/krelease"] = []string{"internal/liveadapter"}
-			candidate["internal/liveadapter"] = []string{"internal/protocol/ir"}
+		"release-product-transitive": func(candidate map[string][]string) {
+			candidate["internal/product/release"] = []string{"internal/liveadapter"}
+			candidate["internal/liveadapter"] = []string{"internal/protocol/liveprogramcompile"}
+		},
+		"live-program-transitive-lab": func(candidate map[string][]string) {
+			candidate["internal/protocol/liveprogram"] = append(candidate["internal/protocol/liveprogram"], "internal/liveadapter")
+			candidate["internal/liveadapter"] = []string{"internal/lab/runtimeadversary"}
+		},
+		"unlisted-owner-importer": func(candidate map[string][]string) {
+			candidate["internal/ownerhelper"] = []string{"internal/protocol/liveprogramcompile"}
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := validateLiveProgramConversionImportGraphV1(func() map[string][]string { candidate := clone(); mutate(candidate); return candidate }()); err == nil {
-				t.Fatal("unlisted release path reached compiler/IR")
+				t.Fatal("live-program ownership boundary violation was accepted")
 			}
 		})
+	}
+	t.Run("listed-owner-importers", func(t *testing.T) {
+		candidate := clone()
+		candidate["cmd/kurdctl"] = append(candidate["cmd/kurdctl"], "internal/protocol/liveprogramcompile")
+		if err := validateLiveProgramConversionImportGraphV1(candidate); err != nil {
+			t.Fatalf("listed owner importer rejected: %v", err)
+		}
+	})
+}
+
+func TestLoadImportGraphV1IncludesTransitivePackagesOutsideSeedRoots(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"internal/product/root.go": `package product
+
+import _ "kurdistan/internal/transitive"
+`,
+		"internal/transitive/transitive.go": `package transitive
+
+import _ "kurdistan/internal/protocol/liveprogramcompile"
+`,
+		"internal/protocol/liveprogramcompile/compile.go": "package liveprogramcompile\n",
+	}
+	for rel, contents := range files {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	graph, err := loadImportGraphV1(root, []string{"internal/product"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := graph["internal/transitive"]; !ok {
+		t.Fatal("transitive package outside seed root was omitted from import graph")
+	}
+	if !slices.Contains(graph["internal/transitive"], "internal/protocol/liveprogramcompile") {
+		t.Fatal("transitive owner-boundary violation was not represented in import graph")
 	}
 }
 
@@ -230,27 +273,60 @@ func loadImportGraphV1(root string, sourceRoots []string) (map[string][]string, 
 			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
-			if err != nil {
-				return err
-			}
 			rel, err := filepath.Rel(root, path)
 			if err != nil {
 				return err
 			}
 			packagePath := filepath.ToSlash(filepath.Dir(rel))
-			imports := make([]string, 0, len(file.Imports))
-			for _, imported := range file.Imports {
-				path := strings.Trim(imported.Path.Value, `"`)
-				if strings.HasPrefix(path, modulePath+"/") {
-					imports = append(imports, strings.TrimPrefix(path, modulePath+"/"))
-				}
+			imports, err := localImportsV1(path)
+			if err != nil {
+				return err
 			}
 			graph[packagePath] = append(graph[packagePath], imports...)
 			return nil
 		})
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	// Expand every repository-local import discovered from the seed trees. A
+	// narrow filesystem walk is not a transitive import graph: a release root
+	// could otherwise reach an owner-only package through an intermediate
+	// package located outside the seed directories.
+	for {
+		pending := make([]string, 0)
+		for _, imports := range graph {
+			for _, imported := range imports {
+				if _, loaded := graph[imported]; !loaded {
+					pending = append(pending, imported)
+				}
+			}
+		}
+		sort.Strings(pending)
+		pending = slices.Compact(pending)
+		if len(pending) == 0 {
+			break
+		}
+		for _, packagePath := range pending {
+			base := filepath.Join(root, filepath.FromSlash(packagePath))
+			entries, err := os.ReadDir(base)
+			if err != nil {
+				return nil, fmt.Errorf("load import package %s: %w", packagePath, err)
+			}
+			// Mark the package loaded even when it has no local imports so the
+			// closure terminates deterministically.
+			graph[packagePath] = nil
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+					continue
+				}
+				imports, err := localImportsV1(filepath.Join(base, entry.Name()))
+				if err != nil {
+					return nil, err
+				}
+				graph[packagePath] = append(graph[packagePath], imports...)
+			}
 		}
 	}
 	for path := range graph {
@@ -260,25 +336,64 @@ func loadImportGraphV1(root string, sourceRoots []string) (map[string][]string, 
 	return graph, nil
 }
 
-func validateLiveProgramConversionImportGraphV1(graph map[string][]string) error {
-	owners := map[string]bool{
-		"internal/protocol/framing":            true,
-		"internal/protocol/liveprogramcompile": true,
+func localImportsV1(path string) ([]string, error) {
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+	if err != nil {
+		return nil, err
 	}
+	imports := make([]string, 0, len(file.Imports))
+	for _, imported := range file.Imports {
+		importPath := strings.Trim(imported.Path.Value, `"`)
+		if strings.HasPrefix(importPath, modulePath+"/") {
+			imports = append(imports, strings.TrimPrefix(importPath, modulePath+"/"))
+		}
+	}
+	return imports, nil
+}
+
+func validateLiveProgramConversionImportGraphV1(graph map[string][]string) error {
+	const compilerBoundary = "internal/protocol/liveprogramcompile"
+	releaseRoots := []string{"internal/androidbridge", "internal/product", "internal/runtime", "cmd/kandroidbridge"}
 	for source := range graph {
-		if owners[source] {
+		if !packageWithinAnyV1(source, releaseRoots) {
 			continue
 		}
-		if path := compilerOrIRReachabilityV1(graph, source); len(path) != 0 {
-			return fmt.Errorf("live-program non-owner %s reaches %s", source, strings.Join(path, " -> "))
+		if path := importReachabilityV1(graph, source, func(imported string) bool { return imported == compilerBoundary }); len(path) != 0 {
+			return fmt.Errorf("live-program release root %s reaches owner compiler through %s", source, strings.Join(path, " -> "))
 		}
+	}
+
+	for source, imports := range graph {
+		if !slices.Contains(imports, compilerBoundary) {
+			continue
+		}
+		// Keep the compiler at the final owner CLI boundary. internal/selfhost
+		// is also linked by the Android bridge, so allowing it here would make
+		// the release-path transitive guard depend on package topology.
+		if source != "cmd/kurdctl" {
+			return fmt.Errorf("live-program compiler importer %s is not owner tooling", source)
+		}
+	}
+
+	forbiddenLiveDependencies := []string{"internal/protocol/ir", "internal/protocol/compiler", "internal/testkit", "internal/lab"}
+	if path := importReachabilityV1(graph, "internal/protocol/liveprogram", func(imported string) bool {
+		return packageWithinAnyV1(imported, forbiddenLiveDependencies)
+	}); len(path) != 0 {
+		return fmt.Errorf("live-program runtime package reaches forbidden dependency through %s", strings.Join(path, " -> "))
 	}
 	return nil
 }
 
-func compilerOrIRReachabilityV1(graph map[string][]string, source string) []string {
-	const compilerPath = "internal/protocol/compiler"
-	const irPath = "internal/protocol/ir"
+func packageWithinAnyV1(packagePath string, roots []string) bool {
+	for _, root := range roots {
+		if packagePath == root || strings.HasPrefix(packagePath, root+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func importReachabilityV1(graph map[string][]string, source string, forbidden func(string) bool) []string {
 	type route struct{ path []string }
 	queue := []route{{path: []string{source}}}
 	seen := map[string]bool{source: true}
@@ -288,7 +403,7 @@ func compilerOrIRReachabilityV1(graph map[string][]string, source string) []stri
 		last := current.path[len(current.path)-1]
 		for _, imported := range graph[last] {
 			next := append(append([]string(nil), current.path...), imported)
-			if imported == compilerPath || imported == irPath {
+			if forbidden(imported) {
 				return next
 			}
 			if !seen[imported] {
