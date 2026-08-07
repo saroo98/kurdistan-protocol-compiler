@@ -5,6 +5,7 @@ package sessionplan
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"reflect"
 	"testing"
@@ -142,5 +143,36 @@ func TestRelayAdmissionPrefaceV1RejectsMalformedOrNonCanonicalBytes(t *testing.T
 	mutated.PlanDigest = [32]byte{}
 	if _, err := EncodeRelayAdmissionPrefaceV1(mutated); !errors.Is(err, ErrRelayAdmissionV1) {
 		t.Fatalf("zero plan digest err=%v", err)
+	}
+}
+
+func TestRelayAdmissionPrefaceStreamV1IsLengthBounded(t *testing.T) {
+	request := fixtureRequestV2(t)
+	plan, err := BuildV2(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preface, err := NewRelayAdmissionPrefaceV1(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stream bytes.Buffer
+	if err := WriteRelayAdmissionPrefaceV1(&stream, preface); err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := ReadRelayAdmissionPrefaceV1(&stream)
+	if err != nil || !reflect.DeepEqual(decoded, preface) {
+		t.Fatalf("decoded=%+v err=%v", decoded, err)
+	}
+	for name, wire := range map[string][]byte{
+		"zero":      {0, 0, 0, 0},
+		"oversized": append(binary.BigEndian.AppendUint32(nil, MaxRelayAdmissionPrefaceBytesV1+1), 0),
+		"truncated": {0, 0, 0, 4, 1, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got, err := ReadRelayAdmissionPrefaceV1(bytes.NewReader(wire)); err == nil || !reflect.DeepEqual(got, RelayAdmissionPrefaceV1{}) {
+				t.Fatalf("stream accepted: %+v err=%v", got, err)
+			}
+		})
 	}
 }
