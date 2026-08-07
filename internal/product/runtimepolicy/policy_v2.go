@@ -393,10 +393,16 @@ func validateAddresses(p PolicyV2) error {
 	if len(p.Endpoints) == 0 || len(p.Endpoints) > 4 || p.MTU != 1280 {
 		return fail(ErrorInvalid)
 	}
+	seenEndpoints := make(map[string]struct{}, len(p.Endpoints))
 	for i, endpoint := range p.Endpoints {
 		if endpoint.Port == 0 || !validAddress(endpoint.Address, endpoint.Family) || (i > 0 && p.Endpoints[i-1].Priority >= endpoint.Priority) {
 			return fail(ErrorInvalid)
 		}
+		target := string([]byte{endpoint.Family, byte(endpoint.Port >> 8), byte(endpoint.Port)}) + string(endpoint.Address)
+		if _, duplicate := seenEndpoints[target]; duplicate {
+			return fail(ErrorInvalid)
+		}
+		seenEndpoints[target] = struct{}{}
 	}
 	if !validOptionalAddress(p.ClientIPv4, 4) || !validOptionalAddress(p.DNSIPv4, 4) || !validOptionalAddress(p.ClientIPv6, 6) || !validOptionalAddress(p.DNSIPv6, 6) ||
 		(len(p.ClientIPv4) == 0) != (len(p.DNSIPv4) == 0) || (len(p.ClientIPv6) == 0) != (len(p.DNSIPv6) == 0) {

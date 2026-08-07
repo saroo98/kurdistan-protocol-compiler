@@ -89,6 +89,14 @@ func TestProgramV1DecodeRejectsNonFinitePaddingProbability(t *testing.T) {
 	}
 }
 
+func TestProgramV1RejectsPaddingWiderThanFrame(t *testing.T) {
+	program := fixtureProgramV1()
+	program.Padding.MaxPaddingBytes = program.Limits.MaxFrameBytes + 1
+	if err := ValidateV1(program); err == nil {
+		t.Fatal("padding wider than the maximum frame was accepted")
+	}
+}
+
 func fixtureProgramV1() ProgramV1 {
 	var source [32]byte
 	for i := range source {
