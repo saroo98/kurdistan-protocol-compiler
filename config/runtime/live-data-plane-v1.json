@@ -31,14 +31,14 @@
       "fallback-policy",
       "relay-admission-digest"
     ],
-    "liveProgramMinBytes": 1024,
+    "liveProgramMinBytes": 1,
     "liveProgramMaxBytes": 49152,
     "liveProgramDigest": "sha256",
     "liveProgramForbiddenInputs": [
       "model-only-authentication-key",
       "lab-carrier-label",
       "compiler-seed",
-      "operator-only-metadata"
+      "owner-only-metadata"
     ],
     "liveProgramCanonicalReencoding": true,
     "liveProgramIndependentValidation": [
@@ -121,6 +121,24 @@
     "carrierTLSVersion": "1.3",
     "alpn": "kurd/1",
     "exporterLabel": "EXPORTER-Kurdistan-VPN-wire-v1",
+    "sessionBinding": "session-plan-digest-plus-tls-exporter",
+    "exporterContext": "session-plan-digest",
+    "tlsMinimumVersion": "1.3",
+    "tlsMaximumVersion": "1.3",
+    "tlsSessionResumption": "disabled",
+    "profileBind": {
+      "magic": "KRDBND01",
+      "bodyBytes": 72,
+      "tlsExporterOffset": 8,
+      "sessionPlanDigestOffset": 40,
+      "componentBytes": 32
+    },
+    "carrierLengthPrefixBytes": 4,
+    "knownOuterFlags": [
+      "critical"
+    ],
+    "maxControlBytes": 65536,
+    "maxPayloadBytes": 1048576,
     "reliableDataRecordType": 5,
     "profileBindRecordType": 3,
     "engineReadyRecordType": 4,
@@ -136,7 +154,7 @@
     "innerFraming": "signed-profile-shaped",
     "outerAuthentication": "authenticated-kurd-envelope",
     "paddingKeepaliveSeconds": 30,
-    "unauthenticatedPeerIdleSeconds": 90,
+    "noAuthenticatedPeerActivityTimeoutSeconds": 90,
     "replayCommit": "after-raw-ip-write",
     "replayFailure": "discard-pending-replay-and-close",
     "tcpKeepaliveRole": "secondary-transport-liveness",
@@ -156,11 +174,18 @@
       "open-unconnected-tcp-socket",
       "protect-before-connect",
       "strict-tls13-and-kurd-handshake",
-      "bind-profile-digest-and-tls-exporter",
+      "bind-session-plan-digest-and-tls-exporter",
       "establish-tun-from-verified-snapshot",
       "transfer-tun-to-go-pump",
       "bounded-close-on-revoke-network-change-profile-revocation-process-death-or-stop"
-    ]
+    ],
+    "runtimeStatusScope": "loopback-only-predecessor",
+    "runtimeStatusPlanDigestField": "planDigest",
+    "runtimeStatusMtuMin": 1280,
+    "runtimeStatusMtuMax": 1500,
+    "nativeBridgeSessionPlanDigestBytes": 32,
+    "nativeBridgeMtuMin": 1280,
+    "nativeBridgeMtuMax": 1500
   },
   "relay": {
     "listenerFileDescriptor": 3,
@@ -196,7 +221,16 @@
       "reload"
     ],
     "controlSocketAccess": "root-local-owner-unix",
-    "publicListener": "authenticated-kurd-tls-only"
+    "publicListener": "authenticated-kurd-tls-only",
+    "requiredLiveUnitState": "not-applied",
+    "currentPredecessorUnit": {
+      "servicePath": "deploy/selfhost/native/kurd-node.service",
+      "liveDataPlaneAuthorized": false,
+      "privateDevices": true,
+      "addressFamilies": [
+        "AF_UNIX"
+      ]
+    }
   },
   "limits": {
     "referenceVcpu": 1,
@@ -227,7 +261,9 @@
     "preAuthenticationRateLimit": "memory-only-per-process-secret-hash",
     "rateLimitExpirySeconds": 600,
     "ceilingUseMustRemainMateriallyBelowMaximum": true,
-    "signedProgramMayNarrowFragmentLimit": true
+    "signedProgramMayNarrowFragmentLimit": true,
+    "legacyProtectedRecordIncompleteOperations": 8,
+    "liveIncompleteInnerOperationsAreSeparate": true
   },
   "network": {
     "ipv4Pool": "10.77.0.0/24",
@@ -278,7 +314,7 @@
       "model-only-authentication-key",
       "lab-carrier-label",
       "compiler-seed",
-      "operator-only-metadata"
+      "owner-only-metadata"
     ]
   }
 }
