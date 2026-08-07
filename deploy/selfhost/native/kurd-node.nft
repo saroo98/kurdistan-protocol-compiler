@@ -1,0 +1,53 @@
+#!/usr/sbin/nft -f
+
+define egress_if = "KURD_EGRESS_INTERFACE"
+define kurd_port = 443
+
+destroy table inet kurd_node
+
+table inet kurd_node {
+    set blocked_ipv4 {
+        type ipv4_addr
+        flags interval
+        elements = { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8,
+                     169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24,
+                     192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24,
+                     203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4 }
+    }
+
+    set blocked_ipv6 {
+        type ipv6_addr
+        flags interval
+        elements = { ::/128, ::1/128, ::ffff:0:0/96, 100::/64,
+                     2001:db8::/32, fc00::/7, fe80::/10, ff00::/8 }
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "kurd0" ip daddr 10.77.0.1 udp dport 53 accept
+        iifname "kurd0" ip daddr 10.77.0.1 tcp dport 53 accept
+        iifname "kurd0" ip6 daddr fd4b:7572:6400::1 udp dport 53 accept
+        iifname "kurd0" ip6 daddr fd4b:7572:6400::1 tcp dport 53 accept
+        iifname "kurd0" drop
+        iifname $egress_if tcp dport $kurd_port ct state new limit rate 100/second burst 200 packets accept
+        iifname $egress_if tcp dport $kurd_port drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy accept;
+        iifname "kurd0" ip saddr != 10.77.0.0/24 drop
+        iifname "kurd0" ip6 saddr != fd4b:7572:6400::/64 drop
+        iifname "kurd0" ip daddr @blocked_ipv4 drop
+        iifname "kurd0" ip6 daddr @blocked_ipv6 drop
+        iifname "kurd0" oifname $egress_if accept
+        iifname $egress_if oifname "kurd0" ct state established,related accept
+        iifname "kurd0" drop
+        oifname "kurd0" drop
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname $egress_if ip saddr 10.77.0.0/24 masquerade
+        oifname $egress_if ip6 saddr fd4b:7572:6400::/64 masquerade
+    }
+}

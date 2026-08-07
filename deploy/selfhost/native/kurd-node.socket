@@ -1,0 +1,18 @@
+[Unit]
+Description=Kurd node authenticated data-plane listener
+Documentation=file:/usr/local/share/doc/kurd-node/LIVE-DATA-PLANE.md
+Requires=kurd-node-network.service
+After=kurd-node-network.service
+PartOf=kurd-node.service
+
+[Socket]
+ListenStream=443
+Accept=no
+Backlog=128
+KeepAlive=yes
+NoDelay=yes
+ReusePort=no
+Service=kurd-node.service
+
+[Install]
+WantedBy=sockets.target

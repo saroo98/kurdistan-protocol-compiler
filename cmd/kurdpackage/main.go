@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-// Command kurdpackage builds and verifies deterministic Phase 16 native
+// Command kurdpackage builds and verifies deterministic Phase 17 native
 // engineering packages. Distribution signing remains a Phase 19 authority.
 package main
 
@@ -26,6 +26,47 @@ import (
 
 const maxArchiveBytes = 128 << 20
 
+var nativeSourceMappingsV1 = map[string]string{
+	"deploy/selfhost/native/kurd-node.service":         "systemd/kurd-node.service",
+	"deploy/selfhost/native/kurd-node.socket":          "systemd/kurd-node.socket",
+	"deploy/selfhost/native/kurd-node-network.service": "systemd/kurd-node-network.service",
+	"deploy/selfhost/native/kurd-node.sysusers.conf":   "systemd/kurd-node.sysusers.conf",
+	"deploy/selfhost/native/kurd-node.tmpfiles.conf":   "systemd/kurd-node.tmpfiles.conf",
+	"deploy/selfhost/native/80-kurd0.netdev":           "networkd/80-kurd0.netdev",
+	"deploy/selfhost/native/80-kurd0.network":          "networkd/80-kurd0.network",
+	"deploy/selfhost/native/90-kurd-node.conf":         "sysctl/90-kurd-node.conf",
+	"deploy/selfhost/native/kurd-node.nft":             "nftables/kurd-node.nft",
+	"deploy/selfhost/native/kurd-node-unbound.conf":    "unbound/kurd-node-unbound.conf",
+	"deploy/selfhost/native/install.sh":                "install.sh",
+	"deploy/selfhost/native/preflight.sh":              "preflight.sh",
+	"deploy/selfhost/native/rollback.sh":               "rollback.sh",
+	"deploy/selfhost/native/uninstall.sh":              "uninstall.sh",
+	"deploy/selfhost/native/upgrade.sh":                "upgrade.sh",
+	"docs/self-hosting/QUICKSTART.md":                  "docs/QUICKSTART.md",
+	"docs/self-hosting/INSTALL.md":                     "docs/INSTALL.md",
+	"docs/self-hosting/CONTAINER.md":                   "docs/CONTAINER.md",
+	"docs/self-hosting/SECURITY.md":                    "docs/SECURITY.md",
+	"docs/self-hosting/LIVE-DATA-PLANE.md":             "docs/LIVE-DATA-PLANE.md",
+	"docs/self-hosting/BACKUP-RESTORE.md":              "docs/BACKUP-RESTORE.md",
+	"docs/self-hosting/UPGRADE-ROLLBACK.md":            "docs/UPGRADE-ROLLBACK.md",
+	"docs/self-hosting/TROUBLESHOOTING.md":             "docs/TROUBLESHOOTING.md",
+	"LICENSE":                                          "docs/LICENSE",
+	"NOTICE":                                           "docs/NOTICE",
+}
+
+var requiredNativeFilesV1 = map[string]int64{
+	"systemd/kurd-node.service":         0o644,
+	"systemd/kurd-node.socket":          0o644,
+	"systemd/kurd-node-network.service": 0o644,
+	"systemd/kurd-node.sysusers.conf":   0o644,
+	"systemd/kurd-node.tmpfiles.conf":   0o644,
+	"networkd/80-kurd0.netdev":          0o640,
+	"networkd/80-kurd0.network":         0o644,
+	"sysctl/90-kurd-node.conf":          0o644,
+	"nftables/kurd-node.nft":            0o600,
+	"unbound/kurd-node-unbound.conf":    0o644,
+}
+
 type packageFile struct {
 	Path string
 	Mode int64
@@ -48,6 +89,7 @@ type packageManifest struct {
 	Dirty          bool         `json:"dirty"`
 	Signed         bool         `json:"signed"`
 	RelayDataPlane bool         `json:"relayDataPlane"`
+	StateVersion   uint64       `json:"stateVersion"`
 	Files          []fileDigest `json:"files"`
 }
 
@@ -74,8 +116,8 @@ func run(args []string, stdout io.Writer) error {
 		set := flag.NewFlagSet("build", flag.ContinueOnError)
 		set.SetOutput(io.Discard)
 		root := set.String("root", ".", "repository root")
-		out := set.String("out", ".tools/phase16/packages", "output directory")
-		version := set.String("version", "0.16.0-dev", "package version")
+		out := set.String("out", ".tools/phase17/packages", "output directory")
+		version := set.String("version", "0.17.0-dev", "package version")
 		arches := set.String("arches", "amd64,arm64", "comma-separated Linux architectures")
 		if set.Parse(args[1:]) != nil || set.NArg() != 0 {
 			return errors.New("invalid build arguments")
@@ -84,7 +126,7 @@ func run(args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		return json.NewEncoder(stdout).Encode(map[string]any{"schema": "kurd-node-package-set-v1", "signed": false, "relayDataPlane": false, "archives": paths})
+		return json.NewEncoder(stdout).Encode(map[string]any{"schema": "kurd-node-package-set-v1", "signed": false, "relayDataPlane": true, "archives": paths})
 	case "verify":
 		set := flag.NewFlagSet("verify", flag.ContinueOnError)
 		set.SetOutput(io.Discard)
@@ -177,27 +219,8 @@ func packageFiles(root, temporary, version, arch, commit string, dirty bool, goV
 		}
 		files = append(files, packageFile{Path: "bin/" + command, Mode: 0o755, Data: data})
 	}
-	mappings := map[string]string{
-		"deploy/selfhost/native/kurd-node.service":       "systemd/kurd-node.service",
-		"deploy/selfhost/native/kurd-node.sysusers.conf": "systemd/kurd-node.sysusers.conf",
-		"deploy/selfhost/native/kurd-node.tmpfiles.conf": "systemd/kurd-node.tmpfiles.conf",
-		"deploy/selfhost/native/install.sh":              "install.sh",
-		"deploy/selfhost/native/preflight.sh":            "preflight.sh",
-		"deploy/selfhost/native/rollback.sh":             "rollback.sh",
-		"deploy/selfhost/native/uninstall.sh":            "uninstall.sh",
-		"deploy/selfhost/native/upgrade.sh":              "upgrade.sh",
-		"docs/self-hosting/QUICKSTART.md":                "docs/QUICKSTART.md",
-		"docs/self-hosting/INSTALL.md":                   "docs/INSTALL.md",
-		"docs/self-hosting/CONTAINER.md":                 "docs/CONTAINER.md",
-		"docs/self-hosting/SECURITY.md":                  "docs/SECURITY.md",
-		"docs/self-hosting/BACKUP-RESTORE.md":            "docs/BACKUP-RESTORE.md",
-		"docs/self-hosting/UPGRADE-ROLLBACK.md":          "docs/UPGRADE-ROLLBACK.md",
-		"docs/self-hosting/TROUBLESHOOTING.md":           "docs/TROUBLESHOOTING.md",
-		"LICENSE":                                        "docs/LICENSE",
-		"NOTICE":                                         "docs/NOTICE",
-	}
-	keys := make([]string, 0, len(mappings))
-	for source := range mappings {
+	keys := make([]string, 0, len(nativeSourceMappingsV1))
+	for source := range nativeSourceMappingsV1 {
 		keys = append(keys, source)
 	}
 	sort.Strings(keys)
@@ -206,15 +229,12 @@ func packageFiles(root, temporary, version, arch, commit string, dirty bool, goV
 		if err != nil {
 			return nil, err
 		}
-		mode := int64(0o644)
-		if strings.HasSuffix(source, ".sh") {
-			mode = 0o755
-		}
-		files = append(files, packageFile{Path: mappings[source], Mode: mode, Data: data})
+		packagePath := nativeSourceMappingsV1[source]
+		files = append(files, packageFile{Path: packagePath, Mode: nativeModeForPackagePathV1(packagePath), Data: data})
 	}
 	files = append(files, packageFile{Path: "THIRD_PARTY_MODULES.json", Mode: 0o644, Data: moduleJSON})
 	sort.Slice(files, func(left, right int) bool { return files[left].Path < files[right].Path })
-	manifest := packageManifest{Schema: "kurd-node-native-package-v1", Version: version, OS: "linux", Arch: arch, GoVersion: goVersion, SourceCommit: commit, Dirty: dirty, Signed: false, RelayDataPlane: false}
+	manifest := packageManifest{Schema: "kurd-node-native-package-v1", Version: version, OS: "linux", Arch: arch, GoVersion: goVersion, SourceCommit: commit, Dirty: dirty, Signed: false, RelayDataPlane: true, StateVersion: 2}
 	for _, file := range files {
 		manifest.Files = append(manifest.Files, digestFile(file))
 	}
@@ -300,6 +320,7 @@ func verifyArchive(path string) (packageManifest, error) {
 	entries := map[string][]byte{}
 	root := ""
 	total := int64(0)
+	previousName := ""
 	for {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
@@ -310,6 +331,10 @@ func verifyArchive(path string) (packageManifest, error) {
 			return packageManifest{}, errors.New("archive entry rejected")
 		}
 		name := filepath.ToSlash(header.Name)
+		if previousName != "" && name <= previousName {
+			return packageManifest{}, errors.New("archive ordering rejected")
+		}
+		previousName = name
 		parts := strings.Split(name, "/")
 		if len(parts) < 2 || parts[0] == "" || strings.Contains(parts[0], "..") || strings.Contains(name, "\\") {
 			return packageManifest{}, errors.New("archive path rejected")
@@ -327,10 +352,7 @@ func verifyArchive(path string) (packageManifest, error) {
 		if _, duplicate := entries[relative]; duplicate {
 			return packageManifest{}, errors.New("duplicate archive entry")
 		}
-		wantMode := int64(0o644)
-		if strings.HasPrefix(relative, "bin/") || strings.HasSuffix(relative, ".sh") {
-			wantMode = 0o755
-		}
+		wantMode := nativeModeForPackagePathV1(relative)
 		if header.Mode != wantMode {
 			return packageManifest{}, fmt.Errorf("archive mode rejected for %s", relative)
 		}
@@ -344,9 +366,14 @@ func verifyArchive(path string) (packageManifest, error) {
 		}
 		entries[relative] = value
 	}
-	for _, required := range []string{"bin/kurd-node", "bin/kurdctl", "install.sh", "preflight.sh", "rollback.sh", "uninstall.sh", "upgrade.sh", "manifest.json", "SHA256SUMS", "THIRD_PARTY_MODULES.json", "systemd/kurd-node.service", "docs/INSTALL.md", "docs/CONTAINER.md"} {
+	for _, required := range []string{"bin/kurd-node", "bin/kurdctl", "install.sh", "preflight.sh", "rollback.sh", "uninstall.sh", "upgrade.sh", "manifest.json", "SHA256SUMS", "THIRD_PARTY_MODULES.json", "docs/INSTALL.md", "docs/CONTAINER.md", "docs/LIVE-DATA-PLANE.md"} {
 		if len(entries[required]) == 0 {
 			return packageManifest{}, fmt.Errorf("missing package file %s", required)
+		}
+	}
+	for required, mode := range requiredNativeFilesV1 {
+		if len(entries[required]) == 0 || nativeModeForPackagePathV1(required) != mode {
+			return packageManifest{}, fmt.Errorf("missing native package asset %s", required)
 		}
 	}
 	if err := verifySums(entries["SHA256SUMS"], entries); err != nil {
@@ -357,20 +384,22 @@ func verifyArchive(path string) (packageManifest, error) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&manifest); err != nil || manifest.Schema != "kurd-node-native-package-v1" || manifest.Version == "" ||
 		manifest.OS != "linux" || manifest.Arch != "amd64" && manifest.Arch != "arm64" || !validHex(manifest.SourceCommit, 40) ||
-		!strings.HasPrefix(manifest.GoVersion, "go version go") || manifest.Signed || manifest.RelayDataPlane {
+		!strings.HasPrefix(manifest.GoVersion, "go version go") || manifest.Signed || !manifest.RelayDataPlane || manifest.StateVersion != 2 {
 		return packageManifest{}, errors.New("package manifest rejected")
 	}
 	if len(manifest.Files) != len(entries)-2 {
 		return packageManifest{}, errors.New("package manifest inventory incomplete")
 	}
 	seenManifest := map[string]bool{}
+	previousManifestPath := ""
 	for _, expected := range manifest.Files {
 		value, ok := entries[expected.Path]
 		if !ok || expected.Path == "manifest.json" || expected.Path == "SHA256SUMS" || seenManifest[expected.Path] ||
-			digestFile(packageFile{Path: expected.Path, Data: value}) != expected {
+			expected.Path <= previousManifestPath || digestFile(packageFile{Path: expected.Path, Data: value}) != expected {
 			return packageManifest{}, fmt.Errorf("manifest digest mismatch for %s", expected.Path)
 		}
 		seenManifest[expected.Path] = true
+		previousManifestPath = expected.Path
 	}
 	return manifest, nil
 }
@@ -386,6 +415,7 @@ func validHex(value string, length int) bool {
 func verifySums(encoded []byte, entries map[string][]byte) error {
 	scanner := bufio.NewScanner(strings.NewReader(string(encoded)))
 	seen := map[string]bool{}
+	previousPath := ""
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) < 67 || line[64:66] != "  " {
@@ -393,9 +423,10 @@ func verifySums(encoded []byte, entries map[string][]byte) error {
 		}
 		digest, path := line[:64], line[66:]
 		value, ok := entries[path]
-		if !ok || seen[path] {
+		if !ok || seen[path] || path <= previousPath {
 			return errors.New("checksum path rejected")
 		}
+		previousPath = path
 		observed := sha256.Sum256(value)
 		if hex.EncodeToString(observed[:]) != digest {
 			return errors.New("checksum mismatch")
@@ -406,6 +437,25 @@ func verifySums(encoded []byte, entries map[string][]byte) error {
 		return errors.New("checksum inventory incomplete")
 	}
 	return nil
+}
+
+func nativeModeForPackagePathV1(path string) int64 {
+	if mode, ok := requiredNativeFilesV1[path]; ok {
+		return mode
+	}
+	if strings.HasPrefix(path, "bin/") || strings.HasSuffix(path, ".sh") {
+		return 0o755
+	}
+	return 0o644
+}
+
+func nativeSourceForPackagePathV1(path string) string {
+	for source, packagePath := range nativeSourceMappingsV1 {
+		if packagePath == path {
+			return source
+		}
+	}
+	return ""
 }
 
 func digestFile(file packageFile) fileDigest {

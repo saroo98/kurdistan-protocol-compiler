@@ -1,46 +1,47 @@
 # Kurd node self-hosting quick start
 
-Phase 16 provides deployment-local authority, provisioning, encrypted backup,
-profile QR generation, and publication. The public Kurd relay and Internet
-egress data plane are intentionally unavailable until Phase 17.
+The native Phase 17 engineering package combines owner-local authority with
+an authenticated Kurd TLS/TCP relay. It remains unsigned until the Phase 19
+distribution gate and has not yet completed the external data-path acceptance
+campaign.
 
-1. Download the archive and its separately delivered SHA-256 through an
-   authenticated owner-selected channel. Phase 16 engineering archives are
-   checksum-bound but unsigned; public distribution signing is a Phase 19
-   gate.
-2. Run `kurdpackage verify --archive <archive>` on a trusted workstation.
-3. Extract into a new empty directory, inspect the manifest and scripts, then
-   run `sudo ./preflight.sh --install` and `sudo ./install.sh --install`.
-4. Choose a recovery path outside `/var/lib/kurd-node`. Keep it offline.
-5. Enter passphrases on standard input, never as an argument:
-
-   ```sh
-   sudo -u kurd-node /usr/local/bin/kurdctl init \
-     --data-dir /var/lib/kurd-node \
-     --name owner-node \
-     --endpoint 203.0.113.10:443 \
-     --recovery-file /media/offline/owner-recovery.kurd-recovery
-   sudo -u kurd-node /usr/local/bin/kurdctl recovery confirm \
-     --data-dir /var/lib/kurd-node \
-     --recovery-file /media/offline/owner-recovery.kurd-recovery
-   ```
-
-6. Create a profile into a new empty directory:
+1. Obtain the archive and its separately authenticated SHA-256, then verify it
+   on a trusted workstation with `kurdpackage verify --archive <archive>`.
+2. Extract into a new empty directory and inspect `manifest.json`,
+   `SHA256SUMS`, and the scripts.
+3. Run `sudo ./preflight.sh --install`, followed by
+   `sudo ./install.sh --install`. Installation does not create authority keys,
+   enable the listener, or start the service.
+4. Initialize the owner-local authority. The recovery destination must be
+   outside `/var/lib/kurd-node`. Passphrases enter on standard input only.
+5. Confirm the recovery artifact and run `kurdctl doctor`.
+6. Export a fresh device enrollment request from the Android app. Transfer the
+   exact request to the owner through an authenticated channel.
+7. Issue a sealed live profile into a new empty directory:
 
    ```sh
    sudo -u kurd-node /usr/local/bin/kurdctl profile create \
-     --data-dir /var/lib/kurd-node --name phone --valid-for 168h \
+     --data-dir /var/lib/kurd-node \
+     --name phone \
+     --valid-for 168h \
+     --recipient-request /path/to/device.kurd-enrollment \
+     --recipient-registry-dir /var/lib/kurd-node/recipient-registry \
      --output-dir /var/lib/kurd-node/export-phone
    ```
 
-7. Copy only the intended profile artifact/QR to the Android device. Treat it
-   as sensitive. Confirm the displayed deployment fingerprint.
-8. Run `sudo -u kurd-node kurdctl doctor --data-dir /var/lib/kurd-node`, then
-   `sudo systemctl enable --now kurd-node`.
+8. Transfer only the intended `kurd://` profile or QR to that device. A
+   recipient request is single-use by default.
+9. Enable the native network policy and socket only after preflight and local
+   checks pass:
 
-9. Copy the encrypted recovery artifact and encrypted backups off the VPS.
-   After verifying the offline copies, remove the VPS copies. Losing both the
-   root recovery artifact and all current backups is unrecoverable.
+   ```sh
+   sudo systemctl enable --now kurd-node-network.service kurd-node.socket
+   sudo systemctl start kurd-node.service
+   sudo systemctl is-active kurd-node.service kurd-node.socket
+   ```
 
-The app cannot carry traffic through this package until the Phase 17 relay is
-installed. A Phase 16 profile proves authority and import behavior only.
+10. Copy the encrypted recovery artifact and current encrypted backups off the
+    VPS. Losing both is unrecoverable.
+
+Do not claim successful Internet egress until the Phase 17 namespace, emulator,
+and owner-VPS evidence gates have passed for the exact build.

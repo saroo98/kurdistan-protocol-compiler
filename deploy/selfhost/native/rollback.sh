@@ -1,60 +1,131 @@
 #!/bin/sh
 set -eu
 
-if [ "${1:-}" != "--apply" ] || [ "${2:-}" != "--confirm" ] || [ "${3:-}" != "rollback" ]; then
-  echo "usage: rollback.sh --apply --confirm rollback" >&2
+fail() {
+  printf '{"schema":"kurd-node-rollback-v2","rolledBack":false,"code":"%s"}\n' "$1" >&2
   exit 2
-fi
-if [ "$(id -u)" -ne 0 ]; then
-  echo "rollback must run as root" >&2
-  exit 2
-fi
-previous=/var/lib/kurd-node/install/previous
-if [ ! -x "$previous/bin/kurd-node" ] || [ ! -x "$previous/bin/kurdctl" ] || [ ! -f "$previous/systemd/kurd-node.service" ]; then
-  echo "verified previous installation is unavailable" >&2
-  exit 3
-fi
+}
 
-was_active=false
-if systemctl is-active --quiet kurd-node.service; then
-  was_active=true
+[ "${1:-}" = "--apply" ] && [ "${2:-}" = "--confirm" ] && [ "${3:-}" = "rollback" ] || fail INVALID_ARGUMENTS
+[ "$(id -u)" -eq 0 ] || fail ROOT_REQUIRED
+
+for command in systemctl systemd-analyze networkctl nft unbound-checkconf sysctl stat install runuser sed tr cp mv rm mktemp; do
+  command -v "$command" >/dev/null 2>&1 || fail TOOL_MISSING
+done
+/usr/local/lib/kurd-node/preflight.sh --runtime --port 443 --allow-systemd-socket >/dev/null || fail PREFLIGHT_FAILED
+
+previous=/var/lib/kurd-node/install/previous
+[ -x "$previous/bin/kurd-node" ] && [ -x "$previous/bin/kurdctl" ] && [ -f "$previous/systemd/kurd-node.service" ] || fail PREVIOUS_UNAVAILABLE
+
+manifest_value() {
+  sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\(\"[^\"]*\"\|[0-9][0-9]*\).*/\1/p" "$2" | tr -d '"'
+}
+
+previous_state_version=1
+if [ -f "$previous/doc/manifest.json" ]; then
+  observed_state_version=$(manifest_value stateVersion "$previous/doc/manifest.json")
+  [ -z "$observed_state_version" ] || previous_state_version=$observed_state_version
 fi
-systemctl stop kurd-node.service 2>/dev/null || true
+case "$previous_state_version" in
+  1|2) ;;
+  *) fail PREVIOUS_STATE_UNSUPPORTED ;;
+esac
+
+was_service_active=false
+was_socket_enabled=false
+systemctl is-active --quiet kurd-node.service && was_service_active=true || true
+systemctl is-enabled --quiet kurd-node.socket && was_socket_enabled=true || true
+
+temporary=$(mktemp -d /var/tmp/kurd-node-rollback.XXXXXX)
+trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+if [ -f "$previous/systemd/kurd-node.socket" ]; then
+  systemd-analyze verify "$previous/systemd/kurd-node.service" "$previous/systemd/kurd-node.socket" >/dev/null || fail PREVIOUS_SYSTEMD_INVALID
+else
+  systemd-analyze verify "$previous/systemd/kurd-node.service" >/dev/null || fail PREVIOUS_SYSTEMD_INVALID
+fi
+[ ! -f "$previous/unbound/kurd-node.conf" ] || unbound-checkconf "$previous/unbound/kurd-node.conf" >/dev/null || fail PREVIOUS_UNBOUND_INVALID
+[ ! -f "$previous/nftables/kurd-node.nft" ] || nft -c -f "$previous/nftables/kurd-node.nft" >/dev/null || fail PREVIOUS_NFT_INVALID
+
+systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
+
+# A state-v2 package may cross back to v1 only after the complete previous
+# package has passed validation and every live writer has stopped. The
+# authenticated, revision-bound migration marker enforced by kurdctl prevents
+# rollback after any v2 authority mutation.
+if [ "$previous_state_version" = "1" ] && [ -f /var/lib/kurd-node/state.kurd-state ]; then
+  runuser -u kurd-node -- /usr/local/bin/kurdctl migration rollback --data-dir /var/lib/kurd-node --confirm state-v2 >/dev/null || fail STATE_V2_ROLLBACK_REJECTED
+fi
 
 failed=/var/lib/kurd-node/install/failed-current
 rm -rf "$failed"
-install -d -o root -g root -m 0700 "$failed/bin" "$failed/systemd" "$failed/lib" "$failed/doc"
-cp -p /usr/local/bin/kurd-node "$failed/bin/kurd-node"
-cp -p /usr/local/bin/kurdctl "$failed/bin/kurdctl"
-cp -p /etc/systemd/system/kurd-node.service "$failed/systemd/kurd-node.service"
-for helper in preflight rollback uninstall upgrade; do
-  [ ! -f "/usr/local/lib/kurd-node/$helper.sh" ] || cp -p "/usr/local/lib/kurd-node/$helper.sh" "$failed/lib/$helper.sh"
+install -d -o root -g root -m 0700 "$failed/bin" "$failed/systemd" "$failed/networkd" "$failed/sysctl" "$failed/nftables" "$failed/unbound" "$failed/lib" "$failed/doc"
+[ ! -x /usr/local/bin/kurd-node ] || cp -p /usr/local/bin/kurd-node "$failed/bin/kurd-node"
+[ ! -x /usr/local/bin/kurdctl ] || cp -p /usr/local/bin/kurdctl "$failed/bin/kurdctl"
+for unit in kurd-node.service kurd-node.socket kurd-node-network.service; do
+  [ ! -f "/etc/systemd/system/$unit" ] || cp -p "/etc/systemd/system/$unit" "$failed/systemd/$unit"
 done
-if [ -d /usr/local/share/doc/kurd-node ]; then
-  cp -Rp /usr/local/share/doc/kurd-node/. "$failed/doc/"
-fi
+for pair in \
+  /etc/systemd/network/80-kurd0.netdev:networkd/80-kurd0.netdev \
+  /etc/systemd/network/80-kurd0.network:networkd/80-kurd0.network \
+  /etc/sysctl.d/90-kurd-node.conf:sysctl/90-kurd-node.conf \
+  /etc/nftables.d/kurd-node.nft:nftables/kurd-node.nft \
+  /etc/unbound/unbound.conf.d/kurd-node.conf:unbound/kurd-node.conf; do
+  source=${pair%%:*}
+  relative=${pair#*:}
+  [ ! -f "$source" ] || cp -p "$source" "$failed/$relative"
+done
+[ ! -d /usr/local/share/doc/kurd-node ] || cp -Rp /usr/local/share/doc/kurd-node/. "$failed/doc/"
 
 install -o root -g root -m 0755 "$previous/bin/kurd-node" /usr/local/bin/.kurd-node.rollback
 install -o root -g root -m 0755 "$previous/bin/kurdctl" /usr/local/bin/.kurdctl.rollback
 mv /usr/local/bin/.kurd-node.rollback /usr/local/bin/kurd-node
 mv /usr/local/bin/.kurdctl.rollback /usr/local/bin/kurdctl
-install -o root -g root -m 0644 "$previous/systemd/kurd-node.service" /etc/systemd/system/kurd-node.service
-[ ! -f "$previous/systemd/kurd-node.sysusers.conf" ] || install -o root -g root -m 0644 "$previous/systemd/kurd-node.sysusers.conf" /etc/sysusers.d/kurd-node.conf
-[ ! -f "$previous/systemd/kurd-node.tmpfiles.conf" ] || install -o root -g root -m 0644 "$previous/systemd/kurd-node.tmpfiles.conf" /etc/tmpfiles.d/kurd-node.conf
+
+restore_or_remove() {
+  source=$1
+  target=$2
+  mode_value=$3
+  if [ -f "$source" ]; then
+    install -o root -g root -m "$mode_value" "$source" "$target.new"
+    mv "$target.new" "$target"
+  else
+    rm -f "$target"
+  fi
+}
+
+restore_or_remove "$previous/systemd/kurd-node.service" /etc/systemd/system/kurd-node.service 0644
+restore_or_remove "$previous/systemd/kurd-node.socket" /etc/systemd/system/kurd-node.socket 0644
+restore_or_remove "$previous/systemd/kurd-node-network.service" /etc/systemd/system/kurd-node-network.service 0644
+restore_or_remove "$previous/systemd/kurd-node.sysusers.conf" /etc/sysusers.d/kurd-node.conf 0644
+restore_or_remove "$previous/systemd/kurd-node.tmpfiles.conf" /etc/tmpfiles.d/kurd-node.conf 0644
+restore_or_remove "$previous/networkd/80-kurd0.netdev" /etc/systemd/network/80-kurd0.netdev 0640
+restore_or_remove "$previous/networkd/80-kurd0.network" /etc/systemd/network/80-kurd0.network 0644
+restore_or_remove "$previous/sysctl/90-kurd-node.conf" /etc/sysctl.d/90-kurd-node.conf 0644
+restore_or_remove "$previous/nftables/kurd-node.nft" /etc/nftables.d/kurd-node.nft 0600
+restore_or_remove "$previous/unbound/kurd-node.conf" /etc/unbound/unbound.conf.d/kurd-node.conf 0644
+
 rm -rf /usr/local/share/doc/kurd-node
 install -d -o root -g root -m 0755 /usr/local/share/doc/kurd-node
-cp -Rp "$previous/doc/." /usr/local/share/doc/kurd-node/
+[ ! -d "$previous/doc" ] || cp -Rp "$previous/doc/." /usr/local/share/doc/kurd-node/
 for helper in preflight rollback uninstall upgrade; do
-  if [ -f "$previous/lib/$helper.sh" ]; then
-    install -o root -g root -m 0755 "$previous/lib/$helper.sh" "/usr/local/lib/kurd-node/$helper.sh"
-  fi
+  restore_or_remove "$previous/lib/$helper.sh" "/usr/local/lib/kurd-node/$helper.sh" 0755
 done
+
+nft destroy table inet kurd_node >/dev/null 2>&1 || true
 systemctl daemon-reload
+networkctl reload
+sysctl --system >/dev/null
+systemctl try-reload-or-restart unbound.service >/dev/null 2>&1 || true
 if [ -f /var/lib/kurd-node/state.kurd-state ]; then
-  runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir /var/lib/kurd-node >/dev/null
+  runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir /var/lib/kurd-node >/dev/null || fail PREVIOUS_DOCTOR_FAILED
 fi
-if [ "$was_active" = true ]; then
-  systemctl enable --now kurd-node.service >/dev/null
-  systemctl is-active --quiet kurd-node.service
+if [ "$was_socket_enabled" = true ] && [ -f /etc/systemd/system/kurd-node.socket ]; then
+  systemctl enable --now kurd-node.socket >/dev/null || fail PREVIOUS_START_FAILED
+elif [ "$was_service_active" = true ]; then
+  systemctl enable --now kurd-node.service >/dev/null || fail PREVIOUS_START_FAILED
 fi
-printf '{"schema":"kurd-node-rollback-v1","rolledBack":true,"authorityStateRolledBack":false}\n'
+
+trap - EXIT HUP INT TERM
+rm -rf "$temporary"
+printf '{"schema":"kurd-node-rollback-v2","rolledBack":true,"authorityStateRolledBack":%s,"stateVersion":%s}\n' \
+  "$( [ "$previous_state_version" = "1" ] && printf true || printf false )" "$previous_state_version"

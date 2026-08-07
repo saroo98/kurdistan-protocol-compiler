@@ -1,0 +1,12 @@
+[NetDev]
+Name=kurd0
+Kind=tun
+Description=Kurd owner-controlled relay tunnel
+
+[Tun]
+User=kurd-node
+Group=kurd-node
+MultiQueue=no
+PacketInfo=no
+VNetHeader=no
+KeepCarrier=yes
