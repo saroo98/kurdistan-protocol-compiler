@@ -74,6 +74,15 @@ func Initialize(options InitOptions) (InitResult, error) {
 	if err != nil {
 		return InitResult{}, err
 	}
+	tlsName, _, err := net.SplitHostPort(options.Endpoint)
+	if err != nil {
+		return InitResult{}, ErrInvalidInput
+	}
+	tlsIdentity, err := newTLSIdentity(master, deploymentID, strings.ToLower(tlsName), 1, now)
+	if err != nil {
+		return InitResult{}, err
+	}
+	ipv4Pool, ipv6Pool := defaultAddressPools()
 	root := profile.RootSetArtifact{
 		Epoch: 1, ViewID: "root-view.1", ValidFrom: now.Unix(),
 		ValidUntil: now.AddDate(20, 0, 0).Unix(),
@@ -111,13 +120,13 @@ func Initialize(options InitOptions) (InitResult, error) {
 		return InitResult{}, err
 	}
 	state := persistedState{
-		Schema: stateSchema, DeploymentID: deploymentID, DeploymentName: options.DeploymentName,
+		Schema: stateSchema, Version: stateVersionV2, MigrationEpoch: migrationEpochV2, DeploymentID: deploymentID, DeploymentName: options.DeploymentName,
 		Endpoint: options.Endpoint, Root: root, RootPublicDER: rootPublic, RootFingerprint: fingerprint(rootPublic),
 		IssuerKey: issuerKey, IssuerPublicDER: issuerPublic, IssuerSecret: issuerSecret,
-		RelayKeyID: relayID, RelayPublic: relayPublic, RelaySecret: relaySecret,
+		RelayEpoch: 1, RelayKeyID: relayID, RelayPublic: relayPublic, RelaySecret: relaySecret, TLS: tlsIdentity,
 		Delegation: delegation, DelegationPayload: delegationPayload, DelegationSig: delegationSignature,
 		Revocations: revocations, RevocationPayload: revocationPayload, RevocationSig: revocationSignature,
-		LastObservedAt: now.Unix(), Profiles: []profileRecord{}, Audit: []auditEntry{},
+		LastObservedAt: now.Unix(), IPv4Pool: ipv4Pool, IPv6Pool: ipv6Pool, Profiles: []profileRecord{}, Assignments: []addressAssignmentV1{}, Audit: []auditEntry{},
 	}
 	rootPrivateDER, err := x509.MarshalECPrivateKey(rootPrivate)
 	if err != nil {
@@ -198,7 +207,7 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 		}
 		state.Profiles = append(state.Profiles, profileRecord{
 			Name: record.Name, ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation,
-			Artifact: record.Artifact, CreatedAt: record.CreatedAt, ValidUntil: record.ValidUntil,
+			Artifact: record.Artifact, CreatedAt: record.CreatedAt, ValidUntil: record.ValidUntil, Mode: profileModeAuthorityOnly,
 		})
 		result = issued
 		return nil
@@ -229,6 +238,7 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 			return err
 		}
 		previous := state.Profiles[index]
+		state.Assignments = quarantineProfileAssignments(state.Assignments, previous.ProfileID, now.Unix())
 		if err := updateRevocations(state, rootPrivate, now, append(state.Revocations.RevokedContentIDs, previous.ContentID), state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
@@ -263,6 +273,7 @@ func RevokeProfile(dataDir string, options RevokeProfileOptions) error {
 		if err := updateRevocations(state, rootPrivate, now, append(state.Revocations.RevokedContentIDs, state.Profiles[index].ContentID), state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
+		state.Assignments = quarantineProfileAssignments(state.Assignments, state.Profiles[index].ProfileID, now.Unix())
 		state.Profiles[index].Revoked = true
 		return nil
 	})
@@ -360,6 +371,7 @@ func RotateIssuer(dataDir string, options RecoveryActionOptions) (KeyRotationRes
 		if err := updateRevocations(state, rootPrivate, now, appendAllCurrentContentIDs(state.Revocations.RevokedContentIDs, state.Profiles), state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
+		state.Assignments = quarantineAllAssignments(state.Assignments, now.Unix())
 		revoked := revokeAllProfiles(state.Profiles)
 		result = KeyRotationResult{Kind: "issuer", PreviousKeyID: previous, CurrentKeyID: issuerID, DelegationEpoch: state.Delegation.DelegationEpoch, RevocationEpoch: state.Revocations.Epoch, RevokedProfiles: revoked}
 		return nil
@@ -379,6 +391,9 @@ func RotateRelay(dataDir string, options RecoveryActionOptions) (KeyRotationResu
 			return err
 		}
 		previous := state.RelayKeyID
+		if state.RelayEpoch == ^uint64(0) {
+			return ErrInvalidInput
+		}
 		relayPrivate, relayID, relayPublic, err := newRelayKey()
 		if err != nil || requireDistinctKeys(state.Root.Keys[0].KeyID, state.IssuerKey.KeyID, relayID) != nil {
 			return ErrInvalidInput
@@ -388,12 +403,45 @@ func RotateRelay(dataDir string, options RecoveryActionOptions) (KeyRotationResu
 		if err != nil {
 			return err
 		}
+		state.RelayEpoch++
 		state.RelayKeyID, state.RelayPublic, state.RelaySecret = relayID, relayPublic, relaySecret
 		if err := updateRevocations(state, rootPrivate, now, appendAllCurrentContentIDs(state.Revocations.RevokedContentIDs, state.Profiles), state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
+		state.Assignments = quarantineAllAssignments(state.Assignments, now.Unix())
 		revoked := revokeAllProfiles(state.Profiles)
-		result = KeyRotationResult{Kind: "relay", PreviousKeyID: previous, CurrentKeyID: relayID, DelegationEpoch: state.Delegation.DelegationEpoch, RevocationEpoch: state.Revocations.Epoch, RevokedProfiles: revoked}
+		result = KeyRotationResult{Kind: "relay", PreviousKeyID: previous, CurrentKeyID: relayID, DelegationEpoch: state.Delegation.DelegationEpoch, RevocationEpoch: state.Revocations.Epoch, RelayEpoch: state.RelayEpoch, TLSEpoch: state.TLS.Epoch, RevokedProfiles: revoked}
+		return nil
+	})
+	return result, err
+}
+
+func RotateTLS(dataDir string, options RecoveryActionOptions) (KeyRotationResult, error) {
+	now := options.Now.UTC()
+	if options.RecoveryPath == "" || !validPassphrase(options.RecoveryPassphrase) || now.IsZero() {
+		return KeyRotationResult{}, ErrInvalidInput
+	}
+	var result KeyRotationResult
+	err := withStateTransaction(dataDir, "rotate-tls", "deployment.tls", now.Unix(), func(state *persistedState, master []byte) error {
+		rootPrivate, err := recoveryRootForState(*state, options.RecoveryPath, options.RecoveryPassphrase)
+		if err != nil {
+			return err
+		}
+		if state.TLS.Epoch == ^uint64(0) {
+			return ErrInvalidInput
+		}
+		previous := state.TLS.KeyID
+		identity, err := newTLSIdentity(master, state.DeploymentID, state.TLS.SAN, state.TLS.Epoch+1, now)
+		if err != nil {
+			return err
+		}
+		state.TLS = identity
+		if err := updateRevocations(state, rootPrivate, now, appendAllCurrentContentIDs(state.Revocations.RevokedContentIDs, state.Profiles), state.Revocations.EmergencyDenied); err != nil {
+			return err
+		}
+		state.Assignments = quarantineAllAssignments(state.Assignments, now.Unix())
+		revoked := revokeAllProfiles(state.Profiles)
+		result = KeyRotationResult{Kind: "tls", PreviousKeyID: previous, CurrentKeyID: identity.KeyID, DelegationEpoch: state.Delegation.DelegationEpoch, RevocationEpoch: state.Revocations.Epoch, RelayEpoch: state.RelayEpoch, TLSEpoch: identity.Epoch, RevokedProfiles: revoked}
 		return nil
 	})
 	return result, err
@@ -491,7 +539,7 @@ func issueProfile(state *persistedState, master []byte, name, profileID, previou
 	if err != nil {
 		return IssuedProfile{}, profileRecord{}, err
 	}
-	record := profileRecord{Name: name, ProfileID: profileID, ContentID: contentID, Generation: state.Generation, Artifact: artifact, CreatedAt: now.Unix(), ValidUntil: profileValue.ValidUntil}
+	record := profileRecord{Name: name, ProfileID: profileID, ContentID: contentID, Generation: state.Generation, Artifact: artifact, CreatedAt: now.Unix(), ValidUntil: profileValue.ValidUntil, Mode: profileModeAuthorityOnly}
 	return IssuedProfile{ProfileID: profileID, ContentID: contentID, Generation: state.Generation, Artifact: artifact, URI: uri, QRChunks: chunks}, record, nil
 }
 
@@ -567,6 +615,17 @@ func revokeAllProfiles(records []profileRecord) int {
 		}
 	}
 	return count
+}
+
+func quarantineAllAssignments(assignments []addressAssignmentV1, transitionAt int64) []addressAssignmentV1 {
+	result := cloneAssignments(assignments)
+	for index := range result {
+		if result[index].State == addressStateActive {
+			result[index].State = addressStateQuarantined
+			result[index].ReleaseAt = transitionAt + int64(addressQuarantine/time.Second)
+		}
+	}
+	return result
 }
 
 func LoadStatus(dataDir string) (Status, error) {
@@ -727,7 +786,10 @@ func writeExclusive(path string, value []byte, mode os.FileMode) error {
 		_ = os.Remove(path)
 		return err
 	}
-	return file.Close()
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(path))
 }
 
 func artifactDigest(artifact []byte) string {

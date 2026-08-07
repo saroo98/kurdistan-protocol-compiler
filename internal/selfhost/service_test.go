@@ -349,3 +349,31 @@ func TestIssuerAndRelayRotationRevokePriorProfiles(t *testing.T) {
 		})
 	}
 }
+
+func TestTLSRotationRevokesProfilesAndAdvancesEpoch(t *testing.T) {
+	dataDir, recovery, passphrase := initializedV2TestState(t)
+	now := time.Unix(1_760_000_100, 0).UTC()
+	if err := ConfirmRecovery(dataDir, recovery, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	issued, err := CreateProfile(dataDir, CreateProfileOptions{Name: "rotate-tls", ValidFor: 24 * time.Hour, Now: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousTLS := state.TLS.KeyID
+	zero(master)
+	result, err := RotateTLS(dataDir, RecoveryActionOptions{RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now.Add(2 * time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PreviousKeyID != previousTLS || result.CurrentKeyID == previousTLS || result.TLSEpoch != 2 || result.RevokedProfiles != 1 {
+		t.Fatalf("rotation=%+v", result)
+	}
+	if _, err := VerifyBundleAgainstCurrentState(dataDir, issued.Artifact, now.Add(3*time.Minute)); !errors.Is(err, ErrRollback) {
+		t.Fatalf("pre-rotation artifact error=%v", err)
+	}
+}
