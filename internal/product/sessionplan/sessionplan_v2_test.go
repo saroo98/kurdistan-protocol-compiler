@@ -344,3 +344,27 @@ func TestPlanV2ErrorCategoryIsStable(t *testing.T) {
 		t.Fatal("session-plan v2 error contract changed")
 	}
 }
+
+func TestPlanV2RuntimePolicyProjectionIsValidatedClonedAndDestroyed(t *testing.T) {
+	request := fixtureRequestV2(t)
+	plan, err := BuildV2(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := plan.RuntimePolicyAt(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.LiveProgram[0] ^= 1
+	second, err := plan.RuntimePolicyAt(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(policy.LiveProgram, second.LiveProgram) {
+		t.Fatal("runtime policy projection aliases retained plan authority")
+	}
+	plan.Destroy()
+	if !reflect.DeepEqual(plan, PlanV2{}) {
+		t.Fatalf("destroyed plan retained authority: %+v", plan)
+	}
+}

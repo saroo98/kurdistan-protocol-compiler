@@ -158,6 +158,9 @@ func (s *ActivationSession) Destroy() {
 	clear(s.request.Delegation.Signature)
 	clear(s.request.Revocations.Payload)
 	clear(s.request.Revocations.Signature)
+	if destroyer, ok := s.request.OfflineOpener.(interface{ Destroy() }); ok {
+		destroyer.Destroy()
+	}
 	destroyActivationRecord(&s.priorActive)
 	destroyActivationRecord(&s.priorLastKnownGood)
 	destroyActivationRecord(&s.candidate)

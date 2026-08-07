@@ -7,14 +7,41 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 	"time"
 
+	"kurdistan/internal/crypto/profilehpke"
+	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/envelope"
 	"kurdistan/internal/product/lifecycle"
 	"kurdistan/internal/product/profile"
 	"kurdistan/internal/product/runtimepolicy"
 )
+
+type liveRecipientResolver struct{ binding profile.RecipientBinding }
+
+func (resolver liveRecipientResolver) ResolveRecipient(class envelope.ArtifactClass, hint string) (profile.RecipientBinding, error) {
+	return profile.ResolveRecipientBinding([]profile.RecipientBinding{resolver.binding}, class, hint)
+}
+
+type activationRecipientOpener struct{ opener *profilehpke.Opener }
+
+func (opener *activationRecipientOpener) OpenOffline(binding profile.RecipientBinding, outerProtected, encapsulation, ciphertext []byte) ([]byte, error) {
+	if opener == nil || opener.opener == nil {
+		return nil, profile.ErrOfflineVerify
+	}
+	return opener.opener.OpenOffline(binding, outerProtected, encapsulation, ciphertext)
+}
+
+func (opener *activationRecipientOpener) Destroy() {
+	if opener == nil || opener.opener == nil {
+		return
+	}
+	opener.opener.Close()
+	opener.opener = nil
+}
 
 func encodeBundle(value profileBundle) ([]byte, error) {
 	encoded, err := encodeCanonical(value)
@@ -214,6 +241,85 @@ func VerifyLiveAndroidArtifact(encoded []byte, now time.Time, minimumGeneration 
 	}
 	verified.ExactArtifact = bytes.Clone(encoded)
 	return verified, nil
+}
+
+// VerifyLiveBundleForRecipient independently reconstructs the exact recipient
+// binding from the owner-signed outer authority and the device enrollment
+// capability. The request's enrollment expiry is intentionally not reapplied:
+// the issued profile's own validity and revocation state are authoritative.
+func VerifyLiveBundleForRecipient(encoded []byte, now time.Time, minimumGeneration uint64, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1) (VerifiedBundle, profile.OfflineVerifiedArtifact, error) {
+	bundle, _, resolver, opener, err := liveRecipientProviders(encoded, now, minimumGeneration, request, private)
+	if err != nil {
+		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, err
+	}
+	defer opener.Close()
+	verified, err := VerifyLiveAndroidArtifact(encoded, now, minimumGeneration, resolver, opener)
+	if err != nil {
+		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, err
+	}
+	policy, err := runtimepolicy.DecodeV2At(verified.Profile.Policy, now)
+	if err != nil || len(policy.Endpoints) == 0 {
+		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, bundleError("live runtime endpoint")
+	}
+	endpoint := policy.Endpoints[0]
+	address := net.IP(endpoint.Address).String()
+	if address == "<nil>" {
+		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, bundleError("live runtime endpoint")
+	}
+	return VerifiedBundle{
+		DeploymentID: bundle.DeploymentID,
+		Endpoint:     net.JoinHostPort(address, strconv.Itoa(int(endpoint.Port))),
+		ProfileID:    verified.Profile.ProfileID, ContentID: verified.Profile.ContentID,
+		RootFingerprint: bundle.RootFingerprint, IssuerFingerprint: fingerprint(bundle.IssuerPublicDER),
+		RelayKeyID: policy.RelayAuthKeyID, Generation: verified.Profile.Generation,
+		RootEpoch: verified.Profile.RootEpoch, RevocationEpoch: verified.Profile.RevocationEpoch,
+		ValidUntil: verified.Profile.ValidUntil,
+	}, verified, nil
+}
+
+func NewAndroidLiveActivationSessionForRecipient(encoded []byte, now time.Time, current lifecycle.VerifiedState, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1) (*profile.ActivationSession, error) {
+	_, _, resolver, opener, err := liveRecipientProviders(encoded, now, 1, request, private)
+	if err != nil {
+		return nil, err
+	}
+	ownedOpener := &activationRecipientOpener{opener: opener}
+	session, err := NewAndroidLiveActivationSession(encoded, now, current, resolver, ownedOpener)
+	if err != nil {
+		ownedOpener.Destroy()
+		return nil, err
+	}
+	return session, nil
+}
+
+func liveRecipientProviders(encoded []byte, now time.Time, minimumGeneration uint64, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1) (liveProfileBundleV2, envelope.ArtifactMetadata, profile.RecipientResolver, *profilehpke.Opener, error) {
+	bundle, metadata, err := verifyLiveBundleAuthority(encoded, now, minimumGeneration)
+	if err != nil {
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, err
+	}
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil || metadata.RecipientHint != request.RequestID || metadata.RecipientEpoch == 0 {
+		clear(requestBytes)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient request")
+	}
+	clear(requestBytes)
+	privateBytes, err := enrollment.EncodePrivateBundleV1(private)
+	clear(privateBytes)
+	if err != nil {
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient private capability")
+	}
+	binding := profile.RecipientBinding{
+		Class: envelope.ArtifactDeviceRecipient, ProviderID: bundle.Delegation.Scope.ProviderID,
+		LineageID: bundle.Delegation.Scope.LineageID, ProfileNamespace: bundle.Delegation.Scope.ProfileNamespace,
+		Hint: request.RequestID, KeyID: request.RecipientKeyID, Epoch: metadata.RecipientEpoch,
+	}
+	if _, err := profile.ResolveRecipientBinding([]profile.RecipientBinding{binding}, binding.Class, binding.Hint); err != nil {
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient binding")
+	}
+	opener, err := profilehpke.NewOpener(binding, private.RecipientPrivate)
+	if err != nil {
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient opener")
+	}
+	return bundle, metadata, liveRecipientResolver{binding: binding}, opener, nil
 }
 
 // NewAndroidLiveActivationSession builds the stepwise activation transaction

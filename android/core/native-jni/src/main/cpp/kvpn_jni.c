@@ -155,6 +155,134 @@ static void release_array(JNIEnv *env, jbyteArray array, jbyte *elements) {
 }
 
 JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientCreate(
+    JNIEnv *env,
+    jobject receiver,
+    jint validity_seconds,
+    jlongArray output_handle) {
+    (void)receiver;
+    if (validity_seconds <= 0 || output_handle == NULL ||
+        (*env)->GetArrayLength(env, output_handle) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint64_t handle = 0;
+    int32_t code = kvpn_recipient_create((uint32_t)validity_seconds, &handle);
+    if (code == 0) {
+        jlong value = (jlong)handle;
+        (*env)->SetLongArrayRegion(env, output_handle, 0, 1, &value);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientRequest(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jobject output,
+    jintArray output_length) {
+    (void)receiver;
+    if (output_length == NULL || (*env)->GetArrayLength(env, output_length) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (target == NULL) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint32_t length = 0;
+    int32_t code = kvpn_recipient_request(
+        (uint64_t)handle,
+        target,
+        (uint32_t)capacity,
+        &length);
+    jint value = (jint)length;
+    (*env)->SetIntArrayRegion(env, output_length, 0, 1, &value);
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientPrivateExport(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jobject output,
+    jintArray output_length) {
+    (void)receiver;
+    if (output_length == NULL || (*env)->GetArrayLength(env, output_length) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (target == NULL) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint32_t length = 0;
+    int32_t code = kvpn_recipient_private_export(
+        (uint64_t)handle,
+        target,
+        (uint32_t)capacity,
+        &length);
+    jint value = (jint)length;
+    (*env)->SetIntArrayRegion(env, output_length, 0, 1, &value);
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeVerifyPreviewWithRecipient(
+    JNIEnv *env,
+    jobject receiver,
+    jbyteArray input,
+    jbyteArray recipient_request,
+    jbyteArray recipient_private,
+    jobject output,
+    jlongArray metadata) {
+    (void)receiver;
+    if (input == NULL || recipient_request == NULL || recipient_private == NULL ||
+        metadata == NULL || (*env)->GetArrayLength(env, metadata) != 2) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jbyte *input_elements = NULL;
+    jbyte *request_elements = NULL;
+    jbyte *private_elements = NULL;
+    uint32_t input_length = 0;
+    uint32_t request_length = 0;
+    uint32_t private_length = 0;
+    uint8_t *input_bytes = array_bytes(env, input, &input_elements, &input_length);
+    uint8_t *request_bytes = array_bytes(env, recipient_request, &request_elements, &request_length);
+    uint8_t *private_bytes = array_bytes(env, recipient_private, &private_elements, &private_length);
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (input_bytes == NULL || request_bytes == NULL || private_bytes == NULL || target == NULL) {
+        release_array(env, input, input_elements);
+        release_array(env, recipient_request, request_elements);
+        release_array(env, recipient_private, private_elements);
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint64_t handle = 0;
+    uint32_t length = 0;
+    int32_t code = kvpn_verify_preview_with_recipient(
+        input_bytes,
+        input_length,
+        request_bytes,
+        request_length,
+        private_bytes,
+        private_length,
+        &handle,
+        target,
+        (uint32_t)capacity,
+        &length);
+    release_array(env, input, input_elements);
+    release_array(env, recipient_request, request_elements);
+    release_array(env, recipient_private, private_elements);
+    if (code == 0) {
+        jlong values[2] = {(jlong)handle, (jlong)length};
+        (*env)->SetLongArrayRegion(env, metadata, 0, 2, values);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
 Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeActivationSubmit(
     JNIEnv *env,
     jobject receiver,
@@ -541,6 +669,116 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionRoundTrip(
     jint value = (jint)length;
     (*env)->SetIntArrayRegion(env, output_length, 0, 1, &value);
     return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSessionOpenV2(
+    JNIEnv *env,
+    jobject receiver,
+    jbyteArray input,
+    jobject output,
+    jlongArray metadata) {
+    (void)receiver;
+    if (input == NULL || metadata == NULL ||
+        (*env)->GetArrayLength(env, metadata) != 2) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    jbyte *input_elements = NULL;
+    uint32_t input_length = 0;
+    uint8_t *input_bytes = array_bytes(env, input, &input_elements, &input_length);
+    jlong capacity = 0;
+    uint8_t *target = direct_buffer(env, output, &capacity);
+    if (input_bytes == NULL || target == NULL) {
+        release_array(env, input, input_elements);
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint64_t handle = 0;
+    uint32_t length = 0;
+    int32_t code = kvpn_runtime_session_open_v2(
+        input_bytes,
+        input_length,
+        &handle,
+        target,
+        (uint32_t)capacity,
+        &length);
+    release_array(env, input, input_elements);
+    if (code == 0) {
+        jlong values[2] = {(jlong)handle, (jlong)length};
+        (*env)->SetLongArrayRegion(env, metadata, 0, 2, values);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSocketPrepare(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jintArray output_fd) {
+    (void)receiver;
+    if (output_fd == NULL || (*env)->GetArrayLength(env, output_fd) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    int32_t fd = -1;
+    int32_t code = kvpn_runtime_socket_prepare((uint64_t)handle, &fd);
+    if (code == 0) {
+        jint value = (jint)fd;
+        (*env)->SetIntArrayRegion(env, output_fd, 0, 1, &value);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeSocketCommitProtected(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jboolean protected_socket) {
+    (void)env;
+    (void)receiver;
+    return kvpn_runtime_socket_commit_protected(
+        (uint64_t)handle,
+        protected_socket == JNI_TRUE ? 1 : 0);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeTunAttach(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jint fd) {
+    (void)env;
+    (void)receiver;
+    return kvpn_runtime_tun_attach((uint64_t)handle, (int32_t)fd);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeStatus(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jintArray output_state) {
+    (void)receiver;
+    if (output_state == NULL || (*env)->GetArrayLength(env, output_state) != 1) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint32_t state = 0;
+    int32_t code = kvpn_runtime_status((uint64_t)handle, &state);
+    if (code == 0) {
+        jint value = (jint)state;
+        (*env)->SetIntArrayRegion(env, output_state, 0, 1, &value);
+    }
+    return code;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeStop(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle) {
+    (void)env;
+    (void)receiver;
+    return kvpn_runtime_stop((uint64_t)handle);
 }
 
 JNIEXPORT jint JNICALL

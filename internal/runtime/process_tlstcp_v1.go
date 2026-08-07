@@ -144,50 +144,11 @@ func RunProcessClientDuplexOperationV1(ctx context.Context, carrier *tlstcp.Conn
 	if ctx == nil || carrier == nil || handshake == nil || planDigest == ([32]byte{}) || liveprogram.ValidateV1(program) != nil || len(operation.Payload) == 0 {
 		return ErrProcessSessionV1
 	}
-	clientHello, err := handshake.Start()
-	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, clientHello) != nil {
-		return failClientDuplexSessionV1(handshake, carrier, nil)
-	}
-	serverHello, err := receiveEncodedProcessFrameV1(ctx, carrier)
+	endpoint, err := EstablishProcessClientDuplexEndpointV1(ctx, carrier, handshake, planDigest, program)
 	if err != nil {
-		return failClientDuplexSessionV1(handshake, carrier, nil)
-	}
-	clientFinish, err := handshake.AcceptServerHello(serverHello)
-	clear(serverHello)
-	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, clientFinish) != nil {
-		return failClientDuplexSessionV1(handshake, carrier, nil)
-	}
-	serverFinish, err := receiveEncodedProcessFrameV1(ctx, carrier)
-	if err != nil {
-		return failClientDuplexSessionV1(handshake, carrier, nil)
-	}
-	result, err := handshake.AcceptServerFinish(serverFinish)
-	clear(serverFinish)
-	if err != nil {
-		return failClientDuplexSessionV1(handshake, carrier, nil)
-	}
-	endpoint, err := NewProcessClientDuplexEndpointV1(result, planDigest, program)
-	if err != nil {
-		result.Close()
-		return failClientDuplexSessionV1(handshake, carrier, nil)
+		return err
 	}
 	defer endpoint.Abort()
-	binding, err := carrier.CarrierBinding()
-	if err != nil {
-		return failClientDuplexSessionV1(handshake, carrier, endpoint)
-	}
-	bind, err := endpoint.ProfileBind(binding)
-	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, bind) != nil {
-		clear(bind)
-		return failClientDuplexSessionV1(handshake, carrier, endpoint)
-	}
-	clear(bind)
-	ready, err := receiveEncodedProcessFrameV1(ctx, carrier)
-	if err != nil || endpoint.AcceptEngineReady(ready) != nil {
-		clear(ready)
-		return failClientDuplexSessionV1(handshake, carrier, endpoint)
-	}
-	clear(ready)
 	records, err := endpoint.SealOperation(operation, int64(operation.Sequence))
 	if err != nil || len(records) != 1 || sendEncodedProcessFrameV1(ctx, carrier, records[0]) != nil {
 		clearFrameSetV1(records)
@@ -201,6 +162,60 @@ func RunProcessClientDuplexOperationV1(ctx context.Context, carrier *tlstcp.Conn
 	}
 	clear(closeRecord)
 	return nil
+}
+
+// EstablishProcessClientDuplexEndpointV1 completes the authenticated Kurd
+// handshake and carrier-binding exchange for a long-lived client packet pump.
+// On failure it closes all partially established state. On success the caller
+// owns both the returned endpoint and carrier.
+func EstablishProcessClientDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, handshake *ProcessWireClientHandshakeV1, planDigest [32]byte, program liveprogram.ProgramV1) (*ProcessClientDuplexEndpointV1, error) {
+	if ctx == nil || carrier == nil || handshake == nil || planDigest == ([32]byte{}) || liveprogram.ValidateV1(program) != nil {
+		return nil, ErrProcessSessionV1
+	}
+	clientHello, err := handshake.Start()
+	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, clientHello) != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	serverHello, err := receiveEncodedProcessFrameV1(ctx, carrier)
+	if err != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	clientFinish, err := handshake.AcceptServerHello(serverHello)
+	clear(serverHello)
+	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, clientFinish) != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	serverFinish, err := receiveEncodedProcessFrameV1(ctx, carrier)
+	if err != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	result, err := handshake.AcceptServerFinish(serverFinish)
+	clear(serverFinish)
+	if err != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	endpoint, err := NewProcessClientDuplexEndpointV1(result, planDigest, program)
+	if err != nil {
+		result.Close()
+		return nil, failClientDuplexSessionV1(handshake, carrier, nil)
+	}
+	binding, err := carrier.CarrierBinding()
+	if err != nil {
+		return nil, failClientDuplexSessionV1(handshake, carrier, endpoint)
+	}
+	bind, err := endpoint.ProfileBind(binding)
+	if err != nil || sendEncodedProcessFrameV1(ctx, carrier, bind) != nil {
+		clear(bind)
+		return nil, failClientDuplexSessionV1(handshake, carrier, endpoint)
+	}
+	clear(bind)
+	ready, err := receiveEncodedProcessFrameV1(ctx, carrier)
+	if err != nil || endpoint.AcceptEngineReady(ready) != nil {
+		clear(ready)
+		return nil, failClientDuplexSessionV1(handshake, carrier, endpoint)
+	}
+	clear(ready)
+	return endpoint, nil
 }
 
 func RunProcessRelayDuplexOperationV1(ctx context.Context, carrier *tlstcp.Conn, handshake *ProcessWireRelayHandshakeV1, planDigest [32]byte, program liveprogram.ProgramV1, sink ProcessSessionSinkV1) error {

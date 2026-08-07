@@ -18,6 +18,10 @@ type ActivationEnvironment interface {
 	NewActivationSession(VerifyPreview) (*profile.ActivationSession, error)
 }
 
+type RecipientActivationEnvironment interface {
+	NewRecipientActivationSession(VerifyPreview, RecipientCredentials) (*profile.ActivationSession, error)
+}
+
 type activationRecordWire struct {
 	Version uint64                   `cbor:"1,keyasint"`
 	Record  profile.ActivationRecord `cbor:"2,keyasint"`
@@ -58,7 +62,17 @@ func OpenActivation(registry *HandleRegistry, verified Handle, environment Activ
 	if !ok || preview == nil {
 		return 0, CodeInternalFailure
 	}
-	session, err := environment.NewActivationSession(*preview)
+	var session *profile.ActivationSession
+	var err error
+	if preview.recipient != nil {
+		recipientEnvironment, ok := environment.(RecipientActivationEnvironment)
+		if !ok {
+			return 0, CodeTrustUnavailable
+		}
+		session, err = recipientEnvironment.NewRecipientActivationSession(*preview, preview.recipient.Clone())
+	} else {
+		session, err = environment.NewActivationSession(*preview)
+	}
 	if err != nil || session == nil {
 		return 0, CodeVerificationRejected
 	}

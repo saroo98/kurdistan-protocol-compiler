@@ -576,6 +576,10 @@ func verifyGoCopies(root string, value contract) error {
 	}); err != nil {
 		return err
 	}
+	planDigestCall := fmt.Sprintf("val planDigest = reader.fixedBytes(%d)", value.Android.NativeBridgeSessionPlanDigestBytes)
+	if total := strings.Count(nativeBridge, "val planDigest = reader.fixedBytes("); total == 0 || strings.Count(nativeBridge, planDigestCall) != total {
+		return errors.New("Kotlin NativeBridge contains a non-authorized session-plan digest width")
+	}
 	return nil
 }
 
@@ -588,10 +592,14 @@ func verifyDeploymentCopies(root string, value contract) error {
 		fmt.Sprintf("LimitNOFILE=%d", value.Limits.SystemdLimitNOFILE),
 		fmt.Sprintf("TasksMax=%d", value.Limits.SystemdTasksMax),
 		fmt.Sprintf("MemoryMax=%dM", value.Limits.SystemdMemoryMaxMiB),
-		fmt.Sprintf("PrivateDevices=%s", systemdBoolean(value.Relay.CurrentPredecessorUnit.PrivateDevices)),
-		"RestrictAddressFamilies=" + strings.Join(value.Relay.CurrentPredecessorUnit.AddressFamilies, " "),
+		fmt.Sprintf("PrivateDevices=%s", systemdBoolean(value.Relay.PrivateDevices)),
+		fmt.Sprintf("DevicePolicy=%s", value.Relay.DevicePolicy),
+		fmt.Sprintf("DeviceAllow=/dev/net/tun %s", value.Relay.TUNDeviceAccess),
+		"RestrictAddressFamilies=" + strings.Join(value.Relay.AddressFamilies, " "),
 		"CapabilityBoundingSet=", "AmbientCapabilities=",
-		"ExecStart=/usr/local/bin/kurd-node run --data-dir /var/lib/kurd-node",
+		"Requires=kurd-node.socket",
+		"ExecStart=/usr/local/bin/kurd-node serve --data-dir /var/lib/kurd-node",
+		fmt.Sprintf("--control-socket %scontrol.sock", value.Relay.ControlSocketDirectory),
 	} {
 		if !strings.Contains(service, required) {
 			return fmt.Errorf("native deployment copy disagrees with authority: missing %q", required)
@@ -655,8 +663,8 @@ func verifyPublicDocumentation(root string, value contract) error {
 		"KURD-LIVE-CONTRACT: PRIVACY_PAYLOAD_LOGGING=PROHIBITED",
 		"KURD-LIVE-CONTRACT: PRIVACY_FIVE_TUPLE_LOGGING_AND_PERSISTENCE=PROHIBITED",
 		"KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED",
-		"KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=NOT_LIVE",
-		"KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=NOT_APPLIED",
+		"KURD-LIVE-CONTRACT: PREDECESSOR_UNIT_STATE=SUPERSEDED",
+		"KURD-LIVE-CONTRACT: REQUIRED_LIVE_UNIT_STATE=APPLIED_LOCAL_UNVERIFIED_EXTERNAL",
 		"loopback-only predecessor", fmt.Sprintf("%d legacy protected-record incomplete operations", value.Limits.LegacyProtectedRecordIncompleteOperations),
 	} {
 		if !strings.Contains(selfHosting, required) {
@@ -696,7 +704,7 @@ func requiredNonReadinessStatement(value relayAuthority) (string, error) {
 	if value.RequiredLiveUnitState != "not-applied" || value.CurrentPredecessorUnit.LiveDataPlaneAuthorized {
 		return "", errors.New("relay authority cannot supply an approved non-readiness statement")
 	}
-	return "It does not assert that a running service is available or that a particular network environment has been validated.", nil
+	return "This document specifies the implemented local privileges, limits, and network boundary. It does not assert that a public deployment or external data path has passed the Phase 17 exit gate.", nil
 }
 
 func rejectPrivateOrReadinessClaims(document string, network networkAuthority) error {
