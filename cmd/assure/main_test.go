@@ -168,6 +168,41 @@ func TestRunImpactRejectsChangedPathTraversal(t *testing.T) {
 	}
 }
 
+func TestQualificationWorkflowImpactSelectsCompletePRProofSet(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if err := run([]string{
+		"impact", "-root", root,
+		"-path", ".github/workflows/phase16-qualification.yml",
+	}, &stdout, &stderr); err != nil {
+		t.Fatalf("run qualification workflow impact: %v (stderr %q)", err, stderr.String())
+	}
+	var output struct {
+		Proofs []string `json:"proofs"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"android-device-api26",
+		"android-device-api34",
+		"android-device-api36",
+		"android-pr-host",
+		"dependency-freshness",
+		"docs-evidence",
+		"go-audit",
+		"go-core",
+		"go-executable-evidence",
+		"operator",
+	}
+	if !reflect.DeepEqual(output.Proofs, want) {
+		t.Fatalf("qualification workflow proofs = %v, want %v", output.Proofs, want)
+	}
+}
+
 func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
