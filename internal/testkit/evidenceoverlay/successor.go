@@ -24,13 +24,13 @@ const (
 	Phase16ProductionTrustSuccessorPath = "testdata/evidence/phase16/production-trust-overlay.json"
 	Phase16RuntimeSuccessorPath         = "testdata/evidence/phase16/production-runtime-overlay.json"
 	Phase16DecentralizedSuccessorPath   = "testdata/evidence/phase16/decentralized-self-hosted-overlay.json"
-	Phase16P0RepairSuccessorPath        = "testdata/evidence/phase16/p0-repair-overlay.json"
 	PublicDocumentationSuccessorPath    = "testdata/evidence/public-documentation-sanitization-overlay.json"
 )
 
 type overlay struct {
-	Version string  `json:"version"`
-	Entries []entry `json:"entries"`
+	Version          string  `json:"version"`
+	Entries          []entry `json:"entries"`
+	SuccessorEntries []entry `json:"successor_entries,omitempty"`
 }
 
 type entry struct {
@@ -48,14 +48,15 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		path     string
 		version  string
 		optional bool
+		entries  func(overlay) []entry
 	}{
-		{Phase16P0RepairSuccessorPath, "phase16-p0-evidence-repair-v1", true},
-		{PublicDocumentationSuccessorPath, "public-documentation-sanitization-v1", true},
-		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true},
-		{Phase16RuntimeSuccessorPath, "phase16-production-runtime-v1", true},
-		{Phase16ProductionTrustSuccessorPath, "phase16-production-trust-v1", true},
-		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1", true},
-		{SuccessorPath, expectedVersion, false},
+		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true, func(value overlay) []entry { return value.SuccessorEntries }},
+		{PublicDocumentationSuccessorPath, "public-documentation-sanitization-v1", true, func(value overlay) []entry { return value.Entries }},
+		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true, func(value overlay) []entry { return value.Entries }},
+		{Phase16RuntimeSuccessorPath, "phase16-production-runtime-v1", true, func(value overlay) []entry { return value.Entries }},
+		{Phase16ProductionTrustSuccessorPath, "phase16-production-trust-v1", true, func(value overlay) []entry { return value.Entries }},
+		{Phase16SuccessorPath, "phase16-ci-release-acceleration-v1", true, func(value overlay) []entry { return value.Entries }},
+		{SuccessorPath, expectedVersion, false, func(value overlay) []entry { return value.Entries }},
 	}
 	pre := map[string]string{}
 	for _, layer := range layers {
@@ -72,7 +73,7 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		for index, item := range value.Entries {
+		for index, item := range layer.entries(value) {
 			observed, ok := pre[item.Path]
 			if !ok {
 				path := filepath.Join(root, filepath.FromSlash(item.Path))
@@ -137,35 +138,48 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return overlay{}, fmt.Errorf("decode successor overlay %s: trailing JSON", relative)
 	}
-	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 {
+	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > 128 {
 		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)
 	}
+	if relative != Phase16DecentralizedSuccessorPath && len(value.SuccessorEntries) != 0 {
+		return overlay{}, fmt.Errorf("successor entries are only valid in %s", Phase16DecentralizedSuccessorPath)
+	}
+	if err := validateEntries(value.Entries, relative, "entries"); err != nil {
+		return overlay{}, err
+	}
+	if err := validateEntries(value.SuccessorEntries, relative, "successor_entries"); err != nil {
+		return overlay{}, err
+	}
+	return value, nil
+}
+
+func validateEntries(entries []entry, relative, field string) error {
 	last := ""
-	for index, item := range value.Entries {
+	for index, item := range entries {
 		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(item.Path)))
 		if clean != item.Path || item.Path <= last || filepath.IsAbs(item.Path) || strings.HasPrefix(item.Path, "../") || strings.HasPrefix(item.Path, ".tools/") || strings.HasPrefix(item.Path, "planning/") {
-			return overlay{}, fmt.Errorf("invalid successor overlay path %d in %s", index, relative)
+			return fmt.Errorf("invalid successor overlay %s path %d in %s", field, index, relative)
 		}
 		if item.PostEvidence == "ABSENT" {
 			if item.PostSHA256 != "" {
-				return overlay{}, fmt.Errorf("invalid absent successor %d in %s", index, relative)
+				return fmt.Errorf("invalid absent successor %d in %s", index, relative)
 			}
 		} else if item.PostEvidence != "" || !validDigest(item.PostSHA256) {
-			return overlay{}, fmt.Errorf("invalid successor post state %d in %s", index, relative)
+			return fmt.Errorf("invalid successor post state %d in %s", index, relative)
 		}
 		if item.PreEvidence == "ABSENT" {
 			if item.PreSHA256 != "" {
-				return overlay{}, fmt.Errorf("invalid absent predecessor %d in %s", index, relative)
+				return fmt.Errorf("invalid absent predecessor %d in %s", index, relative)
 			}
 		} else if item.PreEvidence != "" || !validDigest(item.PreSHA256) {
-			return overlay{}, fmt.Errorf("invalid existing predecessor %d in %s", index, relative)
+			return fmt.Errorf("invalid existing predecessor %d in %s", index, relative)
 		}
 		if predecessor(item) == postState(item) {
-			return overlay{}, fmt.Errorf("successor entry does not change state %d in %s", index, relative)
+			return fmt.Errorf("successor entry does not change state %d in %s", index, relative)
 		}
 		last = item.Path
 	}
-	return value, nil
+	return nil
 }
 
 func predecessor(item entry) string {

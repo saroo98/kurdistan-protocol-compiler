@@ -521,5 +521,37 @@
       "pre_evidence": "ABSENT",
       "post_sha256": "d5bb03a76821e69231133198c6345757da994ff9d2700e2d72ef2c935291fe49"
     }
+  ],
+  "successor_entries": [
+    {
+      "path": "docs/GITHUB_REPO_PROFILE.md",
+      "pre_sha256": "e6e3e868d59a37e8c0856023584d4b91bc9efdd8e225af94f295813ad32c8395",
+      "post_sha256": "20c9c960b20a5c8bc795419a812ce1832bad0bc35918d04fdd06f427e8b91b51"
+    },
+    {
+      "path": "internal/audit/security.go",
+      "pre_sha256": "c646e806b3bc958e287ddcead3a244906a0ba59c40c3ce96b8261e8978ae3d98",
+      "post_sha256": "fc98db2a301d8c4545457d271a761891bdea542b6ea8aa620eec03880fc4ee8c"
+    },
+    {
+      "path": "internal/audit/security_test.go",
+      "pre_sha256": "d2022c7de0615e3dc5b6cb60bb64b1650900aba22bea493fa7ee842ebfced87b",
+      "post_sha256": "79da303348668dcc3414ea104d92edb616f174ee28a5a9bbbb2f54904c27c227"
+    },
+    {
+      "path": "internal/runtime/policy_enforcement_test.go",
+      "pre_sha256": "b9b82911443414516745b3a9ca5e682877de35f97f40c67dff563047ef0c545f",
+      "post_sha256": "ee84a7b6b0208650679b8d22eb0dbac38779527adf30d1be3fbb8ed018167880"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor.go",
+      "pre_sha256": "35df2f8388e4740470c57845625cce80573fa38acc23396216696679d9924bbf",
+      "post_sha256": "319f873812d3f439028101a7744bdde45bd01c24d1d6c738df54f136ac92cfa1"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor_test.go",
+      "pre_sha256": "f24eeab091ec1022aa358bf54b1e8f65e5e66ba55d8141eb8ab8dd4f293fb2bc",
+      "post_sha256": "ec8e66696fa9c07e4f867d65e5e5cba32890385f5101b537853c4fcb0aa1d9cb"
+    }
   ]
 }

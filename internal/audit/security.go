@@ -1852,7 +1852,6 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	preHashes[evidenceoverlay.Phase16ProductionTrustSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16RuntimeSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.Phase16DecentralizedSuccessorPath] = "ABSENT"
-	preHashes[evidenceoverlay.Phase16P0RepairSuccessorPath] = "ABSENT"
 	preHashes[evidenceoverlay.PublicDocumentationSuccessorPath] = "ABSENT"
 	for path, predecessor := range preHashes {
 		if predecessor != "ABSENT" {
