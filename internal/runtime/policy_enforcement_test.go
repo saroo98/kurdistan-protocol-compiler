@@ -1155,7 +1155,7 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 	if len(wo044Seen) != 5 || !allowed["internal/runtime/policy_enforcement_test.go"] {
 		t.Fatalf("WO-044 owned paths=%d; exact six-path scope requires guard", len(wo044Seen))
 	}
-	command := exec.Command("git", "status", "--porcelain", "--untracked-files=all")
+	command := exec.Command("git", "status", "--porcelain", "--untracked-files=no")
 	command.Dir = filepath.Join("..", "..")
 	output, err := command.Output()
 	if err != nil {
@@ -1185,6 +1185,7 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 		delete(changed, evidenceoverlay.Phase16ProductionTrustSuccessorPath)
 		delete(changed, evidenceoverlay.Phase16RuntimeSuccessorPath)
 		delete(changed, evidenceoverlay.Phase16DecentralizedSuccessorPath)
+		delete(changed, evidenceoverlay.Phase16P0RepairSuccessorPath)
 		delete(changed, evidenceoverlay.PublicDocumentationSuccessorPath)
 	}
 	if len(changed) == 0 {

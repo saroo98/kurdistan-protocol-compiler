@@ -332,6 +332,16 @@
       "post_sha256": "431c5b16b183aae5781337312c69877c90c22473cdd0af21b541b5dc78ce7793"
     },
     {
+      "path": "infra/terraform/modules/audit_sinks/main.tf",
+      "pre_sha256": "f1e3bb3e083b2a8e1043967d5787710db24c63eecae264e83e690bf21923bce5",
+      "post_sha256": "a4e5bff4986188a390637dae69b9e28ac903c630bd6ad9bcf3cad264a6d1092b"
+    },
+    {
+      "path": "infra/terraform/modules/budget/main.tf",
+      "pre_sha256": "e814cd1bc1b7c421ac35bb963e75273fd6126d3e35ce36106a2c3ea079538d06",
+      "post_sha256": "90d5a05d411e80a0e294b00ed839f67b21ac217cd7e23ff9ea1478c95dd1a587"
+    },
+    {
       "path": "internal/androidbridge/verify.go",
       "pre_sha256": "abf65652a449a988a468973a8a66cba3f700a3e5a496de8d981ec1c5619c6c05",
       "post_sha256": "2b933f02cc489fb1b1f18eefb6c35af5ab920a1f6b6d01314e7f6b0fb58ea1dc"

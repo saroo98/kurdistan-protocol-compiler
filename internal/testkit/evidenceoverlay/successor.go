@@ -24,6 +24,7 @@ const (
 	Phase16ProductionTrustSuccessorPath = "testdata/evidence/phase16/production-trust-overlay.json"
 	Phase16RuntimeSuccessorPath         = "testdata/evidence/phase16/production-runtime-overlay.json"
 	Phase16DecentralizedSuccessorPath   = "testdata/evidence/phase16/decentralized-self-hosted-overlay.json"
+	Phase16P0RepairSuccessorPath        = "testdata/evidence/phase16/p0-repair-overlay.json"
 	PublicDocumentationSuccessorPath    = "testdata/evidence/public-documentation-sanitization-overlay.json"
 )
 
@@ -48,6 +49,7 @@ func LoadSuccessor(root, expectedVersion string) (map[string]string, error) {
 		version  string
 		optional bool
 	}{
+		{Phase16P0RepairSuccessorPath, "phase16-p0-evidence-repair-v1", true},
 		{PublicDocumentationSuccessorPath, "public-documentation-sanitization-v1", true},
 		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true},
 		{Phase16RuntimeSuccessorPath, "phase16-production-runtime-v1", true},
