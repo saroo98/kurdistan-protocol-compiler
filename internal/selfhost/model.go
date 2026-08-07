@@ -14,25 +14,27 @@ import (
 )
 
 const (
-	stateFileName                    = "state.kurd-state"
-	masterKeyFileName                = "master.key"
-	lockDirectoryName                = ".state.lock"
-	publicationCursorFileName        = "publication.cursor"
-	stateSchemaV1                    = "kurd-selfhost-state-v1"
-	stateSchemaV2                    = "kurd-selfhost-state-v2"
-	stateSchema                      = stateSchemaV2
-	recoverySchema                   = "kurd-selfhost-recovery-v1"
-	backupSchemaV1                   = "kurd-selfhost-backup-v1"
-	backupSchemaV2                   = "kurd-selfhost-backup-v2"
-	backupSchema                     = backupSchemaV2
-	bundleVersion             uint64 = 1
-	stateVersionV1            uint64 = 1
-	stateVersionV2            uint64 = 2
-	migrationEpochV2          uint64 = 1
-	maxStateBytes                    = 8 << 20
-	maxBackupBytes                   = 16 << 20
-	maxProfiles                      = 4096
-	maxProfileValidity               = 30 * 24 * time.Hour
+	stateFileName                     = "state.kurd-state"
+	masterKeyFileName                 = "master.key"
+	lockDirectoryName                 = ".state.lock"
+	publicationCursorFileName         = "publication.cursor"
+	recipientAuthorityFileName        = "recipient-authority.kurd-auth"
+	stateSchemaV1                     = "kurd-selfhost-state-v1"
+	stateSchemaV2                     = "kurd-selfhost-state-v2"
+	stateSchema                       = stateSchemaV2
+	recoverySchema                    = "kurd-selfhost-recovery-v1"
+	backupSchemaV1                    = "kurd-selfhost-backup-v1"
+	backupSchemaV2                    = "kurd-selfhost-backup-v2"
+	backupSchema                      = backupSchemaV2
+	bundleVersion              uint64 = 1
+	liveBundleVersion          uint64 = 2
+	stateVersionV1             uint64 = 1
+	stateVersionV2             uint64 = 2
+	migrationEpochV2           uint64 = 1
+	maxStateBytes                     = 8 << 20
+	maxBackupBytes                    = 16 << 20
+	maxProfiles                       = 4096
+	maxProfileValidity                = 30 * 24 * time.Hour
 )
 
 var (
@@ -51,6 +53,9 @@ var (
 	ErrCommitUncertain     = errors.New("selfhost: commit outcome uncertain")
 	ErrAddressExhausted    = errors.New("selfhost: address pool exhausted")
 	ErrTLSUnavailable      = errors.New("selfhost: tls identity unavailable")
+	ErrRecipientReplay     = errors.New("selfhost: recipient capability replay rejected")
+	ErrRecipientRegistry   = errors.New("selfhost: recipient registry rejected")
+	ErrRecipientAuthority  = errors.New("selfhost: recipient authority rejected")
 )
 
 type InitOptions struct {
@@ -65,9 +70,13 @@ type InitResult struct {
 }
 
 type CreateProfileOptions struct {
-	Name     string
-	ValidFor time.Duration
-	Now      time.Time
+	Name                  string
+	ValidFor              time.Duration
+	Now                   time.Time
+	RecipientRequest      []byte
+	LiveProgram           []byte
+	RegistryDir           string
+	ConfirmRecipientReuse string
 }
 
 type RotateProfileOptions struct {
@@ -75,6 +84,10 @@ type RotateProfileOptions struct {
 	RecoveryPassphrase      []byte
 	ValidFor                time.Duration
 	Now                     time.Time
+	RecipientRequest        []byte
+	LiveProgram             []byte
+	RegistryDir             string
+	ConfirmRecipientReuse   string
 }
 
 type RevokeProfileOptions struct {
@@ -99,6 +112,10 @@ type KeyRotationResult struct {
 type IssuedProfile struct {
 	ProfileID, ContentID string
 	Generation           uint64
+	ValidUntil           int64
+	Mode                 string
+	Sealed, Connectable  bool
+	Revoked              bool
 	Artifact             []byte
 	URI                  string
 	QRChunks             []string
@@ -252,6 +269,19 @@ type addressAssignmentV1 struct {
 	AssignedAt, ProfileValidUntil, ReleaseAt int64
 }
 
+type recipientUseRecordV1 struct {
+	_                                   struct{} `cbor:",toarray"`
+	RequestTag, RecipientTag, ClientTag string
+	ProfileID                           string
+	FirstUsedAt                         int64
+}
+
+type recipientUseLedgerV1 struct {
+	_          struct{} `cbor:",toarray"`
+	RegistryID string
+	Records    []recipientUseRecordV1
+}
+
 type auditEntry struct {
 	_                                       struct{} `cbor:",toarray"`
 	Sequence                                uint64
@@ -287,6 +317,7 @@ type persistedState struct {
 	IPv4Pool, IPv6Pool               addressPoolV1
 	Profiles                         []profileRecord
 	Assignments                      []addressAssignmentV1
+	RecipientUses                    recipientUseLedgerV1
 	Audit                            []auditEntry
 	PublicationOutbox                []publicationOutboxEntry
 }
@@ -393,6 +424,22 @@ type profileBundle struct {
 	Revocations                            profile.RevocationSetV1
 	RevocationPayload, RevocationSignature []byte
 	SignedProfile                          []byte
+}
+
+type liveProfileBundleV2 struct {
+	_                                      struct{} `cbor:",toarray"`
+	Version                                uint64
+	DeploymentID                           string
+	Root                                   profile.RootSetArtifact
+	RootPublicDER                          []byte
+	RootFingerprint                        string
+	IssuerKey                              profile.KeyReference
+	IssuerPublicDER                        []byte
+	Delegation                             profile.IssuerDelegationArtifact
+	DelegationPayload, DelegationSignature []byte
+	Revocations                            profile.RevocationSetV1
+	RevocationPayload, RevocationSignature []byte
+	SealedProfile                          []byte
 }
 
 type publicationSnapshot struct {

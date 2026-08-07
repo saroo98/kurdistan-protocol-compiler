@@ -1185,6 +1185,7 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 		delete(changed, evidenceoverlay.Phase16ProductionTrustSuccessorPath)
 		delete(changed, evidenceoverlay.Phase16RuntimeSuccessorPath)
 		delete(changed, evidenceoverlay.Phase16DecentralizedSuccessorPath)
+		delete(changed, evidenceoverlay.Phase17SuccessorPath)
 		delete(changed, evidenceoverlay.PublicDocumentationSuccessorPath)
 	}
 	if len(changed) == 0 {
@@ -1734,7 +1735,10 @@ func validatePolicyPhase14AssuranceOverlayV1(root string, overlays map[string]po
 	if err != nil {
 		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
 	}
-	pre := make(map[string]string, len(overlay.Paths))
+	pre := make(map[string]string, len(successor)+len(overlay.Paths))
+	for path, hash := range successor {
+		pre[path] = hash
+	}
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
 	last := ""

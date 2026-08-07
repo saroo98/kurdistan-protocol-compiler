@@ -19,8 +19,8 @@ import (
 	"kurdistan/internal/product/profile"
 )
 
-func initializeStore(dataDir string, master []byte, state persistedState) error {
-	if len(master) != 32 || dataDir == "" {
+func initializeStore(dataDir string, master []byte, state persistedState, recipientAuthority []byte) error {
+	if len(master) != 32 || dataDir == "" || len(recipientAuthority) == 0 {
 		return ErrInvalidInput
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, stateFileName)); err == nil {
@@ -28,10 +28,24 @@ func initializeStore(dataDir string, master []byte, state persistedState) error 
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dataDir), 0o700); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, masterKeyFileName), master, 0o600); err != nil {
+	if err := ensureSelfhostPrivateDirectory(dataDir); err != nil {
+		return err
+	}
+	masterPath := filepath.Join(dataDir, masterKeyFileName)
+	if err := writeSelfhostPrivateFileExclusive(masterPath, master); err != nil {
+		return err
+	}
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(masterPath)
+			removeRecipientAuthority(dataDir)
+		}
+	}()
+	if err := installRecipientAuthority(dataDir, recipientAuthority, true); err != nil {
 		return err
 	}
 	if err := appendAudit(&state, state.Root.ValidFrom, "initialize", state.DeploymentID); err != nil {
@@ -39,7 +53,11 @@ func initializeStore(dataDir string, master []byte, state persistedState) error 
 	}
 	state.Revision = 1
 	state.PublicationOutbox = []publicationOutboxEntry{{Revision: state.Revision, CreatedAt: state.Root.ValidFrom, Action: "initialize"}}
-	return saveState(dataDir, master, state)
+	if err := saveState(dataDir, master, state); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
 }
 
 func loadMasterKey(dataDir string) ([]byte, error) {
@@ -314,7 +332,7 @@ func validateState(state persistedState, master []byte) error {
 		state.RelayKeyID != keyID("relay", state.RelayPublic) || len(state.RelayPublic) != 32 {
 		return ErrStateCorrupt
 	}
-	if validateTLSIdentity(master, state.DeploymentID, state.TLS, state.RelayPublic) != nil || validateAddressPool(state.IPv4Pool) != nil || validateAddressPool(state.IPv6Pool) != nil || validateAssignments(state) != nil {
+	if validateTLSIdentity(master, state.DeploymentID, state.TLS, state.RelayPublic) != nil || validateAddressPool(state.IPv4Pool) != nil || validateAddressPool(state.IPv6Pool) != nil || validateAssignments(state) != nil || validateRecipientUseLedger(state.RecipientUses) != nil {
 		return ErrStateCorrupt
 	}
 	verifier := p256Verifier{keys: map[string]*ecdsa.PublicKey{
