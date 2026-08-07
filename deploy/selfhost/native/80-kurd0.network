@@ -1,0 +1,14 @@
+[Match]
+Name=kurd0
+
+[Link]
+MTUBytes=1280
+RequiredForOnline=no
+
+[Network]
+Address=10.77.0.1/24
+Address=fd4b:7572:6400::1/64
+ConfigureWithoutCarrier=yes
+DHCP=no
+IPv6AcceptRA=no
+LinkLocalAddressing=no

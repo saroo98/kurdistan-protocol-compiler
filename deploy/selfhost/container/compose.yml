@@ -1,6 +1,8 @@
 services:
   kurd-node:
-    image: kurd-node-local:phase16
+    image: kurd-node-local:authority-only
+    labels:
+      org.kurdistan.relay-data-plane: "false"
     read_only: true
     user: "65532:65532"
     network_mode: none

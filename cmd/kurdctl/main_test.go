@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -390,6 +391,8 @@ func TestCLIHelpListsStableAdministrationInterface(t *testing.T) {
 		"profile revoke",
 		"backup create",
 		"restore apply",
+		"migration apply",
+		"migration rollback",
 		"upgrade apply",
 		"logs export-redacted",
 	} {
@@ -399,5 +402,35 @@ func TestCLIHelpListsStableAdministrationInterface(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("help wrote stderr: %s", stderr.String())
+	}
+}
+
+func TestMigrationCommandsRequireExplicitBoundaryAndDelegate(t *testing.T) {
+	originalMigrate, originalRollback := migrateStateToV2, rollbackStateV2
+	defer func() {
+		migrateStateToV2, rollbackStateV2 = originalMigrate, originalRollback
+	}()
+	var migrated, rolledBack string
+	migrateStateToV2 = func(dataDir string, now time.Time) error {
+		if now.IsZero() {
+			t.Fatal("migration did not receive trusted current time")
+		}
+		migrated = dataDir
+		return nil
+	}
+	rollbackStateV2 = func(dataDir string) error {
+		rolledBack = dataDir
+		return nil
+	}
+	var output bytes.Buffer
+	if err := runMigration([]string{"apply", "--data-dir", "state"}, &output); err != nil || migrated != "state" || !strings.Contains(output.String(), `"stateVersion":2`) {
+		t.Fatalf("apply output=%q migrated=%q err=%v", output.String(), migrated, err)
+	}
+	output.Reset()
+	if err := runMigration([]string{"rollback", "--data-dir", "state", "--confirm", "state-v2"}, &output); err != nil || rolledBack != "state" || !strings.Contains(output.String(), `"stateVersion":1`) {
+		t.Fatalf("rollback output=%q rolledBack=%q err=%v", output.String(), rolledBack, err)
+	}
+	if err := runMigration([]string{"rollback", "--data-dir", "state"}, &output); !errors.Is(err, selfhost.ErrInvalidInput) {
+		t.Fatalf("rollback without confirmation err=%v", err)
 	}
 }

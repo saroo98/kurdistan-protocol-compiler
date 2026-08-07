@@ -1,8 +1,9 @@
 [Unit]
-Description=Owner-controlled Kurd node authority publication
-Documentation=file:/usr/local/share/doc/kurd-node/QUICKSTART.md
-After=local-fs.target time-sync.target
-Wants=time-sync.target
+Description=Owner-controlled Kurd authenticated relay
+Documentation=file:/usr/local/share/doc/kurd-node/LIVE-DATA-PLANE.md
+Requires=kurd-node.socket
+After=local-fs.target network-online.target time-sync.target systemd-networkd.service unbound.service kurd-node.socket
+Wants=network-online.target time-sync.target systemd-networkd.service unbound.service
 ConditionPathExists=/var/lib/kurd-node/state.kurd-state
 
 [Service]
@@ -10,14 +11,17 @@ Type=simple
 User=kurd-node
 Group=kurd-node
 UMask=0077
-ExecStart=/usr/local/bin/kurd-node run --data-dir /var/lib/kurd-node --publication-file /var/lib/kurd-node/public/snapshot.kurd-publication
+ExecStartPre=/usr/local/lib/kurd-node/preflight.sh --runtime --port 443 --allow-systemd-socket
+ExecStart=/usr/local/bin/kurd-node serve --data-dir /var/lib/kurd-node --port 443 --control-socket /run/kurd-node/control.sock
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=30s
 TimeoutStopSec=30s
 NoNewPrivileges=yes
 PrivateTmp=yes
-PrivateDevices=yes
+PrivateDevices=no
+DevicePolicy=closed
+DeviceAllow=/dev/net/tun rw
 ProtectSystem=strict
 ProtectHome=yes
 ProtectKernelTunables=yes
@@ -36,7 +40,7 @@ MemoryDenyWriteExecute=yes
 RemoveIPC=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
-RestrictAddressFamilies=AF_UNIX
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
@@ -48,6 +52,9 @@ StateDirectoryMode=0700
 LimitNOFILE=4096
 TasksMax=128
 MemoryMax=512M
+MemorySwapMax=0
+LimitCORE=0
+CoredumpFilter=0x0
 
 [Install]
 WantedBy=multi-user.target

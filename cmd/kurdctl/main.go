@@ -26,13 +26,15 @@ import (
 	"kurdistan/internal/selfhost"
 )
 
-const version = "kurdctl-phase16-v1"
+const version = "kurdctl-phase17-v1"
 
 var (
 	errCLIInvalidInput  = selfhost.ErrInvalidInput
 	errRequestRejected  = errors.New("request rejected")
 	errOutputExists     = errors.New("output exists")
 	errOutputIncomplete = errors.New("output incomplete")
+	migrateStateToV2    = selfhost.MigrateToV2
+	rollbackStateV2     = selfhost.RollbackMigrationV2
 )
 
 type committedOutputError struct {
@@ -107,7 +109,7 @@ func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: kurdctl <init|recovery|status|doctor|profile|keys|node|deployment|clock|lock|backup|restore|upgrade|rollback|logs|version>")
+		fmt.Fprintln(stderr, "usage: kurdctl <init|recovery|status|doctor|profile|keys|node|deployment|clock|lock|backup|restore|migration|upgrade|rollback|logs|version>")
 		return 2
 	}
 	if args[0] == "--help" {
@@ -140,6 +142,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = runBackup(args[1:], stdin, stdout)
 	case "restore":
 		err = runRestore(args[1:], stdin, stdout)
+	case "migration":
+		err = runMigration(args[1:], stdout)
 	case "upgrade":
 		err = runUpgrade(args[1:], stdout, stderr)
 	case "rollback":
@@ -232,6 +236,8 @@ Node and maintenance:
   backup verify
   restore preview
   restore apply
+  migration apply
+  migration rollback
   upgrade check
   upgrade apply
   rollback
@@ -778,6 +784,31 @@ func runRestore(args []string, stdin io.Reader, stdout io.Writer) error {
 		return err
 	}
 	return writeJSON(stdout, map[string]any{"schema": "kurdctl-restore-apply-v1", "restored": true, "state": "QUARANTINED"})
+}
+
+func runMigration(args []string, stdout io.Writer) error {
+	if len(args) == 0 || args[0] != "apply" && args[0] != "rollback" {
+		return selfhost.ErrInvalidInput
+	}
+	set := newFlags("migration " + args[0])
+	dataDir := set.String("data-dir", "", "state directory")
+	confirm := set.String("confirm", "", "must equal state-v2 for rollback")
+	if set.Parse(args[1:]) != nil || set.NArg() != 0 || *dataDir == "" || args[0] == "rollback" && *confirm != "state-v2" {
+		return selfhost.ErrInvalidInput
+	}
+	if args[0] == "apply" {
+		if *confirm != "" {
+			return selfhost.ErrInvalidInput
+		}
+		if err := migrateStateToV2(*dataDir, time.Now().UTC()); err != nil {
+			return err
+		}
+		return writeJSON(stdout, map[string]any{"schema": "kurdctl-migration-v2", "stateVersion": 2, "migrated": true})
+	}
+	if err := rollbackStateV2(*dataDir); err != nil {
+		return err
+	}
+	return writeJSON(stdout, map[string]any{"schema": "kurdctl-migration-rollback-v2", "stateVersion": 1, "rolledBack": true})
 }
 
 func runLogs(args []string, stdout io.Writer) error {
