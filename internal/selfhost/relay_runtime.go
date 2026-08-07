@@ -26,21 +26,30 @@ type RelayRuntimeStatusV1 struct {
 // RelayAdmissionV1 is the exact current relay-side authority for one client
 // identity. It intentionally contains no profile artifact or recipient key.
 type RelayAdmissionV1 struct {
-	ProfileID, ContentID string
-	Generation           uint64
-	ValidUntil           int64
-	ClientAuthKeyID      string
-	ClientAuthPublic     [32]byte
-	AssignedIPv4         []byte
-	AssignedIPv6         []byte
-	RuntimePolicy        runtimepolicy.PolicyV2
+	ProfileID, ContentID  string
+	Generation            uint64
+	ValidFrom, ValidUntil int64
+	ClientAuthKeyID       string
+	ClientAuthPublic      [32]byte
+	AssignedIPv4          []byte
+	AssignedIPv6          []byte
+	RuntimePolicy         runtimepolicy.PolicyV2
+	StrategyIDs           []string
+	RelayIDs              []string
 }
 
 func (a RelayAdmissionV1) clone() RelayAdmissionV1 {
 	a.AssignedIPv4 = bytes.Clone(a.AssignedIPv4)
 	a.AssignedIPv6 = bytes.Clone(a.AssignedIPv6)
 	a.RuntimePolicy = a.RuntimePolicy.Clone()
+	a.StrategyIDs = append([]string(nil), a.StrategyIDs...)
+	a.RelayIDs = append([]string(nil), a.RelayIDs...)
 	return a
+}
+
+type relayProfileKeyV1 struct {
+	ContentID  string
+	Generation uint64
 }
 
 // RelayRuntimeSnapshotV1 owns the only in-process copies of the current relay
@@ -54,6 +63,7 @@ type RelayRuntimeSnapshotV1 struct {
 	tlsPrivate     ed25519.PrivateKey
 	tlsCertificate []byte
 	admissions     map[string]RelayAdmissionV1
+	profiles       map[relayProfileKeyV1]string
 	closed         bool
 }
 
@@ -116,6 +126,7 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		tlsPrivate:     ed25519.PrivateKey(bytes.Clone(tlsPrivate)),
 		tlsCertificate: bytes.Clone(state.TLS.LeafDER),
 		admissions:     make(map[string]RelayAdmissionV1),
+		profiles:       make(map[relayProfileKeyV1]string),
 	}
 	zero(relayPrivate)
 	zero(tlsPrivate)
@@ -137,13 +148,21 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 			snapshot.Close()
 			return nil, ErrStateCorrupt
 		}
+		profileKey := relayProfileKeyV1{ContentID: record.ContentID, Generation: record.Generation}
+		if _, duplicate := snapshot.profiles[profileKey]; duplicate {
+			snapshot.Close()
+			return nil, ErrStateCorrupt
+		}
 		var clientPublic [32]byte
 		copy(clientPublic[:], record.ClientAuthPublic)
 		snapshot.admissions[record.ClientAuthKeyID] = RelayAdmissionV1{
-			ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation, ValidUntil: record.ValidUntil,
+			ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation,
+			ValidFrom: record.CreatedAt, ValidUntil: record.ValidUntil,
 			ClientAuthKeyID: record.ClientAuthKeyID, ClientAuthPublic: clientPublic,
 			AssignedIPv4: bytes.Clone(record.AssignedIPv4), AssignedIPv6: bytes.Clone(record.AssignedIPv6), RuntimePolicy: policy.Clone(),
+			StrategyIDs: []string{"strategy.kurd-tls13-tcp"}, RelayIDs: []string{state.RelayKeyID},
 		}
+		snapshot.profiles[profileKey] = record.ClientAuthKeyID
 	}
 	snapshot.status.AdmissionCount = len(snapshot.admissions)
 	return snapshot, nil
@@ -179,6 +198,28 @@ func (snapshot *RelayRuntimeSnapshotV1) AdmissionByClientKeyIDV1(keyID string) (
 	snapshot.mu.RLock()
 	defer snapshot.mu.RUnlock()
 	if snapshot.closed {
+		return RelayAdmissionV1{}, false
+	}
+	admission, ok := snapshot.admissions[keyID]
+	if !ok {
+		return RelayAdmissionV1{}, false
+	}
+	return admission.clone(), true
+}
+
+// AdmissionByProfileV1 returns the one exact active profile generation. It is
+// used only to select relay-owned authority before TLS and Kurd authentication.
+func (snapshot *RelayRuntimeSnapshotV1) AdmissionByProfileV1(contentID string, generation uint64) (RelayAdmissionV1, bool) {
+	if snapshot == nil || contentID == "" || generation == 0 {
+		return RelayAdmissionV1{}, false
+	}
+	snapshot.mu.RLock()
+	defer snapshot.mu.RUnlock()
+	if snapshot.closed {
+		return RelayAdmissionV1{}, false
+	}
+	keyID, ok := snapshot.profiles[relayProfileKeyV1{ContentID: contentID, Generation: generation}]
+	if !ok {
 		return RelayAdmissionV1{}, false
 	}
 	admission, ok := snapshot.admissions[keyID]
@@ -252,9 +293,11 @@ func (snapshot *RelayRuntimeSnapshotV1) Close() {
 		zero(admission.RuntimePolicy.TLSLeafDER)
 		delete(snapshot.admissions, key)
 	}
+	clear(snapshot.profiles)
 	snapshot.relayPrivate = nil
 	snapshot.tlsPrivate = nil
 	snapshot.tlsCertificate = nil
+	snapshot.profiles = nil
 	snapshot.status = RelayRuntimeStatusV1{}
 	snapshot.closed = true
 }
