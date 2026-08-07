@@ -50,8 +50,17 @@ func TestOpenRelayRuntimeSnapshotReturnsOnlyCurrentLiveAuthority(t *testing.T) {
 	admission, ok := snapshot.AdmissionByClientKeyIDV1(request.ClientAuthKeyID)
 	if !ok || admission.ProfileID != issued.ProfileID || admission.ContentID != issued.ContentID || admission.Generation != issued.Generation ||
 		admission.ClientAuthKeyID != request.ClientAuthKeyID || !bytes.Equal(admission.ClientAuthPublic[:], request.ClientAuthPublic) ||
-		len(admission.AssignedIPv4) != 4 || admission.RuntimePolicy.ClientAuthKeyID != request.ClientAuthKeyID {
+		admission.ValidFrom != now.Unix() || admission.ValidUntil != issued.ValidUntil || len(admission.AssignedIPv4) != 4 ||
+		admission.RuntimePolicy.ClientAuthKeyID != request.ClientAuthKeyID || len(admission.StrategyIDs) != 1 ||
+		admission.StrategyIDs[0] != "strategy.kurd-tls13-tcp" || len(admission.RelayIDs) != 1 || admission.RelayIDs[0] != status.RelayKeyID {
 		t.Fatalf("unexpected relay admission: %+v ok=%v", admission, ok)
+	}
+	byProfile, ok := snapshot.AdmissionByProfileV1(issued.ContentID, issued.Generation)
+	if !ok || byProfile.ClientAuthKeyID != admission.ClientAuthKeyID {
+		t.Fatalf("profile-bound relay admission unavailable: %+v ok=%v", byProfile, ok)
+	}
+	if _, ok := snapshot.AdmissionByProfileV1(issued.ContentID, issued.Generation+1); ok {
+		t.Fatal("stale profile generation retained relay authority")
 	}
 
 	localOne, err := snapshot.Local(status.RelayKeyID)
@@ -92,6 +101,9 @@ func TestOpenRelayRuntimeSnapshotReturnsOnlyCurrentLiveAuthority(t *testing.T) {
 	}
 	if _, ok := snapshot.AdmissionByClientKeyIDV1(request.ClientAuthKeyID); ok {
 		t.Fatal("closed snapshot retained admission authority")
+	}
+	if _, ok := snapshot.AdmissionByProfileV1(issued.ContentID, issued.Generation); ok {
+		t.Fatal("closed snapshot retained profile lookup authority")
 	}
 	if _, err := snapshot.Local(status.RelayKeyID); !errors.Is(err, ErrRelayRuntimeUnavailable) {
 		t.Fatalf("closed relay identity err=%v", err)
