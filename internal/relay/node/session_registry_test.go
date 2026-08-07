@@ -131,11 +131,105 @@ func TestSessionRegistryQueuePressureAndProfileStopFailClosed(t *testing.T) {
 	}
 }
 
+func TestSessionRegistryStopAllTerminatesEveryAssignment(t *testing.T) {
+	registry, err := NewSessionRegistry(newMemoryTunnelV1(), 2, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+	for index, spec := range []SessionSpec{
+		{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: [4]byte{10, 89, 0, 2}},
+		{ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 89, 0, 3}},
+	} {
+		if _, err := registry.Register(spec); err != nil {
+			t.Fatalf("register %d: %v", index, err)
+		}
+	}
+	if stopped := registry.StopAll(); stopped != 2 {
+		t.Fatalf("stopped=%d", stopped)
+	}
+	if snapshot := registry.Snapshot(); snapshot.ActiveSessions != 0 || snapshot.StoppedSessions != 2 {
+		t.Fatalf("snapshot=%+v", snapshot)
+	}
+}
+
+func TestSessionRegistryStopProfileIsNotBlockedByStalledTunnelWrite(t *testing.T) {
+	tunnel := newBlockingWriteTunnelV1()
+	t.Cleanup(tunnel.release)
+	registry, err := NewSessionRegistry(tunnel, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		tunnel.release()
+		_ = registry.Close()
+	})
+	assigned := [4]byte{10, 89, 0, 2}
+	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDone := make(chan struct{})
+	go func() {
+		_, _ = device.Write(testIPv4PacketV1(assigned, [4]byte{1, 1, 1, 1}, 17, []byte{4}))
+		close(writeDone)
+	}()
+	select {
+	case <-tunnel.writeStarted:
+	case <-time.After(time.Second):
+		t.Fatal("TUN write did not start")
+	}
+	stopped := make(chan int, 1)
+	go func() { stopped <- registry.StopProfile("profile-one") }()
+	select {
+	case count := <-stopped:
+		if count != 1 {
+			t.Fatalf("stopped=%d", count)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("profile stop waited for a stalled TUN write")
+	}
+	tunnel.release()
+	select {
+	case <-writeDone:
+	case <-time.After(time.Second):
+		t.Fatal("TUN write did not exit")
+	}
+}
+
 type memoryTunnelV1 struct {
 	read      chan []byte
 	writes    chan []byte
 	closed    chan struct{}
 	closeOnce sync.Once
+}
+
+type blockingWriteTunnelV1 struct {
+	*memoryTunnelV1
+	writeStarted chan struct{}
+	releaseWrite chan struct{}
+	startOnce    sync.Once
+	releaseOnce  sync.Once
+}
+
+func (tunnel *blockingWriteTunnelV1) release() {
+	tunnel.releaseOnce.Do(func() { close(tunnel.releaseWrite) })
+}
+
+func newBlockingWriteTunnelV1() *blockingWriteTunnelV1 {
+	return &blockingWriteTunnelV1{
+		memoryTunnelV1: newMemoryTunnelV1(), writeStarted: make(chan struct{}), releaseWrite: make(chan struct{}),
+	}
+}
+
+func (tunnel *blockingWriteTunnelV1) Write(packet []byte) (int, error) {
+	tunnel.startOnce.Do(func() { close(tunnel.writeStarted) })
+	select {
+	case <-tunnel.releaseWrite:
+		return len(packet), nil
+	case <-tunnel.closed:
+		return 0, io.EOF
+	}
 }
 
 func newMemoryTunnelV1() *memoryTunnelV1 {

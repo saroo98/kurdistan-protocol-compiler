@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-// Command kurd-node maintains the Phase 16 owner-local authority publication.
-// It intentionally has no relay listener or public data plane; those are Phase
-// 17 responsibilities and cannot be represented as available here.
+// Command kurd-node maintains owner-local authority publication and, on a
+// native Linux host, serves the explicitly provisioned Kurd data plane.
 package main
 
 import (
@@ -21,7 +20,7 @@ import (
 	"kurdistan/internal/selfhost"
 )
 
-const version = "kurd-node-phase16-v1"
+const version = "kurd-node-phase17-v1"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -31,11 +30,14 @@ func main() {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && args[0] == "version" {
-		_ = json.NewEncoder(stdout).Encode(map[string]any{"schema": "kurd-node-version-v1", "version": version, "dataPlane": "UNAVAILABLE_PHASE_16"})
+		_ = json.NewEncoder(stdout).Encode(map[string]any{"schema": "kurd-node-version-v1", "version": version, "dataPlane": "NATIVE_LINUX_ONLY"})
 		return 0
 	}
+	if len(args) > 0 && args[0] == "serve" {
+		return runServe(ctx, args[1:], stderr)
+	}
 	if len(args) == 0 || args[0] != "run" {
-		fmt.Fprintln(stderr, "usage: kurd-node run --data-dir DIR --publication-file FILE [--once]")
+		fmt.Fprintln(stderr, "usage: kurd-node run --data-dir DIR --publication-file FILE [--once] | kurd-node serve --data-dir DIR --port PORT [--control-socket PATH]")
 		return 2
 	}
 	set := flag.NewFlagSet("run", flag.ContinueOnError)
