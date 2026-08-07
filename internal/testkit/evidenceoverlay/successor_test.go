@@ -205,41 +205,43 @@ func TestLoadSuccessorChainsDecentralizedAuthorityThroughEarlierLayers(t *testin
 	}
 }
 
-func TestLoadSuccessorChainsP0RepairThroughPublicDocumentationAndEarlierLayers(t *testing.T) {
+func TestLoadSuccessorChainsNewestDecentralizedLFDocumentationAfterPublicLayer(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
-	phase14 := strings.Repeat("1", 64)
-	phase15Bytes := []byte("phase 15\n")
-	phase16CIBytes := []byte("phase 16 CI\n")
-	phase16TrustBytes := []byte("phase 16 trust\n")
-	phase16RuntimeBytes := []byte("phase 16 runtime\n")
-	decentralizedBytes := []byte("phase 16 decentralized\n")
-	publicBytes := []byte("public documentation\n")
-	p0Bytes := []byte("phase 16 P0 repair\n")
-	phase15Digest := sha256.Sum256(phase15Bytes)
-	phase16CIDigest := sha256.Sum256(phase16CIBytes)
-	phase16TrustDigest := sha256.Sum256(phase16TrustBytes)
-	phase16RuntimeDigest := sha256.Sum256(phase16RuntimeBytes)
-	decentralizedDigest := sha256.Sum256(decentralizedBytes)
-	publicDigest := sha256.Sum256(publicBytes)
-	p0Digest := sha256.Sum256(p0Bytes)
-	if err := os.WriteFile(filepath.Join(root, path), p0Bytes, 0o644); err != nil {
+	path := "docs/GITHUB_REPO_PROFILE.md"
+	historical := strings.Repeat("1", 64)
+	phase16Bytes := []byte("phase 16 profile\n")
+	staleWindowsBytes := []byte("profile\r\n")
+	canonicalCommittedBytes := []byte("profile\n")
+	phase16Digest := sha256.Sum256(phase16Bytes)
+	staleWindowsDigest := sha256.Sum256(staleWindowsBytes)
+	canonicalCommittedDigest := sha256.Sum256(canonicalCommittedBytes)
+	if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16RuntimeSuccessorPath, `{"version":"phase16-production-runtime-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16DecentralizedSuccessorPath, `{"version":"phase16-decentralized-self-hosted-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`","post_sha256":"`+hex.EncodeToString(decentralizedDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, PublicDocumentationSuccessorPath, `{"version":"public-documentation-sanitization-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(decentralizedDigest[:])+`","post_sha256":"`+hex.EncodeToString(publicDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16P0RepairSuccessorPath, `{"version":"phase16-p0-evidence-repair-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(publicDigest[:])+`","post_sha256":"`+hex.EncodeToString(p0Digest[:])+`"}]}`)
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(path)), canonicalCommittedBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeOverlayForTest(t, root, PublicDocumentationSuccessorPath, `{"version":"public-documentation-sanitization-v1","entries":[{"path":"`+path+`","pre_sha256":"`+hex.EncodeToString(phase16Digest[:])+`","post_sha256":"`+hex.EncodeToString(staleWindowsDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16DecentralizedSuccessorPath, `{"version":"phase16-decentralized-self-hosted-v1","entries":[{"path":"`+path+`","pre_sha256":"`+historical+`","post_sha256":"`+hex.EncodeToString(phase16Digest[:])+`"}],"successor_entries":[{"path":"`+path+`","pre_sha256":"`+hex.EncodeToString(staleWindowsDigest[:])+`","post_sha256":"`+hex.EncodeToString(canonicalCommittedDigest[:])+`"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := pre[path]; got != phase14 {
-		t.Fatalf("oldest predecessor = %q, want %q", got, phase14)
+	if got := pre[path]; got != historical {
+		t.Fatalf("predecessor = %q, want %q", got, historical)
+	}
+}
+
+func TestRepositoryDocumentationProfileUsesCanonicalLFSuccessorV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, "docs", "GITHUB_REPO_PROFILE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(raw)
+	if got, want := hex.EncodeToString(digest[:]), "20c9c960b20a5c8bc795419a812ce1832bad0bc35918d04fdd06f427e8b91b51"; got != want {
+		t.Fatalf("documentation profile SHA-256 = %s, want canonical LF successor %s", got, want)
 	}
 }
 

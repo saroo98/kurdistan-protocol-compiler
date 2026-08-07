@@ -1222,7 +1222,6 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		}
 	}
 	fixturePaths = append(fixturePaths,
-		evidenceoverlay.Phase16P0RepairSuccessorPath,
 		evidenceoverlay.PublicDocumentationSuccessorPath,
 		evidenceoverlay.SuccessorPath,
 		evidenceoverlay.Phase16SuccessorPath,
