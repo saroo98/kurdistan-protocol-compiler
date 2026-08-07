@@ -220,7 +220,7 @@ func migrateStateV1(v1 persistedStateV1, master []byte, now time.Time) (persiste
 		Delegation: v1.Delegation, DelegationPayload: append([]byte(nil), v1.DelegationPayload...), DelegationSig: append([]byte(nil), v1.DelegationSig...),
 		Revocations: v1.Revocations, RevocationPayload: append([]byte(nil), v1.RevocationPayload...), RevocationSig: append([]byte(nil), v1.RevocationSig...),
 		RecoveryConfirmed: v1.RecoveryConfirmed, Drained: v1.Drained, IPv4Pool: ipv4Pool, IPv6Pool: ipv6Pool,
-		Profiles: profiles, Assignments: []addressAssignmentV1{}, Audit: append([]auditEntry(nil), v1.Audit...), PublicationOutbox: append([]publicationOutboxEntry(nil), v1.PublicationOutbox...),
+		Profiles: profiles, Assignments: []addressAssignmentV1{}, RecipientUses: recipientUseLedgerV1{}, Audit: append([]auditEntry(nil), v1.Audit...), PublicationOutbox: append([]publicationOutboxEntry(nil), v1.PublicationOutbox...),
 	}
 	if err := validateState(state, master); err != nil {
 		return persistedState{}, err

@@ -112,7 +112,7 @@ func newTLSIdentityWithRandom(master []byte, deploymentID, san string, epoch uin
 }
 
 func validateTLSIdentity(master []byte, deploymentID string, identity tlsIdentityV1, relayPublic []byte) error {
-	if identity.Epoch == 0 || !validID(identity.KeyID) || len(identity.Serial) == 0 || len(identity.Serial) > 20 || identity.Serial[0]&0x80 != 0 ||
+	if identity.Epoch == 0 || !validID(identity.KeyID) || len(identity.Serial) == 0 || len(identity.Serial) > 20 ||
 		identity.NotBefore <= 0 || identity.NotAfter <= identity.NotBefore || time.Duration(identity.NotAfter-identity.NotBefore)*time.Second > tlsMaximumLifetime ||
 		len(identity.LeafDER) == 0 || len(identity.LeafDigest) != sha256.Size || len(master) != 32 {
 		return ErrStateCorrupt

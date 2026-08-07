@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 type Entry struct {
@@ -140,11 +142,11 @@ func newEntry(root, id, kind, source, generator, provenance, license, decision, 
 }
 
 func fileHash(root, path string) string {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	digest, err := evidenceoverlay.ResolvePhase17PredecessorSHA256(root, path)
 	if err != nil {
 		panic(err)
 	}
-	return hash(raw)
+	return digest
 }
 
 func hash(raw []byte) string {

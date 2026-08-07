@@ -37,6 +37,15 @@ type hpkeActivationOpener struct {
 	want      RecipientBinding
 }
 
+type hpkeOfflineActivationOpener struct {
+	key  hpke.PrivateKey
+	want RecipientBinding
+}
+
+func (o hpkeOfflineActivationOpener) OpenOffline(binding RecipientBinding, protected, enc, ciphertext []byte) ([]byte, error) {
+	return hpkeActivationOpener{key: o.key, protected: protected, want: o.want}.Open(binding, enc, ciphertext)
+}
+
 func (o hpkeActivationOpener) Open(binding RecipientBinding, enc, ciphertext []byte) ([]byte, error) {
 	if binding != o.want {
 		return nil, errors.New("binding mismatch")
@@ -845,6 +854,39 @@ func TestActivateVerifiedProfileFullSnapshotReplacementRemovesOmittedMembers(t *
 	}
 	if len(store.lkg.Profile.RelayIDs) != 1 || store.lkg.Profile.RelayIDs[0] != "relay-1" {
 		t.Fatalf("last-known-good lost: %#v", store.lkg.Profile)
+	}
+}
+
+func TestActivateVerifiedProfileUnwrapsOuterBundleBeforeContextBoundRecipientOpen(t *testing.T) {
+	request, _ := validActivationRequest(t)
+	metadata := envelope.ArtifactMetadata{
+		Class: envelope.ArtifactDeviceRecipient, AudienceClass: envelope.AudienceProvisionedDevice,
+		RecipientHint: "request-outer-1", RecipientEpoch: 1,
+	}
+	signed := resignProfile(t, &request, func(*envelope.CanonicalProfileV1) {}, metadata, request.Delegation.Artifact.IssuerKey.KeyID)
+	sealRequestHPKE(t, &request, signed, metadata)
+	legacy := request.Opener.(hpkeActivationOpener)
+	inner := bytes.Clone(request.Artifact)
+	outer := append([]byte("owner-bundle-v2:"), inner...)
+	request.Artifact = outer
+	request.Opener = nil
+	request.OfflineOpener = hpkeOfflineActivationOpener{key: legacy.key, want: legacy.want}
+	request.UnwrapArtifact = func(candidate []byte) ([]byte, error) {
+		if !bytes.HasPrefix(candidate, []byte("owner-bundle-v2:")) {
+			return nil, errors.New("outer authority rejected")
+		}
+		return bytes.Clone(candidate[len("owner-bundle-v2:"):]), nil
+	}
+	activated, err := ActivateVerifiedProfile(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(activated.Artifact, outer) || !bytes.Equal(activated.SignedObject, signed) {
+		t.Fatal("activation did not preserve exact outer artifact and opened signed object")
+	}
+	outer[len(outer)-1] ^= 1
+	if bytes.Equal(activated.Artifact, outer) {
+		t.Fatal("activation record aliases caller-owned outer artifact")
 	}
 }
 

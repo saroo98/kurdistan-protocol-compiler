@@ -99,6 +99,11 @@ type TransactionalActivationProvider interface {
 
 type ActivationRequest struct {
 	Artifact []byte
+	// UnwrapArtifact verifies an application-owned outer envelope and returns
+	// the exact native signed or recipient-sealed profile artifact. The
+	// activation record remains bound to Artifact, so durable reopen repeats
+	// this callback over the exact outer bytes.
+	UnwrapArtifact func([]byte) ([]byte, error)
 	// UnwrapSignedObject verifies an application-owned outer envelope and
 	// returns its exact signed profile object. The persisted activation record
 	// remains bound to Artifact, so reopen verification repeats this callback
@@ -113,6 +118,7 @@ type ActivationRequest struct {
 	Verifier           Verifier
 	Resolver           RecipientResolver
 	Opener             RecipientOpener
+	OfflineOpener      OfflineRecipientOpener
 	Storage            TransactionalActivationProvider
 	ContractVersion    string
 	MinSafetyFloor     uint64
@@ -176,8 +182,18 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 	var err error
 	var outer *envelope.SealProtectedContextV1
 	var recipient *RecipientBinding
+	nativeArtifact := bytes.Clone(artifact)
+	if request.UnwrapArtifact != nil {
+		if request.UnwrapSignedObject != nil {
+			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+		}
+		nativeArtifact, err = request.UnwrapArtifact(bytes.Clone(artifact))
+		if err != nil || len(nativeArtifact) == 0 || len(nativeArtifact) > envelope.MaxTotalInputBytes {
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+	}
 	if request.UnwrapSignedObject != nil {
-		if request.Dispatch.Class != envelope.ArtifactSignedPublic || request.Resolver != nil || request.Opener != nil {
+		if request.Dispatch.Class != envelope.ArtifactSignedPublic || request.Resolver != nil || request.Opener != nil || request.OfflineOpener != nil {
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		signedObject, err = request.UnwrapSignedObject(bytes.Clone(artifact))
@@ -186,11 +202,14 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 		}
 		observe(request, StageOuterParsed)
 	} else if request.Dispatch.Class == envelope.ArtifactSignedPublic {
-		signedObject = bytes.Clone(artifact)
+		if request.Resolver != nil || request.Opener != nil || request.OfflineOpener != nil {
+			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+		}
+		signedObject = bytes.Clone(nativeArtifact)
 		observe(request, StageOuterParsed)
 	} else {
-		sealed, err := envelope.ParseSealedProfileOpaque(artifact)
-		if err != nil || request.Resolver == nil || request.Opener == nil {
+		sealed, err := envelope.ParseSealedProfileOpaque(nativeArtifact)
+		if err != nil || request.Resolver == nil || (request.Opener == nil) == (request.OfflineOpener == nil) {
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		context, err := envelope.DecodeSealProtectedContextV1(sealed.Protected)
@@ -199,9 +218,16 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 		}
 		outer = &context
 		observe(request, StageOuterParsed)
-		var resolved RecipientBinding
-		signedObject, resolved, err = OpenResolvedRecipientForMetadata(request.Resolver, request.Opener, context.Metadata, sealed.Encapsulation, sealed.Ciphertext)
+		resolved, err := ResolveRecipientForMetadata(request.Resolver, context.Metadata)
 		if err != nil {
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		if request.OfflineOpener != nil {
+			signedObject, err = request.OfflineOpener.OpenOffline(resolved, sealed.Protected, sealed.Encapsulation, sealed.Ciphertext)
+		} else {
+			signedObject, err = request.Opener.Open(resolved, sealed.Encapsulation, sealed.Ciphertext)
+		}
+		if err != nil || len(signedObject) == 0 || len(signedObject) > envelope.MaxSignedObjectBytes {
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 		recipient = &resolved
@@ -334,6 +360,27 @@ func EncodeIssuerDelegationV1(d IssuerDelegationArtifact) ([]byte, error) {
 		return nil, errors.New("profile: invalid issuer delegation encoding")
 	}
 	return canonicalCBOR(map[uint64]any{1: uint64(1), 2: d.RootEpoch, 3: d.RootKeyID, 4: d.IssuerKey.KeyID, 5: uint64(d.IssuerKey.SuiteID), 6: d.Scope.ProviderID, 7: d.Scope.LineageID, 8: d.Scope.ProfileNamespace, 9: d.ValidFrom, 10: d.ValidUntil, 11: d.DelegationEpoch, 12: d.MaxProfileValiditySecs, 13: d.Revoked})
+}
+
+// EncodeScopedAuthorityV1 returns the canonical root-signing payload for one
+// provider or recipient-registrar capability. Issuer authority is deliberately
+// excluded because it has a separate, narrower encoding and validation path.
+func EncodeScopedAuthorityV1(authority ScopedAuthorityArtifact) ([]byte, error) {
+	if authority.Role != RoleProvider && authority.Role != RoleRecipientRegistrar ||
+		authority.RootEpoch == 0 || !boundedID(authority.RootKeyID) ||
+		authority.SubjectKey.validate() != nil || authority.Scope.validate() != nil ||
+		authority.ValidFrom <= 0 || authority.ValidUntil <= authority.ValidFrom ||
+		authority.AuthorizationEpoch == 0 {
+		return nil, errors.New("profile: invalid scoped authority encoding")
+	}
+	return canonicalCBOR(map[uint64]any{
+		1: uint64(1), 2: string(authority.Role), 3: authority.RootEpoch,
+		4: authority.RootKeyID, 5: authority.SubjectKey.KeyID,
+		6: uint64(authority.SubjectKey.SuiteID), 7: authority.Scope.ProviderID,
+		8: authority.Scope.LineageID, 9: authority.Scope.ProfileNamespace,
+		10: authority.ValidFrom, 11: authority.ValidUntil,
+		12: authority.AuthorizationEpoch, 13: authority.Revoked,
+	})
 }
 
 func EncodeRevocationSetV1(r RevocationSetV1) ([]byte, error) {

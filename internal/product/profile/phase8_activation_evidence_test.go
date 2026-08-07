@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 func TestWO805DeterministicEvidenceReports(t *testing.T) {
@@ -53,7 +55,8 @@ func TestWO805DeterministicEvidenceReports(t *testing.T) {
 			if strings.Join(report.Cases, "\n") != strings.Join(expectedCases, "\n") {
 				t.Fatalf("case set mismatch: %v", report.Cases)
 			}
-			if report.SourceSHA256 != fileSHA256(t, "phase8_activation.go") || report.TestSourceSHA256 != fileSHA256(t, "phase8_activation_test.go") {
+			root := filepath.Clean(filepath.Join("..", "..", ".."))
+			if report.SourceSHA256 != effectiveFileSHA256(t, root, "internal/product/profile/phase8_activation.go") || report.TestSourceSHA256 != effectiveFileSHA256(t, root, "internal/product/profile/phase8_activation_test.go") {
 				t.Fatal("source hash mismatch")
 			}
 			caseHash := stringsSHA256(expectedCases)
@@ -137,6 +140,15 @@ func fileSHA256(t *testing.T, name string) string {
 	}
 	digest := sha256.Sum256(encoded)
 	return hex.EncodeToString(digest[:])
+}
+
+func effectiveFileSHA256(t *testing.T, root, name string) string {
+	t.Helper()
+	digest, err := evidenceoverlay.ResolveCurrentSHA256(root, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest
 }
 
 func stringsSHA256(values []string) string {

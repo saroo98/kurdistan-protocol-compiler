@@ -15,6 +15,7 @@ import (
 
 	"kurdistan/internal/product/envelope"
 	"kurdistan/internal/product/profile"
+	"kurdistan/internal/testkit/evidenceoverlay"
 	"kurdistan/internal/testkit/phase8issuance"
 )
 
@@ -64,17 +65,17 @@ func Generate(out, repoRoot string) error {
 	if err != nil {
 		return err
 	}
-	sourceHash, err := hashFile(filepath.Join(repoRoot, "internal/product/profile/phase8_tooling.go"))
+	sourceHash, err := evidenceoverlay.ResolveCurrentSHA256(repoRoot, "internal/product/profile/phase8_tooling.go")
 	if err != nil {
 		return err
 	}
-	testHash, err := hashFile(filepath.Join(repoRoot, "internal/product/profile/phase8_tooling_external_test.go"))
+	testHash, err := evidenceoverlay.ResolveCurrentSHA256(repoRoot, "internal/product/profile/phase8_tooling_external_test.go")
 	if err != nil {
 		return err
 	}
 	testHashByReport := map[string]string{}
 	for name, path := range map[string]string{"fixture-reproduction-report.json": "internal/product/profile/phase8_tooling_evidence_test.go", "issuance-roundtrip-report.json": "internal/product/profile/phase8_tooling_external_test.go", "production-wiring-negative-report.json": "internal/testkit/phase8issuancefixture/isolation_test.go", "offline-boundary-report.json": "cmd/kprofile/main_test.go", "issuance-negative-report.json": "internal/product/profile/phase8_tooling_external_test.go", "redacted-inspect-report.json": "cmd/kprofile/main_test.go"} {
-		digest, hashErr := hashFile(filepath.Join(repoRoot, filepath.FromSlash(path)))
+		digest, hashErr := evidenceoverlay.ResolveCurrentSHA256(repoRoot, path)
 		if hashErr != nil {
 			return hashErr
 		}

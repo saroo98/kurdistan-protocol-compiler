@@ -5,6 +5,7 @@ package profile_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"kurdistan/internal/product/envelope"
@@ -109,4 +110,56 @@ func TestVerifiedIssuedArtifactRejectsDifferentAuthorizedIntent(t *testing.T) {
 	); err == nil {
 		t.Fatal("artifact finalized under a different authorized intent")
 	}
+}
+
+func TestIssueOfflineCheckedVerifiesSignatureBeforeSealing(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactDeviceRecipient)
+	intent, err := profile.VerifyIssuanceIntent(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer := phase8issuance.NewIssuer()
+	verifier := phase8issuance.NewIndependentVerifier()
+	sealer := phase8issuance.NewRecipientSealer()
+	receipt, err := profile.IssueOfflineChecked(intent, signer, verifier, sealer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signer.Operations() != 1 || verifier.Operations() != 1 || sealer.Phase8BindingsUsed() != 1 {
+		t.Fatalf("operations signer=%d verifier=%d sealer=%d", signer.Operations(), verifier.Operations(), sealer.Phase8BindingsUsed())
+	}
+	if receipt.ProfileID() != spec.Profile.ProfileID || receipt.Generation() != spec.Profile.Generation ||
+		receipt.ValidUntil() != spec.Profile.ValidUntil || receipt.SigningInputSHA256() != intent.SigningInputSHA256() || len(receipt.ArtifactSHA256()) != 64 {
+		t.Fatalf("unexpected receipt: %#v", receipt.Inspection())
+	}
+	artifact := receipt.ExactArtifact()
+	artifact[0] ^= 1
+	if bytes.Equal(artifact, receipt.ExactArtifact()) {
+		t.Fatal("issuer receipt exposed mutable artifact bytes")
+	}
+	verified, err := profile.VerifyIssuedArtifact(intent, receipt.ExactArtifact(), phase8issuance.NewIndependentVerifier(), phase8issuance.NewResolver(envelope.ArtifactDeviceRecipient), phase8issuance.NewIndependentRecipientOpener())
+	if err != nil || verified.ArtifactSHA256() != receipt.ArtifactSHA256() {
+		t.Fatalf("recipient verification err=%v", err)
+	}
+}
+
+func TestIssueOfflineCheckedNeverSealsUnverifiedSignature(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactDeviceRecipient)
+	intent, err := profile.VerifyIssuanceIntent(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealer := phase8issuance.NewRecipientSealer()
+	if _, err := profile.IssueOfflineChecked(intent, phase8issuance.NewIssuer(), rejectingVerifier{}, sealer); !errors.Is(err, profile.ErrOfflineIssuance) {
+		t.Fatalf("unverified signature error=%v", err)
+	}
+	if sealer.Phase8BindingsUsed() != 0 {
+		t.Fatal("recipient sealer ran before signature verification")
+	}
+}
+
+type rejectingVerifier struct{}
+
+func (rejectingVerifier) Verify(profile.KeyReference, []byte, []byte) error {
+	return errors.New("rejected")
 }

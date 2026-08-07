@@ -281,6 +281,46 @@ func TestResolveCurrentSHA256UsesValidatedPredecessorOrWorkingTree(t *testing.T)
 	}
 }
 
+func TestResolvePhase17PredecessorSHA256StopsAtPhase16State(t *testing.T) {
+	root := t.TempDir()
+	overlaidPath := "internal/product/profile/phase8_tooling.go"
+	currentPath := "testdata/evidence/phase8-suite-decision-matrix.json"
+	phase16 := []byte("phase 16 state\n")
+	phase17 := []byte("phase 17 state\n")
+	current := []byte("current phase 16 evidence\n")
+	phase16Digest := sha256.Sum256(phase16)
+	phase17Digest := sha256.Sum256(phase17)
+	currentDigest := sha256.Sum256(current)
+	if err := os.MkdirAll(filepath.Join(root, "internal", "product", "profile"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(overlaidPath)), phase17, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "testdata", "evidence"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(currentPath)), current, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeOverlayForTest(t, root, Phase17SuccessorPath, `{"version":"phase17-live-data-plane-v1","entries":[{"path":"`+overlaidPath+`","pre_sha256":"`+hex.EncodeToString(phase16Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase17Digest[:])+`"}]}`)
+
+	got, err := ResolvePhase17PredecessorSHA256(root, overlaidPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := hex.EncodeToString(phase16Digest[:]); got != want {
+		t.Fatalf("overlaid digest = %q, want Phase 16 digest %q", got, want)
+	}
+	got, err = ResolvePhase17PredecessorSHA256(root, currentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := hex.EncodeToString(currentDigest[:]); got != want {
+		t.Fatalf("unchanged digest = %q, want current digest %q", got, want)
+	}
+}
+
 func writeOverlayForTest(t *testing.T, root, relative, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(relative))
