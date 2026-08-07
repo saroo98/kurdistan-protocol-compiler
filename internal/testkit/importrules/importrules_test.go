@@ -3870,12 +3870,29 @@ func TestStrictRelayReachabilityCompatibilityAllowlistV1(t *testing.T) {
 	fset := token.NewFileSet()
 	runtimeRoot := filepath.Join(root, "internal", "runtime")
 	type indexedDecl struct {
-		name, file string
-		decl       *ast.FuncDecl
-		imports    []*ast.ImportSpec
+		name, file             string
+		receiver, receiverName string
+		decl                   *ast.FuncDecl
+		imports                []*ast.ImportSpec
 	}
 	var declarations []*indexedDecl
-	byName := make(map[string][]*indexedDecl)
+	byFunctionName := make(map[string][]*indexedDecl)
+	byMethod := make(map[string][]*indexedDecl)
+	structFields := make(map[string]map[string]string)
+	baseTypeName := func(expression ast.Expr) string {
+		for {
+			switch value := expression.(type) {
+			case *ast.Ident:
+				return value.Name
+			case *ast.StarExpr:
+				expression = value.X
+			case *ast.ParenExpr:
+				expression = value.X
+			default:
+				return ""
+			}
+		}
+	}
 	err := filepath.WalkDir(runtimeRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -3892,13 +3909,49 @@ func TestStrictRelayReachabilityCompatibilityAllowlistV1(t *testing.T) {
 			return err
 		}
 		for _, declaration := range file.Decls {
+			general, ok := declaration.(*ast.GenDecl)
+			if !ok || general.Tok != token.TYPE {
+				continue
+			}
+			for _, specification := range general.Specs {
+				typeSpec, ok := specification.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				structure, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				fields := make(map[string]string)
+				for _, field := range structure.Fields.List {
+					fieldType := baseTypeName(field.Type)
+					for _, fieldName := range field.Names {
+						fields[fieldName.Name] = fieldType
+					}
+				}
+				structFields[typeSpec.Name.Name] = fields
+			}
+		}
+		for _, declaration := range file.Decls {
 			function, ok := declaration.(*ast.FuncDecl)
 			if !ok || function.Body == nil {
 				continue
 			}
-			indexed := &indexedDecl{name: function.Name.Name, file: name, decl: function, imports: file.Imports}
+			receiver, receiverName := "", ""
+			if function.Recv != nil && len(function.Recv.List) == 1 {
+				receiver = baseTypeName(function.Recv.List[0].Type)
+				if len(function.Recv.List[0].Names) == 1 {
+					receiverName = function.Recv.List[0].Names[0].Name
+				}
+			}
+			indexed := &indexedDecl{name: function.Name.Name, file: name, receiver: receiver, receiverName: receiverName, decl: function, imports: file.Imports}
 			declarations = append(declarations, indexed)
-			byName[indexed.name] = append(byName[indexed.name], indexed)
+			if receiver == "" {
+				byFunctionName[indexed.name] = append(byFunctionName[indexed.name], indexed)
+			} else {
+				key := receiver + "." + indexed.name
+				byMethod[key] = append(byMethod[key], indexed)
+			}
 		}
 		return nil
 	})
@@ -3917,6 +3970,25 @@ func TestStrictRelayReachabilityCompatibilityAllowlistV1(t *testing.T) {
 		}
 	}
 	reached := make(map[*ast.FuncDecl]struct{})
+	var receiverType func(ast.Expr, *indexedDecl) string
+	receiverType = func(expression ast.Expr, current *indexedDecl) string {
+		switch value := expression.(type) {
+		case *ast.Ident:
+			if value.Name == current.receiverName {
+				return current.receiver
+			}
+		case *ast.SelectorExpr:
+			ownerType := receiverType(value.X, current)
+			if ownerType != "" {
+				return structFields[ownerType][value.Sel.Name]
+			}
+		case *ast.ParenExpr:
+			return receiverType(value.X, current)
+		case *ast.StarExpr:
+			return receiverType(value.X, current)
+		}
+		return ""
+	}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
@@ -3936,21 +4008,40 @@ func TestStrictRelayReachabilityCompatibilityAllowlistV1(t *testing.T) {
 				return true
 			}
 			called := ""
+			var localTargets []*indexedDecl
 			switch function := call.Fun.(type) {
 			case *ast.Ident:
 				called = function.Name
+				localTargets = byFunctionName[called]
 			case *ast.SelectorExpr:
 				called = function.Sel.Name
+				if receiver := receiverType(function.X, current); receiver != "" {
+					localTargets = byMethod[receiver+"."+called]
+				}
 			}
 			if _, forbidden := forbiddenCalls[called]; forbidden {
 				t.Errorf("strict relay reached %s:%s calling forbidden symbol %s; allowlist=%s", current.file, current.name, called, strings.Join(compatibilityAllowlist, ", "))
 			}
-			queue = append(queue, byName[called]...)
+			queue = append(queue, localTargets...)
 			return true
 		})
 	}
 	if len(reached) == 0 {
 		t.Fatal("strict relay reachability roots were not indexed")
+	}
+	reachedNames := make(map[string]struct{}, len(reached))
+	for _, declaration := range declarations {
+		if _, ok := reached[declaration.decl]; ok {
+			reachedNames[declaration.name] = struct{}{}
+		}
+	}
+	for _, required := range []string{
+		"newStrictProtectedChannelV1", "sealClientApplicationV1", "openClientApplicationV1",
+		"sealRelayAckV1", "openRelayAckV1", "sealClientCloseV1", "openClientCloseV1",
+	} {
+		if _, ok := reachedNames[required]; !ok {
+			t.Errorf("strict relay reachability lost required protected-path declaration %s", required)
+		}
 	}
 	strictPath := filepath.Join(root, "internal", "runtime", "loopback_pair.go")
 	raw, err := os.ReadFile(strictPath)
