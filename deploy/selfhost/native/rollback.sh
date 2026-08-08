@@ -43,6 +43,11 @@ recreate_owned_tun() {
   return 1
 }
 
+rebind_owned_dns() {
+  systemctl restart unbound.service >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet unbound.service || return 1
+}
+
 was_service_active=false
 was_socket_enabled=false
 systemctl is-active --quiet kurd-node.service && was_service_active=true || true
@@ -127,7 +132,7 @@ nft destroy table inet kurd_node >/dev/null 2>&1 || true
 systemctl daemon-reload
 recreate_owned_tun || fail PREVIOUS_TUN_RECREATE_FAILED
 sysctl --system >/dev/null
-systemctl try-reload-or-restart unbound.service >/dev/null 2>&1 || true
+rebind_owned_dns || fail PREVIOUS_DNS_REBIND_FAILED
 if [ -f /var/lib/kurd-node/state.kurd-state ]; then
   runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir /var/lib/kurd-node >/dev/null || fail PREVIOUS_DOCTOR_FAILED
 fi
