@@ -218,6 +218,23 @@ func TestNativeDeploymentSupportsDistinctIPv4AndIPv6EgressInterfaces(t *testing.
 	}
 }
 
+func TestNativeInstallerStagesEveryServiceExecutableForIsolatedVerification(t *testing.T) {
+	root := repositoryRootV1(t)
+	install, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	installText := string(install)
+	for _, marker := range []string{
+		"stage_systemd_executable bin/kurd-node /usr/local/bin/kurd-node",
+		"stage_systemd_executable bin/kurdctl /usr/local/bin/kurdctl",
+	} {
+		if !strings.Contains(installText, marker) {
+			t.Fatalf("isolated systemd verification is missing %q", marker)
+		}
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
