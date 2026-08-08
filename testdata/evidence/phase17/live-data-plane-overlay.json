@@ -115,7 +115,12 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_sha256": "3de491ac11b03002a2e4d9c3d7d48be78138408ac28b13d21fc11273aa36cb68",
-      "post_sha256": "74343163c3ebb50c8fb534c0417598c00388cb305f870c01ce428671c117e31f"
+      "post_sha256": "cb4e2b318b2629d013eef66c6ec993fd3c517ead0ea345412e109ca0b9905db5"
+    },
+    {
+      "path": ".github/workflows/candidate.yml",
+      "pre_sha256": "1af68be52273bda0278252a91f9caca03e60cc1508f812cb3191fb42687e7404",
+      "post_sha256": "e757753fe06dd10d30f6fc6fd7acdced3492e1efab1e6325d5ad261a358f51c8"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -125,7 +130,7 @@
     {
       "path": ".github/workflows/pr.yml",
       "pre_sha256": "c002c3f6796544048de3764d39ce45bfee4483e05fc7977b2eaf83bd9e3c875e",
-      "post_sha256": "c975b1d5e0c58c6e3e51dd3dc3a1f9d3e69599d45e37ef0cfdf872f229c2cc5f"
+      "post_sha256": "70882e2928ce4fce109f93ab48d429ca0737ab538b95802e24b179a2bcfc1c90"
     },
     {
       "path": "android/app/build.gradle.kts",
@@ -305,7 +310,7 @@
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b7eaa596c3cf0a6b3e78999fd64183bcdd4cb496fbf97080e2fd7f73518da37d"
+      "post_sha256": "43b5a4a8e6eae29ef8929336ddba4bd9290e378d28bf857e8eaf69b86de70445"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitor.kt",
@@ -315,7 +320,7 @@
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelControllerTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "9059b8454d2944f3fc8e91b8507eac4b43f55a9a06c8c8b8172eef8e22bb2948"
+      "post_sha256": "ba66487f39ba8e314b0e518aeeb3c62d107c70d11a0c4fc591a07bdfb4804621"
     },
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitorTest.kt",
@@ -343,9 +348,29 @@
       "post_sha256": "8b9c46ed7b497184e8d3aafb1b9461e7e59e84cbf961c680d515453bd52e1e44"
     },
     {
+      "path": "cmd/assure/candidate.go",
+      "pre_sha256": "11af5b5916c42074c3b5d7c2780cda1d36fd5658e99df487ea5de9e7f8f2d110",
+      "post_sha256": "d397f6b1678d2b4a27a91a724abd5b575cdfb786ce83397473010cf79493ab1e"
+    },
+    {
+      "path": "cmd/assure/candidate_test.go",
+      "pre_sha256": "019ace76e3fc77f19754241fe12decf0a339005a3bb5c439203125909e9fa31e",
+      "post_sha256": "b5e66fc3046d14e56c55c30abfcecac3966b054ecc391ffc073ec5bb8dfa37b0"
+    },
+    {
+      "path": "cmd/assure/main_test.go",
+      "pre_sha256": "791933e26f51eb1b485d8fb73e901b76f4dbc17991ff14e60f779680a78eb6f1",
+      "post_sha256": "12034ebde8072fa4ab72b3dc01c7c0b0cf8f8a27a08f9025feb4fd61b3922787"
+    },
+    {
       "path": "cmd/gate/main.go",
       "pre_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1",
-      "post_sha256": "6ddb207e501dd2ca0e0b24281c46aad564d1f45ed768632e141c394ce11a9610"
+      "post_sha256": "8bed03c504f593764941d013f1b548ebad6b303708cb572a2cc3f5a1c3ae1f38"
+    },
+    {
+      "path": "cmd/gate/main_test.go",
+      "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
+      "post_sha256": "945d5eb5f68f048d237eb74d0f7be9e5b4dc9c4cd820fc03d6500d1c12abf5aa"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -365,7 +390,7 @@
     {
       "path": "cmd/kandroidbridge/environment_selfhost_test.go",
       "pre_sha256": "1938b9e1a22f646ee2a32d74f7af1ef85593b3e66328e4c6308e208a8e188125",
-      "post_sha256": "54f54664fe8258900668b33e05caa4005aafd4bbd800d0940a2ef84bd57b8769"
+      "post_sha256": "a8d846859f0f570bd54b1e898ac616086bd89d7f1bfe6720af4082d6c49ac472"
     },
     {
       "path": "cmd/kandroidbridge/main.go",
@@ -375,12 +400,12 @@
     {
       "path": "cmd/kandroidbridge/phase17_release.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3ce2a250ac1847ffe046eaef16a6b94882108598b9c2314bd9896ecdfa612ef9"
+      "post_sha256": "a3bec7b38153aa77fca877f859e2d9b920f0ae14571dd6815a293ecf8cf8d209"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_stub.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c33b4fb83e322919451a4fe487d8ac983d39dfd39f6c12f94430eb0c3ae53435"
+      "post_sha256": "d03058d1a54806a2561cccc47781d7dc8dafbefdd80bca9b1117b3e6d24d99e7"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_test.go",
@@ -390,7 +415,7 @@
     {
       "path": "cmd/kandroidbridge/phase17_release_unix.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "1ccde914b6456edb1edde00f28e80f490e3548d305051bb6aa93406e1cf6718f"
+      "post_sha256": "0478be881b81884b179a6c873871249f8e67297aa83b22369c287f8218327e02"
     },
     {
       "path": "cmd/kurd-node/main.go",
@@ -531,6 +556,16 @@
       "path": "cmd/phase9verify/main.go",
       "pre_sha256": "a7b3303c3c4bdd9866c023ad42c2de1b872096c2f68a6baeb0ce4c7c0bd2348b",
       "post_sha256": "4f3c55893cbe722d7b8ef9a40c1af6a2ac852f1ab71011720362037b6909cd94"
+    },
+    {
+      "path": "config/ci/impact-policy.json",
+      "pre_sha256": "1251aef3d1e7f7ba6dcc9875d0cf95c1795d8e00c6729c6ef1467419769d3044",
+      "post_sha256": "d869223dfae58d226289a2e80967dc0a01ff634bd9c7315b54636e101cafffc4"
+    },
+    {
+      "path": "config/ci/proof-policy.json",
+      "pre_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e",
+      "post_sha256": "3cd06249460d96c832e9f94fed6c4fe3e3dca6a6bffa8f69015fa036c4e49a33"
     },
     {
       "path": "deploy/selfhost/container/compose.yml",
@@ -695,12 +730,12 @@
     {
       "path": "internal/androidbridge/runtime_session_v2.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "832732b073262320422dfeb1794207937608501729652bb93c5652631c08ce3a"
+      "post_sha256": "32aaa864c21da0e5a4c2e96e1d310cea06c923a7f5a61d69687be6cdfca5dcd5"
     },
     {
       "path": "internal/androidbridge/runtime_session_v2_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e19198e363ea3b2d9bb3c5a9ec6f4d0d33b9d3d5a66851571f9d64503bd0f913"
+      "post_sha256": "3da905f4553f7c06a55cea61587ec1f2629798d399c7e8ec8a623905d452bef4"
     },
     {
       "path": "internal/androidbridge/verify.go",
@@ -973,6 +1008,11 @@
       "post_sha256": "6da3be0467402ea6f34ab4b2d9270205dfb3ed1e58206b0e475fc396ca6f07de"
     },
     {
+      "path": "internal/relay/node/server_phase17integration_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c0d54128e48a0e0ffe3f1c5bda33d9b2daaae25a578635da3f0df02c56ec7711"
+    },
+    {
       "path": "internal/relay/node/server_test.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "87d4327b00e8795dcec311137ad9c261deae6b858ed1f918112ab279f2e57ce1"
@@ -1040,12 +1080,12 @@
     {
       "path": "internal/runtime/ip_tunnel_v1.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "fb22551675069be8585d797d30671f000073970cae625cc2ef07bf658c3aeabe"
+      "post_sha256": "8f027bdf879813f75a6db4253e1055b0b67e34f1a0dcdc9b74741a0c07ef80e4"
     },
     {
       "path": "internal/runtime/ip_tunnel_v1_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "22221e87833695f07352ce7f78b24fd32f36476da318af812d95f22c44528c4a"
+      "post_sha256": "bffb42810e4a41f0bbe2f105219b2fd85448fc6995da164adefe650dba32fabe"
     },
     {
       "path": "internal/runtime/network_tlstcp_integration_test.go",
@@ -1071,6 +1111,11 @@
       "path": "internal/runtime/process_duplex_record_v1_test.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "32c161e3b6241c194d0d4f5e4efe51e73f27b79b94cf4c868a3c49b21aea82d8"
+    },
+    {
+      "path": "internal/runtime/process_phase17integration_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c1d5c782cf8559d9f55af85dda6f4f7c4f3c19894d768070c50fff927c53113c"
     },
     {
       "path": "internal/runtime/process_subprocess_integration_test.go",
@@ -1258,6 +1303,21 @@
       "post_sha256": "c53797166271672b99a1d6bfad5381c67d1040a32ce7a2383960f7cbd0c50ed0"
     },
     {
+      "path": "scripts/phase17/netns-e2e.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "326b4de8b0feaf936997e433d0d502c6f613bf0c7c7dc9efc1c4289c20e3777b"
+    },
+    {
+      "path": "scripts/phase17/netns_probe.py",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5701cee7dffff1a9e8c5eca4f5d37e7ad58edb73c0b4577584d209b5b233a86f"
+    },
+    {
+      "path": "scripts/phase17/netns_witness.py",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3437443dcb4ad19aebe323f7bbd2ba91b70be39308577e7a614a3edbb8fb6abe"
+    },
+    {
       "path": "testdata/evidence/phase16/decentralized-self-hosted-overlay.json",
       "pre_sha256": "45c5d2c42fa460e44b3ddbd3588d706ab728f850d7dd1585cd599fd54e5bfd19",
       "post_sha256": "40963dfd91b0f94861854ca03bd5afb820d37e718912c0dfed29a4e86e5feddc"
@@ -1273,9 +1333,24 @@
       "post_sha256": "ae90d67ea21e55b20f4bf68418f8005afb22400654604309b254fad38b50adcf"
     },
     {
+      "path": "testdata/fixtures/phase17/netns/topology-v1.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b78f5b7350777675e0c9fb9f92169fedeabb74c3a80c799454344c19fa0de365"
+    },
+    {
       "path": "testdata/schemas/phase17-historical-gate-supersession-v1.schema.json",
       "pre_evidence": "ABSENT",
       "post_sha256": "28f06780952141724f8a58be41d5b5c8ca221b8b73a6e457289cdcf0b5bea5da"
+    },
+    {
+      "path": "tools/cmd/workflowverify/main.go",
+      "pre_sha256": "e1c87306ff625d578aa2091fb6125e6c458554f20d5e19d2fee5ae50896a07b1",
+      "post_sha256": "6828b0d782432b2966aa16b3cd43d62ff5ce616b5b9341c02090cd97d0c6810a"
+    },
+    {
+      "path": "tools/cmd/workflowverify/main_test.go",
+      "pre_sha256": "76b791a60eab9578b7e2a582cf5d2a6b4bb47d447ebda2025aa7c5a5f61534f8",
+      "post_sha256": "326682ee16de0e19b307bead76b1a5fac60caf3513f29b0773f84511613e7d1a"
     },
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",

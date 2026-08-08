@@ -34,6 +34,30 @@
       "authorizedPhase": 16
     },
     {
+      "id": "linux-netns",
+      "commands": [["sudo", "--preserve-env=PATH", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"]],
+      "operatingSystems": ["linux"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": false,
+      "freshnessSeconds": 86400,
+      "invalidatedBy": [".github/**", "config/ci/**", "cmd/assure/**", "cmd/gate/**", "go.mod", "go.sum", "internal/assurance/**", "internal/crypto/**", "internal/protocol/**", "internal/relay/**", "internal/runtime/**", "scripts/phase17/**", "testdata/fixtures/phase17/netns/**"],
+      "authorizedPhase": 17
+    },
+    {
+      "id": "linux-netns-contract",
+      "commands": [
+        ["bash", "-n", "scripts/phase17/netns-e2e.sh"],
+        ["python3", "scripts/phase17/netns_witness.py", "--help"],
+        ["python3", "scripts/phase17/netns_probe.py", "--help"],
+        ["go", "test", "-tags=phase17integration", "./internal/relay/...", "./internal/runtime", "-count=1"]
+      ],
+      "operatingSystems": ["linux"],
+      "cachePolicy": "CACHE_ALLOWED_FEEDBACK",
+      "deterministic": true,
+      "invalidatedBy": [".github/**", "config/ci/**", "cmd/assure/**", "cmd/gate/**", "go.mod", "go.sum", "internal/assurance/**", "internal/crypto/**", "internal/protocol/**", "internal/relay/**", "internal/runtime/**", "scripts/phase17/**", "testdata/fixtures/phase17/netns/**"],
+      "authorizedPhase": 17
+    },
+    {
       "id": "operator",
       "commands": [
         ["go", "run", "./cmd/koperator", "verify"],

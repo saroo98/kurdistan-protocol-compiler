@@ -99,7 +99,7 @@ jobs:
           $certificate = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*certificate*.json' -File -Recurse
           if ($certificate.Count -ne 1) { throw "expected one certificate, found $($certificate.Count)" }
           $receipts = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*-receipt.json' -File -Recurse
-          if ($receipts.Count -ne 15) { throw "expected 15 receipts, found $($receipts.Count)" }
+          if ($receipts.Count -ne 16) { throw "expected 16 receipts, found $($receipts.Count)" }
           New-Item -ItemType Directory -Force .tools/collected | Out-Null
           foreach ($receipt in $receipts) {
             Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)
@@ -127,6 +127,7 @@ jobs:
             -required go-audit `
             -required go-core `
             -required go-executable-evidence `
+            -required linux-netns `
             -required operator
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force .tools/verified-assurance/receipts | Out-Null

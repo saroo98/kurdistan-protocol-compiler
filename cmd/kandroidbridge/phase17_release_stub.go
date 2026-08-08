@@ -13,7 +13,7 @@ import (
 	"kurdistan/internal/product/sessionplan"
 )
 
-func newPlatformRuntimeNetwork(_ context.Context, plan sessionplan.PlanV2, _ runtimepolicy.PolicyV2, seed []byte) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
+func newPlatformRuntimeNetwork(_ context.Context, plan sessionplan.PlanV2, _ runtimepolicy.PolicyV2, seed []byte, _ uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
 	clear(seed)
 	plan.Destroy()
 	return nil, androidbridge.CodeIncompatible

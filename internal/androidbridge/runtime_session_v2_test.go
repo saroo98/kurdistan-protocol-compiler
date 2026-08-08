@@ -187,6 +187,79 @@ func TestRuntimeSessionV2CancelClosesNetwork(t *testing.T) {
 	}
 }
 
+func TestRuntimeSessionV2FallsBackOnlyAfterFreshProtectedSocket(t *testing.T) {
+	factory := &fallbackRuntimeNetworkFactory{connectCodes: []ErrorCode{CodeEndpointUnavailable, CodeOK}}
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateVerified,
+		plan: sessionplan.PlanV2{
+			Digest: [32]byte{1},
+			Endpoints: []runtimepolicy.EndpointV2{
+				{Family: 4, Address: []byte{192, 0, 2, 1}, Port: 443},
+				{Family: 4, Address: []byte{192, 0, 2, 2}, Port: 443},
+			},
+		},
+		maxFallbackAttempts: 2,
+		factory:             factory,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+	defer registry.Free(handle)
+
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodeOK {
+		t.Fatalf("first prepare code=%v", code)
+	}
+	if code := RuntimeSocketCommitProtected(&registry, handle, true); code != CodeEndpointUnavailable {
+		t.Fatalf("first commit code=%v", code)
+	}
+	if current, code := RuntimeStatus(&registry, handle); code != CodeOK || current != RuntimeStateVerified {
+		t.Fatalf("fallback state=%v code=%v", current, code)
+	}
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodeOK {
+		t.Fatalf("second prepare code=%v", code)
+	}
+	if code := RuntimeSocketCommitProtected(&registry, handle, true); code != CodeOK {
+		t.Fatalf("second commit code=%v", code)
+	}
+	if got := factory.indexes(); !reflect.DeepEqual(got, []uint8{0, 1}) {
+		t.Fatalf("endpoint indexes=%v", got)
+	}
+	if got := factory.closed(); !reflect.DeepEqual(got, []bool{true, false}) {
+		t.Fatalf("network close state=%v", got)
+	}
+}
+
+func TestRuntimeSessionV2ExhaustedFallbackFailsClosed(t *testing.T) {
+	factory := &fallbackRuntimeNetworkFactory{connectCodes: []ErrorCode{CodeEndpointUnavailable}}
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateVerified,
+		plan: sessionplan.PlanV2{Digest: [32]byte{1}, Endpoints: []runtimepolicy.EndpointV2{
+			{Family: 4, Address: []byte{192, 0, 2, 1}, Port: 443},
+		}},
+		maxFallbackAttempts: 1,
+		factory:             factory,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+	defer registry.Free(handle)
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodeOK {
+		t.Fatal(code)
+	}
+	if code := RuntimeSocketCommitProtected(&registry, handle, true); code != CodeFallbackExhausted {
+		t.Fatalf("commit code=%v", code)
+	}
+	if current, code := RuntimeStatus(&registry, handle); code != CodeOK || current != RuntimeStateClosed {
+		t.Fatalf("exhausted state=%v code=%v", current, code)
+	}
+}
+
 func TestNormalizeRuntimeNetworkCodePreservesActionableFailures(t *testing.T) {
 	for _, code := range []ErrorCode{
 		CodeEndpointUnavailable,
@@ -209,11 +282,64 @@ func TestNormalizeRuntimeNetworkCodePreservesActionableFailures(t *testing.T) {
 
 type recordingRuntimeNetworkFactory struct{ network recordingRuntimeNetwork }
 
-func (factory *recordingRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte) (RuntimeNetworkSession, ErrorCode) {
+func (factory *recordingRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte, _ uint8) (RuntimeNetworkSession, ErrorCode) {
 	clear(seed)
 	factory.network.add("prepare")
 	return &factory.network, CodeOK
 }
+
+type fallbackRuntimeNetworkFactory struct {
+	mu           sync.Mutex
+	connectCodes []ErrorCode
+	endpointIDs  []uint8
+	networks     []*fallbackRuntimeNetwork
+}
+
+func (factory *fallbackRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte, endpointIndex uint8) (RuntimeNetworkSession, ErrorCode) {
+	clear(seed)
+	factory.mu.Lock()
+	defer factory.mu.Unlock()
+	if len(factory.connectCodes) == 0 {
+		return nil, CodeInternalFailure
+	}
+	code := factory.connectCodes[0]
+	factory.connectCodes = factory.connectCodes[1:]
+	network := &fallbackRuntimeNetwork{connectCode: code}
+	factory.endpointIDs = append(factory.endpointIDs, endpointIndex)
+	factory.networks = append(factory.networks, network)
+	return network, CodeOK
+}
+
+func (factory *fallbackRuntimeNetworkFactory) indexes() []uint8 {
+	factory.mu.Lock()
+	defer factory.mu.Unlock()
+	return append([]uint8(nil), factory.endpointIDs...)
+}
+
+func (factory *fallbackRuntimeNetworkFactory) closed() []bool {
+	factory.mu.Lock()
+	defer factory.mu.Unlock()
+	result := make([]bool, len(factory.networks))
+	for index, network := range factory.networks {
+		result[index] = network.isClosed
+	}
+	return result
+}
+
+type fallbackRuntimeNetwork struct {
+	connectCode ErrorCode
+	isClosed    bool
+}
+
+func (*fallbackRuntimeNetwork) SocketFD() (int, ErrorCode) { return 41, CodeOK }
+func (network *fallbackRuntimeNetwork) ConnectProtected(context.Context) ErrorCode {
+	return network.connectCode
+}
+func (*fallbackRuntimeNetwork) AuthenticateTLS(context.Context) ErrorCode  { return CodeOK }
+func (*fallbackRuntimeNetwork) AuthenticateKurd(context.Context) ErrorCode { return CodeOK }
+func (*fallbackRuntimeNetwork) AttachTUN(context.Context, int) ErrorCode   { return CodeOK }
+func (*fallbackRuntimeNetwork) Start(context.Context) ErrorCode            { return CodeOK }
+func (network *fallbackRuntimeNetwork) Close()                             { network.isClosed = true }
 
 type recordingRuntimeNetwork struct {
 	mu      sync.Mutex

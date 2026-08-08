@@ -25,6 +25,8 @@ var (
 	ErrPacketQueueFull  = errors.New("packet_queue_full")
 )
 
+const maxRejectedTUNPacketsV1 = 16
+
 type PacketPumpConfigV1 struct {
 	TUN           io.ReadWriteCloser
 	Carrier       io.ReadWriteCloser
@@ -47,6 +49,12 @@ type PacketPumpV1 struct {
 	closeOnce sync.Once
 	stream    atomic.Uint32
 	activity  atomic.Int64
+	rejected  atomic.Uint32
+}
+
+type authenticatedPacketV1 struct {
+	frame     *AuthenticatedInnerFrameV1
+	completed chan error
 }
 
 func NewPacketPumpV1(config PacketPumpConfigV1) (*PacketPumpV1, error) {
@@ -79,7 +87,7 @@ func (pump *PacketPumpV1) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	outbound := make(chan []byte, pump.config.QueuePackets)
-	inbound := make(chan *AuthenticatedInnerFrameV1, pump.config.IncompleteOps)
+	inbound := make(chan authenticatedPacketV1, pump.config.IncompleteOps)
 	errorsOut := make(chan error, 5)
 	go pump.readTUNV1(ctx, outbound, errorsOut)
 	go pump.sealCarrierV1(ctx, outbound, errorsOut)
@@ -136,9 +144,13 @@ func (pump *PacketPumpV1) readTUNV1(ctx context.Context, output chan<- []byte, f
 		pump.touchV1()
 		if err := pump.validateOutboundPacketV1(packet); err != nil {
 			clear(packet)
-			pump.reportFailureV1(ctx, failures, fmt.Errorf("tun_outbound_validate: %w", err))
-			return
+			if pump.rejected.Add(1) > maxRejectedTUNPacketsV1 {
+				pump.reportFailureV1(ctx, failures, fmt.Errorf("tun_outbound_validate: %w", err))
+				return
+			}
+			continue
 		}
+		pump.rejected.Store(0)
 		select {
 		case output <- packet:
 		case <-ctx.Done():
@@ -183,7 +195,7 @@ func (pump *PacketPumpV1) sealCarrierV1(ctx context.Context, input <-chan []byte
 	}
 }
 
-func (pump *PacketPumpV1) readCarrierV1(ctx context.Context, output chan<- *AuthenticatedInnerFrameV1, failures chan<- error) {
+func (pump *PacketPumpV1) readCarrierV1(ctx context.Context, output chan<- authenticatedPacketV1, failures chan<- error) {
 	for {
 		record, err := readBoundedCarrierRecordV1(pump.config.Carrier, pump.maxRecord)
 		if err != nil {
@@ -200,8 +212,9 @@ func (pump *PacketPumpV1) readCarrierV1(ctx context.Context, output chan<- *Auth
 		if pending == nil {
 			continue
 		}
+		packet := authenticatedPacketV1{frame: pending, completed: make(chan error, 1)}
 		select {
-		case output <- pending:
+		case output <- packet:
 		case <-ctx.Done():
 			_ = pending.Discard()
 			return
@@ -213,18 +226,31 @@ func (pump *PacketPumpV1) readCarrierV1(ctx context.Context, output chan<- *Auth
 			pump.reportFailureV1(ctx, failures, fmt.Errorf("authenticated_queue: %w", ErrPacketQueueFull))
 			return
 		}
+		select {
+		case err := <-packet.completed:
+			if err != nil {
+				return
+			}
+		case <-ctx.Done():
+			return
+		case <-pump.closed:
+			return
+		}
 	}
 }
 
-func (pump *PacketPumpV1) writeTUNV1(ctx context.Context, input <-chan *AuthenticatedInnerFrameV1, failures chan<- error) {
+func (pump *PacketPumpV1) writeTUNV1(ctx context.Context, input <-chan authenticatedPacketV1, failures chan<- error) {
 	for {
 		select {
-		case pending := <-input:
+		case packet := <-input:
+			pending := packet.frame
 			operation := pending.Operation()
 			if operation.Semantic != "data" || len(operation.Payload) == 0 {
 				clear(operation.Payload)
 				_ = pending.Discard()
-				pump.reportFailureV1(ctx, failures, fmt.Errorf("inner_operation: %w", ErrPacketInvalid))
+				err := fmt.Errorf("inner_operation: %w", ErrPacketInvalid)
+				packet.completed <- err
+				pump.reportFailureV1(ctx, failures, err)
 				return
 			}
 			var validateErr error
@@ -236,20 +262,26 @@ func (pump *PacketPumpV1) writeTUNV1(ctx context.Context, input <-chan *Authenti
 			if validateErr != nil {
 				clear(operation.Payload)
 				_ = pending.Discard()
-				pump.reportFailureV1(ctx, failures, fmt.Errorf("inner_packet_validate: %w", validateErr))
+				err := fmt.Errorf("inner_packet_validate: %w", validateErr)
+				packet.completed <- err
+				pump.reportFailureV1(ctx, failures, err)
 				return
 			}
 			count, err := pump.config.TUN.Write(operation.Payload)
 			clear(operation.Payload)
 			if err != nil || count != len(operation.Payload) {
 				_ = pending.Discard()
-				pump.reportFailureV1(ctx, failures, fmt.Errorf("tun_write: %w", ErrPacketPumpIO))
+				err = fmt.Errorf("tun_write: %w", ErrPacketPumpIO)
+				packet.completed <- err
+				pump.reportFailureV1(ctx, failures, err)
 				return
 			}
 			if err := pending.Commit(); err != nil {
+				packet.completed <- err
 				pump.reportFailureV1(ctx, failures, fmt.Errorf("replay_commit: %w", err))
 				return
 			}
+			packet.completed <- nil
 			pump.touchV1()
 		case <-ctx.Done():
 			return

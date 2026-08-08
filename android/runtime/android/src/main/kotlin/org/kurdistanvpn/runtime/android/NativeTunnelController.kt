@@ -49,26 +49,31 @@ internal class NativeTunnelController(
             return@synchronized LiveTunnelStartResult.Failure(LiveTunnelFailure.DUPLICATE_START)
         }
         onStage(LiveTunnelStage.VERIFIED)
-        val socket = when (val prepared = session.prepareSocket()) {
-            is NativeResult.Failure -> return@synchronized fail(
-                session,
-                prepared.error.toLiveTunnelFailure(LiveTunnelFailure.SOCKET_PREPARE_FAILED),
-            )
-            is NativeResult.Success -> prepared.value
-        }
-        onStage(LiveTunnelStage.SOCKET_PREPARED)
-        val protected = runCatching { protector.protect(socket) }.getOrDefault(false)
-        if (!protected) {
-            session.commitProtected(false)
-            return@synchronized fail(session, LiveTunnelFailure.SOCKET_PROTECT_FAILED)
-        }
-        onStage(LiveTunnelStage.SOCKET_PROTECTED)
-        when (val committed = session.commitProtected(true)) {
-            is NativeResult.Failure -> return@synchronized fail(
-                session,
-                committed.error.toLiveTunnelFailure(LiveTunnelFailure.NETWORK_AUTHENTICATION_FAILED),
-            )
-            is NativeResult.Success -> Unit
+        while (true) {
+            val socket = when (val prepared = session.prepareSocket()) {
+                is NativeResult.Failure -> return@synchronized fail(
+                    session,
+                    prepared.error.toLiveTunnelFailure(LiveTunnelFailure.SOCKET_PREPARE_FAILED),
+                )
+                is NativeResult.Success -> prepared.value
+            }
+            onStage(LiveTunnelStage.SOCKET_PREPARED)
+            val protected = runCatching { protector.protect(socket) }.getOrDefault(false)
+            if (!protected) {
+                session.commitProtected(false)
+                return@synchronized fail(session, LiveTunnelFailure.SOCKET_PROTECT_FAILED)
+            }
+            onStage(LiveTunnelStage.SOCKET_PROTECTED)
+            when (val committed = session.commitProtected(true)) {
+                is NativeResult.Failure -> {
+                    if (committed.error == OperationError.ENDPOINT_UNAVAILABLE) continue
+                    return@synchronized fail(
+                        session,
+                        committed.error.toLiveTunnelFailure(LiveTunnelFailure.NETWORK_AUTHENTICATION_FAILED),
+                    )
+                }
+                is NativeResult.Success -> break
+            }
         }
         if (session.status() != NativeResult.Success(NativeRuntimeState.KURD_AUTHENTICATED)) {
             return@synchronized fail(session, LiveTunnelFailure.NATIVE_STATE_MISMATCH)

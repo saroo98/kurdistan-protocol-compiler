@@ -1,0 +1,26 @@
+{
+  "schema": "kurdistan-phase17-netns-topology-v1",
+  "clientRelay": {
+    "ipv4": "192.0.2.0/30",
+    "ipv6": "2001:db8:200::/64"
+  },
+  "relayWitness": {
+    "ipv4": "198.51.100.0/30",
+    "ipv6": "2001:db8:201::/64"
+  },
+  "tunnel": {
+    "ipv4": "10.77.0.0/30",
+    "ipv6": "2001:db8:77::/64",
+    "mtu": 1280
+  },
+  "witnessPorts": {
+    "tcp": 18080,
+    "udp": 18081,
+    "dns": 1053
+  },
+  "evidence": {
+    "retainsPayloads": false,
+    "retainsDestinationNames": false,
+    "retainsPacketCaptures": false
+  }
+}

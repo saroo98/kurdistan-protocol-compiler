@@ -107,7 +107,7 @@ func verifyEmulatorProofScript(path string) error {
 		"$process.HasExited",
 		"adb emulator discovery timed out",
 		"-not (Test-Path -LiteralPath $GateReceipt)",
-		"$emulatorIdentity = \".tools/phase16/emulator-api$Api-identity.json\"",
+		"$emulatorIdentity = \".tools/phase17/emulator-api$Api-identity.json\"",
 		"kurdistan-emulator-package-identity-v1",
 		"Resolve-SdkPackageMetadata",
 		"source.properties",
@@ -125,7 +125,7 @@ func verifyEmulatorProofScript(path string) error {
 	if strings.Contains(content, "Join-Path '.tools/phase16' \"avd-api$Api\"") {
 		return errors.New("Android emulator proof script stores disposable AVD state in uploaded evidence")
 	}
-	for _, prohibited := range []string{".tools/phase16/emulator-api$Api.log", ".tools/phase16/logcat-api$Api.txt"} {
+	for _, prohibited := range []string{".tools/phase17/emulator-api$Api.log", ".tools/phase17/logcat-api$Api.txt"} {
 		if strings.Contains(content, prohibited) {
 			return errors.New("Android emulator proof script stores raw diagnostic output in uploaded evidence")
 		}
@@ -169,7 +169,7 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"-artifact .tools/device/app-internal.apk",
 			"-artifact .tools/device/app-internal-androidTest.apk",
 			"-artifact .tools/device/device-artifacts.json",
-			"-artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json",
+			"-artifact .tools/phase17/emulator-api${{ matrix.api }}-identity.json",
 			"pattern: shadow-*-${{ github.run_id }}-*",
 			"path: .tools/collected-attempts",
 			"Select newest receipt for each proof identity",
@@ -178,8 +178,9 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}",
 			"include-hidden-files: true",
 			"-ref refs/subjects/${{ inputs.sha || github.sha }}",
-			"expected 15 proof receipts",
+			"expected 16 proof receipts",
 			"'-required', 'go-executable-evidence'",
+			"'-required', 'linux-netns'",
 			"-required', 'dependency-freshness'",
 			"-required', 'docs-evidence'",
 			"-proof android-host",
@@ -191,8 +192,9 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"actions/runs/${{ inputs.assurance_run_id }}/attempts/${{ inputs.assurance_run_attempt }}",
 			".github/workflows/assurance.yml",
 			"pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}",
-			"expected 15 receipts",
+			"expected 16 receipts",
 			"-required go-executable-evidence",
+			"-required linux-netns",
 			"expected one API $api emulator identity",
 			"expected three emulator identity inventories",
 			"Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)",
@@ -213,12 +215,13 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"-artifact .tools/device/app-internal.apk",
 			"-artifact .tools/device/app-internal-androidTest.apk",
 			"-artifact .tools/device/device-artifacts.json",
-			"-artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json",
+			"-artifact .tools/phase17/emulator-api${{ matrix.api }}-identity.json",
 			"ref: ${{ github.event.pull_request.head.sha }}",
 			"git diff --name-only --no-renames",
 			"include-hidden-files: true",
 			"-ref 'refs/subjects/${{ github.event.pull_request.head.sha }}'",
 			"'dependency-freshness'",
+			"'linux-netns-contract'",
 			"-proof android-pr-host",
 			"android-pr-host-receipt.json",
 		},
