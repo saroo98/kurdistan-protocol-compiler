@@ -8,6 +8,7 @@ PartOf=kurd-node.service
 [Socket]
 ListenStream=[::]:443
 BindIPv6Only=both
+FileDescriptorName=kurd
 Accept=no
 Backlog=128
 KeepAlive=yes
