@@ -9,7 +9,7 @@ fail() {
 [ "${1:-}" = "--apply" ] && [ "${2:-}" = "--confirm" ] && [ "${3:-}" = "rollback" ] || fail INVALID_ARGUMENTS
 [ "$(id -u)" -eq 0 ] || fail ROOT_REQUIRED
 
-for command in systemctl systemd-analyze networkctl nft unbound-checkconf sysctl stat install runuser sed tr cp mv rm mktemp; do
+for command in systemctl systemd-analyze networkctl nft unbound-checkconf sysctl stat install runuser sed tr cp mv rm mktemp sleep; do
   command -v "$command" >/dev/null 2>&1 || fail TOOL_MISSING
 done
 /usr/local/lib/kurd-node/preflight.sh --runtime --port 443 --allow-systemd-socket >/dev/null || fail PREFLIGHT_FAILED
@@ -30,6 +30,18 @@ case "$previous_state_version" in
   1|2) ;;
   *) fail PREVIOUS_STATE_UNSUPPORTED ;;
 esac
+
+recreate_owned_tun() {
+  networkctl delete kurd0 >/dev/null 2>&1 || true
+  networkctl reload >/dev/null 2>&1 || return 1
+  attempts=0
+  while [ "$attempts" -lt 50 ]; do
+    [ -e /sys/class/net/kurd0/tun_flags ] && return 0
+    attempts=$((attempts + 1))
+    sleep 0.1
+  done
+  return 1
+}
 
 was_service_active=false
 was_socket_enabled=false
@@ -113,7 +125,7 @@ done
 
 nft destroy table inet kurd_node >/dev/null 2>&1 || true
 systemctl daemon-reload
-networkctl reload
+recreate_owned_tun || fail PREVIOUS_TUN_RECREATE_FAILED
 sysctl --system >/dev/null
 systemctl try-reload-or-restart unbound.service >/dev/null 2>&1 || true
 if [ -f /var/lib/kurd-node/state.kurd-state ]; then
