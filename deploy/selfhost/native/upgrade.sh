@@ -11,7 +11,7 @@ mode=${1:-}
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 cd "$script_dir"
-for command in sha256sum sed grep tr id stat install runuser systemctl; do
+for command in sha256sum sed grep tr id stat install runuser systemctl networkctl sleep; do
   command -v "$command" >/dev/null 2>&1 || fail TOOL_MISSING
 done
 [ -f manifest.json ] && [ -f SHA256SUMS ] || fail PACKAGE_INCOMPLETE
@@ -77,8 +77,21 @@ rollback_on_failure() {
 }
 trap rollback_on_failure EXIT HUP INT TERM
 
+recreate_owned_tun() {
+  networkctl delete kurd0 >/dev/null 2>&1 || true
+  networkctl reload >/dev/null 2>&1 || return 1
+  attempts=0
+  while [ "$attempts" -lt 50 ]; do
+    [ -e /sys/class/net/kurd0/tun_flags ] && return 0
+    attempts=$((attempts + 1))
+    sleep 0.1
+  done
+  return 1
+}
+
 systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
 ./install.sh --upgrade >/dev/null || fail INSTALL_FAILED
+recreate_owned_tun || fail TUN_RECREATE_FAILED
 
 if [ -f "$state_file" ]; then
   runuser -u kurd-node -- /usr/local/bin/kurdctl migration apply --data-dir "$data_dir" >/dev/null || fail MIGRATION_FAILED
