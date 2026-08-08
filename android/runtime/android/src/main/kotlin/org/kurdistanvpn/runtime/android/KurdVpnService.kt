@@ -49,8 +49,7 @@ class KurdVpnService : VpnService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var tunnelController: NativeTunnelController? = null
     private var networkMonitor: UnderlyingNetworkMonitor? = null
-    private var underlyingNetwork: Network? = null
-    private var underlyingNetworkBound = false
+    private val underlyingNetworkAvailability = UnderlyingNetworkAvailability<Network>()
     private var pendingAuthorityRequest: String? = null
     private val authorityArrivalTimeout = Runnable {
         val requestId = pendingAuthorityRequest ?: return@Runnable
@@ -209,7 +208,9 @@ class KurdVpnService : VpnService() {
                 if (session == null) return@execute
                 authoritySnapshot = session.snapshot
                 config = configFrom(session.snapshot)
-                if (underlyingNetwork == null || !underlyingNetworkBound) {
+                val selectedUnderlyingNetwork =
+                    underlyingNetworkAvailability.awaitUsable(NETWORK_BIND_TIMEOUT_MILLIS)
+                if (selectedUnderlyingNetwork == null) {
                     session.close()
                     terminalFailure = "LIVE_NETWORK_UNAVAILABLE"
                     return@execute
@@ -217,7 +218,9 @@ class KurdVpnService : VpnService() {
                 if (terminalStateOnDestroy != null) return@execute
                 val controller = NativeTunnelController(
                     protector = SocketProtector(::protect),
-                    tunEstablisher = TunEstablisher(::establishTun),
+                    tunEstablisher = TunEstablisher { configuration ->
+                        establishTun(configuration, selectedUnderlyingNetwork)
+                    },
                     detachedCloser = DetachedFileDescriptorCloser { fd ->
                         runCatching { ParcelFileDescriptor.adoptFd(fd).close() }
                     },
@@ -389,11 +392,15 @@ class KurdVpnService : VpnService() {
         ).validatedForLiveTransport()
     }
 
-    private fun establishTun(configuration: LiveTunConfiguration): DetachableTun? {
+    private fun establishTun(
+        configuration: LiveTunConfiguration,
+        underlyingNetwork: Network,
+    ): DetachableTun? {
         val builder = Builder()
             .setSession("Kurdistan VPN")
             .setMtu(configuration.mtu)
             .setBlocking(true)
+            .setUnderlyingNetworks(arrayOf(underlyingNetwork))
         configuration.addresses.forEach { builder.addAddress(it.address, it.prefixLength) }
         configuration.routes.forEach { builder.addRoute(it.address, it.prefixLength) }
         configuration.dnsServers.forEach(builder::addDnsServer)
@@ -409,10 +416,14 @@ class KurdVpnService : VpnService() {
     }
 
     private fun onUnderlyingNetworkTransition(transition: NetworkTransition<Network>) {
-        underlyingNetwork = transition.current
-        underlyingNetworkBound = transition.current != null && runCatching {
-            setUnderlyingNetworks(arrayOf(transition.current))
-        }.getOrDefault(false)
+        val bound = when {
+            transition.current == null -> false
+            tunnelController?.isRunning() == true -> runCatching {
+                setUnderlyingNetworks(arrayOf(transition.current))
+            }.getOrDefault(false)
+            else -> true
+        }
+        underlyingNetworkAvailability.update(transition.current, bound)
         if (transition.current == null) {
             runCatching { setUnderlyingNetworks(null) }
         }
@@ -484,6 +495,7 @@ class KurdVpnService : VpnService() {
         private const val NOTIFICATION_ID = 1001
         private const val MAX_RUNTIME_OPEN_BYTES = RuntimeStartWire.MAX_RUNTIME_OPEN_BYTES
         private const val AUTHORITY_TIMEOUT_SECONDS = 5L
+        private const val NETWORK_BIND_TIMEOUT_MILLIS = 5_000L
 
         fun start(
             context: Context,

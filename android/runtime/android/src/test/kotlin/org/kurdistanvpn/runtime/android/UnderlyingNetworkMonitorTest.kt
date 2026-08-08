@@ -4,7 +4,10 @@
 package org.kurdistanvpn.runtime.android
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class UnderlyingNetworkMonitorTest {
     @Test
@@ -26,5 +29,32 @@ class UnderlyingNetworkMonitorTest {
             ),
             transitions,
         )
+    }
+
+    @Test
+    fun waitsForAUsableUnderlyingNetwork() {
+        val binding = UnderlyingNetworkAvailability<String>()
+        val waiterStarted = CountDownLatch(1)
+        var selected: String? = null
+        val waiter = Thread {
+            waiterStarted.countDown()
+            selected = binding.awaitUsable(1_000)
+        }
+
+        waiter.start()
+        waiterStarted.await(1, TimeUnit.SECONDS)
+        binding.update("wifi", false)
+        binding.update("wifi", true)
+        waiter.join(1_000)
+
+        assertEquals("wifi", selected)
+    }
+
+    @Test
+    fun failsClosedWhenNoBoundUnderlyingNetworkArrives() {
+        val binding = UnderlyingNetworkAvailability<String>()
+        binding.update("wifi", false)
+
+        assertNull(binding.awaitUsable(10))
     }
 }
