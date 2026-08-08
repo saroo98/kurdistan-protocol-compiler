@@ -35,7 +35,7 @@ func TestValidateCandidateProvenanceBindsEveryCarriedByte(t *testing.T) {
 	writeCandidateFile(t, root, "candidate/a/app.aab", "candidate")
 	writeCandidateFile(t, root, "verified/assurance-certificate.json", "certificate")
 	writeCandidateFile(t, root, "comparison.json", "comparison")
-	receipts := make([]candidateArtifact, 15)
+	receipts := make([]candidateArtifact, 16)
 	for index := range receipts {
 		path := fmt.Sprintf("receipts/%02d.json", index)
 		writeCandidateFile(t, root, filepath.ToSlash(filepath.Join("verified", path)), fmt.Sprintf("receipt-%d", index))

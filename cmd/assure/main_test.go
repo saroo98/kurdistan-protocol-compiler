@@ -196,6 +196,7 @@ func TestQualificationWorkflowImpactSelectsCompletePRProofSet(t *testing.T) {
 		"go-audit",
 		"go-core",
 		"go-executable-evidence",
+		"linux-netns-contract",
 		"operator",
 	}
 	if !reflect.DeepEqual(output.Proofs, want) {
@@ -226,7 +227,7 @@ func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 		{
 			name: "Go dependencies require freshness",
 			path: "go.mod",
-			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-pr-host", "dependency-freshness", "go-audit", "go-core", "go-executable-evidence", "operator"},
+			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-pr-host", "dependency-freshness", "go-audit", "go-core", "go-executable-evidence", "linux-netns-contract", "operator"},
 		},
 		{
 			name: "evidence validator changes require their own proof",
@@ -268,6 +269,7 @@ func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
 		"go-audit":               true,
 		"go-core":                true,
 		"go-executable-evidence": true,
+		"linux-netns":            true,
 		"operator":               true,
 	}
 	laneCount := 0
@@ -284,8 +286,8 @@ func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
 	if len(required) != 0 {
 		t.Fatalf("repository policy is missing required certificate proofs: %v", required)
 	}
-	if laneCount != 15 {
-		t.Fatalf("repository certificate lane count = %d, want 15", laneCount)
+	if laneCount != 16 {
+		t.Fatalf("repository certificate lane count = %d, want 16", laneCount)
 	}
 }
 

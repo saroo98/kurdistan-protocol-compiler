@@ -27,7 +27,7 @@ func newReleaseRuntimeNetworkFactory() androidbridge.RuntimeNetworkFactory {
 	return releaseRuntimeNetworkFactory{}
 }
 
-func (releaseRuntimeNetworkFactory) Prepare(ctx context.Context, plan sessionplan.PlanV2, clientAuthSeed []byte) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
+func (releaseRuntimeNetworkFactory) Prepare(ctx context.Context, plan sessionplan.PlanV2, clientAuthSeed []byte, endpointIndex uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
 	if ctx == nil || len(clientAuthSeed) != ed25519.SeedSize {
 		return nil, androidbridge.CodePolicyRejected
 	}
@@ -36,7 +36,7 @@ func (releaseRuntimeNetworkFactory) Prepare(ctx context.Context, plan sessionpla
 	if err != nil || !releaseClientSeedMatchesPolicy(clientAuthSeed, policy) {
 		return nil, androidbridge.CodePolicyRejected
 	}
-	return newPlatformRuntimeNetwork(ctx, plan.Clone(), policy, bytes.Clone(clientAuthSeed))
+	return newPlatformRuntimeNetwork(ctx, plan.Clone(), policy, bytes.Clone(clientAuthSeed), endpointIndex)
 }
 
 type releaseIdentityV1 struct {

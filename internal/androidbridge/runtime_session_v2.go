@@ -78,7 +78,7 @@ type RuntimeSessionSnapshotV2 struct {
 }
 
 type RuntimeNetworkFactory interface {
-	Prepare(context.Context, sessionplan.PlanV2, []byte) (RuntimeNetworkSession, ErrorCode)
+	Prepare(context.Context, sessionplan.PlanV2, []byte, uint8) (RuntimeNetworkSession, ErrorCode)
 }
 
 type RuntimeNetworkSession interface {
@@ -92,15 +92,18 @@ type RuntimeNetworkSession interface {
 }
 
 type runtimeSessionV2Handle struct {
-	mu          sync.Mutex
-	ctx         context.Context
-	cancel      context.CancelFunc
-	state       RuntimeSessionState
-	snapshot    RuntimeSessionSnapshotV2
-	plan        sessionplan.PlanV2
-	credentials RecipientCredentials
-	factory     RuntimeNetworkFactory
-	network     RuntimeNetworkSession
+	mu                  sync.Mutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	state               RuntimeSessionState
+	snapshot            RuntimeSessionSnapshotV2
+	plan                sessionplan.PlanV2
+	credentials         RecipientCredentials
+	factory             RuntimeNetworkFactory
+	network             RuntimeNetworkSession
+	nextEndpoint        uint8
+	attemptCount        uint8
+	maxFallbackAttempts uint8
 }
 
 func EncodeRuntimeSessionSnapshotV2(snapshot RuntimeSessionSnapshotV2) ([]byte, error) {
@@ -367,6 +370,7 @@ func OpenRuntimeSessionV2(registry *HandleRegistry, encoded []byte, environment 
 	state := &runtimeSessionV2Handle{
 		ctx: ctx, cancel: cancel, state: RuntimeStateVerified, snapshot: snapshot,
 		plan: plan, credentials: credentials, factory: factory,
+		maxFallbackAttempts: runtimeFallbackAttemptsV2(plan, policy),
 	}
 	handle, code := registry.Open(HandleRuntimeSession, state)
 	if code != CodeOK {
@@ -386,10 +390,17 @@ func RuntimeSocketPrepare(registry *HandleRegistry, handle Handle) (int, ErrorCo
 		state.mu.Unlock()
 		return -1, CodePolicyRejected
 	}
-	factory, ctx, plan := state.factory, state.ctx, state.plan.Clone()
+	if state.maxFallbackAttempts == 0 {
+		state.maxFallbackAttempts = 1
+	}
+	if state.attemptCount >= state.maxFallbackAttempts || len(state.plan.Endpoints) > 0 && int(state.nextEndpoint) >= len(state.plan.Endpoints) {
+		state.mu.Unlock()
+		return -1, CodeFallbackExhausted
+	}
+	factory, ctx, plan, endpointIndex := state.factory, state.ctx, state.plan.Clone(), state.nextEndpoint
 	seed := bytes.Clone(state.credentials.Private.ClientAuthSeed)
 	state.mu.Unlock()
-	network, code := factory.Prepare(ctx, plan, seed)
+	network, code := factory.Prepare(ctx, plan, seed, endpointIndex)
 	clear(seed)
 	plan.Destroy()
 	if code != CodeOK || network == nil {
@@ -411,6 +422,8 @@ func RuntimeSocketPrepare(registry *HandleRegistry, handle Handle) (int, ErrorCo
 	}
 	state.network = network
 	state.state = RuntimeStateSocketPrepared
+	state.attemptCount++
+	state.nextEndpoint++
 	state.mu.Unlock()
 	return fd, CodeOK
 }
@@ -442,8 +455,28 @@ func RuntimeSocketCommitProtected(registry *HandleRegistry, handle Handle, prote
 	}
 	for _, step := range steps {
 		if result := step.run(ctx); result != CodeOK {
+			normalized := normalizeRuntimeNetworkCode(result)
+			if step.state == RuntimeStateSocketProtectedCommitted && normalized == CodeEndpointUnavailable {
+				state.mu.Lock()
+				canRetry := state.attemptCount < state.maxFallbackAttempts &&
+					(len(state.plan.Endpoints) == 0 || int(state.nextEndpoint) < len(state.plan.Endpoints)) &&
+					state.ctx.Err() == nil
+				if state.network == network {
+					state.network = nil
+				}
+				if canRetry {
+					state.state = RuntimeStateVerified
+				}
+				state.mu.Unlock()
+				network.Close()
+				if canRetry {
+					return CodeEndpointUnavailable
+				}
+				state.Cancel()
+				return CodeFallbackExhausted
+			}
 			state.Cancel()
-			return normalizeRuntimeNetworkCode(result)
+			return normalized
 		}
 		state.mu.Lock()
 		if state.ctx.Err() != nil || state.state == RuntimeStateClosed {
@@ -455,6 +488,20 @@ func RuntimeSocketCommitProtected(registry *HandleRegistry, handle Handle, prote
 		state.mu.Unlock()
 	}
 	return CodeOK
+}
+
+func runtimeFallbackAttemptsV2(plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2) uint8 {
+	count := int(policy.Fallback.TotalAttempts)
+	if count > len(plan.Endpoints) {
+		count = len(plan.Endpoints)
+	}
+	if count > int(plan.MaxReconnectAttempts) {
+		count = int(plan.MaxReconnectAttempts)
+	}
+	if count <= 0 || count > int(^uint8(0)) {
+		return 0
+	}
+	return uint8(count)
 }
 
 func RuntimeTUNAttach(registry *HandleRegistry, handle Handle, fd int) ErrorCode {

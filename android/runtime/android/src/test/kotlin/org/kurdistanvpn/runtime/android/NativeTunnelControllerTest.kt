@@ -73,6 +73,43 @@ class NativeTunnelControllerTest {
     }
 
     @Test
+    fun endpointFallbackProtectsEveryFreshSocketBeforeRetrying() {
+        val events = mutableListOf<String>()
+        val session = FallbackLiveSession(events, listOf(OperationError.ENDPOINT_UNAVAILABLE, null))
+        val controller = NativeTunnelController(
+            SocketProtector { events += "protect:$it"; true },
+            TunEstablisher { FakeTun(events) },
+            DetachedFileDescriptorCloser {},
+        )
+
+        assertEquals(LiveTunnelStartResult.Running(), controller.start(session))
+        assertEquals(2, events.count { it.startsWith("prepare:") })
+        assertEquals(listOf("protect:40", "protect:41"), events.filter { it.startsWith("protect:") })
+        assertEquals(2, events.count { it == "connect" })
+        assertEquals(1, events.count { it == "tls" })
+        assertEquals(1, events.count { it == "kurd" })
+    }
+
+    @Test
+    fun exhaustedEndpointFallbackFailsClosedWithoutTun() {
+        val events = mutableListOf<String>()
+        val session = FallbackLiveSession(events, listOf(OperationError.FALLBACK_EXHAUSTED))
+        val controller = NativeTunnelController(
+            SocketProtector { events += "protect:$it"; true },
+            TunEstablisher { error("must not establish") },
+            DetachedFileDescriptorCloser {},
+        )
+
+        assertEquals(
+            LiveTunnelStartResult.Failure(LiveTunnelFailure.FALLBACK_EXHAUSTED),
+            controller.start(session),
+        )
+        assertTrue(events.contains("stop"))
+        assertTrue(events.contains("close"))
+        assertFalse(events.contains("establish"))
+    }
+
+    @Test
     fun prepareAndAuthenticationFailuresNeverEstablishTun() {
         listOf(
             FakeLiveSession.Options(prepareError = OperationError.INTERNAL_FAILURE) to LiveTunnelFailure.INTERNAL_FAILURE,
@@ -280,6 +317,47 @@ private class FakeLiveSession(
         return NativeResult.Success(Unit)
     }
 
+    override fun close() { events += "close" }
+}
+
+private class FallbackLiveSession(
+    private val events: MutableList<String>,
+    private val commitErrors: List<OperationError?>,
+) : NativeLiveRuntimeSession {
+    private var attempt = 0
+    private var state = NativeRuntimeState.VERIFIED
+    override val snapshot = snapshot()
+
+    override fun prepareSocket(): NativeResult<Int> {
+        events += "prepare:$attempt"
+        state = NativeRuntimeState.SOCKET_PREPARED
+        return NativeResult.Success(40 + attempt)
+    }
+
+    override fun commitProtected(protectedSocket: Boolean): NativeResult<Unit> {
+        if (!protectedSocket) return NativeResult.Failure(OperationError.POLICY_REJECTED)
+        events += "connect"
+        val error = commitErrors.getOrNull(attempt++)
+        if (error != null) {
+            state = NativeRuntimeState.VERIFIED
+            return NativeResult.Failure(error)
+        }
+        events += listOf("tls", "kurd")
+        state = NativeRuntimeState.KURD_AUTHENTICATED
+        return NativeResult.Success(Unit)
+    }
+
+    override fun attachTun(fileDescriptor: Int): NativeResult<Unit> {
+        events += "attach:$fileDescriptor"
+        state = NativeRuntimeState.RUNNING
+        return NativeResult.Success(Unit)
+    }
+
+    override fun status(): NativeResult<NativeRuntimeState> = NativeResult.Success(state)
+    override fun stop(): NativeResult<Unit> {
+        events += "stop"
+        return NativeResult.Success(Unit)
+    }
     override fun close() { events += "close" }
 }
 

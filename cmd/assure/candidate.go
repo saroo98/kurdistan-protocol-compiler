@@ -105,7 +105,7 @@ func runCandidateValidate(args []string, stdout, stderr io.Writer) error {
 		"-expected-workflow-path", provenance.Assurance.WorkflowPath,
 		"-expected-workflow-source-commit", *expectedCommit,
 	}
-	for _, proof := range []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness", "docs-evidence", "go-audit", "go-core", "go-executable-evidence", "operator"} {
+	for _, proof := range []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-host", "dependency-freshness", "docs-evidence", "go-audit", "go-core", "go-executable-evidence", "linux-netns", "operator"} {
 		certificateArgs = append(certificateArgs, "-required", proof)
 	}
 	if err := runCertificateValidate(certificateArgs, io.Discard, stderr); err != nil {
@@ -125,8 +125,8 @@ func validateCandidateProvenance(root, candidateRoot, assuranceRoot, comparisonP
 	if provenance.Assurance.RunID == "" || provenance.Assurance.RunAttempt < 1 || (provenance.Assurance.Trigger != "push" && provenance.Assurance.Trigger != "workflow_dispatch") || provenance.Assurance.WorkflowPath != ".github/workflows/assurance.yml" || provenance.Assurance.CertificatePath != "assurance-certificate.json" || !fullSHA256Pattern.MatchString(provenance.Assurance.CertificateSHA256) {
 		return errors.New("candidate assurance identity is invalid")
 	}
-	if len(provenance.Assurance.Receipts) != 15 {
-		return fmt.Errorf("candidate assurance contains %d receipts, require 15", len(provenance.Assurance.Receipts))
+	if len(provenance.Assurance.Receipts) != 16 {
+		return fmt.Errorf("candidate assurance contains %d receipts, require 16", len(provenance.Assurance.Receipts))
 	}
 	if len(provenance.Assurance.Inventories) != 3 {
 		return fmt.Errorf("candidate assurance contains %d device inventories, require 3", len(provenance.Assurance.Inventories))

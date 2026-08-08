@@ -26,31 +26,32 @@ import (
 const releaseMaximumClientBufferV1 = uint64(64 << 20)
 
 type platformRuntimeNetwork struct {
-	mu        sync.Mutex
-	closeOnce sync.Once
-	ctx       context.Context
-	plan      sessionplan.PlanV2
-	policy    runtimepolicy.PolicyV2
-	seed      []byte
-	fd        int
-	raw       net.Conn
-	carrier   *tlstcp.Conn
-	endpoint  *kruntime.ProcessClientDuplexEndpointV1
-	program   liveprogram.ProgramV1
-	tun       *os.File
-	pump      *kruntime.PacketPumpV1
+	mu            sync.Mutex
+	closeOnce     sync.Once
+	ctx           context.Context
+	plan          sessionplan.PlanV2
+	policy        runtimepolicy.PolicyV2
+	seed          []byte
+	fd            int
+	endpointIndex uint8
+	raw           net.Conn
+	carrier       *tlstcp.Conn
+	endpoint      *kruntime.ProcessClientDuplexEndpointV1
+	program       liveprogram.ProgramV1
+	tun           *os.File
+	pump          *kruntime.PacketPumpV1
 }
 
-func newPlatformRuntimeNetwork(ctx context.Context, plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2, seed []byte) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
-	if ctx == nil || ctx.Err() != nil || len(plan.Endpoints) == 0 || len(seed) == 0 {
+func newPlatformRuntimeNetwork(ctx context.Context, plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2, seed []byte, endpointIndex uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
+	if ctx == nil || ctx.Err() != nil || len(plan.Endpoints) == 0 || int(endpointIndex) >= len(plan.Endpoints) || len(seed) == 0 {
 		clear(seed)
 		plan.Destroy()
 		return nil, androidbridge.CodePolicyRejected
 	}
 	family := unix.AF_INET
-	if plan.Endpoints[0].Family == 6 {
+	if plan.Endpoints[endpointIndex].Family == 6 {
 		family = unix.AF_INET6
-	} else if plan.Endpoints[0].Family != 4 {
+	} else if plan.Endpoints[endpointIndex].Family != 4 {
 		clear(seed)
 		plan.Destroy()
 		return nil, androidbridge.CodePolicyRejected
@@ -61,7 +62,7 @@ func newPlatformRuntimeNetwork(ctx context.Context, plan sessionplan.PlanV2, pol
 		plan.Destroy()
 		return nil, androidbridge.CodeInternalFailure
 	}
-	return &platformRuntimeNetwork{ctx: ctx, plan: plan, policy: policy.Clone(), seed: seed, fd: fd}, androidbridge.CodeOK
+	return &platformRuntimeNetwork{ctx: ctx, plan: plan, policy: policy.Clone(), seed: seed, fd: fd, endpointIndex: endpointIndex}, androidbridge.CodeOK
 }
 
 func (network *platformRuntimeNetwork) SocketFD() (int, androidbridge.ErrorCode) {
@@ -82,7 +83,11 @@ func (network *platformRuntimeNetwork) ConnectProtected(ctx context.Context) and
 		network.mu.Unlock()
 		return androidbridge.CodePolicyRejected
 	}
-	fd, endpoint, timeout := network.fd, network.plan.Endpoints[0], network.plan.DialTimeout
+	if int(network.endpointIndex) >= len(network.plan.Endpoints) {
+		network.mu.Unlock()
+		return androidbridge.CodePolicyRejected
+	}
+	fd, endpoint, timeout := network.fd, network.plan.Endpoints[network.endpointIndex], network.plan.DialTimeout
 	network.mu.Unlock()
 	connectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

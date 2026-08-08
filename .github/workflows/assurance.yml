@@ -129,6 +129,67 @@ jobs:
         shell: pwsh
         run: throw 'proof failed; terminal evidence was retained'
 
+  linux-netns:
+    name: phase17 Linux namespace proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Install namespace-only system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y iproute2 nftables iputils-ping python3
+      - name: Create evidence directory
+        run: mkdir -p ".tools/assurance/${{ github.run_id }}" .tools/phase17/netns
+      - name: Run isolated namespace proof
+        id: proof
+        continue-on-error: true
+        run: >-
+          go run ./cmd/gate
+          -proof linux-netns
+          -receipt .tools/assurance/${{ github.run_id }}/linux-netns-gate.json
+          -timings .tools/assurance/${{ github.run_id }}/linux-netns-timings.json
+      - name: Issue policy-bound terminal receipt
+        if: always()
+        run: >-
+          go run ./cmd/assure receipt issue
+          -root .
+          -gate .tools/assurance/${{ github.run_id }}/linux-netns-gate.json
+          -workflow .github/workflows/assurance.yml
+          -workflow-source-commit ${{ github.workflow_sha }}
+          -out .tools/assurance/${{ github.run_id }}/linux-netns-receipt.json
+          -commit ${{ inputs.sha || github.sha }}
+          -ref refs/subjects/${{ inputs.sha || github.sha }}
+          -job-id linux-netns
+          -os linux
+          -runner-label ubuntu-24.04
+          -artifact .tools/phase17/netns/aggregate.json
+          -artifact testdata/fixtures/phase17/netns/topology-v1.json
+      - name: Validate passing receipt
+        if: steps.proof.outcome == 'success'
+        run: go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/linux-netns-receipt.json
+      - name: Upload aggregate-only namespace evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: shadow-linux-netns-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .tools/assurance/${{ github.run_id }}/
+            .tools/phase17/netns/aggregate.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Preserve namespace proof failure
+        if: steps.proof.outcome != 'success'
+        run: exit 1
+
   android-host:
     name: android-host (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -366,7 +427,7 @@ jobs:
 
   certificate:
     name: exact-subject assurance certificate
-    needs: [policy, go-proof, android-host, android-device]
+    needs: [policy, go-proof, linux-netns, android-host, android-device]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -404,7 +465,7 @@ jobs:
               $latest[$identity] = [pscustomobject]@{ Attempt = $attempt; File = $file }
             }
           }
-          if ($latest.Count -ne 15) { throw "expected 15 proof identities, found $($latest.Count)" }
+          if ($latest.Count -ne 16) { throw "expected 16 proof identities, found $($latest.Count)" }
           New-Item -ItemType Directory -Force .tools/collected | Out-Null
           foreach ($identity in ($latest.Keys | Sort-Object)) {
             $safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '-receipt.json'
@@ -414,7 +475,7 @@ jobs:
         shell: pwsh
         run: |
           $receipts = Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse | Sort-Object Name
-          if ($receipts.Count -ne 15) { throw "expected 15 proof receipts, found $($receipts.Count)" }
+          if ($receipts.Count -ne 16) { throw "expected 16 proof receipts, found $($receipts.Count)" }
           $arguments = @(
             'run', './cmd/assure', 'certificate', 'issue',
             '-root', '.',
@@ -429,6 +490,7 @@ jobs:
             '-required', 'go-audit',
             '-required', 'go-core',
             '-required', 'go-executable-evidence',
+            '-required', 'linux-netns',
             '-required', 'operator'
           )
           foreach ($receipt in $receipts) {
@@ -450,6 +512,7 @@ jobs:
             -required go-audit `
             -required go-core `
             -required go-executable-evidence `
+            -required linux-netns `
             -required operator
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload aggregate certificate

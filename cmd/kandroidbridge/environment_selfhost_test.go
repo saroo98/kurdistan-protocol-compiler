@@ -217,7 +217,7 @@ type releaseFixtureNetworkFactory struct {
 	prepared int
 }
 
-func (factory *releaseFixtureNetworkFactory) Prepare(_ context.Context, plan sessionplan.PlanV2, seed []byte) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
+func (factory *releaseFixtureNetworkFactory) Prepare(_ context.Context, plan sessionplan.PlanV2, seed []byte, _ uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
 	factory.prepared++
 	defer clear(seed)
 	if plan.Digest == ([32]byte{}) || len(seed) == 0 {

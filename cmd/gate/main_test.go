@@ -58,6 +58,8 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 		{name: "operator", proof: "operator", want: []string{"phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet"}},
 		{name: "documentation evidence", proof: "docs-evidence", want: []string{"phase15-evidence", "release-metadata"}},
 		{name: "dependency freshness", proof: "dependency-freshness", want: []string{"build-govulncheck", "go-vulnerability-analysis", "fetch-osv-scanner", "android-runtime-vulnerability-analysis"}},
+		{name: "Linux namespace", proof: "linux-netns", want: []string{"phase17-linux-netns"}, arg: "--preserve-env=PATH"},
+		{name: "Linux namespace PR contract", proof: "linux-netns-contract", want: []string{"phase17-netns-shell", "phase17-netns-witness-cli", "phase17-netns-probe-cli", "phase17-netns-tagged-tests"}},
 		{name: "Android host", proof: "android-host", want: []string{"android-assurance-host"}, arg: "ciAssuranceHostGate"},
 		{name: "Android PR host", proof: "android-pr-host", want: []string{"android-pr-host"}, arg: "ciPrHostGate"},
 		{name: "Android API 26 device", proof: "android-device-api26", want: []string{"android-device-api26"}},
