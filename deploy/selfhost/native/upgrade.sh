@@ -89,9 +89,15 @@ recreate_owned_tun() {
   return 1
 }
 
+rebind_owned_dns() {
+  systemctl restart unbound.service >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet unbound.service || return 1
+}
+
 systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
 ./install.sh --upgrade >/dev/null || fail INSTALL_FAILED
 recreate_owned_tun || fail TUN_RECREATE_FAILED
+rebind_owned_dns || fail DNS_REBIND_FAILED
 
 if [ -f "$state_file" ]; then
   runuser -u kurd-node -- /usr/local/bin/kurdctl migration apply --data-dir "$data_dir" >/dev/null || fail MIGRATION_FAILED

@@ -352,6 +352,22 @@ func TestUpgradeAndRollbackRecreateTheOwnedTUNFromTheActiveVersion(t *testing.T)
 	}
 }
 
+func TestInstallUpgradeAndRollbackRebindOwnedDNSAfterTUNCreation(t *testing.T) {
+	root := repositoryRootV1(t)
+	for _, name := range []string{"install.sh", "upgrade.sh", "rollback.sh"} {
+		script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(script)
+		if !strings.Contains(text, "rebind_owned_dns()") ||
+			!strings.Contains(text, "systemctl restart unbound.service") ||
+			!strings.Contains(text, "systemctl is-active --quiet unbound.service") {
+			t.Fatalf("%s must rebind and verify owned DNS after the active TUN exists", name)
+		}
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
