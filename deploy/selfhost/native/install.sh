@@ -16,9 +16,24 @@ case "$(uname -m)" in
   *) fail ARCH_UNSUPPORTED ;;
 esac
 
-for command in sha256sum systemctl systemd-analyze systemd-sysusers systemd-tmpfiles networkctl nft unbound unbound-checkconf sysctl stat getent mktemp sed grep basename dirname install mv cp rm runuser; do
+for command in sha256sum systemctl systemd-analyze systemd-sysusers systemd-tmpfiles networkctl nft unbound unbound-checkconf sysctl stat getent mktemp sed grep basename dirname install mv cp rm runuser sleep; do
   command -v "$command" >/dev/null 2>&1 || fail TOOL_MISSING
 done
+
+await_owned_tun() {
+  attempts=0
+  while [ "$attempts" -lt 50 ]; do
+    [ -e /sys/class/net/kurd0/tun_flags ] && return 0
+    attempts=$((attempts + 1))
+    sleep 0.1
+  done
+  return 1
+}
+
+rebind_owned_dns() {
+  systemctl restart unbound.service >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet unbound.service || return 1
+}
 [ -f manifest.json ] && [ -f SHA256SUMS ] || fail PACKAGE_INCOMPLETE
 archive_arch=$(sed -n 's/.*"arch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json)
 [ "$archive_arch" = "$expected_arch" ] || fail ARCH_MISMATCH
@@ -158,10 +173,11 @@ done
 systemd-tmpfiles --create /etc/tmpfiles.d/kurd-node.conf
 systemctl daemon-reload
 networkctl reload
+await_owned_tun || fail TUN_UNAVAILABLE
 sysctl --system >/dev/null
 unbound-checkconf /etc/unbound/unbound.conf.d/kurd-node.conf >/dev/null
 nft -c -f /etc/nftables.d/kurd-node.nft >/dev/null
-systemctl try-reload-or-restart unbound.service >/dev/null 2>&1 || true
+rebind_owned_dns || fail DNS_REBIND_FAILED
 
 trap - EXIT HUP INT TERM
 rm -rf "$temporary"
