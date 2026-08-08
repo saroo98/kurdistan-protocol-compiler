@@ -306,6 +306,9 @@ func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 	if !strings.Contains(text, "\nBindIPv6Only=both\n") {
 		t.Fatal("relay socket must explicitly accept both IPv4-mapped and IPv6 clients")
 	}
+	if !strings.Contains(text, "\nFileDescriptorName=kurd\n") {
+		t.Fatal("relay socket must use the descriptor name enforced by the runtime")
+	}
 	if strings.Count(text, "\nListenStream=") != 1 || strings.Contains(text, "\nListenStream=0.0.0.0:443\n") {
 		t.Fatal("relay service accepts exactly one systemd listener descriptor")
 	}
