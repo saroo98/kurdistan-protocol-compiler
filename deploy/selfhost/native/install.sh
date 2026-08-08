@@ -28,12 +28,13 @@ sha256sum -c SHA256SUMS >/dev/null || fail CHECKSUM_MISMATCH
 
 unset KURD_PREFLIGHT_TEST_ROOT KURD_PREFLIGHT_ALLOW_TEST_ROOT
 preflight_output=$(./preflight.sh --install --port 443) || fail PREFLIGHT_FAILED
-egress_interface=$(printf '%s\n' "$preflight_output" | sed -n 's/.*"egressInterface":"\([A-Za-z0-9_.:-]*\)".*/\1/p')
-[ -n "$egress_interface" ] || fail PREFLIGHT_FAILED
+egress_interface_v4=$(printf '%s\n' "$preflight_output" | sed -n 's/.*"egressInterfaceV4":"\([A-Za-z0-9_.:-]*\)".*/\1/p')
+egress_interface_v6=$(printf '%s\n' "$preflight_output" | sed -n 's/.*"egressInterfaceV6":"\([A-Za-z0-9_.:-]*\)".*/\1/p')
+[ -n "$egress_interface_v4" ] && [ -n "$egress_interface_v6" ] || fail PREFLIGHT_FAILED
 
 temporary=$(mktemp -d /var/tmp/kurd-node-install.XXXXXX)
 trap 'rm -rf "$temporary"' EXIT HUP INT TERM
-sed "s/KURD_EGRESS_INTERFACE/$egress_interface/g" nftables/kurd-node.nft >"$temporary/kurd-node.nft"
+sed -e "s/KURD_EGRESS_INTERFACE_V4/$egress_interface_v4/g" -e "s/KURD_EGRESS_INTERFACE_V6/$egress_interface_v6/g" nftables/kurd-node.nft >"$temporary/kurd-node.nft"
 
 systemd_root=$temporary/systemd-root
 install -d -o root -g root -m 0755 \

@@ -14,6 +14,8 @@ shift
 
 port=443
 requested_egress=${KURD_EGRESS_INTERFACE:-}
+requested_egress_v4=${KURD_EGRESS_INTERFACE_V4:-}
+requested_egress_v6=${KURD_EGRESS_INTERFACE_V6:-}
 allow_systemd_socket=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -25,6 +27,16 @@ while [ "$#" -gt 0 ]; do
     --egress-interface)
       [ "$#" -ge 2 ] || fail INVALID_ARGUMENTS
       requested_egress=$2
+      shift 2
+      ;;
+    --egress-interface-v4)
+      [ "$#" -ge 2 ] || fail INVALID_ARGUMENTS
+      requested_egress_v4=$2
+      shift 2
+      ;;
+    --egress-interface-v6)
+      [ "$#" -ge 2 ] || fail INVALID_ARGUMENTS
+      requested_egress_v6=$2
       shift 2
       ;;
     --allow-systemd-socket)
@@ -40,6 +52,9 @@ case "$port" in
 esac
 [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || fail INVALID_ARGUMENTS
 case "$requested_egress" in
+  *[!A-Za-z0-9_.:-]*) fail INVALID_ARGUMENTS ;;
+esac
+case "$requested_egress_v4:$requested_egress_v6" in
   *[!A-Za-z0-9_.:-]*) fail INVALID_ARGUMENTS ;;
 esac
 
@@ -96,9 +111,15 @@ ipv6_interfaces=$(ip -o -6 route show default | awk '{ for (i=1; i<NF; i++) if (
 [ -n "$ipv6_interfaces" ] || fail NO_IPV6_ROUTE
 [ "$(printf '%s\n' "$ipv4_interfaces" | wc -l | tr -d ' ')" -eq 1 ] || fail MULTIPLE_EGRESS
 [ "$(printf '%s\n' "$ipv6_interfaces" | wc -l | tr -d ' ')" -eq 1 ] || fail MULTIPLE_EGRESS
-egress_interface=$ipv4_interfaces
-[ "$ipv6_interfaces" = "$egress_interface" ] || fail MULTIPLE_EGRESS
-if [ -n "$requested_egress" ] && [ "$requested_egress" != "$egress_interface" ]; then
+egress_interface_v4=$ipv4_interfaces
+egress_interface_v6=$ipv6_interfaces
+if [ -n "$requested_egress" ] && { [ "$requested_egress" != "$egress_interface_v4" ] || [ "$requested_egress" != "$egress_interface_v6" ]; }; then
+  fail EGRESS_MISMATCH
+fi
+if [ -n "$requested_egress_v4" ] && [ "$requested_egress_v4" != "$egress_interface_v4" ]; then
+  fail EGRESS_MISMATCH
+fi
+if [ -n "$requested_egress_v6" ] && [ "$requested_egress_v6" != "$egress_interface_v6" ]; then
   fail EGRESS_MISMATCH
 fi
 
@@ -116,4 +137,4 @@ if [ "$mode" = "--runtime" ]; then
   esac
 fi
 
-printf '{"schema":"kurd-node-preflight-v2","status":"PASS","code":"OK","mode":"%s","egressInterface":"%s","ipv4":true,"ipv6":true}\n' "${mode#--}" "$egress_interface"
+printf '{"schema":"kurd-node-preflight-v2","status":"PASS","code":"OK","mode":"%s","egressInterfaceV4":"%s","egressInterfaceV6":"%s","ipv4":true,"ipv6":true}\n' "${mode#--}" "$egress_interface_v4" "$egress_interface_v6"
