@@ -6,7 +6,8 @@ After=kurd-node-network.service
 PartOf=kurd-node.service
 
 [Socket]
-ListenStream=443
+ListenStream=0.0.0.0:443
+ListenStream=[::]:443
 Accept=no
 Backlog=128
 KeepAlive=yes
