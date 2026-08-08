@@ -314,6 +314,18 @@ func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 	}
 }
 
+func TestRelayServiceKeepsOutputPrivateAndCategoricalFailuresObservable(t *testing.T) {
+	root := repositoryRootV1(t)
+	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(unit)
+	if !strings.Contains(text, "\nStandardOutput=null\n") || !strings.Contains(text, "\nStandardError=journal\n") {
+		t.Fatal("relay service output policy must suppress stdout and retain bounded categorical failures")
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
