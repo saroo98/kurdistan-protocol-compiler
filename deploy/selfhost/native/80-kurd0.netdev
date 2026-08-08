@@ -6,7 +6,7 @@ Description=Kurd owner-controlled relay tunnel
 [Tun]
 User=kurd-node
 Group=kurd-node
-MultiQueue=no
+MultiQueue=yes
 PacketInfo=no
 VNetHeader=no
 KeepCarrier=yes
