@@ -235,6 +235,28 @@ func TestNativeInstallerStagesEveryServiceExecutableForIsolatedVerification(t *t
 	}
 }
 
+func TestNativeFirewallSelectsAddressFamilyWithNFProto(t *testing.T) {
+	root := repositoryRootV1(t)
+	nft, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.nft"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nftText := string(nft)
+	for _, invalid := range []string{`iifname "kurd0" ip oifname`, `iifname "kurd0" ip6 oifname`} {
+		if strings.Contains(nftText, invalid) {
+			t.Fatalf("nft policy contains invalid standalone family selector %q", invalid)
+		}
+	}
+	for _, required := range []string{
+		`iifname "kurd0" meta nfproto ipv4 oifname $egress_if_v4 accept`,
+		`iifname "kurd0" meta nfproto ipv6 oifname $egress_if_v6 accept`,
+	} {
+		if !strings.Contains(nftText, required) {
+			t.Fatalf("nft policy is missing address-family selector %q", required)
+		}
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

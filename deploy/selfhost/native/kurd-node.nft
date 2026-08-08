@@ -42,8 +42,8 @@ table inet kurd_node {
         iifname "kurd0" ip6 saddr != fd4b:7572:6400::/64 drop
         iifname "kurd0" ip daddr @blocked_ipv4 drop
         iifname "kurd0" ip6 daddr @blocked_ipv6 drop
-        iifname "kurd0" ip oifname $egress_if_v4 accept
-        iifname "kurd0" ip6 oifname $egress_if_v6 accept
+        iifname "kurd0" meta nfproto ipv4 oifname $egress_if_v4 accept
+        iifname "kurd0" meta nfproto ipv6 oifname $egress_if_v6 accept
         iifname $egress_if_v4 oifname "kurd0" ct state established,related accept
         iifname $egress_if_v6 oifname "kurd0" ct state established,related accept
         iifname "kurd0" drop
