@@ -64,6 +64,7 @@ stage_systemd_executable() {
 }
 
 stage_systemd_executable bin/kurd-node /usr/local/bin/kurd-node
+stage_systemd_executable bin/kurdctl /usr/local/bin/kurdctl
 stage_systemd_executable preflight.sh /usr/local/lib/kurd-node/preflight.sh
 stage_systemd_executable "$(command -v nft)" /usr/sbin/nft
 stage_systemd_executable "$(command -v unbound)" /usr/sbin/unbound
