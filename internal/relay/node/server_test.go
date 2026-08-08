@@ -236,6 +236,36 @@ func TestServerRunV1InitialStateFailureClosesOwnedResources(t *testing.T) {
 	}
 }
 
+func TestServerRunV1ClassifiesRegistryFailure(t *testing.T) {
+	relayListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		relayListener.Close()
+		t.Fatal(err)
+	}
+	tunnel := newMemoryTunnelV1()
+	if err := tunnel.Close(); err != nil {
+		relayListener.Close()
+		controlListener.Close()
+		t.Fatal(err)
+	}
+	config := DefaultConfig(filepath.Join(t.TempDir(), "node"), uint16(relayListener.Addr().(*net.TCPAddr).Port))
+	config.DNSReady = func(context.Context) bool { return true }
+	config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) {
+		return &fakeRelaySnapshotV1{status: validRelayStatusV1(1)}, nil
+	}
+	server, err := NewServerV1(config, relayListener, tunnel, controlListener, func(net.Conn) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Run(context.Background()); !errors.Is(err, ErrServerRegistry) {
+		t.Fatalf("run err=%v", err)
+	}
+}
+
 func TestServerRunV1RejectsMalformedPrefaceAndStopsCleanly(t *testing.T) {
 	relayListener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
