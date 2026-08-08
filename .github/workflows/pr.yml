@@ -251,7 +251,7 @@ jobs:
           $paths = @{
             'internal-apk' = '.tools/device/app-internal.apk'
             'instrumentation-apk' = '.tools/device/app-internal-androidTest.apk'
-            'expected-tests' = 'android/config/phase14-required-device-tests.txt'
+            'expected-tests' = 'android/config/phase17-required-device-tests.txt'
           }
           foreach ($entry in $metadata.artifacts) {
             if (-not $paths.ContainsKey($entry.name)) { throw "unexpected device artifact $($entry.name)" }
@@ -269,7 +269,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -workflow .github/workflows/pr.yml -workflow-source-commit '${{ github.workflow_sha }}' -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-device -os android-emulator -runner-label api-${{ matrix.api }}-x86_64 -artifact .tools/device/app-internal.apk -artifact .tools/device/app-internal-androidTest.apk -artifact .tools/device/device-artifacts.json -artifact android/config/phase14-required-device-tests.txt -artifact .tools/phase16/emulator-api${{ matrix.api }}-identity.json
+          go run ./cmd/assure receipt issue -root . -gate .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-gate.json -workflow .github/workflows/pr.yml -workflow-source-commit '${{ github.workflow_sha }}' -out .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json -commit '${{ github.event.pull_request.head.sha }}' -ref 'refs/subjects/${{ github.event.pull_request.head.sha }}' -job-id android-device -os android-emulator -runner-label api-${{ matrix.api }}-x86_64 -artifact .tools/device/app-internal.apk -artifact .tools/device/app-internal-androidTest.apk -artifact .tools/device/device-artifacts.json -artifact android/config/phase17-required-device-tests.txt -artifact .tools/phase17/emulator-api${{ matrix.api }}-identity.json
           if ('${{ steps.proof.outcome }}' -eq 'success') { go run ./cmd/assure receipt validate -root . -receipt .tools/assurance/${{ github.run_id }}/${{ matrix.proof }}-receipt.json }
       - name: Upload device receipt
         if: always()
@@ -278,7 +278,7 @@ jobs:
           name: pr-proof-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .tools/assurance/${{ github.run_id }}/
-            .tools/phase16/
+            .tools/phase17/
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 7

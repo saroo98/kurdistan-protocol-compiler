@@ -38,15 +38,15 @@ $avdManager = Join-Path $env:ANDROID_HOME 'cmdline-tools/latest/bin/avdmanager'
 $emulator = Join-Path $env:ANDROID_HOME 'emulator/emulator'
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb'
 $systemImage = "system-images;android-$Api;google_apis;x86_64"
-$avdName = "kurdistan_phase16_api$Api"
+$avdName = "kurdistan_phase17_api$Api"
 $avdParent = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
 $avdHome = [IO.Path]::GetFullPath((Join-Path $avdParent "kurdistan-avd-api$Api"))
 $rawEmulatorLog = Join-Path $avdParent "kurdistan-emulator-api$Api.stdout.log"
 $rawEmulatorError = Join-Path $avdParent "kurdistan-emulator-api$Api.stderr.log"
 $rawPostRunLogcat = Join-Path $avdParent "kurdistan-logcat-api$Api.txt"
-$emulatorSummary = ".tools/phase16/emulator-api$Api-summary.txt"
-$deviceSummary = ".tools/phase16/logcat-api$Api-summary.txt"
-$emulatorIdentity = ".tools/phase16/emulator-api$Api-identity.json"
+$emulatorSummary = ".tools/phase17/emulator-api$Api-summary.txt"
+$deviceSummary = ".tools/phase17/logcat-api$Api-summary.txt"
+$emulatorIdentity = ".tools/phase17/emulator-api$Api-identity.json"
 
 function Resolve-SdkPackageMetadata {
     param([Parameter(Mandatory = $true)][string]$PackageRoot)
@@ -118,7 +118,7 @@ function Write-CategoricalSummary {
     }
 }
 
-New-Item -ItemType Directory -Force '.tools/phase16' | Out-Null
+New-Item -ItemType Directory -Force '.tools/phase17' | Out-Null
 New-Item -ItemType Directory -Force $avdHome | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $GateReceipt) | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $Timings) | Out-Null
@@ -232,7 +232,7 @@ try {
     } catch {}
     try {
         Write-CategoricalSummary -InputPath $rawEmulatorLog -OutputPath $emulatorSummary -Kind 'emulator-stdout'
-        $stderrSummary = ".tools/phase16/emulator-api$Api-stderr-summary.txt"
+        $stderrSummary = ".tools/phase17/emulator-api$Api-stderr-summary.txt"
         Write-CategoricalSummary -InputPath $rawEmulatorError -OutputPath $stderrSummary -Kind 'emulator-stderr'
     } catch {}
     try { & $adb emu kill | Out-Null } catch {}

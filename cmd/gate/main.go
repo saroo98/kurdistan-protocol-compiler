@@ -9,13 +9,13 @@
 //
 //	go run ./cmd/gate                         # modules + build + vet + test + full audit + operator
 //	go run ./cmd/gate -quick                  # complete Go gate with the quick audit
-//	go run ./cmd/gate -android                # complete Go gate plus Android Phase 14
-//	go run ./cmd/gate -android-only           # Android Phase 14 only
+//	go run ./cmd/gate -android                # complete Go gate plus Android Phase 17
+//	go run ./cmd/gate -android-only           # Android Phase 17 only
 //	go run ./cmd/gate -proof go-core          # modules + build + vet + uncached tests
 //	go run ./cmd/gate -proof go-executable-evidence # nested executable evidence only
 //	go run ./cmd/gate -proof go-audit         # full audit only
 //	go run ./cmd/gate -proof operator         # operator verification only
-//	go run ./cmd/gate -proof android-host     # Android Phase 14 only
+//	go run ./cmd/gate -proof android-host     # Android Phase 17 only
 //	go run ./cmd/gate -proof android-pr-host  # cache-enabled PR feedback only
 //
 // It exits non-zero if any step fails.
@@ -96,8 +96,8 @@ func parseOptions(args []string) (gateOptions, error) {
 	flags := flag.NewFlagSet("gate", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.BoolVar(&options.quick, "quick", false, "run the quick audit mode")
-	flags.BoolVar(&options.android, "android", false, "append Android Phase 14 assurance")
-	flags.BoolVar(&options.androidOnly, "android-only", false, "run only Android Phase 14 assurance")
+	flags.BoolVar(&options.android, "android", false, "append Android Phase 17 assurance")
+	flags.BoolVar(&options.androidOnly, "android-only", false, "run only Android Phase 17 assurance")
 	flags.StringVar(&options.proof, "proof", "", "run one proof class")
 	flags.StringVar(&options.receiptPath, "receipt", "", "write a gate execution receipt")
 	flags.StringVar(&options.timingsPath, "timings", "", "write gate timing data")
@@ -294,9 +294,9 @@ func runWithExecutor(args []string, stdout, stderr io.Writer, execute stepExecut
 		return 1
 	}
 	if options.android {
-		fmt.Fprintln(stdout, "GATE PASSED: module verification, build, vet, test, audit, Phase 12 control plane, and Android Phase 14 local assurance all green")
+		fmt.Fprintln(stdout, "GATE PASSED: module verification, build, vet, test, audit, Phase 12 control plane, and Android Phase 17 live data-plane assurance all green")
 	} else if options.androidOnly {
-		fmt.Fprintln(stdout, "GATE PASSED: Android Phase 14 local assurance green")
+		fmt.Fprintln(stdout, "GATE PASSED: Android Phase 17 live data-plane assurance green")
 	} else if options.proof != "" {
 		fmt.Fprintf(stdout, "GATE PASSED: proof %s green\n", options.proof)
 	} else {
@@ -386,16 +386,15 @@ func androidDeviceStep(api int) step {
 		name:    fmt.Sprintf("android-device-api%d", api),
 		program: "go",
 		args: []string{
-			"run", "./cmd/phase9devicegate",
-			"-label", "PHASE 14",
-			"-evidence-dir", fmt.Sprintf(".tools/phase16/device-api%d", api),
+			"run", "./cmd/phase17devicegate",
+			"-evidence-dir", fmt.Sprintf(".tools/phase17/device-api%d", api),
 			"-app-apk", ".tools/device/app-internal.apk",
 			"-test-apk", ".tools/device/app-internal-androidTest.apk",
 			"-app-package", "org.kurdistanvpn.app.internal",
 			"-test-package", "org.kurdistanvpn.app.internal.test",
 			"-conflicting-app-package", "org.kurdistanvpn.app.debug",
 			"-minimum-tests", "1",
-			"-expected-tests", "android/config/phase14-required-device-tests.txt",
+			"-expected-tests", "android/config/phase17-required-device-tests.txt",
 			"-expected-api", fmt.Sprintf("%d", api),
 			"-expected-abi", "x86_64",
 		},
