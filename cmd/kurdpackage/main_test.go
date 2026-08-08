@@ -293,6 +293,23 @@ func TestRelayServiceAllowsItsPreflightToInspectRoutes(t *testing.T) {
 	}
 }
 
+func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
+	root := repositoryRootV1(t)
+	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.socket"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(unit)
+	for _, address := range []string{"ListenStream=0.0.0.0:443", "ListenStream=[::]:443"} {
+		if !strings.Contains(text, address) {
+			t.Fatalf("relay socket is missing explicit public listener %q", address)
+		}
+	}
+	if strings.Contains(text, "\nListenStream=443\n") {
+		t.Fatal("ambiguous relay listener depends on host IPv6 dual-stack policy")
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

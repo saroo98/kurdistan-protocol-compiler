@@ -7,11 +7,41 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 internal data class NetworkTransition<T>(
     val previous: T?,
     val current: T?,
 )
+
+internal class UnderlyingNetworkAvailability<T> {
+    private val lock = ReentrantLock()
+    private val changed = lock.newCondition()
+    private var current: T? = null
+    private var bound = false
+
+    fun update(value: T?, isBound: Boolean) {
+        lock.withLock {
+            current = value
+            bound = value != null && isBound
+            changed.signalAll()
+        }
+    }
+
+    fun awaitUsable(timeoutMillis: Long): T? {
+        require(timeoutMillis >= 0)
+        var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        lock.withLock {
+            while (current == null || !bound) {
+                if (remaining <= 0) return null
+                remaining = changed.awaitNanos(remaining)
+            }
+            return current
+        }
+    }
+}
 
 internal class CurrentNetworkTracker<T>(
     private val onTransition: (NetworkTransition<T>) -> Unit,
