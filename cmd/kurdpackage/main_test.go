@@ -257,6 +257,24 @@ func TestNativeFirewallSelectsAddressFamilyWithNFProto(t *testing.T) {
 	}
 }
 
+func TestRelayServiceAllowsItsPreflightToReadMemoryCapacity(t *testing.T) {
+	root := repositoryRootV1(t)
+	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	preflight, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "preflight.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(preflight), "/proc/meminfo") {
+		t.Fatal("test precondition failed: runtime preflight no longer reads /proc/meminfo")
+	}
+	if strings.Contains(string(unit), "ProcSubset=pid") {
+		t.Fatal("relay service hides /proc/meminfo from its own ExecStartPre capacity check")
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
