@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -84,8 +85,23 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 		return 1
 	}
 	if err := server.Run(ctx); err != nil {
-		fmt.Fprintln(stderr, "kurd-node serve: stopped")
+		fmt.Fprintf(stderr, "kurd-node serve: stopped:%s\n", serverStopCategoryV1(err))
 		return 1
 	}
 	return 0
+}
+
+func serverStopCategoryV1(err error) string {
+	switch {
+	case errors.Is(err, node.ErrServerRegistry):
+		return "registry"
+	case errors.Is(err, node.ErrServerListener):
+		return "listener"
+	case errors.Is(err, node.ErrServerControl):
+		return "control"
+	case errors.Is(err, node.ErrServerReload):
+		return "reload"
+	default:
+		return "unknown"
+	}
 }

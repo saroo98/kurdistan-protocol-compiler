@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -24,6 +25,24 @@ func TestSessionRejectReporterIsCategoricalAndBounded(t *testing.T) {
 	for _, prohibited := range []string{"profile", "endpoint", "address", "key", "credential"} {
 		if strings.Contains(output.String(), prohibited) {
 			t.Fatalf("session rejection report exposed %q", prohibited)
+		}
+	}
+}
+
+func TestServerStopCategoryIsBounded(t *testing.T) {
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{err: node.ErrServerRegistry, want: "registry"},
+		{err: node.ErrServerListener, want: "listener"},
+		{err: node.ErrServerControl, want: "control"},
+		{err: node.ErrServerReload, want: "reload"},
+		{err: errors.New("private detail"), want: "unknown"},
+	}
+	for _, test := range tests {
+		if got := serverStopCategoryV1(test.err); got != test.want {
+			t.Fatalf("category=%q want=%q", got, test.want)
 		}
 	}
 }

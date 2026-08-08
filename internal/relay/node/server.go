@@ -24,10 +24,14 @@ import (
 )
 
 var (
-	ErrServerConfig  = errors.New("relay node: invalid server configuration")
-	ErrServerState   = errors.New("relay node: runtime authority unavailable")
-	ErrServerRun     = errors.New("relay node: server stopped")
-	ErrServerSession = errors.New("relay node: session rejected")
+	ErrServerConfig   = errors.New("relay node: invalid server configuration")
+	ErrServerState    = errors.New("relay node: runtime authority unavailable")
+	ErrServerRun      = errors.New("relay node: server stopped")
+	ErrServerSession  = errors.New("relay node: session rejected")
+	ErrServerRegistry = errors.New("relay node: registry stopped")
+	ErrServerListener = errors.New("relay node: listener stopped")
+	ErrServerControl  = errors.New("relay node: control stopped")
+	ErrServerReload   = errors.New("relay node: reload stopped")
 )
 
 type SessionRejectCodeV1 string
@@ -161,14 +165,32 @@ func (server *ServerV1) Run(ctx context.Context) error {
 			}
 		}()
 	}
-	start(server.registry.Run)
-	start(server.acceptLoopV1)
 	start(func(runContext context.Context) error {
-		return ServeControlV1(runContext, server.control, server.authorizeControl,
-			ControlActionsV1{Health: server.health, Registry: server.registry, Reload: server.Reload, StopProfile: server.stopProfileV1},
-			server.config.ControlTimeout, server.config.ControlWorkers)
+		if err := server.registry.Run(runContext); err != nil {
+			return errors.Join(ErrServerRegistry, err)
+		}
+		return nil
 	})
-	start(server.reloadLoopV1)
+	start(func(runContext context.Context) error {
+		if err := server.acceptLoopV1(runContext); err != nil {
+			return errors.Join(ErrServerListener, err)
+		}
+		return nil
+	})
+	start(func(runContext context.Context) error {
+		if err := ServeControlV1(runContext, server.control, server.authorizeControl,
+			ControlActionsV1{Health: server.health, Registry: server.registry, Reload: server.Reload, StopProfile: server.stopProfileV1},
+			server.config.ControlTimeout, server.config.ControlWorkers); err != nil {
+			return errors.Join(ErrServerControl, err)
+		}
+		return nil
+	})
+	start(func(runContext context.Context) error {
+		if err := server.reloadLoopV1(runContext); err != nil {
+			return errors.Join(ErrServerReload, err)
+		}
+		return nil
+	})
 
 	var runErr error
 	select {
