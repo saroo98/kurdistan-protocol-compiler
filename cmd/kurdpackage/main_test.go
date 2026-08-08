@@ -305,6 +305,9 @@ func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 			t.Fatalf("relay socket is missing explicit public listener %q", address)
 		}
 	}
+	if !strings.Contains(text, "\nBindIPv6Only=ipv6-only\n") {
+		t.Fatal("dual-stack socket must prevent the IPv6 listener from also claiming the IPv4 port")
+	}
 	if strings.Contains(text, "\nListenStream=443\n") {
 		t.Fatal("ambiguous relay listener depends on host IPv6 dual-stack policy")
 	}
