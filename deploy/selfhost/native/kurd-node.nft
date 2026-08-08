@@ -1,6 +1,7 @@
 #!/usr/sbin/nft -f
 
-define egress_if = "KURD_EGRESS_INTERFACE"
+define egress_if_v4 = "KURD_EGRESS_INTERFACE_V4"
+define egress_if_v6 = "KURD_EGRESS_INTERFACE_V6"
 define kurd_port = 443
 
 destroy table inet kurd_node
@@ -29,8 +30,10 @@ table inet kurd_node {
         iifname "kurd0" ip6 daddr fd4b:7572:6400::1 udp dport 53 accept
         iifname "kurd0" ip6 daddr fd4b:7572:6400::1 tcp dport 53 accept
         iifname "kurd0" drop
-        iifname $egress_if tcp dport $kurd_port ct state new limit rate 100/second burst 200 packets accept
-        iifname $egress_if tcp dport $kurd_port drop
+        iifname $egress_if_v4 tcp dport $kurd_port ct state new limit rate 100/second burst 200 packets accept
+        iifname $egress_if_v4 tcp dport $kurd_port drop
+        iifname $egress_if_v6 tcp dport $kurd_port ct state new limit rate 100/second burst 200 packets accept
+        iifname $egress_if_v6 tcp dport $kurd_port drop
     }
 
     chain forward {
@@ -39,15 +42,17 @@ table inet kurd_node {
         iifname "kurd0" ip6 saddr != fd4b:7572:6400::/64 drop
         iifname "kurd0" ip daddr @blocked_ipv4 drop
         iifname "kurd0" ip6 daddr @blocked_ipv6 drop
-        iifname "kurd0" oifname $egress_if accept
-        iifname $egress_if oifname "kurd0" ct state established,related accept
+        iifname "kurd0" ip oifname $egress_if_v4 accept
+        iifname "kurd0" ip6 oifname $egress_if_v6 accept
+        iifname $egress_if_v4 oifname "kurd0" ct state established,related accept
+        iifname $egress_if_v6 oifname "kurd0" ct state established,related accept
         iifname "kurd0" drop
         oifname "kurd0" drop
     }
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        oifname $egress_if ip saddr 10.77.0.0/24 masquerade
-        oifname $egress_if ip6 saddr fd4b:7572:6400::/64 masquerade
+        oifname $egress_if_v4 ip saddr 10.77.0.0/24 masquerade
+        oifname $egress_if_v6 ip6 saddr fd4b:7572:6400::/64 masquerade
     }
 }

@@ -181,6 +181,43 @@ func TestPreflightFailureFixtureInventory(t *testing.T) {
 	}
 }
 
+func TestNativeDeploymentSupportsDistinctIPv4AndIPv6EgressInterfaces(t *testing.T) {
+	root := repositoryRootV1(t)
+	preflight, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "preflight.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	preflightText := string(preflight)
+	for _, marker := range []string{`"egressInterfaceV4"`, `"egressInterfaceV6"`} {
+		if !strings.Contains(preflightText, marker) {
+			t.Fatalf("preflight is missing separate egress field %s", marker)
+		}
+	}
+	if strings.Contains(preflightText, `[ "$ipv6_interfaces" = "$egress_interface" ]`) {
+		t.Fatal("preflight still requires IPv4 and IPv6 to share one interface")
+	}
+
+	nft, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.nft"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{"KURD_EGRESS_INTERFACE_V4", "KURD_EGRESS_INTERFACE_V6"} {
+		if !strings.Contains(string(nft), marker) {
+			t.Fatalf("nft policy is missing %s", marker)
+		}
+	}
+
+	install, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{"egress_interface_v4", "egress_interface_v6", "KURD_EGRESS_INTERFACE_V4", "KURD_EGRESS_INTERFACE_V6"} {
+		if !strings.Contains(string(install), marker) {
+			t.Fatalf("installer is missing %s", marker)
+		}
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
