@@ -90,7 +90,7 @@ jobs:
           New-Item -ItemType Directory -Force ".tools/assurance/${{ github.run_id }}" | Out-Null
           $selected = $env:SELECTED_PROOFS | ConvertFrom-Json
           $failed = @()
-          foreach ($proof in @('go-core', 'go-executable-evidence', 'go-audit', 'operator', 'docs-evidence', 'dependency-freshness')) {
+          foreach ($proof in @('go-core', 'go-executable-evidence', 'go-audit', 'operator', 'docs-evidence', 'dependency-freshness', 'linux-netns-contract')) {
             if ($selected -notcontains $proof) { continue }
             $gate = ".tools/assurance/${{ github.run_id }}/$proof-gate.json"
             $timings = ".tools/assurance/${{ github.run_id }}/$proof-timings.json"

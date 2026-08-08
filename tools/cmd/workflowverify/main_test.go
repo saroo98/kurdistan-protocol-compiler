@@ -124,7 +124,7 @@ $process.HasExited
 & $adb wait-for-device
 adb emulator discovery timed out
 -not (Test-Path -LiteralPath $GateReceipt)
-$emulatorIdentity = ".tools/phase16/emulator-api$Api-identity.json"
+$emulatorIdentity = ".tools/phase17/emulator-api$Api-identity.json"
 kurdistan-emulator-package-identity-v1
 Resolve-SdkPackageMetadata
 source.properties

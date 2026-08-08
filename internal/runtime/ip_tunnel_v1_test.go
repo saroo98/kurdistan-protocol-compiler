@@ -62,6 +62,42 @@ func TestPacketPumpV1CarriesPacketsBothDirections(t *testing.T) {
 	}
 }
 
+func TestPacketPumpV1CommitsEachAuthenticatedPacketBeforeOpeningTheNext(t *testing.T) {
+	clientEndpoint, relayEndpoint, exporter := newProcessDuplexPairV1(t)
+	bindProcessDuplexPairV1(t, clientEndpoint, relayEndpoint, exporter)
+	clientCarrier, relayCarrier := net.Pipe()
+	clientTUN := newMemoryPacketDeviceV1()
+	relayTUN := newMemoryPacketDeviceV1()
+	assigned := [4]byte{10, 89, 0, 2}
+	program := testDuplexProgramV1()
+	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	clientResults := make(chan error, 1)
+	relayResults := make(chan error, 1)
+	go func() { clientResults <- clientPump.Run(ctx) }()
+	go func() { relayResults <- relayPump.Run(ctx) }()
+	for sequence := byte(1); sequence <= 4; sequence++ {
+		clientTUN.injectV1(t, testIPv4PacketV1(assigned, [4]byte{1, 1, 1, 1}, 17, []byte{sequence}))
+	}
+	for sequence := byte(1); sequence <= 4; sequence++ {
+		packet := receivePacketOrFailureV1(t, relayTUN, clientResults, relayResults)
+		if packet[len(packet)-1] != sequence {
+			t.Fatalf("packet %d delivered out of order", sequence)
+		}
+	}
+	cancel()
+	_ = clientPump.Close()
+	_ = relayPump.Close()
+}
+
 func receivePacketOrFailureV1(t *testing.T, device *memoryPacketDeviceV1, clientResults, relayResults <-chan error) []byte {
 	t.Helper()
 	select {
@@ -148,6 +184,73 @@ func TestPacketPumpV1OutboundQueueFullFailsClosed(t *testing.T) {
 	pump.readTUNV1(context.Background(), output, failures)
 	if err := <-failures; !errors.Is(err, ErrPacketQueueFull) {
 		t.Fatalf("queue result=%v", err)
+	}
+	_ = pump.Close()
+}
+
+func TestPacketPumpV1DropsBoundedInvalidTUNPacketsWithoutForwarding(t *testing.T) {
+	clientEndpoint, _, _ := newProcessDuplexPairV1(t)
+	device := newMemoryPacketDeviceV1()
+	one, peer := net.Pipe()
+	defer peer.Close()
+	assigned := [4]byte{10, 89, 0, 2}
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
+		TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(),
+		Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 1,
+		BufferBudget: 12288, IdleTimeout: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	output := make(chan []byte, 1)
+	failures := make(chan error, 1)
+	go pump.readTUNV1(ctx, output, failures)
+	device.injectV1(t, testIPv4PacketV1(assigned, [4]byte{224, 0, 0, 22}, 1, []byte{1}))
+	want := testIPv4PacketV1(assigned, [4]byte{1, 1, 1, 1}, 17, []byte{2})
+	device.injectV1(t, want)
+	select {
+	case got := <-output:
+		if string(got) != string(want) {
+			t.Fatal("valid packet changed after rejected kernel packet")
+		}
+		clear(got)
+	case err := <-failures:
+		t.Fatalf("bounded invalid packet terminated pump: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("valid packet was not forwarded")
+	}
+	cancel()
+	_ = pump.Close()
+}
+
+func TestPacketPumpV1InvalidTUNPacketFloodFailsClosed(t *testing.T) {
+	clientEndpoint, _, _ := newProcessDuplexPairV1(t)
+	device := newMemoryPacketDeviceV1()
+	one, peer := net.Pipe()
+	defer peer.Close()
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
+		TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(),
+		Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 2, IncompleteOps: 1,
+		BufferBudget: 12288, IdleTimeout: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := make(chan []byte, 1)
+	failures := make(chan error, 1)
+	go pump.readTUNV1(context.Background(), output, failures)
+	for index := 0; index <= maxRejectedTUNPacketsV1; index++ {
+		device.injectV1(t, testIPv4PacketV1([4]byte{10, 89, 0, 2}, [4]byte{224, 0, 0, 22}, 1, []byte{byte(index)}))
+	}
+	select {
+	case err := <-failures:
+		if !errors.Is(err, ErrPacketDestination) {
+			t.Fatalf("invalid flood result=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("invalid packet flood did not fail closed")
 	}
 	_ = pump.Close()
 }

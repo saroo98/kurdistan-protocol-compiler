@@ -15,6 +15,8 @@
 //	go run ./cmd/gate -proof go-executable-evidence # nested executable evidence only
 //	go run ./cmd/gate -proof go-audit         # full audit only
 //	go run ./cmd/gate -proof operator         # operator verification only
+//	go run ./cmd/gate -proof linux-netns      # privileged Linux namespace proof
+//	go run ./cmd/gate -proof linux-netns-contract # unprivileged PR contract proof
 //	go run ./cmd/gate -proof android-host     # Android Phase 17 only
 //	go run ./cmd/gate -proof android-pr-host  # cache-enabled PR feedback only
 //
@@ -176,6 +178,15 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 			{name: "go-vulnerability-analysis", program: "./.tools/bin/govulncheck", args: []string{"./..."}},
 			{name: "fetch-osv-scanner", program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
 			{name: "android-runtime-vulnerability-analysis", program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
+		}, nil
+	case "linux-netns":
+		return []step{{name: "phase17-linux-netns", program: "sudo", args: []string{"--preserve-env=PATH", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"}}}, nil
+	case "linux-netns-contract":
+		return []step{
+			{name: "phase17-netns-shell", program: "bash", args: []string{"-n", "scripts/phase17/netns-e2e.sh"}},
+			{name: "phase17-netns-witness-cli", program: "python3", args: []string{"scripts/phase17/netns_witness.py", "--help"}},
+			{name: "phase17-netns-probe-cli", program: "python3", args: []string{"scripts/phase17/netns_probe.py", "--help"}},
+			{name: "phase17-netns-tagged-tests", program: "go", args: []string{"test", "-tags=phase17integration", "./internal/relay/...", "./internal/runtime", "-count=1"}},
 		}, nil
 	case "android-host":
 		return []step{androidAssuranceStep()}, nil
