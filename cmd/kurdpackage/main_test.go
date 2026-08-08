@@ -326,6 +326,18 @@ func TestRelayServiceKeepsOutputPrivateAndCategoricalFailuresObservable(t *testi
 	}
 }
 
+func TestRelayTUNAllowsTheUnprivilegedProcessToAttachItsOwnQueue(t *testing.T) {
+	root := repositoryRootV1(t)
+	netdev, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "80-kurd0.netdev"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(netdev)
+	if strings.Count(text, "\nMultiQueue=") != 1 || !strings.Contains(text, "\nMultiQueue=yes\n") {
+		t.Fatal("owner-created relay TUN must permit the relay process to attach a queue")
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

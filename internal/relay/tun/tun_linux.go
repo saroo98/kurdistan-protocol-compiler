@@ -41,7 +41,7 @@ func OpenExisting(name string) (Device, error) {
 		_ = unix.Close(fd)
 		return nil, errors.Join(ErrOpen, err)
 	}
-	request.SetUint16(uint16(unix.IFF_TUN | unix.IFF_NO_PI))
+	request.SetUint16(openExistingFlags())
 	if err := unix.IoctlIfreq(fd, unix.TUNSETIFF, request); err != nil || request.Name() != name {
 		_ = unix.Close(fd)
 		if err == nil {
@@ -55,6 +55,10 @@ func OpenExisting(name string) (Device, error) {
 		return nil, ErrOpen
 	}
 	return &linuxDevice{file: file, name: name}, nil
+}
+
+func openExistingFlags() uint16 {
+	return uint16(unix.IFF_TUN | unix.IFF_NO_PI | unix.IFF_MULTI_QUEUE)
 }
 
 func requireUnprivilegedProcess() error {
