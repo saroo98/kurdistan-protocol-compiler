@@ -38,7 +38,7 @@ func TestServeRejectsDirectLaunchWithoutSystemdActivation(t *testing.T) {
 	control := filepath.Join(t.TempDir(), "control.sock")
 	var output, errorOutput bytes.Buffer
 	code := run(context.Background(), []string{"serve", "--data-dir", dataDir, "--port", "443", "--control-socket", control}, &output, &errorOutput)
-	if code != 1 || output.Len() != 0 || errorOutput.String() != "kurd-node serve: unavailable\n" {
+	if code != 1 || output.Len() != 0 || errorOutput.String() != "kurd-node serve: unavailable:listener\n" {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, output.String(), errorOutput.String())
 	}
 	if strings.Contains(errorOutput.String(), dataDir) || strings.Contains(errorOutput.String(), control) {

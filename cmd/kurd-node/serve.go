@@ -38,20 +38,20 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 
 	listener, err := node.OpenSystemdListener(config.ListenerPort)
 	if err != nil {
-		fmt.Fprintln(stderr, "kurd-node serve: unavailable")
+		fmt.Fprintln(stderr, "kurd-node serve: unavailable:listener")
 		return 1
 	}
 	tunnel, err := tun.OpenExisting(config.TUNName)
 	if err != nil {
 		_ = listener.Close()
-		fmt.Fprintln(stderr, "kurd-node serve: unavailable")
+		fmt.Fprintln(stderr, "kurd-node serve: unavailable:tunnel")
 		return 1
 	}
 	control, authorizeControl, err := node.OpenControlListenerV1(config.ControlSocket)
 	if err != nil {
 		_ = tunnel.Close()
 		_ = listener.Close()
-		fmt.Fprintln(stderr, "kurd-node serve: unavailable")
+		fmt.Fprintln(stderr, "kurd-node serve: unavailable:control")
 		return 1
 	}
 	server, err := node.NewServerV1(config, listener, tunnel, control, authorizeControl)
@@ -59,7 +59,7 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 		_ = control.Close()
 		_ = tunnel.Close()
 		_ = listener.Close()
-		fmt.Fprintln(stderr, "kurd-node serve: unavailable")
+		fmt.Fprintln(stderr, "kurd-node serve: unavailable:server")
 		return 1
 	}
 	if err := server.Run(ctx); err != nil {
