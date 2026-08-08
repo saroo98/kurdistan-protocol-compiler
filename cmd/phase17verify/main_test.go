@@ -20,6 +20,47 @@ func TestVerifyRepositoryLiveDataPlaneAuthority(t *testing.T) {
 	}
 }
 
+func TestPhase17GateDoesNotApplyHistoricalPhase9ArtifactEvidenceToCurrentAPK(t *testing.T) {
+	build, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "build.gradle.kts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	phase17 := taskBody(t, string(build), "val phase17Gate = tasks.register(\"phase17Gate\")")
+	if strings.Contains(phase17, "verifyPhase9Evidence") {
+		t.Fatal("phase17Gate applies frozen Phase 9 artifact evidence to the current Phase 17 APK")
+	}
+}
+
+func TestHistoricalAndroidGatesDoNotBuildOrInspectCurrentAPK(t *testing.T) {
+	build, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "build.gradle.kts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(build)
+	for _, name := range []string{"phase9Gate", "phase10Gate", "phase11Gate", "phase13Gate", "phase14Gate"} {
+		body := taskBody(t, source, "tasks.register(\""+name+"\")")
+		for _, forbidden := range []string{"assembleRelease", "assembleInternal", "verifyPhase9Evidence"} {
+			if strings.Contains(body, forbidden) {
+				t.Errorf("%s applies current-artifact operation %q", name, forbidden)
+			}
+		}
+	}
+}
+
+func taskBody(t *testing.T, source, declaration string) string {
+	t.Helper()
+	start := strings.Index(source, declaration)
+	if start < 0 {
+		t.Fatalf("missing Gradle task declaration %q", declaration)
+	}
+	rest := source[start:]
+	end := strings.Index(rest, "\n}")
+	if end < 0 {
+		t.Fatalf("unterminated Gradle task declaration %q", declaration)
+	}
+	return rest[:end+2]
+}
+
 func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 	value, err := loadContract(repositoryRoot(t))
 	if err != nil {

@@ -90,7 +90,7 @@ androidComponents {
         }
         val testApkDirectory = testComponent.artifacts.get(SingleArtifact.APK)
         val testApkLoader = testComponent.artifacts.getBuiltArtifactsLoader()
-        val expectedTests = rootProject.file("config/phase14-required-device-tests.txt")
+        val expectedTests = rootProject.file("config/phase17-required-device-tests.txt")
         val metadataOutput = rootProject.layout.buildDirectory.file("ci/device-artifacts.json")
 
         tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
