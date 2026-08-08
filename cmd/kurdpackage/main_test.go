@@ -275,6 +275,24 @@ func TestRelayServiceAllowsItsPreflightToReadMemoryCapacity(t *testing.T) {
 	}
 }
 
+func TestRelayServiceAllowsItsPreflightToInspectRoutes(t *testing.T) {
+	root := repositoryRootV1(t)
+	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	preflight, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "preflight.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(preflight), "ip -o -4 route") {
+		t.Fatal("test precondition failed: runtime preflight no longer inspects routes through iproute2")
+	}
+	if !strings.Contains(string(unit), "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK") {
+		t.Fatal("relay service blocks the AF_NETLINK socket required by its own route preflight")
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
