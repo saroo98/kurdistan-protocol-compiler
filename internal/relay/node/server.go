@@ -30,6 +30,22 @@ var (
 	ErrServerSession = errors.New("relay node: session rejected")
 )
 
+type SessionRejectCodeV1 string
+
+const (
+	SessionRejectInvalidV1   SessionRejectCodeV1 = "invalid"
+	SessionRejectPrefaceV1   SessionRejectCodeV1 = "preface"
+	SessionRejectEntropyV1   SessionRejectCodeV1 = "entropy"
+	SessionRejectStateV1     SessionRejectCodeV1 = "state"
+	SessionRejectAdmissionV1 SessionRejectCodeV1 = "admission"
+	SessionRejectPlanV1      SessionRejectCodeV1 = "plan"
+	SessionRejectAuthV1      SessionRejectCodeV1 = "auth"
+	SessionRejectAddressV1   SessionRejectCodeV1 = "address"
+	SessionRejectLifetimeV1  SessionRejectCodeV1 = "lifetime"
+	SessionRejectCapacityV1  SessionRejectCodeV1 = "capacity"
+	SessionRejectTLSV1       SessionRejectCodeV1 = "tls"
+)
+
 type RelaySnapshotV1 interface {
 	StatusV1() (selfhost.RelayRuntimeStatusV1, bool)
 	AdmissionByProfileV1(string, uint64) (selfhost.RelayAdmissionV1, bool)
@@ -271,34 +287,34 @@ func (server *ServerV1) reloadLoopV1(ctx context.Context) error {
 
 func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn) error {
 	if raw == nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectInvalidV1)
 	}
 	defer raw.Close()
 	prefaceContext, cancelPreface := context.WithTimeout(runContext, server.config.HandshakeTimeout)
 	defer cancelPreface()
 	if deadline, ok := prefaceContext.Deadline(); !ok || raw.SetDeadline(deadline) != nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectInvalidV1)
 	}
 	preface, err := sessionplan.ReadRelayAdmissionPrefaceV1(raw)
 	cancelPreface()
 	if err != nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectPrefaceV1)
 	}
 	sessionID, err := server.nextSessionIDV1()
 	if err != nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectEntropyV1)
 	}
 
 	server.stateMu.RLock()
 	if server.snapshot == nil || !server.health.Snapshot().AcceptingSessions {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectStateV1)
 	}
 	snapshot := server.snapshot
 	admission, ok := snapshot.AdmissionByProfileV1(preface.ProfileContentID, preface.ProfileGeneration)
 	if !ok {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectAdmissionV1)
 	}
 	plan, err := sessionplan.BuildRelayV2At(sessionplan.RelayAuthorityV2{
 		ProfileContentID: admission.ContentID, ProfileGeneration: admission.Generation,
@@ -311,35 +327,35 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	status, statusOK := snapshot.StatusV1()
 	if err != nil || programErr != nil || tlsErr != nil || !validRelayTLSConfigV1(tlsConfig) || !statusOK || status.RelayKeyID != plan.RelayKeyID {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectPlanV1)
 	}
 	processConfig, err := auth.NewProjectedProcessHandshakeConfigV1(admission.ClientAuthKeyID, status.RelayKeyID, program, "tls13-tcp")
 	if err != nil {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectAuthV1)
 	}
 	handshake, err := kruntime.NewProcessWireRelayHandshakeV1(processConfig, auth.Dependencies{Identity: snapshot, Trust: snapshot}, server.replay, plan.Digest)
 	if err != nil {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectAuthV1)
 	}
 	defer handshake.Close()
 	assigned4, assigned6, ok := assignedAddressesV1(admission.AssignedIPv4, admission.AssignedIPv6)
 	if !ok || assigned4 != plan.ClientIPv4 || assigned6 != plan.ClientIPv6 {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectAddressV1)
 	}
 	maximumSession := time.Duration(program.Limits.MaxSessionMillis) * time.Millisecond
 	if maximumSession <= 0 || maximumSession > 24*time.Hour {
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectLifetimeV1)
 	}
 	sessionContext, cancelSession := context.WithTimeout(runContext, maximumSession)
 	transientToken, tracked := server.trackTransientV1(sessionID, admission.ProfileID, cancelSession)
 	if !tracked {
 		cancelSession()
 		server.stateMu.RUnlock()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectCapacityV1)
 	}
 	server.stateMu.RUnlock()
 	defer cancelSession()
@@ -348,12 +364,12 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	handshakeContext, cancelHandshake := context.WithTimeout(sessionContext, server.config.HandshakeTimeout)
 	defer cancelHandshake()
 	if deadline, ok := handshakeContext.Deadline(); !ok || raw.SetDeadline(deadline) != nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectInvalidV1)
 	}
 	carrier, err := tlstcp.Server(handshakeContext, raw, tlsConfig, plan.Digest, uint32(program.Limits.MaxFrameBytes))
 	destroyTLSConfigV1(tlsConfig)
 	if err != nil {
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectTLSV1)
 	}
 	if err := raw.SetDeadline(time.Time{}); err != nil {
 		_ = carrier.Close()
@@ -416,6 +432,13 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 		return ErrServerSession
 	}
 	return nil
+}
+
+func (server *ServerV1) rejectSessionV1(code SessionRejectCodeV1) error {
+	if server != nil && server.config.SessionRejected != nil {
+		server.config.SessionRejected(code)
+	}
+	return ErrServerSession
 }
 
 func acceptRelayDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, handshake *kruntime.ProcessWireRelayHandshakeV1, digest [32]byte, program liveprogram.ProgramV1) (*kruntime.ProcessRelayDuplexEndpointV1, error) {

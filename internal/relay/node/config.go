@@ -34,6 +34,7 @@ type Config struct {
 	DNSReady                        func(context.Context) bool
 	Now                             func() time.Time
 	LoadSnapshot                    func(string, time.Time) (RelaySnapshotV1, error)
+	SessionRejected                 func(SessionRejectCodeV1)
 	Entropy                         io.Reader
 }
 

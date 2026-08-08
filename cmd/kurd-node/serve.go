@@ -8,11 +8,31 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"kurdistan/internal/relay/node"
 	"kurdistan/internal/relay/tun"
 )
+
+type sessionRejectReporterV1 struct {
+	mu        sync.Mutex
+	output    io.Writer
+	remaining uint8
+}
+
+func newSessionRejectReporterV1(output io.Writer, maximum uint8) func(node.SessionRejectCodeV1) {
+	reporter := &sessionRejectReporterV1{output: output, remaining: maximum}
+	return func(code node.SessionRejectCodeV1) {
+		reporter.mu.Lock()
+		defer reporter.mu.Unlock()
+		if reporter.output == nil || reporter.remaining == 0 {
+			return
+		}
+		reporter.remaining--
+		fmt.Fprintf(reporter.output, "kurd-node serve: session-rejected:%s\n", code)
+	}
+}
 
 func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 	set := flag.NewFlagSet("serve", flag.ContinueOnError)
@@ -32,6 +52,7 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 	config.SessionIdleTimeout = 5 * time.Minute
 	config.SessionBufferBudget = 64 << 20
 	config.DNSReady = node.OwnedDNSReadyV1
+	config.SessionRejected = newSessionRejectReporterV1(stderr, 32)
 	if config.Validate() != nil {
 		return 2
 	}
