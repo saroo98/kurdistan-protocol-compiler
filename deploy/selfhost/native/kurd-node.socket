@@ -6,9 +6,8 @@ After=kurd-node-network.service
 PartOf=kurd-node.service
 
 [Socket]
-ListenStream=0.0.0.0:443
 ListenStream=[::]:443
-BindIPv6Only=ipv6-only
+BindIPv6Only=both
 Accept=no
 Backlog=128
 KeepAlive=yes
