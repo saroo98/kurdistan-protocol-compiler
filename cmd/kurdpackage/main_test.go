@@ -338,6 +338,20 @@ func TestRelayTUNAllowsTheUnprivilegedProcessToAttachItsOwnQueue(t *testing.T) {
 	}
 }
 
+func TestUpgradeAndRollbackRecreateTheOwnedTUNFromTheActiveVersion(t *testing.T) {
+	root := repositoryRootV1(t)
+	for _, name := range []string{"upgrade.sh", "rollback.sh"} {
+		script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(script)
+		if !strings.Contains(text, "recreate_owned_tun()") || !strings.Contains(text, "networkctl delete kurd0") || !strings.Contains(text, "networkctl reload") || !strings.Contains(text, "[ -e /sys/class/net/kurd0/tun_flags ]") {
+			t.Fatalf("%s must recreate and await the owned TUN before restarting the relay", name)
+		}
+	}
+}
+
 func repositoryRootV1(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
