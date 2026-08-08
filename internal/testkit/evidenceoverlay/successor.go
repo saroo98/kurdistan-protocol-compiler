@@ -218,7 +218,11 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return overlay{}, fmt.Errorf("decode successor overlay %s: trailing JSON", relative)
 	}
-	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > 128 {
+	successorLimit := 128
+	if relative == Phase17SuccessorPath {
+		successorLimit = 256
+	}
+	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > successorLimit {
 		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)
 	}
 	if relative != Phase16DecentralizedSuccessorPath && relative != Phase17SuccessorPath && len(value.SuccessorEntries) != 0 {

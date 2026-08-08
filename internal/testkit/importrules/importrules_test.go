@@ -1556,7 +1556,7 @@ func validatePhase17LiveDataPlaneOverlayV1(root string) (phase17LiveDataPlaneOve
 func validatePhase17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[string]string, overlay phase17LiveDataPlaneOverlayV1) (phase17LiveDataPlaneOverlayV1, error) {
 	const name = "phase17-live-data-plane-v1"
 	const predecessorBinding = "77772a0daab7ba1bd148fcd437ee1c18be535bb0c4272cbc0f84d5dc0b764cf4"
-	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(phase17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > 128 {
+	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(phase17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > 256 {
 		return phase17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 live-data-plane overlay identity/cardinality")
 	}
 	baseAtPost, err := phase17SuccessorPreAtPostV1(root, currentAtPost, overlay.SuccessorEntries)
@@ -3206,6 +3206,16 @@ func phase17KurdctlProductImportAllowedV1(file, importPath string) bool {
 	return phase17KurdctlProductImportAllowlistV1[file][importPath]
 }
 
+var phase17RelayNodeProductImportAllowlistV1 = map[string]map[string]bool{
+	"internal/relay/node/server.go": {
+		modulePath + "/internal/product/sessionplan": true,
+	},
+}
+
+func phase17RelayNodeProductImportAllowedV1(file, importPath string) bool {
+	return phase17RelayNodeProductImportAllowlistV1[file][importPath]
+}
+
 func TestPhase17ProfileHPKEImportExceptionsV1(t *testing.T) {
 	want := map[string][]string{
 		"internal/crypto/profilehpke/provider.go": {
@@ -3290,6 +3300,36 @@ func TestPhase17KurdctlProductImportExceptionsV1(t *testing.T) {
 	}
 	if phase17KurdctlProductImportAllowedV1("cmd/kurdctl/liveprogram.go", modulePath+"/internal/product/profile") {
 		t.Fatal("unlisted kurdctl product import was accepted")
+	}
+}
+
+func TestPhase17RelayNodeProductImportExceptionsV1(t *testing.T) {
+	const file = "internal/relay/node/server.go"
+	const importPath = modulePath + "/internal/product/sessionplan"
+	if !phase17RelayNodeProductImportAllowedV1(file, importPath) {
+		t.Fatalf("missing exact relay node product exception %s -> %s", file, importPath)
+	}
+	if len(phase17RelayNodeProductImportAllowlistV1) != 1 || len(phase17RelayNodeProductImportAllowlistV1[file]) != 1 {
+		t.Fatal("relay node product exception cardinality widened")
+	}
+	for name, mutant := range map[string]struct {
+		file       string
+		importPath string
+	}{
+		"extra relay file": {
+			file:       "internal/relay/node/session.go",
+			importPath: importPath,
+		},
+		"dependency expansion": {
+			file:       file,
+			importPath: modulePath + "/internal/product/profile",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if phase17RelayNodeProductImportAllowedV1(mutant.file, mutant.importPath) {
+				t.Fatalf("relay node product boundary accepted mutant %s -> %s", mutant.file, mutant.importPath)
+			}
+		})
 	}
 }
 
@@ -3781,7 +3821,7 @@ func contractImportViolationsV1(root string) ([]string, error) {
 			file := filepath.ToSlash(relFile)
 			for _, imp := range f.Imports {
 				ip := strings.Trim(imp.Path.Value, `"`)
-				if phase17ProfileHPKEImportAllowedV1(file, ip) || phase17KurdctlProductImportAllowedV1(file, ip) {
+				if phase17ProfileHPKEImportAllowedV1(file, ip) || phase17KurdctlProductImportAllowedV1(file, ip) || phase17RelayNodeProductImportAllowedV1(file, ip) {
 					continue
 				}
 				if strings.HasPrefix(pkgPath, modulePath+"/internal/product/") &&

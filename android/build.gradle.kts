@@ -4,6 +4,7 @@ import org.cyclonedx.Version
 import org.cyclonedx.gradle.CyclonedxAggregateTask
 import org.cyclonedx.gradle.CyclonedxDirectTask
 import org.cyclonedx.model.Component
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -82,109 +83,124 @@ tasks.withType<CyclonedxAggregateTask>().configureEach {
     projectType.set(Component.Type.APPLICATION)
 }
 
-val verifyPhase9Artifacts = tasks.register<Exec>("verifyPhase9Artifacts") {
-    group = "verification"
-    description = "Inspects the built release boundary, native symbols, and trust separation."
-    dependsOn(":app:assembleRelease", ":app:assembleInternal")
-    workingDir(rootProject.projectDir.parentFile)
-    commandLine(
-        "go",
-        "run",
-        "./cmd/phase9verify",
-        "-release-apk",
-        "android/app/build/outputs/apk/release/app-release-unsigned.apk",
-        "-internal-apk",
-        "android/app/build/outputs/apk/internal/app-internal.apk",
-        "-manifest",
-        "android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
-    )
+fun sha256(path: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    path.inputStream().buffered().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-val verifyPhase10Artifacts = tasks.register<Exec>("verifyPhase10Artifacts") {
+val phaseSnapshotRoot = providers.gradleProperty("phaseSnapshotRoot")
+val phase16SnapshotHashes = mapOf(
+    "app-release-unsigned.apk" to "2bd10c95aee3b61cf40b817cc4131cbdcdaf0bce7f7e13539e01d99925236cf6",
+    "app-internal.apk" to "87a5cac5876038b58723625dc7deeac68160f11c96bd9009a738c2af226ecfc2",
+    "AndroidManifest.xml" to "c8918a762d9e8ed3458b758ce19ca1634317cc58d041ca60edea72d9dbc84117",
+)
+
+fun registerSnapshotArtifactVerification(name: String, phaseFlag: String?) = tasks.register<Exec>(name) {
     group = "verification"
-    description = "Inspects the bounded Phase 10 VPN runtime and release artifact boundary."
-    dependsOn(":app:assembleRelease", ":app:assembleInternal")
+    description = "Manually reproduces the frozen Phase 16 predecessor artifact policy from an explicit ignored snapshot."
     workingDir(rootProject.projectDir.parentFile)
-    commandLine(
-        "go",
-        "run",
-        "./cmd/phase9verify",
-        "-phase10",
-        "-release-apk",
-        "android/app/build/outputs/apk/release/app-release-unsigned.apk",
-        "-internal-apk",
-        "android/app/build/outputs/apk/internal/app-internal.apk",
-        "-manifest",
-        "android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
-    )
+    doFirst {
+        val snapshot = phaseSnapshotRoot.orNull?.takeIf(String::isNotBlank)
+            ?: error("$name requires -PphaseSnapshotRoot=<ignored Phase 16 snapshot directory>")
+        val root = file(snapshot).canonicalFile
+        val artifacts = phase16SnapshotHashes.mapValues { (fileName, expected) ->
+            val path = root.resolve(fileName)
+            require(path.isFile) { "$name snapshot file is missing: $path" }
+            val actual = sha256(path)
+            require(actual == expected) { "$name snapshot digest mismatch for $fileName" }
+            path
+        }
+        val arguments = mutableListOf("go", "run", "./cmd/phase9verify")
+        if (phaseFlag != null) arguments += phaseFlag
+        arguments += listOf(
+            "-release-apk", artifacts.getValue("app-release-unsigned.apk").absolutePath,
+            "-internal-apk", artifacts.getValue("app-internal.apk").absolutePath,
+            "-manifest", artifacts.getValue("AndroidManifest.xml").absolutePath,
+        )
+        commandLine(arguments)
+    }
 }
 
-val verifyPhase11Artifacts = tasks.register<Exec>("verifyPhase11Artifacts") {
+val verifyPhase9SnapshotArtifacts = registerSnapshotArtifactVerification("verifyPhase9SnapshotArtifacts", null)
+val verifyPhase10SnapshotArtifacts = registerSnapshotArtifactVerification("verifyPhase10SnapshotArtifacts", "-phase10")
+val verifyPhase11SnapshotArtifacts = registerSnapshotArtifactVerification("verifyPhase11SnapshotArtifacts", "-phase11")
+
+val verifyHistoricalAndroidMilestones = tasks.register<Exec>("verifyHistoricalAndroidMilestones") {
     group = "verification"
-    description = "Inspects the bounded Phase 11 Kurd loopback transport and release trust boundary."
-    dependsOn(":app:assembleRelease", ":app:assembleInternal")
+    description = "Verifies historical Phase 9 through Phase 14 source, evidence, mutation, and policy compatibility at predecessor 07c7fcfc."
     workingDir(rootProject.projectDir.parentFile)
     commandLine(
         "go",
-        "run",
+        "test",
+        "./cmd/phase9evidence",
         "./cmd/phase9verify",
-        "-phase11",
-        "-release-apk",
-        "android/app/build/outputs/apk/release/app-release-unsigned.apk",
-        "-internal-apk",
-        "android/app/build/outputs/apk/internal/app-internal.apk",
-        "-manifest",
-        "android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
+        "./cmd/phase13verify",
+        "./cmd/phase14verify",
+        "-count=1",
     )
 }
 
 val verifyPhase13Artifacts = tasks.register<Exec>("verifyPhase13Artifacts") {
     group = "verification"
-    description = "Inspects the Phase 13 Android product artifact and verified-session boundary."
-    dependsOn(verifyPhase11Artifacts)
+    description = "Verifies the historical Phase 13 source and verified-session boundary."
     workingDir(rootProject.projectDir.parentFile)
     commandLine("go", "run", "./cmd/phase13verify", "-root", ".")
 }
 
 val verifyPhase14Artifacts = tasks.register<Exec>("verifyPhase14Artifacts") {
     group = "verification"
-    description = "Validates the fail-closed Phase 14 assurance and release-readiness record."
+    description = "Validates the historical fail-closed Phase 14 assurance and release-readiness record."
     dependsOn(verifyPhase13Artifacts)
     workingDir(rootProject.projectDir.parentFile)
     commandLine("go", "run", "./cmd/phase14verify", "-root", ".")
 }
 
-val verifyPhase9Evidence = tasks.register<Exec>("verifyPhase9Evidence") {
+val verifyPhase17Artifacts = tasks.register<Exec>("verifyPhase17Artifacts") {
     group = "verification"
-    description = "Verifies canonical SBOM, SPDX license, and pinned toolchain evidence."
-    dependsOn(":app:assembleRelease", "cyclonedxBom")
+    description = "Inspects the current live Phase 17 Android APK, manifest, ABI, native symbols, privacy, and evidence boundary."
+    dependsOn(":app:assembleRelease", ":app:assembleInternal")
     workingDir(rootProject.projectDir.parentFile)
-    commandLine("go", "run", "./cmd/phase9evidence")
+    commandLine(
+        "go",
+        "run",
+        "./cmd/phase17verify",
+        "-root",
+        ".",
+        "-release-apk",
+        "android/app/build/outputs/apk/release/app-release-unsigned.apk",
+        "-internal-apk",
+        "android/app/build/outputs/apk/internal/app-internal.apk",
+        "-manifest",
+        "android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
+    )
 }
 
 tasks.register("phase9Gate") {
     group = "verification"
-    description = "Runs the cache-independent Phase 9 Android verification bar."
+    description = "Runs historical Phase 9 source/evidence compatibility for predecessor 07c7fcfc; it does not inspect the current APK."
     dependsOn(
-        ":app:assembleRelease",
-        ":app:assembleInternal",
         ":app:lintRelease",
         ":app:testInternalUnitTest",
         ":app:compileInternalAndroidTestKotlin",
         ":data:metadata:testDebugUnitTest",
         ":data:secure:testDebugUnitTest",
         ":platform:import:testDebugUnitTest",
-        verifyPhase9Artifacts,
-        verifyPhase9Evidence,
+        verifyHistoricalAndroidMilestones,
     )
 }
 
 tasks.register("phase10Gate") {
     group = "verification"
-    description = "Runs the cache-independent bounded Phase 10 Android verification bar."
+    description = "Runs historical Phase 10 source/evidence compatibility for predecessor 07c7fcfc; it does not inspect the current APK."
     dependsOn(
-        ":app:assembleRelease",
-        ":app:assembleInternal",
         ":app:lintRelease",
         ":app:testInternalUnitTest",
         ":app:compileInternalAndroidTestKotlin",
@@ -194,16 +210,14 @@ tasks.register("phase10Gate") {
         ":data:secure:testDebugUnitTest",
         ":platform:import:testDebugUnitTest",
         "cyclonedxBom",
-        verifyPhase10Artifacts,
+        verifyHistoricalAndroidMilestones,
     )
 }
 
 tasks.register("phase11Gate") {
     group = "verification"
-    description = "Runs the cache-independent bounded Phase 11 Android verification bar."
+    description = "Runs historical Phase 11 source/evidence compatibility for predecessor 07c7fcfc; it does not inspect the current APK."
     dependsOn(
-        ":app:assembleRelease",
-        ":app:assembleInternal",
         ":app:lintRelease",
         ":app:testInternalUnitTest",
         ":app:compileInternalAndroidTestKotlin",
@@ -213,13 +227,53 @@ tasks.register("phase11Gate") {
         ":data:secure:testDebugUnitTest",
         ":platform:import:testDebugUnitTest",
         "cyclonedxBom",
-        verifyPhase11Artifacts,
+        verifyHistoricalAndroidMilestones,
     )
 }
 
 tasks.register("phase13Gate") {
     group = "verification"
-    description = "Runs the cache-independent Phase 13 Android product-completion verification bar."
+    description = "Runs historical Phase 13 source/evidence compatibility for predecessor 07c7fcfc; it does not inspect the current APK."
+    dependsOn(
+        ":app:lintRelease",
+        ":app:testInternalUnitTest",
+        ":app:compileInternalAndroidTestKotlin",
+        ":core:model:testDebugUnitTest",
+        ":runtime:api:testDebugUnitTest",
+        ":runtime:android:testDebugUnitTest",
+        ":data:metadata:testDebugUnitTest",
+        ":data:secure:testDebugUnitTest",
+        ":data:settings:testDebugUnitTest",
+        ":platform:import:testDebugUnitTest",
+        "cyclonedxBom",
+        verifyHistoricalAndroidMilestones,
+        verifyPhase13Artifacts,
+    )
+}
+
+val phase14Gate = tasks.register("phase14Gate") {
+    group = "verification"
+    description = "Runs historical Phase 14 source/evidence compatibility for predecessor 07c7fcfc; it does not inspect the current APK."
+    dependsOn(
+        ":app:lintRelease",
+        ":app:testInternalUnitTest",
+        ":app:compileInternalAndroidTestKotlin",
+        ":core:model:testDebugUnitTest",
+        ":runtime:api:testDebugUnitTest",
+        ":runtime:android:testDebugUnitTest",
+        ":data:metadata:testDebugUnitTest",
+        ":data:secure:testDebugUnitTest",
+        ":data:settings:testDebugUnitTest",
+        ":platform:import:testDebugUnitTest",
+        "cyclonedxBom",
+        verifyHistoricalAndroidMilestones,
+        verifyPhase14Artifacts,
+    )
+}
+
+val phase17Gate = tasks.register("phase17Gate") {
+    group = "verification"
+    description = "Runs the cache-independent current Phase 17 live data-plane Android verification bar."
     dependsOn(
         ":app:assembleRelease",
         ":app:assembleInternal",
@@ -235,27 +289,8 @@ tasks.register("phase13Gate") {
         ":platform:import:testDebugUnitTest",
         "cyclonedxBom",
         verifyPhase13Artifacts,
-    )
-}
-
-val phase14Gate = tasks.register("phase14Gate") {
-    group = "verification"
-    description = "Runs the cache-independent Phase 14 local assurance and release-readiness bar."
-    dependsOn(
-        ":app:assembleRelease",
-        ":app:assembleInternal",
-        ":app:lintRelease",
-        ":app:testInternalUnitTest",
-        ":app:compileInternalAndroidTestKotlin",
-        ":core:model:testDebugUnitTest",
-        ":runtime:api:testDebugUnitTest",
-        ":runtime:android:testDebugUnitTest",
-        ":data:metadata:testDebugUnitTest",
-        ":data:secure:testDebugUnitTest",
-        ":data:settings:testDebugUnitTest",
-        ":platform:import:testDebugUnitTest",
-        "cyclonedxBom",
         verifyPhase14Artifacts,
+        verifyPhase17Artifacts,
     )
 }
 
@@ -405,6 +440,34 @@ tasks.register<Exec>("phase14DeviceGate") {
     )
 }
 
+tasks.register<Exec>("phase17DeviceGate") {
+    group = "verification"
+    description = "Runs the exact current Phase 17 device inventory on a connected API 26, 34, or 36 device."
+    dependsOn(":app:assembleInternal", ":app:assembleInternalAndroidTest")
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(
+        "go",
+        "run",
+        "./cmd/phase17devicegate",
+        "-adb",
+        adbExecutable.absolutePath,
+        "-app-apk",
+        "android/app/build/outputs/apk/internal/app-internal.apk",
+        "-test-apk",
+        "android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk",
+        "-app-package",
+        "org.kurdistanvpn.app.internal",
+        "-test-package",
+        "org.kurdistanvpn.app.internal.test",
+        "-conflicting-app-package",
+        "org.kurdistanvpn.app.debug",
+        "-expected-tests",
+        "android/config/phase17-required-device-tests.txt",
+        "-minimum-tests",
+        "1",
+    )
+}
+
 val ciReleaseMetadata = tasks.register<Exec>("ciReleaseMetadata") {
     group = "verification"
     description = "Validates centralized release metadata in offline, non-authoritative mode."
@@ -414,14 +477,14 @@ val ciReleaseMetadata = tasks.register<Exec>("ciReleaseMetadata") {
 
 tasks.register("ciPrHostGate") {
     group = "verification"
-    description = "Runs the existing Phase 14 host proof and centralized metadata check for pull requests."
-    dependsOn(phase14Gate, ciReleaseMetadata)
+    description = "Runs the current Phase 17 host proof and centralized metadata check for pull requests."
+    dependsOn(phase17Gate, ciReleaseMetadata)
 }
 
 tasks.register("ciAssuranceHostGate") {
     group = "verification"
-    description = "Runs the existing Phase 14 host proof and centralized metadata check for assurance."
-    dependsOn(phase14Gate, ciReleaseMetadata)
+    description = "Runs the current Phase 17 host proof and centralized metadata check for assurance."
+    dependsOn(phase17Gate, ciReleaseMetadata)
 }
 
 tasks.register("ciDeviceArtifacts") {

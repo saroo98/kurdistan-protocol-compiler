@@ -41,7 +41,7 @@ jobs:
         run: go run ./cmd/gate
 
   android-phase14:
-    name: Android Phase 14 local assurance (${{ matrix.os }})
+    name: Android Phase 17 live data-plane assurance (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:

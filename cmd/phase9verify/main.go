@@ -7,16 +7,16 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"debug/elf"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
+
+	"kurdistan/internal/androidartifact"
 )
 
 const maxReleaseAPKBytes = 40 * 1024 * 1024
@@ -285,38 +285,23 @@ func requireMarkers(value []byte, required []string) error {
 }
 
 func readAPK(path string) (apkContents, error) {
-	reader, err := zip.OpenReader(path)
+	artifact, err := androidartifact.ReadAPK(path, androidartifact.Limits{
+		MaxEntryBytes: 64 * 1024 * 1024,
+		MaxTotalBytes: 512 * 1024 * 1024,
+	})
 	if err != nil {
 		return apkContents{}, err
 	}
-	defer reader.Close()
 	result := apkContents{
+		dex:     artifact.DEXContents(),
+		all:     artifact.AllContents(),
 		natives: make(map[string][]byte),
 		entries: make(map[string]struct{}),
 	}
-	for _, entry := range reader.File {
-		result.entries[entry.Name] = struct{}{}
-		if entry.UncompressedSize64 > 64*1024*1024 {
-			return apkContents{}, fmt.Errorf("entry %q exceeds inspection bound", entry.Name)
-		}
-		stream, err := entry.Open()
-		if err != nil {
-			return apkContents{}, err
-		}
-		content, readErr := io.ReadAll(io.LimitReader(stream, 64*1024*1024+1))
-		closeErr := stream.Close()
-		if readErr != nil {
-			return apkContents{}, readErr
-		}
-		if closeErr != nil {
-			return apkContents{}, closeErr
-		}
-		result.all = append(result.all, content)
-		if strings.HasPrefix(entry.Name, "classes") && strings.HasSuffix(entry.Name, ".dex") {
-			result.dex = append(result.dex, content)
-		}
-		if strings.HasPrefix(entry.Name, "lib/") && strings.HasSuffix(entry.Name, ".so") {
-			result.natives[entry.Name] = content
+	for _, name := range artifact.EntryNames() {
+		result.entries[name] = struct{}{}
+		if native, ok := artifact.Native(name); ok {
+			result.natives[name] = native
 		}
 	}
 	return result, nil

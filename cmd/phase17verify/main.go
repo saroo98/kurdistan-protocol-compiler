@@ -18,6 +18,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	phase17evidence "kurdistan/internal/phase17evidence"
 )
 
 const contractPath = "config/runtime/live-data-plane-v1.json"
@@ -236,12 +238,42 @@ type privacyAuthority struct {
 
 func main() {
 	root := flag.String("root", ".", "repository root")
+	releaseAPK := flag.String("release-apk", "", "path to the unsigned Phase 17 release APK")
+	internalAPK := flag.String("internal-apk", "", "path to the Phase 17 internal APK")
+	manifest := flag.String("manifest", "", "path to the merged Phase 17 release manifest")
 	flag.Parse()
+	artifactsEnabled, err := validateArtifactPaths(*releaseAPK, *internalAPK, *manifest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "PHASE 17 LIVE DATA-PLANE VERIFICATION FAILED: %v\n", err)
+		os.Exit(2)
+	}
 	if err := verify(*root); err != nil {
 		fmt.Fprintf(os.Stderr, "PHASE 17 LIVE DATA-PLANE VERIFICATION FAILED: %v\n", err)
 		os.Exit(1)
 	}
+	if artifactsEnabled {
+		if err := verifyPhase17Artifacts(*releaseAPK, *internalAPK, *manifest); err != nil {
+			fmt.Fprintf(os.Stderr, "PHASE 17 LIVE DATA-PLANE VERIFICATION FAILED: %v\n", err)
+			os.Exit(1)
+		}
+	}
 	fmt.Println("PHASE 17 LIVE DATA-PLANE VERIFICATION PASSED")
+}
+
+func validateArtifactPaths(releaseAPK, internalAPK, manifest string) (bool, error) {
+	provided := 0
+	for _, value := range []string{releaseAPK, internalAPK, manifest} {
+		if value != "" {
+			provided++
+		}
+	}
+	if provided == 0 {
+		return false, nil
+	}
+	if provided != 3 {
+		return false, fmt.Errorf("release-apk, internal-apk, and manifest must be provided together")
+	}
+	return true, nil
 }
 
 func verify(root string) error {
@@ -260,6 +292,12 @@ func verify(root string) error {
 	}
 	if err := verifyPublicDocumentation(root, value); err != nil {
 		return err
+	}
+	if err := verifyDeviceTestInventory(root); err != nil {
+		return err
+	}
+	if err := phase17evidence.Verify(root); err != nil {
+		return fmt.Errorf("Phase 17 evidence: %w", err)
 	}
 	return nil
 }

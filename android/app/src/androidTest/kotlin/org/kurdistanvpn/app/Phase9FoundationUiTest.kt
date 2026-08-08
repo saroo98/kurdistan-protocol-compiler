@@ -4,14 +4,12 @@
 package org.kurdistanvpn.app
 
 import android.Manifest
-import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.Uri
 import android.net.VpnService
@@ -33,7 +31,6 @@ import androidx.compose.ui.test.click
 import androidx.core.content.ContextCompat
 import androidx.test.espresso.IdlingPolicies
 import androidx.test.platform.app.InstrumentationRegistry
-import java.util.UUID
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
@@ -382,99 +379,22 @@ class Phase9FoundationUiTest {
     }
 
     @Test
-    fun preparedVpnCapturesOnlyTheReservedTestRangeAndStopsCleanly() {
+    fun signedPublicProfileCannotAuthorizeCurrentLiveRuntime() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         assertNull("device gate must prepare VPN consent before this test", VpnService.prepare(context))
         val controller = VpnRuntimeController(context)
         try {
-              startVerifiedRuntime(
-                  controller,
-                  VpnRoutingPolicy(
-                      perAppMode = PerAppRoutingMode.INCLUDE_ONLY,
-                      packages = setOf(
-                          InstrumentationRegistry.getInstrumentation().context.packageName,
-                      ),
-                  ),
-              )
-            awaitActiveRuntime(controller)
-            controller.close()
-            val recreatedController = VpnRuntimeController(context)
-            val recreatedActive = runBlocking {
-                withTimeoutOrNull(runtimeTimeout(10_000)) {
-                    recreatedController.snapshot.first {
-                        it.state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK &&
-                            it.perAppRoutingMode == PerAppRoutingMode.INCLUDE_ONLY
-                    }
-                }
-            }
-            assertTrue(
-                "recreated controller did not recover active runtime: ${recreatedController.snapshot.value}",
-                recreatedActive != null,
+            val failure = prepareLegacyAuthorityExpectingRejection(
+                VpnRoutingPolicy(
+                    perAppMode = PerAppRoutingMode.INCLUDE_ONLY,
+                    packages = setOf(InstrumentationRegistry.getInstrumentation().context.packageName),
+                ),
             )
-            val token = UUID.randomUUID().toString()
-            val probeResult = CompletableDeferred<Boolean>()
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (
-                        intent?.action == VpnProbeActivity.ACTION_RESULT &&
-                        intent.getStringExtra(VpnProbeActivity.EXTRA_TOKEN) == token
-                    ) {
-                        probeResult.complete(
-                            intent.getBooleanExtra(VpnProbeActivity.EXTRA_SUCCESS, false),
-                        )
-                    }
-                }
-            }
-            ContextCompat.registerReceiver(
-                context,
-                receiver,
-                IntentFilter(VpnProbeActivity.ACTION_RESULT),
-                ContextCompat.RECEIVER_EXPORTED,
-            )
-            try {
-                val instrumentationPackage =
-                    InstrumentationRegistry.getInstrumentation().context.packageName
-                context.startActivity(
-                    Intent()
-                        .setClassName(
-                            instrumentationPackage,
-                            VpnProbeActivity::class.java.name,
-                        )
-                        .putExtra(VpnProbeActivity.EXTRA_TOKEN, token)
-                        .putExtra(VpnProbeActivity.EXTRA_TARGET_PACKAGE, context.packageName)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-                val probeSucceeded = runBlocking {
-                    withTimeoutOrNull(runtimeTimeout(10_000)) { probeResult.await() }
-                }
-                assertTrue("VPN probe result was not delivered", probeSucceeded != null)
-                assertTrue("VPN echo or DNS probe failed", probeSucceeded == true)
-            } finally {
-                context.unregisterReceiver(receiver)
-            }
-            val packetSnapshot = runBlocking {
-                withTimeoutOrNull(runtimeTimeout(10_000)) {
-                    recreatedController.snapshot.first {
-                        it.packetsRead >= 2 &&
-                            it.packetsWritten >= 2 &&
-                            it.packetDisposition == "KURD_DNS_REPLIED"
-                    }
-                }
-            } ?: recreatedController.snapshot.value
-            assertTrue("packet snapshot: $packetSnapshot", packetSnapshot.packetsRead >= 2)
-            assertTrue("packet snapshot: $packetSnapshot", packetSnapshot.packetsWritten >= 2)
-            assertEquals("KURD_DNS_REPLIED", packetSnapshot.packetDisposition)
-            recreatedController.stop()
-            val stopped = runBlocking {
-                withTimeoutOrNull(runtimeTimeout(10_000)) {
-                    recreatedController.snapshot.first { it.state == VpnRuntimeState.IDLE }
-                }
-            }
-            assertTrue(
-                "runtime did not stop cleanly: ${recreatedController.snapshot.value}",
-                stopped != null,
-            )
-            recreatedController.close()
+            assertEquals("POLICY_REJECTED", failure)
+            assertEquals(VpnRuntimeState.IDLE, controller.snapshot.value.state)
+            assertEquals(0L, controller.snapshot.value.packetsRead)
+            assertEquals(0L, controller.snapshot.value.packetsWritten)
+            assertNull(controller.snapshot.value.planDigest)
         } finally {
             controller.stop()
             controller.close()
@@ -482,66 +402,23 @@ class Phase9FoundationUiTest {
     }
 
     @Test
-    fun excludedApplicationCannotReachTheReservedRuntime() {
+    fun perAppPolicyCannotWidenSignedPublicProfileIntoLiveAuthority() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         assertNull("device gate must prepare VPN consent before this test", VpnService.prepare(context))
         val controller = VpnRuntimeController(context)
         try {
-            startVerifiedRuntime(
-                controller,
-                VpnRoutingPolicy(
-                    perAppMode = PerAppRoutingMode.EXCLUDE_SELECTED,
-                    packages = setOf(
-                        InstrumentationRegistry.getInstrumentation().context.packageName,
-                    ),
-                ),
-            )
-            awaitActiveRuntime(controller)
-            val token = UUID.randomUUID().toString()
-            val probeResult = CompletableDeferred<Boolean>()
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (
-                        intent?.action == VpnProbeActivity.ACTION_RESULT &&
-                        intent.getStringExtra(VpnProbeActivity.EXTRA_TOKEN) == token
-                    ) {
-                        probeResult.complete(
-                            intent.getBooleanExtra(VpnProbeActivity.EXTRA_SUCCESS, true),
-                        )
-                    }
-                }
-            }
-            ContextCompat.registerReceiver(
-                context,
-                receiver,
-                IntentFilter(VpnProbeActivity.ACTION_RESULT),
-                ContextCompat.RECEIVER_EXPORTED,
-            )
-            try {
-                val instrumentationPackage =
-                    InstrumentationRegistry.getInstrumentation().context.packageName
-                context.startActivity(
-                    Intent()
-                        .setClassName(
-                            instrumentationPackage,
-                            VpnProbeActivity::class.java.name,
-                        )
-                        .putExtra(VpnProbeActivity.EXTRA_TOKEN, token)
-                        .putExtra(VpnProbeActivity.EXTRA_TARGET_PACKAGE, context.packageName)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-                assertTrue(!runBlocking { withTimeout(runtimeTimeout(15_000)) { probeResult.await() } })
-            } finally {
-                context.unregisterReceiver(receiver)
-            }
+            val policy = VpnRoutingPolicy(
+                perAppMode = PerAppRoutingMode.EXCLUDE_SELECTED,
+                packages = setOf(InstrumentationRegistry.getInstrumentation().context.packageName),
+            ).validate()
+            val failure = prepareLegacyAuthorityExpectingRejection(policy)
+            assertEquals("POLICY_REJECTED", failure)
+            assertEquals(VpnRuntimeState.IDLE, controller.snapshot.value.state)
+            assertEquals(0L, controller.snapshot.value.packetsRead)
             assertEquals(0L, controller.snapshot.value.packetsWritten)
+            assertNull(controller.snapshot.value.planDigest)
         } finally {
             controller.stop()
-            runBlocking {
-                withTimeout(runtimeTimeout(10_000)) {
-                    controller.snapshot.first { it.state == VpnRuntimeState.IDLE }
-                }
-            }
             controller.close()
         }
     }
@@ -658,10 +535,7 @@ class Phase9FoundationUiTest {
         }
     }
 
-    private fun startVerifiedRuntime(
-        controller: VpnRuntimeController,
-        routingPolicy: VpnRoutingPolicy,
-    ) {
+    private fun ensureLegacySignedProfileIsReady() {
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             compose.activity.appStateSnapshotForTesting() !is AppState.Booting &&
                 compose.activity.appStateSnapshotForTesting() !is AppState.CompatibilityCheck
@@ -684,37 +558,22 @@ class Phase9FoundationUiTest {
                 state is AppState.Ready && state.profiles.isNotEmpty()
             }
         }
+    }
 
-        val staged = CompletableDeferred<Result<Unit>>()
+    private fun prepareLegacyAuthorityExpectingRejection(routingPolicy: VpnRoutingPolicy): String {
+        ensureLegacySignedProfileIsReady()
+        val outcome = CompletableDeferred<String>()
         compose.activity.runOnUiThread {
             compose.activity.prepareRuntimeAuthorityForTesting(
                 config = VpnRuntimeConfig(routingPolicy = routingPolicy),
                 onReady = { authority ->
-                    runCatching { controller.stageAuthority(authority) }
-                        .onSuccess { staged.complete(Result.success(Unit)) }
-                        .onFailure { staged.complete(Result.failure(it)) }
+                    authority.fill(0)
+                    outcome.complete("UNEXPECTED_AUTHORITY")
                 },
-                onFailure = { error ->
-                    staged.complete(Result.failure(IllegalStateException(error.name)))
-                },
+                onFailure = { error -> outcome.complete(error.name) },
             )
         }
-        runBlocking { withTimeout(runtimeTimeout(20_000)) { staged.await() } }.getOrThrow()
-        controller.startStaged()
-    }
-
-    private fun awaitActiveRuntime(controller: VpnRuntimeController) {
-        val observed = runBlocking {
-            withTimeoutOrNull(runtimeTimeout(10_000)) {
-                controller.snapshot.first {
-                    it.state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK ||
-                        it.state == VpnRuntimeState.FAILED ||
-                        it.state == VpnRuntimeState.REVOKED ||
-                        it.state == VpnRuntimeState.BLOCKED
-                }
-            }
-        } ?: controller.snapshot.value
-        assertEquals("runtime did not become active: $observed", VpnRuntimeState.ACTIVE_KURD_LOOPBACK, observed.state)
+        return runBlocking { withTimeout(runtimeTimeout(20_000)) { outcome.await() } }
     }
 
     private fun waitForText(text: String) {

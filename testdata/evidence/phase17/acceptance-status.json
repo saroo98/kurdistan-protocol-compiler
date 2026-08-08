@@ -1,0 +1,25 @@
+{
+  "schema": "kurdistan-phase17-acceptance-v1",
+  "phase": 17,
+  "complete": false,
+  "status": "IN_PROGRESS",
+  "local": {
+    "currentArtifactPolicy": "PASS",
+    "historicalSupersession": "PASS",
+    "api26Emulator": "PENDING",
+    "api34Emulator": "PENDING",
+    "api36Emulator": "PENDING",
+    "linuxNamespace": "PENDING",
+    "ownedVps": "PENDING",
+    "loadRecoveryPrivacyCampaign": "PENDING"
+  },
+  "external": {
+    "physicalApi26Device": "UNVERIFIED",
+    "physicalApi34Device": "UNVERIFIED",
+    "secondVpsProvider": "UNVERIFIED"
+  },
+  "limitations": [
+    "emulator, Linux namespace, owned-VPS, load, recovery, and privacy campaigns remain to be executed",
+    "physical devices and a second unrelated VPS remain external evidence"
+  ]
+}

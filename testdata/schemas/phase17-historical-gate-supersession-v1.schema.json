@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistan.invalid/schemas/phase17-historical-gate-supersession-v1.schema.json",
+  "title": "Phase 17 historical Android gate supersession",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "predecessor",
+    "artifacts",
+    "historicalVerifierSha256",
+    "historicalTestInventorySha256",
+    "supersededRules",
+    "successorPolicySha256",
+    "successorGate"
+  ],
+  "properties": {
+    "schema": {
+      "const": "phase17-historical-gate-supersession-v1"
+    },
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "ciUrl", "ciConclusion"],
+      "properties": {
+        "commitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "treeSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "ciUrl": {"type": "string", "format": "uri"},
+        "ciConclusion": {"const": "success"}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseApkSha256", "internalApkSha256", "mergedManifestSha256"],
+      "properties": {
+        "releaseApkSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "internalApkSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mergedManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "historicalVerifierSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "historicalTestInventorySha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "supersededRules": {
+      "type": "array",
+      "prefixItems": [
+        {"const": "release-manifest-forbids-internet-and-access-network-state"},
+        {"const": "current-runtime-is-loopback-only"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "successorPolicySha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "successorGate": {"const": "phase17Gate"}
+  }
+}
