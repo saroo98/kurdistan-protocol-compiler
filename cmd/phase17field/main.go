@@ -37,6 +37,7 @@ const (
 	rawSchema                   = "kurdistan-phase17-owned-vps-raw-v2"
 	maxOutputBytes              = 2 << 20
 	appPackage                  = "org.kurdistanvpn.app.internal"
+	testPackage                 = "org.kurdistanvpn.app.internal.test"
 	testRunner                  = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
 	fieldTest                   = "org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#profileRevocationAndBackupRestoreFailClosed"
 	remoteDataDir               = "/var/lib/kurd-node"
@@ -418,12 +419,9 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 	if err != nil {
 		return err
 	}
-	for _, apk := range []string{value.appAPK, value.testAPK} {
-		if _, err := runBytes(parent, runner, nil, root, 2*time.Minute, value.adbPath, "-s", serial, "install", "-r", "-t", apk); err != nil {
-			return errors.New("APK installation failed")
-		}
+	if err := prepareAndroidPackages(parent, runner, value, root, serial); err != nil {
+		return err
 	}
-	_, _ = runBytes(parent, runner, nil, root, 30*time.Second, value.adbPath, "-s", serial, "shell", "appops", "set", appPackage, "ACTIVATE_VPN", "allow")
 	ipv6Authorized, err := prepareIPv6Capability(parent, runner, value, root)
 	if err != nil {
 		return err
@@ -461,6 +459,26 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 	}
 	if err := writeAtomic(filepath.Join(runRoot, "field-result.json"), encoded, 0o600); err != nil {
 		return err
+	}
+	return nil
+}
+
+func prepareAndroidPackages(ctx context.Context, runner commandRunner, value config, root, serial string) error {
+	for _, apk := range []string{value.appAPK, value.testAPK} {
+		if _, err := runBytes(ctx, runner, nil, root, 2*time.Minute, value.adbPath, "-s", serial, "install", "-r", "-t", apk); err != nil {
+			return errors.New("APK installation failed")
+		}
+	}
+	for _, packageName := range []string{appPackage, testPackage} {
+		output, err := runText(ctx, runner, nil, root, value.adbPath,
+			"-s", serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", packageName)
+		if err != nil || output != "Success" {
+			return errors.New("Android package compilation failed")
+		}
+	}
+	if _, err := runBytes(ctx, runner, nil, root, 30*time.Second, value.adbPath,
+		"-s", serial, "shell", "appops", "set", appPackage, "ACTIVATE_VPN", "allow"); err != nil {
+		return errors.New("Android VPN permission preparation failed")
 	}
 	return nil
 }
@@ -739,6 +757,9 @@ func instrumentationFailureCategory(raw []byte) string {
 		}
 	}
 	lower := bytes.ToLower(raw)
+	if bytes.Contains(lower, []byte("shortmsg=process crashed")) {
+		return "INSTRUMENTATION_PROCESS_CRASH"
+	}
 	if bytes.Contains(lower, []byte("failures!!!")) || bytes.Contains(lower, []byte("instrumentation_failed")) {
 		return "INSTRUMENTATION_FAILED"
 	}
