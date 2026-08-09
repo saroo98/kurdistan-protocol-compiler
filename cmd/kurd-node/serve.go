@@ -14,9 +14,28 @@ import (
 
 	"kurdistan/internal/relay/node"
 	"kurdistan/internal/relay/tun"
+	kruntime "kurdistan/internal/runtime"
 )
 
 type sessionRejectReporterV1 struct {
+	mu        sync.Mutex
+	output    io.Writer
+	remaining uint8
+}
+
+type sessionStageReporterV1 struct {
+	mu        sync.Mutex
+	output    io.Writer
+	remaining uint8
+}
+
+type sessionTerminationReporterV1 struct {
+	mu        sync.Mutex
+	output    io.Writer
+	remaining uint8
+}
+
+type sessionPacketPumpSnapshotReporterV1 struct {
 	mu        sync.Mutex
 	output    io.Writer
 	remaining uint8
@@ -32,6 +51,52 @@ func newSessionRejectReporterV1(output io.Writer, maximum uint8) func(node.Sessi
 		}
 		reporter.remaining--
 		fmt.Fprintf(reporter.output, "kurd-node serve: session-rejected:%s\n", code)
+	}
+}
+
+func newSessionStageReporterV1(output io.Writer, maximum uint8) func(node.SessionStageCodeV1) {
+	reporter := &sessionStageReporterV1{output: output, remaining: maximum}
+	return func(stage node.SessionStageCodeV1) {
+		reporter.mu.Lock()
+		defer reporter.mu.Unlock()
+		if reporter.output == nil || reporter.remaining == 0 {
+			return
+		}
+		reporter.remaining--
+		fmt.Fprintf(reporter.output, "kurd-node serve: session-stage:%s\n", stage)
+	}
+}
+
+func newSessionTerminationReporterV1(output io.Writer, maximum uint8) func(node.SessionTerminationCodeV1) {
+	reporter := &sessionTerminationReporterV1{output: output, remaining: maximum}
+	return func(code node.SessionTerminationCodeV1) {
+		reporter.mu.Lock()
+		defer reporter.mu.Unlock()
+		if reporter.output == nil || reporter.remaining == 0 {
+			return
+		}
+		reporter.remaining--
+		fmt.Fprintf(reporter.output, "kurd-node serve: session-terminated:%s\n", code)
+	}
+}
+
+func newSessionPacketPumpSnapshotReporterV1(output io.Writer, maximum uint8) func(kruntime.PacketPumpSnapshotV1) {
+	reporter := &sessionPacketPumpSnapshotReporterV1{output: output, remaining: maximum}
+	return func(snapshot kruntime.PacketPumpSnapshotV1) {
+		reporter.mu.Lock()
+		defer reporter.mu.Unlock()
+		if reporter.output == nil || reporter.remaining == 0 {
+			return
+		}
+		reporter.remaining--
+		fmt.Fprintf(reporter.output, "kurd-node serve: session-pump:tun-read=%d:outbound=%d:carrier-write=%d:carrier-read=%d:authenticated=%d:inner-accepted=%d:inner-rejected=%d:tun-attempts=%d:tun-failures=%d:tun-failure-code=%s:tun-errno=%d:tun-write=%d:rejected=%d:gateway-udp53=%d:gateway-checksum-fail=%d:transport-malformed=%d:return-tcp=%d:return-syn=%d:return-ack=%d:return-rst=%d:return-fin=%d:return-checksum-fail=%d:return-oversize=%d\n",
+			snapshot.TUNPacketsRead, snapshot.OutboundPacketsAccepted, snapshot.CarrierRecordsWritten, snapshot.CarrierRecordsRead,
+			snapshot.AuthenticatedOperations, snapshot.InnerPacketsAccepted, snapshot.InnerPacketsRejected, snapshot.TUNWriteAttempts,
+			snapshot.TUNWriteFailures, snapshot.TUNWriteFailureCode, snapshot.TUNWriteErrno, snapshot.TUNPacketsWritten, snapshot.RejectedTUNPackets,
+			snapshot.RelayGatewayDNSPackets, snapshot.RelayGatewayDNSChecksumFailures, snapshot.RelayTransportMalformedPackets,
+			snapshot.RelayReturnTCPPackets, snapshot.RelayReturnTCPSYNPackets, snapshot.RelayReturnTCPACKPackets,
+			snapshot.RelayReturnTCPRSTPackets, snapshot.RelayReturnTCPFINPackets, snapshot.RelayReturnTCPChecksumFailures,
+			snapshot.RelayReturnOversizePackets)
 	}
 }
 
@@ -54,6 +119,9 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) int {
 	config.SessionBufferBudget = 64 << 20
 	config.DNSReady = node.OwnedDNSReadyV1
 	config.SessionRejected = newSessionRejectReporterV1(stderr, 32)
+	config.SessionProgress = newSessionStageReporterV1(stderr, 64)
+	config.SessionTerminated = newSessionTerminationReporterV1(stderr, 32)
+	config.SessionPacketPumpSnapshot = newSessionPacketPumpSnapshotReporterV1(stderr, 32)
 	if config.Validate() != nil {
 		return 2
 	}

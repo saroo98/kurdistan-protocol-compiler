@@ -135,6 +135,7 @@ sealed interface EnrollmentUiState {
 enum class OperationError {
     INVALID_INPUT,
     SIZE_LIMIT,
+    TRUST_UNAVAILABLE,
     TRUST_REJECTED,
     POLICY_REJECTED,
     DUPLICATE,

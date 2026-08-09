@@ -16,6 +16,7 @@ import (
 var (
 	ErrRegistryConfig   = errors.New("relay node: invalid registry configuration")
 	ErrRegistryClosed   = errors.New("relay node: session registry closed")
+	ErrSessionLimit     = errors.New("relay node: session capacity reached")
 	ErrSessionConflict  = errors.New("relay node: session authority conflict")
 	ErrSessionQueueFull = errors.New("relay node: session queue full")
 	ErrPacketRejected   = errors.New("relay node: packet rejected")
@@ -32,11 +33,23 @@ type RegistrySnapshot struct {
 	ActiveSessions, QueueDrops, UnknownDestinations, StoppedSessions uint64
 }
 
+type SessionStopCodeV1 string
+
+const (
+	SessionStopNoneV1     SessionStopCodeV1 = ""
+	SessionStopLocalV1    SessionStopCodeV1 = "local"
+	SessionStopQueueV1    SessionStopCodeV1 = "queue"
+	SessionStopProfileV1  SessionStopCodeV1 = "profile"
+	SessionStopAllV1      SessionStopCodeV1 = "all"
+	SessionStopRegistryV1 SessionStopCodeV1 = "registry"
+)
+
 type sessionRecord struct {
 	spec      SessionSpec
 	inbound   chan []byte
 	closed    chan struct{}
 	closeOnce sync.Once
+	stopCode  SessionStopCodeV1
 }
 
 type SessionDevice struct {
@@ -80,7 +93,10 @@ func (registry *SessionRegistry) Register(spec SessionSpec) (*SessionDevice, err
 	if registry.closed {
 		return nil, ErrRegistryClosed
 	}
-	if len(registry.sessions) >= registry.max || registry.sessions[spec.ID] != nil || registry.profiles[spec.ProfileID] != "" || registry.clients[spec.ClientKeyID] != "" ||
+	if len(registry.sessions) >= registry.max {
+		return nil, ErrSessionLimit
+	}
+	if registry.sessions[spec.ID] != nil || registry.profiles[spec.ProfileID] != "" || registry.clients[spec.ClientKeyID] != "" ||
 		spec.AssignedIPv4 != ([4]byte{}) && registry.ipv4[spec.AssignedIPv4] != "" ||
 		spec.AssignedIPv6 != ([16]byte{}) && registry.ipv6[spec.AssignedIPv6] != "" {
 		return nil, ErrSessionConflict
@@ -158,7 +174,7 @@ func (registry *SessionRegistry) RouteReturnPacket(packet []byte) error {
 	default:
 		clear(copyPacket)
 		registry.stats.QueueDrops++
-		registry.stopLocked(record)
+		registry.stopLocked(record, SessionStopQueueV1)
 		return ErrSessionQueueFull
 	}
 }
@@ -173,7 +189,7 @@ func (registry *SessionRegistry) StopProfile(profileID string) int {
 	if record == nil {
 		return 0
 	}
-	registry.stopLocked(record)
+	registry.stopLocked(record, SessionStopProfileV1)
 	return 1
 }
 
@@ -188,7 +204,7 @@ func (registry *SessionRegistry) StopAll() int {
 	}
 	stopped := len(registry.sessions)
 	for _, record := range registry.sessions {
-		registry.stopLocked(record)
+		registry.stopLocked(record, SessionStopAllV1)
 	}
 	return stopped
 }
@@ -213,16 +229,20 @@ func (registry *SessionRegistry) Close() error {
 	}
 	registry.closed = true
 	for _, record := range registry.sessions {
-		registry.stopLocked(record)
+		registry.stopLocked(record, SessionStopRegistryV1)
 	}
 	registry.mu.Unlock()
 	return registry.tun.Close()
 }
 
-func (registry *SessionRegistry) stopLocked(record *sessionRecord) {
+func (registry *SessionRegistry) stopLocked(record *sessionRecord, code SessionStopCodeV1) {
 	if record == nil || registry.sessions[record.spec.ID] != record {
 		return
 	}
+	if code == SessionStopNoneV1 {
+		code = SessionStopLocalV1
+	}
+	record.stopCode = code
 	delete(registry.sessions, record.spec.ID)
 	delete(registry.profiles, record.spec.ProfileID)
 	delete(registry.clients, record.spec.ClientKeyID)
@@ -279,8 +299,7 @@ func (device *SessionDevice) Write(packet []byte) (int, error) {
 		return 0, ErrPacketRejected
 	}
 	spec := device.session.spec
-	if _, err := kruntime.ValidateIPPacketV1(packet, kruntime.DirectionRelayV1, spec.AssignedIPv4, spec.AssignedIPv6,
-		spec.AssignedIPv4 != ([4]byte{}), spec.AssignedIPv6 != ([16]byte{})); err != nil {
+	if _, err := kruntime.ValidateRelayOutboundIPPacketV1(packet, spec.AssignedIPv4, spec.AssignedIPv6); err != nil {
 		return 0, ErrPacketRejected
 	}
 	select {
@@ -314,9 +333,18 @@ func (device *SessionDevice) Close() error {
 		return nil
 	}
 	device.registry.mu.Lock()
-	device.registry.stopLocked(device.session)
+	device.registry.stopLocked(device.session, SessionStopLocalV1)
 	device.registry.mu.Unlock()
 	return nil
+}
+
+func (device *SessionDevice) StopCodeV1() SessionStopCodeV1 {
+	if device == nil || device.registry == nil || device.session == nil {
+		return SessionStopNoneV1
+	}
+	device.registry.mu.RLock()
+	defer device.registry.mu.RUnlock()
+	return device.session.stopCode
 }
 
 func packetDestinationV1(packet []byte) ([4]byte, [16]byte, error) {

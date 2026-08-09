@@ -13,6 +13,9 @@ for command in systemctl networkctl nft sysctl rm; do
 done
 
 systemctl disable --now kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
+if [ -x /usr/local/lib/kurd-node/firewall-compat.sh ]; then
+  /usr/local/lib/kurd-node/firewall-compat.sh --remove >/dev/null || fail FIREWALL_COMPAT_REMOVE_FAILED
+fi
 nft destroy table inet kurd_node >/dev/null 2>&1 || true
 networkctl delete kurd0 >/dev/null 2>&1 || true
 

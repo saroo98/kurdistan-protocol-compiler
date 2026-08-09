@@ -25,6 +25,7 @@ const (
 	Phase16RuntimeSuccessorPath         = "testdata/evidence/phase16/production-runtime-overlay.json"
 	Phase16DecentralizedSuccessorPath   = "testdata/evidence/phase16/decentralized-self-hosted-overlay.json"
 	Phase17SuccessorPath                = "testdata/evidence/phase17/live-data-plane-overlay.json"
+	Phase17SuccessorEntryLimit          = 512
 	PublicDocumentationSuccessorPath    = "testdata/evidence/public-documentation-sanitization-overlay.json"
 )
 
@@ -220,7 +221,7 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	}
 	successorLimit := 128
 	if relative == Phase17SuccessorPath {
-		successorLimit = 256
+		successorLimit = Phase17SuccessorEntryLimit
 	}
 	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > successorLimit {
 		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)

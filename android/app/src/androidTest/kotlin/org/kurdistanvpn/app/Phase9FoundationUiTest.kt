@@ -440,6 +440,7 @@ class Phase9FoundationUiTest {
         }
         KurdVpnService.start(
             rejectingContext,
+            "0123456789abcdef0123456789abcdef",
             authority,
             Executor { command -> command.run() },
         ) { category -> handoffFailure = category }

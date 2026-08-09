@@ -88,7 +88,31 @@ type RuntimeNetworkSession interface {
 	AuthenticateKurd(context.Context) ErrorCode
 	AttachTUN(context.Context, int) ErrorCode
 	Start(context.Context) ErrorCode
+	Status() ErrorCode
 	Close()
+}
+
+// RuntimeNetworkDiagnosticsV1 contains only bounded aggregate packet-pump
+// counters. It intentionally excludes addresses, payloads, profile material,
+// credentials, and stable session identifiers.
+type RuntimeNetworkDiagnosticsV1 struct {
+	TUNPacketsRead          uint64
+	OutboundPacketsAccepted uint64
+	CarrierRecordsWritten   uint64
+	CarrierRecordsRead      uint64
+	AuthenticatedOperations uint64
+	InnerPacketsAccepted    uint64
+	InnerPacketsRejected    uint64
+	TUNWriteAttempts        uint64
+	TUNWriteFailures        uint64
+	TUNWriteFailureCode     uint32
+	TUNWriteErrno           uint32
+	TUNPacketsWritten       uint64
+	RejectedTUNPackets      uint64
+}
+
+type runtimeNetworkDiagnosticsProviderV1 interface {
+	RuntimeNetworkDiagnosticsV1() RuntimeNetworkDiagnosticsV1
 }
 
 type runtimeSessionV2Handle struct {
@@ -418,6 +442,7 @@ func RuntimeSocketPrepare(registry *HandleRegistry, handle Handle) (int, ErrorCo
 	if state.state != RuntimeStateVerified || state.ctx.Err() != nil {
 		state.mu.Unlock()
 		network.Close()
+		state.Cancel()
 		return -1, CodeCancelled
 	}
 	state.network = network
@@ -513,9 +538,21 @@ func RuntimeTUNAttach(registry *HandleRegistry, handle Handle, fd int) ErrorCode
 		return code
 	}
 	state.mu.Lock()
-	if state.state != RuntimeStateKurdAuthenticated || state.network == nil || state.ctx == nil || state.ctx.Err() != nil {
+	if state.state != RuntimeStateKurdAuthenticated {
 		state.mu.Unlock()
 		return CodePolicyRejected
+	}
+	if state.network == nil {
+		state.mu.Unlock()
+		return CodeEndpointUnavailable
+	}
+	if state.ctx == nil {
+		state.mu.Unlock()
+		return CodeStateCorrupt
+	}
+	if state.ctx.Err() != nil {
+		state.mu.Unlock()
+		return CodeCancelled
 	}
 	network, ctx := state.network, state.ctx
 	state.mu.Unlock()
@@ -551,8 +588,34 @@ func RuntimeStatus(registry *HandleRegistry, handle Handle) (RuntimeSessionState
 		return 0, code
 	}
 	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.state, CodeOK
+	current, network := state.state, state.network
+	state.mu.Unlock()
+	if current != RuntimeStateRunning || network == nil {
+		return current, CodeOK
+	}
+	if networkCode := normalizeRuntimeNetworkCode(network.Status()); networkCode != CodeOK {
+		state.Cancel()
+		return RuntimeStateClosed, networkCode
+	}
+	return current, CodeOK
+}
+
+func RuntimeNetworkDiagnostics(registry *HandleRegistry, handle Handle) (RuntimeNetworkDiagnosticsV1, ErrorCode) {
+	state, code := runtimeV2State(registry, handle)
+	if code != CodeOK {
+		return RuntimeNetworkDiagnosticsV1{}, code
+	}
+	state.mu.Lock()
+	network := state.network
+	state.mu.Unlock()
+	if network == nil {
+		return RuntimeNetworkDiagnosticsV1{}, CodeEndpointUnavailable
+	}
+	provider, ok := network.(runtimeNetworkDiagnosticsProviderV1)
+	if !ok || provider == nil {
+		return RuntimeNetworkDiagnosticsV1{}, CodeInternalFailure
+	}
+	return provider.RuntimeNetworkDiagnosticsV1(), CodeOK
 }
 
 func RuntimeStop(registry *HandleRegistry, handle Handle) ErrorCode {

@@ -15,6 +15,7 @@ import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.core.nativeapi.NativeActivationSession
 import org.kurdistanvpn.core.nativeapi.NativeCompatibility
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeDiagnostics
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.NativePayloadProtocol
 import org.kurdistanvpn.core.nativeapi.NativeRecipient
@@ -441,6 +442,32 @@ class NativeBridge : KurdNativeCore {
             return NativeResult.Success(state)
         }
 
+        override fun diagnostics(): NativeResult<NativeLiveRuntimeDiagnostics> {
+            if (closed) return NativeResult.Failure(OperationError.CANCELLED)
+            val output = LongArray(13)
+            val code = nativeRuntimeDiagnostics(handle, output)
+            if (code != CODE_OK || output.any { it < 0 }) {
+                return NativeResult.Failure(if (code == CODE_OK) OperationError.INTERNAL_FAILURE else mapError(code))
+            }
+            return NativeResult.Success(
+                NativeLiveRuntimeDiagnostics(
+                    tunPacketsRead = output[0],
+                    outboundPacketsAccepted = output[1],
+                    carrierRecordsWritten = output[2],
+                    carrierRecordsRead = output[3],
+                    authenticatedOperations = output[4],
+                    innerPacketsAccepted = output[5],
+                    innerPacketsRejected = output[6],
+                    tunWriteAttempts = output[7],
+                    tunWriteFailures = output[8],
+                    tunWriteFailureCode = output[9],
+                    tunWriteErrno = output[10],
+                    tunPacketsWritten = output[11],
+                    rejectedTunPackets = output[12],
+                ),
+            )
+        }
+
         override fun stop(): NativeResult<Unit> {
             if (closed) return NativeResult.Failure(OperationError.CANCELLED)
             return unitResult(nativeRuntimeStop(handle))
@@ -528,6 +555,7 @@ class NativeBridge : KurdNativeCore {
     private external fun nativeRuntimeSocketCommitProtected(handle: Long, protectedSocket: Boolean): Int
     private external fun nativeRuntimeTunAttach(handle: Long, fileDescriptor: Int): Int
     private external fun nativeRuntimeStatus(handle: Long, outputState: IntArray): Int
+    private external fun nativeRuntimeDiagnostics(handle: Long, output: LongArray): Int
     private external fun nativeRuntimeStop(handle: Long): Int
 
     companion object {
@@ -773,7 +801,8 @@ class NativeBridge : KurdNativeCore {
                 2 -> OperationError.SIZE_LIMIT
                 3, 4, 5 -> OperationError.INVALID_INPUT
                 6 -> OperationError.CANCELLED
-                7, 8 -> OperationError.TRUST_REJECTED
+                7 -> OperationError.TRUST_UNAVAILABLE
+                8 -> OperationError.TRUST_REJECTED
                 9 -> OperationError.POLICY_REJECTED
                 10 -> OperationError.STORAGE_FAILURE
                 11 -> OperationError.RECOVERY_REQUIRED

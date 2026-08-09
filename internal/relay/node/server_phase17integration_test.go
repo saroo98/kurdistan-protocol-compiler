@@ -24,10 +24,11 @@ func TestPhase17IntegrationRelayFailsClosedAcrossReloadStates(t *testing.T) {
 		name    string
 		failure error
 		state   HealthState
+		wantErr bool
 	}{
 		{name: "drain", failure: selfhost.ErrDrained, state: HealthDraining},
 		{name: "disable", failure: selfhost.ErrRelayRuntimeUnavailable, state: HealthDisabled},
-		{name: "corrupt", failure: selfhost.ErrStateCorrupt, state: HealthDegraded},
+		{name: "corrupt", failure: selfhost.ErrStateCorrupt, state: HealthDegraded, wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			config := DefaultConfig(filepath.Join(t.TempDir(), "node"), 443)
@@ -56,8 +57,9 @@ func TestPhase17IntegrationRelayFailsClosedAcrossReloadStates(t *testing.T) {
 			if _, err := registry.Register(SessionSpec{ID: "phase17-established", ProfileID: "phase17-profile", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
 				t.Fatal(err)
 			}
-			if err := server.Reload(); err == nil {
-				t.Fatal("unsafe state reload succeeded")
+			err = server.Reload()
+			if (err != nil) != test.wantErr {
+				t.Fatalf("reload err=%v wantErr=%v", err, test.wantErr)
 			}
 			select {
 			case <-cancelled.Done():

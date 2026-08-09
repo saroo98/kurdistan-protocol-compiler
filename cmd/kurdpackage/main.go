@@ -37,6 +37,7 @@ var nativeSourceMappingsV1 = map[string]string{
 	"deploy/selfhost/native/90-kurd-node.conf":         "sysctl/90-kurd-node.conf",
 	"deploy/selfhost/native/kurd-node.nft":             "nftables/kurd-node.nft",
 	"deploy/selfhost/native/kurd-node-unbound.conf":    "unbound/kurd-node-unbound.conf",
+	"deploy/selfhost/native/firewall-compat.sh":        "firewall-compat.sh",
 	"deploy/selfhost/native/install.sh":                "install.sh",
 	"deploy/selfhost/native/preflight.sh":              "preflight.sh",
 	"deploy/selfhost/native/rollback.sh":               "rollback.sh",
@@ -366,7 +367,7 @@ func verifyArchive(path string) (packageManifest, error) {
 		}
 		entries[relative] = value
 	}
-	for _, required := range []string{"bin/kurd-node", "bin/kurdctl", "install.sh", "preflight.sh", "rollback.sh", "uninstall.sh", "upgrade.sh", "manifest.json", "SHA256SUMS", "THIRD_PARTY_MODULES.json", "docs/INSTALL.md", "docs/CONTAINER.md", "docs/LIVE-DATA-PLANE.md"} {
+	for _, required := range []string{"bin/kurd-node", "bin/kurdctl", "firewall-compat.sh", "install.sh", "preflight.sh", "rollback.sh", "uninstall.sh", "upgrade.sh", "manifest.json", "SHA256SUMS", "THIRD_PARTY_MODULES.json", "docs/INSTALL.md", "docs/CONTAINER.md", "docs/LIVE-DATA-PLANE.md"} {
 		if len(entries[required]) == 0 {
 			return packageManifest{}, fmt.Errorf("missing package file %s", required)
 		}

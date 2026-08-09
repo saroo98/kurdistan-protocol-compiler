@@ -270,5 +270,6 @@ func (network *releaseFixtureNetwork) Start(context.Context) androidbridge.Error
 	network.appendCall("start")
 	return androidbridge.CodeOK
 }
+func (*releaseFixtureNetwork) Status() androidbridge.ErrorCode { return androidbridge.CodeOK }
 
 func (network *releaseFixtureNetwork) Close() { network.closed = true }

@@ -36,7 +36,7 @@ func TestBuildV2UsesSignedDefaultsAndManualSelection(t *testing.T) {
 		automatic.RelayKeyID != req.RuntimePolicy.RelayAuthKeyID || automatic.CarrierFamily != runtimepolicy.CarrierFamilyTLS13TCP ||
 		automatic.ALPN != "kurd/1" || len(automatic.Endpoints) != 2 || automatic.Endpoints[0].Priority != 0 || automatic.Endpoints[1].Priority != 1 ||
 		automatic.IPMode != runtimepolicy.IPModeIPv4Only || automatic.MTU != 1280 || automatic.MaxQueuePackets != 100 ||
-		automatic.MaxIncompleteOps != 100 || automatic.MaxReconnectAttempts != 3 || automatic.DialTimeout != 5*time.Second ||
+		automatic.MaxIncompleteOps != 64 || automatic.MaxReconnectAttempts != 3 || automatic.DialTimeout != 5*time.Second ||
 		automatic.IdleTimeout != 30*time.Second || automatic.Digest == ([32]byte{}) {
 		t.Fatalf("unexpected default plan: %+v", automatic)
 	}
@@ -51,6 +51,14 @@ func TestBuildV2UsesSignedDefaultsAndManualSelection(t *testing.T) {
 	}
 	if manual.StrategyID != req.Requested.StrategyID || manual.Digest != automatic.Digest {
 		t.Fatalf("equivalent manual selection changed authority: auto=%x manual=%x", automatic.Digest, manual.Digest)
+	}
+}
+
+func TestBuildV2RejectsIncompleteOperationLimitAboveProcessCapacity(t *testing.T) {
+	req := fixtureRequestV2(t)
+	req.Requested.MaxIncompleteOps = 65
+	if plan, err := BuildV2(req); err == nil || !reflect.DeepEqual(plan, PlanV2{}) {
+		t.Fatalf("unsupported incomplete-operation limit accepted: plan=%+v err=%v", plan, err)
 	}
 }
 

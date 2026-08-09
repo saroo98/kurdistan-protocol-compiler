@@ -4,12 +4,18 @@
 package selfhost
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/argon2"
+	"kurdistan/internal/product/enrollment"
 )
 
 func TestPhase16BackupRemainsReadableAndRestoresAsV2(t *testing.T) {
@@ -89,6 +95,178 @@ func TestV2BackupPreservesTLSAddressPoolsAndQuarantine(t *testing.T) {
 		!reflect.DeepEqual(restored.IPv6Pool, original.IPv6Pool) || !reflect.DeepEqual(restored.Assignments, original.Assignments) ||
 		restored.Generation != original.Generation || restored.Revision != original.Revision+1 || !restored.Drained || restored.RecoveryConfirmed {
 		t.Fatal("v2 backup restore changed protected relay-capable state")
+	}
+}
+
+func TestLegacyV2BackupWithNoRecipientLedgerRemainsReadable(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	now := time.Unix(1_760_100_000, 0).UTC()
+	backupPath := filepath.Join(t.TempDir(), "legacy-v2.kurd-backup")
+	passphrase := []byte("legacy v2 backup test passphrase")
+	writeLegacyV2BackupForTest(t, dataDir, backupPath, passphrase, now)
+
+	summary, err := VerifyBackup(backupPath, passphrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Schema != backupSchemaV2 {
+		t.Fatalf("legacy backup schema=%q", summary.Schema)
+	}
+	destination := filepath.Join(t.TempDir(), "restored")
+	if err := ApplyRestore(RestoreOptions{
+		BackupPath: backupPath, DataDir: destination, ExpectedDigest: summary.Digest,
+		Passphrase: passphrase, Now: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLegacyV2BackupCannotLoseRequiredRecipientRegistry(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	recoveryPath := filepath.Join(filepath.Dir(dataDir), "recovery.kurd-recovery")
+	registryDir := filepath.Join(dataDir, "recipient-registry")
+	now := time.Unix(1_760_150_000, 0).UTC()
+	passphrase := []byte("state v2 test recovery passphrase")
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	request, private, err := enrollment.Generate(now, time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(private)
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateProfile(dataDir, CreateProfileOptions{
+		Name: "legacy-device", ValidFor: 24 * time.Hour, Now: now,
+		RecipientRequest: requestBytes, LiveProgram: testLiveProgramV1(t, 1769), RegistryDir: registryDir,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	backupPath := filepath.Join(t.TempDir(), "unsafe-legacy-v2.kurd-backup")
+	writeLegacyV2BackupForTest(t, dataDir, backupPath, passphrase, now.Add(time.Minute))
+	if _, err := VerifyBackup(backupPath, passphrase); !errors.Is(err, ErrRecoveryRejected) {
+		t.Fatalf("legacy v2 backup without required registry error=%v", err)
+	}
+}
+
+func TestBackupRestoresOwnerRecipientRegistryBeforeFurtherIssuance(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	recoveryPath := filepath.Join(filepath.Dir(dataDir), "recovery.kurd-recovery")
+	registryDir := filepath.Join(dataDir, "recipient-registry")
+	now := time.Unix(1_760_200_000, 0).UTC()
+	passphrase := []byte("state v2 test recovery passphrase")
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	request, private, err := enrollment.Generate(now, time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(private)
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateProfile(dataDir, CreateProfileOptions{
+		Name: "first-device", ValidFor: 24 * time.Hour, Now: now,
+		RecipientRequest: requestBytes, LiveProgram: testLiveProgramV1(t, 1771), RegistryDir: registryDir,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	backupPath := filepath.Join(t.TempDir(), "node.kurd-backup")
+	summary, err := CreateBackup(BackupOptions{
+		DataDir: dataDir, Destination: backupPath, RegistryDir: registryDir,
+		Passphrase: passphrase, Now: now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoredData := filepath.Join(t.TempDir(), "restored-data")
+	restoredRegistry := filepath.Join(restoredData, "recipient-registry")
+	if err := ApplyRestore(RestoreOptions{
+		BackupPath: backupPath, DataDir: restoredData, RegistryDir: restoredRegistry,
+		ExpectedDigest: summary.Digest, Passphrase: passphrase, Now: now.Add(2 * time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ConfirmRecovery(restoredData, recoveryPath, passphrase, now.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDrained(restoredData, false, now.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	secondRequest, secondPrivate, err := enrollment.Generate(now.Add(5*time.Minute), time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(secondPrivate)
+	secondRequestBytes, err := enrollment.EncodeRequestV1(secondRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateProfile(restoredData, CreateProfileOptions{
+		Name: "second-device", ValidFor: 24 * time.Hour, Now: now.Add(5 * time.Minute),
+		RecipientRequest: secondRequestBytes, LiveProgram: testLiveProgramV1(t, 1772), RegistryDir: restoredRegistry,
+	}); err != nil {
+		t.Fatalf("fresh issuance after restore failed: %v", err)
+	}
+}
+
+func writeLegacyV2BackupForTest(t *testing.T, dataDir, destination string, passphrase []byte, now time.Time) {
+	t.Helper()
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	stateFile, err := os.ReadFile(filepath.Join(dataDir, stateFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := backupPayloadV2{
+		Schema: backupSchemaV2, DeploymentID: state.DeploymentID,
+		AuditHead: state.Audit[len(state.Audit)-1].Digest, Revision: state.Revision,
+		Generation: state.Generation, CreatedAt: now.Unix(), StateVersion: state.Version,
+		MigrationEpoch: state.MigrationEpoch, MasterKey: append([]byte(nil), master...), StateFile: stateFile,
+	}
+	plain, err := encodeCanonical(payload)
+	zero(payload.MasterKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(plain)
+	salt, err := randomBytes(16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce, err := randomBytes(12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := argon2.IDKey(passphrase, salt, recoveryIterations, recoveryMemoryKiB, recoveryParallelism, 32)
+	defer zero(key)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope, err := encodeCanonical(backupEnvelope{
+		Schema: backupSchemaV2, KDFMemoryKiB: recoveryMemoryKiB, KDFIterations: recoveryIterations,
+		KDFParallelism: recoveryParallelism, Salt: salt, Nonce: nonce,
+		Ciphertext: aead.Seal(nil, nonce, plain, backupAADV2(salt, nonce)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destination, envelope, 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

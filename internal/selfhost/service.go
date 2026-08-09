@@ -378,6 +378,35 @@ func SetDrained(dataDir string, drained bool, now time.Time) error {
 	})
 }
 
+// SetIPv6Enabled changes whether future live profiles may receive an IPv6
+// assignment. The owner must first establish host capability out of band and
+// authorize this authority-widening transition with the offline recovery key.
+// Existing profiles and assignments are never rewritten by this operation.
+func SetIPv6Enabled(dataDir string, enabled bool, options RecoveryActionOptions) error {
+	now := options.Now.UTC()
+	if options.RecoveryPath == "" || !validPassphrase(options.RecoveryPassphrase) || now.IsZero() {
+		return ErrInvalidInput
+	}
+	action := "disable-ipv6-pool"
+	if enabled {
+		action = "enable-ipv6-pool"
+	}
+	return withStateTransaction(dataDir, action, "deployment.network.ipv6", now.Unix(), func(state *persistedState, _ []byte) error {
+		if _, err := recoveryRootForState(*state, options.RecoveryPath, options.RecoveryPassphrase); err != nil {
+			return err
+		}
+		if !enabled {
+			for _, assignment := range state.Assignments {
+				if assignment.Family == addressFamilyIPv6 && assignment.State == addressStateActive {
+					return ErrInvalidInput
+				}
+			}
+		}
+		state.IPv6Pool.Enabled = enabled
+		return nil
+	})
+}
+
 func SetDeploymentDisabled(dataDir string, disabled bool, options RecoveryActionOptions) error {
 	now := options.Now.UTC()
 	if options.RecoveryPath == "" || !validPassphrase(options.RecoveryPassphrase) || now.IsZero() {

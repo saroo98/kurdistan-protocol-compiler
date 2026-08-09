@@ -35,19 +35,57 @@ var (
 )
 
 type SessionRejectCodeV1 string
+type SessionStageCodeV1 string
+type SessionTerminationCodeV1 string
 
 const (
-	SessionRejectInvalidV1   SessionRejectCodeV1 = "invalid"
-	SessionRejectPrefaceV1   SessionRejectCodeV1 = "preface"
-	SessionRejectEntropyV1   SessionRejectCodeV1 = "entropy"
-	SessionRejectStateV1     SessionRejectCodeV1 = "state"
-	SessionRejectAdmissionV1 SessionRejectCodeV1 = "admission"
-	SessionRejectPlanV1      SessionRejectCodeV1 = "plan"
-	SessionRejectAuthV1      SessionRejectCodeV1 = "auth"
-	SessionRejectAddressV1   SessionRejectCodeV1 = "address"
-	SessionRejectLifetimeV1  SessionRejectCodeV1 = "lifetime"
-	SessionRejectCapacityV1  SessionRejectCodeV1 = "capacity"
-	SessionRejectTLSV1       SessionRejectCodeV1 = "tls"
+	SessionRejectInvalidV1               SessionRejectCodeV1 = "invalid"
+	SessionRejectHealthV1                SessionRejectCodeV1 = "health"
+	SessionRejectSourceLimitV1           SessionRejectCodeV1 = "source-limit"
+	SessionRejectPrefaceV1               SessionRejectCodeV1 = "preface"
+	SessionRejectEntropyV1               SessionRejectCodeV1 = "entropy"
+	SessionRejectStateV1                 SessionRejectCodeV1 = "state"
+	SessionRejectAdmissionV1             SessionRejectCodeV1 = "admission"
+	SessionRejectPlanV1                  SessionRejectCodeV1 = "plan"
+	SessionRejectAuthV1                  SessionRejectCodeV1 = "auth"
+	SessionRejectAuthConfigV1            SessionRejectCodeV1 = "auth-config"
+	SessionRejectAuthConfigProfileV1     SessionRejectCodeV1 = "auth-config-profile"
+	SessionRejectAuthConfigPolicyV1      SessionRejectCodeV1 = "auth-config-policy"
+	SessionRejectAuthConfigFloorV1       SessionRejectCodeV1 = "auth-config-floor"
+	SessionRejectAuthUnknownIdentityV1   SessionRejectCodeV1 = "auth-unknown-identity"
+	SessionRejectAuthUntrustedIdentityV1 SessionRejectCodeV1 = "auth-untrusted-identity"
+	SessionRejectAuthLimitV1             SessionRejectCodeV1 = "auth-limit"
+	SessionRejectAuthCredentialsV1       SessionRejectCodeV1 = "auth-credentials"
+	SessionRejectAddressV1               SessionRejectCodeV1 = "address"
+	SessionRejectLifetimeV1              SessionRejectCodeV1 = "lifetime"
+	SessionRejectCapacityV1              SessionRejectCodeV1 = "capacity"
+	SessionRejectTLSV1                   SessionRejectCodeV1 = "tls"
+	SessionRejectPacketPumpV1            SessionRejectCodeV1 = "packet-pump"
+	SessionRejectPumpTUNV1               SessionRejectCodeV1 = "packet-pump-tun"
+	SessionRejectPumpCarrierV1           SessionRejectCodeV1 = "packet-pump-carrier"
+	SessionRejectPumpRecordV1            SessionRejectCodeV1 = "packet-pump-record"
+	SessionRejectPumpQueueV1             SessionRejectCodeV1 = "packet-pump-queue"
+	SessionRejectPumpIdleV1              SessionRejectCodeV1 = "packet-pump-idle"
+)
+
+const (
+	SessionTerminationCompleteV1  SessionTerminationCodeV1 = "complete"
+	SessionTerminationLifetimeV1  SessionTerminationCodeV1 = "lifetime"
+	SessionTerminationQueueV1     SessionTerminationCodeV1 = "queue"
+	SessionTerminationProfileV1   SessionTerminationCodeV1 = "profile"
+	SessionTerminationAuthorityV1 SessionTerminationCodeV1 = "authority"
+	SessionTerminationRegistryV1  SessionTerminationCodeV1 = "registry"
+	SessionTerminationCancelledV1 SessionTerminationCodeV1 = "cancelled"
+)
+
+const (
+	SessionStageAcceptedV1       SessionStageCodeV1 = "accepted"
+	SessionStagePrefaceReadyV1   SessionStageCodeV1 = "preface-ready"
+	SessionStageAuthorityReadyV1 SessionStageCodeV1 = "authority-ready"
+	SessionStageTLSStartV1       SessionStageCodeV1 = "tls-start"
+	SessionStageTLSReadyV1       SessionStageCodeV1 = "tls-ready"
+	SessionStageKurdReadyV1      SessionStageCodeV1 = "kurd-ready"
+	SessionStagePumpReadyV1      SessionStageCodeV1 = "pump-ready"
 )
 
 type RelaySnapshotV1 interface {
@@ -82,6 +120,11 @@ type ServerV1 struct {
 	transientMu       sync.Mutex
 	transientSequence uint64
 	transients        map[string]transientSessionV1
+
+	connectionMu       sync.Mutex
+	connectionSequence uint64
+	connectionsClosed  bool
+	connections        map[uint64]net.Conn
 }
 
 type transientSessionV1 struct {
@@ -121,6 +164,7 @@ func NewServerV1(config Config, listener net.Listener, tunnel io.ReadWriteCloser
 		listener: listener, control: control, authorizeControl: authorizeControl,
 		limiter: limiter, replay: replay, workers: make(chan struct{}, config.MaxHandshakeWorkers),
 		listenerReady: true, tunnelReady: true, transients: make(map[string]transientSessionV1),
+		connections: make(map[uint64]net.Conn),
 	}, nil
 }
 
@@ -201,6 +245,8 @@ func (server *ServerV1) Run(ctx context.Context) error {
 	cancel()
 	_ = server.listener.Close()
 	_ = server.control.Close()
+	server.stopAllTransientsV1()
+	server.closeAllConnectionsV1()
 	_ = server.registry.Close()
 	wait.Wait()
 	server.shutdownV1()
@@ -228,6 +274,9 @@ func (server *ServerV1) Reload() error {
 			state = HealthDisabled
 		}
 		server.failClosedStateV1(state)
+		if state == HealthDraining || state == HealthDisabled {
+			return nil
+		}
 		return errors.Join(ErrServerState, err)
 	}
 	status, ok := candidate.StatusV1()
@@ -277,15 +326,31 @@ func (server *ServerV1) acceptLoopV1(ctx context.Context) error {
 			}
 			return ErrServerRun
 		}
-		if !server.health.Snapshot().AcceptingSessions || !server.limiter.Allow(connection.RemoteAddr()) {
+		if !server.health.Snapshot().AcceptingSessions {
+			_ = server.rejectSessionV1(SessionRejectHealthV1)
+			_ = connection.Close()
+			continue
+		}
+		if !server.limiter.Allow(connection.RemoteAddr()) {
+			_ = server.rejectSessionV1(SessionRejectSourceLimitV1)
 			_ = connection.Close()
 			continue
 		}
 		select {
 		case server.workers <- struct{}{}:
+			connectionToken, tracked := server.trackConnectionV1(connection)
+			if !tracked {
+				<-server.workers
+				_ = connection.Close()
+				continue
+			}
 			sessions.Add(1)
 			go func() {
-				defer func() { <-server.workers; sessions.Done() }()
+				defer func() {
+					server.releaseConnectionV1(connectionToken)
+					<-server.workers
+					sessions.Done()
+				}()
 				_ = server.handleSessionV1(ctx, connection)
 			}()
 		default:
@@ -311,6 +376,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	if raw == nil {
 		return server.rejectSessionV1(SessionRejectInvalidV1)
 	}
+	server.observeSessionStageV1(SessionStageAcceptedV1)
 	defer raw.Close()
 	prefaceContext, cancelPreface := context.WithTimeout(runContext, server.config.HandshakeTimeout)
 	defer cancelPreface()
@@ -322,6 +388,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	if err != nil {
 		return server.rejectSessionV1(SessionRejectPrefaceV1)
 	}
+	server.observeSessionStageV1(SessionStagePrefaceReadyV1)
 	sessionID, err := server.nextSessionIDV1()
 	if err != nil {
 		return server.rejectSessionV1(SessionRejectEntropyV1)
@@ -354,12 +421,12 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	processConfig, err := auth.NewProjectedProcessHandshakeConfigV1(admission.ClientAuthKeyID, status.RelayKeyID, program, "tls13-tcp")
 	if err != nil {
 		server.stateMu.RUnlock()
-		return server.rejectSessionV1(SessionRejectAuthV1)
+		return server.rejectSessionV1(sessionRejectAuthConfigV1(err))
 	}
 	handshake, err := kruntime.NewProcessWireRelayHandshakeV1(processConfig, auth.Dependencies{Identity: snapshot, Trust: snapshot}, server.replay, plan.Digest)
 	if err != nil {
 		server.stateMu.RUnlock()
-		return server.rejectSessionV1(SessionRejectAuthV1)
+		return server.rejectSessionV1(sessionRejectHandshakeV1(err))
 	}
 	defer handshake.Close()
 	assigned4, assigned6, ok := assignedAddressesV1(admission.AssignedIPv4, admission.AssignedIPv6)
@@ -382,17 +449,20 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	server.stateMu.RUnlock()
 	defer cancelSession()
 	defer server.releaseTransientV1(sessionID, transientToken)
+	server.observeSessionStageV1(SessionStageAuthorityReadyV1)
 
 	handshakeContext, cancelHandshake := context.WithTimeout(sessionContext, server.config.HandshakeTimeout)
 	defer cancelHandshake()
 	if deadline, ok := handshakeContext.Deadline(); !ok || raw.SetDeadline(deadline) != nil {
 		return server.rejectSessionV1(SessionRejectInvalidV1)
 	}
+	server.observeSessionStageV1(SessionStageTLSStartV1)
 	carrier, err := tlstcp.Server(handshakeContext, raw, tlsConfig, plan.Digest, uint32(program.Limits.MaxFrameBytes))
 	destroyTLSConfigV1(tlsConfig)
 	if err != nil {
 		return server.rejectSessionV1(SessionRejectTLSV1)
 	}
+	server.observeSessionStageV1(SessionStageTLSReadyV1)
 	if err := raw.SetDeadline(time.Time{}); err != nil {
 		_ = carrier.Close()
 		return ErrServerSession
@@ -403,6 +473,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 		_ = carrier.Close()
 		return ErrServerSession
 	}
+	server.observeSessionStageV1(SessionStageKurdReadyV1)
 
 	server.stateMu.RLock()
 	currentStatus, currentOK := selfhost.RelayRuntimeStatusV1{}, false
@@ -423,21 +494,21 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 		server.stateMu.RUnlock()
 		endpoint.Abort()
 		_ = carrier.Close()
-		return ErrServerSession
+		return server.rejectSessionV1(sessionRejectRegistryV1(err))
 	}
 	server.releaseTransientV1(sessionID, transientToken)
 	server.stateMu.RUnlock()
 	defer device.Close()
 
-	duplexCarrier, err := kruntime.NewProcessTLSTCPDuplexCarrierV1(sessionContext, carrier)
+	idleTimeout := plan.IdleTimeout
+	if idleTimeout <= 0 || idleTimeout > server.config.SessionIdleTimeout {
+		idleTimeout = server.config.SessionIdleTimeout
+	}
+	duplexCarrier, err := kruntime.NewProcessTLSTCPDuplexCarrierV1(sessionContext, carrier, idleTimeout)
 	if err != nil {
 		endpoint.Abort()
 		_ = carrier.Close()
 		return ErrServerSession
-	}
-	idleTimeout := plan.IdleTimeout
-	if idleTimeout <= 0 || idleTimeout > server.config.SessionIdleTimeout {
-		idleTimeout = server.config.SessionIdleTimeout
 	}
 	pump, err := kruntime.NewPacketPumpV1(kruntime.PacketPumpConfigV1{
 		TUN: device, Carrier: duplexCarrier, Endpoint: endpoint, Program: program, Direction: kruntime.DirectionRelayV1,
@@ -447,13 +518,106 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	if err != nil {
 		_ = duplexCarrier.Close()
 		endpoint.Abort()
-		return ErrServerSession
+		return server.rejectSessionV1(SessionRejectPacketPumpV1)
 	}
 	defer pump.Close()
-	if err := pump.Run(sessionContext); err != nil && sessionContext.Err() == nil {
-		return ErrServerSession
+	server.observeSessionStageV1(SessionStagePumpReadyV1)
+	pumpErr := pump.Run(sessionContext)
+	server.observeSessionPacketPumpSnapshotV1(pump.SnapshotV1())
+	contextErr := sessionContext.Err()
+	if pumpErr != nil && contextErr == nil {
+		return server.rejectSessionV1(sessionRejectPacketPumpV1(pumpErr))
 	}
+	server.observeSessionTerminationV1(sessionTerminationCodeV1(pumpErr, contextErr, device.StopCodeV1()))
 	return nil
+}
+
+func sessionTerminationCodeV1(_ error, contextErr error, stopCode SessionStopCodeV1) SessionTerminationCodeV1 {
+	if errors.Is(contextErr, context.DeadlineExceeded) {
+		return SessionTerminationLifetimeV1
+	}
+	if errors.Is(contextErr, context.Canceled) {
+		switch stopCode {
+		case SessionStopQueueV1:
+			return SessionTerminationQueueV1
+		case SessionStopProfileV1:
+			return SessionTerminationProfileV1
+		case SessionStopAllV1:
+			return SessionTerminationAuthorityV1
+		case SessionStopRegistryV1:
+			return SessionTerminationRegistryV1
+		default:
+			return SessionTerminationCancelledV1
+		}
+	}
+	return SessionTerminationCompleteV1
+}
+
+func sessionRejectPacketPumpV1(err error) SessionRejectCodeV1 {
+	stage, ok := kruntime.PacketPumpFailureStageV1(err)
+	if !ok {
+		return SessionRejectPacketPumpV1
+	}
+	return sessionRejectPacketPumpStageV1(stage)
+}
+
+func sessionRejectHandshakeV1(err error) SessionRejectCodeV1 {
+	var handshakeErr *auth.HandshakeError
+	if !errors.As(err, &handshakeErr) {
+		return SessionRejectAuthCredentialsV1
+	}
+	switch handshakeErr.Code {
+	case auth.FailureUnknownIdentity:
+		return SessionRejectAuthUnknownIdentityV1
+	case auth.FailureUntrustedIdentity:
+		return SessionRejectAuthUntrustedIdentityV1
+	case auth.FailureInternalLimit:
+		return SessionRejectAuthLimitV1
+	default:
+		return SessionRejectAuthCredentialsV1
+	}
+}
+
+func sessionRejectAuthConfigV1(err error) SessionRejectCodeV1 {
+	var handshakeErr *auth.HandshakeError
+	if !errors.As(err, &handshakeErr) {
+		return SessionRejectAuthConfigV1
+	}
+	switch handshakeErr.Code {
+	case auth.FailureProfileMismatch:
+		return SessionRejectAuthConfigProfileV1
+	case auth.FailurePolicyMismatch:
+		return SessionRejectAuthConfigPolicyV1
+	case auth.FailurePolicyFloorRejected:
+		return SessionRejectAuthConfigFloorV1
+	default:
+		return SessionRejectAuthConfigV1
+	}
+}
+
+func sessionRejectRegistryV1(err error) SessionRejectCodeV1 {
+	if errors.Is(err, ErrSessionLimit) {
+		return SessionRejectCapacityV1
+	}
+	return SessionRejectAdmissionV1
+}
+
+func sessionRejectPacketPumpStageV1(stage kruntime.PacketPumpStageV1) SessionRejectCodeV1 {
+	switch stage {
+	case kruntime.PacketPumpStageTUNReadV1, kruntime.PacketPumpStageTUNWriteV1, kruntime.PacketPumpStageTUNValidateV1:
+		return SessionRejectPumpTUNV1
+	case kruntime.PacketPumpStageCarrierReadV1, kruntime.PacketPumpStageCarrierWriteV1:
+		return SessionRejectPumpCarrierV1
+	case kruntime.PacketPumpStageOutboundQueueV1, kruntime.PacketPumpStageAuthenticatedQueueV1:
+		return SessionRejectPumpQueueV1
+	case kruntime.PacketPumpStageIdleV1:
+		return SessionRejectPumpIdleV1
+	case kruntime.PacketPumpStageSealV1, kruntime.PacketPumpStageRecordOpenV1, kruntime.PacketPumpStageInnerOperationV1,
+		kruntime.PacketPumpStageInnerValidateV1, kruntime.PacketPumpStageReplayCommitV1:
+		return SessionRejectPumpRecordV1
+	default:
+		return SessionRejectPacketPumpV1
+	}
 }
 
 func (server *ServerV1) rejectSessionV1(code SessionRejectCodeV1) error {
@@ -461,6 +625,24 @@ func (server *ServerV1) rejectSessionV1(code SessionRejectCodeV1) error {
 		server.config.SessionRejected(code)
 	}
 	return ErrServerSession
+}
+
+func (server *ServerV1) observeSessionStageV1(stage SessionStageCodeV1) {
+	if server != nil && server.config.SessionProgress != nil {
+		server.config.SessionProgress(stage)
+	}
+}
+
+func (server *ServerV1) observeSessionTerminationV1(code SessionTerminationCodeV1) {
+	if server != nil && server.config.SessionTerminated != nil {
+		server.config.SessionTerminated(code)
+	}
+}
+
+func (server *ServerV1) observeSessionPacketPumpSnapshotV1(snapshot kruntime.PacketPumpSnapshotV1) {
+	if server != nil && server.config.SessionPacketPumpSnapshot != nil {
+		server.config.SessionPacketPumpSnapshot(snapshot)
+	}
 }
 
 func acceptRelayDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, handshake *kruntime.ProcessWireRelayHandshakeV1, digest [32]byte, program liveprogram.ProgramV1) (*kruntime.ProcessRelayDuplexEndpointV1, error) {
@@ -683,6 +865,51 @@ func (server *ServerV1) stopAllTransientsV1() int {
 		transient.cancel()
 	}
 	return len(transients)
+}
+
+func (server *ServerV1) trackConnectionV1(connection net.Conn) (uint64, bool) {
+	if server == nil || connection == nil {
+		return 0, false
+	}
+	server.connectionMu.Lock()
+	defer server.connectionMu.Unlock()
+	if server.connectionsClosed {
+		return 0, false
+	}
+	if server.connections == nil {
+		server.connections = make(map[uint64]net.Conn)
+	}
+	server.connectionSequence++
+	if server.connectionSequence == 0 {
+		server.connectionSequence++
+	}
+	token := server.connectionSequence
+	server.connections[token] = connection
+	return token, true
+}
+
+func (server *ServerV1) releaseConnectionV1(token uint64) {
+	if server == nil || token == 0 {
+		return
+	}
+	server.connectionMu.Lock()
+	delete(server.connections, token)
+	server.connectionMu.Unlock()
+}
+
+func (server *ServerV1) closeAllConnectionsV1() int {
+	if server == nil {
+		return 0
+	}
+	server.connectionMu.Lock()
+	server.connectionsClosed = true
+	connections := server.connections
+	server.connections = make(map[uint64]net.Conn)
+	server.connectionMu.Unlock()
+	for _, connection := range connections {
+		_ = connection.Close()
+	}
+	return len(connections)
 }
 
 func (server *ServerV1) stopProfileV1(profileID string) int {

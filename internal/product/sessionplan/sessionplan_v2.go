@@ -21,6 +21,7 @@ import (
 const (
 	VersionV2                 = "session-plan-v2"
 	supportedStrategyTLS13TCP = "strategy.kurd-tls13-tcp"
+	maximumIncompleteOpsV2    = uint16(64)
 	planDigestDomainV2        = "kurd-session-plan-v2\x00"
 	receiptDigestDomainV2     = "kurd-activation-receipt-v1\x00"
 )
@@ -235,7 +236,7 @@ func ValidateV2At(plan PlanV2, now time.Time) error {
 		plan.LiveProgramDigest == ([32]byte{}) || plan.StrategyID != supportedStrategyTLS13TCP ||
 		!boundedV2(plan.RelayKeyID, 64) || plan.CarrierFamily != runtimepolicy.CarrierFamilyTLS13TCP ||
 		plan.ALPN != "kurd/1" || len(plan.Endpoints) == 0 || len(plan.Endpoints) > 4 ||
-		plan.MTU != 1280 || plan.MaxQueuePackets == 0 || plan.MaxIncompleteOps == 0 ||
+		plan.MTU != 1280 || plan.MaxQueuePackets == 0 || plan.MaxIncompleteOps == 0 || plan.MaxIncompleteOps > maximumIncompleteOpsV2 ||
 		plan.MaxReconnectAttempts == 0 || plan.DialTimeout <= 0 || plan.DialTimeout > 10*time.Second ||
 		plan.IdleTimeout <= 0 || plan.Digest == ([32]byte{}) || len(plan.runtimePolicyBytes) == 0 ||
 		sha256.Sum256(plan.runtimePolicyBytes) != plan.RuntimePolicyDigest {
@@ -390,8 +391,11 @@ func selectLimitsV2(policy runtimepolicy.PolicyV2, requested NarrowingRequestV2)
 	if requested.MaxQueuePackets != 0 {
 		queue = requested.MaxQueuePackets
 	}
-	incomplete := uint16(policy.Limits.MaxQueuedPackets)
+	incomplete := min(uint16(policy.Limits.MaxQueuedPackets), maximumIncompleteOpsV2)
 	if requested.MaxIncompleteOps != 0 {
+		if requested.MaxIncompleteOps > maximumIncompleteOpsV2 {
+			return 0, 0, 0, ErrUnsupportedV2
+		}
 		incomplete = requested.MaxIncompleteOps
 	}
 	reconnects := uint8(policy.Limits.MaxReconnectAttempts)

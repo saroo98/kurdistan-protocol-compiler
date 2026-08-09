@@ -134,6 +134,7 @@ int32_t kvpn_runtime_socket_prepare(uint64_t handle, int32_t *output_fd);
 int32_t kvpn_runtime_socket_commit_protected(uint64_t handle, uint8_t protected_socket);
 int32_t kvpn_runtime_tun_attach(uint64_t handle, int32_t fd);
 int32_t kvpn_runtime_status(uint64_t handle, uint32_t *output_state);
+int32_t kvpn_runtime_diagnostics_v1(uint64_t handle, uint64_t *output, uint32_t output_count);
 int32_t kvpn_runtime_stop(uint64_t handle);
 int32_t kvpn_cancel(uint64_t handle);
 int32_t kvpn_free(uint64_t handle);
