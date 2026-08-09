@@ -46,20 +46,20 @@ internal class UnderlyingNetworkAvailability<T> {
 internal class CurrentNetworkTracker<T>(
     private val onTransition: (NetworkTransition<T>) -> Unit,
 ) {
+    private val available = linkedSetOf<T>()
     private var current: T? = null
 
     fun available(value: T) {
-        if (current == value) return
-        val previous = current
+        if (!available.add(value) || current != null) return
         current = value
-        onTransition(NetworkTransition(previous, value))
+        onTransition(NetworkTransition(null, value))
     }
 
     fun lost(value: T) {
-        if (current != value) return
+        if (!available.remove(value) || current != value) return
         val previous = current
-        current = null
-        onTransition(NetworkTransition(previous, null))
+        current = available.firstOrNull()
+        onTransition(NetworkTransition(previous, current))
     }
 }
 
