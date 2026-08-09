@@ -171,7 +171,7 @@ internal class NativeTunnelController(
 private fun OperationError.toLiveTunnelFailure(fallback: LiveTunnelFailure): LiveTunnelFailure =
     when (this) {
         OperationError.TRUST_REJECTED,
-        OperationError.TRUST_UNAVAILABLE,
+        OperationError.AUTHORITY_UNAVAILABLE,
         OperationError.POLICY_REJECTED,
         OperationError.INCOMPATIBLE_NATIVE_CORE
         -> LiveTunnelFailure.AUTHORITY_REJECTED

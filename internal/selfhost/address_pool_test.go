@@ -6,26 +6,52 @@ package selfhost
 import (
 	"bytes"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 )
 
-func TestIPv4PoolAllocatesOnlyClientRangeAndExhausts(t *testing.T) {
+func TestIPv4PoolAllocatesBeyondLegacy24Boundary(t *testing.T) {
 	ipv4, _ := defaultAddressPools()
+	var assignments []addressAssignmentV1
+	for offset := 2; offset <= 300; offset++ {
+		address, err := allocateAddress(&ipv4, assignments, 100)
+		if err != nil {
+			t.Fatalf("offset %d: %v", offset, err)
+		}
+		if got := hostOffset(ipv4, mustAddrFromBytes(t, address)); got != uint64(offset) {
+			t.Fatalf("address=%v offset=%d want=%d", address, got, offset)
+		}
+		assignments = append(assignments, addressAssignmentV1{Family: addressFamilyIPv4, Address: address, ProfileID: "profiles.fixture", ContentID: "content.fixture", Generation: uint64(offset), State: addressStateActive, AssignedAt: 1, ProfileValidUntil: 200})
+	}
+	if ipv4.PrefixLength != 16 {
+		t.Fatalf("default IPv4 prefix=%d want=16", ipv4.PrefixLength)
+	}
+}
+
+func TestLegacyIPv4PoolStillValidatesAndExhausts(t *testing.T) {
+	ipv4, _ := defaultAddressPools()
+	ipv4.PrefixLength = 24
 	var assignments []addressAssignmentV1
 	for offset := 2; offset <= 254; offset++ {
 		address, err := allocateAddress(&ipv4, assignments, 100)
 		if err != nil {
 			t.Fatalf("offset %d: %v", offset, err)
 		}
-		if address[3] != byte(offset) {
-			t.Fatalf("address=%v want host=%d", address, offset)
-		}
 		assignments = append(assignments, addressAssignmentV1{Family: addressFamilyIPv4, Address: address, ProfileID: "profiles.fixture", ContentID: "content.fixture", Generation: uint64(offset), State: addressStateActive, AssignedAt: 1, ProfileValidUntil: 200})
 	}
 	if _, err := allocateAddress(&ipv4, assignments, 100); !errors.Is(err, ErrAddressExhausted) {
 		t.Fatalf("exhaustion error=%v", err)
 	}
+}
+
+func mustAddrFromBytes(t *testing.T, value []byte) netip.Addr {
+	t.Helper()
+	address, ok := netip.AddrFromSlice(value)
+	if !ok {
+		t.Fatalf("invalid address bytes=%v", value)
+	}
+	return address
 }
 
 func TestAddressQuarantineBoundaryAndDisabledIPv6(t *testing.T) {
