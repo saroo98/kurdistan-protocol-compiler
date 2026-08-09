@@ -342,7 +342,10 @@ class KurdVpnService : VpnService() {
         }
     }
 
-    private fun stopRuntime(finalState: VpnRuntimeState) {
+    private fun stopRuntime(
+        finalState: VpnRuntimeState,
+        finalFailure: String? = null,
+    ) {
         publish(VpnRuntimeState.STOPPING)
         mainHandler.removeCallbacks(authorityArrivalTimeout)
         mainHandler.removeCallbacks(runtimeHealthCheck)
@@ -353,7 +356,7 @@ class KurdVpnService : VpnService() {
         if (!starting.get()) {
             closeRuntime()
             terminalStateOnDestroy = null
-            publish(finalState)
+            publish(finalState, failure = finalFailure)
             activeRequestId = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -522,13 +525,18 @@ class KurdVpnService : VpnService() {
         }
         if (transition.previous == null || transition.previous == transition.current) return
         if (tunnelController?.isRunning() == true) {
+            val failure = if (transition.current == null) {
+                "NETWORK_UNAVAILABLE"
+            } else {
+                "NETWORK_CHANGED"
+            }
             publish(
                 VpnRuntimeState.BLOCKED,
-                failure = if (transition.current == null) "NETWORK_UNAVAILABLE" else "NETWORK_CHANGED",
+                failure = failure,
                 config = activeConfig ?: VpnRuntimeConfig(VpnRoutingPolicy()),
                 authority = latestSnapshot.authority,
             )
-            stopRuntime(VpnRuntimeState.BLOCKED)
+            stopRuntime(VpnRuntimeState.BLOCKED, failure)
         }
     }
 
