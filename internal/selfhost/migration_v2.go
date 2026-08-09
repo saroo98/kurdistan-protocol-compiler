@@ -66,13 +66,16 @@ func MigrateToV2(dataDir string, now time.Time) error {
 		marker, markerErr := readMigrationMarker(dataDir, master)
 		if markerErr == nil && marker.Phase == "prepared" && marker.DeploymentID == state.DeploymentID && marker.SourceRevision == state.Revision {
 			marker.Phase = "committed"
-			return writeMigrationMarker(dataDir, master, marker)
+			if err := writeMigrationMarker(dataDir, master, marker); err != nil {
+				return err
+			}
+			return expandLegacyIPv4Pool(dataDir, master, state, now)
 		}
 		if markerErr == nil && marker.Phase == "committed" {
-			return nil
+			return expandLegacyIPv4Pool(dataDir, master, state, now)
 		}
 		if errors.Is(markerErr, os.ErrNotExist) {
-			return nil
+			return expandLegacyIPv4Pool(dataDir, master, state, now)
 		}
 		return ErrMigration
 	}
@@ -131,6 +134,29 @@ func MigrateToV2(dataDir string, now time.Time) error {
 	}
 	marker.Phase = "committed"
 	return writeMigrationMarker(dataDir, master, marker)
+}
+
+func expandLegacyIPv4Pool(dataDir string, master []byte, state persistedState, now time.Time) error {
+	if state.IPv4Pool.PrefixLength == 16 {
+		return nil
+	}
+	if state.IPv4Pool.PrefixLength != 24 || !bytes.Equal(state.IPv4Pool.Network, []byte{10, 77, 0, 0}) || !bytes.Equal(state.IPv4Pool.ServerDNS, []byte{10, 77, 0, 1}) {
+		return ErrMigration
+	}
+	if err := validateClockTransition(state.LastObservedAt, now.Unix()); err != nil {
+		return err
+	}
+	state.IPv4Pool.PrefixLength = 16
+	if state.IPv4Pool.NextHostOffset < 2 {
+		state.IPv4Pool.NextHostOffset = 2
+	}
+	state.LastObservedAt = now.Unix()
+	state.Revision++
+	if err := appendAudit(&state, now.Unix(), "expand-ipv4-pool", "deployment.network.ipv4"); err != nil {
+		return err
+	}
+	state.PublicationOutbox = []publicationOutboxEntry{{Revision: state.Revision, CreatedAt: now.Unix(), Action: "expand-ipv4-pool"}}
+	return saveState(dataDir, master, state)
 }
 
 // RollbackMigrationV2 restores only the authenticated exact v1 backup before

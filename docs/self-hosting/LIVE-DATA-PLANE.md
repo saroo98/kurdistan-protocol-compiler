@@ -60,7 +60,7 @@ logged nor persistent.
 
 ## Addressing and forwarding
 
-The IPv4 client pool is `10.77.0.0/24`; the TUN server and DNS address is
+The IPv4 client pool is `10.77.0.0/16`; the TUN server and DNS address is
 `10.77.0.1`, and clients receive unique `/32` assignments. The IPv6 client
 pool is `fd4b:7572:6400::/64`; the TUN server and DNS address is
 `fd4b:7572:6400::1`, and clients receive unique `/128` assignments. An active

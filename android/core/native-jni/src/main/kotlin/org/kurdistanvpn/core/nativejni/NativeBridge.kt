@@ -801,7 +801,7 @@ class NativeBridge : KurdNativeCore {
                 2 -> OperationError.SIZE_LIMIT
                 3, 4, 5 -> OperationError.INVALID_INPUT
                 6 -> OperationError.CANCELLED
-                7 -> OperationError.TRUST_UNAVAILABLE
+                7 -> OperationError.AUTHORITY_UNAVAILABLE
                 8 -> OperationError.TRUST_REJECTED
                 9 -> OperationError.POLICY_REJECTED
                 10 -> OperationError.STORAGE_FAILURE

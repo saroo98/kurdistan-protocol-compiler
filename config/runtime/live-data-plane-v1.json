@@ -266,7 +266,7 @@
     "liveIncompleteInnerOperationsAreSeparate": true
   },
   "network": {
-    "ipv4Pool": "10.77.0.0/24",
+    "ipv4Pool": "10.77.0.0/16",
     "ipv4ServerDns": "10.77.0.1",
     "ipv4ClientPrefix": 32,
     "ipv6Pool": "fd4b:7572:6400::/64",

@@ -217,7 +217,7 @@ func TestLiveDataPlaneAuthorityFreezesAllBoundValues(t *testing.T) {
 		t.Fatalf("limits authority = %#v, want %#v", got, want)
 	}
 	if got, want := value.Network, (networkAuthority{
-		IPv4Pool: "10.77.0.0/24", IPv4ServerDNS: "10.77.0.1", IPv4ClientPrefix: 32,
+		IPv4Pool: "10.77.0.0/16", IPv4ServerDNS: "10.77.0.1", IPv4ClientPrefix: 32,
 		IPv6Pool: "fd4b:7572:6400::/64", IPv6ServerDNS: "fd4b:7572:6400::1", IPv6ClientPrefix: 128,
 		AddressReuse: "never-while-active", RevocationQuarantine: "maximum-profile-validity-plus-24-hours",
 		FullTunnelRoutes: []string{"0.0.0.0/0", "::/0"}, PrivateNetworkAccess: "deny-except-tun-dns",

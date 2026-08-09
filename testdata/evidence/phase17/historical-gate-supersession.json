@@ -17,6 +17,6 @@
     "release-manifest-forbids-internet-and-access-network-state",
     "current-runtime-is-loopback-only"
   ],
-  "successorPolicySha256": "c2ccab7bf5829f0e56018de3807e403996b351c365fd137a04efea7f4d0ac1b4",
+  "successorPolicySha256": "5789238a47e7e79d85c235bd2d3df536e8a04b2c65475ee6603210319e03d930",
   "successorGate": "phase17Gate"
 }
