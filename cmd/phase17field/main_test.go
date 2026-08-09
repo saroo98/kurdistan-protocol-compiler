@@ -298,6 +298,38 @@ func TestFieldRuntimeMetricsStayInsideLiveProfileWindow(t *testing.T) {
 	}
 }
 
+func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions(t *testing.T) {
+	var commands []string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		commands = append(commands, name+" "+strings.Join(arguments, " "))
+		if len(arguments) >= 7 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
+			return []byte("Success\n"), nil
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	if err := prepareAndroidPackages(context.Background(), runner, value, ".", "emulator-5554"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"adb -s emulator-5554 install -r -t app.apk",
+		"adb -s emulator-5554 install -r -t test.apk",
+		"adb -s emulator-5554 shell cmd package compile -m speed -f org.kurdistanvpn.app.internal",
+		"adb -s emulator-5554 shell cmd package compile -m speed -f org.kurdistanvpn.app.internal.test",
+		"adb -s emulator-5554 shell appops set org.kurdistanvpn.app.internal ACTIVATE_VPN allow",
+	}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("commands=%q, want %q", commands, want)
+	}
+}
+
+func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) {
+	got := instrumentationFailureCategory([]byte("INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0\n"))
+	if got != "INSTRUMENTATION_PROCESS_CRASH" {
+		t.Fatalf("category=%q, want INSTRUMENTATION_PROCESS_CRASH", got)
+	}
+}
+
 type countingConnectionGate struct{ calls int }
 
 func (gate *countingConnectionGate) wait(context.Context) error {
