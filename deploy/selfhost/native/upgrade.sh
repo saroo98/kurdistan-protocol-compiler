@@ -68,6 +68,8 @@ state_file=$data_dir/state.kurd-state
 backup_dir=/var/backups/kurd-node
 passphrase_file=${KURD_BACKUP_PASSPHRASE_FILE:-}
 backup_file=
+backup_created=false
+backup_reused=false
 was_service_active=false
 was_socket_enabled=false
 v2_mutated=false
@@ -81,10 +83,20 @@ if [ -f "$state_file" ]; then
   passphrase_mode=$(stat -c %a "$passphrase_file")
   [ "$passphrase_mode" = "600" ] || [ "$passphrase_mode" = "400" ] || fail BACKUP_PASSPHRASE_PERMISSIONS
   install -d -o kurd-node -g kurd-node -m 0700 "$backup_dir"
-  backup_file=$backup_dir/pre-upgrade-$candidate_version.kurd-backup
-  [ ! -e "$backup_file" ] || fail BACKUP_EXISTS
+  state_digest=$(sha256sum "$state_file" | cut -d' ' -f1)
+  case "$state_digest" in
+    ''|*[!0-9a-f]*) fail STATE_DIGEST_INVALID ;;
+  esac
+  [ "${#state_digest}" -eq 64 ] || fail STATE_DIGEST_INVALID
+  backup_file=$backup_dir/pre-upgrade-$candidate_version-$state_digest.kurd-backup
   runuser -u kurd-node -- /usr/local/bin/kurdctl node drain --data-dir "$data_dir" >/dev/null || fail DRAIN_FAILED
-  runuser -u kurd-node -- /usr/local/bin/kurdctl backup create --data-dir "$data_dir" --recipient-registry-dir "$recipient_registry" --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_FAILED
+  if [ -e "$backup_file" ]; then
+    [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || fail BACKUP_INVALID
+    backup_reused=true
+  else
+    runuser -u kurd-node -- /usr/local/bin/kurdctl backup create --data-dir "$data_dir" --recipient-registry-dir "$recipient_registry" --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_FAILED
+    backup_created=true
+  fi
   runuser -u kurd-node -- /usr/local/bin/kurdctl backup verify --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_VERIFY_FAILED
 fi
 
@@ -136,5 +148,5 @@ if [ "$was_service_active" = true ]; then
 fi
 
 trap - EXIT HUP INT TERM
-printf '{"schema":"kurd-node-upgrade-apply-v2","previousVersion":"%s","currentVersion":"%s","applied":true,"stateVersion":2,"backupCreated":%s}\n' \
-  "$current_version" "$candidate_version" "$( [ -n "$backup_file" ] && printf true || printf false )"
+printf '{"schema":"kurd-node-upgrade-apply-v2","previousVersion":"%s","currentVersion":"%s","applied":true,"stateVersion":2,"backupCreated":%s,"backupReused":%s}\n' \
+  "$current_version" "$candidate_version" "$backup_created" "$backup_reused"

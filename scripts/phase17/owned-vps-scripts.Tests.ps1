@@ -110,7 +110,10 @@ try {
 $upgrade = Get-Content -Raw (Join-Path $root 'deploy/selfhost/native/upgrade.sh')
 foreach ($marker in @(
     'recipient_registry=$data_dir/recipient-registry',
-    '--recipient-registry-dir "$recipient_registry"'
+    '--recipient-registry-dir "$recipient_registry"',
+    'state_digest=$(sha256sum "$state_file" | cut -d'' '' -f1)',
+    'backup_file=$backup_dir/pre-upgrade-$candidate_version-$state_digest.kurd-backup',
+    'backup_reused=true'
 )) {
     if (-not $upgrade.Contains($marker)) {
         throw "native upgrade does not preserve the owner recipient registry: $marker"

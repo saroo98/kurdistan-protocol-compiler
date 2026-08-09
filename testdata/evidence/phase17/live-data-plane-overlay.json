@@ -675,7 +675,7 @@
     {
       "path": "deploy/selfhost/native/upgrade.sh",
       "pre_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91",
-      "post_sha256": "63f04d66d4c7fa4075c71cb16253b8d9e2dcd1286c086d5b5fcb84fec961d70f"
+      "post_sha256": "bcc839c81b05960f16b7cbfec8be284c6caefce23d3327b42a44e04ecb72e88e"
     },
     {
       "path": "docs/self-hosting/BACKUP-RESTORE.md",
@@ -1395,7 +1395,7 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "feb3deb4c77eb78b3b2a8cf3ca76e96d54c458b82eab88f686295e9b2c4710b5"
+      "post_sha256": "b0b48069c14f95c7bd58a0892a7da3d0df372ec8c2b22667251d8377cde381aa"
     },
     {
       "path": "scripts/phase17/sanitize-field-evidence.ps1",
