@@ -78,7 +78,7 @@ func TestRetryRemoteHealthFailsClosedAfterBoundedAttempts(t *testing.T) {
 
 func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testing.T) {
 	step := 0
-	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+	runner := commandRunner{runFunc: func(_ context.Context, stdin []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		if name != "ssh" || len(arguments) == 0 {
 			return nil, errors.New("unexpected command")
 		}
@@ -91,8 +91,11 @@ func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testin
 			}
 			return []byte("SERVICE_HEALTH_PASS\n"), nil
 		case 2:
-			if !strings.Contains(command, "IPV6_AUTHORIZED") {
-				return nil, errors.New("IPv6 authorization was not second")
+			if command != "sudo -n sh -s" {
+				return nil, errors.New("IPv6 authorization must use a bounded stdin script")
+			}
+			if !strings.Contains(string(stdin), "IPV6_AUTHORIZED") || strings.Contains(command, "IPV6_AUTHORIZED") {
+				return nil, errors.New("IPv6 authorization script was not isolated from argv")
 			}
 			return []byte("IPV6_AUTHORIZED\n"), nil
 		default:

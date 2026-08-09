@@ -618,7 +618,7 @@ func dnsProbeFamilies(ipv6Authorized bool) []string {
 }
 
 func authorizeIPv6Capability(ctx context.Context, runner commandRunner, value config, root string) (bool, error) {
-	raw, err := ssh(ctx, runner, value, root, 45*time.Second, "sudo -n sh -c "+shellQuote(remoteIPv6CapabilityScript(value.ipv6ProbeAddress)))
+	raw, err := sshScript(ctx, runner, value, root, 45*time.Second, remoteIPv6CapabilityScript(value.ipv6ProbeAddress))
 	if err != nil {
 		return false, errors.New("IPv6 capability preflight failed")
 	}
@@ -1388,6 +1388,11 @@ func remoteService(ctx context.Context, runner commandRunner, value config, root
 func ssh(ctx context.Context, runner commandRunner, value config, root string, timeout time.Duration, command string) ([]byte, error) {
 	return runBytes(ctx, runner, nil, root, timeout, value.sshPath,
 		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=20", "--", value.sshAlias, command)
+}
+
+func sshScript(ctx context.Context, runner commandRunner, value config, root string, timeout time.Duration, script string) ([]byte, error) {
+	return runBytes(ctx, runner, []byte(script), root, timeout, value.sshPath,
+		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=20", "--", value.sshAlias, "sudo -n sh -s")
 }
 
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
