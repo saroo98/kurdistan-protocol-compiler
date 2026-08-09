@@ -330,6 +330,26 @@ func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) 
 	}
 }
 
+func TestFieldActionsUseDedicatedNonComposeInstrumentationEntryPoint(t *testing.T) {
+	want := "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
+	if fieldTest != want {
+		t.Fatalf("fieldTest=%q, want %q", fieldTest, want)
+	}
+	source, err := os.ReadFile(filepath.Join("..", "..", "android", "app", "src", "androidTest", "kotlin", "org", "kurdistanvpn", "app", "Phase17FieldActionDeviceTest.kt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, prohibited := range [][]byte{
+		[]byte("createAndroidComposeRule"),
+		[]byte("ActivityScenario"),
+		[]byte("MainActivity"),
+	} {
+		if bytes.Contains(source, prohibited) {
+			t.Fatalf("field action entry point contains UI lifecycle dependency %q", prohibited)
+		}
+	}
+}
+
 type countingConnectionGate struct{ calls int }
 
 func (gate *countingConnectionGate) wait(context.Context) error {
