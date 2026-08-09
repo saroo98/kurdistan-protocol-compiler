@@ -607,7 +607,14 @@ func prepareIPv6Capability(ctx context.Context, runner commandRunner, value conf
 	if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
 		return false, err
 	}
-	return authorizeIPv6Capability(ctx, runner, value, root)
+	authorized, err := authorizeIPv6Capability(ctx, runner, value, root)
+	if err != nil || !authorized {
+		return authorized, err
+	}
+	if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func dnsProbeFamilies(ipv6Authorized bool) []string {

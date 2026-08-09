@@ -98,6 +98,11 @@ func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testin
 				return nil, errors.New("IPv6 authorization script was not isolated from argv")
 			}
 			return []byte("IPV6_AUTHORIZED\n"), nil
+		case 3:
+			if !strings.Contains(command, "systemctl start kurd-node.service") {
+				return nil, errors.New("runtime health was not restored after authority reload")
+			}
+			return []byte("SERVICE_HEALTH_PASS\n"), nil
 		default:
 			return nil, errors.New("unexpected extra command")
 		}
@@ -107,7 +112,7 @@ func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !authorized || step != 2 {
+	if !authorized || step != 3 {
 		t.Fatalf("authorized=%v steps=%d", authorized, step)
 	}
 }
