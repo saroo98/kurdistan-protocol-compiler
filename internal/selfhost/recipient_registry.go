@@ -221,17 +221,27 @@ func loadOrInitializeOwnerRecipientRegistry(directory, expectedRegistryID string
 		zero(key)
 		return ownerRecipientRegistryV1{}, nil, ErrRecipientRegistry
 	}
-	var envelope ownerRecipientRegistryEnvelopeV1
-	if decodeCanonical(stateRaw, &envelope, maxStateBytes) != nil || envelope.Version != 1 || !hmac.Equal(envelope.MAC, ownerRecipientRegistryMAC(key, envelope.Payload)) {
-		zero(key)
-		return ownerRecipientRegistryV1{}, nil, ErrRecipientRegistry
-	}
-	var registry ownerRecipientRegistryV1
-	if decodeCanonical(envelope.Payload, &registry, maxStateBytes) != nil || validateOwnerRecipientRegistry(registry) != nil || registry.RegistryID != ownerRecipientRegistryID(key) {
+	registry, err := decodeOwnerRecipientRegistry(key, stateRaw)
+	if err != nil {
 		zero(key)
 		return ownerRecipientRegistryV1{}, nil, ErrRecipientRegistry
 	}
 	return registry, key, nil
+}
+
+func decodeOwnerRecipientRegistry(key, stateRaw []byte) (ownerRecipientRegistryV1, error) {
+	if len(key) != 32 || len(stateRaw) == 0 || len(stateRaw) > maxStateBytes {
+		return ownerRecipientRegistryV1{}, ErrRecipientRegistry
+	}
+	var envelope ownerRecipientRegistryEnvelopeV1
+	if decodeCanonical(stateRaw, &envelope, maxStateBytes) != nil || envelope.Version != 1 || !hmac.Equal(envelope.MAC, ownerRecipientRegistryMAC(key, envelope.Payload)) {
+		return ownerRecipientRegistryV1{}, ErrRecipientRegistry
+	}
+	var registry ownerRecipientRegistryV1
+	if decodeCanonical(envelope.Payload, &registry, maxStateBytes) != nil || validateOwnerRecipientRegistry(registry) != nil || registry.RegistryID != ownerRecipientRegistryID(key) {
+		return ownerRecipientRegistryV1{}, ErrRecipientRegistry
+	}
+	return registry, nil
 }
 
 func saveOwnerRecipientRegistry(directory string, key []byte, registry ownerRecipientRegistryV1) error {

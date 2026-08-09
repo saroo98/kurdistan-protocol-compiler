@@ -108,12 +108,17 @@ esac
 ipv4_interfaces=$(ip -o -4 route show default | awk '{ for (i=1; i<NF; i++) if ($i == "dev") print $(i+1) }' | sort -u)
 [ -n "$ipv4_interfaces" ] || fail NO_IPV4_ROUTE
 ipv6_interfaces=$(ip -o -6 route show default | awk '{ for (i=1; i<NF; i++) if ($i == "dev") print $(i+1) }' | sort -u)
-[ -n "$ipv6_interfaces" ] || fail NO_IPV6_ROUTE
 [ "$(printf '%s\n' "$ipv4_interfaces" | wc -l | tr -d ' ')" -eq 1 ] || fail MULTIPLE_EGRESS
-[ "$(printf '%s\n' "$ipv6_interfaces" | wc -l | tr -d ' ')" -eq 1 ] || fail MULTIPLE_EGRESS
 egress_interface_v4=$ipv4_interfaces
-egress_interface_v6=$ipv6_interfaces
-if [ -n "$requested_egress" ] && { [ "$requested_egress" != "$egress_interface_v4" ] || [ "$requested_egress" != "$egress_interface_v6" ]; }; then
+ipv6DefaultRoute=false
+if [ -n "$ipv6_interfaces" ]; then
+  [ "$(printf '%s\n' "$ipv6_interfaces" | wc -l | tr -d ' ')" -eq 1 ] || fail MULTIPLE_EGRESS
+  egress_interface_v6=$ipv6_interfaces
+  ipv6DefaultRoute=true
+else
+  egress_interface_v6=$egress_interface_v4
+fi
+if [ -n "$requested_egress" ] && { [ "$requested_egress" != "$egress_interface_v4" ] || { [ "$ipv6DefaultRoute" = true ] && [ "$requested_egress" != "$egress_interface_v6" ]; }; }; then
   fail EGRESS_MISMATCH
 fi
 if [ -n "$requested_egress_v4" ] && [ "$requested_egress_v4" != "$egress_interface_v4" ]; then
@@ -121,6 +126,25 @@ if [ -n "$requested_egress_v4" ] && [ "$requested_egress_v4" != "$egress_interfa
 fi
 if [ -n "$requested_egress_v6" ] && [ "$requested_egress_v6" != "$egress_interface_v6" ]; then
   fail EGRESS_MISMATCH
+fi
+
+ipv6Global=false
+if [ "$ipv6DefaultRoute" = true ] && ip -o -6 addr show dev "$egress_interface_v6" scope global | grep -qv ' tentative'; then
+  ipv6Global=true
+fi
+ipv6Forwarding=false
+if [ "$(sysctl -n net.ipv6.conf.all.forwarding 2>/dev/null || true)" = 1 ]; then
+  ipv6Forwarding=true
+fi
+ipv6NftPolicy=false
+if nft_rules=$(nft list table inet kurd_node 2>/dev/null); then
+  if printf '%s' "$nft_rules" | grep -F 'ip6 saddr fd4b:7572:6400::/64' >/dev/null && printf '%s' "$nft_rules" | grep -F 'masquerade' >/dev/null; then
+    ipv6NftPolicy=true
+  fi
+fi
+ipv6=false
+if [ "$ipv6Global:$ipv6DefaultRoute:$ipv6Forwarding:$ipv6NftPolicy" = true:true:true:true ]; then
+  ipv6=true
 fi
 
 if ss -H -ltn "sport = :$port" | grep -q .; then
@@ -137,4 +161,5 @@ if [ "$mode" = "--runtime" ]; then
   esac
 fi
 
-printf '{"schema":"kurd-node-preflight-v2","status":"PASS","code":"OK","mode":"%s","egressInterfaceV4":"%s","egressInterfaceV6":"%s","ipv4":true,"ipv6":true}\n' "${mode#--}" "$egress_interface_v4" "$egress_interface_v6"
+printf '{"schema":"kurd-node-preflight-v2","status":"PASS","code":"OK","mode":"%s","egressInterfaceV4":"%s","egressInterfaceV6":"%s","ipv4":true,"ipv6":%s,"ipv6Global":%s,"ipv6DefaultRoute":%s,"ipv6Forwarding":%s,"ipv6NftPolicy":%s}\n' \
+  "${mode#--}" "$egress_interface_v4" "$egress_interface_v6" "$ipv6" "$ipv6Global" "$ipv6DefaultRoute" "$ipv6Forwarding" "$ipv6NftPolicy"

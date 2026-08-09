@@ -8,6 +8,22 @@ fail() {
 
 mode=${1:---install}
 [ "$mode" = "--install" ] || [ "$mode" = "--upgrade" ] || fail INVALID_ARGUMENTS
+shift || true
+listen_port=443
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --port)
+      [ "$#" -ge 2 ] || fail INVALID_ARGUMENTS
+      listen_port=$2
+      shift 2
+      ;;
+    *) fail INVALID_ARGUMENTS ;;
+  esac
+done
+case "$listen_port" in
+  ''|*[!0-9]*) fail INVALID_ARGUMENTS ;;
+esac
+[ "$listen_port" -ge 1 ] && [ "$listen_port" -le 65535 ] || fail INVALID_ARGUMENTS
 [ "$(id -u)" -eq 0 ] || fail ROOT_REQUIRED
 [ "$(uname -s)" = "Linux" ] || fail OS_UNSUPPORTED
 case "$(uname -m)" in
@@ -42,7 +58,7 @@ grep -Eq '"signed"[[:space:]]*:[[:space:]]*false' manifest.json || fail SIGNATUR
 sha256sum -c SHA256SUMS >/dev/null || fail CHECKSUM_MISMATCH
 
 unset KURD_PREFLIGHT_TEST_ROOT KURD_PREFLIGHT_ALLOW_TEST_ROOT
-preflight_output=$(./preflight.sh --install --port 443) || fail PREFLIGHT_FAILED
+preflight_output=$(./preflight.sh --install --port "$listen_port") || fail PREFLIGHT_FAILED
 egress_interface_v4=$(printf '%s\n' "$preflight_output" | sed -n 's/.*"egressInterfaceV4":"\([A-Za-z0-9_.:-]*\)".*/\1/p')
 egress_interface_v6=$(printf '%s\n' "$preflight_output" | sed -n 's/.*"egressInterfaceV6":"\([A-Za-z0-9_.:-]*\)".*/\1/p')
 [ -n "$egress_interface_v4" ] && [ -n "$egress_interface_v6" ] || fail PREFLIGHT_FAILED
@@ -67,7 +83,8 @@ done
 [ -n "$systemd_unit_source" ] || fail SYSTEMD_CONFIG_INVALID
 cp -Rp "$systemd_unit_source" "$systemd_root/usr/lib/systemd/system"
 for unit in kurd-node-network.service kurd-node.socket kurd-node.service; do
-  install -o root -g root -m 0644 "systemd/$unit" "$systemd_root/etc/systemd/system/$unit"
+  sed "s/KURD_LISTEN_PORT/$listen_port/g" "systemd/$unit" >"$temporary/$unit"
+  install -o root -g root -m 0644 "$temporary/$unit" "$systemd_root/etc/systemd/system/$unit"
 done
 
 stage_systemd_executable() {
@@ -87,6 +104,7 @@ stage_systemd_executable /usr/lib/systemd/systemd-networkd /usr/lib/systemd/syst
 systemd-analyze --root="$systemd_root" verify kurd-node-network.service kurd-node.socket kurd-node.service >/dev/null || fail SYSTEMD_CONFIG_INVALID
 unbound-checkconf unbound/kurd-node-unbound.conf >/dev/null || fail UNBOUND_CONFIG_INVALID
 nft -c -f "$temporary/kurd-node.nft" >/dev/null || fail NFT_CONFIG_INVALID
+./firewall-compat.sh --check "$listen_port" "$egress_interface_v4" "$egress_interface_v6" >/dev/null || fail FIREWALL_COMPAT_INVALID
 
 assert_owned_target() {
   target=$1
@@ -132,7 +150,7 @@ if [ -x /usr/local/bin/kurd-node ] || [ -x /usr/local/bin/kurdctl ]; then
   [ ! -f /etc/sysctl.d/90-kurd-node.conf ] || cp -p /etc/sysctl.d/90-kurd-node.conf "$previous_new/sysctl/90-kurd-node.conf"
   [ ! -f /etc/nftables.d/kurd-node.nft ] || cp -p /etc/nftables.d/kurd-node.nft "$previous_new/nftables/kurd-node.nft"
   [ ! -f /etc/unbound/unbound.conf.d/kurd-node.conf ] || cp -p /etc/unbound/unbound.conf.d/kurd-node.conf "$previous_new/unbound/kurd-node.conf"
-  for helper in preflight rollback uninstall upgrade; do
+  for helper in firewall-compat preflight rollback uninstall upgrade; do
     [ ! -f "/usr/local/lib/kurd-node/$helper.sh" ] || cp -p "/usr/local/lib/kurd-node/$helper.sh" "$previous_new/lib/$helper.sh"
   done
   if [ -d /usr/local/share/doc/kurd-node ]; then
@@ -151,7 +169,7 @@ done
 install_atomic bin/kurd-node /usr/local/bin/kurd-node 0755 root root
 install_atomic bin/kurdctl /usr/local/bin/kurdctl 0755 root root
 for unit in kurd-node.service kurd-node.socket kurd-node-network.service; do
-  install_atomic "systemd/$unit" "/etc/systemd/system/$unit" 0644 root root
+  install_atomic "$temporary/$unit" "/etc/systemd/system/$unit" 0644 root root
 done
 install_atomic systemd/kurd-node.sysusers.conf /etc/sysusers.d/kurd-node.conf 0644 root root
 install_atomic systemd/kurd-node.tmpfiles.conf /etc/tmpfiles.d/kurd-node.conf 0644 root root
@@ -163,7 +181,7 @@ install_atomic networkd/80-kurd0.network /etc/systemd/network/80-kurd0.network 0
 install_atomic sysctl/90-kurd-node.conf /etc/sysctl.d/90-kurd-node.conf 0644 root root
 install_atomic "$temporary/kurd-node.nft" /etc/nftables.d/kurd-node.nft 0600 root root
 install_atomic unbound/kurd-node-unbound.conf /etc/unbound/unbound.conf.d/kurd-node.conf 0644 root root
-for helper in preflight rollback uninstall upgrade; do
+for helper in firewall-compat preflight rollback uninstall upgrade; do
   install_atomic "$helper.sh" "/usr/local/lib/kurd-node/$helper.sh" 0755 root root
 done
 for document in docs/* manifest.json THIRD_PARTY_MODULES.json SHA256SUMS; do
@@ -178,6 +196,7 @@ sysctl --system >/dev/null
 unbound-checkconf /etc/unbound/unbound.conf.d/kurd-node.conf >/dev/null
 nft -c -f /etc/nftables.d/kurd-node.nft >/dev/null
 rebind_owned_dns || fail DNS_REBIND_FAILED
+/usr/local/lib/kurd-node/firewall-compat.sh --apply "$listen_port" "$egress_interface_v4" "$egress_interface_v6" >/dev/null || fail FIREWALL_COMPAT_FAILED
 
 trap - EXIT HUP INT TERM
 rm -rf "$temporary"

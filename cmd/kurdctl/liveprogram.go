@@ -9,7 +9,9 @@ import (
 	"encoding/binary"
 	"io"
 	"strconv"
+	"time"
 
+	"kurdistan/internal/crypto/auth"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/protocol/liveprogram"
@@ -21,7 +23,12 @@ var liveProgramCapabilitiesV1 = []string{
 	"carrier_backpressure", "generated_backend", "transcript_binding", "replay_window", "nonce_schedule",
 }
 
-const maxLiveProgramCompileAttemptsV1 = 8
+const (
+	maxLiveProgramCompileAttemptsV1     = 8
+	liveProgramSessionLifetimeV1        = 24 * time.Hour
+	liveProgramMaxSessionMessagesV1     = 1 << 24
+	liveProgramMaxKeyLifetimeMessagesV1 = 1 << 16
+)
 
 type liveProgramCandidateCompilerV1 func(seed int64) (encoded []byte, forbiddenCollision bool, err error)
 
@@ -62,7 +69,15 @@ func compileLiveProgramWithV1(random io.Reader, compile liveProgramCandidateComp
 
 func compileLiveProgramCandidateV1(seed int64) ([]byte, bool, error) {
 	model, err := compiler.Generate(seed)
-	if err != nil || compiler.ValidateDeterministic(model) != nil || ir.Validate(model) != nil {
+	if err != nil || compiler.ValidateDeterministic(model) != nil {
+		return nil, false, errCLIInvalidInput
+	}
+	model.Limits.MaxSessionMillis = int(liveProgramSessionLifetimeV1 / time.Millisecond)
+	model.Security.MaxSessionMessages = liveProgramMaxSessionMessagesV1
+	model.Security.MaxKeyLifetimeMessages = liveProgramMaxKeyLifetimeMessagesV1
+	model.GenerationHash = ""
+	model.GenerationHash, err = ir.CanonicalHash(model)
+	if err != nil || ir.Validate(model) != nil {
 		return nil, false, errCLIInvalidInput
 	}
 	canonicalHash, err := ir.CanonicalHash(model)
@@ -83,6 +98,9 @@ func compileLiveProgramCandidateV1(seed int64) ([]byte, bool, error) {
 	decoded, err := liveprogram.DecodeV1(encoded)
 	if err != nil || liveprogram.ValidateV1(decoded) != nil {
 		return nil, false, errCLIInvalidInput
+	}
+	if _, err := auth.NewProjectedProcessHandshakeConfigV1("client.phase17-validation", "relay.phase17-validation", decoded, "tls13-tcp"); err != nil {
+		return nil, true, nil
 	}
 	reencoded, err := liveprogram.EncodeV1(decoded)
 	if err != nil || !bytes.Equal(encoded, reencoded) {

@@ -25,7 +25,8 @@ const (
 	recoverySchema                    = "kurd-selfhost-recovery-v1"
 	backupSchemaV1                    = "kurd-selfhost-backup-v1"
 	backupSchemaV2                    = "kurd-selfhost-backup-v2"
-	backupSchema                      = backupSchemaV2
+	backupSchemaV3                    = "kurd-selfhost-backup-v3"
+	backupSchema                      = backupSchemaV3
 	bundleVersion              uint64 = 1
 	liveBundleVersion          uint64 = 2
 	stateVersionV1             uint64 = 1
@@ -145,9 +146,9 @@ type ProfileSummary struct {
 }
 
 type BackupOptions struct {
-	DataDir, Destination string
-	Passphrase           []byte
-	Now                  time.Time
+	DataDir, Destination, RegistryDir string
+	Passphrase                        []byte
+	Now                               time.Time
 }
 
 type BackupSummary struct {
@@ -158,9 +159,9 @@ type BackupSummary struct {
 }
 
 type RestoreOptions struct {
-	BackupPath, DataDir, ExpectedDigest string
-	Passphrase                          []byte
-	Now                                 time.Time
+	BackupPath, DataDir, RegistryDir, ExpectedDigest string
+	Passphrase                                       []byte
+	Now                                              time.Time
 }
 
 type PublicationSummary struct {
@@ -392,6 +393,15 @@ type backupPayloadV1 struct {
 	MasterKey, StateFile            []byte
 }
 
+type backupPayloadV2 struct {
+	_                               struct{} `cbor:",toarray"`
+	Schema, DeploymentID, AuditHead string
+	Revision, Generation            uint64
+	CreatedAt                       int64
+	StateVersion, MigrationEpoch    uint64
+	MasterKey, StateFile            []byte
+}
+
 type backupPayload struct {
 	_                               struct{} `cbor:",toarray"`
 	Schema, DeploymentID, AuditHead string
@@ -399,6 +409,8 @@ type backupPayload struct {
 	CreatedAt                       int64
 	StateVersion, MigrationEpoch    uint64
 	MasterKey, StateFile            []byte
+	RecipientRegistryKey            []byte
+	RecipientRegistryState          []byte
 }
 
 type backupEnvelope struct {

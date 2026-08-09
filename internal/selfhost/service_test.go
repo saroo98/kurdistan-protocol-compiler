@@ -119,6 +119,46 @@ func TestInitializeRequiresVerifiedRecoveryBeforeIssuance(t *testing.T) {
 	}
 }
 
+func TestIPv6CapabilityIsDisabledByDefaultAndRequiresRecoveryAuthorization(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "offline", "recovery")
+	passphrase := []byte("correct horse battery staple")
+	now := time.Unix(1_800_300_000, 0).UTC()
+	if _, err := Initialize(InitOptions{
+		DataDir: dataDir, DeploymentName: "owner-node", Endpoint: "203.0.113.7:443",
+		RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(master)
+	if state.IPv6Pool.Enabled {
+		t.Fatal("IPv6 pool was enabled without verified host capability")
+	}
+	if err := SetIPv6Enabled(dataDir, true, RecoveryActionOptions{
+		RecoveryPath: recovery, RecoveryPassphrase: []byte("wrong passphrase value"), Now: now.Add(time.Minute),
+	}); !errors.Is(err, ErrRecoveryRejected) {
+		t.Fatalf("unauthorized IPv6 enable error=%v", err)
+	}
+	if err := SetIPv6Enabled(dataDir, true, RecoveryActionOptions{
+		RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now.Add(2 * time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	state, master, err = loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	if !state.IPv6Pool.Enabled {
+		t.Fatal("recovery-authorized IPv6 capability was not persisted")
+	}
+}
+
 func TestRecoveryRejectsWrongPassphraseAndTampering(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "node")

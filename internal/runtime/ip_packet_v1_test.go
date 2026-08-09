@@ -68,9 +68,29 @@ func TestValidateClientOutboundIPPacketV1AllowsOnlyExactTunnelGateway(t *testing
 	if _, err := validateClientOutboundIPPacketV1(dns, assigned, [16]byte{}); err != nil {
 		t.Fatalf("exact tunnel gateway rejected: %v", err)
 	}
+	wrongSource := testIPv4PacketV1([4]byte{10, 89, 0, 3}, [4]byte{10, 89, 0, 1}, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(wrongSource, assigned, [16]byte{}); !errors.Is(err, ErrPacketSource) {
+		t.Fatalf("wrong source=%v", err)
+	}
 	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{1})
 	if _, err := validateClientOutboundIPPacketV1(otherPrivate, assigned, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
 		t.Fatalf("other private destination=%v", err)
+	}
+}
+
+func TestValidateRelayOutboundIPPacketV1AllowsOnlyExactTunnelGatewayFromAssignedSource(t *testing.T) {
+	assigned := [4]byte{10, 89, 0, 2}
+	dns := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 1}, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(dns, assigned, [16]byte{}); err != nil {
+		t.Fatalf("exact tunnel gateway rejected: %v", err)
+	}
+	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(otherPrivate, assigned, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
+		t.Fatalf("other private destination=%v", err)
+	}
+	wrongSource := testIPv4PacketV1([4]byte{10, 89, 0, 3}, [4]byte{10, 89, 0, 1}, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(wrongSource, assigned, [16]byte{}); !errors.Is(err, ErrPacketSource) {
+		t.Fatalf("wrong source=%v", err)
 	}
 }
 

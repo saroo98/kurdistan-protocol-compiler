@@ -48,6 +48,23 @@ data class VpnRuntimeSnapshot(
     val profileFingerprint: String? = null,
     val strategyFingerprint: String? = null,
     val relayFingerprint: String? = null,
+    val diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
+)
+
+data class VpnRuntimeDiagnostics(
+    val tunPacketsRead: Long = 0,
+    val outboundPacketsAccepted: Long = 0,
+    val carrierRecordsWritten: Long = 0,
+    val carrierRecordsRead: Long = 0,
+    val authenticatedOperations: Long = 0,
+    val innerPacketsAccepted: Long = 0,
+    val innerPacketsRejected: Long = 0,
+    val tunWriteAttempts: Long = 0,
+    val tunWriteFailures: Long = 0,
+    val tunWriteFailureCode: Long = 0,
+    val tunWriteErrno: Long = 0,
+    val tunPacketsWritten: Long = 0,
+    val rejectedTunPackets: Long = 0,
 )
 
 data class VpnRuntimeConfig(
@@ -139,9 +156,24 @@ object VpnRuntimeContract {
     const val EXTRA_ALLOW_LAN = "allow_lan"
     const val EXTRA_STARTED_AT = "started_at_elapsed_realtime"
     const val EXTRA_AUTHORITY_REQUEST = "authority_request"
+    const val EXTRA_RUNTIME_REQUEST = "runtime_request"
+    const val EXTRA_STATUS_QUERY = "status_query"
     const val EXTRA_PLAN_DIGEST = "plan_digest"
     const val EXTRA_PROFILE_GENERATION = "profile_generation"
     const val EXTRA_PROFILE_FINGERPRINT = "profile_fingerprint"
     const val EXTRA_STRATEGY_FINGERPRINT = "strategy_fingerprint"
     const val EXTRA_RELAY_FINGERPRINT = "relay_fingerprint"
+    const val EXTRA_DIAGNOSTIC_TUN_READ = "diagnostic_tun_read"
+    const val EXTRA_DIAGNOSTIC_OUTBOUND = "diagnostic_outbound"
+    const val EXTRA_DIAGNOSTIC_CARRIER_WRITE = "diagnostic_carrier_write"
+    const val EXTRA_DIAGNOSTIC_CARRIER_READ = "diagnostic_carrier_read"
+    const val EXTRA_DIAGNOSTIC_AUTHENTICATED = "diagnostic_authenticated"
+    const val EXTRA_DIAGNOSTIC_INNER_ACCEPTED = "diagnostic_inner_accepted"
+    const val EXTRA_DIAGNOSTIC_INNER_REJECTED = "diagnostic_inner_rejected"
+    const val EXTRA_DIAGNOSTIC_TUN_ATTEMPTS = "diagnostic_tun_attempts"
+    const val EXTRA_DIAGNOSTIC_TUN_FAILURES = "diagnostic_tun_failures"
+    const val EXTRA_DIAGNOSTIC_TUN_FAILURE_CODE = "diagnostic_tun_failure_code"
+    const val EXTRA_DIAGNOSTIC_TUN_ERRNO = "diagnostic_tun_errno"
+    const val EXTRA_DIAGNOSTIC_TUN_WRITTEN = "diagnostic_tun_written"
+    const val EXTRA_DIAGNOSTIC_REJECTED = "diagnostic_rejected"
 }

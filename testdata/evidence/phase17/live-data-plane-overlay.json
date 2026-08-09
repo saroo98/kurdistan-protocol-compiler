@@ -135,7 +135,7 @@
     {
       "path": "android/app/build.gradle.kts",
       "pre_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45",
-      "post_sha256": "70ec02d64630f81a16a2506b48e358e8670f788fa24e3dbfa382c95f36aa32e3"
+      "post_sha256": "6c4eaafb44228ccb7ae15dae019b528ebe09939c7a10760c5a59e1a12faa969c"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt",
@@ -143,14 +143,19 @@
       "post_sha256": "b11e9f4fad363f087ad85f6f59751b6bd8ec29c8098738f58079cef73452d2cc"
     },
     {
+      "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1f2dab0fd196ee803a67d7b56bcfc00b8b1aaf4942a0c55199cc7be763ff05c8"
+    },
+    {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c0589a4128caae900d7626632fb9a747d9c321ab74e979d5f67c61587a71d5cc"
+      "post_sha256": "5cf5e251115d426ef3ed7816abf37eebe0b8371305875e790174c1d40f89646b"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
       "pre_sha256": "37ad84cebaa7a7d04cf010976794f0c0a7dd972d0d527ebf5eea42e78b3a37b5",
-      "post_sha256": "3550c220a935d9eff6b64a6936e0c0837b3917fde9e3a58abae341b542dbc136"
+      "post_sha256": "92a1e595835323f91781f0cc597d527ad8c983c88f40b09a8ef064ea1b4c85ad"
     },
     {
       "path": "android/app/src/main/AndroidManifest.xml",
@@ -178,9 +183,19 @@
       "post_sha256": "e11464ef63c0dca28e6512569d177109f6ab241e29e9ec4f4a3e074cb2271b21"
     },
     {
+      "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnRuntimeController.kt",
+      "pre_sha256": "13a4d09b7c3594703d99061a983d94517fad4fb7b7067df82387098b30f53567",
+      "post_sha256": "b559198369cda5476e0638d1110c7d1b4e2b8fb620048f0fb7d7e8e2b336511f"
+    },
+    {
       "path": "android/app/src/main/res/xml/network_security_config.xml",
       "pre_evidence": "ABSENT",
       "post_sha256": "dbc726438a7e99c69fdfc39146cd51ef8300dacb236843bbce3ecd2a1712a80f"
+    },
+    {
+      "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/Phase9ExportWireTest.kt",
+      "pre_sha256": "078423dd0665df9641a16e3546b714b56e89897ae205fc3dae3e1540c7a109d2",
+      "post_sha256": "857fed9e267120f6ab0e720eba3636121b378890f5487702fbda92f52d618e4e"
     },
     {
       "path": "android/build.gradle.kts",
@@ -190,32 +205,32 @@
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0b17f1df8df96c57628ffd951757c7ab6f69b6d3df00e92ffac228a13c4b0c2a"
+      "post_sha256": "95934fd4b61030bbbfcca26830d7fd31fcb9d84cd8b43f8faf3a9cd176551d9a"
     },
     {
       "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
       "pre_sha256": "a986e48a20165360fa0b7e73aa38761cb1b27a19aad8edcd140c4fb88c37b9aa",
-      "post_sha256": "d0def50598b9f0eb77b95092353ac787daf2ee24281bd4bba9f63fc0d25baabb"
+      "post_sha256": "3c622b2cdd620542eebebe1ff8e6f3ed761cc441a285f06a229a5b947c043cf0"
     },
     {
       "path": "android/core/native-api/src/main/kotlin/org/kurdistanvpn/core/nativeapi/KurdNativeCore.kt",
       "pre_sha256": "71b7414b223e22671b1d909fc1bb7f116ed97a9e37c98aec308f6930e639c67d",
-      "post_sha256": "9b78261456420688722b83d2ba98acd7ed3b4a10ac186bcb3809801cfea11112"
+      "post_sha256": "112135911b20d6fb399428e0b6ba3230bc413961e1af904b87157fe8ee9b0d52"
     },
     {
       "path": "android/core/native-jni/src/main/cpp/kvpn_abi.h",
       "pre_sha256": "b35dfcbb9c79cacd2028952db146ee1565b87f0745011a993239955495057ca5",
-      "post_sha256": "3faf494dab2b8ab678061af9c1a8879bc345bfa17e0e4fc73312a803a4b54669"
+      "post_sha256": "a78562dd56f8851c0bd0410aea604c73511bb06e51f241824f15c3fe594a738c"
     },
     {
       "path": "android/core/native-jni/src/main/cpp/kvpn_jni.c",
       "pre_sha256": "6dc6cb5b777105946e1bec5629ce84d1531b582e5391b4540926ba8dbcafe0e9",
-      "post_sha256": "350048486ec6bc5126fe02312326b7c83228b641e864c385a97560d392276050"
+      "post_sha256": "9f39f04398cd9ccc58142724c01f45363d526699399b833c2ecbbe6ab6f9989d"
     },
     {
       "path": "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
       "pre_sha256": "e36cea22ac27c2b1a92a8e0690d68fa5846bb7f7df8b1e4af56d0d32862b5f27",
-      "post_sha256": "33be9d28feaea44b4afe94c3e0c8e3bb49a8c42dac397bcd776539622dd3d112"
+      "post_sha256": "fb2961da023f06769bed356ff341f31fd70d2447ddf16359e90e695d636a6e63"
     },
     {
       "path": "android/core/ui/src/main/res/values-ar/strings.xml",
@@ -305,27 +320,27 @@
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt",
       "pre_sha256": "9accbaa216f67cac4b61f9e2ad34fdfec508e22cec894934e7afffafab349adb",
-      "post_sha256": "f630c0885c8ebd9e3ecb8dfce5331cde13187959c3505cb5328d716c7a710466"
+      "post_sha256": "a1a76df5bd4c00facc6e047e97dd1e831904beed359deac46d7fafb299f6df09"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "43b5a4a8e6eae29ef8929336ddba4bd9290e378d28bf857e8eaf69b86de70445"
+      "post_sha256": "df98b4459665842de00cad1cd91b4cb1858f9c7c87bee3addca69c3b08927d47"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitor.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f1a934e55f2630ade333d8bb45b6304da604441a406629ff8b124c14fc7c1838"
+      "post_sha256": "b8382961f66ea4364ba107592a5a0aba96fdb4bab2bf587c48809b66bf35d2e2"
     },
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelControllerTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "ba66487f39ba8e314b0e518aeeb3c62d107c70d11a0c4fc591a07bdfb4804621"
+      "post_sha256": "c24106df958cf1f0235910884f863941805fe498c71c77e21a98b6a8076cb065"
     },
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitorTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c69563d16e5aa479f40aa1356730f38c738c6701147df40255818f702d9b5385"
+      "post_sha256": "b8736a1c9701cd6f4357b7fb2c8c90dec48aa2a9426521aba9b8bdd685a48533"
     },
     {
       "path": "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/LiveRuntimeModels.kt",
@@ -340,7 +355,7 @@
     {
       "path": "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",
       "pre_sha256": "db65c8332e8ca113186f86a95ed4c88b9f2e671ccab722f767508eb7b8d2dbc2",
-      "post_sha256": "2b5a681c7db5527bb58f03c72b820db10f30bda814a85477b50964f7e963420a"
+      "post_sha256": "24ca1fb267a9078648b9064ae6c9f1577fd88b86802fd4dc0136666c9233bb2e"
     },
     {
       "path": "android/runtime/api/src/test/kotlin/org/kurdistanvpn/runtime/api/VpnRoutingPolicyTest.kt",
@@ -390,17 +405,17 @@
     {
       "path": "cmd/kandroidbridge/environment_selfhost_test.go",
       "pre_sha256": "1938b9e1a22f646ee2a32d74f7af1ef85593b3e66328e4c6308e208a8e188125",
-      "post_sha256": "a8d846859f0f570bd54b1e898ac616086bd89d7f1bfe6720af4082d6c49ac472"
+      "post_sha256": "a38ddf7c1939a596afd76f635f42136296931d6f550555529015db06119279cf"
     },
     {
       "path": "cmd/kandroidbridge/main.go",
       "pre_sha256": "f0d5244fefbd1a9aa6794486bd480ceea9e0af069471defb914a8ae8ca2ee8ee",
-      "post_sha256": "828f9fb3741f7ad80a5a51cd0ac76eec90c038e0d20d39fcd4749779a2125841"
+      "post_sha256": "9755f0950ad34beb7ef77089911d0ddfd063870d6b5474a1c1307c1c150b1805"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "a3bec7b38153aa77fca877f859e2d9b920f0ae14571dd6815a293ecf8cf8d209"
+      "post_sha256": "56c30fb76a31b8c666ca2147b9160f1ee381dba325fbf31b5bf636ac0958a743"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_stub.go",
@@ -410,12 +425,12 @@
     {
       "path": "cmd/kandroidbridge/phase17_release_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8ac3ecb61b92b10477a66e396c556c672c8a60cc62498cdc229f3e8b14847700"
+      "post_sha256": "406b0802c6d341f6454316b1aae4429b17f2e4c516dc9af0e200b6826db0d0be"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_unix.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0478be881b81884b179a6c873871249f8e67297aa83b22369c287f8218327e02"
+      "post_sha256": "d6d94906f6b315fa353f5da409f330fb7383f3e7292f210ea789534ce483e462"
     },
     {
       "path": "cmd/kurd-node/main.go",
@@ -425,22 +440,27 @@
     {
       "path": "cmd/kurd-node/main_test.go",
       "pre_sha256": "34f6981590f375b19f435997c4609738f3866f89cabf7299496a7226b45b0b33",
-      "post_sha256": "4f6b9c7a70b5de36dc02e9478b1144c15a5295851b1d0bf6e21d5a4525a42c6a"
+      "post_sha256": "b7125889261a536de606c6db31222ee75d8f04af0f9c4a7b6e96e43a16066ef4"
     },
     {
       "path": "cmd/kurd-node/serve.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "9a003c986be82e5694ba3794d5e33da3a31330c10ead2ab8a56773877d8babec"
+      "post_sha256": "b34557dccb8f5c8a1d51affaf17f42cad89f2ccf06934d29a8f7fd46b8c8a9b9"
+    },
+    {
+      "path": "cmd/kurd-node/serve_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f9fe280ffd39a0c051ed9edfba768abd7596070ad0584cc97a34e4dfd383bd3f"
     },
     {
       "path": "cmd/kurdctl/liveprogram.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "596019e812a41d36a37a16351e6d7153bd4ff2a90493a387942f2b93627e30c2"
+      "post_sha256": "6fd5a2126f3d2fd634322aba9651286ae3e19c24e7d57b1a964447d76993d163"
     },
     {
       "path": "cmd/kurdctl/liveprogram_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "44967d3d33824e8943502b208fb9ef6363479e24069a3257211e73bcf20ee332"
+      "post_sha256": "60c1362b3bb11bf2334331b5558525904553c17a36593ab47ed02e432d72909d"
     },
     {
       "path": "cmd/kurdctl/localpath.go",
@@ -475,27 +495,27 @@
     {
       "path": "cmd/kurdctl/main.go",
       "pre_sha256": "b7f7581ff05765511e76a9a6e8ebe30ee8e22b4bdbd1eb0c1a64ba09ea687540",
-      "post_sha256": "69fe5f6d086ce90c547831ec2ae8d04ef09fdf86a48d8698a6aa9b6da55a0c2d"
+      "post_sha256": "a4945ed63fbfc225fa8a3535b830d5f31b92d1a285fe1e79f270655ca0632caf"
     },
     {
       "path": "cmd/kurdctl/main_test.go",
       "pre_sha256": "956ebf319f5124eb0e415b063ae732441b6ffbf475f3464faf78b059725798db",
-      "post_sha256": "16de6c25316a8c27e29ac0faf6c0b139627df3e19d753a8db3ce5c9106adb208"
+      "post_sha256": "fc036f60a00868133409e5ffdb538ecabe6721ad2040777419d7e616b1136b65"
     },
     {
       "path": "cmd/kurdpackage/main.go",
       "pre_sha256": "716df0a669591a1bd609f5f7f63cdf682869bdd721660d6c496bde116f0f39e1",
-      "post_sha256": "8ded41290b340dfffdb96dd97691fbe2fa7a259ed8d259e5a50fb036e0da1768"
+      "post_sha256": "58b1fa12d18273ac730e8c8fb83a9a8e9ed477b1ad5c6a722efaea9816a1e663"
     },
     {
       "path": "cmd/kurdpackage/main_test.go",
       "pre_sha256": "a8bb87f03fc506667606b39a2fc4139858cf9aeb7c8400e00ad58884a707bfdd",
-      "post_sha256": "95bf396dd2e377aa0b86ee0e2af7c5fb15577d1fd3559768c023faf29cc3d320"
+      "post_sha256": "7ded2e1038ba31b5b5a19d5f289647fc40f0615def9d381d23c4a52619867bfe"
     },
     {
       "path": "cmd/kurdpackage/testdata/preflight-failures.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "153f6b76d62b1742fb520b5543fbca603c73ae47a9ea1ac921218ee237a13d19"
+      "post_sha256": "a4110493e3be5a69f68d041e85f92c44a7d89a115b34961007f3647aa06902fc"
     },
     {
       "path": "cmd/phase16verify/main.go",
@@ -505,7 +525,7 @@
     {
       "path": "cmd/phase17devicegate/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "81d1e8e477c198af4181a2ccc49b195c63b8082061ecb38976c3374f14bf4e9f"
+      "post_sha256": "e4fb7a7e1401006a408092ef00a149e853b4dc80fd87f7fbb24aa514322c9fbc"
     },
     {
       "path": "cmd/phase17devicegate/main_test.go",
@@ -515,12 +535,22 @@
     {
       "path": "cmd/phase17evidence/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3cbea743fd2cb30b9942c4efc528af8e5009783dfeae2d19434236a335030bf7"
+      "post_sha256": "828334af0fe668064a52e85cdfa4ef2292304be5bfb4ca70e74c4289a436071f"
     },
     {
       "path": "cmd/phase17evidence/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "95e8c2b7e9b9ea2eb11ed04360122abdb79ef0c405085ae0c352eccc3954f99f"
+      "post_sha256": "ecb9fac1401889eb94cda2917d927e9793e741b0a6d3967444ab1f98243dfef1"
+    },
+    {
+      "path": "cmd/phase17field/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "623d54fe50b230abe85356abc432b8b086b29526645b3e0b3334f8ae83e24090"
+    },
+    {
+      "path": "cmd/phase17field/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "142a0c43320f43f2e45b633bd5de264c9b2d7f7b7ccbf54e2609486d9ec17771"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -535,7 +565,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8fc7ba3e397b724f19c2253793c1dd382ed768154d1c8973953b756e763a10c6"
+      "post_sha256": "925ca6ad172a8d923871a4bd9d1774df80d230696249f406e0eacb8fa11efec3"
     },
     {
       "path": "cmd/phase17verify/inventory_test.go",
@@ -550,7 +580,7 @@
     {
       "path": "cmd/phase17verify/main_test.go",
       "pre_sha256": "92eee6cd7d76309b8ee315e48f5d51af1fd726000e6b1ece5cfcec8d2f5dbb77",
-      "post_sha256": "125af1bfdd9dc7601126524f7a93d7c4df49b7dbed4bdccf06f960b4093667f4"
+      "post_sha256": "10d92381a21a977709fc1cf2f799d713711722bf71d900d71fe8b7cd94861f91"
     },
     {
       "path": "cmd/phase9verify/main.go",
@@ -575,7 +605,7 @@
     {
       "path": "deploy/selfhost/native/80-kurd0.netdev",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f39a08d1db62a4e3605f891a0fad0b49b4b087cd0325f18408bad6dba217da25"
+      "post_sha256": "fe033f1a2855d0d1d781f02f9b5176d1d0730f8ed4067d832bf7f597569e97ba"
     },
     {
       "path": "deploy/selfhost/native/80-kurd0.network",
@@ -588,14 +618,19 @@
       "post_sha256": "98eb4e22cda268ac81f02b2d3905c10e11a92ce6c06f4b9c6dd1e237c3f8fabd"
     },
     {
+      "path": "deploy/selfhost/native/firewall-compat.sh",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a154d779d78b8037b2e7680de4faca7708033d9e13a214a1b159799e6361b0b7"
+    },
+    {
       "path": "deploy/selfhost/native/install.sh",
       "pre_sha256": "9acb1e95674f3e4178268a79b840a4ef4317d631ef23bf46483382ff3843125d",
-      "post_sha256": "faac02f4e336aa608b295b044c7fc4f8b2dc0693020ed27e2db812d500ab26fb"
+      "post_sha256": "cb53e8eeca66ca78562db492f75804479df460a993cf05e06c2ed64dee203f67"
     },
     {
       "path": "deploy/selfhost/native/kurd-node-network.service",
       "pre_evidence": "ABSENT",
-      "post_sha256": "14228140c3bd54ed3410a0f59f433ff37c2bcfc605cab87c24d97867456f33f4"
+      "post_sha256": "79742b5ac2b0fe571b198efbeecace91ff3435bbbef143cd6470a46214e97ba5"
     },
     {
       "path": "deploy/selfhost/native/kurd-node-unbound.conf",
@@ -605,17 +640,17 @@
     {
       "path": "deploy/selfhost/native/kurd-node.nft",
       "pre_evidence": "ABSENT",
-      "post_sha256": "2b883677cbb20fbe0d17c64472f771b4133d3b06dcaacd577c90d216b7637403"
+      "post_sha256": "88efbe9cd1396aeaaa57fa763c2f23027c34eb2ac35524fb24d49211c4d851a4"
     },
     {
       "path": "deploy/selfhost/native/kurd-node.service",
       "pre_sha256": "6dab693f6cc84e65e0e56c986cec0766baf679d1b4181b9ad2116e01e5ae2247",
-      "post_sha256": "6385edeb0d0f374701a008a65dda7590a638a32b5971c48f0da74a0e1f1be124"
+      "post_sha256": "a24d879e747bbb92335e6c3ef28fac1b3d9115c6411ab75b32647777ee844faa"
     },
     {
       "path": "deploy/selfhost/native/kurd-node.socket",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e4619f6dbc6d73c0f8fa54b1b44d4d9dfeb714b58ad2aab3062b2e5da8202d18"
+      "post_sha256": "c410470dde37bef860063736ce3efcbd610edf686dbb021739c7353e746172b3"
     },
     {
       "path": "deploy/selfhost/native/kurd-node.tmpfiles.conf",
@@ -625,27 +660,27 @@
     {
       "path": "deploy/selfhost/native/preflight.sh",
       "pre_sha256": "7b7c4f008163fa5993b99c44e7a82ef36379755390a0cec8d7d282b3baac16b8",
-      "post_sha256": "493f571e3b4146c59ee651d83bebf33bba5167e757d17e25a9593688b1eaa264"
+      "post_sha256": "1e69af1efc6c20e58d49f9026745d25a9e4559424c74e47f1a0bf88ed5257c23"
     },
     {
       "path": "deploy/selfhost/native/rollback.sh",
       "pre_sha256": "37c689e9d2bca3ccb0ea6583c1446bd175d9942868181eb41915558524649f69",
-      "post_sha256": "ce3c9c9cef98af00aeca4ee4c165408efc1f43d76ddf5c2ae06c661419d010a7"
+      "post_sha256": "b65e8d88087eb66437df44cfab5a241b859a026f4900b483b3c0c28391d703ac"
     },
     {
       "path": "deploy/selfhost/native/uninstall.sh",
       "pre_sha256": "f7c30e94b6d2a766f19c7c3e20d8af4d49f5ca071f185a6c42a51bd13582c336",
-      "post_sha256": "6248e83081e54f64e85b45298110f843a9ed58e70660d7d45eea798ba326f613"
+      "post_sha256": "650fc4167f2075b46775b2ee1c8f88af980cfcdac4efd9729fe896b91cee605c"
     },
     {
       "path": "deploy/selfhost/native/upgrade.sh",
       "pre_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91",
-      "post_sha256": "bfb5de1b3154caf1e7c6f7e510718fa228ce06e36798b9ea2f7db91be606c3a9"
+      "post_sha256": "63f04d66d4c7fa4075c71cb16253b8d9e2dcd1286c086d5b5fcb84fec961d70f"
     },
     {
       "path": "docs/self-hosting/BACKUP-RESTORE.md",
       "pre_sha256": "14a5dc8f6dd6192510aebfe1f78ec45a73ca7e1917b6e8486377c582412859ae",
-      "post_sha256": "61bd09afe0efb9fa4ae391621efceba5ef464220aba7cf6a2c8673fd120ec171"
+      "post_sha256": "8b76828fd00129259cf2b229f1e0b25647c960a51c6dea4669d4191058f7aa56"
     },
     {
       "path": "docs/self-hosting/CONTAINER.md",
@@ -730,12 +765,12 @@
     {
       "path": "internal/androidbridge/runtime_session_v2.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "32aaa864c21da0e5a4c2e96e1d310cea06c923a7f5a61d69687be6cdfca5dcd5"
+      "post_sha256": "ce92c4a386aa462811b91b269c8064dce9f4739c50f68326dec4d58cac226c53"
     },
     {
       "path": "internal/androidbridge/runtime_session_v2_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3da905f4553f7c06a55cea61587ec1f2629798d399c7e8ec8a623905d452bef4"
+      "post_sha256": "81a7765c8f222dc9bf9a8569d11dc31330fdd40532143c58d6173de14aed04a1"
     },
     {
       "path": "internal/androidbridge/verify.go",
@@ -750,7 +785,7 @@
     {
       "path": "internal/audit/security.go",
       "pre_sha256": "fc98db2a301d8c4545457d271a761891bdea542b6ea8aa620eec03880fc4ee8c",
-      "post_sha256": "bda0707a6e7293273fdeeadd4ed3e2b0c78f2e3c0d7057cecf102c9f33d85618"
+      "post_sha256": "fedab85c491b0e26f4fb74c79d2987a271fb5e045a2fa4d67e7af99be8dc8edc"
     },
     {
       "path": "internal/audit/security_test.go",
@@ -808,9 +843,29 @@
       "post_sha256": "213e19279612c9d5124dbabdc365dfc7bf99d526aad3e55ff83f919ba0226f60"
     },
     {
+      "path": "internal/observe/labtrace/corpus.go",
+      "pre_sha256": "885cb50ffb746485837178d6b765fa5383f920e6db3a1b8e206e9db199e0aaa1",
+      "post_sha256": "2e50a1b72b4164c1f2a7a7c40e00b6317f7ae058a416d588c5ba8693183a5c53"
+    },
+    {
+      "path": "internal/observe/labtrace/corpus_test.go",
+      "pre_sha256": "86e7a46769e666872a5c5bda8be83ce1a272b08f34756727da0e92b14a3ddd46",
+      "post_sha256": "cd30452079d49aebf3ec8cd06b82a13416d344cfb1a284c02728d25898d44974"
+    },
+    {
       "path": "internal/phase17evidence/evidence.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "9252d2773e2d5329ec10b4dc64b9d0be114613131ad1198764413190716b5732"
+    },
+    {
+      "path": "internal/phase17evidence/field.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "4d293103e83830f932487a35f4a4806e4361b046ac4d09fdb919678c58aee170"
+    },
+    {
+      "path": "internal/phase17evidence/field_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d741c47d33caafc5c5a4d4edf780125ca44587de8e16fdd3c93a59f05e468c6c"
     },
     {
       "path": "internal/product/enrollment/request_lifecycle_test.go",
@@ -910,12 +965,12 @@
     {
       "path": "internal/product/sessionplan/sessionplan_v2.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8bafb6c40365334cfa278ab363ed2caf3db0bcaff9c76218eac106e5064721d2"
+      "post_sha256": "927ac37537ba38cbfe15369e96696a30702e42d7f46dcee1ccc4d5244d5eef4e"
     },
     {
       "path": "internal/product/sessionplan/sessionplan_v2_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "71171c85660478b0fb2a2cf130399c967795882b993c32939865852df8f42bea"
+      "post_sha256": "7d39a55383aee511b4ec979178e886a619c89be38f990ac87f4a1ec3e5e3fa8d"
     },
     {
       "path": "internal/protocol/framing/codec_test.go",
@@ -935,7 +990,7 @@
     {
       "path": "internal/relay/node/config.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "78bfcc839d1f89acf723192c1796a40ded037b214ca0d4810bdcebbb077f93e4"
+      "post_sha256": "b0eedb132f63e22e726a9339d87b313fae8731af27d3b9417bc86ff465c5e5da"
     },
     {
       "path": "internal/relay/node/control.go",
@@ -980,7 +1035,7 @@
     {
       "path": "internal/relay/node/health_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3939bc37d7cdf6cdd7aee09ae33cd61096c54e2b45c2b928708da1675afb461d"
+      "post_sha256": "1d29e0ffa03d9f422074d68a21d813160d23e50cf5708d1b070eae7372204709"
     },
     {
       "path": "internal/relay/node/listener.go",
@@ -1005,27 +1060,27 @@
     {
       "path": "internal/relay/node/server.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6da3be0467402ea6f34ab4b2d9270205dfb3ed1e58206b0e475fc396ca6f07de"
+      "post_sha256": "241663a5a6ac7c7c68c6a8f87b8ea85252652bebefdb98cc7ca5cdb978dc2c18"
     },
     {
       "path": "internal/relay/node/server_phase17integration_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c0d54128e48a0e0ffe3f1c5bda33d9b2daaae25a578635da3f0df02c56ec7711"
+      "post_sha256": "f194344ed8caaf57e3b1e5be7afa339ca91b1a61e38d133c16daf4e6b881176a"
     },
     {
       "path": "internal/relay/node/server_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "87d4327b00e8795dcec311137ad9c261deae6b858ed1f918112ab279f2e57ce1"
+      "post_sha256": "35e2688262ec15b3f392e4f73cf2be36521673c5d0cfb41121b234c96e03c196"
     },
     {
       "path": "internal/relay/node/session_registry.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "4e968a4b6f944a1f1d8a04887c903ee1cf15d76f21fedbf7f7ff2bffa465a741"
+      "post_sha256": "89481bfd06b85275ed49a5bc38fe2237c1fe675b720a08a78cd3b9d76b448bf8"
     },
     {
       "path": "internal/relay/node/session_registry_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3f6f9d44af3b354602954c076a94cef757573d921b0595b951a9fcda5350ae44"
+      "post_sha256": "9cfb839018d625454b9dcce7ff97379701f5c53c4e78b80219f30b6dfdf5c915"
     },
     {
       "path": "internal/relay/node/source_limiter.go",
@@ -1050,7 +1105,12 @@
     {
       "path": "internal/relay/tun/tun_linux.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "63758966e71771b7b9ec4f31e8613dccc18941cfbfcf6b33164ba58bc993124f"
+      "post_sha256": "d5ce40e30a5aa43a90a38a7cbd6d4ce0c1f8068c4bba3e62caa34ac0a6f6e5cd"
+    },
+    {
+      "path": "internal/relay/tun/tun_linux_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "76d1241a850f6352baf4d091e522f5b839f83a94564c50a2693b696c1d8a282d"
     },
     {
       "path": "internal/relay/tun/tun_test.go",
@@ -1065,7 +1125,7 @@
     {
       "path": "internal/runtime/ip_packet_v1.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "fdf831b66104236287acd3e036adfa69bae15a1119e9bc472bd628b9f7b023af"
+      "post_sha256": "d80b997cc1a2b1d2c28a22c85ad7cdff40f45c613fb68350c36da586e20ca710"
     },
     {
       "path": "internal/runtime/ip_packet_v1_fuzz_test.go",
@@ -1075,22 +1135,27 @@
     {
       "path": "internal/runtime/ip_packet_v1_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0f8456a70571d363e38c656c25e21b570358addd2f6a38644b6630e9caa248ff"
+      "post_sha256": "70cc5feafe510bbcbb5a5cdd7f5fcc965b70c85729350c0e6e1e76014500b498"
     },
     {
       "path": "internal/runtime/ip_tunnel_v1.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8f027bdf879813f75a6db4253e1055b0b67e34f1a0dcdc9b74741a0c07ef80e4"
+      "post_sha256": "3b749c3a45ec1a6a3851a454f7efe95d7f1ee4cc7106fe551bb4f823e17400c3"
     },
     {
       "path": "internal/runtime/ip_tunnel_v1_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "bffb42810e4a41f0bbe2f105219b2fd85448fc6995da164adefe650dba32fabe"
+      "post_sha256": "3eb3e7b2044ec33aa3fff66da7dbac92b8b5d2d610f4d95b4b3660b178dc26f7"
     },
     {
       "path": "internal/runtime/network_tlstcp_integration_test.go",
       "pre_sha256": "3fb7889d4045e05f581c208a474ae33ddcdb3ea3ec43a6e4af9511531a2e2842",
-      "post_sha256": "3010263ce8db3d1b7ed74f811ad9f14200b3414cfa8c48a2f8efede4e2afddb2"
+      "post_sha256": "1587efedf59d74ffd43216b1898cf77a76c2c00767e7db463f3de2a4e5902ff6"
+    },
+    {
+      "path": "internal/runtime/phase17_endurance_campaign_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fcf4dbf517d6941ad6febea89caf43fc418f142e5854800908baf5ac31528694"
     },
     {
       "path": "internal/runtime/policy_enforcement_test.go",
@@ -1115,7 +1180,7 @@
     {
       "path": "internal/runtime/process_phase17integration_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c1d5c782cf8559d9f55af85dda6f4f7c4f3c19894d768070c50fff927c53113c"
+      "post_sha256": "86d5c8092ebe05a624851c06ade8a8683d726d8de7b83187b2b1dc069154f397"
     },
     {
       "path": "internal/runtime/process_subprocess_integration_test.go",
@@ -1125,7 +1190,7 @@
     {
       "path": "internal/runtime/process_tlstcp_v1.go",
       "pre_sha256": "8d4ef0761b573707539c4b5d805e688ef3be9f6729dab8732d88ebfe40215dcc",
-      "post_sha256": "633da32f55f4e3303cd3e27d5768b488eb54911d1f3d6894adfc87e2f108508c"
+      "post_sha256": "d3d69350b1a4ccedf1dd6a199c79eea99977bbed6d15889bde92c72342f3dac8"
     },
     {
       "path": "internal/selfhost/address_pool.go",
@@ -1140,12 +1205,12 @@
     {
       "path": "internal/selfhost/backup.go",
       "pre_sha256": "a8ef664a34a59688384cb8c44d0b79b81e192681618a0317f438b4c35efa2e30",
-      "post_sha256": "2ad55d76c34daf537df91ca7163b28d9d8665e27d3a7dda1faf65a5cf9d06def"
+      "post_sha256": "1c7e6872eb174ec875a5d93e2b4a3dc940120e20880c056d003bd68656088661"
     },
     {
       "path": "internal/selfhost/backup_test.go",
       "pre_sha256": "b5978d324c81cd2f950ae852594fa9a74fc5a843d64feeb9ed2a1b637b1d54d3",
-      "post_sha256": "85bfa1926806c0bf544ca34de02d714d13d1831a19f4bc44b087a629da959ab0"
+      "post_sha256": "7cd505f2a636811e637f60d325cb9199776982bf302782c76089e477ab8fd4d2"
     },
     {
       "path": "internal/selfhost/bundle.go",
@@ -1170,7 +1235,7 @@
     {
       "path": "internal/selfhost/model.go",
       "pre_sha256": "5951d6524f24c28979f76c255ad203f6dc70fbcf7d14ed8baab85db1ddc21575",
-      "post_sha256": "3f77e505467661c627d5a1670280641efdcd9750421b103f4f6484545c43cb56"
+      "post_sha256": "a3dfd89db6af9fbe8199b2cb9a8e7542c1b369953345b9d5bf17f26d8c640152"
     },
     {
       "path": "internal/selfhost/private_path_other.go",
@@ -1215,7 +1280,7 @@
     {
       "path": "internal/selfhost/recipient_registry.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "025af10edea673704f132a53356c6dddd930c86de8b0d5d3bd765cd12352d543"
+      "post_sha256": "2ebcbc01db65dc275006d4a7faf7e304da4f4137333db0d53af01896494a88d0"
     },
     {
       "path": "internal/selfhost/recipient_registry_test.go",
@@ -1235,12 +1300,12 @@
     {
       "path": "internal/selfhost/service.go",
       "pre_sha256": "a121c83ef386a7e3b312ec3591dd12c9b53618baa54dbcfd30f6561bbf2a3bfb",
-      "post_sha256": "5af32f0655a533ff49ce47dd0b5b83691fd054d97e7d2b4734acc6b08f8ea65c"
+      "post_sha256": "b621331e6bc78d6f70caa9bd5d02b78307acf2a6cec4cbd336461f827573efcb"
     },
     {
       "path": "internal/selfhost/service_test.go",
       "pre_sha256": "2ff7715121c7925b852696ff9fc14f690af640cf90b1c2e1551986e5c3bdcdc1",
-      "post_sha256": "67e58974aa7438f112ba5fa8b0c4b2dcc9a4c0b58aba302afc3166142f09b4ab"
+      "post_sha256": "302ce93a71213930ce585b59b8bbe1a9f44a98d6bfc4ddea4ec100bd8912edf8"
     },
     {
       "path": "internal/selfhost/state_v2_test.go",
@@ -1280,17 +1345,17 @@
     {
       "path": "internal/testkit/evidenceoverlay/successor.go",
       "pre_sha256": "319f873812d3f439028101a7744bdde45bd01c24d1d6c738df54f136ac92cfa1",
-      "post_sha256": "c87577cae4e152b257961f7b9521be4fd0c2d8e656d7951da4fe38cae6eba84d"
+      "post_sha256": "0a6aefe9cfd7c8e855e915d748c2e8f5718c08d458bc952c5129abff5f207daf"
     },
     {
       "path": "internal/testkit/evidenceoverlay/successor_test.go",
       "pre_sha256": "ec8e66696fa9c07e4f867d65e5e5cba32890385f5101b537853c4fcb0aa1d9cb",
-      "post_sha256": "0fec1d09c97acea0157cf7487d7254c708a907b70564f096bba87166497b29c9"
+      "post_sha256": "498b8736702be81b6e89d8d2e1aa0f90e2fd2d0b5338bda5e6c987d774c9a32c"
     },
     {
       "path": "internal/testkit/importrules/importrules_test.go",
       "pre_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1",
-      "post_sha256": "08ca36ba0c45054b6c4f2e657f9833c10be6ddec0e579764533e5ab17cc2aac3"
+      "post_sha256": "963e2cbd1a5557c48234b1ba8485dce42bbba57b42ad01a62574dc54a30ec28b"
     },
     {
       "path": "internal/testkit/phase8assurance/manifest.go",
@@ -1316,6 +1381,26 @@
       "path": "scripts/phase17/netns_witness.py",
       "pre_evidence": "ABSENT",
       "post_sha256": "3437443dcb4ad19aebe323f7bbd2ba91b70be39308577e7a614a3edbb8fb6abe"
+    },
+    {
+      "path": "scripts/phase17/owned-vps-e2e.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "0e91961c753c1b66111485be19cc08d8b232b66289a7a18e3f96ca945faef5e9"
+    },
+    {
+      "path": "scripts/phase17/owned-vps-preflight.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b9049f6731c29eeebd36d889213a62acb9b42beb8ac0d465b0bacc7181f116b5"
+    },
+    {
+      "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "feb3deb4c77eb78b3b2a8cf3ca76e96d54c458b82eab88f686295e9b2c4710b5"
+    },
+    {
+      "path": "scripts/phase17/sanitize-field-evidence.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "aed49e60f5f8a658731c5d6753d1b947ada9842b2e4ca02361b0f5dd7e7f7c9f"
     },
     {
       "path": "testdata/evidence/phase16/decentralized-self-hosted-overlay.json",

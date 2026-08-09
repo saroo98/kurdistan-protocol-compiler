@@ -80,61 +80,42 @@ android {
 }
 
 val repositoryDirectory = rootProject.projectDir.parentFile
+val internalAppApk = layout.buildDirectory.file("outputs/apk/internal/app-internal.apk")
+val internalTestApk = layout.buildDirectory.file(
+    "outputs/apk/androidTest/internal/app-internal-androidTest.apk",
+)
+val phase17ExpectedTests = rootProject.file("config/phase17-required-device-tests.txt")
+val deviceArtifactMetadata = rootProject.layout.buildDirectory.file("ci/device-artifacts.json")
+
+tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
+    group = "build"
+    description = "Builds and hashes the exact internal app and instrumentation APK pair."
+    dependsOn("assembleInternal", "assembleInternalAndroidTest")
+    inputs.file(internalAppApk)
+    inputs.file(internalTestApk)
+    inputs.file(phase17ExpectedTests)
+    outputs.file(deviceArtifactMetadata)
+    workingDir(repositoryDirectory)
+    commandLine(
+        "go",
+        "run",
+        "./cmd/releaseverify",
+        "-root",
+        ".",
+        "-artifact-subject",
+        "DEVICE_TEST_SET",
+        "-artifact-metadata",
+        deviceArtifactMetadata.get().asFile.relativeTo(repositoryDirectory).invariantSeparatorsPath,
+        "-artifact",
+        "internal-apk=${internalAppApk.get().asFile.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
+        "-artifact",
+        "instrumentation-apk=${internalTestApk.get().asFile.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
+        "-artifact",
+        "expected-tests=${phase17ExpectedTests.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
+    )
+}
 
 androidComponents {
-    onVariants(selector().withName("internal")) { variant ->
-        val appApkDirectory = variant.artifacts.get(SingleArtifact.APK)
-        val appApkLoader = variant.artifacts.getBuiltArtifactsLoader()
-        val testComponent = requireNotNull(variant.androidTest) {
-            "internal Android test component is required for CI device artifacts"
-        }
-        val testApkDirectory = testComponent.artifacts.get(SingleArtifact.APK)
-        val testApkLoader = testComponent.artifacts.getBuiltArtifactsLoader()
-        val expectedTests = rootProject.file("config/phase17-required-device-tests.txt")
-        val metadataOutput = rootProject.layout.buildDirectory.file("ci/device-artifacts.json")
-
-        tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
-            group = "build"
-            description = "Builds and hashes the exact internal app and instrumentation APK pair."
-            dependsOn("assembleInternal", "assembleInternalAndroidTest")
-            inputs.dir(appApkDirectory)
-            inputs.dir(testApkDirectory)
-            inputs.file(expectedTests)
-            outputs.file(metadataOutput)
-            workingDir(repositoryDirectory)
-            doFirst {
-                val appArtifacts = requireNotNull(appApkLoader.load(appApkDirectory.get())) {
-                    "internal APK metadata is missing"
-                }
-                val testArtifacts = requireNotNull(testApkLoader.load(testApkDirectory.get())) {
-                    "internal instrumentation APK metadata is missing"
-                }
-                val appApk = appArtifacts.elements.singleOrNull()?.outputFile?.let(::file)
-                    ?: error("require exactly one internal application APK")
-                val testApk = testArtifacts.elements.singleOrNull()?.outputFile?.let(::file)
-                    ?: error("require exactly one internal instrumentation APK")
-                fun relative(path: File) = path.relativeTo(repositoryDirectory).invariantSeparatorsPath
-                commandLine(
-                    "go",
-                    "run",
-                    "./cmd/releaseverify",
-                    "-root",
-                    ".",
-                    "-artifact-subject",
-                    "DEVICE_TEST_SET",
-                    "-artifact-metadata",
-                    relative(metadataOutput.get().asFile),
-                    "-artifact",
-                    "internal-apk=${relative(appApk)}",
-                    "-artifact",
-                    "instrumentation-apk=${relative(testApk)}",
-                    "-artifact",
-                    "expected-tests=${relative(expectedTests)}",
-                )
-            }
-        }
-    }
-
     onVariants(selector().withName("release")) { variant ->
         val apkDirectory = variant.artifacts.get(SingleArtifact.APK)
         val apkLoader = variant.artifacts.getBuiltArtifactsLoader()

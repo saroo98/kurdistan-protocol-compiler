@@ -17,6 +17,7 @@ import org.kurdistanvpn.runtime.android.KurdVpnService
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
 import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
+import org.kurdistanvpn.runtime.api.VpnRuntimeDiagnostics
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 import org.kurdistanvpn.core.model.DnsMode
 import org.kurdistanvpn.core.model.IpMode
@@ -28,11 +29,28 @@ class VpnRuntimeController(
         Thread(task, "kurd-runtime-authority-handoff").apply { isDaemon = true }
     }
     private var stagedAuthority: ByteArray? = null
+    @Volatile
+    private var activeRequestId: String? = null
+    @Volatile
+    private var pendingStatusQueryId: String? = null
     private val mutableSnapshot = MutableStateFlow(VpnRuntimeSnapshot())
     val snapshot: StateFlow<VpnRuntimeSnapshot> = mutableSnapshot.asStateFlow()
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != VpnRuntimeContract.ACTION_STATUS) return
+            val decision = selectRuntimeStatus(
+                    expectedRequestId = activeRequestId,
+                    pendingQueryId = pendingStatusQueryId,
+                    incomingRequestId = intent.getStringExtra(
+                        VpnRuntimeContract.EXTRA_RUNTIME_REQUEST,
+                    ),
+                    incomingQueryId = intent.getStringExtra(
+                        VpnRuntimeContract.EXTRA_STATUS_QUERY,
+                    ),
+                )
+            if (!decision.accept) return
+            if (decision.consumeQuery) pendingStatusQueryId = null
+            decision.bindRequestId?.let { activeRequestId = it }
             val state = intent.getStringExtra(VpnRuntimeContract.EXTRA_STATE)
                 ?.let { runCatching { VpnRuntimeState.valueOf(it) }.getOrNull() }
                 ?: VpnRuntimeState.FAILED
@@ -75,6 +93,21 @@ class VpnRuntimeController(
                 relayFingerprint = intent.getStringExtra(
                     VpnRuntimeContract.EXTRA_RELAY_FINGERPRINT,
                 ),
+                diagnostics = VpnRuntimeDiagnostics(
+                    tunPacketsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, 0),
+                    outboundPacketsAccepted = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, 0),
+                    carrierRecordsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_WRITE, 0),
+                    carrierRecordsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_READ, 0),
+                    authenticatedOperations = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_AUTHENTICATED, 0),
+                    innerPacketsAccepted = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_ACCEPTED, 0),
+                    innerPacketsRejected = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_REJECTED, 0),
+                    tunWriteAttempts = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ATTEMPTS, 0),
+                    tunWriteFailures = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURES, 0),
+                    tunWriteFailureCode = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURE_CODE, 0),
+                    tunWriteErrno = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ERRNO, 0),
+                    tunPacketsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, 0),
+                    rejectedTunPackets = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, 0),
+                ),
             )
         }
     }
@@ -86,8 +119,12 @@ class VpnRuntimeController(
             IntentFilter(VpnRuntimeContract.ACTION_STATUS),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+        val queryId = KurdVpnService.newRequestId()
+        pendingStatusQueryId = queryId
         context.sendBroadcast(
-            Intent(VpnRuntimeContract.ACTION_QUERY_STATUS).setPackage(context.packageName),
+            Intent(VpnRuntimeContract.ACTION_QUERY_STATUS)
+                .setPackage(context.packageName)
+                .putExtra(VpnRuntimeContract.EXTRA_STATUS_QUERY, queryId),
         )
     }
 
@@ -101,6 +138,7 @@ class VpnRuntimeController(
 
     fun permissionRejected() {
         clearStagedAuthority()
+        activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
             state = VpnRuntimeState.FAILED,
             failure = "CONSENT_REJECTED",
@@ -109,6 +147,7 @@ class VpnRuntimeController(
 
     fun notificationPermissionRejected() {
         clearStagedAuthority()
+        activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
             state = VpnRuntimeState.FAILED,
             failure = "NOTIFICATION_PERMISSION_REJECTED",
@@ -124,6 +163,7 @@ class VpnRuntimeController(
 
     fun authorityRejected(category: String) {
         clearStagedAuthority()
+        activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
             state = VpnRuntimeState.FAILED,
             failure = category.take(64),
@@ -138,19 +178,26 @@ class VpnRuntimeController(
             return
         }
         mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.CONNECTING)
+        val requestId = KurdVpnService.newRequestId()
+        pendingStatusQueryId = null
+        activeRequestId = requestId
         runCatching {
-            KurdVpnService.start(context, authority, handoffExecutor) { category ->
-                mutableSnapshot.value = VpnRuntimeSnapshot(
-                    state = VpnRuntimeState.FAILED,
-                    failure = category.take(64),
-                )
+            KurdVpnService.start(context, requestId, authority, handoffExecutor) { category ->
+                if (activeRequestId == requestId) {
+                    mutableSnapshot.value = VpnRuntimeSnapshot(
+                        state = VpnRuntimeState.FAILED,
+                        failure = category.take(64),
+                    )
+                }
             }
         }.onFailure {
             authority.fill(0)
-            mutableSnapshot.value = VpnRuntimeSnapshot(
-                state = VpnRuntimeState.FAILED,
-                failure = "RUNTIME_START_FAILED",
-            )
+            if (activeRequestId == requestId) {
+                mutableSnapshot.value = VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "RUNTIME_START_FAILED",
+                )
+            }
         }
     }
 
@@ -169,6 +216,7 @@ class VpnRuntimeController(
             // obligation.
             context.stopService(Intent(context, KurdVpnService::class.java))
             mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.IDLE)
+            activeRequestId = null
             return
         }
         mutableSnapshot.value = current.copy(state = VpnRuntimeState.STOPPING)
@@ -185,4 +233,29 @@ class VpnRuntimeController(
         stagedAuthority?.fill(0)
         stagedAuthority = null
     }
+}
+
+internal data class RuntimeStatusDecision(
+    val accept: Boolean,
+    val bindRequestId: String? = null,
+    val consumeQuery: Boolean = false,
+)
+
+internal fun selectRuntimeStatus(
+    expectedRequestId: String?,
+    pendingQueryId: String?,
+    incomingRequestId: String?,
+    incomingQueryId: String?,
+): RuntimeStatusDecision {
+    if (expectedRequestId != null) {
+        return RuntimeStatusDecision(accept = expectedRequestId == incomingRequestId)
+    }
+    if (pendingQueryId == null || incomingQueryId != pendingQueryId) {
+        return RuntimeStatusDecision(accept = false)
+    }
+    return RuntimeStatusDecision(
+        accept = true,
+        bindRequestId = incomingRequestId,
+        consumeQuery = true,
+    )
 }

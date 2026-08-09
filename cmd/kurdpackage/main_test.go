@@ -87,7 +87,7 @@ func TestNativeShellAssetsRemainFailClosedAndSecretSafe(t *testing.T) {
 	root := repositoryRootV1(t)
 	native := filepath.Join(root, "deploy", "selfhost", "native")
 	entries, err := filepath.Glob(filepath.Join(native, "*.sh"))
-	if err != nil || len(entries) != 5 {
+	if err != nil || len(entries) != 6 {
 		t.Fatalf("native shell inventory=%d err=%v", len(entries), err)
 	}
 	for _, path := range entries {
@@ -166,7 +166,7 @@ func TestPreflightFailureFixtureInventory(t *testing.T) {
 	if err := decoder.Decode(&fixture); err != nil || fixture.Schema != "kurd-node-preflight-failure-fixtures-v1" {
 		t.Fatalf("fixture decode: %v", err)
 	}
-	want := []string{"NO_TUN", "TIME_NOT_SYNCED", "NO_IPV4_ROUTE", "NO_IPV6_ROUTE", "MULTIPLE_EGRESS", "PORT_CONFLICT", "NFT_MISSING", "UNBOUND_MISSING", "NETWORKD_MISSING", "KERNEL_UNSUPPORTED", "LOW_DISK", "LOW_MEMORY"}
+	want := []string{"NO_TUN", "TIME_NOT_SYNCED", "NO_IPV4_ROUTE", "MULTIPLE_EGRESS", "PORT_CONFLICT", "NFT_MISSING", "UNBOUND_MISSING", "NETWORKD_MISSING", "KERNEL_UNSUPPORTED", "LOW_DISK", "LOW_MEMORY"}
 	if len(fixture.Cases) != len(want) {
 		t.Fatalf("fixture cases=%d want=%d", len(fixture.Cases), len(want))
 	}
@@ -215,6 +215,71 @@ func TestNativeDeploymentSupportsDistinctIPv4AndIPv6EgressInterfaces(t *testing.
 		if !strings.Contains(string(install), marker) {
 			t.Fatalf("installer is missing %s", marker)
 		}
+	}
+}
+
+func TestNativeDeploymentReconcilesUFWWithoutTakingFirewallOwnership(t *testing.T) {
+	root := repositoryRootV1(t)
+	helperPath := filepath.Join(root, "deploy", "selfhost", "native", "firewall-compat.sh")
+	helper, err := os.ReadFile(helperPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	helperText := string(helper)
+	for _, required := range []string{
+		"kurd-node-managed-v1",
+		"ufw show added",
+		"ufw allow in on kurd0 to 10.77.0.1 port 53 proto udp",
+		"ufw allow in on kurd0 to 10.77.0.1 port 53 proto tcp",
+		"ufw route allow in on kurd0 out on",
+		"ufw allow in on",
+		`port "$ingress_port" proto tcp`,
+		"--check",
+		"--apply",
+		"--remove",
+	} {
+		if !strings.Contains(helperText, required) {
+			t.Fatalf("UFW compatibility helper is missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"ufw enable", "ufw disable", "ufw reset", "DEFAULT_FORWARD_POLICY", "flush ruleset", "eval "} {
+		if strings.Contains(helperText, forbidden) {
+			t.Fatalf("UFW compatibility helper takes ownership of host firewall state through %q", forbidden)
+		}
+	}
+
+	install, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	installText := string(install)
+	checkAt := strings.Index(installText, `./firewall-compat.sh --check "$listen_port" "$egress_interface_v4" "$egress_interface_v6"`)
+	mutationAt := strings.Index(installText, "install_atomic bin/kurd-node")
+	applyAt := strings.Index(installText, `/usr/local/lib/kurd-node/firewall-compat.sh --apply "$listen_port" "$egress_interface_v4" "$egress_interface_v6"`)
+	if checkAt < 0 || mutationAt < 0 || applyAt < 0 || !(checkAt < mutationAt && mutationAt < applyAt) {
+		t.Fatal("installer must validate UFW compatibility before mutation and apply it after installing the owned helper")
+	}
+
+	rollback, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "rollback.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollbackText := string(rollback)
+	if !strings.Contains(rollbackText, "firewall-compat.sh --remove") ||
+		!strings.Contains(rollbackText, "for helper in firewall-compat") ||
+		!strings.Contains(rollbackText, `"$previous/lib/$helper.sh"`) {
+		t.Fatal("rollback must remove current managed UFW rules and restore the previous helper authority")
+	}
+	uninstall, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "uninstall.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(uninstall), "firewall-compat.sh --remove") {
+		t.Fatal("uninstall must remove only Kurd-managed UFW compatibility rules")
+	}
+
+	if got := nativeSourceMappingsV1["deploy/selfhost/native/firewall-compat.sh"]; got != "firewall-compat.sh" {
+		t.Fatalf("package mapping=%q", got)
 	}
 }
 
@@ -293,6 +358,23 @@ func TestRelayServiceAllowsItsPreflightToInspectRoutes(t *testing.T) {
 	}
 }
 
+func TestNetworkPolicySurvivesBoundedDnsOutage(t *testing.T) {
+	root := repositoryRootV1(t)
+	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node-network.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(unit)
+	if strings.Contains(text, "Requires=systemd-networkd.service unbound.service") {
+		t.Fatal("stopping the DNS resolver also tears down the relay nftables policy")
+	}
+	if !strings.Contains(text, "Requires=systemd-networkd.service") ||
+		!strings.Contains(text, "Wants=unbound.service") ||
+		!strings.Contains(text, "After=network-online.target systemd-networkd.service unbound.service") {
+		t.Fatal("network policy must require networkd while ordering after and softly requesting DNS")
+	}
+}
+
 func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 	root := repositoryRootV1(t)
 	unit, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "kurd-node.socket"))
@@ -300,7 +382,7 @@ func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(unit)
-	if !strings.Contains(text, "\nListenStream=[::]:443\n") {
+	if !strings.Contains(text, "\nListenStream=[::]:KURD_LISTEN_PORT\n") {
 		t.Fatal("relay socket is missing its single inherited dual-stack listener")
 	}
 	if !strings.Contains(text, "\nBindIPv6Only=both\n") {
@@ -309,8 +391,49 @@ func TestRelaySocketListensOnBothPublicAddressFamilies(t *testing.T) {
 	if !strings.Contains(text, "\nFileDescriptorName=kurd\n") {
 		t.Fatal("relay socket must use the descriptor name enforced by the runtime")
 	}
-	if strings.Count(text, "\nListenStream=") != 1 || strings.Contains(text, "\nListenStream=0.0.0.0:443\n") {
+	if strings.Count(text, "\nListenStream=") != 1 || strings.Contains(text, "\nListenStream=0.0.0.0:KURD_LISTEN_PORT\n") {
 		t.Fatal("relay service accepts exactly one systemd listener descriptor")
+	}
+}
+
+func TestNativeDeploymentUsesOneValidatedConfigurableSignedPort(t *testing.T) {
+	root := repositoryRootV1(t)
+	read := func(relative string) string {
+		t.Helper()
+		encoded, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(encoded)
+	}
+
+	service := read("deploy/selfhost/native/kurd-node.service")
+	socket := read("deploy/selfhost/native/kurd-node.socket")
+	install := read("deploy/selfhost/native/install.sh")
+	upgrade := read("deploy/selfhost/native/upgrade.sh")
+	rollback := read("deploy/selfhost/native/rollback.sh")
+	firewall := read("deploy/selfhost/native/firewall-compat.sh")
+
+	for name, text := range map[string]string{"service": service, "socket": socket} {
+		if !strings.Contains(text, "KURD_LISTEN_PORT") {
+			t.Fatalf("%s unit does not use the validated installer port placeholder", name)
+		}
+		if strings.Contains(text, ":443") || strings.Contains(text, "--port 443") {
+			t.Fatalf("%s unit still hardcodes port 443", name)
+		}
+	}
+	for name, text := range map[string]string{"install": install, "upgrade": upgrade, "rollback": rollback} {
+		if !strings.Contains(text, "listen_port") || !strings.Contains(text, "--port") {
+			t.Fatalf("%s does not preserve the configured listener port", name)
+		}
+	}
+	for _, marker := range []string{"ingress_port", "ingressPort=", `port "$ingress_port" proto tcp`} {
+		if !strings.Contains(firewall, marker) {
+			t.Fatalf("firewall compatibility helper is missing %q", marker)
+		}
+	}
+	if strings.Contains(firewall, "port 443 proto tcp") {
+		t.Fatal("firewall compatibility helper still hardcodes port 443")
 	}
 }
 
@@ -352,6 +475,24 @@ func TestUpgradeAndRollbackRecreateTheOwnedTUNFromTheActiveVersion(t *testing.T)
 	}
 }
 
+func TestRollbackRestoresTheOwnedTUNConfigurationWithNetworkdAccess(t *testing.T) {
+	root := repositoryRootV1(t)
+	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "rollback.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, required := range []string{
+		"getent group systemd-network",
+		"network_group=systemd-network",
+		`restore_or_remove "$previous/networkd/80-kurd0.netdev" /etc/systemd/network/80-kurd0.netdev 0640 "$network_group"`,
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("rollback must preserve systemd-network access to the restored TUN configuration: missing %q", required)
+		}
+	}
+}
+
 func TestInstallUpgradeAndRollbackRebindOwnedDNSAfterTUNCreation(t *testing.T) {
 	root := repositoryRootV1(t)
 	for _, name := range []string{"install.sh", "upgrade.sh", "rollback.sh"} {
@@ -382,6 +523,7 @@ func fixturePackageFiles(t *testing.T, forge bool) []packageFile {
 	files := []packageFile{
 		{Path: "bin/kurd-node", Mode: 0o755, Data: []byte("node")},
 		{Path: "bin/kurdctl", Mode: 0o755, Data: []byte("ctl")},
+		{Path: "firewall-compat.sh", Mode: 0o755, Data: []byte("firewall")},
 		{Path: "install.sh", Mode: 0o755, Data: []byte("install")},
 		{Path: "preflight.sh", Mode: 0o755, Data: []byte("preflight")},
 		{Path: "rollback.sh", Mode: 0o755, Data: []byte("rollback")},

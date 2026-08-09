@@ -32,15 +32,22 @@ func CreateBackup(options BackupOptions) (BackupSummary, error) {
 	if err != nil || len(stateFile) == 0 || len(stateFile) > maxStateBytes {
 		return BackupSummary{}, ErrStateCorrupt
 	}
+	registryKey, registryState, err := readRecipientRegistryForBackup(options.RegistryDir, state.RecipientUses.RegistryID)
+	if err != nil {
+		return BackupSummary{}, err
+	}
+	defer zero(registryKey)
 	auditHead := state.Audit[len(state.Audit)-1].Digest
 	payload := backupPayload{
 		Schema: backupSchema, DeploymentID: state.DeploymentID, AuditHead: auditHead,
 		Revision: state.Revision, Generation: state.Generation, CreatedAt: now.Unix(),
 		StateVersion: state.Version, MigrationEpoch: state.MigrationEpoch,
 		MasterKey: append([]byte(nil), master...), StateFile: stateFile,
+		RecipientRegistryKey: append([]byte(nil), registryKey...), RecipientRegistryState: append([]byte(nil), registryState...),
 	}
 	encoded, err := sealBackup(payload, options.Passphrase)
 	zero(payload.MasterKey)
+	zero(payload.RecipientRegistryKey)
 	if err != nil {
 		return BackupSummary{}, err
 	}
@@ -59,6 +66,7 @@ func VerifyBackup(path string, passphrase []byte) (BackupSummary, error) {
 		return BackupSummary{}, err
 	}
 	defer zero(payload.MasterKey)
+	defer zero(payload.RecipientRegistryKey)
 	return backupSummary(payload, encoded, state.profileCount()), nil
 }
 
@@ -71,6 +79,7 @@ func PreviewRestore(options RestoreOptions) (BackupSummary, error) {
 		return BackupSummary{}, err
 	}
 	defer zero(payload.MasterKey)
+	defer zero(payload.RecipientRegistryKey)
 	now := options.Now.UTC().Unix()
 	if payload.CreatedAt > now+300 {
 		return BackupSummary{}, ErrClockUnhealthy
@@ -106,6 +115,7 @@ func ApplyRestore(options RestoreOptions) error {
 		return ErrRecoveryRejected
 	}
 	defer zero(payload.MasterKey)
+	defer zero(payload.RecipientRegistryKey)
 	parent := filepath.Dir(options.DataDir)
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return err
@@ -146,7 +156,24 @@ func ApplyRestore(options RestoreOptions) error {
 	if _, err := loadStateWithKey(staging, payload.MasterKey); err != nil {
 		return err
 	}
+	registryCreated := false
+	if len(payload.RecipientRegistryKey) != 0 {
+		relativeRegistry, nested := pathWithin(options.DataDir, options.RegistryDir)
+		registryTarget := options.RegistryDir
+		if nested {
+			registryTarget = filepath.Join(staging, relativeRegistry)
+		}
+		created, restoreErr := restoreOwnerRecipientRegistry(registryTarget, payload.RecipientRegistryKey, payload.RecipientRegistryState, backupState.recipientRegistryID())
+		if restoreErr != nil {
+			return restoreErr
+		}
+		registryCreated = created && !nested
+	}
 	if err := os.Rename(staging, options.DataDir); err != nil {
+		if registryCreated {
+			_ = os.RemoveAll(options.RegistryDir)
+			_ = syncDirectory(filepath.Dir(options.RegistryDir))
+		}
 		return err
 	}
 	return syncDirectory(parent)
@@ -165,6 +192,13 @@ func (state decodedBackupState) profileCount() int {
 		return len(state.v1.Profiles)
 	}
 	return 0
+}
+
+func (state decodedBackupState) recipientRegistryID() string {
+	if state.v2 != nil {
+		return state.v2.RecipientUses.RegistryID
+	}
+	return ""
 }
 
 func readBackup(path string, passphrase []byte) (backupPayload, []byte, decodedBackupState, error) {
@@ -187,15 +221,23 @@ func readBackup(path string, passphrase []byte) (backupPayload, []byte, decodedB
 	state, err := decodeStateFile(payload.StateFile, payload.MasterKey)
 	if err != nil || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch != state.MigrationEpoch || state.DeploymentID != payload.DeploymentID || state.Revision != payload.Revision || state.Generation != payload.Generation || state.Audit[len(state.Audit)-1].Digest != payload.AuditHead {
 		zero(payload.MasterKey)
+		zero(payload.RecipientRegistryKey)
 		return backupPayload{}, nil, decodedBackupState{}, ErrRecoveryRejected
+	}
+	if err := validateBackupRecipientRegistry(payload, state.RecipientUses.RegistryID); err != nil {
+		zero(payload.MasterKey)
+		zero(payload.RecipientRegistryKey)
+		return backupPayload{}, nil, decodedBackupState{}, err
 	}
 	return payload, encoded, decodedBackupState{v2: &state}, nil
 }
 
 func sealBackup(payload backupPayload, passphrase []byte) ([]byte, error) {
-	if payload.Schema != backupSchemaV2 || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch == 0 ||
+	if payload.Schema != backupSchemaV3 || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch == 0 ||
 		!validID(payload.DeploymentID) || payload.Revision == 0 || payload.CreatedAt <= 0 || payload.AuditHead == "" ||
-		len(payload.MasterKey) != 32 || len(payload.StateFile) == 0 || len(payload.StateFile) > maxStateBytes || !validPassphrase(passphrase) {
+		len(payload.MasterKey) != 32 || len(payload.StateFile) == 0 || len(payload.StateFile) > maxStateBytes ||
+		len(payload.RecipientRegistryKey) != 0 && len(payload.RecipientRegistryKey) != 32 || len(payload.RecipientRegistryState) > maxStateBytes ||
+		!validPassphrase(passphrase) {
 		return nil, ErrInvalidInput
 	}
 	plain, err := encodeCanonical(payload)
@@ -223,7 +265,7 @@ func sealBackup(payload backupPayload, passphrase []byte) ([]byte, error) {
 	}
 	envelope := backupEnvelope{
 		Schema: backupSchema, KDFMemoryKiB: recoveryMemoryKiB, KDFIterations: recoveryIterations, KDFParallelism: recoveryParallelism,
-		Salt: salt, Nonce: nonce, Ciphertext: aead.Seal(nil, nonce, plain, backupAADV2(salt, nonce)),
+		Salt: salt, Nonce: nonce, Ciphertext: aead.Seal(nil, nonce, plain, backupAADV3(salt, nonce)),
 	}
 	return encodeCanonical(envelope)
 }
@@ -233,7 +275,7 @@ func openBackup(encoded, passphrase []byte) (backupPayload, error) {
 		return backupPayload{}, ErrRecoveryRejected
 	}
 	var envelope backupEnvelope
-	if decodeCanonical(encoded, &envelope, maxBackupBytes) != nil || envelope.Schema != backupSchemaV1 && envelope.Schema != backupSchemaV2 ||
+	if decodeCanonical(encoded, &envelope, maxBackupBytes) != nil || envelope.Schema != backupSchemaV1 && envelope.Schema != backupSchemaV2 && envelope.Schema != backupSchemaV3 ||
 		envelope.KDFMemoryKiB != recoveryMemoryKiB || envelope.KDFIterations != recoveryIterations || envelope.KDFParallelism != recoveryParallelism ||
 		len(envelope.Salt) != 16 || len(envelope.Nonce) != 12 {
 		return backupPayload{}, ErrRecoveryRejected
@@ -251,6 +293,8 @@ func openBackup(encoded, passphrase []byte) (backupPayload, error) {
 	aad := backupAADV2(envelope.Salt, envelope.Nonce)
 	if envelope.Schema == backupSchemaV1 {
 		aad = backupAADV1(envelope.Salt, envelope.Nonce)
+	} else if envelope.Schema == backupSchemaV3 {
+		aad = backupAADV3(envelope.Salt, envelope.Nonce)
 	}
 	plain, err := aead.Open(nil, envelope.Nonce, envelope.Ciphertext, aad)
 	if err != nil {
@@ -267,8 +311,21 @@ func openBackup(encoded, passphrase []byte) (backupPayload, error) {
 			CreatedAt: legacy.CreatedAt, StateVersion: stateVersionV1, MasterKey: legacy.MasterKey, StateFile: legacy.StateFile,
 		}, nil
 	}
+	if envelope.Schema == backupSchemaV2 {
+		var legacy backupPayloadV2
+		if decodeCanonical(plain, &legacy, maxBackupBytes) != nil || legacy.Schema != backupSchemaV2 || !validID(legacy.DeploymentID) ||
+			legacy.Revision == 0 || legacy.CreatedAt <= 0 || legacy.AuditHead == "" || legacy.StateVersion != stateVersionV2 || legacy.MigrationEpoch == 0 {
+			return backupPayload{}, ErrRecoveryRejected
+		}
+		return backupPayload{
+			Schema: legacy.Schema, DeploymentID: legacy.DeploymentID, AuditHead: legacy.AuditHead,
+			Revision: legacy.Revision, Generation: legacy.Generation, CreatedAt: legacy.CreatedAt,
+			StateVersion: legacy.StateVersion, MigrationEpoch: legacy.MigrationEpoch,
+			MasterKey: legacy.MasterKey, StateFile: legacy.StateFile,
+		}, nil
+	}
 	var payload backupPayload
-	if decodeCanonical(plain, &payload, maxBackupBytes) != nil || payload.Schema != backupSchemaV2 || !validID(payload.DeploymentID) ||
+	if decodeCanonical(plain, &payload, maxBackupBytes) != nil || payload.Schema != backupSchemaV3 || !validID(payload.DeploymentID) ||
 		payload.Revision == 0 || payload.CreatedAt <= 0 || payload.AuditHead == "" || payload.StateVersion != stateVersionV2 || payload.MigrationEpoch == 0 {
 		return backupPayload{}, ErrRecoveryRejected
 	}
@@ -281,6 +338,124 @@ func backupAADV1(salt, nonce []byte) []byte {
 
 func backupAADV2(salt, nonce []byte) []byte {
 	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", backupSchemaV2, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
+}
+
+func backupAADV3(salt, nonce []byte) []byte {
+	return []byte(fmt.Sprintf("%s|argon2id|%d|%d|%d|%x|%x", backupSchemaV3, recoveryMemoryKiB, recoveryIterations, recoveryParallelism, salt, nonce))
+}
+
+func readRecipientRegistryForBackup(directory, expectedRegistryID string) ([]byte, []byte, error) {
+	if directory == "" {
+		if expectedRegistryID == "" {
+			return nil, nil, nil
+		}
+		return nil, nil, ErrRecipientRegistry
+	}
+	info, err := os.Lstat(directory)
+	if errors.Is(err, os.ErrNotExist) && expectedRegistryID == "" {
+		return nil, nil, nil
+	}
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || protectSelfhostPrivatePath(directory, true) != nil {
+		return nil, nil, ErrRecipientRegistry
+	}
+	keyPath := filepath.Join(directory, ownerRecipientRegistryKey)
+	statePath := filepath.Join(directory, ownerRecipientRegistryState)
+	key, keyErr := os.ReadFile(keyPath)
+	stateRaw, stateErr := os.ReadFile(statePath)
+	if keyErr != nil || stateErr != nil || protectSelfhostPrivatePath(keyPath, false) != nil || protectSelfhostPrivatePath(statePath, false) != nil {
+		zero(key)
+		return nil, nil, ErrRecipientRegistry
+	}
+	registry, decodeErr := decodeOwnerRecipientRegistry(key, stateRaw)
+	if decodeErr != nil || expectedRegistryID != "" && registry.RegistryID != expectedRegistryID {
+		zero(key)
+		return nil, nil, ErrRecipientRegistry
+	}
+	return key, stateRaw, nil
+}
+
+func validateBackupRecipientRegistry(payload backupPayload, expectedRegistryID string) error {
+	keyPresent := len(payload.RecipientRegistryKey) != 0
+	statePresent := len(payload.RecipientRegistryState) != 0
+	if keyPresent != statePresent {
+		return ErrRecoveryRejected
+	}
+	if !keyPresent {
+		if expectedRegistryID != "" {
+			return ErrRecoveryRejected
+		}
+		return nil
+	}
+	if payload.Schema != backupSchemaV3 {
+		return ErrRecoveryRejected
+	}
+	registry, err := decodeOwnerRecipientRegistry(payload.RecipientRegistryKey, payload.RecipientRegistryState)
+	if err != nil || expectedRegistryID != "" && registry.RegistryID != expectedRegistryID {
+		return ErrRecoveryRejected
+	}
+	return nil
+}
+
+func restoreOwnerRecipientRegistry(directory string, key, stateRaw []byte, expectedRegistryID string) (bool, error) {
+	if directory == "" || expectedRegistryID == "" {
+		return false, ErrRecoveryRejected
+	}
+	registry, err := decodeOwnerRecipientRegistry(key, stateRaw)
+	if err != nil || registry.RegistryID != expectedRegistryID {
+		return false, ErrRecoveryRejected
+	}
+	if _, statErr := os.Lstat(directory); statErr == nil {
+		existing, existingKey, loadErr := loadOrInitializeOwnerRecipientRegistry(directory, expectedRegistryID)
+		zero(existingKey)
+		if loadErr != nil || existing.RegistryID != expectedRegistryID {
+			return false, ErrRecipientRegistry
+		}
+		return false, nil
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return false, ErrRecipientRegistry
+	}
+	parent := filepath.Dir(directory)
+	if err := os.MkdirAll(parent, 0o700); err != nil {
+		return false, ErrRecipientRegistry
+	}
+	if err := createSelfhostPrivateDirectory(directory); err != nil {
+		return false, ErrRecipientRegistry
+	}
+	remove := true
+	defer func() {
+		if remove {
+			_ = os.RemoveAll(directory)
+		}
+	}()
+	if err := writeSelfhostPrivateFileExclusive(filepath.Join(directory, ownerRecipientRegistryKey), key); err != nil {
+		return false, ErrRecipientRegistry
+	}
+	if err := writeSelfhostPrivateFileExclusive(filepath.Join(directory, ownerRecipientRegistryState), stateRaw); err != nil {
+		return false, ErrRecipientRegistry
+	}
+	loaded, loadedKey, err := loadOrInitializeOwnerRecipientRegistry(directory, expectedRegistryID)
+	zero(loadedKey)
+	if err != nil || loaded.RegistryID != expectedRegistryID || syncDirectory(directory) != nil || syncDirectory(parent) != nil {
+		return false, ErrRecipientRegistry
+	}
+	remove = false
+	return true, nil
+}
+
+func pathWithin(parent, child string) (string, bool) {
+	if parent == "" || child == "" {
+		return "", false
+	}
+	parentAbsolute, parentErr := filepath.Abs(parent)
+	childAbsolute, childErr := filepath.Abs(child)
+	if parentErr != nil || childErr != nil {
+		return "", false
+	}
+	relative, err := filepath.Rel(parentAbsolute, childAbsolute)
+	if err != nil || relative == "." || !filepath.IsLocal(relative) {
+		return "", false
+	}
+	return relative, true
 }
 
 func backupSummary(payload backupPayload, encoded []byte, profileCount int) BackupSummary {

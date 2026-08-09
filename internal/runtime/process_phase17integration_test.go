@@ -90,7 +90,7 @@ func phase17RunNamespaceClientV1(t *testing.T, ctx context.Context, address, tun
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, carrier)
+	adapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, carrier, 15*time.Second)
 	if err != nil {
 		endpoint.Abort()
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func phase17RunNamespaceRelayV1(t *testing.T, ctx context.Context, address, tunN
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, carrier)
+	adapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, carrier, 15*time.Second)
 	if err != nil {
 		endpoint.Abort()
 		t.Fatal(err)

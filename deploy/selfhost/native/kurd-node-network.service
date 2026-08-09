@@ -1,7 +1,8 @@
 [Unit]
 Description=Kurd node owned network policy
 Documentation=file:/usr/local/share/doc/kurd-node/LIVE-DATA-PLANE.md
-Requires=systemd-networkd.service unbound.service
+Requires=systemd-networkd.service
+Wants=unbound.service
 After=network-online.target systemd-networkd.service unbound.service
 Before=kurd-node.socket kurd-node.service
 

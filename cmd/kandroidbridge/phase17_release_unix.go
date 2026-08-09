@@ -23,8 +23,6 @@ import (
 	"kurdistan/internal/transport/tlstcp"
 )
 
-const releaseMaximumClientBufferV1 = uint64(64 << 20)
-
 type platformRuntimeNetwork struct {
 	mu            sync.Mutex
 	closeOnce     sync.Once
@@ -40,6 +38,7 @@ type platformRuntimeNetwork struct {
 	program       liveprogram.ProgramV1
 	tun           *os.File
 	pump          *kruntime.PacketPumpV1
+	terminalCode  androidbridge.ErrorCode
 }
 
 func newPlatformRuntimeNetwork(ctx context.Context, plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2, seed []byte, endpointIndex uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
@@ -204,16 +203,31 @@ func (network *platformRuntimeNetwork) AttachTUN(ctx context.Context, fd int) an
 		return androidbridge.CodeInvalidArgument
 	}
 	var stat unix.Stat_t
-	if unix.Fstat(fd, &stat) != nil || stat.Mode&unix.S_IFMT != unix.S_IFCHR {
-		return androidbridge.CodePolicyRejected
+	if unix.Fstat(fd, &stat) != nil {
+		return androidbridge.CodeTUNIOFailed
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFCHR {
+		return androidbridge.CodeInvalidArgument
 	}
 	network.mu.Lock()
 	defer network.mu.Unlock()
-	if network.endpoint == nil || network.tun != nil || network.ctx.Err() != nil {
-		return androidbridge.CodePolicyRejected
+	if network.endpoint == nil {
+		return androidbridge.CodeEndpointUnavailable
 	}
-	file := os.NewFile(uintptr(fd), "kurd-android-tun")
+	if network.tun != nil {
+		return androidbridge.CodeInvalidArgument
+	}
+	if network.ctx.Err() != nil {
+		return androidbridge.CodeCancelled
+	}
+	ownedFD, err := unix.Dup(fd)
+	if err != nil {
+		return androidbridge.CodeInternalFailure
+	}
+	unix.CloseOnExec(ownedFD)
+	file := os.NewFile(uintptr(ownedFD), "kurd-android-tun")
 	if file == nil {
+		_ = unix.Close(ownedFD)
 		return androidbridge.CodeInternalFailure
 	}
 	network.tun = file
@@ -229,7 +243,7 @@ func (network *platformRuntimeNetwork) Start(ctx context.Context) androidbridge.
 		network.mu.Unlock()
 		return androidbridge.CodePolicyRejected
 	}
-	duplex, err := kruntime.NewProcessTLSTCPDuplexCarrierV1(network.ctx, network.carrier)
+	duplex, err := kruntime.NewProcessTLSTCPDuplexCarrierV1(network.ctx, network.carrier, network.plan.IdleTimeout)
 	if err != nil {
 		network.mu.Unlock()
 		return androidbridge.CodeInternalFailure
@@ -254,10 +268,39 @@ func (network *platformRuntimeNetwork) Start(ctx context.Context) androidbridge.
 	network.pump = pump
 	network.mu.Unlock()
 	go func() {
-		_ = pump.Run(network.ctx)
+		err := pump.Run(network.ctx)
+		network.mu.Lock()
+		if network.ctx.Err() != nil {
+			network.terminalCode = androidbridge.CodeCancelled
+		} else {
+			network.terminalCode = releasePacketPumpErrorCode(err)
+		}
+		network.mu.Unlock()
 		network.Close()
 	}()
 	return androidbridge.CodeOK
+}
+
+func (network *platformRuntimeNetwork) Status() androidbridge.ErrorCode {
+	if network == nil {
+		return androidbridge.CodeInternalFailure
+	}
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.terminalCode
+}
+
+func (network *platformRuntimeNetwork) RuntimeNetworkDiagnosticsV1() androidbridge.RuntimeNetworkDiagnosticsV1 {
+	if network == nil {
+		return androidbridge.RuntimeNetworkDiagnosticsV1{}
+	}
+	network.mu.Lock()
+	pump := network.pump
+	network.mu.Unlock()
+	if pump == nil {
+		return androidbridge.RuntimeNetworkDiagnosticsV1{}
+	}
+	return releaseRuntimeNetworkDiagnostics(pump.SnapshotV1())
 }
 
 func (network *platformRuntimeNetwork) Close() {
@@ -338,16 +381,4 @@ func releaseConnectFD(ctx context.Context, fd int, endpoint runtimepolicy.Endpoi
 		}
 		return nil
 	}
-}
-
-func releasePacketBufferBudget(program liveprogram.ProgramV1, queue, incomplete uint16) (uint64, bool) {
-	if liveprogram.ValidateV1(program) != nil || queue == 0 || incomplete == 0 || program.Limits.MaxPayloadBytes < 40 {
-		return 0, false
-	}
-	count := uint64(queue) + uint64(incomplete)
-	budget := uint64(program.Limits.MaxPayloadBytes) * count
-	if count == 0 || budget/count != uint64(program.Limits.MaxPayloadBytes) || budget > releaseMaximumClientBufferV1 {
-		return 0, false
-	}
-	return budget, true
 }

@@ -6,7 +6,9 @@
 package tun
 
 import (
+	"os"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -17,5 +19,39 @@ func TestOpenExistingAttachesToTheOwnerCreatedMultiQueueTUN(t *testing.T) {
 		if flags&required == 0 {
 			t.Fatalf("missing required TUN flag %#x from %#x", required, flags)
 		}
+	}
+}
+
+func TestOpenExistingUsesPollableNonblockingDescriptor(t *testing.T) {
+	if flags := openExistingFileFlags(); flags&unix.O_NONBLOCK == 0 {
+		t.Fatalf("open flags %#x do not include O_NONBLOCK", flags)
+	}
+}
+
+func TestLinuxDeviceCloseInterruptsBlockedReadAndIsIdempotent(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = writer.Close() })
+	device := &linuxDevice{file: reader, name: OwnedName}
+	done := make(chan error, 1)
+	go func() {
+		_, readErr := device.Read(make([]byte, 1))
+		done <- readErr
+	}()
+	if err := device.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := device.Close(); err != nil {
+		t.Fatalf("second close: %v", err)
+	}
+	select {
+	case readErr := <-done:
+		if readErr == nil {
+			t.Fatal("blocked read completed without a close error")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("close did not interrupt blocked read")
 	}
 }

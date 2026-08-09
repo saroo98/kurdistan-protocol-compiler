@@ -101,6 +101,22 @@ data class NativeLiveRuntimeSessionSnapshot(
     val idleTimeoutMillis: Long,
 )
 
+data class NativeLiveRuntimeDiagnostics(
+    val tunPacketsRead: Long,
+    val outboundPacketsAccepted: Long,
+    val carrierRecordsWritten: Long,
+    val carrierRecordsRead: Long,
+    val authenticatedOperations: Long,
+    val innerPacketsAccepted: Long,
+    val innerPacketsRejected: Long,
+    val tunWriteAttempts: Long,
+    val tunWriteFailures: Long,
+    val tunWriteFailureCode: Long,
+    val tunWriteErrno: Long,
+    val tunPacketsWritten: Long,
+    val rejectedTunPackets: Long,
+)
+
 interface NativeRecipient : AutoCloseable {
     fun publicRequest(): NativeResult<ByteArray>
     fun privateBundle(): NativeResult<ByteArray>
@@ -113,6 +129,8 @@ interface NativeLiveRuntimeSession : AutoCloseable {
     fun commitProtected(protectedSocket: Boolean): NativeResult<Unit>
     fun attachTun(fileDescriptor: Int): NativeResult<Unit>
     fun status(): NativeResult<NativeRuntimeState>
+    fun diagnostics(): NativeResult<NativeLiveRuntimeDiagnostics> =
+        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
     fun stop(): NativeResult<Unit>
 }
 

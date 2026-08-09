@@ -7,6 +7,7 @@ import java.net.InetAddress
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeDiagnostics
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativeapi.NativeRuntimeState
@@ -97,9 +98,15 @@ internal class NativeTunnelController(
             return@synchronized fail(session, LiveTunnelFailure.TUN_ESTABLISH_FAILED)
         }
         onStage(LiveTunnelStage.TUN_ESTABLISHED)
-        when (val attached = session.attachTun(tunFileDescriptor)) {
+        val attached = try {
+            session.attachTun(tunFileDescriptor)
+        } finally {
+            // The native runtime duplicates the descriptor synchronously. Android
+            // retains ownership of the detached original and closes it exactly once.
+            runCatching { detachedCloser.close(tunFileDescriptor) }
+        }
+        when (attached) {
             is NativeResult.Failure -> {
-                runCatching { detachedCloser.close(tunFileDescriptor) }
                 return@synchronized fail(
                     session,
                     attached.error.toLiveTunnelFailure(LiveTunnelFailure.TUN_ATTACH_FAILED),
@@ -116,6 +123,30 @@ internal class NativeTunnelController(
     }
 
     fun isRunning(): Boolean = synchronized(lock) { activeSession != null }
+
+    fun diagnostics(): NativeResult<NativeLiveRuntimeDiagnostics> = synchronized(lock) {
+        activeSession?.diagnostics() ?: NativeResult.Failure(OperationError.CANCELLED)
+    }
+
+    fun checkHealth(): LiveTunnelFailure? = synchronized(lock) {
+        val session = activeSession ?: return@synchronized null
+        val failure = when (val status = session.status()) {
+            is NativeResult.Success -> if (status.value == NativeRuntimeState.RUNNING) {
+                null
+            } else {
+                LiveTunnelFailure.NATIVE_STATE_MISMATCH
+            }
+            is NativeResult.Failure -> status.error.toLiveTunnelFailure(
+                LiveTunnelFailure.INTERNAL_FAILURE,
+            )
+        }
+        if (failure == null) return@synchronized null
+        activeSession = null
+        runCatching { session.stop() }
+        runCatching { session.close() }
+        onStage(LiveTunnelStage.STOPPED)
+        failure
+    }
 
     fun stop() = synchronized(lock) {
         val session = activeSession ?: return@synchronized
@@ -140,6 +171,7 @@ internal class NativeTunnelController(
 private fun OperationError.toLiveTunnelFailure(fallback: LiveTunnelFailure): LiveTunnelFailure =
     when (this) {
         OperationError.TRUST_REJECTED,
+        OperationError.TRUST_UNAVAILABLE,
         OperationError.POLICY_REJECTED,
         OperationError.INCOMPATIBLE_NATIVE_CORE
         -> LiveTunnelFailure.AUTHORITY_REJECTED

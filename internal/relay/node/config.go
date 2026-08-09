@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/selfhost"
 )
 
@@ -35,13 +36,16 @@ type Config struct {
 	Now                             func() time.Time
 	LoadSnapshot                    func(string, time.Time) (RelaySnapshotV1, error)
 	SessionRejected                 func(SessionRejectCodeV1)
+	SessionProgress                 func(SessionStageCodeV1)
+	SessionTerminated               func(SessionTerminationCodeV1)
+	SessionPacketPumpSnapshot       func(kruntime.PacketPumpSnapshotV1)
 	Entropy                         io.Reader
 }
 
 func DefaultConfig(dataDir string, listenerPort uint16) Config {
 	return Config{
 		DataDir: dataDir, TUNName: "kurd0", ControlSocket: filepath.Join(dataDir, "control.sock"), ListenerPort: listenerPort,
-		MaxHandshakeWorkers: 32, MaxSessions: 256, SessionQueuePackets: 64,
+		MaxHandshakeWorkers: 32, MaxSessions: 64, SessionQueuePackets: 64,
 		MaxSourceEntries: 4096, MaxSourceAttempts: 20, ControlWorkers: 4,
 		HandshakeTimeout: 10 * time.Second, SessionIdleTimeout: 10 * time.Minute, ReloadInterval: 5 * time.Second,
 		SourceWindow: time.Minute, ControlTimeout: 2 * time.Second,

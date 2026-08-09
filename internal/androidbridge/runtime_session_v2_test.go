@@ -156,6 +156,79 @@ func TestRuntimeSessionV2RunsOnlyAfterAuthenticatedTUNAttach(t *testing.T) {
 	}
 }
 
+func TestRuntimeSessionV2ReportsOnlyBoundedAggregateNetworkDiagnostics(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	factory.network.diagnostics = RuntimeNetworkDiagnosticsV1{
+		TUNPacketsRead:          1,
+		OutboundPacketsAccepted: 2,
+		CarrierRecordsWritten:   3,
+		CarrierRecordsRead:      4,
+		AuthenticatedOperations: 5,
+		InnerPacketsAccepted:    6,
+		InnerPacketsRejected:    7,
+		TUNWriteAttempts:        8,
+		TUNWriteFailures:        9,
+		TUNWriteFailureCode:     10,
+		TUNWriteErrno:           11,
+		TUNPacketsWritten:       12,
+		RejectedTUNPackets:      13,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateRunning,
+		plan:    sessionplan.PlanV2{Digest: [32]byte{1}},
+		factory: factory,
+		network: &factory.network,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatalf("open code=%v", code)
+	}
+	defer registry.Free(handle)
+
+	got, code := RuntimeNetworkDiagnostics(&registry, handle)
+	if code != CodeOK {
+		t.Fatalf("diagnostics code=%v", code)
+	}
+	if !reflect.DeepEqual(got, factory.network.diagnostics) {
+		t.Fatalf("diagnostics=%+v want=%+v", got, factory.network.diagnostics)
+	}
+}
+
+func TestRuntimeSessionV2ReportsAsynchronousNetworkFailure(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateVerified,
+		plan:    sessionplan.PlanV2{Digest: [32]byte{1}},
+		factory: factory,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+	defer registry.Free(handle)
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodeOK {
+		t.Fatal(code)
+	}
+	if code := RuntimeSocketCommitProtected(&registry, handle, true); code != CodeOK {
+		t.Fatal(code)
+	}
+	if code := RuntimeTUNAttach(&registry, handle, 73); code != CodeOK {
+		t.Fatal(code)
+	}
+	factory.network.setStatus(CodeTUNIOFailed)
+
+	if current, code := RuntimeStatus(&registry, handle); code != CodeTUNIOFailed || current != RuntimeStateClosed {
+		t.Fatalf("asynchronous failure state=%v code=%v", current, code)
+	}
+	if !factory.network.closed() {
+		t.Fatal("asynchronous failure did not close network")
+	}
+}
+
 func TestRuntimeSessionV2CancelClosesNetwork(t *testing.T) {
 	factory := &recordingRuntimeNetworkFactory{}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -184,6 +257,56 @@ func TestRuntimeSessionV2CancelClosesNetwork(t *testing.T) {
 	}
 	if code := registry.Free(handle); code != CodeOK {
 		t.Fatal(code)
+	}
+}
+
+func TestRuntimeSessionV2ThousandCancellationPointsFailClosed(t *testing.T) {
+	stages := []string{"prepare", "connect", "tls", "kurd", "tun-attach", "tun-start"}
+	for iteration := 0; iteration < 1000; iteration++ {
+		stage := stages[iteration%len(stages)]
+		ctx, cancel := context.WithCancel(context.Background())
+		factory := &cancellationRuntimeNetworkFactory{cancelAt: stage, cancel: cancel}
+		state := &runtimeSessionV2Handle{
+			ctx: ctx, cancel: cancel, state: RuntimeStateVerified,
+			plan: sessionplan.PlanV2{Digest: [32]byte{1}}, maxFallbackAttempts: 1, factory: factory,
+		}
+		registry := HandleRegistry{}
+		handle, code := registry.Open(HandleRuntimeSession, state)
+		if code != CodeOK {
+			t.Fatalf("iteration %d stage %s open=%v", iteration, stage, code)
+		}
+		_, prepareCode := RuntimeSocketPrepare(&registry, handle)
+		if stage == "prepare" {
+			if prepareCode != CodeCancelled {
+				t.Fatalf("iteration %d prepare=%v", iteration, prepareCode)
+			}
+		} else {
+			if prepareCode != CodeOK {
+				t.Fatalf("iteration %d stage %s prepare=%v", iteration, stage, prepareCode)
+			}
+			commitCode := RuntimeSocketCommitProtected(&registry, handle, true)
+			if stage == "connect" || stage == "tls" || stage == "kurd" {
+				if commitCode != CodeCancelled {
+					t.Fatalf("iteration %d stage %s commit=%v", iteration, stage, commitCode)
+				}
+			} else {
+				if commitCode != CodeOK {
+					t.Fatalf("iteration %d stage %s commit=%v", iteration, stage, commitCode)
+				}
+				if attachCode := RuntimeTUNAttach(&registry, handle, 73); attachCode != CodeCancelled {
+					t.Fatalf("iteration %d stage %s attach=%v", iteration, stage, attachCode)
+				}
+			}
+		}
+		if factory.network == nil || !factory.network.closed() {
+			t.Fatalf("iteration %d stage %s retained network", iteration, stage)
+		}
+		if current, statusCode := RuntimeStatus(&registry, handle); statusCode != CodeOK || current != RuntimeStateClosed {
+			t.Fatalf("iteration %d stage %s state=%v code=%v", iteration, stage, current, statusCode)
+		}
+		if freeCode := registry.Free(handle); freeCode != CodeOK {
+			t.Fatalf("iteration %d stage %s free=%v", iteration, stage, freeCode)
+		}
 	}
 }
 
@@ -282,6 +405,66 @@ func TestNormalizeRuntimeNetworkCodePreservesActionableFailures(t *testing.T) {
 
 type recordingRuntimeNetworkFactory struct{ network recordingRuntimeNetwork }
 
+type cancellationRuntimeNetworkFactory struct {
+	cancelAt string
+	cancel   context.CancelFunc
+	network  *cancellationRuntimeNetwork
+}
+
+func (factory *cancellationRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte, _ uint8) (RuntimeNetworkSession, ErrorCode) {
+	clear(seed)
+	factory.network = &cancellationRuntimeNetwork{cancelAt: factory.cancelAt, cancel: factory.cancel}
+	if factory.cancelAt == "prepare" {
+		factory.cancel()
+	}
+	return factory.network, CodeOK
+}
+
+type cancellationRuntimeNetwork struct {
+	mu       sync.Mutex
+	cancelAt string
+	cancel   context.CancelFunc
+	isClosed bool
+}
+
+func (*cancellationRuntimeNetwork) SocketFD() (int, ErrorCode) { return 41, CodeOK }
+func (network *cancellationRuntimeNetwork) ConnectProtected(context.Context) ErrorCode {
+	network.cancelIf("connect")
+	return CodeOK
+}
+func (network *cancellationRuntimeNetwork) AuthenticateTLS(context.Context) ErrorCode {
+	network.cancelIf("tls")
+	return CodeOK
+}
+func (network *cancellationRuntimeNetwork) AuthenticateKurd(context.Context) ErrorCode {
+	network.cancelIf("kurd")
+	return CodeOK
+}
+func (network *cancellationRuntimeNetwork) AttachTUN(context.Context, int) ErrorCode {
+	network.cancelIf("tun-attach")
+	return CodeOK
+}
+func (network *cancellationRuntimeNetwork) Start(context.Context) ErrorCode {
+	network.cancelIf("tun-start")
+	return CodeOK
+}
+func (*cancellationRuntimeNetwork) Status() ErrorCode { return CodeOK }
+func (network *cancellationRuntimeNetwork) Close() {
+	network.mu.Lock()
+	network.isClosed = true
+	network.mu.Unlock()
+}
+func (network *cancellationRuntimeNetwork) closed() bool {
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.isClosed
+}
+func (network *cancellationRuntimeNetwork) cancelIf(stage string) {
+	if network.cancelAt == stage {
+		network.cancel()
+	}
+}
+
 func (factory *recordingRuntimeNetworkFactory) Prepare(_ context.Context, _ sessionplan.PlanV2, seed []byte, _ uint8) (RuntimeNetworkSession, ErrorCode) {
 	clear(seed)
 	factory.network.add("prepare")
@@ -339,12 +522,15 @@ func (*fallbackRuntimeNetwork) AuthenticateTLS(context.Context) ErrorCode  { ret
 func (*fallbackRuntimeNetwork) AuthenticateKurd(context.Context) ErrorCode { return CodeOK }
 func (*fallbackRuntimeNetwork) AttachTUN(context.Context, int) ErrorCode   { return CodeOK }
 func (*fallbackRuntimeNetwork) Start(context.Context) ErrorCode            { return CodeOK }
+func (*fallbackRuntimeNetwork) Status() ErrorCode                          { return CodeOK }
 func (network *fallbackRuntimeNetwork) Close()                             { network.isClosed = true }
 
 type recordingRuntimeNetwork struct {
-	mu      sync.Mutex
-	history []string
-	isClose bool
+	mu           sync.Mutex
+	history      []string
+	isClose      bool
+	terminalCode ErrorCode
+	diagnostics  RuntimeNetworkDiagnosticsV1
 }
 
 func (network *recordingRuntimeNetwork) SocketFD() (int, ErrorCode) { return 41, CodeOK }
@@ -368,6 +554,16 @@ func (network *recordingRuntimeNetwork) Start(context.Context) ErrorCode {
 	network.add("start")
 	return CodeOK
 }
+func (network *recordingRuntimeNetwork) Status() ErrorCode {
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.terminalCode
+}
+func (network *recordingRuntimeNetwork) RuntimeNetworkDiagnosticsV1() RuntimeNetworkDiagnosticsV1 {
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.diagnostics
+}
 func (network *recordingRuntimeNetwork) Close() {
 	network.mu.Lock()
 	defer network.mu.Unlock()
@@ -387,4 +583,9 @@ func (network *recordingRuntimeNetwork) closed() bool {
 	network.mu.Lock()
 	defer network.mu.Unlock()
 	return network.isClose
+}
+func (network *recordingRuntimeNetwork) setStatus(code ErrorCode) {
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	network.terminalCode = code
 }
