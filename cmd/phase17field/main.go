@@ -39,7 +39,7 @@ const (
 	appPackage                  = "org.kurdistanvpn.app.internal"
 	testPackage                 = "org.kurdistanvpn.app.internal.test"
 	testRunner                  = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
-	fieldTest                   = "org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#profileRevocationAndBackupRestoreFailClosed"
+	fieldTest                   = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
 	remoteDataDir               = "/var/lib/kurd-node"
 	remoteRegistry              = "/var/lib/kurd-node/recipient-registry"
 	remoteControl               = "/run/kurd-node/control.sock"

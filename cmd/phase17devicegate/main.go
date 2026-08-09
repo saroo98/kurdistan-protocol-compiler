@@ -17,6 +17,7 @@ import (
 )
 
 var requiredPhase17DeviceTests = []string{
+	"minSdk=34 org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction",
 	"org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected",
 	"org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#liveIpv4LifecycleProtectsSocketBeforeConnectAndStopsCleanly",
 	"org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#permissionRevocationAndProcessDeathRequireFreshAuthority",
