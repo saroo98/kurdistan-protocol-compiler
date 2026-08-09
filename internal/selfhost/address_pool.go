@@ -5,6 +5,7 @@ package selfhost
 
 import (
 	"bytes"
+	"encoding/binary"
 	"net/netip"
 	"sort"
 	"time"
@@ -18,7 +19,7 @@ const (
 
 func defaultAddressPools() (addressPoolV1, addressPoolV1) {
 	return addressPoolV1{
-			Family: addressFamilyIPv4, Network: []byte{10, 77, 0, 0}, PrefixLength: 24,
+			Family: addressFamilyIPv4, Network: []byte{10, 77, 0, 0}, PrefixLength: 16,
 			ServerDNS: []byte{10, 77, 0, 1}, Enabled: true, NextHostOffset: 2,
 		}, addressPoolV1{
 			Family: addressFamilyIPv6, Network: netip.MustParseAddr("fd4b:7572:6400::").AsSlice(), PrefixLength: 64,
@@ -29,7 +30,7 @@ func defaultAddressPools() (addressPoolV1, addressPoolV1) {
 func validateAddressPool(pool addressPoolV1) error {
 	address, ok := netip.AddrFromSlice(pool.Network)
 	if !ok || address.Is4In6() || uint8(address.BitLen()) != familyBits(pool.Family) ||
-		pool.Family == addressFamilyIPv4 && pool.PrefixLength != 24 || pool.Family == addressFamilyIPv6 && pool.PrefixLength != 64 {
+		pool.Family == addressFamilyIPv4 && pool.PrefixLength != 16 && pool.PrefixLength != 24 || pool.Family == addressFamilyIPv6 && pool.PrefixLength != 64 {
 		return ErrStateCorrupt
 	}
 	prefix := netip.PrefixFrom(address, int(pool.PrefixLength)).Masked()
@@ -182,7 +183,11 @@ func addressAtOffset(pool addressPoolV1, offset uint64) ([]byte, error) {
 	}
 	if pool.Family == addressFamilyIPv4 {
 		value := base.As4()
-		value[3] = byte(offset)
+		baseValue := uint64(binary.BigEndian.Uint32(value[:]))
+		if offset > uint64(^uint32(0))-baseValue {
+			return nil, ErrStateCorrupt
+		}
+		binary.BigEndian.PutUint32(value[:], uint32(baseValue+offset))
 		return append([]byte(nil), value[:]...), nil
 	}
 	value := base.As16()
@@ -195,7 +200,13 @@ func addressAtOffset(pool addressPoolV1, offset uint64) ([]byte, error) {
 
 func hostOffset(pool addressPoolV1, address netip.Addr) uint64 {
 	if pool.Family == addressFamilyIPv4 {
-		return uint64(address.As4()[3])
+		baseAddress, ok := netip.AddrFromSlice(pool.Network)
+		if !ok {
+			return 0
+		}
+		base := baseAddress.As4()
+		value := address.As4()
+		return uint64(binary.BigEndian.Uint32(value[:]) - binary.BigEndian.Uint32(base[:]))
 	}
 	value := address.As16()
 	var result uint64
@@ -209,7 +220,7 @@ func usableHostOffset(pool addressPoolV1, offset uint64) bool {
 	if offset < 2 || offset > maxHostOffset(pool) {
 		return false
 	}
-	return pool.Family != addressFamilyIPv4 || offset < 255
+	return pool.Family != addressFamilyIPv4 || offset < maxHostOffset(pool)
 }
 
 func nextHostOffset(pool addressPoolV1, offset uint64) uint64 {

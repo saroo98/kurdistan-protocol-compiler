@@ -38,7 +38,7 @@ table inet kurd_node {
 
     chain forward {
         type filter hook forward priority filter; policy accept;
-        iifname "kurd0" ip saddr != 10.77.0.0/24 drop
+        iifname "kurd0" ip saddr != 10.77.0.0/16 drop
         iifname "kurd0" ip6 saddr != fd4b:7572:6400::/64 drop
         iifname "kurd0" ip daddr @blocked_ipv4 drop
         iifname "kurd0" ip6 daddr @blocked_ipv6 drop
@@ -52,7 +52,7 @@ table inet kurd_node {
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        oifname $egress_if_v4 ip saddr 10.77.0.0/24 masquerade
+        oifname $egress_if_v4 ip saddr 10.77.0.0/16 masquerade
         oifname $egress_if_v6 ip6 saddr fd4b:7572:6400::/64 masquerade
     }
 }

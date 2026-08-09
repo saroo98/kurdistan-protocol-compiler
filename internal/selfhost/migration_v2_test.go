@@ -90,6 +90,45 @@ func TestMigrationRollbackClosesAfterFirstV2Transaction(t *testing.T) {
 	}
 }
 
+func TestMigrationApplyExpandsLegacyIPv4PoolExactlyOnce(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.IPv4Pool.PrefixLength = 24
+	state.IPv4Pool.NextHostOffset = 254
+	if err := saveState(dataDir, master, state); err != nil {
+		zero(master)
+		t.Fatal(err)
+	}
+	zero(master)
+
+	now := time.Unix(state.LastObservedAt+60, 0).UTC()
+	if err := MigrateToV2(dataDir, now); err != nil {
+		t.Fatal(err)
+	}
+	expanded, loadedMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(loadedMaster)
+	if expanded.IPv4Pool.PrefixLength != 16 || expanded.Revision != state.Revision+1 || expanded.Audit[len(expanded.Audit)-1].Action != "expand-ipv4-pool" {
+		t.Fatalf("expanded state=%+v", expanded.IPv4Pool)
+	}
+	if err := MigrateToV2(dataDir, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	idempotent, loadedMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(loadedMaster)
+	if idempotent.Revision != expanded.Revision {
+		t.Fatalf("idempotent revision=%d want=%d", idempotent.Revision, expanded.Revision)
+	}
+}
+
 func TestMigrationRollbackResumesAfterStateRestoreBeforeMarkerRemoval(t *testing.T) {
 	dataDir, raw, master := copyPhase16Fixture(t)
 	v1, err := decodeStateFileV1(raw, master)

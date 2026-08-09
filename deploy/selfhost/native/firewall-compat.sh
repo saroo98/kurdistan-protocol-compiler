@@ -62,7 +62,7 @@ managed_rule_present() {
 check_rules() {
   ufw --dry-run allow in on kurd0 to 10.77.0.1 port 53 proto udp comment "$marker-dns4-udp" >/dev/null
   ufw --dry-run allow in on kurd0 to 10.77.0.1 port 53 proto tcp comment "$marker-dns4-tcp" >/dev/null
-  ufw --dry-run route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/24 comment "$marker-route4" >/dev/null
+  ufw --dry-run route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/16 comment "$marker-route4" >/dev/null
   ufw --dry-run allow in on "$egress_interface_v4" to any port "$ingress_port" proto tcp comment "$marker-ingress4" >/dev/null
   if [ "$ipv6_enabled" = true ]; then
     ufw --dry-run allow in on kurd0 to fd4b:7572:6400::1 port 53 proto udp comment "$marker-dns6-udp" >/dev/null
@@ -75,7 +75,7 @@ check_rules() {
 apply_rules() {
   ufw allow in on kurd0 to 10.77.0.1 port 53 proto udp comment "$marker-dns4-udp" >/dev/null
   ufw allow in on kurd0 to 10.77.0.1 port 53 proto tcp comment "$marker-dns4-tcp" >/dev/null
-  ufw route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/24 comment "$marker-route4" >/dev/null
+  ufw route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/16 comment "$marker-route4" >/dev/null
   ufw allow in on "$egress_interface_v4" to any port "$ingress_port" proto tcp comment "$marker-ingress4" >/dev/null
   if [ "$ipv6_enabled" = true ]; then
     ufw allow in on kurd0 to fd4b:7572:6400::1 port 53 proto udp comment "$marker-dns6-udp" >/dev/null
@@ -93,7 +93,7 @@ remove_rules() {
     ufw --force delete allow in on kurd0 to 10.77.0.1 port 53 proto tcp comment "$marker-dns4-tcp" >/dev/null
   fi
   if managed_rule_present "$marker-route4"; then
-    ufw --force delete route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/24 comment "$marker-route4" >/dev/null
+    ufw --force delete route allow in on kurd0 out on "$egress_interface_v4" from 10.77.0.0/16 comment "$marker-route4" >/dev/null
   fi
   if managed_rule_present "$marker-ingress4"; then
     ufw --force delete allow in on "$egress_interface_v4" to any port "$ingress_port" proto tcp comment "$marker-ingress4" >/dev/null
