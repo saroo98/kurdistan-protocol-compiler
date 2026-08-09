@@ -11,13 +11,16 @@ import java.util.concurrent.TimeUnit
 
 class UnderlyingNetworkMonitorTest {
     @Test
-    fun ignoresDuplicatesAndStaleLossWhileReportingCurrentNetworkChanges() {
+    fun retainsCurrentNetworkUntilLossThenPromotesAStandbyCandidate() {
         val transitions = mutableListOf<NetworkTransition<String>>()
         val tracker = CurrentNetworkTracker<String>(transitions::add)
 
         tracker.available("wifi")
         tracker.available("wifi")
         tracker.available("cell")
+        tracker.lost("cell")
+        tracker.available("cell")
+        tracker.lost("wifi")
         tracker.lost("wifi")
         tracker.lost("cell")
 
