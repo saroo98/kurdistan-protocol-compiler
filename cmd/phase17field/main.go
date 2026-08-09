@@ -432,15 +432,9 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 		return errors.New("IPv6 capability unavailable")
 	}
 	tracker := &resourceTracker{}
-	if err := observeRemoteMetrics(parent, runner, value, root, tracker); err != nil {
-		return err
-	}
 	outcome, err := runFunctional(parent, runner, value, root, serial, remotePackage, ipv6Authorized, tracker)
 	if err != nil {
 		_ = safeStop(parent, runner, value, root)
-		return err
-	}
-	if err := observeRemoteMetrics(parent, runner, value, root, tracker); err != nil {
 		return err
 	}
 	last := tracker.samples[len(tracker.samples)-1]
@@ -510,6 +504,9 @@ func runFunctional(ctx context.Context, runner commandRunner, value config, root
 	if err := verifyFieldTraffic(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized); err != nil {
 		return outcome, err
 	}
+	if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
+		return outcome, err
+	}
 	if err := remoteService(ctx, runner, value, root, "sudo -n systemctl stop unbound.service"); err != nil {
 		return outcome, err
 	}
@@ -551,6 +548,9 @@ func runFunctional(ctx context.Context, runner commandRunner, value config, root
 		outcome.reconnects += soakReconnects
 		outcome.campaign.SoakDurationMS = soakDurationMS
 		outcome.campaign.SoakCycles = soakCycles
+	}
+	if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
+		return outcome, err
 	}
 	if err := revokeRemoteProfile(ctx, runner, value, root, profileID); err != nil {
 		return outcome, err
