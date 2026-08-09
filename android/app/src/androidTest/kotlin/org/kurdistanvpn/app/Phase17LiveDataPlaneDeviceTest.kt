@@ -218,9 +218,6 @@ class Phase17LiveDataPlaneDeviceTest {
     @SdkSuppress(minSdkVersion = 34)
     @Test
     fun profileRevocationAndBackupRestoreFailClosed() = runBlocking {
-        if (Phase17FieldHarness.runIfRequested()) {
-            return@runBlocking
-        }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val application = instrumentation.targetContext.applicationContext as KurdistanApplication
         val root = application.compositionRoot
