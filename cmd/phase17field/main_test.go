@@ -269,6 +269,35 @@ func TestRemoteMetricsCommandUsesReadOnlyPrivilegeForProtectedProcState(t *testi
 	}
 }
 
+func TestFieldRuntimeMetricsStayInsideLiveProfileWindow(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runFieldStart := bytes.Index(source, []byte("func runField("))
+	runFunctionalStart := bytes.Index(source, []byte("func runFunctional("))
+	if runFieldStart < 0 || runFunctionalStart < 0 {
+		t.Fatal("field orchestration boundary unavailable")
+	}
+	issueStart := bytes.Index(source[runFunctionalStart:], []byte("issueAndActivateProfile("))
+	verifyStart := bytes.Index(source[runFunctionalStart:], []byte("verifyFieldTraffic("))
+	revokeStart := bytes.Index(source[runFunctionalStart:], []byte("revokeRemoteProfile("))
+	functionalEnd := bytes.Index(source[runFunctionalStart:], []byte("\n}\n\nfunc issueAndActivateProfile("))
+	if issueStart < 0 || verifyStart < 0 || revokeStart < 0 || functionalEnd < 0 {
+		t.Fatal("field orchestration boundary unavailable")
+	}
+	runFieldBody := source[runFieldStart:runFunctionalStart]
+	if bytes.Contains(runFieldBody, []byte("observeRemoteMetrics(")) {
+		t.Fatal("runtime metrics sampled before a live profile exists")
+	}
+	functionalBody := source[runFunctionalStart : runFunctionalStart+functionalEnd]
+	firstSample := bytes.Index(functionalBody, []byte("observeRemoteMetrics("))
+	lastSample := bytes.LastIndex(functionalBody, []byte("observeRemoteMetrics("))
+	if !(issueStart < verifyStart && verifyStart < firstSample && firstSample < lastSample && lastSample < revokeStart) {
+		t.Fatalf("runtime metrics are outside the active profile window: issue=%d verify=%d first=%d last=%d revoke=%d", issueStart, verifyStart, firstSample, lastSample, revokeStart)
+	}
+}
+
 type countingConnectionGate struct{ calls int }
 
 func (gate *countingConnectionGate) wait(context.Context) error {
