@@ -122,7 +122,7 @@ func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: kurdctl <init|recovery|status|doctor|profile|keys|node|deployment|clock|lock|backup|restore|migration|upgrade|rollback|logs|version>")
+		fmt.Fprintln(stderr, "usage: kurdctl <init|recovery|status|doctor|profile|keys|node|network|deployment|clock|lock|backup|restore|migration|upgrade|rollback|logs|version>")
 		return 2
 	}
 	if args[0] == "--help" {
@@ -145,6 +145,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = runKeys(args[1:], stdin, stdout)
 	case "node":
 		err = runNode(args[1:], stdout)
+	case "network":
+		err = runNetwork(args[1:], stdin, stdout)
 	case "deployment":
 		err = runDeployment(args[1:], stdin, stdout)
 	case "clock":
@@ -249,6 +251,8 @@ Node and maintenance:
   node drain
   node reload
   node resume
+  network ipv6 enable
+  network ipv6 disable
   backup create
   backup verify
   restore preview
@@ -263,6 +267,39 @@ Node and maintenance:
 
 Passphrases are read from standard input and are never accepted as arguments.
 `)
+}
+
+func runNetwork(args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) < 2 || args[0] != "ipv6" || args[1] != "enable" && args[1] != "disable" ||
+		rejectDuplicateFlags(args[2:], "data-dir", "recovery-file", "confirm") {
+		return selfhost.ErrInvalidInput
+	}
+	set := newFlags("network ipv6 " + args[1])
+	dataDir := set.String("data-dir", "", "state directory")
+	recovery := set.String("recovery-file", "", "offline recovery artifact")
+	confirm := set.String("confirm", "", "exact network capability confirmation")
+	if set.Parse(args[2:]) != nil || set.NArg() != 0 {
+		return selfhost.ErrInvalidInput
+	}
+	enabled := args[1] == "enable"
+	wantConfirmation := "disable-ipv6"
+	if enabled {
+		wantConfirmation = "enable-ipv6"
+	}
+	if *confirm != wantConfirmation {
+		return selfhost.ErrInvalidInput
+	}
+	passphrase, err := readPassphrase(stdin)
+	if err != nil {
+		return err
+	}
+	defer zero(passphrase)
+	if err := selfhost.SetIPv6Enabled(*dataDir, enabled, selfhost.RecoveryActionOptions{
+		RecoveryPath: *recovery, RecoveryPassphrase: passphrase, Now: time.Now().UTC(),
+	}); err != nil {
+		return err
+	}
+	return writeJSON(stdout, map[string]any{"schema": "kurdctl-network-ipv6-v1", "enabled": enabled})
 }
 
 func runKeys(args []string, stdin io.Reader, stdout io.Writer) error {
@@ -430,12 +467,7 @@ func runProfile(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return committedOutputError{cause: err, profileID: issued.ProfileID, generation: issued.Generation}
 		}
-		if issued.Connectable {
-			if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
-				return committedRuntimeControlError{cause: err}
-			}
-		}
-		return writeJSON(stdout, profileMutationResponse("kurdctl-profile-create-v2", issued, paths))
+		return writeProfileMutationAndNotify(stdout, "kurdctl-profile-create-v2", issued, paths, *controlSocket)
 	case "list":
 		set := newFlags("profile list")
 		dataDir := set.String("data-dir", "", "state directory")
@@ -597,12 +629,19 @@ func runProfileRotate(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return committedOutputError{cause: err, profileID: issued.ProfileID, generation: issued.Generation}
 	}
+	return writeProfileMutationAndNotify(stdout, "kurdctl-profile-rotate-v2", issued, paths, *controlSocket)
+}
+
+func writeProfileMutationAndNotify(stdout io.Writer, schema string, issued selfhost.IssuedProfile, paths profileOutputFilesV2, controlSocket string) error {
+	if err := writeJSON(stdout, profileMutationResponse(schema, issued, paths)); err != nil {
+		return committedOutputError{cause: err, profileID: issued.ProfileID, generation: issued.Generation}
+	}
 	if issued.Connectable {
-		if err := notifyRelayRuntime(*controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
+		if err := notifyRelayRuntime(controlSocket, node.ControlRequestV1{Command: node.ControlReloadV1}, false); err != nil {
 			return committedRuntimeControlError{cause: err}
 		}
 	}
-	return writeJSON(stdout, profileMutationResponse("kurdctl-profile-rotate-v2", issued, paths))
+	return nil
 }
 
 func runProfileRevoke(args []string, stdin io.Reader, stdout io.Writer) error {
@@ -818,8 +857,16 @@ func runBackup(args []string, stdin io.Reader, stdout io.Writer) error {
 	set := newFlags("backup " + args[0])
 	dataDir := set.String("data-dir", "", "state directory")
 	file := set.String("file", "", "backup file")
+	registryDir := set.String("recipient-registry-dir", "", "owner-local recipient-use registry")
 	if set.Parse(args[1:]) != nil || set.NArg() != 0 {
 		return selfhost.ErrInvalidInput
+	}
+	if args[0] == "create" && *registryDir == "" {
+		var err error
+		*registryDir, err = defaultRecipientRegistryDir()
+		if err != nil {
+			return errUnsupportedFilesystem
+		}
 	}
 	passphrase, err := readPassphrase(stdin)
 	if err != nil {
@@ -828,7 +875,7 @@ func runBackup(args []string, stdin io.Reader, stdout io.Writer) error {
 	defer zero(passphrase)
 	var result selfhost.BackupSummary
 	if args[0] == "create" {
-		result, err = selfhost.CreateBackup(selfhost.BackupOptions{DataDir: *dataDir, Destination: *file, Passphrase: passphrase, Now: time.Now().UTC()})
+		result, err = selfhost.CreateBackup(selfhost.BackupOptions{DataDir: *dataDir, Destination: *file, RegistryDir: *registryDir, Passphrase: passphrase, Now: time.Now().UTC()})
 	} else {
 		result, err = selfhost.VerifyBackup(*file, passphrase)
 	}
@@ -846,15 +893,23 @@ func runRestore(args []string, stdin io.Reader, stdout io.Writer) error {
 	dataDir := set.String("data-dir", "", "state directory")
 	file := set.String("file", "", "backup file")
 	digest := set.String("expected-digest", "", "preview digest")
+	registryDir := set.String("recipient-registry-dir", "", "owner-local recipient-use registry")
 	if set.Parse(args[1:]) != nil || set.NArg() != 0 {
 		return selfhost.ErrInvalidInput
+	}
+	if args[0] == "apply" && *registryDir == "" {
+		var err error
+		*registryDir, err = defaultRecipientRegistryDir()
+		if err != nil || prepareRecipientRegistryParent(*registryDir) != nil {
+			return errUnsupportedFilesystem
+		}
 	}
 	passphrase, err := readPassphrase(stdin)
 	if err != nil {
 		return err
 	}
 	defer zero(passphrase)
-	options := selfhost.RestoreOptions{BackupPath: *file, DataDir: *dataDir, ExpectedDigest: *digest, Passphrase: passphrase, Now: time.Now().UTC()}
+	options := selfhost.RestoreOptions{BackupPath: *file, DataDir: *dataDir, RegistryDir: *registryDir, ExpectedDigest: *digest, Passphrase: passphrase, Now: time.Now().UTC()}
 	if args[0] == "preview" {
 		result, err := selfhost.PreviewRestore(options)
 		if err != nil {

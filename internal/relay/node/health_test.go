@@ -13,6 +13,9 @@ import (
 func TestConfigV1RejectsUnsafeOrUnboundedValues(t *testing.T) {
 	valid := DefaultConfig(filepath.Join(t.TempDir(), "node"), 443)
 	valid.DNSReady = func(context.Context) bool { return true }
+	if valid.MaxHandshakeWorkers != 32 || valid.MaxSessions != 64 || valid.SessionQueuePackets != 64 {
+		t.Fatalf("unsafe default concurrency bounds: handshakes=%d sessions=%d queue=%d", valid.MaxHandshakeWorkers, valid.MaxSessions, valid.SessionQueuePackets)
+	}
 	if err := valid.Validate(); err != nil {
 		t.Fatal(err)
 	}

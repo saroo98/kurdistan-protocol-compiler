@@ -231,11 +231,11 @@ func TestProcessTLSTCPDuplexCarrierV1PreservesExactWireRecords(t *testing.T) {
 	client, relay := phase11TLSPairV1(t, digest)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	clientAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, client)
+	clientAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, client, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, relay)
+	relayAdapter, err := NewProcessTLSTCPDuplexCarrierV1(ctx, relay, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +257,68 @@ func TestProcessTLSTCPDuplexCarrierV1PreservesExactWireRecords(t *testing.T) {
 	}
 	clear(got)
 	clear(encoded)
+}
+
+func TestProcessTLSTCPDuplexCarrierV1BoundsIOWithDeadlineFreeParent(t *testing.T) {
+	var digest [32]byte
+	for index := range digest {
+		digest[index] = byte(index + 91)
+	}
+	client, relay := phase11TLSPairV1(t, digest)
+	clientAdapter, err := NewProcessTLSTCPDuplexCarrierV1(context.Background(), client, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	relayAdapter, err := NewProcessTLSTCPDuplexCarrierV1(context.Background(), relay, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := wirev1.Encode(wirev1.Frame{Type: wirev1.TypeReliableData, StreamID: 11, PlanDigest: digest, Payload: []byte("deadline-free-parent")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDone := make(chan error, 1)
+	go func() { writeDone <- writeBoundedRecordV1(clientAdapter, encoded) }()
+	got, err := readBoundedCarrierRecordV1(relayAdapter, len(encoded))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-writeDone; err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, encoded) {
+		t.Fatal("TLS adapter changed the wire record")
+	}
+	clear(got)
+	clear(encoded)
+}
+
+func TestProcessTLSTCPDuplexCarrierV1RejectsInvalidIdleTimeout(t *testing.T) {
+	var digest [32]byte
+	digest[0] = 1
+	client, _ := phase11TLSPairV1(t, digest)
+	for _, idleTimeout := range []time.Duration{0, -time.Second, maxProcessTLSTCPIdleTimeoutV1 + time.Nanosecond} {
+		if _, err := NewProcessTLSTCPDuplexCarrierV1(context.Background(), client, idleTimeout); !errors.Is(err, ErrProcessSessionV1) {
+			t.Fatalf("idle timeout %s: expected rejection, got %v", idleTimeout, err)
+		}
+	}
+}
+
+func TestProcessTLSTCPDuplexCarrierV1DeadlineFreeReadTimesOut(t *testing.T) {
+	var digest [32]byte
+	digest[0] = 2
+	client, _ := phase11TLSPairV1(t, digest)
+	adapter, err := NewProcessTLSTCPDuplexCarrierV1(context.Background(), client, 20*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	if _, err := adapter.Read(make([]byte, 128)); err == nil {
+		t.Fatal("deadline-free read unexpectedly remained valid without peer data")
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("bounded read exceeded its fail-closed deadline: %s", elapsed)
+	}
 }
 
 func TestProcessDuplexOperationAcrossTLSCarrierV1(t *testing.T) {

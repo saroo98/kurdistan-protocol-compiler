@@ -5,24 +5,101 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
+	"kurdistan/internal/androidbridge"
 	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/runtimepolicy"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/protocol/liveprogram"
 	"kurdistan/internal/protocol/liveprogramcompile"
+	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/selfhost"
 	"kurdistan/internal/transport/tlstcp"
 )
+
+func TestReleasePacketPumpErrorCodeRemainsCategorical(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want androidbridge.ErrorCode
+	}{
+		{nil, androidbridge.CodeNetworkLost},
+		{context.Canceled, androidbridge.CodeCancelled},
+		{kruntime.ErrPacketQueueFull, androidbridge.CodeResourceLimit},
+		{kruntime.ErrPacketPumpConfig, androidbridge.CodeStateCorrupt},
+		{kruntime.ErrPacketPumpIO, androidbridge.CodeTUNIOFailed},
+		{errors.New("opaque"), androidbridge.CodeNetworkLost},
+	} {
+		if got := releasePacketPumpErrorCode(test.err); got != test.want {
+			t.Fatalf("error=%v code=%v want=%v", test.err, got, test.want)
+		}
+	}
+}
+
+func TestReleaseRuntimeNetworkDiagnosticsMapsOnlyAggregateCounters(t *testing.T) {
+	snapshot := kruntime.PacketPumpSnapshotV1{
+		TUNPacketsRead:          1,
+		OutboundPacketsAccepted: 2,
+		CarrierRecordsWritten:   3,
+		CarrierRecordsRead:      4,
+		AuthenticatedOperations: 5,
+		InnerPacketsAccepted:    6,
+		InnerPacketsRejected:    7,
+		TUNWriteAttempts:        8,
+		TUNWriteFailures:        9,
+		TUNWriteFailureCode:     kruntime.PacketPumpTUNWriteFailureNoBufferV1,
+		TUNWriteErrno:           105,
+		TUNPacketsWritten:       10,
+		RejectedTUNPackets:      11,
+	}
+	want := androidbridge.RuntimeNetworkDiagnosticsV1{
+		TUNPacketsRead:          1,
+		OutboundPacketsAccepted: 2,
+		CarrierRecordsWritten:   3,
+		CarrierRecordsRead:      4,
+		AuthenticatedOperations: 5,
+		InnerPacketsAccepted:    6,
+		InnerPacketsRejected:    7,
+		TUNWriteAttempts:        8,
+		TUNWriteFailures:        9,
+		TUNWriteFailureCode:     5,
+		TUNWriteErrno:           105,
+		TUNPacketsWritten:       10,
+		RejectedTUNPackets:      11,
+	}
+	if got := releaseRuntimeNetworkDiagnostics(snapshot); got != want {
+		t.Fatalf("diagnostics=%+v want=%+v", got, want)
+	}
+}
+
+func TestReleasePacketPumpStageErrorCodeDistinguishesTUNCarrierAndRecord(t *testing.T) {
+	for _, test := range []struct {
+		stage kruntime.PacketPumpStageV1
+		want  androidbridge.ErrorCode
+	}{
+		{kruntime.PacketPumpStageTUNReadV1, androidbridge.CodeTUNIOFailed},
+		{kruntime.PacketPumpStageCarrierReadV1, androidbridge.CodeEndpointUnavailable},
+		{kruntime.PacketPumpStageCarrierWriteV1, androidbridge.CodeNetworkLost},
+		{kruntime.PacketPumpStageRecordOpenV1, androidbridge.CodeKurdAuthRejected},
+		{kruntime.PacketPumpStageOutboundQueueV1, androidbridge.CodeResourceLimit},
+		{kruntime.PacketPumpStageIdleV1, androidbridge.CodeFallbackExhausted},
+		{"unknown", androidbridge.CodeNetworkLost},
+	} {
+		if got := releasePacketPumpStageErrorCode(test.stage); got != test.want {
+			t.Fatalf("stage=%q code=%v want=%v", test.stage, got, test.want)
+		}
+	}
+}
 
 func TestReleaseTLSClientConfigPinsExactLeafAndProtocol(t *testing.T) {
 	policy, seed, now := releasePolicyFixture(t)
@@ -79,6 +156,23 @@ func TestClearRuntimePolicyV2WipesRetainedByteMaterial(t *testing.T) {
 	clearRuntimePolicyV2(&policy)
 	if !reflect.DeepEqual(policy, runtimepolicy.PolicyV2{}) || !allZeroBytes(program) || !allZeroBytes(leaf) || !allZeroBytes(endpoint) {
 		t.Fatal("release policy byte material was retained")
+	}
+}
+
+func TestReleasePacketBufferBudgetUsesMaximumTUNPacketSize(t *testing.T) {
+	program, err := liveprogram.DecodeV1(releaseLiveProgramFixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const queuePackets = uint16(100)
+	const incompleteOps = uint16(64)
+	budget, ok := releasePacketBufferBudget(program, queuePackets, incompleteOps)
+	if !ok {
+		t.Fatal("valid signed queue bounds exceeded the client budget because the program payload ceiling was used as a TUN packet allocation")
+	}
+	want := uint64(65535) * uint64(queuePackets+incompleteOps)
+	if budget != want {
+		t.Fatalf("buffer budget=%d want=%d", budget, want)
 	}
 }
 

@@ -7,11 +7,59 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestSessionRegistryHundredConcurrentClientsEnforceSixtyFourSessionLimit(t *testing.T) {
+	registry, err := NewSessionRegistry(newMemoryTunnelV1(), 64, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+
+	type result struct {
+		device *SessionDevice
+		err    error
+	}
+	results := make(chan result, 100)
+	var workers sync.WaitGroup
+	for index := 0; index < 100; index++ {
+		index := index
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			device, registerErr := registry.Register(SessionSpec{
+				ID: fmt.Sprintf("session-%03d", index), ProfileID: fmt.Sprintf("profile-%03d", index), ClientKeyID: fmt.Sprintf("client-%03d", index),
+				AssignedIPv4: [4]byte{10, 89, 1, byte(index + 2)},
+			})
+			results <- result{device: device, err: registerErr}
+		}()
+	}
+	workers.Wait()
+	close(results)
+
+	accepted, limited := 0, 0
+	for item := range results {
+		switch {
+		case item.err == nil && item.device != nil:
+			accepted++
+		case errors.Is(item.err, ErrSessionLimit) && item.device == nil:
+			limited++
+		default:
+			t.Fatalf("non-categorical admission result: device=%v err=%v", item.device, item.err)
+		}
+	}
+	if accepted != 64 || limited != 36 {
+		t.Fatalf("accepted=%d limited=%d want=64/36", accepted, limited)
+	}
+	if snapshot := registry.Snapshot(); snapshot.ActiveSessions != 64 {
+		t.Fatalf("active sessions=%d want=64", snapshot.ActiveSessions)
+	}
+}
 
 func TestSessionRegistryRoutesExactReturnAddressesWithoutCrossDelivery(t *testing.T) {
 	tunnel := newMemoryTunnelV1()
@@ -91,6 +139,17 @@ func TestSessionRegistryRejectsDuplicateAuthorityAndSpoofedSource(t *testing.T) 
 	if count, err := device.Write(spoofed); count != 0 || !errors.Is(err, ErrPacketRejected) {
 		t.Fatalf("spoofed packet accepted: count=%d err=%v", count, err)
 	}
+	tunnelGateway := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 1}, 17, []byte{4})
+	if count, err := device.Write(tunnelGateway); err != nil || count != len(tunnelGateway) {
+		t.Fatalf("exact tunnel gateway rejected: count=%d err=%v", count, err)
+	}
+	if got := tunnel.writtenPacket(t); string(got) != string(tunnelGateway) {
+		t.Fatal("exact tunnel gateway packet was not delivered to the shared TUN")
+	}
+	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{4})
+	if count, err := device.Write(otherPrivate); count != 0 || !errors.Is(err, ErrPacketRejected) {
+		t.Fatalf("other private destination accepted: count=%d err=%v", count, err)
+	}
 	valid := testIPv4PacketV1(assigned, [4]byte{1, 1, 1, 1}, 17, []byte{4})
 	if count, err := device.Write(valid); err != nil || count != len(valid) {
 		t.Fatalf("valid packet rejected: count=%d err=%v", count, err)
@@ -128,6 +187,37 @@ func TestSessionRegistryQueuePressureAndProfileStopFailClosed(t *testing.T) {
 	}
 	if snapshot := registry.Snapshot(); snapshot.ActiveSessions != 0 || snapshot.QueueDrops != 1 || snapshot.StoppedSessions != 1 {
 		t.Fatalf("unexpected registry snapshot: %+v", snapshot)
+	}
+	if got := device.StopCodeV1(); got != SessionStopQueueV1 {
+		t.Fatalf("stop code=%q want=%q", got, SessionStopQueueV1)
+	}
+}
+
+func TestSessionRegistryReportsProfileAndLocalStopCategories(t *testing.T) {
+	registry, err := NewSessionRegistry(newMemoryTunnelV1(), 2, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+	profileDevice, err := registry.Register(SessionSpec{ID: "session-profile", ProfileID: "profile-target", ClientKeyID: "client-profile", AssignedIPv4: [4]byte{10, 89, 0, 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	localDevice, err := registry.Register(SessionSpec{ID: "session-local", ProfileID: "profile-local", ClientKeyID: "client-local", AssignedIPv4: [4]byte{10, 89, 0, 3}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stopped := registry.StopProfile("profile-target"); stopped != 1 {
+		t.Fatalf("stopped=%d", stopped)
+	}
+	if got := profileDevice.StopCodeV1(); got != SessionStopProfileV1 {
+		t.Fatalf("profile stop code=%q want=%q", got, SessionStopProfileV1)
+	}
+	if err := localDevice.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := localDevice.StopCodeV1(); got != SessionStopLocalV1 {
+		t.Fatalf("local stop code=%q want=%q", got, SessionStopLocalV1)
 	}
 }
 

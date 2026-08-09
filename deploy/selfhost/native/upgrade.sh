@@ -8,6 +8,26 @@ fail() {
 
 mode=${1:-}
 [ "$mode" = "--check" ] || [ "$mode" = "--apply" ] || fail INVALID_ARGUMENTS
+shift
+listen_port=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --port)
+      [ "$#" -ge 2 ] || fail INVALID_ARGUMENTS
+      listen_port=$2
+      shift 2
+      ;;
+    *) fail INVALID_ARGUMENTS ;;
+  esac
+done
+if [ -z "$listen_port" ] && [ -f /etc/systemd/system/kurd-node.socket ]; then
+  listen_port=$(sed -n 's/^ListenStream=\[::\]:\([0-9][0-9]*\)$/\1/p' /etc/systemd/system/kurd-node.socket)
+fi
+[ -n "$listen_port" ] || listen_port=443
+case "$listen_port" in
+  ''|*[!0-9]*) fail INVALID_ARGUMENTS ;;
+esac
+[ "$listen_port" -ge 1 ] && [ "$listen_port" -le 65535 ] || fail INVALID_ARGUMENTS
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 cd "$script_dir"
@@ -16,7 +36,7 @@ for command in sha256sum sed grep tr id stat install runuser systemctl networkct
 done
 [ -f manifest.json ] && [ -f SHA256SUMS ] || fail PACKAGE_INCOMPLETE
 sha256sum -c SHA256SUMS >/dev/null || fail CHECKSUM_MISMATCH
-./preflight.sh --install --port 443 --allow-systemd-socket >/dev/null || fail PREFLIGHT_FAILED
+./preflight.sh --install --port "$listen_port" --allow-systemd-socket >/dev/null || fail PREFLIGHT_FAILED
 
 manifest_value() {
   sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\(\"[^\"]*\"\|[0-9][0-9]*\).*/\1/p" "$2" | tr -d '"'
@@ -43,6 +63,7 @@ fi
 [ "$(id -u)" -eq 0 ] || fail ROOT_REQUIRED
 
 data_dir=/var/lib/kurd-node
+recipient_registry=$data_dir/recipient-registry
 state_file=$data_dir/state.kurd-state
 backup_dir=/var/backups/kurd-node
 passphrase_file=${KURD_BACKUP_PASSPHRASE_FILE:-}
@@ -63,7 +84,7 @@ if [ -f "$state_file" ]; then
   backup_file=$backup_dir/pre-upgrade-$candidate_version.kurd-backup
   [ ! -e "$backup_file" ] || fail BACKUP_EXISTS
   runuser -u kurd-node -- /usr/local/bin/kurdctl node drain --data-dir "$data_dir" >/dev/null || fail DRAIN_FAILED
-  runuser -u kurd-node -- /usr/local/bin/kurdctl backup create --data-dir "$data_dir" --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_FAILED
+  runuser -u kurd-node -- /usr/local/bin/kurdctl backup create --data-dir "$data_dir" --recipient-registry-dir "$recipient_registry" --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_FAILED
   runuser -u kurd-node -- /usr/local/bin/kurdctl backup verify --file "$backup_file" <"$passphrase_file" >/dev/null || fail BACKUP_VERIFY_FAILED
 fi
 
@@ -95,7 +116,7 @@ rebind_owned_dns() {
 }
 
 systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
-./install.sh --upgrade >/dev/null || fail INSTALL_FAILED
+./install.sh --upgrade --port "$listen_port" >/dev/null || fail INSTALL_FAILED
 recreate_owned_tun || fail TUN_RECREATE_FAILED
 rebind_owned_dns || fail DNS_REBIND_FAILED
 

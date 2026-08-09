@@ -803,6 +803,33 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeStatus(
 }
 
 JNIEXPORT jint JNICALL
+Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeDiagnostics(
+    JNIEnv *env,
+    jobject receiver,
+    jlong handle,
+    jlongArray output) {
+    (void)receiver;
+    const jsize output_count = 13;
+    if (output == NULL || (*env)->GetArrayLength(env, output) != output_count) {
+        return KVPN_INVALID_ARGUMENT;
+    }
+    uint64_t values[13] = {0};
+    int32_t code = kvpn_runtime_diagnostics_v1((uint64_t)handle, values, 13);
+    if (code != 0) {
+        return code;
+    }
+    jlong converted[13] = {0};
+    for (jsize index = 0; index < output_count; index++) {
+        if (values[index] > INT64_MAX) {
+            return KVPN_SIZE_LIMIT;
+        }
+        converted[index] = (jlong)values[index];
+    }
+    (*env)->SetLongArrayRegion(env, output, 0, output_count, converted);
+    return (*env)->ExceptionCheck(env) ? KVPN_INVALID_ARGUMENT : 0;
+}
+
+JNIEXPORT jint JNICALL
 Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeStop(
     JNIEnv *env,
     jobject receiver,

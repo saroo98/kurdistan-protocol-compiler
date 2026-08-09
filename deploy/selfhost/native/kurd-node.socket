@@ -6,7 +6,7 @@ After=kurd-node-network.service
 PartOf=kurd-node.service
 
 [Socket]
-ListenStream=[::]:443
+ListenStream=[::]:KURD_LISTEN_PORT
 BindIPv6Only=both
 FileDescriptorName=kurd
 Accept=no

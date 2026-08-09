@@ -933,7 +933,7 @@ func validateM17LiveDataPlaneOverlayV1(root string) (m17LiveDataPlaneOverlayV1, 
 func validateM17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[string]string, overlay m17LiveDataPlaneOverlayV1) (m17LiveDataPlaneOverlayV1, error) {
 	const name = "phase17-live-data-plane-v1"
 	const predecessorBinding = "77772a0daab7ba1bd148fcd437ee1c18be535bb0c4272cbc0f84d5dc0b764cf4"
-	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(m17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > 256 {
+	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(m17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > evidenceoverlay.Phase17SuccessorEntryLimit {
 		return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 live-data-plane overlay identity/cardinality")
 	}
 	baseAtPost, err := m17SuccessorPreAtPostV1(root, currentAtPost, overlay.SuccessorEntries)

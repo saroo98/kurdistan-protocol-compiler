@@ -13,6 +13,7 @@ import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.model.SelectionMode
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeDiagnostics
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.NativePayloadProtocol
 import org.kurdistanvpn.core.nativeapi.NativeResult
@@ -43,13 +44,30 @@ class NativeTunnelControllerTest {
                 "stage:VERIFIED", "prepare", "stage:SOCKET_PREPARED", "protect",
                 "stage:SOCKET_PROTECTED", "connect", "tls", "kurd", "status:KURD_AUTHENTICATED",
                 "stage:AUTHENTICATED", "builder", "establish", "detach",
-                "stage:TUN_ESTABLISHED", "attach:71", "status:RUNNING", "stage:RUNNING",
+                "stage:TUN_ESTABLISHED", "attach:71", "close-detached:71",
+                "status:RUNNING", "stage:RUNNING",
             ),
             events,
         )
         assertTrue(controller.isRunning())
         controller.stop()
         assertFalse(controller.isRunning())
+    }
+
+    @Test
+    fun diagnosticsReturnsOnlyTheActiveNativeSessionAggregateSnapshot() {
+        val events = mutableListOf<String>()
+        val session = FakeLiveSession(events)
+        val controller = NativeTunnelController(
+            protector = SocketProtector { true },
+            tunEstablisher = TunEstablisher { FakeTun(events) },
+            detachedCloser = DetachedFileDescriptorCloser {},
+        )
+
+        assertEquals(LiveTunnelStartResult.Running(), controller.start(session))
+        assertEquals(NativeResult.Success(liveDiagnostics()), controller.diagnostics())
+        controller.stop()
+        assertEquals(NativeResult.Failure(OperationError.CANCELLED), controller.diagnostics())
     }
 
     @Test
@@ -165,6 +183,24 @@ class NativeTunnelControllerTest {
     }
 
     @Test
+    fun asynchronousNativeFailureClearsFalseRunningState() {
+        val events = mutableListOf<String>()
+        val session = FakeLiveSession(events)
+        val controller = NativeTunnelController(
+            SocketProtector { true },
+            TunEstablisher { FakeTun(events) },
+            DetachedFileDescriptorCloser {},
+        )
+        assertEquals(LiveTunnelStartResult.Running(), controller.start(session))
+        session.failStatus(OperationError.TUN_IO_FAILED)
+
+        assertEquals(LiveTunnelFailure.TUN_IO_FAILED, controller.checkHealth())
+        assertFalse(controller.isRunning())
+        assertTrue(events.contains("stop"))
+        assertTrue(events.contains("close"))
+    }
+
+    @Test
     fun nullTunAndDuplicateStartFailClosed() {
         val firstEvents = mutableListOf<String>()
         val controller = NativeTunnelController(
@@ -209,7 +245,7 @@ class NativeTunnelControllerTest {
             LiveTunnelStartResult.Failure(LiveTunnelFailure.INTERNAL_FAILURE),
             controller.start(session),
         )
-        assertTrue(events.contains("closed:71"))
+        assertEquals(1, events.count { it == "closed:71" })
         assertFalse(events.contains("stage:${LiveTunnelStage.RUNNING.name}"))
     }
 
@@ -218,12 +254,12 @@ class NativeTunnelControllerTest {
         val configuration = snapshot(dualStack = true).toLiveTunConfiguration()
 
         assertEquals(
-            listOf("10.77.0.2", "fd00:77:0:0:0:0:0:2"),
+            listOf("10.77.0.2", "fd4b:7572:6400:0:0:0:0:2"),
             configuration.addresses.map { it.address },
         )
         assertEquals(listOf(32, 128), configuration.addresses.map { it.prefixLength })
         assertEquals(listOf(0, 0), configuration.routes.map { it.prefixLength })
-        assertEquals(listOf("10.77.0.1", "fd00:77:0:0:0:0:0:1"), configuration.dnsServers)
+        assertEquals(listOf("10.77.0.1", "fd4b:7572:6400:0:0:0:0:1"), configuration.dnsServers)
         assertEquals(1280, configuration.mtu)
     }
 
@@ -279,6 +315,7 @@ private class FakeLiveSession(
     )
 
     private var state = NativeRuntimeState.VERIFIED
+    private var statusError: OperationError? = null
     override val snapshot = snapshot()
 
     override fun prepareSocket(): NativeResult<Int> {
@@ -308,7 +345,15 @@ private class FakeLiveSession(
 
     override fun status(): NativeResult<NativeRuntimeState> {
         events += "status:${state.name}"
+        statusError?.let { return NativeResult.Failure(it) }
         return NativeResult.Success(state)
+    }
+
+    override fun diagnostics(): NativeResult<NativeLiveRuntimeDiagnostics> =
+        NativeResult.Success(liveDiagnostics())
+
+    fun failStatus(error: OperationError) {
+        statusError = error
     }
 
     override fun stop(): NativeResult<Unit> {
@@ -376,8 +421,8 @@ private fun snapshot(dualStack: Boolean = false) = NativeLiveRuntimeSessionSnaps
     metered = false,
     clientIpv4 = byteArrayOf(10, 77, 0, 2),
     dnsIpv4 = byteArrayOf(10, 77, 0, 1),
-    clientIpv6 = if (dualStack) byteArrayOf(0xfd.toByte(), 0, 0, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2) else ByteArray(16),
-    dnsIpv6 = if (dualStack) byteArrayOf(0xfd.toByte(), 0, 0, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) else ByteArray(16),
+    clientIpv6 = if (dualStack) byteArrayOf(0xfd.toByte(), 0x4b, 0x75, 0x72, 0x64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2) else ByteArray(16),
+    dnsIpv6 = if (dualStack) byteArrayOf(0xfd.toByte(), 0x4b, 0x75, 0x72, 0x64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) else ByteArray(16),
     routes = buildList {
         add(NativeRoute(ByteArray(4), 0))
         if (dualStack) add(NativeRoute(ByteArray(16), 0))
@@ -388,4 +433,20 @@ private fun snapshot(dualStack: Boolean = false) = NativeLiveRuntimeSessionSnaps
     maxReconnectAttempts = 3,
     dialTimeoutMillis = 5_000,
     idleTimeoutMillis = 60_000,
+)
+
+private fun liveDiagnostics() = NativeLiveRuntimeDiagnostics(
+    tunPacketsRead = 1,
+    outboundPacketsAccepted = 2,
+    carrierRecordsWritten = 3,
+    carrierRecordsRead = 4,
+    authenticatedOperations = 5,
+    innerPacketsAccepted = 6,
+    innerPacketsRejected = 7,
+    tunWriteAttempts = 8,
+    tunWriteFailures = 9,
+    tunWriteFailureCode = 10,
+    tunWriteErrno = 11,
+    tunPacketsWritten = 12,
+    rejectedTunPackets = 13,
 )

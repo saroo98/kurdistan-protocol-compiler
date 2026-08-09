@@ -7,6 +7,10 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+	"time"
+
+	"kurdistan/internal/crypto/auth"
+	"kurdistan/internal/protocol/liveprogram"
 )
 
 func TestLiveProgramCapabilityConventionIsPinned(t *testing.T) {
@@ -60,5 +64,53 @@ func TestCompileLiveProgramFailsClosedAfterCollisionBudget(t *testing.T) {
 	})
 	if !errors.Is(err, errCLIInvalidInput) || calls != maxLiveProgramCompileAttemptsV1 {
 		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}
+
+func TestCompileLiveProgramCandidateUsesLiveSessionBounds(t *testing.T) {
+	for _, seed := range []int64{72_623_859_790_382_856, 144_964_032_628_459_529, 217_304_205_466_536_202} {
+		encoded, collision, err := compileLiveProgramCandidateV1(seed)
+		if err != nil {
+			t.Fatalf("seed %d: %v", seed, err)
+		}
+		if collision {
+			t.Fatalf("seed %d: product-safe candidate reported a forbidden collision", seed)
+		}
+		program, err := liveprogram.DecodeV1(encoded)
+		if err != nil {
+			t.Fatalf("seed %d decode: %v", seed, err)
+		}
+		if got, want := time.Duration(program.Limits.MaxSessionMillis)*time.Millisecond, 24*time.Hour; got != want {
+			t.Fatalf("seed %d session lifetime=%s want=%s", seed, got, want)
+		}
+		if program.Limits.MaxSessionMessages != 1<<24 {
+			t.Fatalf("seed %d session messages=%d want=%d", seed, program.Limits.MaxSessionMessages, 1<<24)
+		}
+		if program.Limits.MaxKeyLifetimeMessages != 1<<16 {
+			t.Fatalf("seed %d key lifetime messages=%d want=%d", seed, program.Limits.MaxKeyLifetimeMessages, 1<<16)
+		}
+		if program.Security.Policy.MaxSessionMessages != program.Limits.MaxSessionMessages ||
+			program.Security.Policy.MaxKeyLifetimeMessages != program.Limits.MaxKeyLifetimeMessages {
+			t.Fatalf("seed %d security and live limits diverged", seed)
+		}
+	}
+}
+
+func TestCompileLiveProgramCandidateBuildsProjectedProcessHandshake(t *testing.T) {
+	for seed := int64(1); seed <= 512; seed++ {
+		encoded, collision, err := compileLiveProgramCandidateV1(seed)
+		if err != nil {
+			t.Fatalf("seed %d compile: %v", seed, err)
+		}
+		if collision {
+			continue
+		}
+		program, err := liveprogram.DecodeV1(encoded)
+		if err != nil {
+			t.Fatalf("seed %d decode: %v", seed, err)
+		}
+		if _, err := auth.NewProjectedProcessHandshakeConfigV1("client.phase17", "relay.phase17", program, "tls13-tcp"); err != nil {
+			t.Fatalf("seed %d projected process handshake rejected live program: %v", seed, err)
+		}
 	}
 }

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"kurdistan/internal/crypto/auth"
+	kruntime "kurdistan/internal/runtime"
 	"kurdistan/internal/selfhost"
 )
 
@@ -53,6 +55,176 @@ func TestServerReloadV1ReplacesAuthorityAndTerminatesExistingSessions(t *testing
 	}
 }
 
+func TestSessionRejectPacketPumpStageV1IsBoundedAndCategorical(t *testing.T) {
+	for _, test := range []struct {
+		stage kruntime.PacketPumpStageV1
+		want  SessionRejectCodeV1
+	}{
+		{kruntime.PacketPumpStageTUNReadV1, SessionRejectPumpTUNV1},
+		{kruntime.PacketPumpStageCarrierWriteV1, SessionRejectPumpCarrierV1},
+		{kruntime.PacketPumpStageRecordOpenV1, SessionRejectPumpRecordV1},
+		{kruntime.PacketPumpStageOutboundQueueV1, SessionRejectPumpQueueV1},
+		{kruntime.PacketPumpStageIdleV1, SessionRejectPumpIdleV1},
+		{"unknown", SessionRejectPacketPumpV1},
+	} {
+		if got := sessionRejectPacketPumpStageV1(test.stage); got != test.want {
+			t.Fatalf("stage=%q code=%q want=%q", test.stage, got, test.want)
+		}
+	}
+}
+
+func TestSessionRejectHandshakeV1IsBoundedAndCategorical(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want SessionRejectCodeV1
+	}{
+		{&auth.HandshakeError{Code: auth.FailureUnknownIdentity}, SessionRejectAuthUnknownIdentityV1},
+		{&auth.HandshakeError{Code: auth.FailureUntrustedIdentity}, SessionRejectAuthUntrustedIdentityV1},
+		{&auth.HandshakeError{Code: auth.FailureInternalLimit}, SessionRejectAuthLimitV1},
+		{errors.New("other"), SessionRejectAuthCredentialsV1},
+	} {
+		if got := sessionRejectHandshakeV1(test.err); got != test.want {
+			t.Fatalf("err=%v code=%q want=%q", test.err, got, test.want)
+		}
+	}
+}
+
+func TestSessionRejectAuthConfigV1IsBoundedAndCategorical(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want SessionRejectCodeV1
+	}{
+		{&auth.HandshakeError{Code: auth.FailureProfileMismatch}, SessionRejectAuthConfigProfileV1},
+		{&auth.HandshakeError{Code: auth.FailurePolicyMismatch}, SessionRejectAuthConfigPolicyV1},
+		{&auth.HandshakeError{Code: auth.FailurePolicyFloorRejected}, SessionRejectAuthConfigFloorV1},
+		{errors.New("other"), SessionRejectAuthConfigV1},
+	} {
+		if got := sessionRejectAuthConfigV1(test.err); got != test.want {
+			t.Fatalf("err=%v code=%q want=%q", test.err, got, test.want)
+		}
+	}
+}
+
+func TestSessionRejectRegistryV1IsBoundedAndCategorical(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want SessionRejectCodeV1
+	}{
+		{ErrSessionLimit, SessionRejectCapacityV1},
+		{ErrSessionConflict, SessionRejectAdmissionV1},
+		{errors.New("other"), SessionRejectAdmissionV1},
+	} {
+		if got := sessionRejectRegistryV1(test.err); got != test.want {
+			t.Fatalf("error=%v got=%q want=%q", test.err, got, test.want)
+		}
+	}
+}
+
+func TestAcceptLoopV1ReportsFailClosedPreAcceptReason(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		healthReady   bool
+		closeLimiter  bool
+		wantRejection SessionRejectCodeV1
+	}{
+		{name: "health unavailable", wantRejection: SessionRejectHealthV1},
+		{name: "source limiter denied", healthReady: true, closeLimiter: true, wantRejection: SessionRejectSourceLimitV1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			limiter, err := NewSourceLimiterV1(make([]byte, 32), 4, 2, time.Minute, func() time.Time {
+				return time.Unix(1_800_000_000, 0).UTC()
+			})
+			if err != nil {
+				listener.Close()
+				t.Fatal(err)
+			}
+			if test.closeLimiter {
+				limiter.Close()
+			} else {
+				defer limiter.Close()
+			}
+			health := NewHealthMachine()
+			if test.healthReady {
+				health.Update(HealthRequirements{Listener: true, Tunnel: true, VerifiedState: true, TLSIdentity: true, RelayIdentity: true, DNS: true})
+			}
+			rejected := make(chan SessionRejectCodeV1, 1)
+			server := &ServerV1{
+				config: Config{SessionRejected: func(code SessionRejectCodeV1) { rejected <- code }},
+				health: health, listener: listener, limiter: limiter, workers: make(chan struct{}, 1),
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() { done <- server.acceptLoopV1(ctx) }()
+
+			connection, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
+			if err != nil {
+				cancel()
+				listener.Close()
+				t.Fatal(err)
+			}
+			if err := connection.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+				connection.Close()
+				cancel()
+				listener.Close()
+				t.Fatal(err)
+			}
+			if count, readErr := connection.Read(make([]byte, 1)); count != 0 || readErr == nil {
+				connection.Close()
+				cancel()
+				listener.Close()
+				t.Fatalf("pre-accept rejection did not close connection: count=%d err=%v", count, readErr)
+			}
+			connection.Close()
+			select {
+			case got := <-rejected:
+				if got != test.wantRejection {
+					cancel()
+					listener.Close()
+					t.Fatalf("rejection=%q want=%q", got, test.wantRejection)
+				}
+			case <-time.After(time.Second):
+				cancel()
+				listener.Close()
+				t.Fatal("pre-accept rejection was not reported")
+			}
+			cancel()
+			listener.Close()
+			select {
+			case err := <-done:
+				if err != nil {
+					t.Fatalf("accept loop stop err=%v", err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("accept loop did not stop")
+			}
+		})
+	}
+}
+
+func TestSessionTerminationCodeV1IsBoundedAndCategorical(t *testing.T) {
+	for _, test := range []struct {
+		pumpErr, contextErr error
+		stopCode            SessionStopCodeV1
+		want                SessionTerminationCodeV1
+	}{
+		{contextErr: context.DeadlineExceeded, want: SessionTerminationLifetimeV1},
+		{contextErr: context.Canceled, stopCode: SessionStopQueueV1, want: SessionTerminationQueueV1},
+		{contextErr: context.Canceled, stopCode: SessionStopProfileV1, want: SessionTerminationProfileV1},
+		{contextErr: context.Canceled, stopCode: SessionStopAllV1, want: SessionTerminationAuthorityV1},
+		{contextErr: context.Canceled, stopCode: SessionStopRegistryV1, want: SessionTerminationRegistryV1},
+		{contextErr: context.Canceled, want: SessionTerminationCancelledV1},
+		{want: SessionTerminationCompleteV1},
+	} {
+		if got := sessionTerminationCodeV1(test.pumpErr, test.contextErr, test.stopCode); got != test.want {
+			t.Fatalf("context=%v stop=%q code=%q want=%q", test.contextErr, test.stopCode, got, test.want)
+		}
+	}
+}
+
 func TestServerReloadV1ClearsTemporaryTLSIdentity(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	snapshot := &fakeRelaySnapshotV1{status: validRelayStatusV1(1)}
@@ -81,14 +253,15 @@ func TestServerReloadV1ClearsTemporaryTLSIdentity(t *testing.T) {
 	}
 }
 
-func TestServerReloadV1FailsClosedOnDrainedOrCorruptState(t *testing.T) {
+func TestServerReloadV1FailsClosedAcrossAdministrativeAndCorruptState(t *testing.T) {
 	for _, test := range []struct {
 		failure error
 		want    HealthState
+		wantErr bool
 	}{
 		{failure: selfhost.ErrDrained, want: HealthDraining},
 		{failure: selfhost.ErrRelayRuntimeUnavailable, want: HealthDisabled},
-		{failure: selfhost.ErrStateCorrupt, want: HealthDegraded},
+		{failure: selfhost.ErrStateCorrupt, want: HealthDegraded, wantErr: true},
 	} {
 		t.Run(test.failure.Error(), func(t *testing.T) {
 			config := DefaultConfig(filepath.Join(t.TempDir(), "node"), 443)
@@ -103,11 +276,44 @@ func TestServerReloadV1FailsClosedOnDrainedOrCorruptState(t *testing.T) {
 				t.Fatal(err)
 			}
 			server := &ServerV1{config: config, health: NewHealthMachine(), registry: registry, listenerReady: true, tunnelReady: true}
-			if err := server.Reload(); err == nil || registry.Snapshot().ActiveSessions != 0 {
+			err = server.Reload()
+			if (err != nil) != test.wantErr || registry.Snapshot().ActiveSessions != 0 {
 				t.Fatalf("reload err=%v registry=%+v", err, registry.Snapshot())
 			}
 			if got := server.health.Snapshot().State; got != test.want {
 				t.Fatalf("health=%s want=%s", got, test.want)
+			}
+		})
+	}
+}
+
+func TestServerReloadV1AppliesAdministrativeFailClosedStatesWithoutStoppingControl(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		failure error
+		want    HealthState
+	}{
+		{name: "drained", failure: selfhost.ErrDrained, want: HealthDraining},
+		{name: "disabled", failure: selfhost.ErrRelayRuntimeUnavailable, want: HealthDisabled},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := DefaultConfig(filepath.Join(t.TempDir(), "node"), 443)
+			config.DNSReady = func(context.Context) bool { return true }
+			config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) { return nil, test.failure }
+			registry, err := NewSessionRegistry(newMemoryTunnelV1(), 1, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer registry.Close()
+			if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
+				t.Fatal(err)
+			}
+			server := &ServerV1{config: config, health: NewHealthMachine(), registry: registry, listenerReady: true, tunnelReady: true}
+			if err := server.Reload(); err != nil {
+				t.Fatalf("administrative transition returned error: %v", err)
+			}
+			if registry.Snapshot().ActiveSessions != 0 || server.health.Snapshot().State != test.want {
+				t.Fatalf("registry=%+v health=%+v", registry.Snapshot(), server.health.Snapshot())
 			}
 		})
 	}
@@ -282,6 +488,13 @@ func TestServerRunV1RejectsMalformedPrefaceAndStopsCleanly(t *testing.T) {
 	config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) {
 		return &fakeRelaySnapshotV1{status: validRelayStatusV1(1)}, nil
 	}
+	var stagesMu sync.Mutex
+	var stages []SessionStageCodeV1
+	config.SessionProgress = func(stage SessionStageCodeV1) {
+		stagesMu.Lock()
+		defer stagesMu.Unlock()
+		stages = append(stages, stage)
+	}
 	server, err := NewServerV1(config, relayListener, newMemoryTunnelV1(), controlListener, func(net.Conn) error { return nil })
 	if err != nil {
 		t.Fatal(err)
@@ -319,6 +532,13 @@ func TestServerRunV1RejectsMalformedPrefaceAndStopsCleanly(t *testing.T) {
 		t.Fatalf("malformed preface was not rejected: count=%d err=%v", count, err)
 	}
 	connection.Close()
+	stagesMu.Lock()
+	if len(stages) != 1 || stages[0] != SessionStageAcceptedV1 {
+		stagesMu.Unlock()
+		cancel()
+		t.Fatalf("stages=%v", stages)
+	}
+	stagesMu.Unlock()
 	cancel()
 	select {
 	case err := <-done:
@@ -327,6 +547,73 @@ func TestServerRunV1RejectsMalformedPrefaceAndStopsCleanly(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("server did not stop")
+	}
+}
+
+func TestServerRunV1CancellationClosesConnectionBlockedBeforePreface(t *testing.T) {
+	relayListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		relayListener.Close()
+		t.Fatal(err)
+	}
+	port := uint16(relayListener.Addr().(*net.TCPAddr).Port)
+	config := DefaultConfig(filepath.Join(t.TempDir(), "node"), port)
+	config.HandshakeTimeout = 30 * time.Second
+	config.DNSReady = func(context.Context) bool { return true }
+	config.LoadSnapshot = func(string, time.Time) (RelaySnapshotV1, error) {
+		return &fakeRelaySnapshotV1{status: validRelayStatusV1(1)}, nil
+	}
+	accepted := make(chan struct{}, 1)
+	config.SessionProgress = func(stage SessionStageCodeV1) {
+		if stage == SessionStageAcceptedV1 {
+			select {
+			case accepted <- struct{}{}:
+			default:
+			}
+		}
+	}
+	server, err := NewServerV1(config, relayListener, newMemoryTunnelV1(), controlListener, func(net.Conn) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- server.Run(ctx) }()
+	deadline := time.Now().Add(time.Second)
+	for !server.health.Snapshot().AcceptingSessions && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if !server.health.Snapshot().AcceptingSessions {
+		cancel()
+		t.Fatal("server did not become ready")
+	}
+	connection, err := net.DialTimeout("tcp", relayListener.Addr().String(), time.Second)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	select {
+	case <-accepted:
+	case <-time.After(time.Second):
+		cancel()
+		t.Fatal("server did not accept blocked preface connection")
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("run err=%v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		connection.Close()
+		<-done
+		t.Fatal("server cancellation waited for the handshake deadline")
 	}
 }
 

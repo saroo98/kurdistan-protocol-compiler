@@ -21,6 +21,103 @@ import (
 	"kurdistan/internal/transport/tlstcp"
 )
 
+const releaseMaximumClientBufferV1 = uint64(64 << 20)
+
+func releasePacketBufferBudget(program liveprogram.ProgramV1, queue, incomplete uint16) (uint64, bool) {
+	if liveprogram.ValidateV1(program) != nil || queue == 0 || incomplete == 0 || program.Limits.MaxPayloadBytes < 40 {
+		return 0, false
+	}
+	maxPacket := min(program.Limits.MaxPayloadBytes, 65535)
+	count := uint64(queue) + uint64(incomplete)
+	budget := uint64(maxPacket) * count
+	if count == 0 || budget/count != uint64(maxPacket) || budget > releaseMaximumClientBufferV1 {
+		return 0, false
+	}
+	return budget, true
+}
+
+func releasePacketPumpErrorCode(err error) androidbridge.ErrorCode {
+	if stage, ok := kruntime.PacketPumpFailureStageV1(err); ok {
+		return releasePacketPumpStageErrorCode(stage)
+	}
+	switch {
+	case err == nil:
+		return androidbridge.CodeNetworkLost
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return androidbridge.CodeCancelled
+	case errors.Is(err, kruntime.ErrPacketQueueFull):
+		return androidbridge.CodeResourceLimit
+	case errors.Is(err, kruntime.ErrPacketPumpConfig):
+		return androidbridge.CodeStateCorrupt
+	case errors.Is(err, kruntime.ErrPacketPumpIO):
+		return androidbridge.CodeTUNIOFailed
+	default:
+		return androidbridge.CodeNetworkLost
+	}
+}
+
+func releaseRuntimeNetworkDiagnostics(snapshot kruntime.PacketPumpSnapshotV1) androidbridge.RuntimeNetworkDiagnosticsV1 {
+	return androidbridge.RuntimeNetworkDiagnosticsV1{
+		TUNPacketsRead:          snapshot.TUNPacketsRead,
+		OutboundPacketsAccepted: snapshot.OutboundPacketsAccepted,
+		CarrierRecordsWritten:   snapshot.CarrierRecordsWritten,
+		CarrierRecordsRead:      snapshot.CarrierRecordsRead,
+		AuthenticatedOperations: snapshot.AuthenticatedOperations,
+		InnerPacketsAccepted:    snapshot.InnerPacketsAccepted,
+		InnerPacketsRejected:    snapshot.InnerPacketsRejected,
+		TUNWriteAttempts:        snapshot.TUNWriteAttempts,
+		TUNWriteFailures:        snapshot.TUNWriteFailures,
+		TUNWriteFailureCode:     releaseTUNWriteFailureCode(snapshot.TUNWriteFailureCode),
+		TUNWriteErrno:           snapshot.TUNWriteErrno,
+		TUNPacketsWritten:       snapshot.TUNPacketsWritten,
+		RejectedTUNPackets:      snapshot.RejectedTUNPackets,
+	}
+}
+
+func releaseTUNWriteFailureCode(code kruntime.PacketPumpTUNWriteFailureCodeV1) uint32 {
+	switch code {
+	case kruntime.PacketPumpTUNWriteFailureShortV1:
+		return 1
+	case kruntime.PacketPumpTUNWriteFailureClosedV1:
+		return 2
+	case kruntime.PacketPumpTUNWriteFailureInterruptedV1:
+		return 3
+	case kruntime.PacketPumpTUNWriteFailureInvalidV1:
+		return 4
+	case kruntime.PacketPumpTUNWriteFailureNoBufferV1:
+		return 5
+	case kruntime.PacketPumpTUNWriteFailurePermissionV1:
+		return 6
+	case kruntime.PacketPumpTUNWriteFailureIOV1:
+		return 7
+	case kruntime.PacketPumpTUNWriteFailureOtherV1:
+		return 8
+	default:
+		return 0
+	}
+}
+
+func releasePacketPumpStageErrorCode(stage kruntime.PacketPumpStageV1) androidbridge.ErrorCode {
+	switch stage {
+	case kruntime.PacketPumpStageTUNReadV1, kruntime.PacketPumpStageTUNWriteV1:
+		return androidbridge.CodeTUNIOFailed
+	case kruntime.PacketPumpStageOutboundQueueV1, kruntime.PacketPumpStageAuthenticatedQueueV1:
+		return androidbridge.CodeResourceLimit
+	case kruntime.PacketPumpStageSealV1, kruntime.PacketPumpStageRecordOpenV1,
+		kruntime.PacketPumpStageInnerOperationV1, kruntime.PacketPumpStageInnerValidateV1,
+		kruntime.PacketPumpStageReplayCommitV1, kruntime.PacketPumpStageTUNValidateV1:
+		return androidbridge.CodeKurdAuthRejected
+	case kruntime.PacketPumpStageCarrierReadV1:
+		return androidbridge.CodeEndpointUnavailable
+	case kruntime.PacketPumpStageCarrierWriteV1:
+		return androidbridge.CodeNetworkLost
+	case kruntime.PacketPumpStageIdleV1:
+		return androidbridge.CodeFallbackExhausted
+	default:
+		return androidbridge.CodeNetworkLost
+	}
+}
+
 type releaseRuntimeNetworkFactory struct{}
 
 func newReleaseRuntimeNetworkFactory() androidbridge.RuntimeNetworkFactory {

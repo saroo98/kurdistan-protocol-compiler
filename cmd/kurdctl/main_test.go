@@ -96,6 +96,35 @@ func TestCLIEndToEndUsesStdinPassphrasesAndExclusiveOutputs(t *testing.T) {
 	}
 }
 
+func TestCLINetworkIPv6RequiresExactConfirmationAndRecoveryAuthorization(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "offline", "recovery")
+	passphrase := "correct horse battery staple\n"
+	call := func(args []string, input string) (int, bytes.Buffer, bytes.Buffer) {
+		var stdout, stderr bytes.Buffer
+		code := run(args, bytes.NewBufferString(input), &stdout, &stderr)
+		return code, stdout, stderr
+	}
+	if code, _, stderr := call([]string{"init", "--data-dir", dataDir, "--name", "owner-node", "--endpoint", "203.0.113.7:443", "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("init code=%d stderr=%s", code, stderr.String())
+	}
+	if code, _, _ := call([]string{"network", "ipv6", "enable", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "wrong"}, passphrase); code != 2 {
+		t.Fatalf("IPv6 enable without exact confirmation code=%d", code)
+	}
+	code, stdout, stderr := call([]string{"network", "ipv6", "enable", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "enable-ipv6"}, passphrase)
+	if code != 0 {
+		t.Fatalf("IPv6 enable code=%d stderr=%s", code, stderr.String())
+	}
+	var result struct {
+		Schema  string `json:"schema"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil || result.Schema != "kurdctl-network-ipv6-v1" || !result.Enabled {
+		t.Fatalf("IPv6 enable output=%s err=%v", stdout.String(), err)
+	}
+}
+
 func TestCommittedOperationsNotifyRunningRelayImmediately(t *testing.T) {
 	base := t.TempDir()
 	dataDir := filepath.Join(base, "node")
@@ -472,6 +501,63 @@ func TestCLICreatesDeviceBoundLiveProfileAndRejectsRecipientReplay(t *testing.T)
 	}
 	if reloads != 2 {
 		t.Fatalf("runtime reloads=%d want=2", reloads)
+	}
+}
+
+func TestCLIReportsCommittedLiveProfileBeforeRuntimeNotificationFailure(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "offline", "recovery")
+	registry := filepath.Join(base, "recipient-registry")
+	passphrase := "correct horse battery staple\n"
+	call := func(args []string, input string) (int, bytes.Buffer, bytes.Buffer) {
+		var stdout, stderr bytes.Buffer
+		code := run(args, bytes.NewBufferString(input), &stdout, &stderr)
+		return code, stdout, stderr
+	}
+	if code, _, stderr := call([]string{"init", "--data-dir", dataDir, "--name", "owner-node", "--endpoint", "203.0.113.7:443", "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("init code=%d stderr=%s", code, stderr.String())
+	}
+	if code, _, stderr := call([]string{"recovery", "confirm", "--data-dir", dataDir, "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("confirm code=%d stderr=%s", code, stderr.String())
+	}
+	request, private, err := enrollment.Generate(time.Now().UTC(), time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(private)
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(base, "device.kurd-enrollment")
+	if err := os.WriteFile(requestPath, requestBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previousNotify := notifyRelayRuntime
+	defer func() { notifyRelayRuntime = previousNotify }()
+	notifyRelayRuntime = func(string, node.ControlRequestV1, bool) error { return node.ErrControlConfig }
+	outputDir := filepath.Join(base, "live-profile")
+	code, stdout, stderr := call([]string{
+		"profile", "create", "--data-dir", dataDir, "--name", "phone", "--valid-for", "24h",
+		"--recipient-request", requestPath, "--recipient-registry-dir", registry, "--output-dir", outputDir,
+		"--control-socket", filepath.Join(base, "run", "control.sock"),
+	}, "")
+	if code != 7 || stderr.String() != "kurdctl: state committed; runtime notification pending; run kurdctl node reload\n" {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	var created struct {
+		ProfileID   string `json:"profileId"`
+		Connectable bool   `json:"connectable"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &created); err != nil || created.ProfileID == "" || !created.Connectable {
+		t.Fatalf("committed response=%q err=%v", stdout.String(), err)
+	}
+	if info, err := os.Stat(filepath.Join(outputDir, "profile.kurd-profile")); err != nil || info.Size() == 0 {
+		t.Fatalf("committed artifact missing: %v", err)
+	}
+	if issued, err := selfhost.LoadProfile(dataDir, created.ProfileID); err != nil || !issued.Connectable {
+		t.Fatalf("committed profile unavailable: %+v err=%v", issued, err)
 	}
 }
 

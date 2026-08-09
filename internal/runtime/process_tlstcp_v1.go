@@ -10,6 +10,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"kurdistan/internal/protocol/framing"
 	"kurdistan/internal/protocol/liveprogram"
@@ -19,12 +20,15 @@ import (
 
 var ErrProcessSessionV1 = errors.New("process-separated Kurd session rejected")
 
+const maxProcessTLSTCPIdleTimeoutV1 = 24 * time.Hour
+
 // ProcessTLSTCPDuplexCarrierV1 adapts the message-oriented strict TLS carrier
 // to the bounded length-prefixed stream contract used by PacketPumpV1. It does
 // not decrypt, reinterpret, or retain application payloads.
 type ProcessTLSTCPDuplexCarrierV1 struct {
 	ctx       context.Context
 	carrier   *tlstcp.Conn
+	ioTimeout time.Duration
 	readMu    sync.Mutex
 	writeMu   sync.Mutex
 	closeOnce sync.Once
@@ -33,11 +37,11 @@ type ProcessTLSTCPDuplexCarrierV1 struct {
 	writeBuf  []byte
 }
 
-func NewProcessTLSTCPDuplexCarrierV1(ctx context.Context, carrier *tlstcp.Conn) (*ProcessTLSTCPDuplexCarrierV1, error) {
-	if ctx == nil || carrier == nil {
+func NewProcessTLSTCPDuplexCarrierV1(ctx context.Context, carrier *tlstcp.Conn, idleTimeout time.Duration) (*ProcessTLSTCPDuplexCarrierV1, error) {
+	if ctx == nil || carrier == nil || idleTimeout <= 0 || idleTimeout > maxProcessTLSTCPIdleTimeoutV1 {
 		return nil, ErrProcessSessionV1
 	}
-	return &ProcessTLSTCPDuplexCarrierV1{ctx: ctx, carrier: carrier}, nil
+	return &ProcessTLSTCPDuplexCarrierV1{ctx: ctx, carrier: carrier, ioTimeout: 2 * idleTimeout}, nil
 }
 
 func (adapter *ProcessTLSTCPDuplexCarrierV1) Read(output []byte) (int, error) {
@@ -47,7 +51,9 @@ func (adapter *ProcessTLSTCPDuplexCarrierV1) Read(output []byte) (int, error) {
 	adapter.readMu.Lock()
 	defer adapter.readMu.Unlock()
 	if len(adapter.readBuf) == 0 {
-		frame, err := adapter.carrier.Receive(adapter.ctx)
+		operationContext, cancel := context.WithTimeout(adapter.ctx, adapter.ioTimeout)
+		frame, err := adapter.carrier.Receive(operationContext)
+		cancel()
 		if err != nil {
 			return 0, err
 		}
@@ -93,7 +99,10 @@ func (adapter *ProcessTLSTCPDuplexCarrierV1) Write(input []byte) (int, error) {
 			adapter.clearWriteV1()
 			return 0, ErrProcessSessionV1
 		}
-		if err := adapter.carrier.Send(adapter.ctx, frame); err != nil {
+		operationContext, cancel := context.WithTimeout(adapter.ctx, adapter.ioTimeout)
+		err = adapter.carrier.Send(operationContext, frame)
+		cancel()
+		if err != nil {
 			clear(frame.Payload)
 			adapter.clearWriteV1()
 			return 0, err

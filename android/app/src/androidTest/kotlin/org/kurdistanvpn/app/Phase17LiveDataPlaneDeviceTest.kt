@@ -13,6 +13,8 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.IOException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -35,6 +37,73 @@ import org.kurdistanvpn.runtime.api.VpnRuntimeState
 class Phase17LiveDataPlaneDeviceTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected() {
+        assertTrue(
+            Phase17FieldHarness.isExpectedDnsUnavailableFailure(
+                expectAvailable = false,
+                failure = SocketTimeoutException("fixture"),
+            ),
+        )
+        assertTrue(
+            Phase17FieldHarness.isExpectedDnsUnavailableFailure(
+                expectAvailable = false,
+                failure = IOException("fixture"),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedDnsUnavailableFailure(
+                expectAvailable = true,
+                failure = SocketTimeoutException("fixture"),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedDnsUnavailableFailure(
+                expectAvailable = false,
+                failure = IllegalStateException("fixture"),
+            ),
+        )
+
+        assertFalse(
+            Phase17FieldHarness.runDnsExchange(expectAvailable = false) {
+                throw IOException("send failed before receive")
+            },
+        )
+
+        assertTrue(
+            Phase17FieldHarness.isExpectedDnsStartupFailure(
+                expectAvailable = false,
+                state = VpnRuntimeState.FAILED,
+                failure = "LIVE_TLS_REJECTED",
+                packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedDnsStartupFailure(
+                expectAvailable = true,
+                state = VpnRuntimeState.FAILED,
+                failure = "LIVE_TLS_REJECTED",
+                packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedDnsStartupFailure(
+                expectAvailable = false,
+                state = VpnRuntimeState.FAILED,
+                failure = "LIVE_TLS_REJECTED",
+                packetDisposition = "LIVE_STAGE_TUN_ESTABLISHED",
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedDnsStartupFailure(
+                expectAvailable = false,
+                state = VpnRuntimeState.FAILED,
+                failure = "LIVE_AUTHORITY_REJECTED",
+                packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
+            ),
+        )
+    }
 
     @Test
     fun liveIpv4LifecycleProtectsSocketBeforeConnectAndStopsCleanly() {
@@ -149,6 +218,9 @@ class Phase17LiveDataPlaneDeviceTest {
     @SdkSuppress(minSdkVersion = 34)
     @Test
     fun profileRevocationAndBackupRestoreFailClosed() = runBlocking {
+        if (Phase17FieldHarness.runIfRequested()) {
+            return@runBlocking
+        }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val application = instrumentation.targetContext.applicationContext as KurdistanApplication
         val root = application.compositionRoot

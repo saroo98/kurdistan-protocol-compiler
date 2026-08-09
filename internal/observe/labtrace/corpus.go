@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/observe/diversity"
+	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/relay"
-	ktrace "kurdistan/internal/observe/trace"
 )
 
 type CorpusOptions struct {
@@ -95,7 +95,8 @@ func CaptureTrace(ctx context.Context, p *ir.Profile, payload []byte) ([]ktrace.
 	if err != nil {
 		return nil, err
 	}
-	go func() { _ = relay.ServeEcho(echoCtx, echoLn, nil) }()
+	echoDone := make(chan error, 1)
+	go func() { echoDone <- relay.ServeEcho(echoCtx, echoLn, nil) }()
 
 	serverCtx, stopServer := context.WithCancel(ctx)
 	defer stopServer()
@@ -106,13 +107,22 @@ func CaptureTrace(ctx context.Context, p *ir.Profile, payload []byte) ([]ktrace.
 	}
 	var buf bytes.Buffer
 	rec := ktrace.NewRecorder(&buf)
-	go func() { _ = relay.Serve(serverCtx, serverLn, echoLn.Addr().String(), p, rec, nil) }()
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- relay.Serve(serverCtx, serverLn, echoLn.Addr().String(), p, rec, nil) }()
 
 	echo, err := relay.ClientRoundTrip(ctx, p, serverLn.Addr().String(), payload, rec)
 	stopServer()
 	stopEcho()
+	serverErr := <-serverDone
+	echoErr := <-echoDone
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("client round trip: %w", err)
+	}
+	if serverErr != nil {
+		return nil, fmt.Errorf("relay server: %w", serverErr)
+	}
+	if echoErr != nil {
+		return nil, fmt.Errorf("echo server: %w", echoErr)
 	}
 	if !bytes.Equal(echo, payload) {
 		return nil, fmt.Errorf("echo response mismatch")

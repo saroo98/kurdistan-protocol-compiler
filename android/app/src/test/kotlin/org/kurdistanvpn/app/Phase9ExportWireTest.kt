@@ -4,12 +4,35 @@
 package org.kurdistanvpn.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.kurdistanvpn.core.model.DiagnosticComponent
 import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
 
 class Phase9ExportWireTest {
+    @Test
+    fun runtimeStatusCorrelationRejectsDelayedOrMissingSessionIdentity() {
+        val current = "0123456789abcdef0123456789abcdef"
+        val stale = "fedcba9876543210fedcba9876543210"
+        val query = "11111111111111111111111111111111"
+        val otherQuery = "22222222222222222222222222222222"
+
+        assertFalse(selectRuntimeStatus(null, null, stale, null).accept)
+        assertFalse(selectRuntimeStatus(null, query, stale, null).accept)
+        assertFalse(selectRuntimeStatus(null, query, stale, otherQuery).accept)
+
+        val rebound = selectRuntimeStatus(null, query, current, query)
+        assertTrue(rebound.accept)
+        assertTrue(rebound.consumeQuery)
+        assertEquals(current, rebound.bindRequestId)
+
+        assertTrue(selectRuntimeStatus(current, null, current, null).accept)
+        assertFalse(selectRuntimeStatus(current, null, stale, null).accept)
+        assertFalse(selectRuntimeStatus(current, null, null, null).accept)
+    }
+
     @Test
     fun diagnosticRequestNeverAddsCountsToNonCountCategories() {
         for (profileCount in listOf(0, 1, 8, Int.MAX_VALUE)) {

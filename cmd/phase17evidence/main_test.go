@@ -5,7 +5,11 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
+
+	phase17 "kurdistan/internal/phase17evidence"
 )
 
 func TestHistoricalSupersessionRejectsWideningAndNonGreenPredecessor(t *testing.T) {
@@ -64,6 +68,33 @@ func TestStrictJSONRejectsUnknownAndDuplicateFields(t *testing.T) {
 	}
 }
 
+func TestConvertSanitizedEvidenceUpdatesAcceptanceAtomically(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "owned-vps.json")
+	output := filepath.Join(directory, "acceptance-status.json")
+	current, err := phase17.MarshalCanonical(validAcceptanceForTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(input, validOwnedVPSEvidenceForCommandTest(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(output, current, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := convertOwnedVPSFiles(input, output); err != nil {
+		t.Fatal(err)
+	}
+	var updated acceptance
+	raw, err := os.ReadFile(output)
+	if err != nil || decodeStrict(raw, &updated) != nil {
+		t.Fatalf("decode converted evidence: %v", err)
+	}
+	if updated.Local["ownedVps"] != "PASS" || updated.Local["api36Emulator"] != "PASS" {
+		t.Fatalf("converted status=%+v", updated.Local)
+	}
+}
+
 func validSupersessionForTest() supersession {
 	return supersession{
 		Schema: "phase17-historical-gate-supersession-v1",
@@ -116,4 +147,15 @@ func validAcceptanceForTest() acceptance {
 
 func digest64(value string) string {
 	return string(bytes.Repeat([]byte(value), 64))
+}
+
+func validOwnedVPSEvidenceForCommandTest() []byte {
+	checks := ""
+	for index, name := range phase17.RequiredOwnedVPSChecks() {
+		if index > 0 {
+			checks += ","
+		}
+		checks += `"` + name + `":"PASS"`
+	}
+	return []byte(`{"schema":"kurdistan-phase17-owned-vps-evidence-v2","result":"PASS","subject":{"commitSha":"0123456789abcdef0123456789abcdef01234567","treeSha":"89abcdef0123456789abcdef0123456789abcdef","packageSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","appApkSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","testApkSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"environment":{"hostClass":"OWNER_CONTROLLED_VPS","os":"linux","arch":"amd64","androidClass":"EMULATOR","androidApi":36,"androidAbi":"x86_64","ipv4":true,"ipv6":true},"checks":{` + checks + `},"metrics":{"durationMs":1200,"peakRssBytes":1048576,"peakFileDescriptors":12,"reconnects":2},"privacy":{"payloadRetained":false,"destinationRetained":false,"dnsNameRetained":false,"credentialRetained":false,"keyRetained":false,"profileRetained":false,"rawLogRetained":false},"limitations":["first owner-controlled provider and emulator evidence only"],"campaign":{"mode":"Functional","restartReconnectCycles":0,"profileRotationCycles":0,"impairments":[],"soakDurationMs":0,"soakCycles":0}}`)
 }

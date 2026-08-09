@@ -30,15 +30,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
+import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeDiagnostics
 import org.kurdistanvpn.core.nativejni.NativeBridge
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
 import org.kurdistanvpn.runtime.api.LiveTunConfiguration
+import org.kurdistanvpn.runtime.api.LiveTunnelStage
 import org.kurdistanvpn.runtime.api.LiveTunnelStartResult
 import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
+import org.kurdistanvpn.runtime.api.VpnRuntimeDiagnostics
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 
 class KurdVpnService : VpnService() {
@@ -51,13 +54,46 @@ class KurdVpnService : VpnService() {
     private var networkMonitor: UnderlyingNetworkMonitor? = null
     private val underlyingNetworkAvailability = UnderlyingNetworkAvailability<Network>()
     private var pendingAuthorityRequest: String? = null
+    @Volatile
+    private var activeRequestId: String? = null
     private val authorityArrivalTimeout = Runnable {
         val requestId = pendingAuthorityRequest ?: return@Runnable
         pendingAuthorityRequest = null
         RuntimeAuthorityBroker.cancel(requestId)
         publish(VpnRuntimeState.FAILED, failure = "AUTHORITY_HANDOFF_TIMEOUT")
+        activeRequestId = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+    private val runtimeHealthCheck = object : Runnable {
+        override fun run() {
+            val controller = tunnelController ?: return
+            val diagnostics = when (val result = controller.diagnostics()) {
+                is NativeResult.Success -> result.value.toRuntimeDiagnostics()
+                is NativeResult.Failure -> latestSnapshot.diagnostics
+            }
+            val failure = controller.checkHealth()
+            if (failure != null) {
+                val config = activeConfig ?: VpnRuntimeConfig(VpnRoutingPolicy())
+                val authority = latestSnapshot.authority
+                closeRuntime()
+                publish(
+                    VpnRuntimeState.FAILED,
+                    failure = "LIVE_${failure.name}",
+                    disposition = "LIVE_STAGE_RUNTIME_MONITOR",
+                    config = config,
+                    authority = authority,
+                    diagnostics = diagnostics,
+                )
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return
+            }
+            if (diagnostics != latestSnapshot.diagnostics) {
+                publish(latestSnapshot.copy(diagnostics = diagnostics))
+            }
+            mainHandler.postDelayed(this, RUNTIME_HEALTH_INTERVAL_MILLIS)
+        }
     }
     private val nativeCore by lazy { NativeBridge() }
     @Volatile
@@ -69,7 +105,12 @@ class KurdVpnService : VpnService() {
     private val statusQueryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == VpnRuntimeContract.ACTION_QUERY_STATUS) {
-                publish(latestSnapshot)
+                val queryId = intent.getStringExtra(
+                    VpnRuntimeContract.EXTRA_STATUS_QUERY,
+                ).orEmpty()
+                if (validRequestId(queryId)) {
+                    publishTransient(latestSnapshot, queryId)
+                }
             }
         }
     }
@@ -112,12 +153,17 @@ class KurdVpnService : VpnService() {
                     VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST,
                 ).orEmpty()
                 if (!armAuthorityRequest(requestId)) {
-                    publish(
-                        VpnRuntimeState.FAILED,
-                        failure = "MISSING_VERIFIED_AUTHORITY",
+                    publishTransient(
+                        PublishedSnapshot(
+                            state = VpnRuntimeState.FAILED,
+                            failure = "MISSING_VERIFIED_AUTHORITY",
+                            requestId = requestId.takeIf(::validRequestId),
+                        ),
                     )
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+                    if (activeRequestId == null && tunnelController?.isRunning() != true && !starting.get()) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
                     return Service.START_NOT_STICKY
                 }
             }
@@ -137,6 +183,7 @@ class KurdVpnService : VpnService() {
     override fun onDestroy() {
         runCatching { unregisterReceiver(statusQueryReceiver) }
         mainHandler.removeCallbacks(authorityArrivalTimeout)
+        mainHandler.removeCallbacks(runtimeHealthCheck)
         pendingAuthorityRequest?.let(RuntimeAuthorityBroker::cancel)
         pendingAuthorityRequest = null
         networkMonitor?.close()
@@ -151,10 +198,8 @@ class KurdVpnService : VpnService() {
     override fun onBind(intent: Intent?): IBinder? = super.onBind(intent)
 
     private fun armAuthorityRequest(requestId: String): Boolean {
-        if (requestId.length != 32 || requestId.any { it !in '0'..'9' && it !in 'a'..'f' }) {
-            return false
-        }
-        if (pendingAuthorityRequest != null || tunnelController?.isRunning() == true || starting.get()) return false
+        if (!validRequestId(requestId) || activeRequestId != null || pendingAuthorityRequest != null || tunnelController?.isRunning() == true || starting.get()) return false
+        activeRequestId = requestId
         pendingAuthorityRequest = requestId
         startForeground(NOTIFICATION_ID, notification("Awaiting verified Kurd session authority"))
         publish(VpnRuntimeState.PREPARING)
@@ -167,7 +212,10 @@ class KurdVpnService : VpnService() {
                 startRuntime(descriptor, length)
             }
         }
-        if (!armed) pendingAuthorityRequest = null
+        if (!armed) {
+            pendingAuthorityRequest = null
+            activeRequestId = null
+        }
         if (armed && pendingAuthorityRequest == requestId) {
             mainHandler.postDelayed(authorityArrivalTimeout, AUTHORITY_TIMEOUT_SECONDS * 1_000L)
         }
@@ -191,6 +239,7 @@ class KurdVpnService : VpnService() {
             var terminalFailure: String? = null
             var config = VpnRuntimeConfig(VpnRoutingPolicy())
             var authoritySnapshot: NativeLiveRuntimeSessionSnapshot? = null
+            var lastStage: LiveTunnelStage? = null
             try {
                 val authorityBytes = readAuthority(authority, authorityLength)
                 val opened = try {
@@ -224,6 +273,15 @@ class KurdVpnService : VpnService() {
                     detachedCloser = DetachedFileDescriptorCloser { fd ->
                         runCatching { ParcelFileDescriptor.adoptFd(fd).close() }
                     },
+                    onStage = { stage ->
+                        lastStage = stage
+                        publish(
+                            VpnRuntimeState.PREPARING,
+                            disposition = "LIVE_STAGE_${stage.name}",
+                            config = config,
+                            authority = authoritySnapshot,
+                        )
+                    },
                 )
                 tunnelController = controller
                 when (val started = controller.start(session)) {
@@ -238,6 +296,10 @@ class KurdVpnService : VpnService() {
                             authority = authoritySnapshot,
                         )
                         updateNotification("Verified Kurd relay session active")
+                        mainHandler.postDelayed(
+                            runtimeHealthCheck,
+                            RUNTIME_HEALTH_INTERVAL_MILLIS,
+                        )
                     }
                 }
             } catch (failure: AuthorityReadFailure) {
@@ -258,6 +320,7 @@ class KurdVpnService : VpnService() {
                         config = config,
                         authority = authoritySnapshot,
                     )
+                    activeRequestId = null
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 } else if (failure != null && starting.compareAndSet(true, false)) {
@@ -265,9 +328,11 @@ class KurdVpnService : VpnService() {
                     publish(
                         VpnRuntimeState.FAILED,
                         failure = failure,
+                        disposition = "LIVE_STAGE_${lastStage?.name ?: "AUTHORITY_OPEN"}",
                         config = config,
                         authority = authoritySnapshot,
                     )
+                    activeRequestId = null
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 } else if (failure == null) {
@@ -280,6 +345,7 @@ class KurdVpnService : VpnService() {
     private fun stopRuntime(finalState: VpnRuntimeState) {
         publish(VpnRuntimeState.STOPPING)
         mainHandler.removeCallbacks(authorityArrivalTimeout)
+        mainHandler.removeCallbacks(runtimeHealthCheck)
         pendingAuthorityRequest?.let(RuntimeAuthorityBroker::cancel)
         pendingAuthorityRequest = null
         terminalStateOnDestroy = finalState
@@ -288,12 +354,14 @@ class KurdVpnService : VpnService() {
             closeRuntime()
             terminalStateOnDestroy = null
             publish(finalState)
+            activeRequestId = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
     private fun closeRuntime() {
+        mainHandler.removeCallbacks(runtimeHealthCheck)
         starting.set(false)
         runCatching { tunnelController?.close() }
         tunnelController = null
@@ -308,6 +376,7 @@ class KurdVpnService : VpnService() {
         disposition: String? = null,
         config: VpnRuntimeConfig = VpnRuntimeConfig(VpnRoutingPolicy()),
         authority: NativeLiveRuntimeSessionSnapshot? = null,
+        diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
     ) {
         publish(
             PublishedSnapshot(
@@ -318,6 +387,8 @@ class KurdVpnService : VpnService() {
                 disposition = disposition,
                 config = config,
                 authority = authority,
+                diagnostics = diagnostics,
+                requestId = activeRequestId,
                 startedAtElapsedRealtime = if (
                     state == VpnRuntimeState.ACTIVE_KURD_LOOPBACK ||
                     state == VpnRuntimeState.ACTIVE_KURD_LIVE ||
@@ -332,9 +403,18 @@ class KurdVpnService : VpnService() {
 
     private fun publish(snapshot: PublishedSnapshot) {
         latestSnapshot = snapshot
+        publishTransient(snapshot)
+    }
+
+    private fun publishTransient(
+        snapshot: PublishedSnapshot,
+        statusQueryId: String? = null,
+    ) {
         sendBroadcast(
             Intent(VpnRuntimeContract.ACTION_STATUS)
                 .setPackage(packageName)
+                .putExtra(VpnRuntimeContract.EXTRA_RUNTIME_REQUEST, snapshot.requestId)
+                .putExtra(VpnRuntimeContract.EXTRA_STATUS_QUERY, statusQueryId)
                 .putExtra(VpnRuntimeContract.EXTRA_STATE, snapshot.state.name)
                 .putExtra(VpnRuntimeContract.EXTRA_PACKETS, snapshot.packets)
                 .putExtra(VpnRuntimeContract.EXTRA_PACKETS_WRITTEN, snapshot.replies)
@@ -372,7 +452,20 @@ class KurdVpnService : VpnService() {
                 .putExtra(
                     VpnRuntimeContract.EXTRA_RELAY_FINGERPRINT,
                     snapshot.authority?.relayFingerprint?.toHex(),
-                ),
+                )
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, snapshot.diagnostics.tunPacketsRead)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, snapshot.diagnostics.outboundPacketsAccepted)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_WRITE, snapshot.diagnostics.carrierRecordsWritten)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_READ, snapshot.diagnostics.carrierRecordsRead)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_AUTHENTICATED, snapshot.diagnostics.authenticatedOperations)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_ACCEPTED, snapshot.diagnostics.innerPacketsAccepted)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_REJECTED, snapshot.diagnostics.innerPacketsRejected)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ATTEMPTS, snapshot.diagnostics.tunWriteAttempts)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURES, snapshot.diagnostics.tunWriteFailures)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURE_CODE, snapshot.diagnostics.tunWriteFailureCode)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ERRNO, snapshot.diagnostics.tunWriteErrno)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, snapshot.diagnostics.tunPacketsWritten)
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, snapshot.diagnostics.rejectedTunPackets),
         )
     }
 
@@ -496,9 +589,11 @@ class KurdVpnService : VpnService() {
         private const val MAX_RUNTIME_OPEN_BYTES = RuntimeStartWire.MAX_RUNTIME_OPEN_BYTES
         private const val AUTHORITY_TIMEOUT_SECONDS = 5L
         private const val NETWORK_BIND_TIMEOUT_MILLIS = 5_000L
+        private const val RUNTIME_HEALTH_INTERVAL_MILLIS = 250L
 
         fun start(
             context: Context,
+            requestId: String,
             authority: ByteArray,
             handoffExecutor: Executor,
             onFailure: (String) -> Unit,
@@ -506,7 +601,7 @@ class KurdVpnService : VpnService() {
             require(authority.size in 1..MAX_RUNTIME_OPEN_BYTES) {
                 "INVALID_VERIFIED_AUTHORITY"
             }
-            val requestId = UUID.randomUUID().toString().replace("-", "")
+            require(validRequestId(requestId)) { "INVALID_AUTHORITY_REQUEST" }
             val pipe = ParcelFileDescriptor.createReliablePipe()
             val readSide = pipe[0]
             val writeSide = pipe[1]
@@ -616,6 +711,11 @@ class KurdVpnService : VpnService() {
             }
         }
 
+        fun newRequestId(): String = UUID.randomUUID().toString().replace("-", "")
+
+        private fun validRequestId(value: String): Boolean =
+            value.length == 32 && value.all { it in '0'..'9' || it in 'a'..'f' }
+
         fun stop(context: Context) {
             val intent = Intent(context, KurdVpnService::class.java)
                 .setAction(VpnRuntimeContract.ACTION_STOP)
@@ -632,6 +732,24 @@ class KurdVpnService : VpnService() {
         val config: VpnRuntimeConfig = VpnRuntimeConfig(VpnRoutingPolicy()),
         val startedAtElapsedRealtime: Long = 0,
         val authority: NativeLiveRuntimeSessionSnapshot? = null,
+        val diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
+        val requestId: String? = null,
+    )
+
+    private fun NativeLiveRuntimeDiagnostics.toRuntimeDiagnostics() = VpnRuntimeDiagnostics(
+        tunPacketsRead = tunPacketsRead,
+        outboundPacketsAccepted = outboundPacketsAccepted,
+        carrierRecordsWritten = carrierRecordsWritten,
+        carrierRecordsRead = carrierRecordsRead,
+        authenticatedOperations = authenticatedOperations,
+        innerPacketsAccepted = innerPacketsAccepted,
+        innerPacketsRejected = innerPacketsRejected,
+        tunWriteAttempts = tunWriteAttempts,
+        tunWriteFailures = tunWriteFailures,
+        tunWriteFailureCode = tunWriteFailureCode,
+        tunWriteErrno = tunWriteErrno,
+        tunPacketsWritten = tunPacketsWritten,
+        rejectedTunPackets = rejectedTunPackets,
     )
 
     private class AuthorityReadFailure(val category: String) : Exception()

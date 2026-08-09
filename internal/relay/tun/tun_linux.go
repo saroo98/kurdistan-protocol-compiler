@@ -10,13 +10,16 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
 
 type linuxDevice struct {
-	file *os.File
-	name string
+	file      *os.File
+	name      string
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // OpenExisting attaches to the persistent owner-created TUN named kurd0.
@@ -32,7 +35,7 @@ func OpenExisting(name string) (Device, error) {
 	if err := requireExistingTUN(name); err != nil {
 		return nil, err
 	}
-	fd, err := unix.Open("/dev/net/tun", unix.O_RDWR|unix.O_CLOEXEC, 0)
+	fd, err := unix.Open("/dev/net/tun", openExistingFileFlags(), 0)
 	if err != nil {
 		return nil, errors.Join(ErrOpen, err)
 	}
@@ -59,6 +62,10 @@ func OpenExisting(name string) (Device, error) {
 
 func openExistingFlags() uint16 {
 	return uint16(unix.IFF_TUN | unix.IFF_NO_PI | unix.IFF_MULTI_QUEUE)
+}
+
+func openExistingFileFlags() int {
+	return unix.O_RDWR | unix.O_CLOEXEC | unix.O_NONBLOCK
 }
 
 func requireUnprivilegedProcess() error {
@@ -99,9 +106,10 @@ func (device *linuxDevice) Close() error {
 	if device == nil || device.file == nil {
 		return nil
 	}
-	file := device.file
-	device.file = nil
-	return file.Close()
+	device.closeOnce.Do(func() {
+		device.closeErr = device.file.Close()
+	})
+	return device.closeErr
 }
 
 var _ Device = (*linuxDevice)(nil)

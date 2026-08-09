@@ -20,6 +20,41 @@ func TestVerifyRepositoryLiveDataPlaneAuthority(t *testing.T) {
 	}
 }
 
+func TestFieldHarnessUsesAuthoritativePhase17DnsAddresses(t *testing.T) {
+	harness, err := os.ReadFile(filepath.Join(
+		repositoryRoot(t),
+		"android", "app", "src", "androidTest", "kotlin", "org", "kurdistanvpn", "app", "Phase17FieldHarness.kt",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(harness)
+	for _, required := range []string{"10.77.0.1", "fd4b:7572:6400::1"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("field harness missing authoritative DNS address %q", required)
+		}
+	}
+	if strings.Contains(text, "fd00:77::1") {
+		t.Fatal("field harness retains obsolete IPv6 DNS fixture")
+	}
+}
+
+func TestFieldHarnessStopsEachLiveSessionBeforeReturning(t *testing.T) {
+	harness, err := os.ReadFile(filepath.Join(
+		repositoryRoot(t),
+		"android", "app", "src", "androidTest", "kotlin", "org", "kurdistanvpn", "app", "Phase17FieldHarness.kt",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(harness)
+	for _, required := range []string{"controller.stop()", "LIVE_STOP_TIMEOUT"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("field harness does not prove live-session teardown: missing %q", required)
+		}
+	}
+}
+
 func TestPhase17GateDoesNotApplyHistoricalPhase9ArtifactEvidenceToCurrentAPK(t *testing.T) {
 	build, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "build.gradle.kts"))
 	if err != nil {

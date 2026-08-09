@@ -6,11 +6,55 @@ package evidenceoverlay
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestPhase17SuccessorOverlayUsesBoundedExpandedCardinality(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(Phase17SuccessorPath)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(count int) {
+		t.Helper()
+		entries := make([]entry, count)
+		for index := range entries {
+			entries[index] = entry{
+				Path:       fmt.Sprintf("phase17/file-%03d", index),
+				PreSHA256:  strings.Repeat("a", 64),
+				PostSHA256: strings.Repeat("b", 64),
+			}
+		}
+		raw, err := json.Marshal(overlay{
+			Version: "phase17-live-data-plane-v1",
+			Entries: []entry{{
+				Path:       "phase17/base",
+				PreSHA256:  strings.Repeat("a", 64),
+				PostSHA256: strings.Repeat("b", 64),
+			}},
+			SuccessorEntries: entries,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(Phase17SuccessorPath)), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write(263)
+	if _, err := readOverlay(root, Phase17SuccessorPath, "phase17-live-data-plane-v1"); err != nil {
+		t.Fatalf("expanded Phase 17 successor inventory rejected: %v", err)
+	}
+	write(Phase17SuccessorEntryLimit + 1)
+	if _, err := readOverlay(root, Phase17SuccessorPath, "phase17-live-data-plane-v1"); err == nil {
+		t.Fatal("Phase 17 successor inventory above the bounded limit accepted")
+	}
+}
 
 func TestLoadSuccessorVerifiesPostStateAndReturnsPredecessors(t *testing.T) {
 	root := t.TempDir()
