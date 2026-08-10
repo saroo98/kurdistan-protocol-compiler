@@ -606,17 +606,17 @@ func issueAndActivateProfile(ctx context.Context, runner commandRunner, value co
 }
 
 func verifyFieldTraffic(ctx context.Context, runner commandRunner, value config, root, serial string, probeURL, probeDigest []byte, ipv6Authorized bool) error {
-	if err := runFieldAction(ctx, runner, value, root, serial, "data-plane", map[string]string{
-		"phase17ProbeUrl": string(probeURL), "phase17ExpectedResponseSha256": string(probeDigest),
-	}, "DATA_PLANE_VERIFIED"); err != nil {
-		return err
-	}
 	for _, family := range dnsProbeFamilies(ipv6Authorized) {
 		if err := runFieldAction(ctx, runner, value, root, serial, "dns-probe", map[string]string{
 			"phase17DnsFamily": family, "phase17ExpectDnsAvailable": "true",
 		}, "DNS_IPV"+family+"_VERIFIED"); err != nil {
 			return err
 		}
+	}
+	if err := runFieldAction(ctx, runner, value, root, serial, "data-plane", map[string]string{
+		"phase17ProbeUrl": string(probeURL), "phase17ExpectedResponseSha256": string(probeDigest),
+	}, "DATA_PLANE_VERIFIED"); err != nil {
+		return err
 	}
 	return nil
 }

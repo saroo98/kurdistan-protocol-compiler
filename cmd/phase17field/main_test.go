@@ -323,6 +323,44 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 	}
 }
 
+func TestVerifyFieldTrafficProvesExplicitTunnelDNSBeforeHostnameDataPlane(t *testing.T) {
+	var actions []string
+	var activeAction string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, fmt.Errorf("unexpected command %q", name)
+		}
+		for index, argument := range arguments {
+			if argument == "phase17FieldAction" && index+1 < len(arguments) {
+				activeAction = arguments[index+1]
+				actions = append(actions, activeAction)
+				return []byte("OK (1 test)\n"), nil
+			}
+		}
+		if len(arguments) >= 6 && arguments[2] == "shell" && arguments[3] == "run-as" && arguments[5] == "cat" {
+			switch activeAction {
+			case "dns-probe":
+				return []byte("DNS_IPV4_VERIFIED\n"), nil
+			case "data-plane":
+				return []byte("DATA_PLANE_VERIFIED\n"), nil
+			default:
+				return nil, errors.New("field action unavailable")
+			}
+		}
+		return []byte(""), nil
+	}}
+	value := config{adbPath: "adb"}
+	if err := verifyFieldTraffic(
+		context.Background(), runner, value, "", "emulator-5554",
+		[]byte("https://probe.example/"), []byte(strings.Repeat("0", 64)), false,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"dns-probe", "data-plane"}; !reflect.DeepEqual(actions, want) {
+		t.Fatalf("actions=%v, want %v", actions, want)
+	}
+}
+
 func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) {
 	got := instrumentationFailureCategory([]byte("INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0\n"))
 	if got != "INSTRUMENTATION_PROCESS_CRASH" {
