@@ -6,6 +6,7 @@ package selfhost
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -402,6 +403,53 @@ func TestIssuerAndRelayRotationRevokePriorProfiles(t *testing.T) {
 				t.Fatalf("pre-rotation profile remained current: %v", err)
 			}
 		})
+	}
+}
+
+func TestIssuerRotationCompactsContentRevocationsCoveredByRetiredIssuer(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recoveryPath := filepath.Join(base, "offline", "recovery")
+	passphrase := []byte("correct horse battery staple")
+	now := time.Unix(1_800_100_000, 0).UTC()
+	if _, err := Initialize(InitOptions{DataDir: dataDir, DeploymentName: "owner-node", Endpoint: "203.0.113.7:443", RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 2; index++ {
+		at := now.Add(time.Duration(index+1) * time.Minute)
+		issued, err := CreateProfile(dataDir, CreateProfileOptions{Name: fmt.Sprintf("phone-%d", index), ValidFor: 24 * time.Hour, Now: at})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := RevokeProfile(dataDir, RevokeProfileOptions{ProfileID: issued.ProfileID, RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: at.Add(time.Second)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(master)
+	if len(before.Revocations.RevokedContentIDs) != 2 {
+		t.Fatalf("precondition revoked content IDs=%d, want 2", len(before.Revocations.RevokedContentIDs))
+	}
+	retiredIssuer := before.IssuerKey.KeyID
+	if _, err := RotateIssuer(dataDir, RecoveryActionOptions{RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: now.Add(3 * time.Minute)}); err != nil {
+		t.Fatal(err)
+	}
+	after, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(master)
+	if len(after.Revocations.RevokedContentIDs) != 0 {
+		t.Fatalf("retired-issuer content revocations retained=%d, want 0", len(after.Revocations.RevokedContentIDs))
+	}
+	if !contains(after.Revocations.RevokedIssuerKeyIDs, retiredIssuer) {
+		t.Fatal("retired issuer was not preserved in the signed revocation set")
 	}
 }
 
