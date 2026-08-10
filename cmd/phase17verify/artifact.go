@@ -67,6 +67,7 @@ var phase17BridgeSymbols = []string{
 	"kvpn_recipient_request",
 	"kvpn_recipient_validate",
 	"kvpn_runtime_diagnostics_v1",
+	"kvpn_runtime_rejection_code_v1",
 	"kvpn_runtime_session_open",
 	"kvpn_runtime_session_open_v2",
 	"kvpn_runtime_session_roundtrip",

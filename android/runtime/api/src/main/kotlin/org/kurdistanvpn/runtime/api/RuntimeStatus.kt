@@ -67,6 +67,7 @@ data class VpnRuntimeDiagnostics(
     val tunWriteErrno: Long = 0,
     val tunPacketsWritten: Long = 0,
     val rejectedTunPackets: Long = 0,
+    val rejectedTunPacketCode: Long = 0,
 )
 
 data class VpnRuntimeConfig(
@@ -179,4 +180,5 @@ object VpnRuntimeContract {
     const val EXTRA_DIAGNOSTIC_TUN_ERRNO = "diagnostic_tun_errno"
     const val EXTRA_DIAGNOSTIC_TUN_WRITTEN = "diagnostic_tun_written"
     const val EXTRA_DIAGNOSTIC_REJECTED = "diagnostic_rejected"
+    const val EXTRA_DIAGNOSTIC_REJECTION_CODE = "diagnostic_rejection_code"
 }
