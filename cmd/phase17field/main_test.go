@@ -253,6 +253,59 @@ func TestAssertAndroidPrivacyRejectsPrivateProbeEndpointInLogcat(t *testing.T) {
 	}
 }
 
+func TestAssertAndroidPrivacyScansCompleteBufferBeyondGenericCommandLimit(t *testing.T) {
+	benign := bytes.Repeat([]byte{'x'}, maxOutputBytes+1024)
+	if len(benign) <= maxOutputBytes {
+		t.Fatalf("fixture bytes=%d, want more than generic command bound %d", len(benign), maxOutputBytes)
+	}
+	if len(benign) >= maxAndroidPrivacyLogBytes {
+		t.Fatalf("fixture bytes=%d, want less than privacy bound %d", len(benign), maxAndroidPrivacyLogBytes)
+	}
+	step := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, _ ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected command")
+		}
+		step++
+		if step == 1 {
+			return []byte("package:" + appPackage + " uid:10288\n"), nil
+		}
+		return benign, nil
+	}}
+	value := config{adbPath: "adb"}
+	if err := assertAndroidPrivacy(context.Background(), runner, value, ".", "emulator-5554", []byte("https://probe.invalid/check")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAssertAndroidPrivacyRejectsBufferBeyondDedicatedBound(t *testing.T) {
+	step := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, _ ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected command")
+		}
+		step++
+		if step == 1 {
+			return []byte("package:" + appPackage + " uid:10288\n"), nil
+		}
+		return bytes.Repeat([]byte{'x'}, maxAndroidPrivacyLogBytes+1), nil
+	}}
+	value := config{adbPath: "adb"}
+	err := assertAndroidPrivacy(context.Background(), runner, value, ".", "emulator-5554", []byte("https://probe.invalid/check"))
+	if err == nil || err.Error() != "Android privacy log scan unavailable" {
+		t.Fatalf("error=%v, want bounded privacy scan failure", err)
+	}
+}
+
+func TestRunBytesWithLimitEnforcesBoundForInjectedRunner(t *testing.T) {
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+		return []byte("123456789"), nil
+	}}
+	if _, err := runBytesWithLimit(context.Background(), runner, nil, ".", time.Second, 8, "fixture"); err == nil {
+		t.Fatal("injected runner output beyond the requested bound was accepted")
+	}
+}
+
 func TestParsePackageUIDRejectsAmbiguousOrMalformedIdentity(t *testing.T) {
 	for _, test := range []struct {
 		name string
