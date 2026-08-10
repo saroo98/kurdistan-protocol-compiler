@@ -129,7 +129,9 @@ type PacketPumpConfigV1 struct {
 	Program       liveprogram.ProgramV1
 	Direction     DirectionV1
 	AssignedIPv4  [4]byte
+	DNSIPv4       [4]byte
 	AssignedIPv6  [16]byte
+	DNSIPv6       [16]byte
 	QueuePackets  uint16
 	IncompleteOps uint16
 	BufferBudget  uint64
@@ -206,7 +208,8 @@ type authenticatedPacketV1 struct {
 func NewPacketPumpV1(config PacketPumpConfigV1) (*PacketPumpV1, error) {
 	if config.TUN == nil || config.Carrier == nil || config.Endpoint == nil || liveprogram.ValidateV1(config.Program) != nil ||
 		(config.Direction != DirectionClientV1 && config.Direction != DirectionRelayV1) || config.QueuePackets == 0 || config.IncompleteOps == 0 ||
-		config.QueuePackets > maximumPacketQueueV1 || config.IncompleteOps > maximumIncompletePacketsV1 || config.IdleTimeout <= 0 {
+		config.QueuePackets > maximumPacketQueueV1 || config.IncompleteOps > maximumIncompletePacketsV1 || config.IdleTimeout <= 0 ||
+		!validPacketPumpAddressAuthorityV1(config.AssignedIPv4, config.DNSIPv4, config.AssignedIPv6, config.DNSIPv6) {
 		return nil, ErrPacketPumpConfig
 	}
 	maxPacket := config.Program.Limits.MaxPayloadBytes
@@ -224,6 +227,15 @@ func NewPacketPumpV1(config PacketPumpConfigV1) (*PacketPumpV1, error) {
 	pump.stream.Store(1)
 	pump.activity.Store(time.Now().UnixNano())
 	return pump, nil
+}
+
+func validPacketPumpAddressAuthorityV1(assignedIPv4, dnsIPv4 [4]byte, assignedIPv6, dnsIPv6 [16]byte) bool {
+	hasIPv4 := assignedIPv4 != [4]byte{}
+	hasIPv6 := assignedIPv6 != [16]byte{}
+	if !hasIPv4 && !hasIPv6 || hasIPv4 != (dnsIPv4 != [4]byte{}) || hasIPv6 != (dnsIPv6 != [16]byte{}) {
+		return false
+	}
+	return (!hasIPv4 || assignedIPv4 != dnsIPv4) && (!hasIPv6 || assignedIPv6 != dnsIPv6)
 }
 
 func (pump *PacketPumpV1) Run(ctx context.Context) error {
@@ -485,7 +497,7 @@ func (pump *PacketPumpV1) writeTUNV1(ctx context.Context, input <-chan authentic
 			if pump.config.Direction == DirectionClientV1 {
 				_, validateErr = validateReturnIPPacketV1(operation.Payload, pump.config.AssignedIPv4, pump.config.AssignedIPv6)
 			} else {
-				_, validateErr = ValidateRelayOutboundIPPacketV1(operation.Payload, pump.config.AssignedIPv4, pump.config.AssignedIPv6)
+				_, validateErr = ValidateRelayOutboundIPPacketV1(operation.Payload, pump.config.AssignedIPv4, pump.config.DNSIPv4, pump.config.AssignedIPv6, pump.config.DNSIPv6)
 			}
 			if validateErr != nil {
 				pump.innerPacketsRejected.Add(1)
@@ -498,7 +510,7 @@ func (pump *PacketPumpV1) writeTUNV1(ctx context.Context, input <-chan authentic
 			}
 			pump.innerPacketsAccepted.Add(1)
 			if pump.config.Direction == DirectionRelayV1 {
-				classification := classifyRelayTransportV1(operation.Payload, pump.config.AssignedIPv4, pump.config.AssignedIPv6)
+				classification := classifyRelayTransportV1(operation.Payload, pump.config.DNSIPv4, pump.config.DNSIPv6)
 				if classification.GatewayDNS {
 					pump.relayGatewayDNSPackets.Add(1)
 					if !classification.ChecksumValid {
@@ -618,7 +630,7 @@ func (pump *PacketPumpV1) touchV1() { pump.activity.Store(time.Now().UnixNano())
 
 func (pump *PacketPumpV1) validateOutboundPacketV1(packet []byte) error {
 	if pump.config.Direction == DirectionClientV1 {
-		_, err := validateClientOutboundIPPacketV1(packet, pump.config.AssignedIPv4, pump.config.AssignedIPv6)
+		_, err := validateClientOutboundIPPacketV1(packet, pump.config.AssignedIPv4, pump.config.DNSIPv4, pump.config.AssignedIPv6, pump.config.DNSIPv6)
 		return err
 	}
 	info, err := validateReturnIPPacketV1(packet, pump.config.AssignedIPv4, pump.config.AssignedIPv6)

@@ -256,7 +256,8 @@ func (network *platformRuntimeNetwork) Start(ctx context.Context) androidbridge.
 	}
 	pump, err := kruntime.NewPacketPumpV1(kruntime.PacketPumpConfigV1{
 		TUN: network.tun, Carrier: duplex, Endpoint: network.endpoint, Program: network.program,
-		Direction: kruntime.DirectionClientV1, AssignedIPv4: network.plan.ClientIPv4, AssignedIPv6: network.plan.ClientIPv6,
+		Direction: kruntime.DirectionClientV1, AssignedIPv4: network.plan.ClientIPv4, DNSIPv4: network.plan.DNSIPv4,
+		AssignedIPv6: network.plan.ClientIPv6, DNSIPv6: network.plan.DNSIPv6,
 		QueuePackets: network.plan.MaxQueuePackets, IncompleteOps: network.plan.MaxIncompleteOps,
 		BufferBudget: budget, IdleTimeout: network.plan.IdleTimeout,
 	})

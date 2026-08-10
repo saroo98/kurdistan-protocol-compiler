@@ -488,7 +488,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	}
 	device, err := server.registry.Register(SessionSpec{
 		ID: sessionID, ProfileID: admission.ProfileID, ClientKeyID: admission.ClientAuthKeyID,
-		AssignedIPv4: assigned4, AssignedIPv6: assigned6, Cancel: cancelSession,
+		AssignedIPv4: assigned4, DNSIPv4: plan.DNSIPv4, AssignedIPv6: assigned6, DNSIPv6: plan.DNSIPv6, Cancel: cancelSession,
 	})
 	if err != nil {
 		server.stateMu.RUnlock()
@@ -512,7 +512,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	}
 	pump, err := kruntime.NewPacketPumpV1(kruntime.PacketPumpConfigV1{
 		TUN: device, Carrier: duplexCarrier, Endpoint: endpoint, Program: program, Direction: kruntime.DirectionRelayV1,
-		AssignedIPv4: assigned4, AssignedIPv6: assigned6, QueuePackets: plan.MaxQueuePackets,
+		AssignedIPv4: assigned4, DNSIPv4: plan.DNSIPv4, AssignedIPv6: assigned6, DNSIPv6: plan.DNSIPv6, QueuePackets: plan.MaxQueuePackets,
 		IncompleteOps: plan.MaxIncompleteOps, BufferBudget: server.config.SessionBufferBudget, IdleTimeout: idleTimeout,
 	})
 	if err != nil {

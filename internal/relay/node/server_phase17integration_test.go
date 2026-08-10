@@ -54,7 +54,7 @@ func TestPhase17IntegrationRelayFailsClosedAcrossReloadStates(t *testing.T) {
 			if _, ok := server.trackTransientV1("phase17-inflight", "phase17-profile", cancel); !ok {
 				t.Fatal("track in-flight session")
 			}
-			if _, err := registry.Register(SessionSpec{ID: "phase17-established", ProfileID: "phase17-profile", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
+			if _, err := registry.Register(SessionSpec{ID: "phase17-established", ProfileID: "phase17-profile", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1}}); err != nil {
 				t.Fatal(err)
 			}
 			err = server.Reload()
@@ -140,11 +140,11 @@ func TestPhase17IntegrationMultiClientIsolationAndSourcePolicy(t *testing.T) {
 	defer registry.Close()
 	firstAddress := [4]byte{10, 89, 0, 2}
 	secondAddress := [4]byte{10, 89, 0, 3}
-	first, err := registry.Register(SessionSpec{ID: "phase17-one", ProfileID: "phase17-profile-one", ClientKeyID: "phase17-client-one", AssignedIPv4: firstAddress})
+	first, err := registry.Register(SessionSpec{ID: "phase17-one", ProfileID: "phase17-profile-one", ClientKeyID: "phase17-client-one", AssignedIPv4: firstAddress, DNSIPv4: [4]byte{10, 77, 0, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := registry.Register(SessionSpec{ID: "phase17-two", ProfileID: "phase17-profile-two", ClientKeyID: "phase17-client-two", AssignedIPv4: secondAddress})
+	second, err := registry.Register(SessionSpec{ID: "phase17-two", ProfileID: "phase17-profile-two", ClientKeyID: "phase17-client-two", AssignedIPv4: secondAddress, DNSIPv4: [4]byte{10, 77, 0, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

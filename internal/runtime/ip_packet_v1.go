@@ -54,7 +54,7 @@ type relayReturnTransportClassificationV1 struct {
 	Malformed     bool
 }
 
-func classifyRelayTransportV1(packet []byte, assignedIPv4 [4]byte, _ [16]byte) relayTransportClassificationV1 {
+func classifyRelayTransportV1(packet []byte, dnsIPv4 [4]byte, _ [16]byte) relayTransportClassificationV1 {
 	classification := relayTransportClassificationV1{}
 	if len(packet) < 20 || packet[0]>>4 != 4 {
 		classification.Malformed = true
@@ -79,9 +79,7 @@ func classifyRelayTransportV1(packet []byte, assignedIPv4 [4]byte, _ [16]byte) r
 		classification.Malformed = true
 		return classification
 	}
-	gateway := assignedIPv4
-	gateway[3] = 1
-	classification.GatewayDNS = assignedIPv4 != [4]byte{} && equalIPv4BytesV1(packet[16:20], gateway) && binary.BigEndian.Uint16(udp[2:4]) == 53
+	classification.GatewayDNS = dnsIPv4 != [4]byte{} && equalIPv4BytesV1(packet[16:20], dnsIPv4) && binary.BigEndian.Uint16(udp[2:4]) == 53
 	checksum := binary.BigEndian.Uint16(udp[6:8])
 	classification.ChecksumValid = checksum == 0 || validIPv4UDPChecksumV1(packet[12:16], packet[16:20], udp)
 	return classification
@@ -266,7 +264,7 @@ func validateReturnIPPacketV1(packet []byte, assignedIPv4 [4]byte, assignedIPv6 
 	}
 }
 
-func validateClientOutboundIPPacketV1(packet []byte, assignedIPv4 [4]byte, assignedIPv6 [16]byte) (IPPacketInfoV1, error) {
+func validateClientOutboundIPPacketV1(packet []byte, assignedIPv4, dnsIPv4 [4]byte, assignedIPv6, dnsIPv6 [16]byte) (IPPacketInfoV1, error) {
 	if len(packet) == 0 {
 		return IPPacketInfoV1{}, ErrPacketInvalid
 	}
@@ -275,52 +273,33 @@ func validateClientOutboundIPPacketV1(packet []byte, assignedIPv4 [4]byte, assig
 		if assignedIPv4 == [4]byte{} {
 			return IPPacketInfoV1{}, ErrPacketFamily
 		}
-		server := assignedIPv4
-		server[3] = 1
-		return validateIPv4PacketV1(packet, DirectionRelayV1, assignedIPv4, netip.AddrFrom4(server))
+		if dnsIPv4 == [4]byte{} {
+			return IPPacketInfoV1{}, ErrPacketDestination
+		}
+		return validateIPv4PacketV1(packet, DirectionRelayV1, assignedIPv4, netip.AddrFrom4(dnsIPv4))
 	case 6:
 		if assignedIPv6 == [16]byte{} {
 			return IPPacketInfoV1{}, ErrPacketFamily
 		}
-		server := assignedIPv6
-		server[15] = 1
-		return validateIPv6PacketV1(packet, DirectionRelayV1, assignedIPv6, netip.AddrFrom16(server))
+		if dnsIPv6 == [16]byte{} {
+			return IPPacketInfoV1{}, ErrPacketDestination
+		}
+		return validateIPv6PacketV1(packet, DirectionRelayV1, assignedIPv6, netip.AddrFrom16(dnsIPv6))
 	default:
 		return IPPacketInfoV1{}, ErrPacketInvalid
 	}
 }
 
-func validateRelayOutboundIPPacketV1(packet []byte, assignedIPv4 [4]byte, assignedIPv6 [16]byte) (IPPacketInfoV1, error) {
-	if len(packet) == 0 {
-		return IPPacketInfoV1{}, ErrPacketInvalid
-	}
-	switch packet[0] >> 4 {
-	case 4:
-		if assignedIPv4 == [4]byte{} {
-			return IPPacketInfoV1{}, ErrPacketFamily
-		}
-		server := assignedIPv4
-		server[3] = 1
-		return validateIPv4PacketV1(packet, DirectionRelayV1, assignedIPv4, netip.AddrFrom4(server))
-	case 6:
-		if assignedIPv6 == [16]byte{} {
-			return IPPacketInfoV1{}, ErrPacketFamily
-		}
-		server := assignedIPv6
-		server[15] = 1
-		return validateIPv6PacketV1(packet, DirectionRelayV1, assignedIPv6, netip.AddrFrom16(server))
-	default:
-		return IPPacketInfoV1{}, ErrPacketInvalid
-	}
+func validateRelayOutboundIPPacketV1(packet []byte, assignedIPv4, dnsIPv4 [4]byte, assignedIPv6, dnsIPv6 [16]byte) (IPPacketInfoV1, error) {
+	return validateClientOutboundIPPacketV1(packet, assignedIPv4, dnsIPv4, assignedIPv6, dnsIPv6)
 }
 
 // ValidateRelayOutboundIPPacketV1 applies the relay's exact source and
-// destination policy, including the assigned in-tunnel gateway and no other
-// private destination. Relay adapters must use this boundary rather than the
-// generic packet validator so repeated validation cannot narrow signed DNS
-// authority inconsistently.
-func ValidateRelayOutboundIPPacketV1(packet []byte, assignedIPv4 [4]byte, assignedIPv6 [16]byte) (IPPacketInfoV1, error) {
-	return validateRelayOutboundIPPacketV1(packet, assignedIPv4, assignedIPv6)
+// destination policy, including the explicitly signed in-tunnel DNS address
+// and no other private destination. Relay adapters must use this boundary
+// rather than reconstructing DNS authority from the assigned client address.
+func ValidateRelayOutboundIPPacketV1(packet []byte, assignedIPv4, dnsIPv4 [4]byte, assignedIPv6, dnsIPv6 [16]byte) (IPPacketInfoV1, error) {
+	return validateRelayOutboundIPPacketV1(packet, assignedIPv4, dnsIPv4, assignedIPv6, dnsIPv6)
 }
 
 func blockedPacketAddressV1(address netip.Addr) bool {
