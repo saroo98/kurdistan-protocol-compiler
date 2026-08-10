@@ -198,28 +198,38 @@ internal object Phase17FieldHarness {
         val coordinators = Phase13Coordinators.create(root)
         val localRecordId = root.settingsStore.settings.first().profiles.activeLocalRecordId
             ?: error("ACTIVE_PROFILE_UNAVAILABLE")
-        val authority = when (val result = coordinators.runtime.openLiveAuthority(localRecordId)) {
-            is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Success -> result
-            is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Failure ->
-                error("RUNTIME_AUTHORITY_FAILED:${result.error}")
-            null -> error("RUNTIME_AUTHORITY_UNAVAILABLE")
+        val config = VpnRuntimeConfig(
+            routingPolicy = VpnRoutingPolicy(),
+            mtu = 1280,
+        )
+        val authorityProvider = FreshRuntimeAuthorityProvider {
+            when (val result = coordinators.runtime.openLiveAuthority(localRecordId)) {
+                is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Success ->
+                    result.material.use { material ->
+                        FreshRuntimeAuthority.Ready(
+                            RuntimeStartWire.encode(
+                                verifyRequest = material.verifyRequest,
+                                activationRecord = material.activationRecord,
+                                recipientRequest = material.recipientRequest,
+                                recipientPrivate = material.recipientPrivate,
+                                config = config,
+                            ),
+                        )
+                    }
+                is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Failure ->
+                    FreshRuntimeAuthority.Rejected(result.error.name)
+                null -> FreshRuntimeAuthority.Rejected("STORAGE_FAILURE")
+            }
         }
-        val encoded = authority.material.use { material ->
-            RuntimeStartWire.encode(
-                verifyRequest = material.verifyRequest,
-                activationRecord = material.activationRecord,
-                recipientRequest = material.recipientRequest,
-                recipientPrivate = material.recipientPrivate,
-                config = VpnRuntimeConfig(
-                    routingPolicy = VpnRoutingPolicy(),
-                    mtu = 1280,
-                ),
-            )
+        val encoded = when (val prepared = authorityProvider.prepare()) {
+            is FreshRuntimeAuthority.Ready -> prepared.encoded
+            is FreshRuntimeAuthority.Rejected ->
+                error("RUNTIME_AUTHORITY_FAILED:${prepared.failure}")
         }
         val controller = VpnRuntimeController(application)
         try {
             check(controller.prepareIntent() == null) { "VPN_CONSENT_REQUIRED" }
-            controller.stageAuthority(encoded)
+            controller.stageAuthority(encoded, authorityProvider)
             controller.startStaged()
             val snapshot = withTimeoutOrNull(120_000) {
                 controller.snapshot.first { value ->
@@ -255,6 +265,9 @@ internal object Phase17FieldHarness {
             }
             check(snapshot.profileGeneration > 0 && !snapshot.planDigest.isNullOrBlank()) {
                 "LIVE_SESSION_EVIDENCE_MISSING"
+            }
+            check(snapshot.maxReconnectAttempts in 1..5) {
+                "LIVE_RECONNECT_POLICY_MISSING"
             }
             if (shouldVerifyDataPlane || dnsFamily != null) {
                 delay(1_000)

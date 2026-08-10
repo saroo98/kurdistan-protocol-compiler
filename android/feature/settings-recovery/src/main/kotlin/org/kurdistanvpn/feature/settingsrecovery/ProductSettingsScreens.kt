@@ -166,7 +166,11 @@ fun ConnectionSettingsScreen(
         Text(stringResource(UiR.string.manual_strategy_unavailable))
     }
     UnavailableSetting(stringResource(UiR.string.auto_connect_launch), stringResource(UiR.string.auto_connect_launch_reason))
-    UnavailableSetting(stringResource(UiR.string.safe_reconnect), stringResource(UiR.string.safe_reconnect_reason))
+    AvailableSetting(
+        stringResource(UiR.string.safe_reconnect),
+        stringResource(UiR.string.safe_reconnect_reason),
+        "safe_reconnect_available",
+    )
     UnavailableSetting(stringResource(UiR.string.auto_connect_boot), stringResource(UiR.string.auto_connect_boot_reason))
     UnavailableSetting(stringResource(UiR.string.kill_switch), stringResource(UiR.string.kill_switch_reason))
     UnavailableSetting(stringResource(UiR.string.allow_local_network), stringResource(UiR.string.allow_local_network_reason))
@@ -424,6 +428,17 @@ private fun UnavailableSetting(title: String, explanation: String) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(stringResource(UiR.string.unavailable), color = MaterialTheme.colorScheme.error)
+            Text(explanation, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun AvailableSetting(title: String, explanation: String, tag: String) {
+    Card(modifier = Modifier.fillMaxWidth().testTag(tag)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(UiR.string.available), color = MaterialTheme.colorScheme.primary)
             Text(explanation, style = MaterialTheme.typography.bodySmall)
         }
     }

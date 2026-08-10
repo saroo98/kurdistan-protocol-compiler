@@ -352,11 +352,21 @@ class MainActivity : FragmentActivity() {
                     },
                     onCancelDiagnostic = viewModel::cancelDiagnostic,
                     onClearDiagnosticEvents = viewModel::clearDiagnosticEvents,
-                    onStartVpn = {
+                    onStartVpn = startVpn@{
+                        val config = runtimeConfig(settings)
+                        val reconnectAuthorityProvider =
+                            viewModel.freshRuntimeAuthorityProvider(config)
+                        if (reconnectAuthorityProvider == null) {
+                            vpnController.authorityRejected(OperationError.POLICY_REJECTED.name)
+                            return@startVpn
+                        }
                         viewModel.prepareRuntimeStart(
-                            config = runtimeConfig(settings),
+                            config = config,
                             onReady = { authority ->
-                                vpnController.stageAuthority(authority)
+                                vpnController.stageAuthority(
+                                    authority,
+                                    reconnectAuthorityProvider,
+                                )
                                 if (
                                     Build.VERSION.SDK_INT >= 33 &&
                                     ContextCompat.checkSelfPermission(
