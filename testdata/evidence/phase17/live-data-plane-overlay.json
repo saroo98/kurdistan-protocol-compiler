@@ -155,7 +155,7 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c971ba5cdd960ac0135ef2e03d16eebbf90b45979d00cac7d0f3a126e06b702c"
+      "post_sha256": "6dba6387f86a7fd6488cb6df397e23b40405605d908842836193222d6b6619d1"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
@@ -205,7 +205,7 @@
     {
       "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnRuntimeController.kt",
       "pre_sha256": "13a4d09b7c3594703d99061a983d94517fad4fb7b7067df82387098b30f53567",
-      "post_sha256": "95ef673025fa2c6ea8ee9e9bd84cf316a4d4883ce2aa06bb3d9639b4d16e1d67"
+      "post_sha256": "dc6e2c2c4c9a6920ddb56b99b04aedb32229e53a5f0f7fc0f187ae3839f4fcf3"
     },
     {
       "path": "android/app/src/main/res/xml/network_security_config.xml",
@@ -245,22 +245,22 @@
     {
       "path": "android/core/native-api/src/main/kotlin/org/kurdistanvpn/core/nativeapi/KurdNativeCore.kt",
       "pre_sha256": "71b7414b223e22671b1d909fc1bb7f116ed97a9e37c98aec308f6930e639c67d",
-      "post_sha256": "112135911b20d6fb399428e0b6ba3230bc413961e1af904b87157fe8ee9b0d52"
+      "post_sha256": "8616af0771af7205dd7694310e55a8ad54e1e056dc36d7a8402dad0ec52acf04"
     },
     {
       "path": "android/core/native-jni/src/main/cpp/kvpn_abi.h",
       "pre_sha256": "b35dfcbb9c79cacd2028952db146ee1565b87f0745011a993239955495057ca5",
-      "post_sha256": "a78562dd56f8851c0bd0410aea604c73511bb06e51f241824f15c3fe594a738c"
+      "post_sha256": "4be94cc3313054938ded1ce829dec8034e21660396a43c9fdd9b0deeb58dcdca"
     },
     {
       "path": "android/core/native-jni/src/main/cpp/kvpn_jni.c",
       "pre_sha256": "6dc6cb5b777105946e1bec5629ce84d1531b582e5391b4540926ba8dbcafe0e9",
-      "post_sha256": "9f39f04398cd9ccc58142724c01f45363d526699399b833c2ecbbe6ab6f9989d"
+      "post_sha256": "ea2b7714c244100e0fdacc6465a5c5e0791442e3cc06630775ce6bff660f988d"
     },
     {
       "path": "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
       "pre_sha256": "e36cea22ac27c2b1a92a8e0690d68fa5846bb7f7df8b1e4af56d0d32862b5f27",
-      "post_sha256": "9c07ad97f65c2a6da3da6acf6b42388f9f31619aca79824a4e5b89e83b314394"
+      "post_sha256": "bef263665cd9f73fc0c00599c8a4320c89d830fd05faf45a3be2e99c0469a11b"
     },
     {
       "path": "android/core/ui/src/main/res/values-ar/strings.xml",
@@ -355,7 +355,7 @@
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt",
       "pre_sha256": "9accbaa216f67cac4b61f9e2ad34fdfec508e22cec894934e7afffafab349adb",
-      "post_sha256": "261def42c7e72d5a2a2b52f706e30af1efcfa36307804f75434cc87b12475593"
+      "post_sha256": "cc0b44254e94a71507529c9f393556e534bdfa08788cd534bdf884f5e9ec481b"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
@@ -375,7 +375,7 @@
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelControllerTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c24106df958cf1f0235910884f863941805fe498c71c77e21a98b6a8076cb065"
+      "post_sha256": "7040dbab9323811efdc2be6ce7220c776c8cb7a077f570a3efe12373d84b6f2f"
     },
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/PendingRuntimeTerminationTest.kt",
@@ -405,7 +405,7 @@
     {
       "path": "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",
       "pre_sha256": "db65c8332e8ca113186f86a95ed4c88b9f2e671ccab722f767508eb7b8d2dbc2",
-      "post_sha256": "34be34d5eaa7df717523c7443fc6657b3e7af32a10eae0fbd01c75747291650a"
+      "post_sha256": "ebb458ecd86dbf78fa600bd6f0500ed91c6b19b5fdd2ce4cd3958901741ade4c"
     },
     {
       "path": "android/runtime/api/src/test/kotlin/org/kurdistanvpn/runtime/api/VpnRoutingPolicyTest.kt",
@@ -460,12 +460,12 @@
     {
       "path": "cmd/kandroidbridge/main.go",
       "pre_sha256": "f0d5244fefbd1a9aa6794486bd480ceea9e0af069471defb914a8ae8ca2ee8ee",
-      "post_sha256": "9755f0950ad34beb7ef77089911d0ddfd063870d6b5474a1c1307c1c150b1805"
+      "post_sha256": "85b872dcd34c4f2cb1145810d08073806f64b5548dd26171735a239cc8de18be"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "56c30fb76a31b8c666ca2147b9160f1ee381dba325fbf31b5bf636ac0958a743"
+      "post_sha256": "eef247f28d38331bd252db220c59bbf38cb568e86fd66c4d9f26a39c551e94ae"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_stub.go",
@@ -475,7 +475,7 @@
     {
       "path": "cmd/kandroidbridge/phase17_release_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "406b0802c6d341f6454316b1aae4429b17f2e4c516dc9af0e200b6826db0d0be"
+      "post_sha256": "dbb4b92a9ba820db40bd796b157cf22081fadef433f3fb3676d8f64cc636a2bf"
     },
     {
       "path": "cmd/kandroidbridge/phase17_release_unix.go",
@@ -595,17 +595,17 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "4e14bda129d5000cf05552a64d4c14d2ea67c5da28697d2a456b8baff338a06c"
+      "post_sha256": "35934d9dba82b28c73ca6c6c1a539220c77444d6e2690fcad6df783c90e5fa90"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e5d5deb3cf59048ec1fc9440f38a1ddb899db9b6f16535b52482d881d5f203bf"
+      "post_sha256": "2d3a8f614d1f3775aa5d609ce223670a81fb163570c7d652262094540a37084c"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "5789238a47e7e79d85c235bd2d3df536e8a04b2c65475ee6603210319e03d930"
+      "post_sha256": "a2fc8a1e6f0ed0def65dac3e1c337711097db1bec525326c8984733c0c461a84"
     },
     {
       "path": "cmd/phase17verify/artifact_test.go",
@@ -820,7 +820,7 @@
     {
       "path": "internal/androidbridge/runtime_session_v2.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "ce92c4a386aa462811b91b269c8064dce9f4739c50f68326dec4d58cac226c53"
+      "post_sha256": "33b5805fd53ef690811a7e4726a038ec620515a43fc6c647305be6ef32825f1c"
     },
     {
       "path": "internal/androidbridge/runtime_session_v2_test.go",
@@ -1195,12 +1195,12 @@
     {
       "path": "internal/runtime/ip_tunnel_v1.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3b749c3a45ec1a6a3851a454f7efe95d7f1ee4cc7106fe551bb4f823e17400c3"
+      "post_sha256": "c1e33e816a021b35ed945d2cf145372154480eb5aa1052859906e342ce4f8428"
     },
     {
       "path": "internal/runtime/ip_tunnel_v1_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3eb3e7b2044ec33aa3fff66da7dbac92b8b5d2d610f4d95b4b3660b178dc26f7"
+      "post_sha256": "0905dcfe7c015c2f539edf3ae98763e23e022916432158aa54e8ecb6747c6bdc"
     },
     {
       "path": "internal/runtime/network_tlstcp_integration_test.go",
@@ -1470,7 +1470,7 @@
     {
       "path": "testdata/evidence/phase17/historical-gate-supersession.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "694cc8686cf05f59c1394492d6802cb841920beba3c71e407a8be60c09e00619"
+      "post_sha256": "c6357d1388756199e3d308402c591700a2029db885cb7048d8372ec7823b7099"
     },
     {
       "path": "testdata/fixtures/phase17/netns/topology-v1.json",

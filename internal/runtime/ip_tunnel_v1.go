@@ -110,6 +110,18 @@ const (
 	maximumIncompletePacketsV1 = 64
 )
 
+type PacketRejectionCodeV1 uint32
+
+const (
+	PacketRejectionNoneV1 PacketRejectionCodeV1 = iota
+	PacketRejectionInvalidV1
+	PacketRejectionFamilyV1
+	PacketRejectionProtocolV1
+	PacketRejectionSourceV1
+	PacketRejectionDestinationV1
+	PacketRejectionFragmentedV1
+)
+
 type PacketPumpConfigV1 struct {
 	TUN           io.ReadWriteCloser
 	Carrier       io.ReadWriteCloser
@@ -146,6 +158,7 @@ type PacketPumpV1 struct {
 	tunWriteErrno           atomic.Uint32
 	tunPacketsWritten       atomic.Uint64
 	rejectedTUNPackets      atomic.Uint64
+	rejectedTUNPacketCode   atomic.Uint32
 	relayGatewayDNSPackets  atomic.Uint64
 	relayDNSChecksumFailed  atomic.Uint64
 	relayTransportMalformed atomic.Uint64
@@ -172,6 +185,7 @@ type PacketPumpSnapshotV1 struct {
 	TUNWriteErrno                   uint32
 	TUNPacketsWritten               uint64
 	RejectedTUNPackets              uint64
+	RejectedTUNPacketCode           PacketRejectionCodeV1
 	RelayGatewayDNSPackets          uint64
 	RelayGatewayDNSChecksumFailures uint64
 	RelayTransportMalformedPackets  uint64
@@ -274,6 +288,7 @@ func (pump *PacketPumpV1) SnapshotV1() PacketPumpSnapshotV1 {
 		TUNWriteErrno:                   pump.tunWriteErrno.Load(),
 		TUNPacketsWritten:               pump.tunPacketsWritten.Load(),
 		RejectedTUNPackets:              pump.rejectedTUNPackets.Load(),
+		RejectedTUNPacketCode:           PacketRejectionCodeV1(pump.rejectedTUNPacketCode.Load()),
 		RelayGatewayDNSPackets:          pump.relayGatewayDNSPackets.Load(),
 		RelayGatewayDNSChecksumFailures: pump.relayDNSChecksumFailed.Load(),
 		RelayTransportMalformedPackets:  pump.relayTransportMalformed.Load(),
@@ -309,6 +324,7 @@ func (pump *PacketPumpV1) readTUNV1(ctx context.Context, output chan<- []byte, f
 		if err := pump.validateOutboundPacketV1(packet); err != nil {
 			clear(packet)
 			pump.rejectedTUNPackets.Add(1)
+			pump.rejectedTUNPacketCode.Store(uint32(packetRejectionCodeV1(err)))
 			if pump.rejected.Add(1) > maxRejectedTUNPacketsV1 {
 				pump.reportFailureV1(ctx, failures, newPacketPumpFailureV1(PacketPumpStageTUNValidateV1, err))
 				return
@@ -330,6 +346,23 @@ func (pump *PacketPumpV1) readTUNV1(ctx context.Context, output chan<- []byte, f
 			pump.reportFailureV1(ctx, failures, newPacketPumpFailureV1(PacketPumpStageOutboundQueueV1, ErrPacketQueueFull))
 			return
 		}
+	}
+}
+
+func packetRejectionCodeV1(err error) PacketRejectionCodeV1 {
+	switch {
+	case errors.Is(err, ErrPacketFamily):
+		return PacketRejectionFamilyV1
+	case errors.Is(err, ErrPacketProtocol):
+		return PacketRejectionProtocolV1
+	case errors.Is(err, ErrPacketSource):
+		return PacketRejectionSourceV1
+	case errors.Is(err, ErrPacketDestination):
+		return PacketRejectionDestinationV1
+	case errors.Is(err, ErrPacketFragmented):
+		return PacketRejectionFragmentedV1
+	default:
+		return PacketRejectionInvalidV1
 	}
 }
 

@@ -303,7 +303,8 @@ internal object Phase17FieldHarness {
                                 ":tun-failure-code=${value.tunWriteFailureCode}" +
                                 ":tun-errno=${value.tunWriteErrno}" +
                                 ":tun-write=${value.tunPacketsWritten}" +
-                                ":rejected=${value.rejectedTunPackets}"
+                                ":rejected=${value.rejectedTunPackets}" +
+                                ":rejection-code=${value.rejectedTunPacketCode}"
                     }
                     writeAtomic(
                         File(fieldRoot, RESULT),

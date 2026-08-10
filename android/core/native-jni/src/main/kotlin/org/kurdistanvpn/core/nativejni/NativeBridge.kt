@@ -444,7 +444,7 @@ class NativeBridge : KurdNativeCore {
 
         override fun diagnostics(): NativeResult<NativeLiveRuntimeDiagnostics> {
             if (closed) return NativeResult.Failure(OperationError.CANCELLED)
-            val output = LongArray(13)
+            val output = LongArray(14)
             val code = nativeRuntimeDiagnostics(handle, output)
             if (code != CODE_OK || output.any { it < 0 }) {
                 return NativeResult.Failure(if (code == CODE_OK) OperationError.INTERNAL_FAILURE else mapError(code))
@@ -464,6 +464,7 @@ class NativeBridge : KurdNativeCore {
                     tunWriteErrno = output[10],
                     tunPacketsWritten = output[11],
                     rejectedTunPackets = output[12],
+                    rejectedTunPacketCode = output[13],
                 ),
             )
         }

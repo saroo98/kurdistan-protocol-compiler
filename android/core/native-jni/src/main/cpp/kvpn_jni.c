@@ -809,7 +809,7 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeDiagnostics(
     jlong handle,
     jlongArray output) {
     (void)receiver;
-    const jsize output_count = 13;
+    const jsize output_count = 14;
     if (output == NULL || (*env)->GetArrayLength(env, output) != output_count) {
         return KVPN_INVALID_ARGUMENT;
     }
@@ -818,13 +818,19 @@ Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRuntimeDiagnostics(
     if (code != 0) {
         return code;
     }
-    jlong converted[13] = {0};
-    for (jsize index = 0; index < output_count; index++) {
+    uint32_t rejection_code = 0;
+    code = kvpn_runtime_rejection_code_v1((uint64_t)handle, &rejection_code);
+    if (code != 0) {
+        return code;
+    }
+    jlong converted[14] = {0};
+    for (jsize index = 0; index < 13; index++) {
         if (values[index] > INT64_MAX) {
             return KVPN_SIZE_LIMIT;
         }
         converted[index] = (jlong)values[index];
     }
+    converted[13] = (jlong)rejection_code;
     (*env)->SetLongArrayRegion(env, output, 0, output_count, converted);
     return (*env)->ExceptionCheck(env) ? KVPN_INVALID_ARGUMENT : 0;
 }

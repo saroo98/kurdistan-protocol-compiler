@@ -109,6 +109,7 @@ type RuntimeNetworkDiagnosticsV1 struct {
 	TUNWriteErrno           uint32
 	TUNPacketsWritten       uint64
 	RejectedTUNPackets      uint64
+	RejectedTUNPacketCode   uint32
 }
 
 type runtimeNetworkDiagnosticsProviderV1 interface {
