@@ -449,4 +449,5 @@ private fun liveDiagnostics() = NativeLiveRuntimeDiagnostics(
     tunWriteErrno = 11,
     tunPacketsWritten = 12,
     rejectedTunPackets = 13,
+    rejectedTunPacketCode = 4,
 )

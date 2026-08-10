@@ -71,6 +71,7 @@ func releaseRuntimeNetworkDiagnostics(snapshot kruntime.PacketPumpSnapshotV1) an
 		TUNWriteErrno:           snapshot.TUNWriteErrno,
 		TUNPacketsWritten:       snapshot.TUNPacketsWritten,
 		RejectedTUNPackets:      snapshot.RejectedTUNPackets,
+		RejectedTUNPacketCode:   uint32(snapshot.RejectedTUNPacketCode),
 	}
 }
 

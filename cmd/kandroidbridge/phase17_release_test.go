@@ -61,6 +61,7 @@ func TestReleaseRuntimeNetworkDiagnosticsMapsOnlyAggregateCounters(t *testing.T)
 		TUNWriteErrno:           105,
 		TUNPacketsWritten:       10,
 		RejectedTUNPackets:      11,
+		RejectedTUNPacketCode:   kruntime.PacketRejectionSourceV1,
 	}
 	want := androidbridge.RuntimeNetworkDiagnosticsV1{
 		TUNPacketsRead:          1,
@@ -76,6 +77,7 @@ func TestReleaseRuntimeNetworkDiagnosticsMapsOnlyAggregateCounters(t *testing.T)
 		TUNWriteErrno:           105,
 		TUNPacketsWritten:       10,
 		RejectedTUNPackets:      11,
+		RejectedTUNPacketCode:   uint32(kruntime.PacketRejectionSourceV1),
 	}
 	if got := releaseRuntimeNetworkDiagnostics(snapshot); got != want {
 		t.Fatalf("diagnostics=%+v want=%+v", got, want)

@@ -747,6 +747,20 @@ func kvpn_runtime_diagnostics_v1(handle C.uint64_t, output *C.uint64_t, outputCo
 	return C.int32_t(androidbridge.CodeOK)
 }
 
+//export kvpn_runtime_rejection_code_v1
+func kvpn_runtime_rejection_code_v1(handle C.uint64_t, output *C.uint32_t) (result C.int32_t) {
+	defer recoverCode(&result)
+	if output == nil {
+		return C.int32_t(androidbridge.CodeInvalidArgument)
+	}
+	diagnostics, code := androidbridge.RuntimeNetworkDiagnostics(&registry, androidbridge.Handle(handle))
+	if code != androidbridge.CodeOK {
+		return C.int32_t(code)
+	}
+	*output = C.uint32_t(diagnostics.RejectedTUNPacketCode)
+	return C.int32_t(androidbridge.CodeOK)
+}
+
 //export kvpn_runtime_stop
 func kvpn_runtime_stop(handle C.uint64_t) (result C.int32_t) {
 	defer recoverCode(&result)

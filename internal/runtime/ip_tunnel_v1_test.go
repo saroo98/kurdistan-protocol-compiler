@@ -481,6 +481,9 @@ func TestPacketPumpV1DropsBoundedInvalidTUNPacketsWithoutForwarding(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("valid packet was not forwarded")
 	}
+	if got := pump.SnapshotV1().RejectedTUNPacketCode; got != PacketRejectionSourceV1 {
+		t.Fatalf("rejection code=%v, want %v", got, PacketRejectionSourceV1)
+	}
 	cancel()
 	_ = pump.Close()
 }

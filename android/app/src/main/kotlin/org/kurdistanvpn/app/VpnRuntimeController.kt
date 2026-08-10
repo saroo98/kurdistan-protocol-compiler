@@ -127,6 +127,10 @@ class VpnRuntimeController(
                     tunWriteErrno = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ERRNO, 0),
                     tunPacketsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, 0),
                     rejectedTunPackets = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, 0),
+                    rejectedTunPacketCode = intent.getLongExtra(
+                        VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTION_CODE,
+                        0,
+                    ),
                 ),
             ))
         }

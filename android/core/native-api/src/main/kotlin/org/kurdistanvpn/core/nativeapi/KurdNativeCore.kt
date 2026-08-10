@@ -115,6 +115,7 @@ data class NativeLiveRuntimeDiagnostics(
     val tunWriteErrno: Long,
     val tunPacketsWritten: Long,
     val rejectedTunPackets: Long,
+    val rejectedTunPacketCode: Long,
 )
 
 interface NativeRecipient : AutoCloseable {

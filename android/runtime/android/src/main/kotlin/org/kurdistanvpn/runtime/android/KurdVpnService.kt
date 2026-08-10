@@ -472,7 +472,11 @@ class KurdVpnService : VpnService() {
                 .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURE_CODE, snapshot.diagnostics.tunWriteFailureCode)
                 .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ERRNO, snapshot.diagnostics.tunWriteErrno)
                 .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, snapshot.diagnostics.tunPacketsWritten)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, snapshot.diagnostics.rejectedTunPackets),
+                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, snapshot.diagnostics.rejectedTunPackets)
+                .putExtra(
+                    VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTION_CODE,
+                    snapshot.diagnostics.rejectedTunPacketCode,
+                ),
         )
     }
 
@@ -762,6 +766,7 @@ class KurdVpnService : VpnService() {
         tunWriteErrno = tunWriteErrno,
         tunPacketsWritten = tunPacketsWritten,
         rejectedTunPackets = rejectedTunPackets,
+        rejectedTunPacketCode = rejectedTunPacketCode,
     )
 
     private class AuthorityReadFailure(val category: String) : Exception()
