@@ -330,6 +330,51 @@ func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) 
 	}
 }
 
+func TestInstrumentationFailureCategoryClassifiesSafeDataPlaneBoundary(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "dns resolution",
+			raw:  "java.net.UnknownHostException: private.example.invalid\nFAILURES!!!\n",
+			want: "DATA_PLANE_DNS_RESOLUTION_FAILED",
+		},
+		{
+			name: "connect timeout",
+			raw:  "java.net.SocketTimeoutException: connect timed out\nFAILURES!!!\n",
+			want: "DATA_PLANE_CONNECT_TIMEOUT",
+		},
+		{
+			name: "read timeout",
+			raw:  "java.net.SocketTimeoutException: Read timed out\nFAILURES!!!\n",
+			want: "DATA_PLANE_READ_TIMEOUT",
+		},
+		{
+			name: "tls handshake",
+			raw:  "javax.net.ssl.SSLHandshakeException: private certificate detail\nFAILURES!!!\n",
+			want: "DATA_PLANE_TLS_HANDSHAKE_FAILED",
+		},
+		{
+			name: "connect failure",
+			raw:  "java.net.ConnectException: private endpoint detail\nFAILURES!!!\n",
+			want: "DATA_PLANE_CONNECT_FAILED",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := instrumentationFailureCategory([]byte(test.raw))
+			if got != test.want {
+				t.Fatalf("category=%q, want %q", got, test.want)
+			}
+			if strings.Contains(got, "private") || strings.Contains(got, "example") {
+				t.Fatalf("category exposed private instrumentation output: %q", got)
+			}
+		})
+	}
+}
+
 func TestFieldActionsUseDedicatedNonComposeInstrumentationEntryPoint(t *testing.T) {
 	want := "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
 	if fieldTest != want {
