@@ -36,6 +36,7 @@ import (
 const (
 	rawSchema                   = "kurdistan-phase17-owned-vps-raw-v2"
 	maxOutputBytes              = 2 << 20
+	maxAndroidPrivacyLogBytes   = 16 << 20
 	appPackage                  = "org.kurdistanvpn.app.internal"
 	testPackage                 = "org.kurdistanvpn.app.internal.test"
 	testRunner                  = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
@@ -1394,9 +1395,13 @@ func assertAndroidPrivacy(ctx context.Context, runner commandRunner, value confi
 		return errors.New("Android package identity rejected")
 	}
 	arguments := []string{"-s", serial, "logcat", "-d", "-v", "brief", "--uid=" + uid}
-	raw, err := runBytes(ctx, runner, nil, root, 30*time.Second, value.adbPath, arguments...)
-	if err != nil || !safeCategory(raw) {
-		return errors.New("Android privacy log scan failed")
+	raw, err := runBytesWithLimit(ctx, runner, nil, root, 2*time.Minute, maxAndroidPrivacyLogBytes, value.adbPath, arguments...)
+	if err != nil {
+		return errors.New("Android privacy log scan unavailable")
+	}
+	defer clear(raw)
+	if !safeCategory(raw) {
+		return errors.New("Android privacy log scan found sensitive material")
 	}
 	if containsForbiddenProbeLogValue(raw, forbiddenProbeURL, value.ipv6ProbeAddress) {
 		return errors.New("Android privacy log scan found a private probe endpoint")
@@ -1674,20 +1679,32 @@ func sshScript(ctx context.Context, runner commandRunner, value config, root str
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
 
 func (runner commandRunner) run(ctx context.Context, stdin []byte, directory, name string, arguments ...string) ([]byte, error) {
+	return runner.runWithLimit(ctx, stdin, directory, maxOutputBytes, name, arguments...)
+}
+
+func (runner commandRunner) runWithLimit(ctx context.Context, stdin []byte, directory string, maximum int, name string, arguments ...string) ([]byte, error) {
+	if maximum < 1 {
+		return nil, errors.New("command output bound rejected")
+	}
 	if _, remote := runner.remoteCommands[name]; remote && runner.remoteGate != nil {
 		if err := runner.remoteGate.wait(ctx); err != nil {
 			return nil, err
 		}
 	}
 	if runner.runFunc != nil {
-		return runner.runFunc(ctx, stdin, directory, name, arguments...)
+		raw, err := runner.runFunc(ctx, stdin, directory, name, arguments...)
+		if len(raw) > maximum {
+			clear(raw)
+			return nil, errors.New("command output exceeded bound")
+		}
+		return raw, err
 	}
 	command := exec.CommandContext(ctx, name, arguments...)
 	command.Dir = directory
 	if stdin != nil {
 		command.Stdin = bytes.NewReader(stdin)
 	}
-	var output boundedBuffer
+	output := boundedBuffer{maximum: maximum}
 	command.Stdout = &output
 	command.Stderr = &output
 	err := command.Run()
@@ -1703,12 +1720,13 @@ func (runner commandRunner) run(ctx context.Context, stdin []byte, directory, na
 type boundedBuffer struct {
 	data     []byte
 	overflow bool
+	maximum  int
 }
 
 func (buffer *boundedBuffer) Write(data []byte) (int, error) {
-	if len(buffer.data)+len(data) > maxOutputBytes {
+	if len(buffer.data)+len(data) > buffer.maximum {
 		buffer.overflow = true
-		remaining := maxOutputBytes - len(buffer.data)
+		remaining := buffer.maximum - len(buffer.data)
 		if remaining > 0 {
 			buffer.data = append(buffer.data, data[:remaining]...)
 		}
@@ -1719,9 +1737,13 @@ func (buffer *boundedBuffer) Write(data []byte) (int, error) {
 }
 
 func runBytes(parent context.Context, runner commandRunner, stdin []byte, directory string, timeout time.Duration, name string, arguments ...string) ([]byte, error) {
+	return runBytesWithLimit(parent, runner, stdin, directory, timeout, maxOutputBytes, name, arguments...)
+}
+
+func runBytesWithLimit(parent context.Context, runner commandRunner, stdin []byte, directory string, timeout time.Duration, maximum int, name string, arguments ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
-	return runner.run(ctx, stdin, directory, name, arguments...)
+	return runner.runWithLimit(ctx, stdin, directory, maximum, name, arguments...)
 }
 
 func runText(ctx context.Context, runner commandRunner, stdin []byte, directory, name string, arguments ...string) (string, error) {
