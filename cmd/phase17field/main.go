@@ -1127,8 +1127,16 @@ printf RECOVERY_PASS
 
 func revokeRemoteProfile(ctx context.Context, runner commandRunner, value config, root, profileID string) error {
 	raw, err := ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationScript(profileID)))
-	if err != nil || strings.TrimSpace(string(raw)) != "REVOKE_PASS" {
+	category := strings.TrimSpace(string(raw))
+	if err == nil && category == "REVOKE_PASS" {
+		return nil
+	}
+	if err == nil || category != "REVOKE_COMMITTED_PENDING" {
 		return errors.New("profile revocation failed")
+	}
+	raw, err = ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationReconcileScript(profileID)))
+	if err != nil || strings.TrimSpace(string(raw)) != "REVOKE_PASS" {
+		return errors.New("profile revocation reconciliation failed")
 	}
 	return nil
 }
@@ -1143,9 +1151,42 @@ tmp=$(mktemp -d /var/tmp/phase17-revoke.XXXXXX)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 chown kurd-node:kurd-node "$tmp"
 install -o kurd-node -g kurd-node -m 0600 "$recovery" "$tmp/recovery"
-runuser -u kurd-node -- /usr/local/bin/kurdctl profile revoke --data-dir %q --profile-id "$profile_id" --recovery-file "$tmp/recovery" --confirm-profile "$profile_id" --control-socket %q <"$pass" >/dev/null
-printf REVOKE_PASS
+set +e
+runuser -u kurd-node -- /usr/local/bin/kurdctl profile revoke --data-dir %q --profile-id "$profile_id" --recovery-file "$tmp/recovery" --confirm-profile "$profile_id" --control-socket %q <"$pass" >/dev/null 2>"$tmp/revoke.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  printf REVOKE_PASS
+  exit 0
+fi
+if [ "$status" -eq 7 ] && grep -Fqx 'kurdctl: state committed; runtime notification pending; run kurdctl node reload' "$tmp/revoke.err"; then
+  printf REVOKE_COMMITTED_PENDING
+  exit 7
+fi
+exit "$status"
 `, remotePassFile, remoteRecovery, shellQuote(profileID), remoteDataDir, remoteControl)
+}
+
+func remoteRevocationReconcileScript(profileID string) string {
+	return fmt.Sprintf(`set -eu
+profile_id=%s
+summary=$(runuser -u kurd-node -- /usr/local/bin/kurdctl profile show --data-dir %q --profile-id "$profile_id" --redacted)
+printf '%%s\n' "$summary" | grep -Fq '"revoked":true'
+printf '%%s\n' "$summary" | grep -Fq '"connectable":false'
+attempt=0
+while [ "$attempt" -lt 3 ]; do
+  if runuser -u kurd-node -- /usr/local/bin/kurdctl node reload --control-socket %q >/dev/null 2>&1; then
+    printf REVOKE_PASS
+    exit 0
+  fi
+  attempt=$((attempt + 1))
+  sleep 1
+done
+systemctl restart kurd-node.socket kurd-node.service >/dev/null
+systemctl is-active --quiet kurd-node.socket
+systemctl is-active --quiet kurd-node.service
+printf REVOKE_PASS
+`, shellQuote(profileID), remoteDataDir, remoteControl)
 }
 
 func removeRemoteProfile(ctx context.Context, runner commandRunner, value config, root, profileID string) error {
