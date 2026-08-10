@@ -1048,8 +1048,13 @@ func exerciseRemoteRecovery(ctx context.Context, runner commandRunner, value con
 		return errors.New("drain and resume failed")
 	}
 	raw, err := ssh(ctx, runner, value, root, 2*time.Minute, "sudo -n sh -c "+shellQuote(remoteRecoveryScript()))
-	if err != nil || strings.TrimSpace(string(raw)) != "RECOVERY_PASS" {
-		return errors.New("backup, restore, or emergency disable recovery failed")
+	if err != nil || strings.TrimSpace(string(raw)) != "RECOVERY_BACKUP_PASS" {
+		return errors.New("backup or restore recovery failed")
+	}
+	if err := withRemoteDeploymentDisabled(ctx, runner, value, root, func() error {
+		return remoteService(ctx, runner, value, root, "sudo -n systemctl start kurd-node.socket kurd-node.service >/dev/null; sudo -n systemctl is-active --quiet kurd-node.socket; sudo -n systemctl is-active --quiet kurd-node.service")
+	}); err != nil {
+		return errors.New("emergency disable recovery failed")
 	}
 	if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
 		return err
@@ -1096,12 +1101,7 @@ chown kurd-node:kurd-node "$tmp"
 work="$tmp/work"
 backup="$work/state.kurd-backup"
 restored="$work/restored"
-deployment_disabled=false
 cleanup() {
-  if [ "$deployment_disabled" = true ]; then
-    systemctl start kurd-node.socket kurd-node.service >/dev/null 2>&1 || true
-    runuser -u kurd-node -- /usr/local/bin/kurdctl deployment enable --data-dir /var/lib/kurd-node --recovery-file "$work/recovery" --confirm enable --control-socket /run/kurd-node/control.sock <"$pass" >/dev/null 2>&1 || true
-  fi
   rm -rf "$tmp"
 }
 trap cleanup EXIT HUP INT TERM
@@ -1116,13 +1116,150 @@ digest=$(printf '%s\n' "$preview" | sed -n 's/.*"Digest":"\([0-9a-f]\{64\}\)".*/
 runuser -u kurd-node -- /usr/local/bin/kurdctl restore apply --file "$backup" --data-dir "$restored" --recipient-registry-dir "$restored/recipient-registry" --expected-digest "$digest" <"$pass" >/dev/null
 runuser -u kurd-node -- /usr/local/bin/kurdctl recovery confirm --data-dir "$restored" --recovery-file "$work/recovery" <"$pass" >/dev/null
 runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir "$restored" >/dev/null
-runuser -u kurd-node -- /usr/local/bin/kurdctl deployment disable --data-dir /var/lib/kurd-node --recovery-file "$work/recovery" --confirm disable --control-socket /run/kurd-node/control.sock <"$pass" >/dev/null
-deployment_disabled=true
-systemctl start kurd-node.socket kurd-node.service >/dev/null
-runuser -u kurd-node -- /usr/local/bin/kurdctl deployment enable --data-dir /var/lib/kurd-node --recovery-file "$work/recovery" --confirm enable --control-socket /run/kurd-node/control.sock <"$pass" >/dev/null
-deployment_disabled=false
-printf RECOVERY_PASS
+printf RECOVERY_BACKUP_PASS
 `
+}
+
+func setRemoteDeployment(ctx context.Context, runner commandRunner, value config, root string, disabled bool) error {
+	raw, err := ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteDeploymentMutationScript(disabled)))
+	category := strings.TrimSpace(string(raw))
+	if err != nil {
+		if category != "DEPLOYMENT_COMMITTED_PENDING" {
+			return errors.New("deployment mutation failed")
+		}
+		raw, err = ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteDeploymentReconcileScript(disabled)))
+		if err != nil || strings.TrimSpace(string(raw)) != "DEPLOYMENT_RECONCILE_PASS" {
+			return errors.New("deployment runtime reconciliation failed")
+		}
+	} else if category != "DEPLOYMENT_MUTATION_PASS" {
+		return errors.New("deployment mutation response rejected")
+	}
+	observed, err := remoteDeploymentDisabled(ctx, runner, value, root)
+	if err != nil || observed != disabled {
+		return errors.New("deployment durable state mismatch")
+	}
+	return nil
+}
+
+func withRemoteDeploymentDisabled(ctx context.Context, runner commandRunner, value config, root string, during func() error) (resultErr error) {
+	if during == nil {
+		return errors.New("deployment disabled-state check unavailable")
+	}
+	cleanupArmed := true
+	defer func() {
+		if !cleanupArmed {
+			return
+		}
+		if err := restoreRemoteDeploymentEnabled(context.Background(), runner, value, root); err != nil {
+			cleanupErr := errors.New("deployment fail-safe enable failed")
+			if resultErr == nil {
+				resultErr = cleanupErr
+			} else {
+				resultErr = errors.Join(resultErr, cleanupErr)
+			}
+		}
+	}()
+	if err := setRemoteDeployment(ctx, runner, value, root, true); err != nil {
+		return err
+	}
+	if err := during(); err != nil {
+		return err
+	}
+	if err := setRemoteDeployment(ctx, runner, value, root, false); err != nil {
+		return err
+	}
+	cleanupArmed = false
+	return nil
+}
+
+func restoreRemoteDeploymentEnabled(ctx context.Context, runner commandRunner, value config, root string) error {
+	disabled, err := remoteDeploymentDisabled(ctx, runner, value, root)
+	if err == nil && !disabled {
+		return nil
+	}
+	return setRemoteDeployment(ctx, runner, value, root, false)
+}
+
+func remoteDeploymentDisabled(ctx context.Context, runner commandRunner, value config, root string) (bool, error) {
+	raw, err := ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteDeploymentStateScript()))
+	if err != nil {
+		return false, errors.New("deployment state unavailable")
+	}
+	switch strings.TrimSpace(string(raw)) {
+	case "DEPLOYMENT_DISABLED":
+		return true, nil
+	case "DEPLOYMENT_ENABLED":
+		return false, nil
+	default:
+		return false, errors.New("deployment state response rejected")
+	}
+}
+
+func remoteDeploymentMutationScript(disabled bool) string {
+	action := "enable"
+	if disabled {
+		action = "disable"
+	}
+	return fmt.Sprintf(`set -eu
+pass=%q
+recovery=%q
+tmp=$(mktemp -d /var/tmp/phase17-deployment.XXXXXX)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+chown kurd-node:kurd-node "$tmp"
+install -o kurd-node -g kurd-node -m 0600 "$recovery" "$tmp/recovery"
+set +e
+runuser -u kurd-node -- /usr/local/bin/kurdctl deployment %s --data-dir %q --recovery-file "$tmp/recovery" --confirm %s --control-socket %q <"$pass" >/dev/null 2>"$tmp/mutation.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  printf DEPLOYMENT_MUTATION_PASS
+  exit 0
+fi
+if [ "$status" -eq 7 ] && grep -Fqx 'kurdctl: state committed; runtime notification pending; run kurdctl node reload' "$tmp/mutation.err"; then
+  printf DEPLOYMENT_COMMITTED_PENDING
+  exit 7
+fi
+exit "$status"
+`, remotePassFile, remoteRecovery, action, remoteDataDir, action, remoteControl)
+}
+
+func remoteDeploymentStateScript() string {
+	return fmt.Sprintf(`set -eu
+summary=$(runuser -u kurd-node -- /usr/local/bin/kurdctl deployment status --data-dir %q)
+if printf '%%s\n' "$summary" | grep -Fq '"disabled":true'; then
+  printf DEPLOYMENT_DISABLED
+elif printf '%%s\n' "$summary" | grep -Fq '"disabled":false'; then
+  printf DEPLOYMENT_ENABLED
+else
+  exit 8
+fi
+`, remoteDataDir)
+}
+
+func remoteDeploymentReconcileScript(disabled bool) string {
+	expected := "false"
+	if disabled {
+		expected = "true"
+	}
+	return fmt.Sprintf(`set -eu
+summary=$(runuser -u kurd-node -- /usr/local/bin/kurdctl deployment status --data-dir %q)
+printf '%%s\n' "$summary" | grep -Fq '"disabled":%s'
+attempt=0
+while [ "$attempt" -lt 3 ]; do
+  if runuser -u kurd-node -- /usr/local/bin/kurdctl node reload --control-socket %q >/dev/null 2>&1; then
+    printf DEPLOYMENT_RECONCILE_PASS
+    exit 0
+  fi
+  attempt=$((attempt + 1))
+  sleep 1
+done
+systemctl restart kurd-node.socket kurd-node.service >/dev/null
+systemctl is-active --quiet kurd-node.socket
+systemctl is-active --quiet kurd-node.service
+summary=$(runuser -u kurd-node -- /usr/local/bin/kurdctl deployment status --data-dir %q)
+printf '%%s\n' "$summary" | grep -Fq '"disabled":%s'
+printf DEPLOYMENT_RECONCILE_PASS
+`, remoteDataDir, expected, remoteControl, remoteDataDir, expected)
 }
 
 func revokeRemoteProfile(ctx context.Context, runner commandRunner, value config, root, profileID string) error {

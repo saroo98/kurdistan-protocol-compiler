@@ -334,6 +334,10 @@ func TestDeploymentDisableRequiresRecoveryAndAdvancesRevocationEpoch(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	disabled, err := DeploymentDisabled(dataDir)
+	if err != nil || disabled {
+		t.Fatalf("initial deployment disabled=%v err=%v", disabled, err)
+	}
 	if err := SetDeploymentDisabled(dataDir, true, RecoveryActionOptions{RecoveryPath: recoveryPath, RecoveryPassphrase: []byte("wrong passphrase value"), Now: now.Add(2 * time.Minute)}); !errors.Is(err, ErrRecoveryRejected) {
 		t.Fatalf("unauthorized deployment disable error = %v", err)
 	}
@@ -347,8 +351,19 @@ func TestDeploymentDisableRequiresRecoveryAndAdvancesRevocationEpoch(t *testing.
 	if after.RevocationEpoch <= before.RevocationEpoch {
 		t.Fatalf("disable did not advance revocation epoch: before=%d after=%d", before.RevocationEpoch, after.RevocationEpoch)
 	}
+	disabled, err = DeploymentDisabled(dataDir)
+	if err != nil || !disabled {
+		t.Fatalf("committed deployment disabled=%v err=%v", disabled, err)
+	}
 	if _, err := VerifyBundleAgainstCurrentState(dataDir, issued.Artifact, now.Add(3*time.Minute)); !errors.Is(err, ErrRollback) {
 		t.Fatalf("pre-disable profile remained current: %v", err)
+	}
+	if err := SetDeploymentDisabled(dataDir, false, RecoveryActionOptions{RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: now.Add(4 * time.Minute)}); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err = DeploymentDisabled(dataDir)
+	if err != nil || disabled {
+		t.Fatalf("re-enabled deployment disabled=%v err=%v", disabled, err)
 	}
 }
 

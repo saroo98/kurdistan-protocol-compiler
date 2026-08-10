@@ -545,12 +545,12 @@
     {
       "path": "cmd/kurdctl/main.go",
       "pre_sha256": "b7f7581ff05765511e76a9a6e8ebe30ee8e22b4bdbd1eb0c1a64ba09ea687540",
-      "post_sha256": "a4945ed63fbfc225fa8a3535b830d5f31b92d1a285fe1e79f270655ca0632caf"
+      "post_sha256": "aef13b3ad93fc574557cf044376405589216d7c3cb1944fb863c02df2757a99d"
     },
     {
       "path": "cmd/kurdctl/main_test.go",
       "pre_sha256": "956ebf319f5124eb0e415b063ae732441b6ffbf475f3464faf78b059725798db",
-      "post_sha256": "fc036f60a00868133409e5ffdb538ecabe6721ad2040777419d7e616b1136b65"
+      "post_sha256": "c212fbf3ca7bc162a6ba24363f2ab5d4f19136409f315b1e58c675ec6750a145"
     },
     {
       "path": "cmd/kurdpackage/main.go",
@@ -595,12 +595,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "2b808eeb2c2457275f4b8d53d664556aed15e702cec3cbd8b1aa8fbfef9d101b"
+      "post_sha256": "3a7b2d95d8d9033c63f94b6adcca9bb6e9d048573252838b3fca2ee16c43c1d0"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "2d70ace6980c2f55dd1cdc2fb288dd590563a2029940bb2470b53f32feafdeb1"
+      "post_sha256": "9da2a594d6f9056da67af3e0684d632e642f00ef6619a671da3ee3e5972e8c9f"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -1355,12 +1355,12 @@
     {
       "path": "internal/selfhost/service.go",
       "pre_sha256": "a121c83ef386a7e3b312ec3591dd12c9b53618baa54dbcfd30f6561bbf2a3bfb",
-      "post_sha256": "b621331e6bc78d6f70caa9bd5d02b78307acf2a6cec4cbd336461f827573efcb"
+      "post_sha256": "039eea8d54ad0116c5e35cc2df78a6dc6d98ef2c2a698db3b56c86760c2107ac"
     },
     {
       "path": "internal/selfhost/service_test.go",
       "pre_sha256": "2ff7715121c7925b852696ff9fc14f690af640cf90b1c2e1551986e5c3bdcdc1",
-      "post_sha256": "302ce93a71213930ce585b59b8bbe1a9f44a98d6bfc4ddea4ec100bd8912edf8"
+      "post_sha256": "da72902e6eb449744b9702616850690d71f0c52049a8c06c8238d97b7bc964cb"
     },
     {
       "path": "internal/selfhost/state_v2_test.go",

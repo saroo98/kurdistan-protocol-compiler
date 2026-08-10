@@ -660,7 +660,7 @@ func TestCategorizeProfileIssuanceFailureDoesNotEchoUnknownOutput(t *testing.T) 
 	}
 }
 
-func TestRemoteRecoveryScriptUsesCurrentTransactionalRestoreAndRegistry(t *testing.T) {
+func TestRemoteRecoveryScriptUsesCurrentTransactionalBackupRestoreAndRegistry(t *testing.T) {
 	script := remoteRecoveryScript()
 	for _, required := range []string{
 		"pass=/root/.kurd-node-field/current-passphrase",
@@ -670,11 +670,8 @@ func TestRemoteRecoveryScriptUsesCurrentTransactionalRestoreAndRegistry(t *testi
 		"restore preview --file \"$backup\" --data-dir \"$restored\"",
 		"restore apply --file \"$backup\" --data-dir \"$restored\" --recipient-registry-dir \"$restored/recipient-registry\" --expected-digest \"$digest\"",
 		"recovery confirm --data-dir \"$restored\" --recovery-file \"$work/recovery\"",
-		"deployment_disabled=false",
 		"cleanup()",
-		"if [ \"$deployment_disabled\" = true ]",
-		"systemctl start kurd-node.socket kurd-node.service",
-		"deployment_disabled=true",
+		"RECOVERY_BACKUP_PASS",
 		"[ ! -e \"$restored\" ]",
 	} {
 		if !strings.Contains(script, required) {
@@ -686,19 +683,13 @@ func TestRemoteRecoveryScriptUsesCurrentTransactionalRestoreAndRegistry(t *testi
 	if confirm < 0 || doctor < 0 || confirm > doctor {
 		t.Fatal("restored state was examined before its offline recovery was explicitly reconfirmed")
 	}
-	disable := strings.Index(script, "deployment disable")
-	armed := strings.LastIndex(script, "deployment_disabled=true")
-	restart := strings.LastIndex(script, "systemctl start kurd-node.socket kurd-node.service")
-	enable := strings.LastIndex(script, "deployment enable")
-	disarmed := strings.LastIndex(script, "deployment_disabled=false")
-	if disable < 0 || armed < disable || restart < armed || enable < restart || disarmed < enable {
-		t.Fatal("emergency-disable drill is not protected by fail-safe re-enable cleanup")
-	}
 	for _, rejected := range []string{
 		"find /root /var/lib /var/backups",
 		"kurdctl restore --file",
 		"install -d -o kurd-node -g kurd-node -m 0700 \"$restored\"",
 		"sha256sum \"$backup\"",
+		"deployment disable",
+		"deployment enable",
 	} {
 		if strings.Contains(script, rejected) {
 			t.Fatalf("recovery script retains unsafe legacy flow %q", rejected)
@@ -770,6 +761,89 @@ func TestRevokeRemoteProfileReconcilesCommittedRuntimeNotification(t *testing.T)
 	}
 	if calls != 2 {
 		t.Fatalf("revocation calls=%d, want 2", calls)
+	}
+}
+
+func TestSetRemoteDeploymentReconcilesCommittedRuntimeNotification(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "deployment disable") {
+				return nil, errors.New("initial deployment disable missing")
+			}
+			return []byte("DEPLOYMENT_COMMITTED_PENDING"), errors.New("command failed")
+		case 2:
+			for _, required := range []string{"deployment status", "node reload", "systemctl restart kurd-node.socket kurd-node.service"} {
+				if !strings.Contains(command, required) {
+					return nil, fmt.Errorf("reconciliation missing %q", required)
+				}
+			}
+			return []byte("DEPLOYMENT_RECONCILE_PASS"), nil
+		case 3:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("deployment state verification missing")
+			}
+			return []byte("DEPLOYMENT_DISABLED"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	if err := setRemoteDeployment(context.Background(), runner, value, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("deployment calls=%d, want 3", calls)
+	}
+}
+
+func TestWithRemoteDeploymentDisabledReenablesAfterFailure(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "deployment disable") {
+				return nil, errors.New("disable mutation missing")
+			}
+			return []byte("DEPLOYMENT_MUTATION_PASS"), nil
+		case 2, 3:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("disabled state verification missing")
+			}
+			return []byte("DEPLOYMENT_DISABLED"), nil
+		case 4:
+			if !strings.Contains(command, "deployment enable") {
+				return nil, errors.New("fail-safe enable mutation missing")
+			}
+			return []byte("DEPLOYMENT_MUTATION_PASS"), nil
+		case 5:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("enabled state verification missing")
+			}
+			return []byte("DEPLOYMENT_ENABLED"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	injected := errors.New("injected disabled-state check failure")
+	err := withRemoteDeploymentDisabled(context.Background(), runner, value, "", func() error { return injected })
+	if !errors.Is(err, injected) {
+		t.Fatalf("recovery error=%v, want injected failure", err)
+	}
+	if calls != 5 {
+		t.Fatalf("deployment calls=%d, want 5", calls)
 	}
 }
 
