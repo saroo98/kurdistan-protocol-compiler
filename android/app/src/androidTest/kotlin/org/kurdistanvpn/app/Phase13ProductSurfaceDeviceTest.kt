@@ -120,6 +120,7 @@ class Phase13ProductSurfaceDeviceTest {
 
         compose.onNodeWithText(SelectionMode.KURD_ONLY.name).performClick()
         compose.runOnIdle { assertEquals(SelectionMode.AUTOMATIC, current.value.selectionMode) }
+        compose.onNodeWithTag("safe_reconnect_available").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(context.getString(UiR.string.apply)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(SelectionMode.KURD_ONLY, current.value.selectionMode) }
         compose.onNodeWithText(context.getString(UiR.string.recover_internet_stop_vpn))

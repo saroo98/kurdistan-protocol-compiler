@@ -760,15 +760,44 @@ class ProductRootViewModel(
         onReady: (ByteArray) -> Unit,
         onFailure: (OperationError) -> Unit,
     ) {
-        val localRecordId = mutableSettings.value.profiles.activeLocalRecordId
-        if (localRecordId == null) {
+        val provider = freshRuntimeAuthorityProvider(config)
+        if (provider == null) {
             onFailure(OperationError.POLICY_REJECTED)
             return
         }
         viewModelScope.launch {
+            when (val prepared = provider.prepare()) {
+                is FreshRuntimeAuthority.Ready -> {
+                    recordDiagnostic(
+                        DiagnosticLogLevel.INFO,
+                        DiagnosticComponent.RUNTIME,
+                        "RUNTIME_AUTHORITY_PREPARED",
+                    )
+                    onReady(prepared.encoded)
+                }
+                is FreshRuntimeAuthority.Rejected -> {
+                    recordDiagnostic(
+                        DiagnosticLogLevel.WARNING,
+                        DiagnosticComponent.RUNTIME,
+                        "RUNTIME_AUTHORITY_UNAVAILABLE",
+                    )
+                    onFailure(
+                        runCatching { OperationError.valueOf(prepared.failure) }
+                            .getOrDefault(OperationError.POLICY_REJECTED),
+                    )
+                }
+            }
+        }
+    }
+
+    internal fun freshRuntimeAuthorityProvider(
+        config: VpnRuntimeConfig,
+    ): FreshRuntimeAuthorityProvider? {
+        val localRecordId = mutableSettings.value.profiles.activeLocalRecordId ?: return null
+        return FreshRuntimeAuthorityProvider {
             when (val authority = coordinators.runtime.openLiveAuthority(localRecordId)) {
                 is RuntimeAuthorityResult.Success -> authority.material.use { material ->
-                    val encoded = runCatching {
+                    runCatching {
                         withContext(Dispatchers.Default) {
                             RuntimeStartWire.encode(
                                 verifyRequest = material.verifyRequest,
@@ -778,31 +807,16 @@ class ProductRootViewModel(
                                 config = config,
                             )
                         }
-                    }.getOrElse {
-                        recordDiagnostic(
-                            DiagnosticLogLevel.WARNING,
-                            DiagnosticComponent.RUNTIME,
-                            "RUNTIME_AUTHORITY_REJECTED",
-                        )
-                        onFailure(OperationError.POLICY_REJECTED)
-                        return@launch
-                    }
-                    recordDiagnostic(
-                        DiagnosticLogLevel.INFO,
-                        DiagnosticComponent.RUNTIME,
-                        "RUNTIME_AUTHORITY_PREPARED",
+                    }.fold(
+                        onSuccess = FreshRuntimeAuthority::Ready,
+                        onFailure = {
+                            FreshRuntimeAuthority.Rejected(OperationError.POLICY_REJECTED.name)
+                        },
                     )
-                    onReady(encoded)
                 }
-                is RuntimeAuthorityResult.Failure -> {
-                    recordDiagnostic(
-                        DiagnosticLogLevel.WARNING,
-                        DiagnosticComponent.RUNTIME,
-                        "RUNTIME_AUTHORITY_UNAVAILABLE",
-                    )
-                    onFailure(authority.error)
-                }
-                null -> onFailure(OperationError.STORAGE_FAILURE)
+                is RuntimeAuthorityResult.Failure ->
+                    FreshRuntimeAuthority.Rejected(authority.error.name)
+                null -> FreshRuntimeAuthority.Rejected(OperationError.STORAGE_FAILURE.name)
             }
         }
     }

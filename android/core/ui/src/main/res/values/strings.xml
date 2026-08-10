@@ -190,7 +190,7 @@
     <string name="auto_connect_launch">Auto-connect on app launch</string>
     <string name="auto_connect_launch_reason">Automatic startup is disabled until consent, verified-profile availability, and bounded lifecycle retries are exercised together by the device gate.</string>
     <string name="safe_reconnect">Safe reconnect</string>
-    <string name="safe_reconnect_reason">The local runtime does not yet execute a bounded reconnect controller. Failures stop cleanly instead of retrying without fresh authority.</string>
+    <string name="safe_reconnect_reason">Network failures retry only within the signed profile limit. Every attempt reopens authority and creates a fresh protected Kurd session. Revocation and non-network failures stop without retry.</string>
     <string name="auto_connect_boot">Auto-connect after device boot</string>
     <string name="auto_connect_boot_reason">Android background-start rules and system-managed always-on authority are not yet wired.</string>
     <string name="kill_switch">Kill switch</string>
