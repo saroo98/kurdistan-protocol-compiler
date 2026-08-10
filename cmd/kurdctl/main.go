@@ -234,6 +234,7 @@ Authority and recovery:
   keys rotate issuer
   keys rotate relay
   keys rotate tls
+  deployment status
   deployment disable
   deployment enable
   clock repair
@@ -711,8 +712,20 @@ func runNode(args []string, stdout io.Writer) error {
 }
 
 func runDeployment(args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) == 0 || args[0] != "disable" && args[0] != "enable" {
+	if len(args) == 0 || args[0] != "disable" && args[0] != "enable" && args[0] != "status" {
 		return selfhost.ErrInvalidInput
+	}
+	if args[0] == "status" {
+		set := newFlags("deployment status")
+		dataDir := set.String("data-dir", "", "state directory")
+		if rejectDuplicateFlags(args[1:], "data-dir") || set.Parse(args[1:]) != nil || set.NArg() != 0 || *dataDir == "" {
+			return selfhost.ErrInvalidInput
+		}
+		disabled, err := selfhost.DeploymentDisabled(*dataDir)
+		if err != nil {
+			return err
+		}
+		return writeJSON(stdout, map[string]any{"schema": "kurdctl-deployment-status-v1", "disabled": disabled})
 	}
 	set := newFlags("deployment " + args[0])
 	dataDir := set.String("data-dir", "", "state directory")
