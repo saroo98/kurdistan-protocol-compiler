@@ -224,6 +224,55 @@ func TestCommittedOperationReportsNotificationFailureWithoutRepeatingMutation(t 
 	}
 }
 
+func TestDeploymentStatusReportsOnlyCategoricalCommittedState(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "recovery")
+	passphrase := "correct horse battery staple\n"
+	call := func(args []string, input string) (int, bytes.Buffer, bytes.Buffer) {
+		var stdout, stderr bytes.Buffer
+		code := run(args, bytes.NewBufferString(input), &stdout, &stderr)
+		return code, stdout, stderr
+	}
+	if code, _, stderr := call([]string{"init", "--data-dir", dataDir, "--name", "owner-node", "--endpoint", "203.0.113.7:443", "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("init code=%d stderr=%s", code, stderr.String())
+	}
+	if code, _, stderr := call([]string{"recovery", "confirm", "--data-dir", dataDir, "--recovery-file", recovery}, passphrase); code != 0 {
+		t.Fatalf("confirm code=%d stderr=%s", code, stderr.String())
+	}
+	assertStatus := func(want bool) {
+		t.Helper()
+		code, stdout, stderr := call([]string{"deployment", "status", "--data-dir", dataDir}, "")
+		if code != 0 || stderr.Len() != 0 {
+			t.Fatalf("status code=%d stderr=%q", code, stderr.String())
+		}
+		var status struct {
+			Schema   string `json:"schema"`
+			Disabled bool   `json:"disabled"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
+			t.Fatal(err)
+		}
+		if status.Schema != "kurdctl-deployment-status-v1" || status.Disabled != want {
+			t.Fatalf("status=%+v wantDisabled=%v", status, want)
+		}
+		for _, secret := range []string{"owner-node", "203.0.113.7", "DeploymentID", "RootFingerprint"} {
+			if strings.Contains(stdout.String(), secret) {
+				t.Fatalf("categorical deployment status disclosed %q", secret)
+			}
+		}
+	}
+	assertStatus(false)
+
+	previousNotify := notifyRelayRuntime
+	defer func() { notifyRelayRuntime = previousNotify }()
+	notifyRelayRuntime = func(string, node.ControlRequestV1, bool) error { return nil }
+	if code, _, stderr := call([]string{"deployment", "disable", "--data-dir", dataDir, "--recovery-file", recovery, "--confirm", "disable", "--control-socket", filepath.Join(base, "control.sock")}, passphrase); code != 0 {
+		t.Fatalf("disable code=%d stderr=%s", code, stderr.String())
+	}
+	assertStatus(true)
+}
+
 func TestWriteIssuedRendersBeforeCreatingOutputRoot(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "profile-output")
 	_, err := writeIssued(outputDir, selfhost.IssuedProfile{

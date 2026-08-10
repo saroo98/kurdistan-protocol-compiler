@@ -425,6 +425,18 @@ func SetDeploymentDisabled(dataDir string, disabled bool, options RecoveryAction
 	})
 }
 
+// DeploymentDisabled returns only the deployment-local emergency-deny state.
+// It intentionally exposes no deployment identity, endpoint, key material, or
+// profile metadata so callers can reconcile a committed mutation safely.
+func DeploymentDisabled(dataDir string) (bool, error) {
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		return false, err
+	}
+	zero(master)
+	return state.Revocations.EmergencyDenied, nil
+}
+
 func RepairClock(dataDir string, options RecoveryActionOptions) error {
 	now := options.Now.UTC()
 	if options.RecoveryPath == "" || !validPassphrase(options.RecoveryPassphrase) || now.IsZero() {
