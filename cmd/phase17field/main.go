@@ -429,6 +429,9 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 	if !ipv6Authorized {
 		return errors.New("IPv6 capability unavailable")
 	}
+	if err := prepareRemoteCampaignAuthority(parent, runner, value, root); err != nil {
+		return err
+	}
 	tracker := &resourceTracker{}
 	outcome, err := runFunctional(parent, runner, value, root, serial, remotePackage, ipv6Authorized, tracker)
 	if err != nil {
@@ -633,6 +636,54 @@ func prepareIPv6Capability(ctx context.Context, runner commandRunner, value conf
 		return false, err
 	}
 	return true, nil
+}
+
+func prepareRemoteCampaignAuthority(ctx context.Context, runner commandRunner, value config, root string) error {
+	raw, err := ssh(ctx, runner, value, root, 2*time.Minute, "sudo -n sh -c "+shellQuote(remoteCampaignAuthorityScript()))
+	if err != nil || strings.TrimSpace(string(raw)) != "ISSUER_ROLLOVER_PASS" {
+		return errors.New("campaign authority rollover failed")
+	}
+	if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
+		return errors.New("campaign authority health failed")
+	}
+	return nil
+}
+
+func remoteCampaignAuthorityScript() string {
+	return fmt.Sprintf(`set -eu
+pass=%q
+recovery=%q
+[ -f "$pass" ] && [ ! -L "$pass" ] && [ -f "$recovery" ] && [ ! -L "$recovery" ]
+tmp=$(mktemp -d /var/tmp/phase17-authority.XXXXXX)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+chown kurd-node:kurd-node "$tmp"
+install -o kurd-node -g kurd-node -m 0600 "$recovery" "$tmp/recovery"
+set +e
+runuser -u kurd-node -- /usr/local/bin/kurdctl keys rotate issuer --data-dir %q --recovery-file "$tmp/recovery" --confirm issuer --control-socket %q <"$pass" >/dev/null 2>"$tmp/rotate.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  printf ISSUER_ROLLOVER_PASS
+  exit 0
+fi
+if [ "$status" -ne 7 ] || ! grep -Fqx 'kurdctl: state committed; runtime notification pending; run kurdctl node reload' "$tmp/rotate.err"; then
+  exit "$status"
+fi
+attempt=0
+while [ "$attempt" -lt 3 ]; do
+  if runuser -u kurd-node -- /usr/local/bin/kurdctl node reload --data-dir %q --control-socket %q >/dev/null 2>&1; then
+    printf ISSUER_ROLLOVER_PASS
+    exit 0
+  fi
+  attempt=$((attempt + 1))
+  sleep 1
+done
+systemctl restart kurd-node.socket kurd-node.service >/dev/null
+systemctl is-active --quiet kurd-node.socket
+systemctl is-active --quiet kurd-node.service
+runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir %q >/dev/null
+printf ISSUER_ROLLOVER_PASS
+`, remotePassFile, remoteRecovery, remoteDataDir, remoteControl, remoteDataDir, remoteControl, remoteDataDir)
 }
 
 func dnsProbeFamilies(ipv6Authorized bool) []string {

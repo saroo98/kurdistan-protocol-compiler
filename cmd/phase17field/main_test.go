@@ -117,6 +117,38 @@ func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testin
 	}
 }
 
+func TestPrepareRemoteCampaignAuthorityRotatesBeforeFieldTraffic(t *testing.T) {
+	step := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected command")
+		}
+		step++
+		command := arguments[len(arguments)-1]
+		switch step {
+		case 1:
+			if !strings.Contains(command, "keys rotate issuer") || !strings.Contains(command, "ISSUER_ROLLOVER_PASS") {
+				return nil, errors.New("campaign issuer rollover missing")
+			}
+			return []byte("ISSUER_ROLLOVER_PASS\n"), nil
+		case 2:
+			if !strings.Contains(command, "systemctl start kurd-node.service") {
+				return nil, errors.New("post-rollover health validation missing")
+			}
+			return []byte("SERVICE_HEALTH_PASS\n"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", relayPort: 8443}
+	if err := prepareRemoteCampaignAuthority(context.Background(), runner, value, "."); err != nil {
+		t.Fatal(err)
+	}
+	if step != 2 {
+		t.Fatalf("steps=%d, want 2", step)
+	}
+}
+
 func TestRemoteDnsDegradedCheckRequiresOnlyResolverToBeUnavailable(t *testing.T) {
 	script := remoteDNSDegradedScript(8443)
 	for _, required := range []string{

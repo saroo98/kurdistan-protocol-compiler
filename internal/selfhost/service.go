@@ -493,7 +493,11 @@ func RotateIssuer(dataDir string, options RecoveryActionOptions) (KeyRotationRes
 		}
 		state.DelegationPayload, state.DelegationSig = delegationPayload, delegationSignature
 		state.Revocations.RevokedIssuerKeyIDs = sortedUnique(append(state.Revocations.RevokedIssuerKeyIDs, previous))
-		if err := updateRevocations(state, rootPrivate, now, appendAllCurrentContentIDs(state.Revocations.RevokedContentIDs, state.Profiles), state.Revocations.EmergencyDenied); err != nil {
+		compactedRevocations, err := compactContentRevocationsCoveredByRetiredIssuers(state)
+		if err != nil {
+			return err
+		}
+		if err := updateRevocations(state, rootPrivate, now, compactedRevocations, state.Revocations.EmergencyDenied); err != nil {
 			return err
 		}
 		state.Assignments = quarantineAllAssignments(state.Assignments, now.Unix())
@@ -769,6 +773,52 @@ func appendAllCurrentContentIDs(existing []string, records []profileRecord) []st
 		}
 	}
 	return sortedUnique(result)
+}
+
+func compactContentRevocationsCoveredByRetiredIssuers(state *persistedState) ([]string, error) {
+	if state == nil {
+		return nil, ErrInvalidInput
+	}
+	retired := make(map[string]struct{}, len(state.Revocations.RevokedIssuerKeyIDs))
+	for _, keyID := range state.Revocations.RevokedIssuerKeyIDs {
+		retired[keyID] = struct{}{}
+	}
+	covered := make(map[string]struct{}, len(state.Profiles))
+	for _, record := range state.Profiles {
+		issuerKeyID, err := profileRecordIssuerKeyID(record)
+		if err != nil {
+			return nil, ErrStateCorrupt
+		}
+		if _, ok := retired[issuerKeyID]; ok {
+			covered[record.ContentID] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(state.Revocations.RevokedContentIDs))
+	for _, contentID := range state.Revocations.RevokedContentIDs {
+		if _, redundant := covered[contentID]; !redundant {
+			result = append(result, contentID)
+		}
+	}
+	return sortedUnique(result), nil
+}
+
+func profileRecordIssuerKeyID(record profileRecord) (string, error) {
+	switch record.Mode {
+	case profileModeAuthorityOnly:
+		bundle, err := decodeBundle(record.Artifact)
+		if err != nil || bundle.IssuerKey.KeyID == "" {
+			return "", ErrStateCorrupt
+		}
+		return bundle.IssuerKey.KeyID, nil
+	case profileModeLive:
+		bundle, err := decodeLiveBundle(record.Artifact)
+		if err != nil || bundle.IssuerKey.KeyID == "" {
+			return "", ErrStateCorrupt
+		}
+		return bundle.IssuerKey.KeyID, nil
+	default:
+		return "", ErrStateCorrupt
+	}
 }
 
 func revokeAllProfiles(records []profileRecord) int {
