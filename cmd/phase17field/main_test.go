@@ -739,6 +739,40 @@ func TestRemoveRemoteProfileRevokesIssuedFieldAuthority(t *testing.T) {
 	}
 }
 
+func TestRevokeRemoteProfileReconcilesCommittedRuntimeNotification(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "profile revoke") {
+				return nil, errors.New("initial revocation missing")
+			}
+			return []byte("REVOKE_COMMITTED_PENDING"), errors.New("command failed")
+		case 2:
+			for _, required := range []string{"profile show", "\"revoked\":true", "node reload", "systemctl restart kurd-node.socket kurd-node.service"} {
+				if !strings.Contains(command, required) {
+					return nil, fmt.Errorf("reconciliation missing %q", required)
+				}
+			}
+			return []byte("REVOKE_PASS"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	if err := revokeRemoteProfile(context.Background(), runner, value, "", "profiles.field"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("revocation calls=%d, want 2", calls)
+	}
+}
+
 func TestRunFieldActionDeletesStaleEvidenceBeforeInstrumentation(t *testing.T) {
 	step := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
