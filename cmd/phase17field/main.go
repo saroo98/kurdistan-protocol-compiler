@@ -757,6 +757,25 @@ func instrumentationFailureCategory(raw []byte) string {
 		}
 	}
 	lower := bytes.ToLower(raw)
+	if bytes.Contains(raw, []byte("java.net.UnknownHostException")) {
+		return "DATA_PLANE_DNS_RESOLUTION_FAILED"
+	}
+	if bytes.Contains(raw, []byte("java.net.SocketTimeoutException")) {
+		switch {
+		case bytes.Contains(lower, []byte("connect timed out")):
+			return "DATA_PLANE_CONNECT_TIMEOUT"
+		case bytes.Contains(lower, []byte("read timed out")):
+			return "DATA_PLANE_READ_TIMEOUT"
+		default:
+			return "DATA_PLANE_TIMEOUT"
+		}
+	}
+	if bytes.Contains(raw, []byte("javax.net.ssl.SSLHandshakeException")) {
+		return "DATA_PLANE_TLS_HANDSHAKE_FAILED"
+	}
+	if bytes.Contains(raw, []byte("java.net.ConnectException")) {
+		return "DATA_PLANE_CONNECT_FAILED"
+	}
 	if bytes.Contains(lower, []byte("shortmsg=process crashed")) {
 		return "INSTRUMENTATION_PROCESS_CRASH"
 	}
