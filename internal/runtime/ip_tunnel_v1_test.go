@@ -17,39 +17,40 @@ import (
 	"time"
 )
 
+var testTunnelDNSIPv4V1 = [4]byte{10, 89, 0, 1}
+
 func TestClassifyRelayTransportV1ReportsOnlyBoundedDNSAndChecksumCategories(t *testing.T) {
-	assigned := [4]byte{10, 89, 0, 2}
-	gateway := assigned
-	gateway[3] = 1
+	assigned := [4]byte{10, 77, 1, 2}
+	gateway := [4]byte{10, 77, 0, 1}
 
 	valid := testIPv4UDPPacketV1(assigned, gateway, 40000, 53, []byte{0, 1, 0, 0})
-	classification := classifyRelayTransportV1(valid, assigned, [16]byte{})
+	classification := classifyRelayTransportV1(valid, gateway, [16]byte{})
 	if classification.Version != 4 || classification.Protocol != 17 || !classification.GatewayDNS || !classification.ChecksumValid || classification.Malformed {
 		t.Fatalf("valid DNS classification=%+v", classification)
 	}
 
 	invalidChecksum := append([]byte(nil), valid...)
 	invalidChecksum[len(invalidChecksum)-1] ^= 1
-	classification = classifyRelayTransportV1(invalidChecksum, assigned, [16]byte{})
+	classification = classifyRelayTransportV1(invalidChecksum, gateway, [16]byte{})
 	if !classification.GatewayDNS || classification.ChecksumValid || classification.Malformed {
 		t.Fatalf("invalid-checksum DNS classification=%+v", classification)
 	}
 
 	nonDNS := testIPv4UDPPacketV1(assigned, [4]byte{1, 1, 1, 1}, 40000, 443, []byte{1})
-	classification = classifyRelayTransportV1(nonDNS, assigned, [16]byte{})
+	classification = classifyRelayTransportV1(nonDNS, gateway, [16]byte{})
 	if classification.GatewayDNS || !classification.ChecksumValid || classification.Malformed {
 		t.Fatalf("public UDP classification=%+v", classification)
 	}
 
 	malformed := testIPv4PacketV1(assigned, gateway, 17, []byte{1, 2, 3})
-	classification = classifyRelayTransportV1(malformed, assigned, [16]byte{})
+	classification = classifyRelayTransportV1(malformed, gateway, [16]byte{})
 	if !classification.Malformed || classification.ChecksumValid {
 		t.Fatalf("malformed UDP classification=%+v", classification)
 	}
 }
 
 func TestClassifyRelayReturnTransportV1ReportsOnlyBoundedTCPAndChecksumCategories(t *testing.T) {
-	assigned := [4]byte{10, 89, 0, 2}
+	assigned := [4]byte{10, 89, 1, 2}
 	remote := [4]byte{198, 51, 100, 8}
 
 	synACK := testIPv4TCPPacketV1(remote, assigned, 443, 40000, 0x12, nil)
@@ -139,11 +140,11 @@ func TestPacketPumpV1CarriesPacketsBothDirections(t *testing.T) {
 	relayTUN := newMemoryPacketDeviceV1()
 	assigned := [4]byte{10, 89, 0, 2}
 	program := testDuplexProgramV1()
-	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,13 +199,13 @@ func TestPacketPumpV1CarriesAssignedTunnelDNSGatewayToRelayTUN(t *testing.T) {
 	clientCarrier, relayCarrier := net.Pipe()
 	clientTUN := newMemoryPacketDeviceV1()
 	relayTUN := newMemoryPacketDeviceV1()
-	assigned := [4]byte{10, 89, 0, 2}
+	assigned := [4]byte{10, 89, 1, 2}
 	program := testDuplexProgramV1()
-	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,9 +218,7 @@ func TestPacketPumpV1CarriesAssignedTunnelDNSGatewayToRelayTUN(t *testing.T) {
 	go func() { clientResults <- clientPump.Run(ctx) }()
 	go func() { relayResults <- relayPump.Run(ctx) }()
 
-	dnsGateway := assigned
-	dnsGateway[3] = 1
-	query := testIPv4UDPPacketV1(assigned, dnsGateway, 40000, 53, []byte{0, 1, 0, 0})
+	query := testIPv4UDPPacketV1(assigned, testTunnelDNSIPv4V1, 40000, 53, []byte{0, 1, 0, 0})
 	clientTUN.injectV1(t, query)
 	if got := receivePacketOrFailureV1(t, relayTUN, clientResults, relayResults); string(got) != string(query) {
 		t.Fatal("relay DNS packet mismatch")
@@ -238,7 +237,7 @@ func TestRelayPacketPumpSnapshotCountsOnlyAggregateReturnTCPMetadata(t *testing.
 	assigned := [4]byte{10, 89, 0, 2}
 	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
 		TUN: device, Carrier: carrier, Endpoint: clientEndpoint, Program: testDuplexProgramV1(),
-		Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 1,
+		Direction: DirectionRelayV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 1,
 		BufferBudget: 12288, IdleTimeout: time.Second,
 	})
 	if err != nil {
@@ -277,11 +276,11 @@ func TestPacketPumpV1CommitsEachAuthenticatedPacketBeforeOpeningTheNext(t *testi
 	relayTUN := newMemoryPacketDeviceV1()
 	assigned := [4]byte{10, 89, 0, 2}
 	program := testDuplexProgramV1()
-	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
+	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
+	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 4, IncompleteOps: 4, BufferBudget: 32768, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,6 +338,18 @@ func TestPacketPumpV1RejectsUnsafeBoundsAndShortTUNWrite(t *testing.T) {
 			TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1,
 			QueuePackets: 1, IncompleteOps: 65, BufferBudget: 1 << 24, IdleTimeout: time.Second,
 		},
+		"assigned IPv4 without signed DNS": {
+			TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1,
+			AssignedIPv4: [4]byte{10, 89, 1, 2}, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 1 << 24, IdleTimeout: time.Second,
+		},
+		"signed DNS without assigned IPv4": {
+			TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1,
+			DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 1 << 24, IdleTimeout: time.Second,
+		},
+		"client and signed DNS addresses collide": {
+			TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1,
+			AssignedIPv4: testTunnelDNSIPv4V1, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 1 << 24, IdleTimeout: time.Second,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := NewPacketPumpV1(config); !errors.Is(err, ErrPacketPumpConfig) {
@@ -361,7 +372,8 @@ func TestPacketPumpV1AllowsSignedQueueBoundsIndependentOfWireConcurrency(t *test
 	budget := uint64(maxPacket) * uint64(queuePackets+incompleteOps)
 	if _, err := NewPacketPumpV1(PacketPumpConfigV1{
 		TUN: device, Carrier: carrier, Endpoint: clientEndpoint, Program: program,
-		Direction: DirectionClientV1, QueuePackets: queuePackets, IncompleteOps: incompleteOps,
+		Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1,
+		QueuePackets: queuePackets, IncompleteOps: incompleteOps,
 		BufferBudget: budget, IdleTimeout: time.Second,
 	}); err != nil {
 		t.Fatalf("signed queue bounds were incorrectly coupled to wire concurrency: %v", err)
@@ -376,11 +388,11 @@ func TestPacketPumpV1ShortTUNWriteDiscardsPendingAndTerminates(t *testing.T) {
 	relayTUN := &shortWritePacketDeviceV1{memoryPacketDeviceV1: newMemoryPacketDeviceV1()}
 	assigned := [4]byte{10, 89, 0, 2}
 	program := testDuplexProgramV1()
-	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	clientPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: clientTUN, Carrier: clientCarrier, Endpoint: clientEndpoint, Program: program, Direction: DirectionClientV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
+	relayPump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: relayTUN, Carrier: relayCarrier, Endpoint: relayEndpoint, Program: program, Direction: DirectionRelayV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 2, BufferBudget: 16384, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +442,7 @@ func TestPacketPumpV1OutboundQueueFullFailsClosed(t *testing.T) {
 	device := newMemoryPacketDeviceV1()
 	carrier, peer := net.Pipe()
 	defer peer.Close()
-	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: carrier, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: carrier, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +465,7 @@ func TestPacketPumpV1DropsBoundedInvalidTUNPacketsWithoutForwarding(t *testing.T
 	assigned := [4]byte{10, 89, 0, 2}
 	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
 		TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(),
-		Direction: DirectionClientV1, AssignedIPv4: assigned, QueuePackets: 2, IncompleteOps: 1,
+		Direction: DirectionClientV1, AssignedIPv4: assigned, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 1,
 		BufferBudget: 12288, IdleTimeout: time.Second,
 	})
 	if err != nil {
@@ -495,7 +507,7 @@ func TestPacketPumpV1InvalidTUNPacketFloodFailsClosed(t *testing.T) {
 	defer peer.Close()
 	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
 		TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(),
-		Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 2, IncompleteOps: 1,
+		Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 2, IncompleteOps: 1,
 		BufferBudget: 12288, IdleTimeout: time.Second,
 	})
 	if err != nil {
@@ -523,7 +535,7 @@ func TestPacketPumpV1IdleTimeoutIsTerminal(t *testing.T) {
 	device := newMemoryPacketDeviceV1()
 	one, two := net.Pipe()
 	defer two.Close()
-	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: 40 * time.Millisecond})
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: 40 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +549,7 @@ func TestPacketPumpV1ReportsUnexpectedTUNClosureCategorically(t *testing.T) {
 	device := newMemoryPacketDeviceV1()
 	one, two := net.Pipe()
 	defer two.Close()
-	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,7 +567,7 @@ func TestPacketPumpV1ReportsUnexpectedCarrierClosureCategorically(t *testing.T) 
 	clientEndpoint, _, _ := newProcessDuplexPairV1(t)
 	device := newMemoryPacketDeviceV1()
 	one, two := net.Pipe()
-	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
+	pump, err := NewPacketPumpV1(PacketPumpConfigV1{TUN: device, Carrier: one, Endpoint: clientEndpoint, Program: testDuplexProgramV1(), Direction: DirectionClientV1, AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testTunnelDNSIPv4V1, QueuePackets: 1, IncompleteOps: 1, BufferBudget: 8192, IdleTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}

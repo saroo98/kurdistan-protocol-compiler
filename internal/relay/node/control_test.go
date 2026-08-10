@@ -49,7 +49,7 @@ func TestControlActionsV1MutateOnlyAuthorizedLocalState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	device, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}})
+	device, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

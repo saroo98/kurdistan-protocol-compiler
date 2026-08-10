@@ -25,7 +25,9 @@ var (
 type SessionSpec struct {
 	ID, ProfileID, ClientKeyID string
 	AssignedIPv4               [4]byte
+	DNSIPv4                    [4]byte
 	AssignedIPv6               [16]byte
+	DNSIPv6                    [16]byte
 	Cancel                     context.CancelFunc
 }
 
@@ -85,7 +87,7 @@ func NewSessionRegistry(tun io.ReadWriteCloser, maxSessions, queuePackets int) (
 
 func (registry *SessionRegistry) Register(spec SessionSpec) (*SessionDevice, error) {
 	if registry == nil || !boundedSessionIDV1(spec.ID) || !boundedSessionIDV1(spec.ProfileID) || !boundedSessionIDV1(spec.ClientKeyID) ||
-		spec.AssignedIPv4 == ([4]byte{}) && spec.AssignedIPv6 == ([16]byte{}) {
+		!validSessionAddressAuthorityV1(spec) {
 		return nil, ErrRegistryConfig
 	}
 	registry.mu.Lock()
@@ -113,6 +115,15 @@ func (registry *SessionRegistry) Register(spec SessionSpec) (*SessionDevice, err
 	}
 	registry.stats.ActiveSessions = uint64(len(registry.sessions))
 	return &SessionDevice{registry: registry, session: record}, nil
+}
+
+func validSessionAddressAuthorityV1(spec SessionSpec) bool {
+	hasIPv4 := spec.AssignedIPv4 != [4]byte{}
+	hasIPv6 := spec.AssignedIPv6 != [16]byte{}
+	if !hasIPv4 && !hasIPv6 || hasIPv4 != (spec.DNSIPv4 != [4]byte{}) || hasIPv6 != (spec.DNSIPv6 != [16]byte{}) {
+		return false
+	}
+	return (!hasIPv4 || spec.AssignedIPv4 != spec.DNSIPv4) && (!hasIPv6 || spec.AssignedIPv6 != spec.DNSIPv6)
 }
 
 func (registry *SessionRegistry) Run(ctx context.Context) error {
@@ -299,7 +310,7 @@ func (device *SessionDevice) Write(packet []byte) (int, error) {
 		return 0, ErrPacketRejected
 	}
 	spec := device.session.spec
-	if _, err := kruntime.ValidateRelayOutboundIPPacketV1(packet, spec.AssignedIPv4, spec.AssignedIPv6); err != nil {
+	if _, err := kruntime.ValidateRelayOutboundIPPacketV1(packet, spec.AssignedIPv4, spec.DNSIPv4, spec.AssignedIPv6, spec.DNSIPv6); err != nil {
 		return 0, ErrPacketRejected
 	}
 	select {

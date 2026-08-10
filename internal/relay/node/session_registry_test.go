@@ -14,6 +14,39 @@ import (
 	"time"
 )
 
+var (
+	testRelayDNSIPv4V1 = [4]byte{10, 89, 0, 1}
+	testRelayDNSIPv6V1 = [16]byte{0xfd, 0x42, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+)
+
+func TestSessionRegistryRejectsIncompleteDNSAuthority(t *testing.T) {
+	registry, err := NewSessionRegistry(newMemoryTunnelV1(), 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+	for name, spec := range map[string]SessionSpec{
+		"assigned without DNS": {
+			ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one",
+			AssignedIPv4: [4]byte{10, 89, 1, 2},
+		},
+		"DNS without assigned": {
+			ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one",
+			DNSIPv4: testRelayDNSIPv4V1,
+		},
+		"client and DNS collide": {
+			ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one",
+			AssignedIPv4: testRelayDNSIPv4V1, DNSIPv4: testRelayDNSIPv4V1,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if device, registerErr := registry.Register(spec); device != nil || !errors.Is(registerErr, ErrRegistryConfig) {
+				t.Fatalf("incomplete authority accepted: device=%v err=%v", device, registerErr)
+			}
+		})
+	}
+}
+
 func TestSessionRegistryHundredConcurrentClientsEnforceSixtyFourSessionLimit(t *testing.T) {
 	registry, err := NewSessionRegistry(newMemoryTunnelV1(), 64, 1)
 	if err != nil {
@@ -34,7 +67,7 @@ func TestSessionRegistryHundredConcurrentClientsEnforceSixtyFourSessionLimit(t *
 			defer workers.Done()
 			device, registerErr := registry.Register(SessionSpec{
 				ID: fmt.Sprintf("session-%03d", index), ProfileID: fmt.Sprintf("profile-%03d", index), ClientKeyID: fmt.Sprintf("client-%03d", index),
-				AssignedIPv4: [4]byte{10, 89, 1, byte(index + 2)},
+				AssignedIPv4: [4]byte{10, 89, 1, byte(index + 2)}, DNSIPv4: testRelayDNSIPv4V1,
 			})
 			results <- result{device: device, err: registerErr}
 		}()
@@ -76,11 +109,11 @@ func TestSessionRegistryRoutesExactReturnAddressesWithoutCrossDelivery(t *testin
 	second4 := [4]byte{10, 89, 0, 3}
 	first6 := [16]byte{0xfd, 0x42, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 	second6 := [16]byte{0xfd, 0x42, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3}
-	one, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: first4, AssignedIPv6: first6})
+	one, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: first4, DNSIPv4: testRelayDNSIPv4V1, AssignedIPv6: first6, DNSIPv6: testRelayDNSIPv6V1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	two, err := registry.Register(SessionSpec{ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: second4, AssignedIPv6: second6})
+	two, err := registry.Register(SessionSpec{ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: second4, DNSIPv4: testRelayDNSIPv4V1, AssignedIPv6: second6, DNSIPv6: testRelayDNSIPv6V1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,16 +151,17 @@ func TestSessionRegistryRejectsDuplicateAuthorityAndSpoofedSource(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer registry.Close()
-	assigned := [4]byte{10, 89, 0, 2}
-	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned})
+	assigned := [4]byte{10, 77, 1, 2}
+	dnsAddress := [4]byte{10, 77, 0, 1}
+	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned, DNSIPv4: dnsAddress})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for name, spec := range map[string]SessionSpec{
-		"session": {ID: "session-one", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 89, 0, 3}},
-		"profile": {ID: "session-two", ProfileID: "profile-one", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 89, 0, 3}},
-		"client":  {ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-one", AssignedIPv4: [4]byte{10, 89, 0, 3}},
-		"address": {ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: assigned},
+		"session": {ID: "session-one", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 77, 1, 3}, DNSIPv4: dnsAddress},
+		"profile": {ID: "session-two", ProfileID: "profile-one", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 77, 1, 3}, DNSIPv4: dnsAddress},
+		"client":  {ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-one", AssignedIPv4: [4]byte{10, 77, 1, 3}, DNSIPv4: dnsAddress},
+		"address": {ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: assigned, DNSIPv4: dnsAddress},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if duplicate, err := registry.Register(spec); duplicate != nil || !errors.Is(err, ErrSessionConflict) {
@@ -139,14 +173,14 @@ func TestSessionRegistryRejectsDuplicateAuthorityAndSpoofedSource(t *testing.T) 
 	if count, err := device.Write(spoofed); count != 0 || !errors.Is(err, ErrPacketRejected) {
 		t.Fatalf("spoofed packet accepted: count=%d err=%v", count, err)
 	}
-	tunnelGateway := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 1}, 17, []byte{4})
+	tunnelGateway := testIPv4PacketV1(assigned, dnsAddress, 17, []byte{4})
 	if count, err := device.Write(tunnelGateway); err != nil || count != len(tunnelGateway) {
 		t.Fatalf("exact tunnel gateway rejected: count=%d err=%v", count, err)
 	}
 	if got := tunnel.writtenPacket(t); string(got) != string(tunnelGateway) {
 		t.Fatal("exact tunnel gateway packet was not delivered to the shared TUN")
 	}
-	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{4})
+	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 77, 0, 9}, 17, []byte{4})
 	if count, err := device.Write(otherPrivate); count != 0 || !errors.Is(err, ErrPacketRejected) {
 		t.Fatalf("other private destination accepted: count=%d err=%v", count, err)
 	}
@@ -167,7 +201,7 @@ func TestSessionRegistryQueuePressureAndProfileStopFailClosed(t *testing.T) {
 	}
 	defer registry.Close()
 	assigned := [4]byte{10, 89, 0, 2}
-	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned})
+	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned, DNSIPv4: testRelayDNSIPv4V1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,11 +233,11 @@ func TestSessionRegistryReportsProfileAndLocalStopCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer registry.Close()
-	profileDevice, err := registry.Register(SessionSpec{ID: "session-profile", ProfileID: "profile-target", ClientKeyID: "client-profile", AssignedIPv4: [4]byte{10, 89, 0, 2}})
+	profileDevice, err := registry.Register(SessionSpec{ID: "session-profile", ProfileID: "profile-target", ClientKeyID: "client-profile", AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testRelayDNSIPv4V1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	localDevice, err := registry.Register(SessionSpec{ID: "session-local", ProfileID: "profile-local", ClientKeyID: "client-local", AssignedIPv4: [4]byte{10, 89, 0, 3}})
+	localDevice, err := registry.Register(SessionSpec{ID: "session-local", ProfileID: "profile-local", ClientKeyID: "client-local", AssignedIPv4: [4]byte{10, 89, 0, 3}, DNSIPv4: testRelayDNSIPv4V1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,8 +262,8 @@ func TestSessionRegistryStopAllTerminatesEveryAssignment(t *testing.T) {
 	}
 	defer registry.Close()
 	for index, spec := range []SessionSpec{
-		{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: [4]byte{10, 89, 0, 2}},
-		{ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 89, 0, 3}},
+		{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: [4]byte{10, 89, 0, 2}, DNSIPv4: testRelayDNSIPv4V1},
+		{ID: "session-two", ProfileID: "profile-two", ClientKeyID: "client-two", AssignedIPv4: [4]byte{10, 89, 0, 3}, DNSIPv4: testRelayDNSIPv4V1},
 	} {
 		if _, err := registry.Register(spec); err != nil {
 			t.Fatalf("register %d: %v", index, err)
@@ -255,7 +289,7 @@ func TestSessionRegistryStopProfileIsNotBlockedByStalledTunnelWrite(t *testing.T
 		_ = registry.Close()
 	})
 	assigned := [4]byte{10, 89, 0, 2}
-	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned})
+	device, err := registry.Register(SessionSpec{ID: "session-one", ProfileID: "profile-one", ClientKeyID: "client-one", AssignedIPv4: assigned, DNSIPv4: testRelayDNSIPv4V1})
 	if err != nil {
 		t.Fatal(err)
 	}
