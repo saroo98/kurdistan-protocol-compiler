@@ -10,6 +10,10 @@ import android.content.IntentFilter
 import android.net.VpnService
 import java.util.concurrent.Executors
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +29,7 @@ import org.kurdistanvpn.core.model.IpMode
 class VpnRuntimeController(
     private val context: Context,
 ) : AutoCloseable {
+    private val reconnectScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val handoffExecutor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "kurd-runtime-authority-handoff").apply { isDaemon = true }
     }
@@ -35,6 +40,14 @@ class VpnRuntimeController(
     private var pendingStatusQueryId: String? = null
     private val mutableSnapshot = MutableStateFlow(VpnRuntimeSnapshot())
     val snapshot: StateFlow<VpnRuntimeSnapshot> = mutableSnapshot.asStateFlow()
+    private val reconnectCoordinator = RuntimeReconnectCoordinator(
+        scope = reconnectScope,
+        publish = ::acceptSnapshot,
+        restart = { authority ->
+            stageAuthorityForReconnect(authority)
+            startStaged()
+        },
+    )
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != VpnRuntimeContract.ACTION_STATUS) return
@@ -54,7 +67,7 @@ class VpnRuntimeController(
             val state = intent.getStringExtra(VpnRuntimeContract.EXTRA_STATE)
                 ?.let { runCatching { VpnRuntimeState.valueOf(it) }.getOrNull() }
                 ?: VpnRuntimeState.FAILED
-            mutableSnapshot.value = VpnRuntimeSnapshot(
+            acceptSnapshot(VpnRuntimeSnapshot(
                 state = state,
                 packetsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_PACKETS, 0),
                 packetsWritten =
@@ -93,6 +106,13 @@ class VpnRuntimeController(
                 relayFingerprint = intent.getStringExtra(
                     VpnRuntimeContract.EXTRA_RELAY_FINGERPRINT,
                 ),
+                maxReconnectAttempts = intent.getIntExtra(
+                    VpnRuntimeContract.EXTRA_MAX_RECONNECT_ATTEMPTS,
+                    0,
+                ),
+                runtimeRequestId = intent.getStringExtra(
+                    VpnRuntimeContract.EXTRA_RUNTIME_REQUEST,
+                ),
                 diagnostics = VpnRuntimeDiagnostics(
                     tunPacketsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, 0),
                     outboundPacketsAccepted = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, 0),
@@ -108,7 +128,7 @@ class VpnRuntimeController(
                     tunPacketsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, 0),
                     rejectedTunPackets = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, 0),
                 ),
-            )
+            ))
         }
     }
 
@@ -137,6 +157,7 @@ class VpnRuntimeController(
     }
 
     fun permissionRejected() {
+        reconnectCoordinator.cancel()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -146,6 +167,7 @@ class VpnRuntimeController(
     }
 
     fun notificationPermissionRejected() {
+        reconnectCoordinator.cancel()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -154,7 +176,20 @@ class VpnRuntimeController(
         )
     }
 
-    fun stageAuthority(encoded: ByteArray) {
+    internal fun stageAuthority(
+        encoded: ByteArray,
+        reconnectAuthorityProvider: FreshRuntimeAuthorityProvider? = null,
+    ) {
+        require(encoded.isNotEmpty()) { "MISSING_VERIFIED_AUTHORITY" }
+        if (reconnectAuthorityProvider == null) {
+            reconnectCoordinator.cancel()
+        } else {
+            reconnectCoordinator.begin(reconnectAuthorityProvider)
+        }
+        stageAuthorityForReconnect(encoded)
+    }
+
+    private fun stageAuthorityForReconnect(encoded: ByteArray) {
         require(encoded.isNotEmpty()) { "MISSING_VERIFIED_AUTHORITY" }
         clearStagedAuthority()
         stagedAuthority = encoded
@@ -162,6 +197,7 @@ class VpnRuntimeController(
     }
 
     fun authorityRejected(category: String) {
+        reconnectCoordinator.cancel()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -184,24 +220,27 @@ class VpnRuntimeController(
         runCatching {
             KurdVpnService.start(context, requestId, authority, handoffExecutor) { category ->
                 if (activeRequestId == requestId) {
-                    mutableSnapshot.value = VpnRuntimeSnapshot(
+                    acceptSnapshot(VpnRuntimeSnapshot(
                         state = VpnRuntimeState.FAILED,
                         failure = category.take(64),
-                    )
+                        runtimeRequestId = requestId,
+                    ))
                 }
             }
         }.onFailure {
             authority.fill(0)
             if (activeRequestId == requestId) {
-                mutableSnapshot.value = VpnRuntimeSnapshot(
+                acceptSnapshot(VpnRuntimeSnapshot(
                     state = VpnRuntimeState.FAILED,
                     failure = "RUNTIME_START_FAILED",
-                )
+                    runtimeRequestId = requestId,
+                ))
             }
         }
     }
 
     fun stop() {
+        reconnectCoordinator.cancel()
         val current = mutableSnapshot.value
         if (
             current.state == VpnRuntimeState.IDLE ||
@@ -224,6 +263,8 @@ class VpnRuntimeController(
     }
 
     override fun close() {
+        reconnectCoordinator.cancel()
+        reconnectScope.cancel()
         clearStagedAuthority()
         handoffExecutor.shutdownNow()
         runCatching { context.unregisterReceiver(receiver) }
@@ -232,6 +273,11 @@ class VpnRuntimeController(
     private fun clearStagedAuthority() {
         stagedAuthority?.fill(0)
         stagedAuthority = null
+    }
+
+    private fun acceptSnapshot(value: VpnRuntimeSnapshot) {
+        mutableSnapshot.value = value
+        reconnectCoordinator.observe(value)
     }
 }
 

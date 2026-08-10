@@ -48,6 +48,8 @@ data class VpnRuntimeSnapshot(
     val profileFingerprint: String? = null,
     val strategyFingerprint: String? = null,
     val relayFingerprint: String? = null,
+    val maxReconnectAttempts: Int = 0,
+    val runtimeRequestId: String? = null,
     val diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
 )
 
@@ -163,6 +165,7 @@ object VpnRuntimeContract {
     const val EXTRA_PROFILE_FINGERPRINT = "profile_fingerprint"
     const val EXTRA_STRATEGY_FINGERPRINT = "strategy_fingerprint"
     const val EXTRA_RELAY_FINGERPRINT = "relay_fingerprint"
+    const val EXTRA_MAX_RECONNECT_ATTEMPTS = "max_reconnect_attempts"
     const val EXTRA_DIAGNOSTIC_TUN_READ = "diagnostic_tun_read"
     const val EXTRA_DIAGNOSTIC_OUTBOUND = "diagnostic_outbound"
     const val EXTRA_DIAGNOSTIC_CARRIER_WRITE = "diagnostic_carrier_write"

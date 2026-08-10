@@ -24,6 +24,8 @@ class VpnRuntimeContractTest {
         assertEquals(0, snapshot.packetsWritten)
         assertFalse(snapshot.alwaysOn)
         assertFalse(snapshot.lockdown)
+        assertEquals(0, snapshot.maxReconnectAttempts)
+        assertEquals(null, snapshot.runtimeRequestId)
     }
 
     @Test

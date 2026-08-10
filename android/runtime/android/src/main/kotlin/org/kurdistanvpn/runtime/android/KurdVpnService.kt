@@ -100,8 +100,7 @@ class KurdVpnService : VpnService() {
     private var activeConfig: VpnRuntimeConfig? = null
     @Volatile
     private var latestSnapshot = PublishedSnapshot()
-    @Volatile
-    private var terminalStateOnDestroy: VpnRuntimeState? = null
+    private val pendingTermination = PendingRuntimeTermination()
     private val statusQueryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == VpnRuntimeContract.ACTION_QUERY_STATUS) {
@@ -189,8 +188,9 @@ class KurdVpnService : VpnService() {
         networkMonitor?.close()
         networkMonitor = null
         closeRuntime()
-        terminalStateOnDestroy?.let(::publish)
-        terminalStateOnDestroy = null
+        pendingTermination.take()?.let { outcome ->
+            publish(outcome.state, failure = outcome.failure)
+        }
         executor.shutdownNow()
         super.onDestroy()
     }
@@ -264,7 +264,7 @@ class KurdVpnService : VpnService() {
                     terminalFailure = "LIVE_NETWORK_UNAVAILABLE"
                     return@execute
                 }
-                if (terminalStateOnDestroy != null) return@execute
+                if (pendingTermination.peek() != null) return@execute
                 val controller = NativeTunnelController(
                     protector = SocketProtector(::protect),
                     tunEstablisher = TunEstablisher { configuration ->
@@ -310,13 +310,13 @@ class KurdVpnService : VpnService() {
                 }
             } finally {
                 val failure = terminalFailure
-                val requestedTerminalState = terminalStateOnDestroy
-                if (requestedTerminalState != null) {
+                val requestedTermination = pendingTermination.take()
+                if (requestedTermination != null) {
                     starting.set(false)
                     closeRuntime()
-                    terminalStateOnDestroy = null
                     publish(
-                        requestedTerminalState,
+                        requestedTermination.state,
+                        failure = requestedTermination.failure,
                         config = config,
                         authority = authoritySnapshot,
                     )
@@ -351,12 +351,12 @@ class KurdVpnService : VpnService() {
         mainHandler.removeCallbacks(runtimeHealthCheck)
         pendingAuthorityRequest?.let(RuntimeAuthorityBroker::cancel)
         pendingAuthorityRequest = null
-        terminalStateOnDestroy = finalState
+        pendingTermination.request(finalState, finalFailure)
         tunnelController?.stop()
         if (!starting.get()) {
             closeRuntime()
-            terminalStateOnDestroy = null
-            publish(finalState, failure = finalFailure)
+            val outcome = pendingTermination.take() ?: RuntimeTermination(finalState, finalFailure)
+            publish(outcome.state, failure = outcome.failure)
             activeRequestId = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -455,6 +455,10 @@ class KurdVpnService : VpnService() {
                 .putExtra(
                     VpnRuntimeContract.EXTRA_RELAY_FINGERPRINT,
                     snapshot.authority?.relayFingerprint?.toHex(),
+                )
+                .putExtra(
+                    VpnRuntimeContract.EXTRA_MAX_RECONNECT_ATTEMPTS,
+                    snapshot.authority?.maxReconnectAttempts ?: 0,
                 )
                 .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, snapshot.diagnostics.tunPacketsRead)
                 .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, snapshot.diagnostics.outboundPacketsAccepted)
