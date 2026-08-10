@@ -201,7 +201,9 @@ func phase17NamespacePumpV1(t *testing.T, device *os.File, carrier *ProcessTLSTC
 	t.Helper()
 	pump, err := NewPacketPumpV1(PacketPumpConfigV1{
 		TUN: device, Carrier: carrier, Endpoint: endpoint, Program: testDuplexProgramV1(), Direction: direction,
-		AssignedIPv4: [4]byte{10, 77, 0, 2}, AssignedIPv6: [16]byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+		AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1},
+		AssignedIPv6: [16]byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+		DNSIPv6:      [16]byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		QueuePackets: 8, IncompleteOps: 4, BufferBudget: 128 << 10, IdleTimeout: 15 * time.Second,
 	})
 	if err != nil {

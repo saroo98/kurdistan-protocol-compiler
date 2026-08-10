@@ -62,35 +62,55 @@ func TestValidateIPPacketV1RejectsSpoofingFragmentsAndBlockedDestinations(t *tes
 	}
 }
 
-func TestValidateClientOutboundIPPacketV1AllowsOnlyExactTunnelGateway(t *testing.T) {
-	assigned := [4]byte{10, 89, 0, 2}
-	dns := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 1}, 17, []byte{1})
-	if _, err := validateClientOutboundIPPacketV1(dns, assigned, [16]byte{}); err != nil {
-		t.Fatalf("exact tunnel gateway rejected: %v", err)
+func TestValidateClientOutboundIPPacketV1AllowsOnlyExactSignedDNS(t *testing.T) {
+	assigned := [4]byte{10, 77, 1, 2}
+	dnsAddress := [4]byte{10, 77, 0, 1}
+	dns := testIPv4PacketV1(assigned, dnsAddress, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(dns, assigned, dnsAddress, [16]byte{}, [16]byte{}); err != nil {
+		t.Fatalf("exact signed DNS rejected: %v", err)
 	}
-	wrongSource := testIPv4PacketV1([4]byte{10, 89, 0, 3}, [4]byte{10, 89, 0, 1}, 17, []byte{1})
-	if _, err := validateClientOutboundIPPacketV1(wrongSource, assigned, [16]byte{}); !errors.Is(err, ErrPacketSource) {
+	wrongSource := testIPv4PacketV1([4]byte{10, 77, 1, 3}, dnsAddress, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(wrongSource, assigned, dnsAddress, [16]byte{}, [16]byte{}); !errors.Is(err, ErrPacketSource) {
 		t.Fatalf("wrong source=%v", err)
 	}
-	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{1})
-	if _, err := validateClientOutboundIPPacketV1(otherPrivate, assigned, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
+	legacyDerivedDNS := testIPv4PacketV1(assigned, [4]byte{10, 77, 1, 1}, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(legacyDerivedDNS, assigned, dnsAddress, [16]byte{}, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
+		t.Fatalf("legacy derived DNS destination=%v", err)
+	}
+	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 77, 0, 9}, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(otherPrivate, assigned, dnsAddress, [16]byte{}, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
 		t.Fatalf("other private destination=%v", err)
 	}
 }
 
-func TestValidateRelayOutboundIPPacketV1AllowsOnlyExactTunnelGatewayFromAssignedSource(t *testing.T) {
-	assigned := [4]byte{10, 89, 0, 2}
-	dns := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 1}, 17, []byte{1})
-	if _, err := validateRelayOutboundIPPacketV1(dns, assigned, [16]byte{}); err != nil {
-		t.Fatalf("exact tunnel gateway rejected: %v", err)
+func TestValidateRelayOutboundIPPacketV1AllowsOnlyExactSignedDNSFromAssignedSource(t *testing.T) {
+	assigned := [4]byte{10, 77, 1, 2}
+	dnsAddress := [4]byte{10, 77, 0, 1}
+	dns := testIPv4PacketV1(assigned, dnsAddress, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(dns, assigned, dnsAddress, [16]byte{}, [16]byte{}); err != nil {
+		t.Fatalf("exact signed DNS rejected: %v", err)
 	}
-	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 89, 0, 9}, 17, []byte{1})
-	if _, err := validateRelayOutboundIPPacketV1(otherPrivate, assigned, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
+	otherPrivate := testIPv4PacketV1(assigned, [4]byte{10, 77, 0, 9}, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(otherPrivate, assigned, dnsAddress, [16]byte{}, [16]byte{}); !errors.Is(err, ErrPacketDestination) {
 		t.Fatalf("other private destination=%v", err)
 	}
-	wrongSource := testIPv4PacketV1([4]byte{10, 89, 0, 3}, [4]byte{10, 89, 0, 1}, 17, []byte{1})
-	if _, err := validateRelayOutboundIPPacketV1(wrongSource, assigned, [16]byte{}); !errors.Is(err, ErrPacketSource) {
+	wrongSource := testIPv4PacketV1([4]byte{10, 77, 1, 3}, dnsAddress, 17, []byte{1})
+	if _, err := validateRelayOutboundIPPacketV1(wrongSource, assigned, dnsAddress, [16]byte{}, [16]byte{}); !errors.Is(err, ErrPacketSource) {
 		t.Fatalf("wrong source=%v", err)
+	}
+}
+
+func TestValidateClientOutboundIPPacketV1UsesExactSignedIPv6DNS(t *testing.T) {
+	assigned := [16]byte{0xfd, 0x42, 0x77, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2}
+	dnsAddress := [16]byte{0xfd, 0x42, 0x77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	dns := testIPv6PacketV1(assigned, dnsAddress, 17, []byte{1})
+	if _, err := validateClientOutboundIPPacketV1(dns, [4]byte{}, [4]byte{}, assigned, dnsAddress); err != nil {
+		t.Fatalf("exact signed IPv6 DNS rejected: %v", err)
+	}
+	legacyDerivedDNS := assigned
+	legacyDerivedDNS[15] = 1
+	if _, err := validateClientOutboundIPPacketV1(testIPv6PacketV1(assigned, legacyDerivedDNS, 17, []byte{1}), [4]byte{}, [4]byte{}, assigned, dnsAddress); !errors.Is(err, ErrPacketDestination) {
+		t.Fatalf("legacy derived IPv6 DNS destination=%v", err)
 	}
 }
 

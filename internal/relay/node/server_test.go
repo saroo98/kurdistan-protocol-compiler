@@ -44,7 +44,7 @@ func TestServerReloadV1ReplacesAuthorityAndTerminatesExistingSessions(t *testing
 	if err := server.Reload(); err != nil || server.health.Snapshot().State != HealthReady {
 		t.Fatalf("initial reload err=%v health=%+v", err, server.health.Snapshot())
 	}
-	if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
+	if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := server.Reload(); err != nil {
@@ -272,7 +272,7 @@ func TestServerReloadV1FailsClosedAcrossAdministrativeAndCorruptState(t *testing
 				t.Fatal(err)
 			}
 			defer registry.Close()
-			if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
+			if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1}}); err != nil {
 				t.Fatal(err)
 			}
 			server := &ServerV1{config: config, health: NewHealthMachine(), registry: registry, listenerReady: true, tunnelReady: true}
@@ -305,7 +305,7 @@ func TestServerReloadV1AppliesAdministrativeFailClosedStatesWithoutStoppingContr
 				t.Fatal(err)
 			}
 			defer registry.Close()
-			if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}}); err != nil {
+			if _, err := registry.Register(SessionSpec{ID: "session-1", ProfileID: "profile-1", ClientKeyID: "client-1", AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1}}); err != nil {
 				t.Fatal(err)
 			}
 			server := &ServerV1{config: config, health: NewHealthMachine(), registry: registry, listenerReady: true, tunnelReady: true}
@@ -365,7 +365,7 @@ func TestServerStopProfileV1CancelsEstablishedAndInFlightSessions(t *testing.T) 
 	defer registry.Close()
 	if _, err := registry.Register(SessionSpec{
 		ID: "session-established", ProfileID: "profile-target", ClientKeyID: "client-established",
-		AssignedIPv4: [4]byte{10, 77, 0, 2},
+		AssignedIPv4: [4]byte{10, 77, 0, 2}, DNSIPv4: [4]byte{10, 77, 0, 1},
 	}); err != nil {
 		t.Fatal(err)
 	}
