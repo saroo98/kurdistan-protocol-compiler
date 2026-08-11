@@ -268,8 +268,24 @@ class KurdVpnService : VpnService() {
                     return@execute
                 }
                 if (pendingTermination.peek() != null) return@execute
+                if (!setUnderlyingNetworks(arrayOf(selectedUnderlyingNetwork))) {
+                    session.close()
+                    terminalFailure = "LIVE_NETWORK_BIND_FAILED"
+                    return@execute
+                }
                 val controller = NativeTunnelController(
                     protector = SocketProtector(::protect),
+                    networkBinder = SocketNetworkBinder { descriptor ->
+                        // fromFd duplicates the descriptor. The native session retains
+                        // ownership of the original socket across this binding call.
+                        val duplicate = ParcelFileDescriptor.fromFd(descriptor)
+                        try {
+                            selectedUnderlyingNetwork.bindSocket(duplicate.fileDescriptor)
+                            true
+                        } finally {
+                            duplicate.close()
+                        }
+                    },
                     tunEstablisher = TunEstablisher { configuration ->
                         establishTun(configuration, selectedUnderlyingNetwork)
                     },
@@ -371,6 +387,7 @@ class KurdVpnService : VpnService() {
         starting.set(false)
         runCatching { tunnelController?.close() }
         tunnelController = null
+        runCatching { setUnderlyingNetworks(null) }
         activeConfig = null
     }
 

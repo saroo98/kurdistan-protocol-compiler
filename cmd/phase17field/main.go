@@ -795,7 +795,7 @@ func instrumentationFailureCategory(raw []byte) string {
 		"RECIPIENT_CREATE_FAILED": true, "RECIPIENT_REQUEST_UNAVAILABLE": true,
 		"RUNTIME_AUTHORITY_FAILED": true, "RUNTIME_AUTHORITY_UNAVAILABLE": true,
 		"SEALED_PROFILE_UNAVAILABLE": true, "VPN_CONSENT_REQUIRED": true,
-		"VPN_NETWORK_NOT_READY": true,
+		"VPN_NETWORK_NOT_READY": true, "VPN_NETWORK_TEARDOWN_TIMEOUT": true,
 	}
 	for _, match := range instrumentCategoryV1.FindAll(raw, -1) {
 		value := string(match)
@@ -1600,7 +1600,7 @@ func soak(ctx context.Context, runner commandRunner, value config, root, serial 
 			if err := exerciseRemoteImpairment(
 				ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized, frozenImpairmentMatrix[3],
 			); err != nil {
-				return reconnects, 0, cycles, errors.New("soak bounded interruption failed")
+				return reconnects, 0, cycles, fmt.Errorf("soak bounded interruption failed: %w", err)
 			}
 		}
 		if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {

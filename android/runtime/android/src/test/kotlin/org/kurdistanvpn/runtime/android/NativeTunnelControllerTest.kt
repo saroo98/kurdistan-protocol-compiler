@@ -30,6 +30,7 @@ class NativeTunnelControllerTest {
         val session = FakeLiveSession(events)
         val controller = NativeTunnelController(
             protector = SocketProtector { events += "protect"; true },
+            networkBinder = SocketNetworkBinder { events += "bind"; true },
             tunEstablisher = TunEstablisher {
                 events += "builder"
                 FakeTun(events)
@@ -42,7 +43,7 @@ class NativeTunnelControllerTest {
         assertEquals(
             listOf(
                 "stage:VERIFIED", "prepare", "stage:SOCKET_PREPARED", "protect",
-                "stage:SOCKET_PROTECTED", "connect", "tls", "kurd", "status:KURD_AUTHENTICATED",
+                "stage:SOCKET_PROTECTED", "bind", "connect", "tls", "kurd", "status:KURD_AUTHENTICATED",
                 "stage:AUTHENTICATED", "builder", "establish", "detach",
                 "stage:TUN_ESTABLISHED", "attach:71", "close-detached:71",
                 "status:RUNNING", "stage:RUNNING",
@@ -60,6 +61,7 @@ class NativeTunnelControllerTest {
         val session = FakeLiveSession(events)
         val controller = NativeTunnelController(
             protector = SocketProtector { true },
+            networkBinder = SocketNetworkBinder { true },
             tunEstablisher = TunEstablisher { FakeTun(events) },
             detachedCloser = DetachedFileDescriptorCloser {},
         )
@@ -76,6 +78,7 @@ class NativeTunnelControllerTest {
         val session = FakeLiveSession(events)
         val controller = NativeTunnelController(
             SocketProtector { events += "protect"; false },
+            SocketNetworkBinder { error("must not bind") },
             TunEstablisher { error("must not establish") },
             DetachedFileDescriptorCloser {},
         )
@@ -91,11 +94,31 @@ class NativeTunnelControllerTest {
     }
 
     @Test
+    fun underlyingNetworkBindFailureFailsClosedBeforeNativeConnect() {
+        val events = mutableListOf<String>()
+        val session = FakeLiveSession(events)
+        val controller = NativeTunnelController(
+            protector = SocketProtector { events += "protect:$it"; true },
+            networkBinder = SocketNetworkBinder { events += "bind:$it"; false },
+            tunEstablisher = TunEstablisher { error("must not establish") },
+            detachedCloser = DetachedFileDescriptorCloser {},
+        )
+
+        assertEquals(
+            LiveTunnelStartResult.Failure(LiveTunnelFailure.SOCKET_BIND_FAILED),
+            controller.start(session),
+        )
+        assertEquals(listOf("prepare", "protect:37", "bind:37", "commit-false", "stop", "close"), events)
+        assertFalse(events.contains("connect"))
+    }
+
+    @Test
     fun endpointFallbackProtectsEveryFreshSocketBeforeRetrying() {
         val events = mutableListOf<String>()
         val session = FallbackLiveSession(events, listOf(OperationError.ENDPOINT_UNAVAILABLE, null))
         val controller = NativeTunnelController(
             SocketProtector { events += "protect:$it"; true },
+            SocketNetworkBinder { events += "bind:$it"; true },
             TunEstablisher { FakeTun(events) },
             DetachedFileDescriptorCloser {},
         )
@@ -103,6 +126,7 @@ class NativeTunnelControllerTest {
         assertEquals(LiveTunnelStartResult.Running(), controller.start(session))
         assertEquals(2, events.count { it.startsWith("prepare:") })
         assertEquals(listOf("protect:40", "protect:41"), events.filter { it.startsWith("protect:") })
+        assertEquals(listOf("bind:40", "bind:41"), events.filter { it.startsWith("bind:") })
         assertEquals(2, events.count { it == "connect" })
         assertEquals(1, events.count { it == "tls" })
         assertEquals(1, events.count { it == "kurd" })
@@ -114,6 +138,7 @@ class NativeTunnelControllerTest {
         val session = FallbackLiveSession(events, listOf(OperationError.FALLBACK_EXHAUSTED))
         val controller = NativeTunnelController(
             SocketProtector { events += "protect:$it"; true },
+            SocketNetworkBinder { true },
             TunEstablisher { error("must not establish") },
             DetachedFileDescriptorCloser {},
         )
@@ -138,6 +163,7 @@ class NativeTunnelControllerTest {
             val events = mutableListOf<String>()
             val controller = NativeTunnelController(
                 SocketProtector { true },
+                SocketNetworkBinder { true },
                 TunEstablisher { error("must not establish") },
                 DetachedFileDescriptorCloser {},
             )
@@ -169,6 +195,7 @@ class NativeTunnelControllerTest {
             val events = mutableListOf<String>()
             val controller = NativeTunnelController(
                 SocketProtector { true },
+                SocketNetworkBinder { true },
                 TunEstablisher { FakeTun(events) },
                 DetachedFileDescriptorCloser { events += "closed:$it" },
             )
@@ -188,6 +215,7 @@ class NativeTunnelControllerTest {
         val session = FakeLiveSession(events)
         val controller = NativeTunnelController(
             SocketProtector { true },
+            SocketNetworkBinder { true },
             TunEstablisher { FakeTun(events) },
             DetachedFileDescriptorCloser {},
         )
@@ -205,6 +233,7 @@ class NativeTunnelControllerTest {
         val firstEvents = mutableListOf<String>()
         val controller = NativeTunnelController(
             SocketProtector { true },
+            SocketNetworkBinder { true },
             TunEstablisher { null },
             DetachedFileDescriptorCloser {},
         )
@@ -217,6 +246,7 @@ class NativeTunnelControllerTest {
         val runningEvents = mutableListOf<String>()
         val running = NativeTunnelController(
             SocketProtector { true },
+            SocketNetworkBinder { true },
             TunEstablisher { FakeTun(runningEvents) },
             DetachedFileDescriptorCloser {},
         )
@@ -236,6 +266,7 @@ class NativeTunnelControllerTest {
         val session = FakeLiveSession(events, failAttach = true)
         val controller = NativeTunnelController(
             SocketProtector { true },
+            SocketNetworkBinder { true },
             TunEstablisher { FakeTun(events) },
             DetachedFileDescriptorCloser { events += "closed:$it" },
             onStage = { events += "stage:${it.name}" },
