@@ -53,6 +53,8 @@ var (
 	ErrMigration               = errors.New("selfhost: migration rejected")
 	ErrCommitUncertain         = errors.New("selfhost: commit outcome uncertain")
 	ErrAddressExhausted        = errors.New("selfhost: address pool exhausted")
+	ErrCapacityExhausted       = errors.New("selfhost: capacity exhausted")
+	ErrArtifactUnavailable     = errors.New("selfhost: profile artifact unavailable")
 	ErrTLSUnavailable          = errors.New("selfhost: tls identity unavailable")
 	ErrRecipientReplay         = errors.New("selfhost: recipient capability replay rejected")
 	ErrRecipientRegistry       = errors.New("selfhost: recipient registry rejected")

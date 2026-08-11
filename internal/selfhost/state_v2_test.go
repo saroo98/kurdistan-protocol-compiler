@@ -4,12 +4,38 @@
 package selfhost
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestSaveStateReportsCapacityInsteadOfCorruption(t *testing.T) {
+	dataDir, recovery, passphrase := initializedV2TestState(t)
+	now := time.Unix(1_760_000_000, 0).UTC()
+	if err := ConfirmRecovery(dataDir, recovery, passphrase, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	issued, err := CreateProfile(dataDir, CreateProfileOptions{Name: "capacity", ValidFor: time.Hour, Now: now.Add(2 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	index := profileIndex(state.Profiles, issued.ProfileID)
+	if index < 0 {
+		t.Fatal("created profile missing from state")
+	}
+	state.Profiles[index].Artifact = bytes.Repeat([]byte{0x42}, maxStateBytes)
+	if err := saveState(dataDir, master, state); !errors.Is(err, ErrCapacityExhausted) {
+		t.Fatalf("oversized valid state error = %v, want capacity exhausted", err)
+	}
+}
 
 func TestStateV2RoundTripDoesNotAliasMutableData(t *testing.T) {
 	dataDir, _, _ := initializedV2TestState(t)
