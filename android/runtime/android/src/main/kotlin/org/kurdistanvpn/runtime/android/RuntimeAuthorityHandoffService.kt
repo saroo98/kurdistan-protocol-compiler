@@ -15,7 +15,6 @@ import android.os.ParcelFileDescriptor
 import java.util.concurrent.atomic.AtomicReference
 
 internal object RuntimeAuthorityBroker {
-    private const val EXPIRY_MILLIS = 5_000L
     private val mainHandler = Handler(Looper.getMainLooper())
     private val expected = AtomicReference<Expected?>()
     private val pending = AtomicReference<Pending?>()
@@ -56,7 +55,7 @@ internal object RuntimeAuthorityBroker {
         }
         mainHandler.postDelayed({
             if (pending.compareAndSet(value, null)) value.descriptor.close()
-        }, EXPIRY_MILLIS)
+        }, RuntimeAuthorityTimeoutPolicy.PENDING_DESCRIPTOR_MILLIS)
         return true
     }
 
