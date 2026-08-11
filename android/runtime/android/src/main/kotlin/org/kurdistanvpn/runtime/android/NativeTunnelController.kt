@@ -23,6 +23,10 @@ internal fun interface SocketProtector {
     fun protect(fileDescriptor: Int): Boolean
 }
 
+internal fun interface SocketNetworkBinder {
+    fun bind(fileDescriptor: Int): Boolean
+}
+
 internal fun interface TunEstablisher {
     fun establish(configuration: LiveTunConfiguration): DetachableTun?
 }
@@ -37,6 +41,7 @@ internal fun interface DetachedFileDescriptorCloser {
 
 internal class NativeTunnelController(
     private val protector: SocketProtector,
+    private val networkBinder: SocketNetworkBinder,
     private val tunEstablisher: TunEstablisher,
     private val detachedCloser: DetachedFileDescriptorCloser,
     private val onStage: (LiveTunnelStage) -> Unit = {},
@@ -65,6 +70,11 @@ internal class NativeTunnelController(
                 return@synchronized fail(session, LiveTunnelFailure.SOCKET_PROTECT_FAILED)
             }
             onStage(LiveTunnelStage.SOCKET_PROTECTED)
+            val bound = runCatching { networkBinder.bind(socket) }.getOrDefault(false)
+            if (!bound) {
+                session.commitProtected(false)
+                return@synchronized fail(session, LiveTunnelFailure.SOCKET_BIND_FAILED)
+            }
             when (val committed = session.commitProtected(true)) {
                 is NativeResult.Failure -> {
                     if (committed.error == OperationError.ENDPOINT_UNAVAILABLE) continue

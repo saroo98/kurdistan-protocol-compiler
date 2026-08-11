@@ -58,6 +58,8 @@ internal object Phase17FieldHarness {
     private const val ARG_VERIFY_IPV6 = "phase17VerifyIPv6"
     private const val MAX_PROBE_RESPONSE_BYTES = 64
     private const val VPN_NETWORK_READY_TIMEOUT_MILLIS = 10_000L
+    private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
+    private const val VPN_NETWORK_POLL_MILLIS = 50L
 
     internal fun isExpectedDnsUnavailableFailure(
         expectAvailable: Boolean,
@@ -87,6 +89,21 @@ internal object Phase17FieldHarness {
             state == VpnRuntimeState.FAILED &&
             failure in setOf("LIVE_TLS_REJECTED", "LIVE_FALLBACK_EXHAUSTED") &&
             packetDisposition == "LIVE_STAGE_SOCKET_PROTECTED"
+
+    internal suspend fun awaitVpnNetworkTeardown(
+        timeoutMillis: Long,
+        pollMillis: Long,
+        vpnTransportPresent: () -> Boolean,
+    ): Boolean {
+        require(timeoutMillis > 0) { "VPN_TEARDOWN_TIMEOUT_REJECTED" }
+        require(pollMillis > 0) { "VPN_TEARDOWN_POLL_REJECTED" }
+        return withTimeoutOrNull(timeoutMillis) {
+            while (vpnTransportPresent()) {
+                delay(pollMillis)
+            }
+            true
+        } ?: false
+    }
 
     suspend fun runIfRequested(): Boolean {
         val action = InstrumentationRegistry.getArguments().getString(ARG_ACTION)
@@ -355,9 +372,27 @@ internal object Phase17FieldHarness {
                         controller.snapshot.first { value -> value.state == VpnRuntimeState.IDLE }
                     } != null,
                 ) { "LIVE_STOP_TIMEOUT" }
+                check(awaitVpnNetworkTeardown(application)) {
+                    "VPN_NETWORK_TEARDOWN_TIMEOUT"
+                }
             } finally {
                 controller.close()
             }
+        }
+    }
+
+    private suspend fun awaitVpnNetworkTeardown(context: Context): Boolean {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        return awaitVpnNetworkTeardown(
+            timeoutMillis = VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS,
+            pollMillis = VPN_NETWORK_POLL_MILLIS,
+        ) {
+            runCatching {
+                connectivity.activeNetwork?.let { network ->
+                    connectivity.getNetworkCapabilities(network)
+                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                } ?: false
+            }.getOrDefault(true)
         }
     }
 
