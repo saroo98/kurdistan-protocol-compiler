@@ -575,7 +575,7 @@
     {
       "path": "cmd/kurdpackage/main_test.go",
       "pre_sha256": "a8bb87f03fc506667606b39a2fc4139858cf9aeb7c8400e00ad58884a707bfdd",
-      "post_sha256": "7ded2e1038ba31b5b5a19d5f289647fc40f0615def9d381d23c4a52619867bfe"
+      "post_sha256": "efd0b7b1921cd634c74cad385c82c34dc375d351e0bbf5e7a0d5b6934b3ec56a"
     },
     {
       "path": "cmd/kurdpackage/testdata/preflight-failures.json",
@@ -735,7 +735,7 @@
     {
       "path": "deploy/selfhost/native/rollback.sh",
       "pre_sha256": "37c689e9d2bca3ccb0ea6583c1446bd175d9942868181eb41915558524649f69",
-      "post_sha256": "b65e8d88087eb66437df44cfab5a241b859a026f4900b483b3c0c28391d703ac"
+      "post_sha256": "ee061de4ea0dbe34d15312d9a4d183167e7e263ac2cda44aff9223439399bfeb"
     },
     {
       "path": "deploy/selfhost/native/uninstall.sh",
