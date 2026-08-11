@@ -139,6 +139,12 @@ func TestCLIEndToEndUsesStdinPassphrasesAndExclusiveOutputs(t *testing.T) {
 			t.Fatalf("revoked show=%s err=%v", stdout.String(), err)
 		}
 	}
+	if code, stdout, _ := call([]string{"profile", "show", "--data-dir", dataDir, "--profile-id", created.ProfileID, "--reveal", "uri"}, ""); code == 0 || stdout.Len() != 0 {
+		t.Fatalf("revoked profile URI remained exportable: code=%d stdout=%q", code, stdout.String())
+	}
+	if code, stdout, _ := call([]string{"profile", "show", "--data-dir", dataDir, "--profile-id", created.ProfileID, "--output-dir", filepath.Join(base, "revoked-export")}, ""); code == 0 || stdout.Len() != 0 {
+		t.Fatalf("revoked profile artifact remained exportable: code=%d stdout=%q", code, stdout.String())
+	}
 }
 
 func TestCLINetworkIPv6RequiresExactConfirmationAndRecoveryAuthorization(t *testing.T) {

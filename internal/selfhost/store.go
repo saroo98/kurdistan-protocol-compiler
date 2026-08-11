@@ -159,13 +159,19 @@ func saveStateWithHooks(dataDir string, master []byte, state persistedState, hoo
 		return err
 	}
 	payload, err := encodeCanonical(state)
-	if err != nil || len(payload) > maxStateBytes {
+	if err != nil {
 		return ErrStateCorrupt
+	}
+	if len(payload) > maxStateBytes {
+		return ErrCapacityExhausted
 	}
 	envelope := stateEnvelope{Version: stateVersionV2, Payload: payload, MAC: stateMACV2(master, payload)}
 	encoded, err := encodeCanonical(envelope)
-	if err != nil || len(encoded) > maxStateBytes {
+	if err != nil {
 		return ErrStateCorrupt
+	}
+	if len(encoded) > maxStateBytes {
+		return ErrCapacityExhausted
 	}
 	if err := hooks.check(stateWriteBeforeTemporary); err != nil {
 		return err
@@ -302,6 +308,7 @@ func withStateTransactionClock(dataDir string, action, subject string, at int64,
 	if err := update(&state, master); err != nil {
 		return err
 	}
+	compactRevokedProfiles(&state)
 	if at > state.LastObservedAt {
 		state.LastObservedAt = at
 	}
@@ -354,7 +361,7 @@ func validateState(state persistedState, master []byte) error {
 	seenProfiles := make(map[string]struct{}, len(state.Profiles))
 	for _, record := range state.Profiles {
 		if !validName(record.Name) || !validID(record.ProfileID) || !validID(record.ContentID) || record.Generation == 0 ||
-			len(record.Artifact) == 0 || record.CreatedAt <= 0 || record.ValidUntil <= record.CreatedAt {
+			len(record.Artifact) == 0 && !isRevokedProfileTombstone(record) || record.CreatedAt <= 0 || record.ValidUntil <= record.CreatedAt {
 			return ErrStateCorrupt
 		}
 		if err := validateProfileRecordV2(state, record); err != nil {

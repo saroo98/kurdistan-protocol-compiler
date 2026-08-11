@@ -204,8 +204,10 @@ func categorizeCLIError(err error) (string, int) {
 		return "recipient registry rejected", 4
 	case errors.Is(err, selfhost.ErrRecipientAuthority):
 		return "recipient authority rejected", 4
-	case errors.Is(err, selfhost.ErrAddressExhausted):
+	case errors.Is(err, selfhost.ErrAddressExhausted), errors.Is(err, selfhost.ErrCapacityExhausted):
 		return "capacity exhausted", 4
+	case errors.Is(err, selfhost.ErrArtifactUnavailable):
+		return "profile artifact unavailable", 4
 	case errors.Is(err, selfhost.ErrTLSUnavailable):
 		return "tls validity rejected", 4
 	case errors.Is(err, errOutputExists):
@@ -547,6 +549,9 @@ func runProfileShow(args []string, stdout io.Writer) error {
 	issued, err := selfhost.LoadProfile(*dataDir, *id)
 	if err != nil {
 		return err
+	}
+	if len(issued.Artifact) == 0 && (*outputDir != "" || *reveal != "summary") {
+		return selfhost.ErrArtifactUnavailable
 	}
 	if *outputDir != "" {
 		paths, writeErr := writeIssued(*outputDir, issued)

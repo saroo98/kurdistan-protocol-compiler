@@ -355,7 +355,7 @@
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt",
       "pre_sha256": "9accbaa216f67cac4b61f9e2ad34fdfec508e22cec894934e7afffafab349adb",
-      "post_sha256": "cc0b44254e94a71507529c9f393556e534bdfa08788cd534bdf884f5e9ec481b"
+      "post_sha256": "63660a874a2850b76d57922a308f43bc4fadcb17cb7b901e89849ea4f572fa0d"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
@@ -366,6 +366,16 @@
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/PendingRuntimeTermination.kt",
       "pre_evidence": "ABSENT",
       "post_sha256": "ec9952b5e91ce304e772c1ef17d26272a070236bf7972e9ad169db2ac6108d9a"
+    },
+    {
+      "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityHandoffService.kt",
+      "pre_sha256": "ce6c1d64a15cfb1c7753f9a649858a75ba359a1c7be0cd1a0d7e67791bec8318",
+      "post_sha256": "2b89f5250eafaaa4c63b28d9eb6bf1371ef4dbcfb5b0176c5cd0e8a9362ed5e8"
+    },
+    {
+      "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityTimeoutPolicy.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8421184fb04333c118f1bf93a26f6dcc3b2586080ad5aaaf485dc0a51bfb7f50"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitor.kt",
@@ -381,6 +391,11 @@
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/PendingRuntimeTerminationTest.kt",
       "pre_evidence": "ABSENT",
       "post_sha256": "4a61eadae4a27003abe397b75e7a1e31a17ac1257fbd0a744345d9173d969830"
+    },
+    {
+      "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityTimeoutPolicyTest.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8e1640cc25d21f6f74556c091be43e182259dd590ad2f7ebf54647553150a7e9"
     },
     {
       "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitorTest.kt",
@@ -545,12 +560,12 @@
     {
       "path": "cmd/kurdctl/main.go",
       "pre_sha256": "b7f7581ff05765511e76a9a6e8ebe30ee8e22b4bdbd1eb0c1a64ba09ea687540",
-      "post_sha256": "aef13b3ad93fc574557cf044376405589216d7c3cb1944fb863c02df2757a99d"
+      "post_sha256": "f94f5ce68f96e0a6d764668e40a15a1383cae218c0d7a66cee7659237c8b5ec6"
     },
     {
       "path": "cmd/kurdctl/main_test.go",
       "pre_sha256": "956ebf319f5124eb0e415b063ae732441b6ffbf475f3464faf78b059725798db",
-      "post_sha256": "c212fbf3ca7bc162a6ba24363f2ab5d4f19136409f315b1e58c675ec6750a145"
+      "post_sha256": "e2b3ebc8ea5848066343cbe73c72f298916c40e942524a39c604db5119448106"
     },
     {
       "path": "cmd/kurdpackage/main.go",
@@ -595,12 +610,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3a7b2d95d8d9033c63f94b6adcca9bb6e9d048573252838b3fca2ee16c43c1d0"
+      "post_sha256": "76bd468bbf75031e011ac9c0a791e823e3e1ef345308a38b9b444dcc59ec1b9f"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "9da2a594d6f9056da67af3e0684d632e642f00ef6619a671da3ee3e5972e8c9f"
+      "post_sha256": "e6917507fc1beca3102174396ec5789a9b6e2dae02ae0c922a1f8a12c73a5914"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -1290,7 +1305,7 @@
     {
       "path": "internal/selfhost/model.go",
       "pre_sha256": "5951d6524f24c28979f76c255ad203f6dc70fbcf7d14ed8baab85db1ddc21575",
-      "post_sha256": "a3dfd89db6af9fbe8199b2cb9a8e7542c1b369953345b9d5bf17f26d8c640152"
+      "post_sha256": "b71dd9f0aadb6a431536e080996c75f8f25a459681bda1ee4200a744d46c79da"
     },
     {
       "path": "internal/selfhost/private_path_other.go",
@@ -1325,17 +1340,17 @@
     {
       "path": "internal/selfhost/recipient_profile.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "4731e7a9181595528f5339cecdd7d8c7364f6ea4c426329a42a16b37976f5b28"
+      "post_sha256": "e9b41417e6517c93175a4fbdc9b31143a08d9eb91c4640a67ac50086ef8406bb"
     },
     {
       "path": "internal/selfhost/recipient_profile_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "93a23659d06e42d134abd45868cb10d3bc54cd101774540d56abda1435af81ff"
+      "post_sha256": "6e777d753dcb8421c1713516e58fdd4099d8d94f4b8b244d2e57a5dfa9dbf54a"
     },
     {
       "path": "internal/selfhost/recipient_registry.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "2ebcbc01db65dc275006d4a7faf7e304da4f4137333db0d53af01896494a88d0"
+      "post_sha256": "5fb9ba0bb61f1adef6d2cb856f3ffbd65096d32651604f171c80389b0287a735"
     },
     {
       "path": "internal/selfhost/recipient_registry_test.go",
@@ -1355,22 +1370,22 @@
     {
       "path": "internal/selfhost/service.go",
       "pre_sha256": "a121c83ef386a7e3b312ec3591dd12c9b53618baa54dbcfd30f6561bbf2a3bfb",
-      "post_sha256": "039eea8d54ad0116c5e35cc2df78a6dc6d98ef2c2a698db3b56c86760c2107ac"
+      "post_sha256": "20e9f59548acc953766f18f04c985f21cb8ca36fd034729ed8eaf8e97f41da3a"
     },
     {
       "path": "internal/selfhost/service_test.go",
       "pre_sha256": "2ff7715121c7925b852696ff9fc14f690af640cf90b1c2e1551986e5c3bdcdc1",
-      "post_sha256": "da72902e6eb449744b9702616850690d71f0c52049a8c06c8238d97b7bc964cb"
+      "post_sha256": "0ec10987375276080aaaa573e525a4a4851de82872e21a3484eb9f88c65ffb19"
     },
     {
       "path": "internal/selfhost/state_v2_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8952dd73862fada510c2bdb0d6ddcc618d61f5fc24f783f5ee9100950a6cabb3"
+      "post_sha256": "945dbe7e8f2917446e9ed6b60857b2880ac83358319ff00e5c11f2416b90b1c5"
     },
     {
       "path": "internal/selfhost/store.go",
       "pre_sha256": "ed4dce66246ca58060133de738d99843c312364ba7dda71fb0def4f65040d6fe",
-      "post_sha256": "baabb3df86950a6a3bb685d7a9de9daf83634f4e8781ce07dacc45994f4552be"
+      "post_sha256": "60a96723e0013398170c7e4357f82b9d2d9923d67635d68166438178fe3a2184"
     },
     {
       "path": "internal/selfhost/testdata/phase16-v1/backup.kurd-backup",

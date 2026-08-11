@@ -315,6 +315,154 @@ func TestRotateAndRevokeLiveProfileInvalidatePriorArtifacts(t *testing.T) {
 	}
 }
 
+func TestRevokeLiveProfileCompactsStoredArtifactAndPreservesSummary(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	recoveryPath := filepath.Join(filepath.Dir(dataDir), "recovery.kurd-recovery")
+	registryDir := filepath.Join(t.TempDir(), "registry")
+	now := time.Unix(1_760_200_000, 0).UTC()
+	passphrase := []byte("state v2 test recovery passphrase")
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	request, private, err := enrollment.Generate(now, time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(private)
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := CreateProfile(dataDir, CreateProfileOptions{
+		Name: "disposable-phone", ValidFor: 24 * time.Hour, Now: now,
+		RecipientRequest: requestBytes, LiveProgram: testLiveProgramV1(t, 1711), RegistryDir: registryDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(filepath.Join(dataDir, stateFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RevokeProfile(dataDir, RevokeProfileOptions{
+		ProfileID: issued.ProfileID, RecoveryPath: recoveryPath, RecoveryPassphrase: passphrase, Now: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	record := state.Profiles[profileIndex(state.Profiles, issued.ProfileID)]
+	if !record.Revoked || len(record.Artifact) != 0 || len(record.RuntimePolicy) != 0 ||
+		len(record.RecipientPublic) != 0 || len(record.ClientAuthPublic) != 0 ||
+		len(record.RelayAdmissionDigest) != 0 || len(record.AssignedIPv4) != 0 || len(record.AssignedIPv6) != 0 {
+		t.Fatalf("revoked live record retained sensitive or bulky material: %+v", record)
+	}
+	stored, err := LoadProfile(dataDir, issued.ProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stored.Revoked || stored.Connectable || !stored.Sealed || len(stored.Artifact) != 0 || stored.URI != "" || len(stored.QRChunks) != 0 {
+		t.Fatalf("revoked summary=%+v", stored)
+	}
+	after, err := os.Stat(filepath.Join(dataDir, stateFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Size() >= before.Size() {
+		t.Fatalf("revocation did not compact state: before=%d after=%d", before.Size(), after.Size())
+	}
+}
+
+func TestFailedCapacityTransactionDoesNotConsumeRecipientCapability(t *testing.T) {
+	dataDir, recoveryPath, passphrase := initializedV2TestState(t)
+	registryDir := filepath.Join(t.TempDir(), "registry")
+	now := time.Unix(1_760_300_000, 0).UTC()
+	if err := ConfirmRecovery(dataDir, recoveryPath, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	padding, err := CreateProfile(dataDir, CreateProfileOptions{Name: "capacity-padding", ValidFor: 24 * time.Hour, Now: now.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := profileIndex(state.Profiles, padding.ProfileID)
+	if index < 0 {
+		zero(master)
+		t.Fatal("padding profile missing")
+	}
+	originalArtifact := bytes.Clone(state.Profiles[index].Artifact)
+	low, high, best := 1, maxStateBytes, 0
+	for low <= high {
+		middle := low + (high-low)/2
+		state.Profiles[index].Artifact = bytes.Repeat([]byte{0x42}, middle)
+		payload, encodeErr := encodeCanonical(state)
+		if encodeErr != nil {
+			zero(master)
+			t.Fatal(encodeErr)
+		}
+		envelope, encodeErr := encodeCanonical(stateEnvelope{Version: stateVersionV2, Payload: payload, MAC: stateMACV2(master, payload)})
+		if encodeErr != nil {
+			zero(master)
+			t.Fatal(encodeErr)
+		}
+		if len(envelope) <= maxStateBytes-1024 {
+			best = middle
+			low = middle + 1
+		} else {
+			high = middle - 1
+		}
+	}
+	if best == 0 {
+		zero(master)
+		t.Fatal("could not construct near-capacity state")
+	}
+	state.Profiles[index].Artifact = bytes.Repeat([]byte{0x42}, best)
+	if err := saveState(dataDir, master, state); err != nil {
+		zero(master)
+		t.Fatal(err)
+	}
+	zero(master)
+
+	request, private, err := enrollment.Generate(now.Add(2*time.Second), time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearEnrollmentPrivate(private)
+	requestBytes, err := enrollment.EncodeRequestV1(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := CreateProfileOptions{
+		Name: "capacity-failed", ValidFor: 24 * time.Hour, Now: now.Add(2 * time.Second),
+		RecipientRequest: requestBytes, LiveProgram: testLiveProgramV1(t, 1712), RegistryDir: registryDir,
+	}
+	if _, err := CreateProfile(dataDir, options); !errors.Is(err, ErrCapacityExhausted) {
+		t.Fatalf("near-capacity create error = %v, want capacity exhausted", err)
+	}
+	state, master, err = loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index = profileIndex(state.Profiles, padding.ProfileID)
+	state.Profiles[index].Artifact = originalArtifact
+	if err := saveState(dataDir, master, state); err != nil {
+		zero(master)
+		t.Fatal(err)
+	}
+	zero(master)
+	options.Name = "capacity-retry"
+	options.Now = now.Add(3 * time.Second)
+	if _, err := CreateProfile(dataDir, options); err != nil {
+		t.Fatalf("recipient capability remained consumed after rolled-back state transaction: %v", err)
+	}
+}
+
 type exactRecipientResolver struct{ binding profile.RecipientBinding }
 
 func testLiveProgramV1(t *testing.T, seed int64) []byte {
