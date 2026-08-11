@@ -71,6 +71,9 @@ else
 fi
 [ ! -f "$previous/unbound/kurd-node.conf" ] || unbound-checkconf "$previous/unbound/kurd-node.conf" >/dev/null || fail PREVIOUS_UNBOUND_INVALID
 [ ! -f "$previous/nftables/kurd-node.nft" ] || nft -c -f "$previous/nftables/kurd-node.nft" >/dev/null || fail PREVIOUS_NFT_INVALID
+if [ "$previous_state_version" = "2" ] && [ -f /var/lib/kurd-node/state.kurd-state ]; then
+  runuser -u kurd-node -- "$previous/bin/kurdctl" doctor --data-dir /var/lib/kurd-node >/dev/null || fail PREVIOUS_DOCTOR_FAILED
+fi
 
 systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
 if [ -x /usr/local/lib/kurd-node/firewall-compat.sh ]; then
