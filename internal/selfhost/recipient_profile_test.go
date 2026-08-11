@@ -355,10 +355,22 @@ func TestRevokeLiveProfileCompactsStoredArtifactAndPreservesSummary(t *testing.T
 	}
 	defer zero(master)
 	record := state.Profiles[profileIndex(state.Profiles, issued.ProfileID)]
-	if !record.Revoked || len(record.Artifact) != 0 || len(record.RuntimePolicy) != 0 ||
+	if !record.Revoked || record.Mode != profileModeAuthorityOnly || !bytes.Equal(record.Artifact, []byte("KRT1L")) || len(record.RuntimePolicy) != 0 ||
 		len(record.RecipientPublic) != 0 || len(record.ClientAuthPublic) != 0 ||
 		len(record.RelayAdmissionDigest) != 0 || len(record.AssignedIPv4) != 0 || len(record.AssignedIPv6) != 0 {
 		t.Fatalf("revoked live record retained sensitive or bulky material: %+v", record)
+	}
+	if _, err := decodeBundle(record.Artifact); err == nil {
+		t.Fatal("revoked tombstone marker decoded as an exportable profile bundle")
+	}
+	// Commit 5986a's state-v2 reader required a non-empty artifact and accepted
+	// authority-only records only when every live-only field was empty. Keep
+	// this exact compatibility boundary so package rollback can still run its
+	// old doctor before reinstalling the corrected package.
+	if len(record.Artifact) == 0 || record.Mode != profileModeAuthorityOnly || !recipientRecordEmpty(record.Recipient) ||
+		len(record.RecipientPublic) != 0 || record.ClientAuthKeyID != "" || len(record.ClientAuthPublic) != 0 ||
+		len(record.RuntimePolicy) != 0 || len(record.RelayAdmissionDigest) != 0 || len(record.AssignedIPv4) != 0 || len(record.AssignedIPv6) != 0 {
+		t.Fatal("revoked tombstone violates the previous state-v2 reader contract")
 	}
 	stored, err := LoadProfile(dataDir, issued.ProfileID)
 	if err != nil {
@@ -373,6 +385,27 @@ func TestRevokeLiveProfileCompactsStoredArtifactAndPreservesSummary(t *testing.T
 	}
 	if after.Size() >= before.Size() {
 		t.Fatalf("revocation did not compact state: before=%d after=%d", before.Size(), after.Size())
+	}
+
+	// Build 04a5aae briefly wrote empty-artifact tombstones. A corrected node
+	// must load that exact fail-closed form and rewrite it to the marker accepted
+	// by the immediately previous state-v2 reader on the next transaction.
+	state.Profiles[profileIndex(state.Profiles, issued.ProfileID)].Mode = profileModeLive
+	state.Profiles[profileIndex(state.Profiles, issued.ProfileID)].Artifact = nil
+	if err := saveState(dataDir, master, state); err != nil {
+		t.Fatalf("save legacy empty tombstone: %v", err)
+	}
+	if err := SetDrained(dataDir, true, now.Add(3*time.Minute)); err != nil {
+		t.Fatalf("upgrade legacy empty tombstone: %v", err)
+	}
+	upgraded, upgradedMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(upgradedMaster)
+	upgradedRecord := upgraded.Profiles[profileIndex(upgraded.Profiles, issued.ProfileID)]
+	if upgradedRecord.Mode != profileModeAuthorityOnly || !bytes.Equal(upgradedRecord.Artifact, []byte("KRT1L")) {
+		t.Fatalf("legacy empty tombstone was not rewritten for rollback compatibility: %+v", upgradedRecord)
 	}
 }
 

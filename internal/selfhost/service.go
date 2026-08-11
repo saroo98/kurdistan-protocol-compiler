@@ -918,9 +918,10 @@ func LoadProfile(dataDir, profileID string) (IssuedProfile, error) {
 	}
 	record := state.Profiles[index]
 	if isRevokedProfileTombstone(record) {
+		mode := revokedProfileOriginalMode(record)
 		return IssuedProfile{
 			ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation, ValidUntil: record.ValidUntil,
-			Mode: record.Mode, Sealed: record.Mode == profileModeLive, Connectable: false, Revoked: true,
+			Mode: mode, Sealed: mode == profileModeLive, Connectable: false, Revoked: true,
 		}, nil
 	}
 	uri, err := envelope.EncodeArtifactURI(record.Artifact)

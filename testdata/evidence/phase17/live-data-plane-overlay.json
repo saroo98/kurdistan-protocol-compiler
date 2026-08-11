@@ -1340,12 +1340,12 @@
     {
       "path": "internal/selfhost/recipient_profile.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e9b41417e6517c93175a4fbdc9b31143a08d9eb91c4640a67ac50086ef8406bb"
+      "post_sha256": "0e64b7f806385c1c7444a44fb14b54844e6c2167e9a84218c9a657fef3f29124"
     },
     {
       "path": "internal/selfhost/recipient_profile_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6e777d753dcb8421c1713516e58fdd4099d8d94f4b8b244d2e57a5dfa9dbf54a"
+      "post_sha256": "27487e607987a9164566157faf22695c6b1fbbf663c15782bd7470a6f0dd0cb3"
     },
     {
       "path": "internal/selfhost/recipient_registry.go",
@@ -1370,7 +1370,7 @@
     {
       "path": "internal/selfhost/service.go",
       "pre_sha256": "a121c83ef386a7e3b312ec3591dd12c9b53618baa54dbcfd30f6561bbf2a3bfb",
-      "post_sha256": "20e9f59548acc953766f18f04c985f21cb8ca36fd034729ed8eaf8e97f41da3a"
+      "post_sha256": "16b1e461837c322054dba5f2a9164e6ce350a956f06231970bc02010e435f3de"
     },
     {
       "path": "internal/selfhost/service_test.go",

@@ -338,6 +338,11 @@ func validateProfileRecordV2(state persistedState, record profileRecord) error {
 	}
 }
 
+const (
+	revokedAuthorityTombstoneArtifact = "KRT1A"
+	revokedLiveTombstoneArtifact      = "KRT1L"
+)
+
 func compactRevokedProfiles(state *persistedState) {
 	if state == nil {
 		return
@@ -347,7 +352,20 @@ func compactRevokedProfiles(state *persistedState) {
 		if !record.Revoked {
 			continue
 		}
-		record.Artifact = nil
+		originalMode := revokedProfileOriginalMode(*record)
+		zero(record.Artifact)
+		zero(record.RecipientPublic)
+		zero(record.ClientAuthPublic)
+		zero(record.RuntimePolicy)
+		zero(record.RelayAdmissionDigest)
+		zero(record.AssignedIPv4)
+		zero(record.AssignedIPv6)
+		record.Mode = profileModeAuthorityOnly
+		if originalMode == profileModeLive {
+			record.Artifact = []byte(revokedLiveTombstoneArtifact)
+		} else {
+			record.Artifact = []byte(revokedAuthorityTombstoneArtifact)
+		}
 		record.Recipient = recipientBindingRecord{}
 		record.RecipientPublic = nil
 		record.ClientAuthKeyID = ""
@@ -360,10 +378,18 @@ func compactRevokedProfiles(state *persistedState) {
 }
 
 func isRevokedProfileTombstone(record profileRecord) bool {
-	return record.Revoked && (record.Mode == profileModeAuthorityOnly || record.Mode == profileModeLive) &&
-		len(record.Artifact) == 0 && recipientRecordEmpty(record.Recipient) && len(record.RecipientPublic) == 0 &&
+	marker := len(record.Artifact) == 0 && (record.Mode == profileModeAuthorityOnly || record.Mode == profileModeLive) ||
+		record.Mode == profileModeAuthorityOnly && (string(record.Artifact) == revokedAuthorityTombstoneArtifact || string(record.Artifact) == revokedLiveTombstoneArtifact)
+	return record.Revoked && marker && recipientRecordEmpty(record.Recipient) && len(record.RecipientPublic) == 0 &&
 		record.ClientAuthKeyID == "" && len(record.ClientAuthPublic) == 0 && len(record.RuntimePolicy) == 0 &&
 		len(record.RelayAdmissionDigest) == 0 && len(record.AssignedIPv4) == 0 && len(record.AssignedIPv6) == 0
+}
+
+func revokedProfileOriginalMode(record profileRecord) string {
+	if record.Mode == profileModeLive || string(record.Artifact) == revokedLiveTombstoneArtifact {
+		return profileModeLive
+	}
+	return profileModeAuthorityOnly
 }
 
 func validateLiveProfileRecord(state persistedState, record profileRecord) error {
