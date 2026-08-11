@@ -4,6 +4,10 @@
 package org.kurdistanvpn.app
 
 import androidx.test.platform.app.InstrumentationRegistry
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -51,7 +55,9 @@ internal object Phase17FieldHarness {
     private const val ARG_EXPECTED_RESPONSE_SHA256 = "phase17ExpectedResponseSha256"
     private const val ARG_DNS_FAMILY = "phase17DnsFamily"
     private const val ARG_EXPECT_DNS_AVAILABLE = "phase17ExpectDnsAvailable"
+    private const val ARG_VERIFY_IPV6 = "phase17VerifyIPv6"
     private const val MAX_PROBE_RESPONSE_BYTES = 64
+    private const val VPN_NETWORK_READY_TIMEOUT_MILLIS = 10_000L
 
     internal fun isExpectedDnsUnavailableFailure(
         expectAvailable: Boolean,
@@ -99,6 +105,19 @@ internal object Phase17FieldHarness {
             "import-profile" -> importProfile(root, fieldRoot)
             "connect" -> connect(application, root, fieldRoot, shouldVerifyDataPlane = false)
             "data-plane" -> connect(application, root, fieldRoot, shouldVerifyDataPlane = true)
+            "traffic" -> {
+                val verifyIPv6 = InstrumentationRegistry.getArguments()
+                    .getString(ARG_VERIFY_IPV6)
+                    ?.toBooleanStrictOrNull()
+                    ?: error("DNS_EXPECTATION_REJECTED")
+                connect(
+                    application,
+                    root,
+                    fieldRoot,
+                    shouldVerifyDataPlane = true,
+                    trafficDnsFamilies = if (verifyIPv6) listOf(4, 6) else listOf(4),
+                )
+            }
             "dns-probe" -> {
                 val arguments = InstrumentationRegistry.getArguments()
                 val family = arguments.getString(ARG_DNS_FAMILY)?.toIntOrNull()
@@ -194,6 +213,7 @@ internal object Phase17FieldHarness {
         shouldVerifyDataPlane: Boolean,
         dnsFamily: Int? = null,
         expectDnsAvailable: Boolean = true,
+        trafficDnsFamilies: List<Int> = emptyList(),
     ) {
         val coordinators = Phase13Coordinators.create(root)
         val localRecordId = root.settingsStore.settings.first().profiles.activeLocalRecordId
@@ -269,19 +289,30 @@ internal object Phase17FieldHarness {
             check(snapshot.maxReconnectAttempts in 1..5) {
                 "LIVE_RECONNECT_POLICY_MISSING"
             }
-            if (shouldVerifyDataPlane || dnsFamily != null) {
-                delay(1_000)
+            if (shouldVerifyDataPlane || dnsFamily != null || trafficDnsFamilies.isNotEmpty()) {
+                val requiredDnsFamilies = when {
+                    trafficDnsFamilies.isNotEmpty() -> trafficDnsFamilies
+                    dnsFamily != null -> listOf(dnsFamily)
+                    else -> listOf(4)
+                }
+                val vpnNetwork = awaitVerifiedVpnNetwork(application, requiredDnsFamilies)
                 val stable = controller.snapshot.value
                 check(stable.state == VpnRuntimeState.ACTIVE_KURD_LIVE) {
                     "LIVE_RUNTIME_UNSTABLE:${stable.failure ?: stable.state.name}:" +
                         (stable.packetDisposition ?: "NONE")
                 }
                 try {
-                    if (dnsFamily == null) {
-                        verifyDataPlane()
+                    if (trafficDnsFamilies.isNotEmpty()) {
+                        trafficDnsFamilies.forEach { family ->
+                            verifyDnsPlane(vpnNetwork, family, expectAvailable = true)
+                        }
+                        verifyDataPlane(vpnNetwork)
+                        writeAtomic(File(fieldRoot, RESULT), "TRAFFIC_VERIFIED\n".encodeToByteArray())
+                    } else if (dnsFamily == null) {
+                        verifyDataPlane(vpnNetwork)
                         writeAtomic(File(fieldRoot, RESULT), "DATA_PLANE_VERIFIED\n".encodeToByteArray())
                     } else {
-                        verifyDnsPlane(dnsFamily, expectDnsAvailable)
+                        verifyDnsPlane(vpnNetwork, dnsFamily, expectDnsAvailable)
                         val outcome = if (expectDnsAvailable) "VERIFIED" else "FAIL_CLOSED"
                         writeAtomic(
                             File(fieldRoot, RESULT),
@@ -330,7 +361,38 @@ internal object Phase17FieldHarness {
         }
     }
 
-    private suspend fun verifyDataPlane() = withContext(Dispatchers.IO) {
+    private suspend fun awaitVerifiedVpnNetwork(
+        context: Context,
+        requiredDnsFamilies: List<Int>,
+    ): Network {
+        require(requiredDnsFamilies.isNotEmpty() && requiredDnsFamilies.all { it == 4 || it == 6 }) {
+            "DNS_FAMILY_REJECTED"
+        }
+        val expectedDns = requiredDnsFamilies.map { family ->
+            InetAddress.getByName(if (family == 4) "10.77.0.1" else "fd4b:7572:6400::1")
+        }.toSet()
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        return withTimeoutOrNull(VPN_NETWORK_READY_TIMEOUT_MILLIS) {
+            while (true) {
+                val network = connectivity.activeNetwork
+                val capabilities = network?.let(connectivity::getNetworkCapabilities)
+                val properties = network?.let(connectivity::getLinkProperties)
+                if (
+                    network != null &&
+                    capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true &&
+                    properties != null &&
+                    properties.dnsServers.containsAll(expectedDns)
+                ) {
+                    return@withTimeoutOrNull network
+                }
+                delay(50)
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
+        } ?: error("VPN_NETWORK_NOT_READY")
+    }
+
+    private suspend fun verifyDataPlane(vpnNetwork: Network) = withContext(Dispatchers.IO) {
         val arguments = InstrumentationRegistry.getArguments()
         val rawUrl = arguments.getString(ARG_PROBE_URL)?.trim().orEmpty()
         val expectedDigest = arguments.getString(ARG_EXPECTED_RESPONSE_SHA256)?.trim().orEmpty()
@@ -340,7 +402,7 @@ internal object Phase17FieldHarness {
             rawUrl.length in 1..2048 && uri.scheme == "https" && !uri.host.isNullOrBlank() &&
                 uri.host.any(Char::isLetter) && uri.userInfo == null && uri.fragment == null,
         ) { "PROBE_URL_REJECTED" }
-        val connection = (uri.toURL().openConnection() as HttpURLConnection).apply {
+        val connection = (vpnNetwork.openConnection(uri.toURL()) as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 10_000
             instanceFollowRedirects = false
@@ -373,7 +435,11 @@ internal object Phase17FieldHarness {
         }
     }
 
-    private suspend fun verifyDnsPlane(family: Int, expectAvailable: Boolean) =
+    private suspend fun verifyDnsPlane(
+        vpnNetwork: Network,
+        family: Int,
+        expectAvailable: Boolean,
+    ) =
         withContext(Dispatchers.IO) {
             require(family == 4 || family == 6) { "DNS_FAMILY_REJECTED" }
             val server = InetAddress.getByName(
@@ -385,6 +451,7 @@ internal object Phase17FieldHarness {
             try {
                 runDnsExchange(expectAvailable) {
                     DatagramSocket().use { socket ->
+                        vpnNetwork.bindSocket(socket)
                         socket.soTimeout = 5_000
                         socket.send(DatagramPacket(query, query.size, server, 53))
                         val packet = DatagramPacket(response, response.size)

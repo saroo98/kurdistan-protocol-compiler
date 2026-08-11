@@ -414,41 +414,91 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 	}
 }
 
-func TestVerifyFieldTrafficProvesExplicitTunnelDNSBeforeHostnameDataPlane(t *testing.T) {
-	var actions []string
-	var activeAction string
-	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
-		if name != "adb" {
-			return nil, fmt.Errorf("unexpected command %q", name)
-		}
-		for index, argument := range arguments {
-			if argument == "phase17FieldAction" && index+1 < len(arguments) {
-				activeAction = arguments[index+1]
-				actions = append(actions, activeAction)
-				return []byte("OK (1 test)\n"), nil
+func TestVerifyFieldTrafficProvesTunnelDNSAndHostnameDataPlaneInOneVpnSession(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		ipv6Authorized bool
+		wantIPv6       string
+	}{
+		{name: "IPv4 only", wantIPv6: "false"},
+		{name: "dual stack", ipv6Authorized: true, wantIPv6: "true"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var actions []string
+			var activeAction string
+			var instrumentationArguments []string
+			runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+				if name != "adb" {
+					return nil, fmt.Errorf("unexpected command %q", name)
+				}
+				for index, argument := range arguments {
+					if argument == "phase17FieldAction" && index+1 < len(arguments) {
+						activeAction = arguments[index+1]
+						actions = append(actions, activeAction)
+						instrumentationArguments = append([]string(nil), arguments...)
+						return []byte("OK (1 test)\n"), nil
+					}
+				}
+				if len(arguments) >= 6 && arguments[2] == "shell" && arguments[3] == "run-as" && arguments[5] == "cat" {
+					if activeAction == "traffic" {
+						return []byte("TRAFFIC_VERIFIED\n"), nil
+					}
+					return nil, errors.New("field action unavailable")
+				}
+				return []byte(""), nil
+			}}
+			value := config{adbPath: "adb"}
+			if err := verifyFieldTraffic(
+				context.Background(), runner, value, "", "emulator-5554",
+				[]byte("https://probe.example/"), []byte(strings.Repeat("0", 64)), test.ipv6Authorized,
+			); err != nil {
+				t.Fatal(err)
 			}
-		}
-		if len(arguments) >= 6 && arguments[2] == "shell" && arguments[3] == "run-as" && arguments[5] == "cat" {
-			switch activeAction {
-			case "dns-probe":
-				return []byte("DNS_IPV4_VERIFIED\n"), nil
-			case "data-plane":
-				return []byte("DATA_PLANE_VERIFIED\n"), nil
-			default:
-				return nil, errors.New("field action unavailable")
+			if want := []string{"traffic"}; !reflect.DeepEqual(actions, want) {
+				t.Fatalf("actions=%v, want %v", actions, want)
 			}
+			for key, want := range map[string]string{
+				"phase17ProbeUrl":               "https://probe.example/",
+				"phase17ExpectedResponseSha256": strings.Repeat("0", 64),
+				"phase17VerifyIPv6":             test.wantIPv6,
+			} {
+				if !instrumentationExtraEquals(instrumentationArguments, key, want) {
+					t.Fatalf("instrumentation extra %s=%q missing from %q", key, want, instrumentationArguments)
+				}
+			}
+		})
+	}
+}
+
+func instrumentationExtraEquals(arguments []string, key, want string) bool {
+	for index := 0; index+2 < len(arguments); index++ {
+		if arguments[index] == "-e" && arguments[index+1] == key && arguments[index+2] == want {
+			return true
 		}
-		return []byte(""), nil
-	}}
-	value := config{adbPath: "adb"}
-	if err := verifyFieldTraffic(
-		context.Background(), runner, value, "", "emulator-5554",
-		[]byte("https://probe.example/"), []byte(strings.Repeat("0", 64)), false,
-	); err != nil {
+	}
+	return false
+}
+
+func TestFieldHarnessBindsDNSAndHostnameTrafficToTheSameVerifiedVpnNetwork(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "app", "src", "androidTest", "kotlin",
+		"org", "kurdistanvpn", "app", "Phase17FieldHarness.kt",
+	))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"dns-probe", "data-plane"}; !reflect.DeepEqual(actions, want) {
-		t.Fatalf("actions=%v, want %v", actions, want)
+	for _, required := range [][]byte{
+		[]byte(`"traffic" ->`),
+		[]byte(`"TRAFFIC_VERIFIED\n"`),
+		[]byte("vpnNetwork.bindSocket(socket)"),
+		[]byte("vpnNetwork.openConnection(uri.toURL())"),
+	} {
+		if !bytes.Contains(source, required) {
+			t.Fatalf("field harness missing same-session VPN binding %q", required)
+		}
+	}
+	if bytes.Contains(source, []byte("uri.toURL().openConnection()")) {
+		t.Fatal("hostname probe still relies on asynchronous process-default network selection")
 	}
 }
 
