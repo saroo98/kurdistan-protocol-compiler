@@ -122,11 +122,22 @@ func TestNativeShellAssetsRemainFailClosedAndSecretSafe(t *testing.T) {
 	}
 	rollbackText := string(rollback)
 	validationAt := strings.Index(rollbackText, "PREVIOUS_NFT_INVALID")
-	previousDoctorAt := strings.Index(rollbackText, `"$previous/bin/kurdctl" doctor`)
+	previousDoctorAt := strings.Index(rollbackText, `"$previous_doctor" doctor`)
 	stopAt := strings.Index(rollbackText, "systemctl stop kurd-node.socket")
 	migrationAt := strings.Index(rollbackText, "kurdctl migration rollback")
 	if validationAt < 0 || previousDoctorAt < 0 || stopAt < 0 || migrationAt < 0 || !(validationAt < previousDoctorAt && previousDoctorAt < stopAt && stopAt < migrationAt) {
 		t.Fatal("rollback must validate the previous package, stop live writers, then mutate state")
+	}
+	for _, required := range []string{
+		`install -o root -g kurd-node -m 0750 "$previous/bin/kurdctl" "$previous_doctor"`,
+		`runuser -u kurd-node -- "$previous_doctor" doctor --data-dir /var/lib/kurd-node`,
+	} {
+		if !strings.Contains(rollbackText, required) {
+			t.Fatalf("rollback previous-state preflight missing %q", required)
+		}
+	}
+	if strings.Contains(rollbackText, `runuser -u kurd-node -- "$previous/bin/kurdctl"`) {
+		t.Fatal("rollback cannot execute the previous binary through the root-only snapshot path")
 	}
 	installScript, err := os.ReadFile(filepath.Join(native, "install.sh"))
 	if err != nil {
