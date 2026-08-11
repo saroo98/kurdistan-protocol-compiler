@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +20,49 @@ import (
 	"kurdistan/internal/relay/node"
 	"kurdistan/internal/selfhost"
 )
+
+func TestExchangeRelayRuntimeAllowsBoundedSlowResponse(t *testing.T) {
+	client, server := net.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		defer server.Close()
+		requestWire := make([]byte, 10)
+		if _, err := io.ReadFull(server, requestWire); err != nil {
+			done <- err
+			return
+		}
+		request, err := node.DecodeControlRequestV1(requestWire)
+		if err != nil {
+			done <- err
+			return
+		}
+		if request.Command != node.ControlReloadV1 {
+			done <- errors.New("unexpected control command")
+			return
+		}
+		time.Sleep(1200 * time.Millisecond)
+		responseWire, err := node.EncodeControlResponseV1(node.ControlResponseV1{
+			OK: true, Code: node.ControlCodeOKV1,
+			Health: node.HealthSnapshot{State: node.HealthReady, AcceptingSessions: true},
+		})
+		if err == nil {
+			_, err = server.Write(responseWire)
+		}
+		done <- err
+	}()
+
+	started := time.Now()
+	response, err := exchangeRelayRuntimeV1(client, node.ControlRequestV1{Command: node.ControlReloadV1})
+	if err != nil || !response.OK || response.Code != node.ControlCodeOKV1 {
+		t.Fatalf("bounded slow response rejected: response=%+v err=%v", response, err)
+	}
+	if elapsed := time.Since(started); elapsed < time.Second || elapsed > runtimeControlContextTimeoutV1 {
+		t.Fatalf("unexpected exchange duration %s", elapsed)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("server exchange: %v", err)
+	}
+}
 
 func TestCLIEndToEndUsesStdinPassphrasesAndExclusiveOutputs(t *testing.T) {
 	base := t.TempDir()
