@@ -33,6 +33,12 @@ const version = "kurdctl-phase17-v1"
 
 const defaultControlSocketV1 = "/run/kurd-node/control.sock"
 
+const (
+	runtimeControlDialTimeoutV1     = time.Second
+	runtimeControlExchangeTimeoutV1 = 3 * time.Second
+	runtimeControlContextTimeoutV1  = 4 * time.Second
+)
+
 var (
 	errCLIInvalidInput  = selfhost.ErrInvalidInput
 	errRequestRejected  = errors.New("request rejected")
@@ -760,13 +766,13 @@ func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, required b
 	if err != nil || info == nil || info.Mode()&os.ModeSocket == 0 {
 		return errors.Join(node.ErrControlConfig, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	connection, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", path)
+	dialContext, cancelDial := context.WithTimeout(context.Background(), runtimeControlDialTimeoutV1)
+	defer cancelDial()
+	connection, err := (&net.Dialer{Timeout: runtimeControlDialTimeoutV1}).DialContext(dialContext, "unix", path)
 	if err != nil {
 		return errors.Join(node.ErrControlConfig, err)
 	}
-	response, err := node.ExchangeControlV1(ctx, connection, request, time.Second)
+	response, err := exchangeRelayRuntimeV1(connection, request)
 	if err != nil {
 		return err
 	}
@@ -774,6 +780,12 @@ func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, required b
 		return node.ErrControlProtocol
 	}
 	return nil
+}
+
+func exchangeRelayRuntimeV1(connection net.Conn, request node.ControlRequestV1) (node.ControlResponseV1, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), runtimeControlContextTimeoutV1)
+	defer cancel()
+	return node.ExchangeControlV1(ctx, connection, request, runtimeControlExchangeTimeoutV1)
 }
 
 func runClock(args []string, stdin io.Reader, stdout io.Writer) error {
