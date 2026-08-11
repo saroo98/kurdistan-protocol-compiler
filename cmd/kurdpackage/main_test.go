@@ -122,9 +122,10 @@ func TestNativeShellAssetsRemainFailClosedAndSecretSafe(t *testing.T) {
 	}
 	rollbackText := string(rollback)
 	validationAt := strings.Index(rollbackText, "PREVIOUS_NFT_INVALID")
+	previousDoctorAt := strings.Index(rollbackText, `"$previous/bin/kurdctl" doctor`)
 	stopAt := strings.Index(rollbackText, "systemctl stop kurd-node.socket")
 	migrationAt := strings.Index(rollbackText, "kurdctl migration rollback")
-	if validationAt < 0 || stopAt < 0 || migrationAt < 0 || !(validationAt < stopAt && stopAt < migrationAt) {
+	if validationAt < 0 || previousDoctorAt < 0 || stopAt < 0 || migrationAt < 0 || !(validationAt < previousDoctorAt && previousDoctorAt < stopAt && stopAt < migrationAt) {
 		t.Fatal("rollback must validate the previous package, stop live writers, then mutate state")
 	}
 	installScript, err := os.ReadFile(filepath.Join(native, "install.sh"))
