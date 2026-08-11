@@ -355,7 +355,7 @@
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt",
       "pre_sha256": "9accbaa216f67cac4b61f9e2ad34fdfec508e22cec894934e7afffafab349adb",
-      "post_sha256": "bb75c76ac6aa0f9ea9fd6e8bb85bee8b1689a1824220cc473d6f0571a34a5f61"
+      "post_sha256": "c9528270d709844faade101e43b0a62d6b07f0f1487f4815917f8463b72a1930"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
@@ -615,7 +615,7 @@
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "dfe10a33a6031b9e9de16ba81fe30abf899f362020034816556fb9ad21b3e91d"
+      "post_sha256": "897c253e57e9b9f98f91c07082a81f23a420f24070c3ef9d865bc2109ceacc8f"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
