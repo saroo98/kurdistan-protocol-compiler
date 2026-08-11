@@ -63,7 +63,8 @@ systemctl is-active --quiet kurd-node.service && was_service_active=true || true
 systemctl is-enabled --quiet kurd-node.socket && was_socket_enabled=true || true
 
 temporary=$(mktemp -d /var/tmp/kurd-node-rollback.XXXXXX)
-trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+previous_doctor=$(mktemp /var/tmp/kurd-node-previous-doctor.XXXXXX)
+trap 'rm -rf "$temporary"; rm -f "$previous_doctor"' EXIT HUP INT TERM
 if [ -f "$previous/systemd/kurd-node.socket" ]; then
   systemd-analyze verify "$previous/systemd/kurd-node.service" "$previous/systemd/kurd-node.socket" >/dev/null || fail PREVIOUS_SYSTEMD_INVALID
 else
@@ -72,7 +73,8 @@ fi
 [ ! -f "$previous/unbound/kurd-node.conf" ] || unbound-checkconf "$previous/unbound/kurd-node.conf" >/dev/null || fail PREVIOUS_UNBOUND_INVALID
 [ ! -f "$previous/nftables/kurd-node.nft" ] || nft -c -f "$previous/nftables/kurd-node.nft" >/dev/null || fail PREVIOUS_NFT_INVALID
 if [ "$previous_state_version" = "2" ] && [ -f /var/lib/kurd-node/state.kurd-state ]; then
-  runuser -u kurd-node -- "$previous/bin/kurdctl" doctor --data-dir /var/lib/kurd-node >/dev/null || fail PREVIOUS_DOCTOR_FAILED
+  install -o root -g kurd-node -m 0750 "$previous/bin/kurdctl" "$previous_doctor"
+  runuser -u kurd-node -- "$previous_doctor" doctor --data-dir /var/lib/kurd-node >/dev/null || fail PREVIOUS_DOCTOR_FAILED
 fi
 
 systemctl stop kurd-node.socket kurd-node.service kurd-node-network.service 2>/dev/null || true
@@ -168,5 +170,6 @@ fi
 
 trap - EXIT HUP INT TERM
 rm -rf "$temporary"
+rm -f "$previous_doctor"
 printf '{"schema":"kurd-node-rollback-v2","rolledBack":true,"authorityStateRolledBack":%s,"stateVersion":%s}\n' \
   "$( [ "$previous_state_version" = "1" ] && printf true || printf false )" "$previous_state_version"
