@@ -29,6 +29,9 @@ func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.
 		for _, required := range []string{
 			"sudo -n systemctl start kurd-node-network.service kurd-node.socket",
 			"sudo -n systemctl start kurd-node.service",
+			"NETWORK_START_FAILED",
+			"TUN_UNAVAILABLE",
+			"DOCTOR_FAILED",
 			"SERVICE_HEALTH_PASS",
 		} {
 			if !strings.Contains(command, required) {
@@ -42,6 +45,9 @@ func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.
 	defer cancel()
 	if err := assertRemoteHealth(ctx, runner, value, "."); err != nil {
 		t.Fatal(err)
+	}
+	if remoteHealthAttempts < 10 {
+		t.Fatalf("remote health convergence attempts=%d, want at least 10", remoteHealthAttempts)
 	}
 }
 
