@@ -610,16 +610,11 @@ func issueAndActivateProfile(ctx context.Context, runner commandRunner, value co
 }
 
 func verifyFieldTraffic(ctx context.Context, runner commandRunner, value config, root, serial string, probeURL, probeDigest []byte, ipv6Authorized bool) error {
-	for _, family := range dnsProbeFamilies(ipv6Authorized) {
-		if err := runFieldAction(ctx, runner, value, root, serial, "dns-probe", map[string]string{
-			"phase17DnsFamily": family, "phase17ExpectDnsAvailable": "true",
-		}, "DNS_IPV"+family+"_VERIFIED"); err != nil {
-			return err
-		}
-	}
-	if err := runFieldAction(ctx, runner, value, root, serial, "data-plane", map[string]string{
-		"phase17ProbeUrl": string(probeURL), "phase17ExpectedResponseSha256": string(probeDigest),
-	}, "DATA_PLANE_VERIFIED"); err != nil {
+	if err := runFieldAction(ctx, runner, value, root, serial, "traffic", map[string]string{
+		"phase17ProbeUrl":               string(probeURL),
+		"phase17ExpectedResponseSha256": string(probeDigest),
+		"phase17VerifyIPv6":             strconv.FormatBool(ipv6Authorized),
+	}, "TRAFFIC_VERIFIED"); err != nil {
 		return err
 	}
 	return nil
@@ -800,6 +795,7 @@ func instrumentationFailureCategory(raw []byte) string {
 		"RECIPIENT_CREATE_FAILED": true, "RECIPIENT_REQUEST_UNAVAILABLE": true,
 		"RUNTIME_AUTHORITY_FAILED": true, "RUNTIME_AUTHORITY_UNAVAILABLE": true,
 		"SEALED_PROFILE_UNAVAILABLE": true, "VPN_CONSENT_REQUIRED": true,
+		"VPN_NETWORK_NOT_READY": true,
 	}
 	for _, match := range instrumentCategoryV1.FindAll(raw, -1) {
 		value := string(match)

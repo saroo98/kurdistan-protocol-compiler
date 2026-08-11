@@ -155,7 +155,7 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6dba6387f86a7fd6488cb6df397e23b40405605d908842836193222d6b6619d1"
+      "post_sha256": "fef946b6705fc8e87d3ee1d300a64a63f2b4cf3c99f9ede7ed33d6702ccb1771"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
@@ -610,12 +610,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "d40aafc91a610dfad58278464fc49081d8a47896e06bf749abbc62bb6f3999cb"
+      "post_sha256": "bc00855b9ad91d31a387d35af573ee5bcd66ce27f092e47ea5289b3ea8e85d7c"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6f1629cece68978856125bd293ea0133dc70da29833f9b6b36ca1c74b43d6f92"
+      "post_sha256": "fe4845a3f1ce66b51a4fd2c58b7e6dfb8b996c520491964a381a0138a42d756f"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
