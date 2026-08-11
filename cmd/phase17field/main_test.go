@@ -512,6 +512,24 @@ func TestFieldHarnessBindsDNSAndHostnameTrafficToTheSameVerifiedVpnNetwork(t *te
 	}
 }
 
+func TestVpnServiceDeclaresUnderlyingNetworkOnBuilderBeforeEstablish(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "runtime", "android", "src", "main", "kotlin",
+		"org", "kurdistanvpn", "runtime", "android", "KurdVpnService.kt",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	builderBinding := bytes.Index(source, []byte(".setUnderlyingNetworks(arrayOf(underlyingNetwork))"))
+	establish := bytes.Index(source, []byte("val descriptor = builder.establish()"))
+	if builderBinding < 0 || establish < 0 || builderBinding > establish {
+		t.Fatal("VPN builder must declare the verified underlying network before establish")
+	}
+	if bytes.Contains(source, []byte("if (!setUnderlyingNetworks(arrayOf(selectedUnderlyingNetwork)))")) {
+		t.Fatal("VpnService.setUnderlyingNetworks must not run before the VPN is established")
+	}
+}
+
 func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) {
 	got := instrumentationFailureCategory([]byte("INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0\n"))
 	if got != "INSTRUMENTATION_PROCESS_CRASH" {

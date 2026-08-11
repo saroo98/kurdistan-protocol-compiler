@@ -268,11 +268,6 @@ class KurdVpnService : VpnService() {
                     return@execute
                 }
                 if (pendingTermination.peek() != null) return@execute
-                if (!setUnderlyingNetworks(arrayOf(selectedUnderlyingNetwork))) {
-                    session.close()
-                    terminalFailure = "LIVE_NETWORK_BIND_FAILED"
-                    return@execute
-                }
                 val controller = NativeTunnelController(
                     protector = SocketProtector(::protect),
                     networkBinder = SocketNetworkBinder { descriptor ->
