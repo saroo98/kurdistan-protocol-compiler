@@ -34,6 +34,10 @@ object LiveTunnelInvariantProbe {
                 events += "protect:$descriptor"
                 protectSucceeds
             },
+            networkBinder = SocketNetworkBinder { descriptor ->
+                events += "bind:$descriptor"
+                true
+            },
             tunEstablisher = TunEstablisher {
                 events += "builder"
                 ProbeTun(events)

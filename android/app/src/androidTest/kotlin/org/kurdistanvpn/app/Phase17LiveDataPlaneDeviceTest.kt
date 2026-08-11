@@ -106,6 +106,28 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun teardownBarrierRequiresActiveVpnTransportToDisappearBeforeNextSession() = runBlocking {
+        var samples = 0
+        assertTrue(
+            Phase17FieldHarness.awaitVpnNetworkTeardown(
+                timeoutMillis = 1_000,
+                pollMillis = 1,
+            ) {
+                samples += 1
+                samples < 3
+            },
+        )
+        assertEquals(3, samples)
+
+        assertFalse(
+            Phase17FieldHarness.awaitVpnNetworkTeardown(
+                timeoutMillis = 10,
+                pollMillis = 1,
+            ) { true },
+        )
+    }
+
+    @Test
     fun liveIpv4LifecycleProtectsSocketBeforeConnectAndStopsCleanly() {
         val success = LiveTunnelInvariantProbe.exercise(protectSucceeds = true)
         assertTrue(success.runningBeforeStop)
@@ -114,6 +136,7 @@ class Phase17LiveDataPlaneDeviceTest {
         assertOrdered(
             success.events,
             "protect:37",
+            "bind:37",
             "connect",
             "tls",
             "kurd",

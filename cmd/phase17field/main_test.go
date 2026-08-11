@@ -500,6 +500,16 @@ func TestFieldHarnessBindsDNSAndHostnameTrafficToTheSameVerifiedVpnNetwork(t *te
 	if bytes.Contains(source, []byte("uri.toURL().openConnection()")) {
 		t.Fatal("hostname probe still relies on asynchronous process-default network selection")
 	}
+	for _, required := range [][]byte{
+		[]byte("awaitVpnNetworkTeardown(application)"),
+		[]byte("connectivity.activeNetwork"),
+		[]byte("NetworkCapabilities.TRANSPORT_VPN"),
+		[]byte("VPN_NETWORK_TEARDOWN_TIMEOUT"),
+	} {
+		if !bytes.Contains(source, required) {
+			t.Fatalf("field harness missing teardown synchronization %q", required)
+		}
+	}
 }
 
 func TestInstrumentationFailureCategoryRejectsAndroidProcessCrash(t *testing.T) {
@@ -539,6 +549,16 @@ func TestInstrumentationFailureCategoryClassifiesSafeDataPlaneBoundary(t *testin
 			name: "connect failure",
 			raw:  "java.net.ConnectException: private endpoint detail\nFAILURES!!!\n",
 			want: "DATA_PLANE_CONNECT_FAILED",
+		},
+		{
+			name: "rapid reconnect fallback",
+			raw:  "LIVE_CONNECT_FAILED:LIVE_FALLBACK_EXHAUSTED:LIVE_STAGE_SOCKET_PROTECTED\nFAILURES!!!\n",
+			want: "LIVE_CONNECT_FAILED:LIVE_FALLBACK_EXHAUSTED:LIVE_STAGE_SOCKET_PROTECTED",
+		},
+		{
+			name: "teardown readiness timeout",
+			raw:  "VPN_NETWORK_TEARDOWN_TIMEOUT\nFAILURES!!!\n",
+			want: "VPN_NETWORK_TEARDOWN_TIMEOUT",
 		},
 	}
 	for _, test := range tests {
