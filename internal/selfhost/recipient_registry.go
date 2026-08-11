@@ -47,8 +47,9 @@ type ownerRecipientRegistryEnvelopeV1 struct {
 }
 
 type recipientUseReservationV1 struct {
-	RegistryID string
-	Record     recipientUseRecordV1
+	RegistryID   string
+	DeploymentID string
+	Record       recipientUseRecordV1
 }
 
 func recipientUseRecord(request enrollment.PublicRequestV1, profileID string, firstUsedAt int64) recipientUseRecordV1 {
@@ -185,7 +186,58 @@ func reserveOwnerRecipientUse(registryDir, expectedRegistryID, deploymentID, pro
 	if validateOwnerRecipientRegistry(registry) != nil || saveOwnerRecipientRegistry(registryDir, key, registry) != nil {
 		return recipientUseReservationV1{}, ErrRecipientRegistry
 	}
-	return recipientUseReservationV1{RegistryID: registry.RegistryID, Record: record}, nil
+	return recipientUseReservationV1{RegistryID: registry.RegistryID, DeploymentID: deploymentID, Record: record}, nil
+}
+
+func releaseOwnerRecipientUse(registryDir string, reservation recipientUseReservationV1) error {
+	if registryDir == "" || !validID(reservation.RegistryID) || !validID(reservation.DeploymentID) || !validRecipientUseRecord(reservation.Record) {
+		return ErrRecipientRegistry
+	}
+	if _, err := os.Lstat(registryDir); err != nil || protectSelfhostPrivatePath(registryDir, true) != nil {
+		return ErrRecipientRegistry
+	}
+	lock := filepath.Join(registryDir, ownerRecipientRegistryLock)
+	if err := createSelfhostPrivateDirectory(lock); err != nil {
+		if errors.Is(err, ErrBusy) {
+			return ErrBusy
+		}
+		return ErrRecipientRegistry
+	}
+	if err := protectSelfhostPrivatePath(lock, true); err != nil {
+		_ = os.Remove(lock)
+		return ErrRecipientRegistry
+	}
+	defer os.Remove(lock)
+
+	registry, key, err := loadOrInitializeOwnerRecipientRegistry(registryDir, reservation.RegistryID)
+	if err != nil {
+		return err
+	}
+	defer zero(key)
+	target := ownerRecipientUseRecordV1{
+		RequestTag: reservation.Record.RequestTag, RecipientTag: reservation.Record.RecipientTag, ClientTag: reservation.Record.ClientTag,
+		DeploymentID: reservation.DeploymentID, ProfileID: reservation.Record.ProfileID, FirstUsedAt: reservation.Record.FirstUsedAt,
+	}
+	index := -1
+	for candidateIndex, existing := range registry.Records {
+		matchesTag := existing.RequestTag == target.RequestTag || existing.RecipientTag == target.RecipientTag || existing.ClientTag == target.ClientTag
+		if existing == target {
+			if index >= 0 {
+				return ErrRecipientRegistry
+			}
+			index = candidateIndex
+		} else if matchesTag {
+			return ErrRecipientRegistry
+		}
+	}
+	if index < 0 {
+		return nil
+	}
+	registry.Records = append(registry.Records[:index], registry.Records[index+1:]...)
+	if validateOwnerRecipientRegistry(registry) != nil || saveOwnerRecipientRegistry(registryDir, key, registry) != nil {
+		return ErrRecipientRegistry
+	}
+	return nil
 }
 
 func loadOrInitializeOwnerRecipientRegistry(directory, expectedRegistryID string) (ownerRecipientRegistryV1, []byte, error) {

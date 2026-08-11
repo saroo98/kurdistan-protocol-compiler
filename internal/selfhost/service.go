@@ -210,6 +210,7 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 		}
 	}
 	var result IssuedProfile
+	var ownerReservation *recipientUseReservationV1
 	err = withStateTransaction(dataDir, "create-profile", "profile."+options.Name, now.Unix(), func(state *persistedState, master []byte) error {
 		if !state.RecoveryConfirmed {
 			return ErrRecoveryUnconfirmed
@@ -239,6 +240,7 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 			if err != nil {
 				return err
 			}
+			ownerReservation = &reservation
 			issued, record, err = issueLiveProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, options.LiveProgram, now, recipientRequest, 1, &reservation)
 		} else {
 			issued, record, err = issueProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, now)
@@ -250,6 +252,11 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 		result = issued
 		return nil
 	})
+	if err != nil && ownerReservation != nil && !errors.Is(err, ErrCommitUncertain) {
+		if rollbackErr := releaseOwnerRecipientUse(options.RegistryDir, *ownerReservation); rollbackErr != nil {
+			err = errors.Join(err, rollbackErr)
+		}
+	}
 	return result, err
 }
 
@@ -268,6 +275,7 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 		}
 	}
 	var result IssuedProfile
+	var ownerReservation *recipientUseReservationV1
 	err = withStateTransaction(dataDir, "rotate-profile", options.ProfileID, now.Unix(), func(state *persistedState, master []byte) error {
 		if !state.RecoveryConfirmed {
 			return ErrRecoveryUnconfirmed
@@ -316,6 +324,7 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 			if err != nil {
 				return err
 			}
+			ownerReservation = &reservation
 			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, now, recipientRequest, epoch, &reservation)
 		} else if previous.Mode == profileModeLive {
 			reused := enrollment.PublicRequestV1{
@@ -334,6 +343,11 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 		result = issued
 		return nil
 	})
+	if err != nil && ownerReservation != nil && !errors.Is(err, ErrCommitUncertain) {
+		if rollbackErr := releaseOwnerRecipientUse(options.RegistryDir, *ownerReservation); rollbackErr != nil {
+			err = errors.Join(err, rollbackErr)
+		}
+	}
 	return result, err
 }
 
@@ -785,6 +799,14 @@ func compactContentRevocationsCoveredByRetiredIssuers(state *persistedState) ([]
 	}
 	covered := make(map[string]struct{}, len(state.Profiles))
 	for _, record := range state.Profiles {
+		if isRevokedProfileTombstone(record) {
+			// Tombstones are created only after content revocation. Issuer
+			// rotation retires the current issuer before this compaction, and
+			// every earlier issuer is already retired, so the content
+			// revocation is redundant without retaining the full artifact.
+			covered[record.ContentID] = struct{}{}
+			continue
+		}
 		issuerKeyID, err := profileRecordIssuerKeyID(record)
 		if err != nil {
 			return nil, ErrStateCorrupt
@@ -895,6 +917,12 @@ func LoadProfile(dataDir, profileID string) (IssuedProfile, error) {
 		return IssuedProfile{}, ErrNotFound
 	}
 	record := state.Profiles[index]
+	if isRevokedProfileTombstone(record) {
+		return IssuedProfile{
+			ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation, ValidUntil: record.ValidUntil,
+			Mode: record.Mode, Sealed: record.Mode == profileModeLive, Connectable: false, Revoked: true,
+		}, nil
+	}
 	uri, err := envelope.EncodeArtifactURI(record.Artifact)
 	if err != nil {
 		return IssuedProfile{}, ErrStateCorrupt

@@ -318,6 +318,12 @@ func recipientRecord(binding profile.RecipientBinding) recipientBindingRecord {
 }
 
 func validateProfileRecordV2(state persistedState, record profileRecord) error {
+	if isRevokedProfileTombstone(record) {
+		if !profileHasNoActiveAssignments(state.Assignments, record.ProfileID) {
+			return ErrStateCorrupt
+		}
+		return nil
+	}
 	switch record.Mode {
 	case profileModeAuthorityOnly:
 		if !recipientRecordEmpty(record.Recipient) || len(record.RecipientPublic) != 0 || record.ClientAuthKeyID != "" || len(record.ClientAuthPublic) != 0 ||
@@ -330,6 +336,34 @@ func validateProfileRecordV2(state persistedState, record profileRecord) error {
 	default:
 		return ErrStateCorrupt
 	}
+}
+
+func compactRevokedProfiles(state *persistedState) {
+	if state == nil {
+		return
+	}
+	for index := range state.Profiles {
+		record := &state.Profiles[index]
+		if !record.Revoked {
+			continue
+		}
+		record.Artifact = nil
+		record.Recipient = recipientBindingRecord{}
+		record.RecipientPublic = nil
+		record.ClientAuthKeyID = ""
+		record.ClientAuthPublic = nil
+		record.RuntimePolicy = nil
+		record.RelayAdmissionDigest = nil
+		record.AssignedIPv4 = nil
+		record.AssignedIPv6 = nil
+	}
+}
+
+func isRevokedProfileTombstone(record profileRecord) bool {
+	return record.Revoked && (record.Mode == profileModeAuthorityOnly || record.Mode == profileModeLive) &&
+		len(record.Artifact) == 0 && recipientRecordEmpty(record.Recipient) && len(record.RecipientPublic) == 0 &&
+		record.ClientAuthKeyID == "" && len(record.ClientAuthPublic) == 0 && len(record.RuntimePolicy) == 0 &&
+		len(record.RelayAdmissionDigest) == 0 && len(record.AssignedIPv4) == 0 && len(record.AssignedIPv6) == 0
 }
 
 func validateLiveProfileRecord(state persistedState, record profileRecord) error {
