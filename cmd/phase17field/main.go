@@ -1025,25 +1025,37 @@ func categorizeProfileIssuanceFailure(raw []byte) error {
 	return errors.New("profile issuance failed")
 }
 
+const remoteHealthAttempts = 10
+
 func assertRemoteHealth(ctx context.Context, runner commandRunner, value config, root string) error {
 	script := fmt.Sprintf(`set -eu
-sudo -n systemctl start kurd-node-network.service kurd-node.socket
-sudo -n systemctl start kurd-node.service
-systemctl is-active --quiet kurd-node.socket
-systemctl is-active --quiet kurd-node.service
-systemctl is-active --quiet unbound.service
-test -e /sys/class/net/kurd0/tun_flags
-ss -H -ltn 'sport = :%d' | grep -q .
-sudo -n -u kurd-node /usr/local/bin/kurdctl doctor --data-dir %s >/dev/null
+sudo -n systemctl start kurd-node-network.service kurd-node.socket >/dev/null 2>&1 || { printf NETWORK_START_FAILED; exit 8; }
+sudo -n systemctl start kurd-node.service >/dev/null 2>&1 || { printf RELAY_START_FAILED; exit 8; }
+systemctl is-active --quiet kurd-node.socket || { printf SOCKET_INACTIVE; exit 8; }
+systemctl is-active --quiet kurd-node.service || { printf RELAY_INACTIVE; exit 8; }
+systemctl is-active --quiet unbound.service || { printf DNS_INACTIVE; exit 8; }
+test -e /sys/class/net/kurd0/tun_flags || { printf TUN_UNAVAILABLE; exit 8; }
+ss -H -ltn 'sport = :%d' | grep -q . || { printf LISTENER_UNAVAILABLE; exit 8; }
+sudo -n -u kurd-node /usr/local/bin/kurdctl doctor --data-dir %s >/dev/null 2>&1 || { printf DOCTOR_FAILED; exit 8; }
 printf SERVICE_HEALTH_PASS
 `, value.relayPort, remoteDataDir)
-	return retryRemoteHealth(ctx, 4, 2*time.Second, func() error {
+	return retryRemoteHealth(ctx, remoteHealthAttempts, 2*time.Second, func() error {
 		raw, err := ssh(ctx, runner, value, root, 30*time.Second, script)
 		if err != nil || strings.TrimSpace(string(raw)) != "SERVICE_HEALTH_PASS" {
-			return errors.New("remote service health failed")
+			return remoteHealthError(raw)
 		}
 		return nil
 	})
+}
+
+func remoteHealthError(raw []byte) error {
+	category := strings.TrimSpace(string(raw))
+	switch category {
+	case "NETWORK_START_FAILED", "RELAY_START_FAILED", "SOCKET_INACTIVE", "RELAY_INACTIVE", "DNS_INACTIVE", "TUN_UNAVAILABLE", "LISTENER_UNAVAILABLE", "DOCTOR_FAILED":
+		return fmt.Errorf("remote service health failed: %s", category)
+	default:
+		return errors.New("remote service health failed")
+	}
 }
 
 func retryRemoteHealth(ctx context.Context, attempts int, delay time.Duration, check func() error) error {
