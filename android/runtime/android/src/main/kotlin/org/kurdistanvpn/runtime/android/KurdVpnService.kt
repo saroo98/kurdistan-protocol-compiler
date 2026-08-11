@@ -217,7 +217,10 @@ class KurdVpnService : VpnService() {
             activeRequestId = null
         }
         if (armed && pendingAuthorityRequest == requestId) {
-            mainHandler.postDelayed(authorityArrivalTimeout, AUTHORITY_TIMEOUT_SECONDS * 1_000L)
+            mainHandler.postDelayed(
+                authorityArrivalTimeout,
+                RuntimeAuthorityTimeoutPolicy.ARRIVAL_MILLIS,
+            )
         }
         return armed
     }
@@ -603,7 +606,6 @@ class KurdVpnService : VpnService() {
         private const val CHANNEL_ID = "kurdistan-vpn-runtime"
         private const val NOTIFICATION_ID = 1001
         private const val MAX_RUNTIME_OPEN_BYTES = RuntimeStartWire.MAX_RUNTIME_OPEN_BYTES
-        private const val AUTHORITY_TIMEOUT_SECONDS = 5L
         private const val NETWORK_BIND_TIMEOUT_MILLIS = 5_000L
         private const val RUNTIME_HEALTH_INTERVAL_MILLIS = 250L
 
@@ -693,7 +695,7 @@ class KurdVpnService : VpnService() {
                 }
 
                 fun scheduleTimeout() {
-                    handler.postDelayed(timeout, AUTHORITY_TIMEOUT_SECONDS * 1_000L)
+                    handler.postDelayed(timeout, RuntimeAuthorityTimeoutPolicy.BIND_MILLIS)
                 }
 
                 fun failBeforeClaim(category: String) {
@@ -777,7 +779,7 @@ class KurdVpnService : VpnService() {
         }
         val cancellation = timeout.schedule(
             { runCatching { descriptor.closeWithError("authority timeout") } },
-            AUTHORITY_TIMEOUT_SECONDS,
+            RuntimeAuthorityTimeoutPolicy.PIPE_READ_SECONDS,
             TimeUnit.SECONDS,
         )
         return try {
