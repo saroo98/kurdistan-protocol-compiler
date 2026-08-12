@@ -332,7 +332,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "PHASE 17 FIELD FAILED: %v\n", err)
 		os.Exit(2)
 	}
-	if err := runField(context.Background(), commandRunner{}, value); err != nil {
+	if err := runWithHostWakeGuard(acquireHostWakeInhibitor, func() error {
+		return runField(context.Background(), commandRunner{}, value)
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "PHASE 17 FIELD FAILED: %v\n", err)
 		os.Exit(1)
 	}
@@ -961,7 +963,7 @@ exit "$status"
 			failure, _ := ssh(ctx, runner, value, root, 10*time.Second, fmt.Sprintf(`cat %q`, remoteError))
 			initialFailure = failure
 		}
-		category := categorizeProfileIssuanceFailure(initialFailure)
+		category := categorizeProfileIssuanceFailure(initialFailure, err)
 		clear(initialFailure)
 		return "", nil, category
 	}
@@ -997,7 +999,7 @@ exit "$status"
 	return response.ProfileID, artifact, nil
 }
 
-func categorizeProfileIssuanceFailure(raw []byte) error {
+func categorizeProfileIssuanceFailure(raw []byte, transportErr error) error {
 	value := strings.ToLower(string(raw))
 	for marker, category := range map[string]string{
 		"recipient registry rejected":        "profile issuance rejected: recipient registry unavailable",
@@ -1017,6 +1019,15 @@ func categorizeProfileIssuanceFailure(raw []byte) error {
 		if strings.Contains(value, marker) {
 			return errors.New(category)
 		}
+	}
+	if errors.Is(transportErr, context.DeadlineExceeded) {
+		return errors.New("profile issuance transport timed out")
+	}
+	if errors.Is(transportErr, context.Canceled) {
+		return errors.New("profile issuance cancelled")
+	}
+	if transportErr != nil {
+		return errors.New("profile issuance transport failed")
 	}
 	return errors.New("profile issuance failed")
 }
@@ -1751,7 +1762,11 @@ func runBytes(parent context.Context, runner commandRunner, stdin []byte, direct
 func runBytesWithLimit(parent context.Context, runner commandRunner, stdin []byte, directory string, timeout time.Duration, maximum int, name string, arguments ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
-	return runner.runWithLimit(ctx, stdin, directory, maximum, name, arguments...)
+	raw, err := runner.runWithLimit(ctx, stdin, directory, maximum, name, arguments...)
+	if err != nil && ctx.Err() != nil {
+		return raw, ctx.Err()
+	}
+	return raw, err
 }
 
 func runText(ctx context.Context, runner commandRunner, stdin []byte, directory, name string, arguments ...string) (string, error) {
