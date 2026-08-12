@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -795,6 +796,106 @@ func TestIssueProfileRecoversCompletedIssuanceAfterSSHTransportLossWithoutReissu
 	}
 	if profileID != "profile.recovered" || string(artifact) != "sealed-profile" {
 		t.Fatalf("profile=%q artifact=%q", profileID, artifact)
+	}
+}
+
+func TestIssueProfileRetriesOneTransportFailureOnlyAfterUniqueNameHasNoDurableCommit(t *testing.T) {
+	createCalls := 0
+	listCalls := 0
+	profileNames := make([]string, 0, 2)
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		switch name {
+		case "ssh":
+			command := arguments[len(arguments)-1]
+			switch {
+			case strings.Contains(command, "profile create"):
+				createCalls++
+				match := regexp.MustCompile(`--name ['"]?([a-z0-9-]+)['"]?`).FindStringSubmatch(command)
+				if len(match) != 2 || !strings.HasPrefix(match[1], "p17-") {
+					return []byte("kurdctl: invalid input\n"), errors.New("command failed")
+				}
+				profileNames = append(profileNames, match[1])
+				if createCalls == 1 {
+					return nil, errors.New("command failed")
+				}
+				return []byte("PHASE17_ISSUE_READY\n"), nil
+			case strings.Contains(command, "profile list"):
+				listCalls++
+				return []byte(`{"schema":"kurdctl-profile-list-v1","profiles":[]}`), nil
+			case strings.Contains(command, "SERVICE_HEALTH_PASS"):
+				return []byte("SERVICE_HEALTH_PASS\n"), nil
+			case strings.Contains(command, "PHASE17_ISSUE_READY"):
+				return nil, errors.New("not committed")
+			case strings.Contains(command, ".response"):
+				return []byte(`{"schema":"kurdctl-profile-create-v2","profileId":"profile.retried"}`), nil
+			default:
+				return nil, nil
+			}
+		case "scp":
+			destination := arguments[len(arguments)-1]
+			if strings.Contains(destination, ":/tmp/phase17-recipient-") {
+				return nil, nil
+			}
+			return nil, os.WriteFile(destination, []byte("sealed-profile"), 0o600)
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", scpPath: "scp", relayPort: 8443}
+	profileID, artifact, err := issueProfile(context.Background(), runner, value, t.TempDir(), []byte("recipient-request"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(artifact)
+	if createCalls != 2 || listCalls != 1 {
+		t.Fatalf("profile creation calls=%d list calls=%d, want 2 and 1", createCalls, listCalls)
+	}
+	if len(profileNames) != 2 || profileNames[0] != profileNames[1] {
+		t.Fatalf("retry changed unique profile name: %v", profileNames)
+	}
+	if profileID != "profile.retried" || string(artifact) != "sealed-profile" {
+		t.Fatalf("profile=%q artifact=%q", profileID, artifact)
+	}
+}
+
+func TestIssueProfileNeverRetriesWhenUniqueNameAlreadyCommitted(t *testing.T) {
+	createCalls := 0
+	// Capture the generated unique name from the create command and make the
+	// reconciliation list return that exact durable record.
+	var generatedName string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name == "scp" {
+			return nil, nil
+		}
+		if name != "ssh" {
+			return nil, errors.New("unexpected command")
+		}
+		command := arguments[len(arguments)-1]
+		switch {
+		case strings.Contains(command, "profile create"):
+			createCalls++
+			match := regexp.MustCompile(`--name ['"]?([a-z0-9-]+)['"]?`).FindStringSubmatch(command)
+			if len(match) != 2 {
+				return nil, errors.New("command failed")
+			}
+			generatedName = match[1]
+			return nil, errors.New("command failed")
+		case strings.Contains(command, "profile list"):
+			return []byte(fmt.Sprintf(`{"schema":"kurdctl-profile-list-v1","profiles":[{"Name":%q}]}`, generatedName)), nil
+		case strings.Contains(command, "PHASE17_ISSUE_READY"):
+			return nil, errors.New("not committed")
+		default:
+			return nil, nil
+		}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", scpPath: "scp", relayPort: 8443}
+	_, artifact, err := issueProfile(context.Background(), runner, value, t.TempDir(), []byte("recipient-request"))
+	clear(artifact)
+	if err == nil || err.Error() != "profile issuance committed without recoverable artifact" {
+		t.Fatalf("profile issuance error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("profile creation attempts = %d, want exactly one", createCalls)
 	}
 }
 
