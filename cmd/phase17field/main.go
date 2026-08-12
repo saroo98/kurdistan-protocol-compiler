@@ -77,6 +77,7 @@ var (
 		{name: "combined", netem: "delay 100ms 20ms distribution normal loss 1% rate 5mbit"},
 		{name: "carrier-reset", carrierReset: true},
 	}
+	errProfileIssuanceTransport = errors.New("profile issuance transport failed")
 )
 
 type impairmentScenario struct {
@@ -892,6 +893,7 @@ func issueProfile(ctx context.Context, runner commandRunner, value config, root 
 		return "", nil, errors.New("recipient request staging failed")
 	}
 	token := strconv.FormatInt(time.Now().UnixNano(), 16)
+	profileName := "p17-" + token
 	remoteRequest := "/tmp/phase17-recipient-" + token
 	remoteOutput := remoteDataDir + "/.phase17-profile-" + token
 	remoteResponse := remoteRequest + ".response"
@@ -913,7 +915,7 @@ umask 077
 sudo -n chown kurd-node:kurd-node "$req" || { printf PROFILE_REQUEST_OWNER_FAILED; exit 2; }
 sudo -n chmod 0600 "$req" || { printf PROFILE_REQUEST_MODE_FAILED; exit 2; }
 status=0
-sudo -n -u kurd-node /usr/local/bin/kurdctl profile create --data-dir %q --name phase17-field --valid-for 24h --recipient-request "$req" --recipient-registry-dir %q --output-dir "$out" --control-socket %q >"$response" 2>"$error_output" || status=$?
+sudo -n -u kurd-node /usr/local/bin/kurdctl profile create --data-dir %q --name %s --valid-for 24h --recipient-request "$req" --recipient-registry-dir %q --output-dir "$out" --control-socket %q >"$response" 2>"$error_output" || status=$?
 if [ -s "$response" ] && sudo -n test -s "$out/profile.kurd-profile"; then
   sudo -n install -o "$(id -un)" -g "$(id -gn)" -m 0600 "$out/profile.kurd-profile" "$artifact" || { printf PROFILE_ARTIFACT_STAGE_FAILED; exit 6; }
   if [ "$status" -eq 7 ]; then
@@ -937,35 +939,61 @@ cat "$error_output"
 [ -s "$error_output" ] || printf PROFILE_COMMAND_FAILED_%%s "$status"
 [ "$status" -ne 0 ] || status=6
 exit "$status"
-`, remoteRequest, remoteOutput, remoteResponse, remoteError, remoteArtifact, remoteDataDir, remoteRegistry, remoteControl, remoteDataDir, remoteControl)
-	raw, err := ssh(ctx, runner, value, root, 2*time.Minute, script)
-	ready := err == nil && strings.TrimSpace(string(raw)) == "PHASE17_ISSUE_READY"
-	initialFailure := append([]byte(nil), raw...)
-	clear(raw)
-	for attempt := 0; !ready && attempt < 4; attempt++ {
-		if attempt > 0 {
-			timer := time.NewTimer(250 * time.Millisecond)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				clear(initialFailure)
-				return "", nil, errors.New("profile issuance recovery cancelled")
-			case <-timer.C:
+`, remoteRequest, remoteOutput, remoteResponse, remoteError, remoteArtifact, remoteDataDir, shellQuote(profileName), remoteRegistry, remoteControl, remoteDataDir, remoteControl)
+	attemptIssuance := func() (bool, []byte, error) {
+		raw, commandErr := ssh(ctx, runner, value, root, 2*time.Minute, script)
+		ready := commandErr == nil && strings.TrimSpace(string(raw)) == "PHASE17_ISSUE_READY"
+		failure := append([]byte(nil), raw...)
+		clear(raw)
+		for attempt := 0; !ready && attempt < 4; attempt++ {
+			if attempt > 0 {
+				timer := time.NewTimer(250 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					clear(failure)
+					return false, nil, ctx.Err()
+				case <-timer.C:
+				}
 			}
+			check, checkErr := ssh(ctx, runner, value, root, 15*time.Second,
+				fmt.Sprintf(`set -eu; test -s %q; test -s %q; printf PHASE17_ISSUE_READY`, remoteResponse, remoteArtifact))
+			ready = checkErr == nil && strings.TrimSpace(string(check)) == "PHASE17_ISSUE_READY"
+			clear(check)
 		}
-		check, checkErr := ssh(ctx, runner, value, root, 15*time.Second,
-			fmt.Sprintf(`set -eu; test -s %q; test -s %q; printf PHASE17_ISSUE_READY`, remoteResponse, remoteArtifact))
-		ready = checkErr == nil && strings.TrimSpace(string(check)) == "PHASE17_ISSUE_READY"
-		clear(check)
+		return ready, failure, commandErr
 	}
+	ready, initialFailure, issuanceErr := attemptIssuance()
 	if !ready {
 		if len(initialFailure) == 0 {
 			failure, _ := ssh(ctx, runner, value, root, 10*time.Second, fmt.Sprintf(`cat %q`, remoteError))
 			initialFailure = failure
 		}
-		category := categorizeProfileIssuanceFailure(initialFailure, err)
+		category := categorizeProfileIssuanceFailure(initialFailure, issuanceErr)
 		clear(initialFailure)
-		return "", nil, category
+		if !errors.Is(category, errProfileIssuanceTransport) {
+			return "", nil, category
+		}
+		committed, reconcileErr := profileNameCommitted(ctx, runner, value, root, profileName)
+		if reconcileErr != nil {
+			return "", nil, errors.New("profile issuance reconciliation unavailable")
+		}
+		if committed {
+			return "", nil, errors.New("profile issuance committed without recoverable artifact")
+		}
+		if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
+			return "", nil, errors.New("profile issuance transport failed after node health check")
+		}
+		ready, initialFailure, issuanceErr = attemptIssuance()
+		if !ready {
+			if len(initialFailure) == 0 {
+				failure, _ := ssh(ctx, runner, value, root, 10*time.Second, fmt.Sprintf(`cat %q`, remoteError))
+				initialFailure = failure
+			}
+			category = categorizeProfileIssuanceFailure(initialFailure, issuanceErr)
+			clear(initialFailure)
+			return "", nil, category
+		}
 	}
 	clear(initialFailure)
 	responseBytes, err := ssh(ctx, runner, value, root, 10*time.Second, fmt.Sprintf(`cat %q`, remoteResponse))
@@ -999,6 +1027,38 @@ exit "$status"
 	return response.ProfileID, artifact, nil
 }
 
+func profileNameCommitted(ctx context.Context, runner commandRunner, value config, root, name string) (bool, error) {
+	if !selectorPattern.MatchString(name) {
+		return false, errors.New("profile reconciliation name rejected")
+	}
+	raw, err := ssh(ctx, runner, value, root, 30*time.Second,
+		fmt.Sprintf(`sudo -n -u kurd-node /usr/local/bin/kurdctl profile list --data-dir %q`, remoteDataDir))
+	if err != nil {
+		clear(raw)
+		return false, errors.New("profile reconciliation query failed")
+	}
+	defer clear(raw)
+	var listing struct {
+		Schema   string `json:"schema"`
+		Profiles []struct {
+			Name string `json:"Name"`
+		} `json:"profiles"`
+	}
+	if json.Unmarshal(raw, &listing) != nil || listing.Schema != "kurdctl-profile-list-v1" || listing.Profiles == nil {
+		return false, errors.New("profile reconciliation response rejected")
+	}
+	matches := 0
+	for _, profile := range listing.Profiles {
+		if profile.Name == name {
+			matches++
+		}
+	}
+	if matches > 1 {
+		return false, errors.New("profile reconciliation response ambiguous")
+	}
+	return matches == 1, nil
+}
+
 func categorizeProfileIssuanceFailure(raw []byte, transportErr error) error {
 	value := strings.ToLower(string(raw))
 	for marker, category := range map[string]string{
@@ -1027,7 +1087,7 @@ func categorizeProfileIssuanceFailure(raw []byte, transportErr error) error {
 		return errors.New("profile issuance cancelled")
 	}
 	if transportErr != nil {
-		return errors.New("profile issuance transport failed")
+		return errProfileIssuanceTransport
 	}
 	return errors.New("profile issuance failed")
 }
