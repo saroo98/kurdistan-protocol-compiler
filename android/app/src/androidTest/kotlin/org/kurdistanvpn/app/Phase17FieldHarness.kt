@@ -90,21 +90,6 @@ internal object Phase17FieldHarness {
             failure in setOf("LIVE_TLS_REJECTED", "LIVE_FALLBACK_EXHAUSTED") &&
             packetDisposition == "LIVE_STAGE_SOCKET_PROTECTED"
 
-    internal suspend fun awaitVpnNetworkTeardown(
-        timeoutMillis: Long,
-        pollMillis: Long,
-        vpnTransportPresent: () -> Boolean,
-    ): Boolean {
-        require(timeoutMillis > 0) { "VPN_TEARDOWN_TIMEOUT_REJECTED" }
-        require(pollMillis > 0) { "VPN_TEARDOWN_POLL_REJECTED" }
-        return withTimeoutOrNull(timeoutMillis) {
-            while (vpnTransportPresent()) {
-                delay(pollMillis)
-            }
-            true
-        } ?: false
-    }
-
     suspend fun runIfRequested(): Boolean {
         val action = InstrumentationRegistry.getArguments().getString(ARG_ACTION)
             ?.trim()
@@ -383,17 +368,13 @@ internal object Phase17FieldHarness {
 
     private suspend fun awaitVpnNetworkTeardown(context: Context): Boolean {
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
-        return awaitVpnNetworkTeardown(
+        return VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(
             timeoutMillis = VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS,
             pollMillis = VPN_NETWORK_POLL_MILLIS,
-        ) {
-            runCatching {
-                connectivity.activeNetwork?.let { network ->
-                    connectivity.getNetworkCapabilities(network)
-                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-                } ?: false
-            }.getOrDefault(true)
-        }
+            vpnTransportSnapshot = {
+                VpnNetworkTeardownBarrier.snapshot(connectivity)
+            },
+        )
     }
 
     private suspend fun awaitVerifiedVpnNetwork(

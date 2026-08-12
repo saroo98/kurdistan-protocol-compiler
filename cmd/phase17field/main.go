@@ -80,6 +80,7 @@ var (
 	selectorPattern        = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 	hex40Pattern           = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	hex64Pattern           = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
 	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
 	frozenImpairmentMatrix = []impairmentScenario{
 		{name: "bandwidth", netem: "rate 5mbit"},
@@ -347,10 +348,23 @@ func main() {
 	if err := runWithHostWakeGuard(acquireHostWakeInhibitor, func() error {
 		return runField(context.Background(), commandRunner{}, value)
 	}); err != nil {
+		fmt.Fprintln(os.Stdout, terminalFailureLine(err))
 		fmt.Fprintf(os.Stderr, "PHASE 17 FIELD FAILED: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("PHASE 17 OWNED-VPS FIELD MATRIX PASSED")
+}
+
+func terminalFailureLine(err error) string {
+	const fallback = "PHASE17_FAILURE FIELD_FAILURE"
+	if err == nil {
+		return fallback
+	}
+	value := err.Error()
+	if !terminalFailurePattern.MatchString(value) || !safeCategory([]byte(value)) {
+		return fallback
+	}
+	return "PHASE17_FAILURE " + value
 }
 
 func validateConfig(value config) error {

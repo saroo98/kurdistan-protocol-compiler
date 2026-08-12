@@ -7,16 +7,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
 import android.net.VpnService
 import java.util.concurrent.Executors
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.kurdistanvpn.runtime.android.KurdVpnService
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
@@ -34,6 +39,9 @@ class VpnRuntimeController(
         Thread(task, "kurd-runtime-authority-handoff").apply { isDaemon = true }
     }
     private var stagedAuthority: ByteArray? = null
+    private val startLock = Any()
+    private var startGeneration = 0L
+    private var pendingStart: Job? = null
     @Volatile
     private var activeRequestId: String? = null
     @Volatile
@@ -162,6 +170,7 @@ class VpnRuntimeController(
 
     fun permissionRejected() {
         reconnectCoordinator.cancel()
+        cancelPendingStart()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -172,6 +181,7 @@ class VpnRuntimeController(
 
     fun notificationPermissionRejected() {
         reconnectCoordinator.cancel()
+        cancelPendingStart()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -195,6 +205,7 @@ class VpnRuntimeController(
 
     private fun stageAuthorityForReconnect(encoded: ByteArray) {
         require(encoded.isNotEmpty()) { "MISSING_VERIFIED_AUTHORITY" }
+        cancelPendingStart()
         clearStagedAuthority()
         stagedAuthority = encoded
         mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.PREPARING)
@@ -202,6 +213,7 @@ class VpnRuntimeController(
 
     fun authorityRejected(category: String) {
         reconnectCoordinator.cancel()
+        cancelPendingStart()
         clearStagedAuthority()
         activeRequestId = null
         mutableSnapshot.value = VpnRuntimeSnapshot(
@@ -217,36 +229,17 @@ class VpnRuntimeController(
             authorityRejected("MISSING_VERIFIED_AUTHORITY")
             return
         }
-        mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.CONNECTING)
-        val requestId = KurdVpnService.newRequestId()
-        pendingStatusQueryId = null
-        activeRequestId = requestId
-        runCatching {
-            KurdVpnService.start(context, requestId, authority, handoffExecutor) { category ->
-                if (activeRequestId == requestId) {
-                    acceptSnapshot(VpnRuntimeSnapshot(
-                        state = VpnRuntimeState.FAILED,
-                        failure = category.take(64),
-                        runtimeRequestId = requestId,
-                    ))
-                }
-            }
-        }.onFailure {
-            authority.fill(0)
-            if (activeRequestId == requestId) {
-                acceptSnapshot(VpnRuntimeSnapshot(
-                    state = VpnRuntimeState.FAILED,
-                    failure = "RUNTIME_START_FAILED",
-                    runtimeRequestId = requestId,
-                ))
-            }
-        }
+        mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.PREPARING)
+        scheduleStartAfterVpnTeardown(authority)
     }
 
     fun stop() {
         reconnectCoordinator.cancel()
+        val canceledPendingStart = cancelPendingStart()
+        clearStagedAuthority()
         val current = mutableSnapshot.value
         if (
+            (canceledPendingStart && activeRequestId == null) ||
             current.state == VpnRuntimeState.IDLE ||
             current.state == VpnRuntimeState.AWAITING_VPN_CONSENT ||
             current.state == VpnRuntimeState.BLOCKED ||
@@ -268,6 +261,7 @@ class VpnRuntimeController(
 
     override fun close() {
         reconnectCoordinator.cancel()
+        cancelPendingStart()
         reconnectScope.cancel()
         clearStagedAuthority()
         handoffExecutor.shutdownNow()
@@ -279,9 +273,108 @@ class VpnRuntimeController(
         stagedAuthority = null
     }
 
+    private fun scheduleStartAfterVpnTeardown(authority: ByteArray) {
+        val generation: Long
+        val job: Job
+        synchronized(startLock) {
+            cancelPendingStartLocked()
+            generation = startGeneration
+            job = reconnectScope.launch(start = CoroutineStart.LAZY) {
+                var handedOff = false
+                try {
+                    val connectivity = context.getSystemService(ConnectivityManager::class.java)
+                    val ready = VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(
+                        timeoutMillis = VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS,
+                        pollMillis = VPN_NETWORK_POLL_MILLIS,
+                        vpnTransportSnapshot = {
+                            VpnNetworkTeardownBarrier.snapshot(connectivity)
+                        },
+                    )
+                    if (!ready) {
+                        if (isCurrentStart(generation)) {
+                            acceptSnapshot(
+                                VpnRuntimeSnapshot(
+                                    state = VpnRuntimeState.FAILED,
+                                    failure = "VPN_NETWORK_TEARDOWN_TIMEOUT",
+                                ),
+                            )
+                        }
+                        return@launch
+                    }
+                    handedOff = synchronized(startLock) {
+                        if (generation != startGeneration) {
+                            false
+                        } else {
+                            startRuntimeWithAuthority(authority)
+                            pendingStart = null
+                            true
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    if (isCurrentStart(generation)) {
+                        acceptSnapshot(
+                            VpnRuntimeSnapshot(
+                                state = VpnRuntimeState.FAILED,
+                                failure = "RUNTIME_START_FAILED",
+                            ),
+                        )
+                    }
+                } finally {
+                    if (!handedOff) authority.fill(0)
+                    synchronized(startLock) {
+                        if (generation == startGeneration) pendingStart = null
+                    }
+                }
+            }
+            pendingStart = job
+        }
+        job.start()
+    }
+
+    private fun startRuntimeWithAuthority(authority: ByteArray) {
+        mutableSnapshot.value = VpnRuntimeSnapshot(VpnRuntimeState.CONNECTING)
+        val requestId = KurdVpnService.newRequestId()
+        pendingStatusQueryId = null
+        activeRequestId = requestId
+        KurdVpnService.start(context, requestId, authority, handoffExecutor) { category ->
+            if (activeRequestId == requestId) {
+                acceptSnapshot(
+                    VpnRuntimeSnapshot(
+                        state = VpnRuntimeState.FAILED,
+                        failure = category.take(64),
+                        runtimeRequestId = requestId,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun cancelPendingStart(): Boolean = synchronized(startLock) {
+        val canceled = pendingStart != null
+        cancelPendingStartLocked()
+        canceled
+    }
+
+    private fun cancelPendingStartLocked() {
+        startGeneration++
+        pendingStart?.cancel()
+        pendingStart = null
+    }
+
+    private fun isCurrentStart(generation: Long): Boolean = synchronized(startLock) {
+        generation == startGeneration
+    }
+
     private fun acceptSnapshot(value: VpnRuntimeSnapshot) {
         mutableSnapshot.value = value
         reconnectCoordinator.observe(value)
+    }
+
+    private companion object {
+        const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
+        const val VPN_NETWORK_POLL_MILLIS = 50L
     }
 }
 

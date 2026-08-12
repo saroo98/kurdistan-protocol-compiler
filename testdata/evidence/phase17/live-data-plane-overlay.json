@@ -155,12 +155,12 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "15a0cde434306c80f8cad9ab59bae2a7ca37b628b9ba32a863416f25e3643a9b"
+      "post_sha256": "6df51d08c14adce5fd687b2cff74ed539dd50ca7527acdfa5acacec681a5ee6d"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3dbdcbf32db9bc95c60b2979a94045dfd385dda4e16ae0b38e3eda9a68ec6e8e"
+      "post_sha256": "62ff7a194d695d11467c878c642bfabf46bd483fe3902b38fddd1bd739ef24d1"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
@@ -203,9 +203,14 @@
       "post_sha256": "512a97d183759ea5e6aebf1df2823aaafd49cfe7b9f5e2c8eb91af7f153ca4e6"
     },
     {
+      "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnNetworkTeardownBarrier.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "944df8631751c87e2fcfd5cc109ff9bf05e45eb88c8633725f888a5fba01b2f0"
+    },
+    {
       "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnRuntimeController.kt",
       "pre_sha256": "13a4d09b7c3594703d99061a983d94517fad4fb7b7067df82387098b30f53567",
-      "post_sha256": "dc6e2c2c4c9a6920ddb56b99b04aedb32229e53a5f0f7fc0f187ae3839f4fcf3"
+      "post_sha256": "671e8f5891bd5570d3cf09c9a0aef498afc852db86b5b12c8989627aa1522311"
     },
     {
       "path": "android/app/src/main/res/xml/network_security_config.xml",
@@ -228,6 +233,11 @@
       "post_sha256": "579f62077e52ab857a5570cd8c6011a54e2d90cf9f1299791b44c73b7a58dd52"
     },
     {
+      "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/VpnNetworkTeardownBarrierTest.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b82767cc9bed95f6ae81bbfa291f3108fbf024c049c9ebc319d104960c05db69"
+    },
+    {
       "path": "android/build.gradle.kts",
       "pre_sha256": "0b5ce80b1e6d8e7c6d1ffe1b1704066ce2b84ed564116c4fe62348e850e2195a",
       "post_sha256": "f220cf901726934bb9e6a8d4e259f1565a19bf0519fe68f67ad7a7913f911b78"
@@ -235,7 +245,7 @@
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "739da86946d7dcdf19d4ffe91589641bfebe2273d402ef4aab846c9af1b2f892"
+      "post_sha256": "4f06787ec092ceb19b4cdeb0f3fc07f3d10e6ee9d92eddd47be2ae3a2efb7078"
     },
     {
       "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
@@ -608,14 +618,34 @@
       "post_sha256": "ecb9fac1401889eb94cda2917d927e9793e741b0a6d3967444ab1f98243dfef1"
     },
     {
+      "path": "cmd/phase17field/host_awake.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e2547802b6f57c8c2299e3f41e6871ac0e0f5ed819a81357567122b43744c6c4"
+    },
+    {
+      "path": "cmd/phase17field/host_awake_other.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "53e63fa2f6b4fbe33629f8930e0d26714320cfe679e6533b14d003f529ce1600"
+    },
+    {
+      "path": "cmd/phase17field/host_awake_windows.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "64fdf2d65d93ca2225d6f23b0881b48bf238b22cac87a277a914ad856617100a"
+    },
+    {
+      "path": "cmd/phase17field/host_awake_windows_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "5f88d1e2bac31b61e5abf4cdfa60ae1dab33d89d5e1744d426da45e37152fec7"
+    },
+    {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "46b3d1fd45d0be8c8f6d0127f134279e5471411ef92c10306532b6697801b825"
+      "post_sha256": "a3b49e0dac973633c18c4d85f3b579887abd523429c661c19d4908e42a617d7b"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "897c253e57e9b9f98f91c07082a81f23a420f24070c3ef9d865bc2109ceacc8f"
+      "post_sha256": "c3e553a68536b634ac8e0b7bd79f684f9d7f061f687c9ca103e2f2fc6471151e"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -630,7 +660,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "26f766f3f1d9d571d5ef600b62d1f59e47464b37cc0bb0b33349c99099539cf1"
+      "post_sha256": "667fa399f99f37952205820ffad40d7df68a7561ae06ed36e9d61fec48e4c086"
     },
     {
       "path": "cmd/phase17verify/inventory_test.go",
