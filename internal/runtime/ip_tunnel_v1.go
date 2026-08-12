@@ -271,11 +271,11 @@ func (pump *PacketPumpV1) Close() error {
 	var first error
 	pump.closeOnce.Do(func() {
 		close(pump.closed)
-		pump.config.Endpoint.Abort()
-		if err := pump.config.Carrier.Close(); err != nil {
+		if err := pump.config.TUN.Close(); err != nil {
 			first = err
 		}
-		if err := pump.config.TUN.Close(); err != nil && first == nil {
+		pump.config.Endpoint.Abort()
+		if err := pump.config.Carrier.Close(); err != nil && first == nil {
 			first = err
 		}
 	})
