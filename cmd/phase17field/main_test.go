@@ -55,6 +55,22 @@ func TestRunWithHostWakeGuardFailsClosedBeforeCampaign(t *testing.T) {
 	}
 }
 
+func TestTerminalFailureLinePreservesOnlyBoundedSafeCategory(t *testing.T) {
+	want := "PHASE17_FAILURE profile revoke/reissue cycle 47 failed: VPN_NETWORK_NOT_READY"
+	if got := terminalFailureLine(errors.New("profile revoke/reissue cycle 47 failed: VPN_NETWORK_NOT_READY")); got != want {
+		t.Fatalf("terminal failure line = %q, want %q", got, want)
+	}
+
+	for _, unsafe := range []error{
+		errors.New("request failed for https://private.example.invalid/path"),
+		errors.New(strings.Repeat("x", 513)),
+	} {
+		if got := terminalFailureLine(unsafe); got != "PHASE17_FAILURE FIELD_FAILURE" {
+			t.Fatalf("unsafe terminal failure line = %q", got)
+		}
+	}
+}
+
 func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.T) {
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		if name != "ssh" || len(arguments) == 0 {
