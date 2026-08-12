@@ -20,6 +20,40 @@ import (
 	"time"
 )
 
+func TestRunWithHostWakeGuardAcquiresBeforeCampaignAndReleasesAfterFailure(t *testing.T) {
+	var actions []string
+	wantErr := errors.New("campaign failed")
+	err := runWithHostWakeGuard(func() (func(), error) {
+		actions = append(actions, "acquire")
+		return func() { actions = append(actions, "release") }, nil
+	}, func() error {
+		actions = append(actions, "run")
+		return wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("campaign error = %v, want %v", err, wantErr)
+	}
+	if !reflect.DeepEqual(actions, []string{"acquire", "run", "release"}) {
+		t.Fatalf("wake-guard actions = %v", actions)
+	}
+}
+
+func TestRunWithHostWakeGuardFailsClosedBeforeCampaign(t *testing.T) {
+	run := false
+	err := runWithHostWakeGuard(func() (func(), error) {
+		return nil, errors.New("platform call failed")
+	}, func() error {
+		run = true
+		return nil
+	})
+	if err == nil || err.Error() != "host wake inhibition unavailable" {
+		t.Fatalf("wake-guard error = %v", err)
+	}
+	if run {
+		t.Fatal("campaign ran without an active host wake inhibitor")
+	}
+}
+
 func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.T) {
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		if name != "ssh" || len(arguments) == 0 {
@@ -309,6 +343,17 @@ func TestRunBytesWithLimitEnforcesBoundForInjectedRunner(t *testing.T) {
 	}}
 	if _, err := runBytesWithLimit(context.Background(), runner, nil, ".", time.Second, 8, "fixture"); err == nil {
 		t.Fatal("injected runner output beyond the requested bound was accepted")
+	}
+}
+
+func TestRunBytesWithLimitPreservesDeadlineCategory(t *testing.T) {
+	runner := commandRunner{runFunc: func(ctx context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+		<-ctx.Done()
+		return nil, errors.New("command failed")
+	}}
+	_, err := runBytesWithLimit(context.Background(), runner, nil, ".", time.Millisecond, 8, "fixture")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("bounded command error = %v, want deadline exceeded", err)
 	}
 }
 
@@ -753,6 +798,35 @@ func TestIssueProfileRecoversCompletedIssuanceAfterSSHTransportLossWithoutReissu
 	}
 }
 
+func TestIssueProfileReportsSSHTimeoutAfterCommittedOutputReconciliationFails(t *testing.T) {
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		switch name {
+		case "scp":
+			return nil, nil
+		case "ssh":
+			command := arguments[len(arguments)-1]
+			switch {
+			case strings.Contains(command, "profile create"):
+				return nil, context.DeadlineExceeded
+			case strings.Contains(command, "PHASE17_ISSUE_READY"):
+				return nil, errors.New("not committed")
+			case strings.Contains(command, ".error"):
+				return nil, errors.New("error evidence unavailable")
+			default:
+				return nil, nil
+			}
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", scpPath: "scp"}
+	_, artifact, err := issueProfile(context.Background(), runner, value, t.TempDir(), []byte("recipient-request"))
+	clear(artifact)
+	if err == nil || err.Error() != "profile issuance transport timed out" {
+		t.Fatalf("profile issuance error = %v", err)
+	}
+}
+
 func TestIssueProfileRecoversCommittedOutputWhenRuntimeReloadWasPending(t *testing.T) {
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		switch name {
@@ -817,7 +891,7 @@ func TestCategorizeProfileIssuanceFailureReturnsOnlySafeKnownCategories(t *testi
 		"command":    {raw: "PROFILE_COMMAND_FAILED_1\n", want: "profile issuance failed: command produced no category"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := categorizeProfileIssuanceFailure([]byte(test.raw))
+			err := categorizeProfileIssuanceFailure([]byte(test.raw), nil)
 			if err == nil || err.Error() != test.want {
 				t.Fatalf("category error = %v, want %q", err, test.want)
 			}
@@ -830,12 +904,48 @@ func TestCategorizeProfileIssuanceFailureReturnsOnlySafeKnownCategories(t *testi
 
 func TestCategorizeProfileIssuanceFailureDoesNotEchoUnknownOutput(t *testing.T) {
 	raw := []byte("kurdctl: unexpected failure endpoint 198.51.100.7 password=secret\n")
-	err := categorizeProfileIssuanceFailure(raw)
+	err := categorizeProfileIssuanceFailure(raw, nil)
 	if err == nil || err.Error() != "profile issuance failed" {
 		t.Fatalf("unknown failure category = %v", err)
 	}
 	if strings.Contains(err.Error(), "198.51.100.7") || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("unknown failure leaked command output: %v", err)
+	}
+}
+
+func TestCategorizeProfileIssuanceFailurePreservesSafeTransportCategories(t *testing.T) {
+	for name, test := range map[string]struct {
+		raw       []byte
+		transport error
+		want      string
+	}{
+		"deadline": {
+			transport: context.DeadlineExceeded,
+			want:      "profile issuance transport timed out",
+		},
+		"cancelled": {
+			transport: context.Canceled,
+			want:      "profile issuance cancelled",
+		},
+		"generic": {
+			transport: errors.New("private endpoint and credential details"),
+			want:      "profile issuance transport failed",
+		},
+		"known-marker-wins": {
+			raw:       []byte("PROFILE_RUNTIME_RELOAD_FAILED\n"),
+			transport: context.DeadlineExceeded,
+			want:      "profile issuance committed: relay runtime reload failed",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := categorizeProfileIssuanceFailure(test.raw, test.transport)
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("category error = %v, want %q", err, test.want)
+			}
+			if !safeCategory([]byte(err.Error())) {
+				t.Fatalf("category is not privacy-safe: %v", err)
+			}
+		})
 	}
 }
 
