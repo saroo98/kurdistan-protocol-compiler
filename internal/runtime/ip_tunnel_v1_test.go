@@ -49,6 +49,41 @@ func TestClassifyRelayTransportV1ReportsOnlyBoundedDNSAndChecksumCategories(t *t
 	}
 }
 
+func TestPacketPumpCloseReleasesTUNBeforePotentiallyBlockingRemoteTeardown(t *testing.T) {
+	carrierCloseStarted := make(chan struct{})
+	releaseCarrierClose := make(chan struct{})
+	tunClosed := make(chan struct{})
+	pump := &PacketPumpV1{
+		config: PacketPumpConfigV1{
+			TUN: &closeSignalPacketDeviceV1{closed: tunClosed},
+			Carrier: &blockingClosePacketDeviceV1{
+				started: carrierCloseStarted,
+				release: releaseCarrierClose,
+			},
+			Endpoint: closeOrderEndpointV1{},
+		},
+		closed: make(chan struct{}),
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- pump.Close() }()
+	defer func() {
+		close(releaseCarrierClose)
+		<-done
+	}()
+
+	select {
+	case <-carrierCloseStarted:
+	case <-time.After(time.Second):
+		t.Fatal("carrier close did not start")
+	}
+	select {
+	case <-tunClosed:
+	default:
+		t.Fatal("TUN remained open while remote carrier teardown was blocked")
+	}
+}
+
 func TestClassifyRelayReturnTransportV1ReportsOnlyBoundedTCPAndChecksumCategories(t *testing.T) {
 	assigned := [4]byte{10, 89, 1, 2}
 	remote := [4]byte{198, 51, 100, 8}
@@ -586,6 +621,38 @@ type memoryPacketDeviceV1 struct {
 }
 
 type shortWritePacketDeviceV1 struct{ *memoryPacketDeviceV1 }
+
+type closeOrderEndpointV1 struct{ ProcessDuplexEndpointV1 }
+
+func (closeOrderEndpointV1) Abort() {}
+
+type closeSignalPacketDeviceV1 struct {
+	closed chan struct{}
+	once   sync.Once
+}
+
+func (*closeSignalPacketDeviceV1) Read([]byte) (int, error)        { return 0, io.EOF }
+func (*closeSignalPacketDeviceV1) Write(value []byte) (int, error) { return len(value), nil }
+func (device *closeSignalPacketDeviceV1) Close() error {
+	device.once.Do(func() { close(device.closed) })
+	return nil
+}
+
+type blockingClosePacketDeviceV1 struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (*blockingClosePacketDeviceV1) Read([]byte) (int, error)        { return 0, io.EOF }
+func (*blockingClosePacketDeviceV1) Write(value []byte) (int, error) { return len(value), nil }
+func (device *blockingClosePacketDeviceV1) Close() error {
+	device.once.Do(func() {
+		close(device.started)
+		<-device.release
+	})
+	return nil
+}
 
 func (device *shortWritePacketDeviceV1) Write(packet []byte) (int, error) {
 	if len(packet) == 0 {
