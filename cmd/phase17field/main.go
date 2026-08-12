@@ -50,12 +50,23 @@ const (
 	recipientFile               = fieldDirectory + "/recipient-request.bin"
 	profileFile                 = fieldDirectory + "/sealed-profile.bin"
 	fieldResultFile             = fieldDirectory + "/result.txt"
+	impairmentVerificationTries = 3
+	impairmentRetryDelay        = 250 * time.Millisecond
 	frozenRestartCycles         = 100
 	frozenProfileRotationCycles = 100
 	maximumRelayRSSBytes        = 384 << 20
 	maximumRelayFileDescriptors = 1024
 	maximumRelaySwapBytes       = 64 << 20
 )
+
+type fieldActionFailure struct {
+	action   string
+	category string
+}
+
+func (failure *fieldActionFailure) Error() string {
+	return fmt.Sprintf("Android field action %s failed: %s", failure.action, failure.category)
+}
 
 var requiredChecks = []string{
 	"preflight", "packageVerification", "install", "serviceHealth", "enrollment",
@@ -776,7 +787,7 @@ func runFieldAction(ctx context.Context, runner commandRunner, value config, roo
 	category := instrumentationFailureCategory(instrumentation)
 	clear(instrumentation)
 	if category != "" {
-		return fmt.Errorf("Android field action %s failed: %s", action, category)
+		return &fieldActionFailure{action: action, category: category}
 	}
 	if err != nil {
 		return fmt.Errorf("Android field action %s failed", action)
@@ -786,6 +797,32 @@ func runFieldAction(ctx context.Context, runner commandRunner, value config, roo
 		return fmt.Errorf("Android field action %s returned invalid evidence", action)
 	}
 	return nil
+}
+
+func verifyImpairedFieldTraffic(ctx context.Context, verify func(context.Context) error) error {
+	for attempt := 0; attempt < impairmentVerificationTries; attempt++ {
+		err := verify(ctx)
+		if err == nil {
+			return nil
+		}
+		var failure *fieldActionFailure
+		if !errors.As(err, &failure) ||
+			failure.action != "traffic" ||
+			(failure.category != "DATA_PLANE_PROBE_FAILED" && failure.category != "DATA_PLANE_TIMEOUT") ||
+			attempt+1 == impairmentVerificationTries {
+			return err
+		}
+		timer := time.NewTimer(impairmentRetryDelay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return errors.New("impaired traffic verification exhausted")
 }
 
 func instrumentationFailureCategory(raw []byte) string {
@@ -1637,7 +1674,9 @@ func exerciseRemoteImpairment(
 			result = errors.New("network impairment cleanup failed")
 		}
 	}()
-	return verifyFieldTraffic(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized)
+	return verifyImpairedFieldTraffic(ctx, func(attemptCtx context.Context) error {
+		return verifyFieldTraffic(attemptCtx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized)
+	})
 }
 
 func remoteImpairmentApplyScript(scenario impairmentScenario) string {

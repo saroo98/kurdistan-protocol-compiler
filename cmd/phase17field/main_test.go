@@ -1386,6 +1386,78 @@ func TestExecuteStressCampaignRunsExactFrozenInventory(t *testing.T) {
 	}
 }
 
+func TestVerifyImpairedFieldTrafficRetriesTransientProbeFailure(t *testing.T) {
+	attempts := 0
+	err := verifyImpairedFieldTraffic(context.Background(), func(context.Context) error {
+		attempts++
+		if attempts == 1 {
+			return &fieldActionFailure{
+				action:   "traffic",
+				category: "DATA_PLANE_PROBE_FAILED",
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("verify impaired traffic: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts=%d, want 2", attempts)
+	}
+}
+
+func TestVerifyImpairedFieldTrafficFailsAfterBoundedTransientAttempts(t *testing.T) {
+	attempts := 0
+	want := &fieldActionFailure{
+		action:   "traffic",
+		category: "DATA_PLANE_TIMEOUT",
+	}
+	err := verifyImpairedFieldTraffic(context.Background(), func(context.Context) error {
+		attempts++
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error=%v, want final transient failure", err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
+func TestVerifyImpairedFieldTrafficDoesNotRetryNonTransientFailure(t *testing.T) {
+	attempts := 0
+	want := errors.New("authority rejected")
+	err := verifyImpairedFieldTraffic(context.Background(), func(context.Context) error {
+		attempts++
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error=%v, want non-transient failure", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
+func TestVerifyImpairedFieldTrafficHonorsCancellationBeforeRetry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	attempts := 0
+	err := verifyImpairedFieldTraffic(ctx, func(context.Context) error {
+		attempts++
+		cancel()
+		return &fieldActionFailure{
+			action:   "traffic",
+			category: "DATA_PLANE_PROBE_FAILED",
+		}
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error=%v, want context canceled", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
 func TestReadCleanSourceIdentityRequiresAnExactCommittedTree(t *testing.T) {
 	const commit = "1111111111111111111111111111111111111111"
 	const tree = "2222222222222222222222222222222222222222"
