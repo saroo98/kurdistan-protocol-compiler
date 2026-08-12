@@ -109,22 +109,46 @@ class Phase17LiveDataPlaneDeviceTest {
     fun teardownBarrierRequiresActiveVpnTransportToDisappearBeforeNextSession() = runBlocking {
         var samples = 0
         assertTrue(
-            Phase17FieldHarness.awaitVpnNetworkTeardown(
+            VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(
                 timeoutMillis = 1_000,
                 pollMillis = 1,
-            ) {
-                samples += 1
-                samples < 3
-            },
+                vpnTransportSnapshot = {
+                    samples += 1
+                    listOf(samples < 3)
+                },
+            ),
         )
         assertEquals(3, samples)
 
         assertFalse(
-            Phase17FieldHarness.awaitVpnNetworkTeardown(
+            VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(
                 timeoutMillis = 10,
                 pollMillis = 1,
-            ) { true },
+                vpnTransportSnapshot = { listOf(true) },
+            ),
         )
+    }
+
+    @Test
+    fun teardownBarrierWaitsForEveryRegisteredVpnTransport() = runBlocking {
+        var samples = 0
+        assertTrue(
+            VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(
+                timeoutMillis = 1_000,
+                pollMillis = 1,
+                vpnTransportSnapshot = {
+                    samples += 1
+                    if (samples < 3) {
+                        // The default network has already fallen back to the
+                        // underlay, but Android still retains the old VPN.
+                        listOf(false, true)
+                    } else {
+                        listOf(false, false)
+                    }
+                },
+            ),
+        )
+        assertEquals(3, samples)
     }
 
     @Test
