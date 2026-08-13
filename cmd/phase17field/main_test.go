@@ -1470,6 +1470,26 @@ func TestVerifyImpairedFieldTrafficRetriesTransientProbeFailure(t *testing.T) {
 	}
 }
 
+func TestVerifyImpairedFieldTrafficRetriesTransientDNSUnavailability(t *testing.T) {
+	attempts := 0
+	err := verifyImpairedFieldTraffic(context.Background(), func(context.Context) error {
+		attempts++
+		if attempts == 1 {
+			return &fieldActionFailure{
+				action:   "traffic",
+				category: "DNS_UNAVAILABLE",
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("verify impaired traffic: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts=%d, want 2", attempts)
+	}
+}
+
 func TestVerifyImpairedFieldTrafficFailsAfterBoundedTransientAttempts(t *testing.T) {
 	attempts := 0
 	want := &fieldActionFailure{
