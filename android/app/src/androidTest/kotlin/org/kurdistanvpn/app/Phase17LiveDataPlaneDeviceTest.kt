@@ -14,7 +14,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
+import java.net.SocketException
 import java.net.SocketTimeoutException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -32,6 +35,7 @@ import org.kurdistanvpn.runtime.android.LiveTunnelInvariantProbe
 import org.kurdistanvpn.runtime.api.LiveTunnelFailure
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 class Phase17LiveDataPlaneDeviceTest {
@@ -264,6 +268,155 @@ class Phase17LiveDataPlaneDeviceTest {
 
     @SdkSuppress(minSdkVersion = 34)
     @Test
+    fun fieldProbeReacquiresOnlyAfterFreshControlledReconnect() = runBlocking {
+        val initial = activeFieldSnapshot(
+            requestId = "request-1",
+            startedAt = 1_000,
+            maxAttempts = 2,
+        )
+        val snapshots = MutableStateFlow(initial)
+        var authorityPreparations = 1
+        var networkAcquisitions = 0
+        var probeAttempts = 0
+
+        val consumedRetries = Phase17FieldHarness.runVerifiedProbeWithReconnect(
+            initialSnapshot = initial,
+            runtimeSnapshots = snapshots,
+            authorityPreparationCount = { authorityPreparations },
+            reconnectTimeoutMillis = 1_000,
+            acquireNetwork = { "network-${++networkAcquisitions}" },
+            verify = { network ->
+                probeAttempts++
+                if (probeAttempts == 1) {
+                    authorityPreparations++
+                    snapshots.value = VpnRuntimeSnapshot(VpnRuntimeState.RECONNECTING)
+                    snapshots.value = activeFieldSnapshot(
+                        requestId = "request-2",
+                        startedAt = 2_000,
+                        maxAttempts = 2,
+                    )
+                    throw SocketException("old VPN network was replaced")
+                }
+                assertEquals("network-2", network)
+            },
+        )
+
+        assertEquals(1, consumedRetries)
+        assertEquals(2, authorityPreparations)
+        assertEquals(2, networkAcquisitions)
+        assertEquals(2, probeAttempts)
+
+        assertFieldReconnectFailure("FIELD_RECONNECT_AUTHORITY_NOT_FRESH") {
+            val stale = MutableStateFlow(initial)
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = initial,
+                runtimeSnapshots = stale,
+                authorityPreparationCount = { 1 },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = {
+                    stale.value = activeFieldSnapshot(
+                        requestId = "request-2",
+                        startedAt = 2_000,
+                        maxAttempts = 2,
+                    )
+                    throw SocketException("stale authority")
+                },
+            )
+        }
+        assertFieldReconnectFailure("FIELD_RECONNECT_REVOKED") {
+            val revoked = MutableStateFlow(initial)
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = initial,
+                runtimeSnapshots = revoked,
+                authorityPreparationCount = { 1 },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = {
+                    revoked.value = VpnRuntimeSnapshot(
+                        state = VpnRuntimeState.REVOKED,
+                        failure = "PROFILE_REVOKED",
+                    )
+                    throw SocketException("revoked")
+                },
+            )
+        }
+        assertFieldReconnectFailure("FIELD_RECONNECT_NOT_RETRYABLE") {
+            val failed = MutableStateFlow(initial)
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = initial,
+                runtimeSnapshots = failed,
+                authorityPreparationCount = { 1 },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = {
+                    failed.value = VpnRuntimeSnapshot(
+                        state = VpnRuntimeState.FAILED,
+                        failure = "LIVE_TLS_REJECTED",
+                    )
+                    throw SocketException("non-retryable")
+                },
+            )
+        }
+        assertFieldReconnectFailure("FIELD_RECONNECT_CANCELLED") {
+            val stopped = MutableStateFlow(initial)
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = initial,
+                runtimeSnapshots = stopped,
+                authorityPreparationCount = { 1 },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = {
+                    stopped.value = VpnRuntimeSnapshot(VpnRuntimeState.IDLE)
+                    throw SocketException("manual disconnect")
+                },
+            )
+        }
+        assertFieldReconnectFailure("FIELD_RECONNECT_EXHAUSTED") {
+            val oneAttempt = activeFieldSnapshot(
+                requestId = "request-1",
+                startedAt = 1_000,
+                maxAttempts = 1,
+            )
+            val exhausted = MutableStateFlow(oneAttempt)
+            var preparations = 1
+            var attempts = 0
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = oneAttempt,
+                runtimeSnapshots = exhausted,
+                authorityPreparationCount = { preparations },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = {
+                    attempts++
+                    if (attempts == 1) {
+                        preparations++
+                        exhausted.value = activeFieldSnapshot(
+                            requestId = "request-2",
+                            startedAt = 2_000,
+                            maxAttempts = 1,
+                        )
+                    }
+                    throw SocketException("probe interrupted")
+                },
+            )
+        }
+
+        val cancellation = runCatching {
+            Phase17FieldHarness.runVerifiedProbeWithReconnect(
+                initialSnapshot = initial,
+                runtimeSnapshots = MutableStateFlow(initial),
+                authorityPreparationCount = { 1 },
+                reconnectTimeoutMillis = 100,
+                acquireNetwork = { Unit },
+                verify = { throw CancellationException("cancelled") },
+            )
+        }.exceptionOrNull()
+        assertTrue(cancellation is CancellationException)
+    }
+
+    @SdkSuppress(minSdkVersion = 34)
+    @Test
     fun profileRevocationAndBackupRestoreFailClosed() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val application = instrumentation.targetContext.applicationContext as KurdistanApplication
@@ -360,6 +513,31 @@ class Phase17LiveDataPlaneDeviceTest {
         val error = runCatching(block).exceptionOrNull()
         assertTrue("unsafe policy was accepted", error is IllegalArgumentException)
     }
+
+    private suspend fun assertFieldReconnectFailure(
+        expected: String,
+        block: suspend () -> Unit,
+    ) {
+        val failure = runCatching { block() }.exceptionOrNull()
+        assertTrue("expected $expected but was $failure", failure is IllegalStateException)
+        assertEquals(expected, failure?.message)
+    }
+
+    private fun activeFieldSnapshot(
+        requestId: String,
+        startedAt: Long,
+        maxAttempts: Int,
+    ) = VpnRuntimeSnapshot(
+        state = VpnRuntimeState.ACTIVE_KURD_LIVE,
+        startedAtElapsedRealtime = startedAt,
+        profileGeneration = 7,
+        planDigest = "a".repeat(64),
+        profileFingerprint = "profile",
+        strategyFingerprint = "strategy",
+        relayFingerprint = "relay",
+        maxReconnectAttempts = maxAttempts,
+        runtimeRequestId = requestId,
+    )
 
     private fun assertNoAuthorityEvidence(snapshot: org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot) {
         assertEquals(0, snapshot.profileGeneration)

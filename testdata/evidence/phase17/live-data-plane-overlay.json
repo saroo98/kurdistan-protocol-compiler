@@ -155,12 +155,12 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6df51d08c14adce5fd687b2cff74ed539dd50ca7527acdfa5acacec681a5ee6d"
+      "post_sha256": "a0c0542510294c7ee98ffb0ea8fca093bdfcb1bd75b6e61887bf75c0141bf06f"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "62ff7a194d695d11467c878c642bfabf46bd483fe3902b38fddd1bd739ef24d1"
+      "post_sha256": "2731aed16ad8687081e7270a460fef301d3abface26093bc35dab579a3a862f0"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
@@ -245,7 +245,7 @@
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "4f06787ec092ceb19b4cdeb0f3fc07f3d10e6ee9d92eddd47be2ae3a2efb7078"
+      "post_sha256": "c2e6e38d80b450e0e4975d593537c99156f8fcb160df6f575bb44f6159b87dc4"
     },
     {
       "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
@@ -600,7 +600,7 @@
     {
       "path": "cmd/phase17devicegate/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6afc3f33c726bf5b352df7ce576bb39f6ac10e40473138a217d0a12fb44cbb78"
+      "post_sha256": "2ba93608b2cbb6ee8fd17dbe3f27bcbd263510fa2ff2075721beb444c5cca8ae"
     },
     {
       "path": "cmd/phase17devicegate/main_test.go",
@@ -660,7 +660,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "667fa399f99f37952205820ffad40d7df68a7561ae06ed36e9d61fec48e4c086"
+      "post_sha256": "8c28291448a0b4c605cab7564f2883cea74bff9e6e24bd956af0ae136444aef4"
     },
     {
       "path": "cmd/phase17verify/inventory_test.go",
