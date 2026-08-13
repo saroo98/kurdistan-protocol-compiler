@@ -1287,6 +1287,37 @@ func TestRunFieldActionDeletesStaleEvidenceBeforeInstrumentation(t *testing.T) {
 	}
 }
 
+func TestRunFieldActionAllowsBoundedADBReadinessAfterEmulatorBoot(t *testing.T) {
+	sawShortResetDeadline := false
+	runner := commandRunner{runFunc: func(ctx context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch {
+		case strings.Contains(joined, "run-as "+appPackage+" rm -f "+fieldResultFile):
+			deadline, ok := ctx.Deadline()
+			if !ok || time.Until(deadline) < 5*time.Second {
+				sawShortResetDeadline = true
+			}
+			return nil, nil
+		case strings.Contains(joined, "am instrument"):
+			return []byte("OK"), nil
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldResultFile):
+			return []byte("CONNECTED"), nil
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	value := config{adbPath: "adb"}
+	if err := runFieldAction(context.Background(), runner, value, "", "emulator-5554", "connect", nil, "CONNECTED"); err != nil {
+		t.Fatal(err)
+	}
+	if sawShortResetDeadline {
+		t.Fatal("ADB evidence reset retained a sub-five-second readiness deadline")
+	}
+}
+
 func TestRetryFieldEvidenceResetSurvivesTransientInstrumentationTeardown(t *testing.T) {
 	attempts := 0
 	err := retryFieldEvidenceReset(context.Background(), 4, 0, func(context.Context) error {
