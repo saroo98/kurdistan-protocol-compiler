@@ -19,9 +19,11 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertTrue
@@ -36,6 +38,7 @@ import org.kurdistanvpn.platform.importing.VerifyRequestEncoder
 import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 /**
@@ -58,6 +61,7 @@ internal object Phase17FieldHarness {
     private const val ARG_VERIFY_IPV6 = "phase17VerifyIPv6"
     private const val MAX_PROBE_RESPONSE_BYTES = 64
     private const val VPN_NETWORK_READY_TIMEOUT_MILLIS = 10_000L
+    private const val LIVE_RECONNECT_READY_TIMEOUT_MILLIS = 120_000L
     private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
     private const val VPN_NETWORK_POLL_MILLIS = 50L
 
@@ -89,6 +93,121 @@ internal object Phase17FieldHarness {
             state == VpnRuntimeState.FAILED &&
             failure in setOf("LIVE_TLS_REJECTED", "LIVE_FALLBACK_EXHAUSTED") &&
             packetDisposition == "LIVE_STAGE_SOCKET_PROTECTED"
+
+    internal suspend fun <T> runVerifiedProbeWithReconnect(
+        initialSnapshot: VpnRuntimeSnapshot,
+        runtimeSnapshots: StateFlow<VpnRuntimeSnapshot>,
+        authorityPreparationCount: () -> Int,
+        reconnectTimeoutMillis: Long,
+        acquireNetwork: suspend () -> T,
+        verify: suspend (T) -> Unit,
+    ): Int {
+        require(reconnectTimeoutMillis > 0) { "FIELD_RECONNECT_TIMEOUT_REJECTED" }
+        validateActiveReconnectSnapshot(initialSnapshot, previous = null, signedMaximum = null)
+        val signedMaximum = initialSnapshot.maxReconnectAttempts
+        var current = initialSnapshot
+        var observedAuthorityCount = authorityPreparationCount()
+        check(observedAuthorityCount > 0) { "FIELD_RECONNECT_AUTHORITY_MISSING" }
+        var consumedRetries = 0
+
+        while (true) {
+            val network = acquireNetwork()
+            try {
+                verify(network)
+                return consumedRetries
+            } catch (failure: IOException) {
+                if (consumedRetries >= signedMaximum) {
+                    throw IllegalStateException("FIELD_RECONNECT_EXHAUSTED", failure)
+                }
+                val next = withTimeoutOrNull(reconnectTimeoutMillis) {
+                    runtimeSnapshots.first { candidate ->
+                        isFreshSessionCandidate(candidate, current) ||
+                            isTerminalReconnectObservation(candidate)
+                    }
+                } ?: throw IllegalStateException("FIELD_RECONNECT_TIMEOUT", failure)
+
+                when {
+                    next.state == VpnRuntimeState.REVOKED ->
+                        throw IllegalStateException("FIELD_RECONNECT_REVOKED", failure)
+                    next.state == VpnRuntimeState.IDLE || next.state == VpnRuntimeState.STOPPING ->
+                        throw IllegalStateException("FIELD_RECONNECT_CANCELLED", failure)
+                    next.failure == "RECONNECT_EXHAUSTED" ->
+                        throw IllegalStateException("FIELD_RECONNECT_EXHAUSTED", failure)
+                    next.state == VpnRuntimeState.FAILED || next.state == VpnRuntimeState.BLOCKED ->
+                        throw IllegalStateException("FIELD_RECONNECT_NOT_RETRYABLE", failure)
+                }
+
+                validateActiveReconnectSnapshot(next, current, signedMaximum)
+                val nextAuthorityCount = authorityPreparationCount()
+                if (nextAuthorityCount <= observedAuthorityCount) {
+                    throw IllegalStateException("FIELD_RECONNECT_AUTHORITY_NOT_FRESH", failure)
+                }
+                val newlyConsumed = nextAuthorityCount - observedAuthorityCount
+                if (newlyConsumed > signedMaximum - consumedRetries) {
+                    throw IllegalStateException("FIELD_RECONNECT_EXHAUSTED", failure)
+                }
+                consumedRetries += newlyConsumed
+                observedAuthorityCount = nextAuthorityCount
+                current = next
+            }
+        }
+    }
+
+    private fun isFreshSessionCandidate(
+        candidate: VpnRuntimeSnapshot,
+        previous: VpnRuntimeSnapshot,
+    ): Boolean =
+        candidate.state == VpnRuntimeState.ACTIVE_KURD_LIVE &&
+            !candidate.runtimeRequestId.isNullOrBlank() &&
+            candidate.runtimeRequestId != previous.runtimeRequestId
+
+    private fun isTerminalReconnectObservation(candidate: VpnRuntimeSnapshot): Boolean = when {
+        candidate.state == VpnRuntimeState.REVOKED -> true
+        candidate.state == VpnRuntimeState.IDLE || candidate.state == VpnRuntimeState.STOPPING -> true
+        candidate.state == VpnRuntimeState.FAILED || candidate.state == VpnRuntimeState.BLOCKED ->
+            !isRetryableRuntimeFailure(candidate.failure)
+        else -> false
+    }
+
+    private fun validateActiveReconnectSnapshot(
+        candidate: VpnRuntimeSnapshot,
+        previous: VpnRuntimeSnapshot?,
+        signedMaximum: Int?,
+    ) {
+        check(candidate.state == VpnRuntimeState.ACTIVE_KURD_LIVE) {
+            "FIELD_RECONNECT_SESSION_NOT_ACTIVE"
+        }
+        check(!candidate.runtimeRequestId.isNullOrBlank()) { "FIELD_RECONNECT_REQUEST_MISSING" }
+        check(candidate.startedAtElapsedRealtime > 0) { "FIELD_RECONNECT_START_TIME_MISSING" }
+        check(candidate.profileGeneration > 0 && !candidate.planDigest.isNullOrBlank()) {
+            "FIELD_RECONNECT_AUTHORITY_EVIDENCE_MISSING"
+        }
+        check(candidate.maxReconnectAttempts in 1..5) { "FIELD_RECONNECT_POLICY_REJECTED" }
+        if (previous == null) return
+
+        check(candidate.runtimeRequestId != previous.runtimeRequestId) {
+            "FIELD_RECONNECT_REQUEST_NOT_FRESH"
+        }
+        check(candidate.startedAtElapsedRealtime > previous.startedAtElapsedRealtime) {
+            "FIELD_RECONNECT_START_TIME_NOT_FRESH"
+        }
+        check(candidate.profileGeneration == previous.profileGeneration) {
+            "FIELD_RECONNECT_AUTHORITY_CHANGED"
+        }
+        check(candidate.planDigest == previous.planDigest) { "FIELD_RECONNECT_AUTHORITY_CHANGED" }
+        check(candidate.profileFingerprint == previous.profileFingerprint) {
+            "FIELD_RECONNECT_AUTHORITY_CHANGED"
+        }
+        check(candidate.strategyFingerprint == previous.strategyFingerprint) {
+            "FIELD_RECONNECT_AUTHORITY_CHANGED"
+        }
+        check(candidate.relayFingerprint == previous.relayFingerprint) {
+            "FIELD_RECONNECT_AUTHORITY_CHANGED"
+        }
+        check(candidate.maxReconnectAttempts <= requireNotNull(signedMaximum)) {
+            "FIELD_RECONNECT_POLICY_WIDENED"
+        }
+    }
 
     suspend fun runIfRequested(): Boolean {
         val action = InstrumentationRegistry.getArguments().getString(ARG_ACTION)
@@ -224,7 +343,9 @@ internal object Phase17FieldHarness {
             routingPolicy = VpnRoutingPolicy(),
             mtu = 1280,
         )
+        val authorityPreparations = AtomicInteger()
         val authorityProvider = FreshRuntimeAuthorityProvider {
+            authorityPreparations.incrementAndGet()
             when (val result = coordinators.runtime.openLiveAuthority(localRecordId)) {
                 is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Success ->
                     result.material.use { material ->
@@ -297,24 +418,38 @@ internal object Phase17FieldHarness {
                     dnsFamily != null -> listOf(dnsFamily)
                     else -> listOf(4)
                 }
-                val vpnNetwork = awaitVerifiedVpnNetwork(application, requiredDnsFamilies)
                 val stable = controller.snapshot.value
                 check(stable.state == VpnRuntimeState.ACTIVE_KURD_LIVE) {
                     "LIVE_RUNTIME_UNSTABLE:${stable.failure ?: stable.state.name}:" +
                         (stable.packetDisposition ?: "NONE")
                 }
                 try {
+                    runVerifiedProbeWithReconnect(
+                        initialSnapshot = stable,
+                        runtimeSnapshots = controller.snapshot,
+                        authorityPreparationCount = authorityPreparations::get,
+                        reconnectTimeoutMillis = LIVE_RECONNECT_READY_TIMEOUT_MILLIS,
+                        acquireNetwork = {
+                            awaitVerifiedVpnNetwork(application, requiredDnsFamilies)
+                        },
+                        verify = { vpnNetwork ->
+                            if (trafficDnsFamilies.isNotEmpty()) {
+                                trafficDnsFamilies.forEach { family ->
+                                    verifyDnsPlane(vpnNetwork, family, expectAvailable = true)
+                                }
+                                verifyDataPlane(vpnNetwork)
+                            } else if (dnsFamily == null) {
+                                verifyDataPlane(vpnNetwork)
+                            } else {
+                                verifyDnsPlane(vpnNetwork, dnsFamily, expectDnsAvailable)
+                            }
+                        },
+                    )
                     if (trafficDnsFamilies.isNotEmpty()) {
-                        trafficDnsFamilies.forEach { family ->
-                            verifyDnsPlane(vpnNetwork, family, expectAvailable = true)
-                        }
-                        verifyDataPlane(vpnNetwork)
                         writeAtomic(File(fieldRoot, RESULT), "TRAFFIC_VERIFIED\n".encodeToByteArray())
                     } else if (dnsFamily == null) {
-                        verifyDataPlane(vpnNetwork)
                         writeAtomic(File(fieldRoot, RESULT), "DATA_PLANE_VERIFIED\n".encodeToByteArray())
                     } else {
-                        verifyDnsPlane(vpnNetwork, dnsFamily, expectDnsAvailable)
                         val outcome = if (expectDnsAvailable) "VERIFIED" else "FAIL_CLOSED"
                         writeAtomic(
                             File(fieldRoot, RESULT),
