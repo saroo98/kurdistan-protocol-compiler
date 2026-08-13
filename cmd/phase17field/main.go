@@ -53,6 +53,7 @@ const (
 	fieldEvidenceResetAttempts  = 31
 	fieldEvidenceResetDelay     = time.Second
 	fieldEvidenceResetTimeout   = 30 * time.Second
+	fieldEvidenceAttemptTimeout = 10 * time.Second
 	impairmentVerificationTries = 3
 	impairmentRetryDelay        = 250 * time.Millisecond
 	frozenRestartCycles         = 100
@@ -793,7 +794,7 @@ func selectDevice(ctx context.Context, runner commandRunner, value config) (stri
 func runFieldAction(ctx context.Context, runner commandRunner, value config, root, serial, action string, extras map[string]string, expected string) error {
 	resetCtx, cancelReset := context.WithTimeout(ctx, fieldEvidenceResetTimeout)
 	err := retryFieldEvidenceReset(resetCtx, fieldEvidenceResetAttempts, fieldEvidenceResetDelay, func(attemptCtx context.Context) error {
-		raw, resetErr := runBytes(attemptCtx, runner, nil, root, 3*time.Second, value.adbPath,
+		raw, resetErr := runBytes(attemptCtx, runner, nil, root, fieldEvidenceAttemptTimeout, value.adbPath,
 			"-s", serial, "shell", "run-as", appPackage, "rm", "-f", fieldResultFile)
 		clear(raw)
 		return resetErr
