@@ -862,7 +862,9 @@ func verifyImpairedFieldTraffic(ctx context.Context, verify func(context.Context
 		var failure *fieldActionFailure
 		if !errors.As(err, &failure) ||
 			failure.action != "traffic" ||
-			(failure.category != "DATA_PLANE_PROBE_FAILED" && failure.category != "DATA_PLANE_TIMEOUT") ||
+			(failure.category != "DATA_PLANE_PROBE_FAILED" &&
+				failure.category != "DATA_PLANE_TIMEOUT" &&
+				failure.category != "DNS_UNAVAILABLE") ||
 			attempt+1 == impairmentVerificationTries {
 			return err
 		}
