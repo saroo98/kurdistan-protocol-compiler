@@ -1186,7 +1186,10 @@ func categorizeProfileIssuanceFailure(raw []byte, transportErr error) error {
 	return errors.New("profile issuance failed")
 }
 
-const remoteHealthAttempts = 10
+const (
+	remoteHealthAttempts          = 10
+	remoteDeploymentStateAttempts = 5
+)
 
 func assertRemoteHealth(ctx context.Context, runner commandRunner, value config, root string) error {
 	script := fmt.Sprintf(`set -eu
@@ -1359,11 +1362,37 @@ func setRemoteDeployment(ctx context.Context, runner commandRunner, value config
 	} else if category != "DEPLOYMENT_MUTATION_PASS" {
 		return errors.New("deployment mutation response rejected")
 	}
-	observed, err := remoteDeploymentDisabled(ctx, runner, value, root)
-	if err != nil || observed != disabled {
+	if err := waitRemoteDeploymentState(ctx, runner, value, root, disabled); err != nil {
 		return errors.New("deployment durable state mismatch")
 	}
 	return nil
+}
+
+func waitRemoteDeploymentState(ctx context.Context, runner commandRunner, value config, root string, disabled bool) error {
+	var last error
+	for attempt := 0; attempt < remoteDeploymentStateAttempts; attempt++ {
+		observed, err := remoteDeploymentDisabled(ctx, runner, value, root)
+		if err == nil && observed == disabled {
+			return nil
+		}
+		last = err
+		if last == nil {
+			last = errors.New("deployment state has not converged")
+		}
+		if attempt+1 == remoteDeploymentStateAttempts {
+			break
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return errors.New("deployment state convergence cancelled")
+		case <-timer.C:
+		}
+	}
+	return last
 }
 
 func withRemoteDeploymentDisabled(ctx context.Context, runner commandRunner, value config, root string, during func() error) (resultErr error) {
