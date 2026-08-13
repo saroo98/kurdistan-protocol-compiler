@@ -16,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
 import java.net.SocketException
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -413,6 +414,35 @@ class Phase17LiveDataPlaneDeviceTest {
             )
         }.exceptionOrNull()
         assertTrue(cancellation is CancellationException)
+    }
+
+    @SdkSuppress(minSdkVersion = 34)
+    @Test
+    fun networkScopedDnsReadinessWaitsForResolverAfterRapidVpnTransitions() = runBlocking {
+        var attempts = 0
+
+        val observedAttempts = Phase17FieldHarness.awaitNetworkScopedDnsReadiness(
+            timeoutMillis = 1_000,
+            pollMillis = 1,
+            resolve = {
+                attempts++
+                if (attempts < 3) {
+                    throw UnknownHostException("resolver is not attached to the new VPN network yet")
+                }
+            },
+        )
+
+        assertEquals(3, observedAttempts)
+        assertEquals(3, attempts)
+
+        val timeoutFailure = runCatching {
+            Phase17FieldHarness.awaitNetworkScopedDnsReadiness(
+                timeoutMillis = 20,
+                pollMillis = 1,
+                resolve = { throw UnknownHostException("resolver remains unavailable") },
+            )
+        }.exceptionOrNull()
+        assertTrue(timeoutFailure is UnknownHostException)
     }
 
     @SdkSuppress(minSdkVersion = 34)
