@@ -16,6 +16,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -61,6 +62,7 @@ internal object Phase17FieldHarness {
     private const val ARG_VERIFY_IPV6 = "phase17VerifyIPv6"
     private const val MAX_PROBE_RESPONSE_BYTES = 64
     private const val VPN_NETWORK_READY_TIMEOUT_MILLIS = 10_000L
+    private const val VPN_DNS_RESOLVER_READY_TIMEOUT_MILLIS = 10_000L
     private const val LIVE_RECONNECT_READY_TIMEOUT_MILLIS = 120_000L
     private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
     private const val VPN_NETWORK_POLL_MILLIS = 50L
@@ -93,6 +95,32 @@ internal object Phase17FieldHarness {
             state == VpnRuntimeState.FAILED &&
             failure in setOf("LIVE_TLS_REJECTED", "LIVE_FALLBACK_EXHAUSTED") &&
             packetDisposition == "LIVE_STAGE_SOCKET_PROTECTED"
+
+    internal suspend fun awaitNetworkScopedDnsReadiness(
+        timeoutMillis: Long,
+        pollMillis: Long,
+        resolve: suspend () -> Unit,
+    ): Int {
+        require(timeoutMillis > 0 && pollMillis > 0) { "DNS_READINESS_POLICY_REJECTED" }
+        var attempts = 0
+        val ready = withTimeoutOrNull(timeoutMillis) {
+            while (true) {
+                attempts++
+                try {
+                    resolve()
+                    return@withTimeoutOrNull true
+                } catch (_: UnknownHostException) {
+                    delay(pollMillis)
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            false
+        } ?: false
+        if (!ready) {
+            throw UnknownHostException("VPN_DNS_RESOLVER_NOT_READY")
+        }
+        return attempts
+    }
 
     internal suspend fun <T> runVerifiedProbeWithReconnect(
         initialSnapshot: VpnRuntimeSnapshot,
@@ -553,6 +581,14 @@ internal object Phase17FieldHarness {
             rawUrl.length in 1..2048 && uri.scheme == "https" && !uri.host.isNullOrBlank() &&
                 uri.host.any(Char::isLetter) && uri.userInfo == null && uri.fragment == null,
         ) { "PROBE_URL_REJECTED" }
+        awaitNetworkScopedDnsReadiness(
+            timeoutMillis = VPN_DNS_RESOLVER_READY_TIMEOUT_MILLIS,
+            pollMillis = VPN_NETWORK_POLL_MILLIS,
+        ) {
+            if (vpnNetwork.getAllByName(uri.host).isEmpty()) {
+                throw UnknownHostException("VPN_DNS_RESOLVER_NOT_READY")
+            }
+        }
         val connection = (vpnNetwork.openConnection(uri.toURL()) as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 10_000

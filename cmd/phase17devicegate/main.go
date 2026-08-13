@@ -24,6 +24,7 @@ var requiredPhase17DeviceTests = []string{
 	"org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#emergencyStopLeavesNoRuntimeOrSecretEvidence",
 	"minSdk=34 org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#dualStackDnsHandoverAndReconnectRemainPolicyBound",
 	"minSdk=34 org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#fieldProbeReacquiresOnlyAfterFreshControlledReconnect",
+	"minSdk=34 org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#networkScopedDnsReadinessWaitsForResolverAfterRapidVpnTransitions",
 	"minSdk=34 org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#profileRevocationAndBackupRestoreFailClosed",
 	"minSdk=36 org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest#completeCurrentManifestAccessibilityAndLifecycleRemainTruthful",
 }
