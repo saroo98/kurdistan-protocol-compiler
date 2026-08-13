@@ -1287,6 +1287,54 @@ func TestRunFieldActionDeletesStaleEvidenceBeforeInstrumentation(t *testing.T) {
 	}
 }
 
+func TestRetryFieldEvidenceResetSurvivesTransientInstrumentationTeardown(t *testing.T) {
+	attempts := 0
+	err := retryFieldEvidenceReset(context.Background(), 4, 0, func(context.Context) error {
+		attempts++
+		if attempts < 3 {
+			return errors.New("instrumentation process still stopping")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("retry evidence reset: %v", err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
+func TestRetryFieldEvidenceResetFailsClosedAfterBoundedAttempts(t *testing.T) {
+	attempts := 0
+	want := errors.New("package transition never settled")
+	err := retryFieldEvidenceReset(context.Background(), 3, 0, func(context.Context) error {
+		attempts++
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error=%v, want final reset failure", err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
+func TestRetryFieldEvidenceResetHonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	attempts := 0
+	err := retryFieldEvidenceReset(ctx, 4, time.Second, func(context.Context) error {
+		attempts++
+		cancel()
+		return errors.New("instrumentation process still stopping")
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error=%v, want context canceled", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
 func TestRunFieldActionReportsCategoricalInstrumentationFailureWithoutReadingMissingEvidence(t *testing.T) {
 	step := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
