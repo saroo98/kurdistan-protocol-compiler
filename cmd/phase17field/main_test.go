@@ -1209,6 +1209,48 @@ func TestSetRemoteDeploymentReconcilesCommittedRuntimeNotification(t *testing.T)
 	}
 }
 
+func TestSetRemoteDeploymentWaitsForPostCommitStateConvergence(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "deployment disable") {
+				return nil, errors.New("deployment mutation missing")
+			}
+			return []byte("DEPLOYMENT_MUTATION_PASS"), nil
+		case 2:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("first durable-state observation missing")
+			}
+			return nil, errors.New("transient status transport failure")
+		case 3:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("second durable-state observation missing")
+			}
+			return []byte("DEPLOYMENT_ENABLED"), nil
+		case 4:
+			if !strings.Contains(command, "deployment status") {
+				return nil, errors.New("converged durable-state observation missing")
+			}
+			return []byte("DEPLOYMENT_DISABLED"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	if err := setRemoteDeployment(context.Background(), runner, value, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 4 {
+		t.Fatalf("deployment calls=%d, want 4", calls)
+	}
+}
+
 func TestWithRemoteDeploymentDisabledReenablesAfterFailure(t *testing.T) {
 	calls := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
