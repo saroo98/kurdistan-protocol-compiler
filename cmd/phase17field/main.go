@@ -50,6 +50,9 @@ const (
 	recipientFile               = fieldDirectory + "/recipient-request.bin"
 	profileFile                 = fieldDirectory + "/sealed-profile.bin"
 	fieldResultFile             = fieldDirectory + "/result.txt"
+	fieldEvidenceResetAttempts  = 31
+	fieldEvidenceResetDelay     = time.Second
+	fieldEvidenceResetTimeout   = 30 * time.Second
 	impairmentVerificationTries = 3
 	impairmentRetryDelay        = 250 * time.Millisecond
 	frozenRestartCycles         = 100
@@ -788,8 +791,15 @@ func selectDevice(ctx context.Context, runner commandRunner, value config) (stri
 }
 
 func runFieldAction(ctx context.Context, runner commandRunner, value config, root, serial, action string, extras map[string]string, expected string) error {
-	if _, err := runBytes(ctx, runner, nil, root, 10*time.Second, value.adbPath,
-		"-s", serial, "shell", "run-as", appPackage, "rm", "-f", fieldResultFile); err != nil {
+	resetCtx, cancelReset := context.WithTimeout(ctx, fieldEvidenceResetTimeout)
+	err := retryFieldEvidenceReset(resetCtx, fieldEvidenceResetAttempts, fieldEvidenceResetDelay, func(attemptCtx context.Context) error {
+		raw, resetErr := runBytes(attemptCtx, runner, nil, root, 3*time.Second, value.adbPath,
+			"-s", serial, "shell", "run-as", appPackage, "rm", "-f", fieldResultFile)
+		clear(raw)
+		return resetErr
+	})
+	cancelReset()
+	if err != nil {
 		return fmt.Errorf("Android field action %s evidence reset failed", action)
 	}
 	arguments := []string{"-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "phase17FieldAction", action}
@@ -811,6 +821,36 @@ func runFieldAction(ctx context.Context, runner commandRunner, value config, roo
 		return fmt.Errorf("Android field action %s returned invalid evidence", action)
 	}
 	return nil
+}
+
+func retryFieldEvidenceReset(ctx context.Context, attempts int, delay time.Duration, reset func(context.Context) error) error {
+	if attempts < 1 || delay < 0 || reset == nil {
+		return errors.New("field evidence reset policy rejected")
+	}
+	var last error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if err := reset(ctx); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if attempt+1 == attempts {
+			break
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return last
 }
 
 func verifyImpairedFieldTraffic(ctx context.Context, verify func(context.Context) error) error {
