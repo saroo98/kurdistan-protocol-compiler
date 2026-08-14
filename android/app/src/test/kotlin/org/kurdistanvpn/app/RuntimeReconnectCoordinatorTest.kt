@@ -52,6 +52,37 @@ class RuntimeReconnectCoordinatorTest {
     }
 
     @Test
+    fun exhaustedEndpointFallbackUsesTheSignedBudgetAndFreshAuthority() {
+        var preparationCount = 0
+        val started = mutableListOf<ByteArray>()
+        val coordinator = coordinator(
+            restart = { authority ->
+                started += authority.copyOf()
+                authority.fill(0)
+            },
+        )
+        coordinator.begin(
+            FreshRuntimeAuthorityProvider {
+                preparationCount++
+                FreshRuntimeAuthority.Ready(byteArrayOf(9, 8, 7))
+            },
+        )
+
+        coordinator.observe(
+            VpnRuntimeSnapshot(
+                state = VpnRuntimeState.FAILED,
+                failure = "LIVE_FALLBACK_EXHAUSTED",
+                runtimeRequestId = "request-connect-failed",
+                maxReconnectAttempts = 2,
+            ),
+        )
+
+        assertEquals(1, preparationCount)
+        assertEquals(1, coordinator.attempts)
+        assertEquals(listOf(9, 8, 7), started.single().map(Byte::toInt))
+    }
+
+    @Test
     fun duplicateTerminalBroadcastCannotConsumeTwoAttempts() {
         var preparationCount = 0
         val coordinator = coordinator(

@@ -34,6 +34,7 @@ internal fun isRetryableRuntimeFailure(failure: String?): Boolean = failure in s
     "NETWORK_CHANGED",
     "NETWORK_UNAVAILABLE",
     "LIVE_NETWORK_UNAVAILABLE",
+    "LIVE_FALLBACK_EXHAUSTED",
 )
 
 internal fun jitterReconnectDelay(baseDelayMillis: Long, sample: Double): Long {
