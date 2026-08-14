@@ -86,7 +86,7 @@ var (
 	hex64Pattern           = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
 	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
-	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*$`)
+	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*\r?$`)
 	frameTrackerCUJIndexV1 = regexp.MustCompile(`::[0-9]{1,3}@`)
 	frozenImpairmentMatrix = []impairmentScenario{
 		{name: "bandwidth", netem: "rate 5mbit"},

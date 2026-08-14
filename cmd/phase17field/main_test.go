@@ -317,6 +317,9 @@ func TestAssertAndroidPrivacyAcceptsFrameworkCujSequenceWithoutWeakeningEndpoint
 		wantErr bool
 	}{
 		"framework delimiter": {log: frameworkLine},
+		"framework delimiter CRLF": {
+			log: strings.ReplaceAll(frameworkLine, "\n", "\r\n"),
+		},
 		"ipv4 remains rejected": {
 			log:     frameworkLine + "I/KurdistanVPN: endpoint 198.51.100.7\n",
 			wantErr: true,

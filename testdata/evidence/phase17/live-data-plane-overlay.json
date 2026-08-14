@@ -645,12 +645,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "efe6389757495f48eec80a5f02ebdfe11731b87c4aac5d7a3a3a492453072769"
+      "post_sha256": "b0e8a1f37cfb14b0e4db9710578a0716ea1999f6f14222ee2340e2480787a50c"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0a49b771f7a20ebcc75b75b5d7d2a5838cb253a57f998b62ab6dbaa2ab916064"
+      "post_sha256": "1fbdb5ee5eb35eedd865dc17d22b042c571868d142446e69f5ac1ae486d74473"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
