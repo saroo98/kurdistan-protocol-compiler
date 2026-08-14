@@ -329,8 +329,8 @@ func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {
 			goDirectives = append(goDirectives, line)
 		}
 	}
-	if len(goDirectives) != 1 || goDirectives[0] != "go 1.26.5" {
-		t.Fatalf("generated go.mod directives = %q, want exactly [go 1.26.5]", goDirectives)
+	if len(goDirectives) != 1 || goDirectives[0] != "go 1.26.6" {
+		t.Fatalf("generated go.mod directives = %q, want exactly [go 1.26.6]", goDirectives)
 	}
 	goSumRaw, err := os.ReadFile(filepath.Join(out, "go.sum"))
 	if err != nil {

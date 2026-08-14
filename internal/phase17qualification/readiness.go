@@ -245,11 +245,7 @@ func VerifyReadinessEvidenceFiles(root string, index ReadinessEvidenceIndex, can
 	if err != nil {
 		return err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil {
-		return err
-	}
-	if !samePath(rootAbs, resolvedRoot) {
+	if err := ValidateNoLinkedPath(rootAbs); err != nil {
 		return errors.New("qualification readiness evidence root contains a symbolic link")
 	}
 	for _, entry := range index.Entries {

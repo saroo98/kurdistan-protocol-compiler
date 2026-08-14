@@ -152,33 +152,33 @@
     },
     {
       "id": "android-device-api26",
-      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api26", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "26", "-expected-abi", "x86_64"]],
+      "commands": [["go", "run", "./cmd/phase17devicegate", "-evidence-dir", ".tools/phase17/device-api26", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase17-required-device-tests.txt", "-expected-api", "26", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
       "freshnessSeconds": 86400,
-      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
-      "authorizedPhase": 16
+      "invalidatedBy": ["android/**", "cmd/phase17devicegate/**"],
+      "authorizedPhase": 17
     },
     {
       "id": "android-device-api34",
-      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api34", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "34", "-expected-abi", "x86_64"]],
+      "commands": [["go", "run", "./cmd/phase17devicegate", "-evidence-dir", ".tools/phase17/device-api34", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase17-required-device-tests.txt", "-expected-api", "34", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
       "freshnessSeconds": 86400,
-      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
-      "authorizedPhase": 16
+      "invalidatedBy": ["android/**", "cmd/phase17devicegate/**"],
+      "authorizedPhase": 17
     },
     {
       "id": "android-device-api36",
-      "commands": [["go", "run", "./cmd/phase9devicegate", "-label", "PHASE 14", "-evidence-dir", ".tools/phase16/device-api36", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase14-required-device-tests.txt", "-expected-api", "36", "-expected-abi", "x86_64"]],
+      "commands": [["go", "run", "./cmd/phase17devicegate", "-evidence-dir", ".tools/phase17/device-api36", "-app-apk", ".tools/device/app-internal.apk", "-test-apk", ".tools/device/app-internal-androidTest.apk", "-app-package", "org.kurdistanvpn.app.internal", "-test-package", "org.kurdistanvpn.app.internal.test", "-conflicting-app-package", "org.kurdistanvpn.app.debug", "-minimum-tests", "1", "-expected-tests", "android/config/phase17-required-device-tests.txt", "-expected-api", "36", "-expected-abi", "x86_64"]],
       "operatingSystems": ["android-emulator"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
       "freshnessSeconds": 86400,
-      "invalidatedBy": ["android/**", "cmd/phase9devicegate/**"],
-      "authorizedPhase": 16
+      "invalidatedBy": ["android/**", "cmd/phase17devicegate/**"],
+      "authorizedPhase": 17
     }
   ]
 }

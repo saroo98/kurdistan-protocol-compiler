@@ -279,6 +279,32 @@ func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
 			continue
 		}
 		laneCount += len(proof.OperatingSystems)
+		if strings.HasPrefix(proof.ID, "android-device-api") {
+			api := strings.TrimPrefix(proof.ID, "android-device-api")
+			wantCommand := []string{
+				"go", "run", "./cmd/phase17devicegate",
+				"-evidence-dir", ".tools/phase17/device-api" + api,
+				"-app-apk", ".tools/device/app-internal.apk",
+				"-test-apk", ".tools/device/app-internal-androidTest.apk",
+				"-app-package", "org.kurdistanvpn.app.internal",
+				"-test-package", "org.kurdistanvpn.app.internal.test",
+				"-conflicting-app-package", "org.kurdistanvpn.app.debug",
+				"-minimum-tests", "1",
+				"-expected-tests", "android/config/phase17-required-device-tests.txt",
+				"-expected-api", api,
+				"-expected-abi", "x86_64",
+			}
+			if !reflect.DeepEqual(proof.Commands, [][]string{wantCommand}) {
+				t.Fatalf("%s commands = %v, want exact Phase 17 device command %v", proof.ID, proof.Commands, wantCommand)
+			}
+			if proof.AuthorizedPhase != 17 {
+				t.Fatalf("%s authorized phase = %d, want 17", proof.ID, proof.AuthorizedPhase)
+			}
+			wantInvalidators := []string{"android/**", "cmd/phase17devicegate/**"}
+			if !reflect.DeepEqual(proof.InvalidatedBy, wantInvalidators) {
+				t.Fatalf("%s invalidators = %v, want %v", proof.ID, proof.InvalidatedBy, wantInvalidators)
+			}
+		}
 		if proof.ID == "dependency-freshness" && (len(proof.OperatingSystems) != 1 || proof.OperatingSystems[0] != "linux") {
 			t.Fatalf("dependency-freshness operating systems = %v, want [linux]", proof.OperatingSystems)
 		}

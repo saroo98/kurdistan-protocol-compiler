@@ -1,14 +1,70 @@
 {
   "schema": "kurdistan.phase8.codec-fuzz-transcript.v2",
   "host_alias": "reference-windows-amd64",
-  "go_version": "go1.26.5",
-  "captured_at_utc": "2026-07-17T18:02:31Z",
+  "go_version": "go1.26.6",
+  "captured_at_utc": "2026-08-14T21:10:28Z",
   "boundaries": [
-    {"name":"FuzzPhase8ProfileCodec","command":"go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8ProfileCodec$' -fuzztime 60s","raw_transcript":"fuzz-profile.txt","raw_sha256":"f512ae71554e22352bcdd0933ead5c6a7d4e4029189c46eaa8836becb87a530d","source_sha256":"9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f","fixture_sha256":"809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d","observed_fuzz_seconds":61,"executions":30023017,"result":"pass"},
-    {"name":"FuzzPhase8SignedParser","command":"go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8SignedParser$' -fuzztime 60s","raw_transcript":"fuzz-signed.txt","raw_sha256":"5771f8581e3945e396f28f5cddd81ffe7b3860901c031fe89d4300816f451ff4","source_sha256":"9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f","fixture_sha256":"809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d","observed_fuzz_seconds":61,"executions":28011799,"result":"pass"},
-    {"name":"FuzzPhase8SealedParser","command":"go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8SealedParser$' -fuzztime 60s","raw_transcript":"fuzz-sealed.txt","raw_sha256":"9b0df92ece694e2a6862ac6c7f4b14f6180ebefb3224c2bf78b0cdf48249801d","source_sha256":"9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f","fixture_sha256":"809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d","observed_fuzz_seconds":60,"executions":32625423,"result":"pass"},
-    {"name":"FuzzPhase8URIIngress","command":"go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8URIIngress$' -fuzztime 60s","raw_transcript":"fuzz-uri.txt","raw_sha256":"f6e0970aa86d5738c17eb50ff4d1e24cd2e1cd91b1a6789782fc63ead1c02a35","source_sha256":"9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f","fixture_sha256":"809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d","observed_fuzz_seconds":60,"executions":34615870,"result":"pass"},
-    {"name":"FuzzPhase8QRIngress","command":"go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8QRIngress$' -fuzztime 60s","raw_transcript":"fuzz-qr.txt","raw_sha256":"bad75925ddaa482cdb1c7e7ad5954ca6c0929fbcc9770187369133108b06e3f0","source_sha256":"9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f","fixture_sha256":"809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d","observed_fuzz_seconds":60,"executions":42042785,"result":"pass"}
+    {
+      "name": "FuzzPhase8ProfileCodec",
+      "command": "go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8ProfileCodec$' -fuzztime 60s",
+      "raw_transcript": "fuzz-profile.txt",
+      "raw_sha256": "6a9eb28fe991ed21671dc69908059d3e6ab7a4bd48bd64d1f5d3621a60f977ce",
+      "source_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+      "observed_fuzz_seconds": 61,
+      "executions": 33717962,
+      "result": "pass"
+    },
+    {
+      "name": "FuzzPhase8SignedParser",
+      "command": "go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8SignedParser$' -fuzztime 60s",
+      "raw_transcript": "fuzz-signed.txt",
+      "raw_sha256": "c280cf883db4af92e2145c18ad83df4b9e25a49f1182f55e54d663fbb01eda7f",
+      "source_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+      "observed_fuzz_seconds": 61,
+      "executions": 36608928,
+      "result": "pass"
+    },
+    {
+      "name": "FuzzPhase8SealedParser",
+      "command": "go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8SealedParser$' -fuzztime 60s",
+      "raw_transcript": "fuzz-sealed.txt",
+      "raw_sha256": "56b3fa230615ae8f882204131a2fa2282930d5382e1f44cbee05ffeadb3aa127",
+      "source_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+      "observed_fuzz_seconds": 61,
+      "executions": 33140881,
+      "result": "pass"
+    },
+    {
+      "name": "FuzzPhase8URIIngress",
+      "command": "go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8URIIngress$' -fuzztime 60s",
+      "raw_transcript": "fuzz-uri.txt",
+      "raw_sha256": "8849f45fd1ac735b146414a10e40f0ed2faae790c0ca90c2a97e01d36fe0f247",
+      "source_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+      "observed_fuzz_seconds": 61,
+      "executions": 32320286,
+      "result": "pass"
+    },
+    {
+      "name": "FuzzPhase8QRIngress",
+      "command": "go test ./internal/product/envelope -run '^$' -fuzz '^FuzzPhase8QRIngress$' -fuzztime 60s",
+      "raw_transcript": "fuzz-qr.txt",
+      "raw_sha256": "a44a6ff8cf73fc087b1af7e0990518a17c2446da3fe53e847711b142dfbed698",
+      "source_sha256": "9b5828489fb9ae478f400e15c00190c4c7c9e6a94fac6da77d3b61ea6ce3757f",
+      "fixture_sha256": "809e88e453d6adc0f82b194e572b9d8b12e1799dfc22bb643ffe7ea56e6f3c7d",
+      "observed_fuzz_seconds": 61,
+      "executions": 39682520,
+      "result": "pass"
+    }
   ],
-  "privacy": {"username_recorded":false,"machine_name_recorded":false,"absolute_path_recorded":false,"payload_recorded":false,"key_material_recorded":false}
+  "privacy": {
+    "absolute_path_recorded": false,
+    "key_material_recorded": false,
+    "machine_name_recorded": false,
+    "payload_recorded": false,
+    "username_recorded": false
+  }
 }

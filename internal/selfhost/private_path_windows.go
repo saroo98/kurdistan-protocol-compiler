@@ -46,7 +46,7 @@ func protectSelfhostPrivatePath(path string, directory bool) error {
 			TrusteeValue: windows.TrusteeValueFromSID(user.User.Sid),
 		},
 	}}, nil)
-	if err != nil || windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil) != nil {
+	if err != nil || windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, user.User.Sid, nil, acl, nil) != nil {
 		return ErrRecipientRegistry
 	}
 	return verifySelfhostPrivatePath(path, directory)

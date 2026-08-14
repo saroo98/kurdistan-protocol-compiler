@@ -2483,8 +2483,7 @@ func writeExclusiveAtomicWithOps(
 	if err != nil {
 		return err
 	}
-	resolvedDirectory, err := filepath.EvalSymlinks(absDirectory)
-	if err != nil || !sameFieldPath(absDirectory, resolvedDirectory) {
+	if err := phase17qualification.ValidateNoLinkedPath(absDirectory); err != nil {
 		return errors.New("atomic evidence directory rejected")
 	}
 	file, err := operations.createTemp(directory, ".phase17-field-*.tmp")
