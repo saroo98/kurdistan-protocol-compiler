@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -22,7 +21,7 @@ func ReadCurrentHostBootIdentity(ctx context.Context, powershellPath string) ([]
 }
 
 func readCurrentHostBootIdentity(ctx context.Context, powershellPath string, execute hostBootExecutor) ([]byte, error) {
-	if ctx == nil || execute == nil || !filepath.IsAbs(powershellPath) || strings.ContainsAny(powershellPath, "\r\n\x00") {
+	if ctx == nil || execute == nil || !isQualifiedWindowsAbsolutePath(powershellPath) {
 		return nil, errors.New("qualification host boot probe rejected")
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -45,6 +44,19 @@ func readCurrentHostBootIdentity(ctx context.Context, powershellPath string, exe
 		return nil, errors.New("qualification host boot identity rejected")
 	}
 	return []byte(parsed.UTC().Format(time.RFC3339Nano)), nil
+}
+
+func isQualifiedWindowsAbsolutePath(value string) bool {
+	return len(value) >= 3 && hasWindowsDrivePrefix(value) && (value[2] == '\\' || value[2] == '/') &&
+		!strings.ContainsAny(value, "\r\n\x00")
+}
+
+func hasWindowsDrivePrefix(value string) bool {
+	if len(value) < 2 || value[1] != ':' {
+		return false
+	}
+	letter := value[0]
+	return (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')
 }
 
 func executeHostBootProbe(ctx context.Context, executable string, arguments ...string) ([]byte, error) {

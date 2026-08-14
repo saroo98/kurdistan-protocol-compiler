@@ -118,7 +118,8 @@ func TestReadinessIndexRejectsMissingFailingRetainedOrAmbiguousEvidence(t *testi
 		"duplicate evidence": func(value *ReadinessEvidenceIndex) { value.Entries[1].EvidenceSHA256 = value.Entries[0].EvidenceSHA256 },
 		"duplicate path":     func(value *ReadinessEvidenceIndex) { value.Entries[1].Path = value.Entries[0].Path },
 		"path traversal":     func(value *ReadinessEvidenceIndex) { value.Entries[0].Path = "../outside.json" },
-		"absolute path":      func(value *ReadinessEvidenceIndex) { value.Entries[0].Path = "C:/outside.json" },
+		"windows absolute":   func(value *ReadinessEvidenceIndex) { value.Entries[0].Path = "C:/outside.json" },
+		"posix absolute":     func(value *ReadinessEvidenceIndex) { value.Entries[0].Path = "/outside.json" },
 		"zero size":          func(value *ReadinessEvidenceIndex) { value.Entries[0].Size = 0 },
 	}
 	for name, mutate := range mutations {
