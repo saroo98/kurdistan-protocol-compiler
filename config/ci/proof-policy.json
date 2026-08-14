@@ -58,6 +58,32 @@
       "authorizedPhase": 17
     },
     {
+      "id": "phase17-qualification",
+      "commandsByOperatingSystem": {
+        "linux": [
+          ["go", "test", "-count=1", "./internal/phase17qualification", "./internal/phase17evidence", "./internal/phase17privacy/...", "./internal/phase17boundary", "./cmd/phase17qual", "./cmd/phase17scan", "./cmd/phase17boundary", "./cmd/phase17field", "./cmd/phase17evidence", "./cmd/phase17verify", "./internal/testkit/importrules"],
+          ["go", "vet", "./internal/phase17qualification", "./internal/phase17evidence", "./internal/phase17privacy/...", "./internal/phase17boundary", "./cmd/phase17qual", "./cmd/phase17scan", "./cmd/phase17boundary", "./cmd/phase17field", "./cmd/phase17evidence", "./cmd/phase17verify", "./internal/testkit/importrules"],
+          ["go", "run", "./cmd/assure", "workflow", "-root", "."],
+          ["go", "run", "./cmd/phase17verify", "-root", "."],
+          ["python3", "-B", "-I", "scripts/phase17/privacy_scan_b_test.py"],
+          ["pwsh", "-NoProfile", "-File", "scripts/phase17/owned-vps-scripts.Tests.ps1"]
+        ],
+        "windows": [
+          ["go", "test", "-count=1", "./internal/phase17qualification", "./internal/phase17evidence", "./internal/phase17privacy/...", "./internal/phase17boundary", "./cmd/phase17qual", "./cmd/phase17scan", "./cmd/phase17boundary", "./cmd/phase17field", "./cmd/phase17evidence", "./cmd/phase17verify", "./internal/testkit/importrules"],
+          ["go", "vet", "./internal/phase17qualification", "./internal/phase17evidence", "./internal/phase17privacy/...", "./internal/phase17boundary", "./cmd/phase17qual", "./cmd/phase17scan", "./cmd/phase17boundary", "./cmd/phase17field", "./cmd/phase17evidence", "./cmd/phase17verify", "./internal/testkit/importrules"],
+          ["go", "run", "./cmd/assure", "workflow", "-root", "."],
+          ["go", "run", "./cmd/phase17verify", "-root", "."],
+          ["python", "-B", "-I", "scripts/phase17/privacy_scan_b_test.py"],
+          ["pwsh", "-NoProfile", "-File", "scripts/phase17/owned-vps-scripts.Tests.ps1"]
+        ]
+      },
+      "operatingSystems": ["linux", "windows"],
+      "cachePolicy": "CACHE_INDEPENDENT",
+      "deterministic": true,
+      "invalidatedBy": [".github/**", "android/**", "cmd/assure/**", "cmd/gate/**", "cmd/phase17boundary/**", "cmd/phase17evidence/**", "cmd/phase17field/**", "cmd/phase17qual/**", "cmd/phase17scan/**", "cmd/phase17verify/**", "config/ci/**", "config/phase17/**", "config/release/**", "go.mod", "go.sum", "internal/assurance/**", "internal/phase17boundary/**", "internal/phase17evidence/**", "internal/phase17privacy/**", "internal/phase17qualification/**", "internal/testkit/importrules/**", "scripts/phase17/**", "testdata/fixtures/phase17/privacy-scanner/**", "testdata/schemas/**"],
+      "authorizedPhase": 17
+    },
+    {
       "id": "operator",
       "commands": [
         ["go", "run", "./cmd/koperator", "verify"],

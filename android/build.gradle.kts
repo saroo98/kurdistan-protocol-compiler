@@ -163,6 +163,13 @@ val verifyPhase14Artifacts = tasks.register<Exec>("verifyPhase14Artifacts") {
     commandLine("go", "run", "./cmd/phase14verify", "-root", ".")
 }
 
+val verifyPhase17QualificationSource = tasks.register<Exec>("verifyPhase17QualificationSource") {
+    group = "verification"
+    description = "Runs the public, credential-free Phase 17 qualification policy, schema, privacy, wrapper, and boundary proof."
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("go", "run", "./cmd/gate", "-proof", "phase17-qualification")
+}
+
 val verifyPhase17Artifacts = tasks.register<Exec>("verifyPhase17Artifacts") {
     group = "verification"
     description = "Inspects the current live Phase 17 Android APK, manifest, ABI, native symbols, privacy, and evidence boundary."
@@ -290,6 +297,7 @@ val phase17Gate = tasks.register("phase17Gate") {
         "cyclonedxBom",
         verifyPhase13Artifacts,
         verifyPhase14Artifacts,
+        verifyPhase17QualificationSource,
         verifyPhase17Artifacts,
     )
 }

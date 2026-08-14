@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-candidate-comparison-v1.schema.json",
+  "title": "Kurdistan Phase 17 candidate reproducibility comparison v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "commitSha", "treeSha", "result", "entries"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-candidate-comparison-v1"},
+    "commitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "treeSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "result": {"const": "PASS"},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\\\]+$"},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

@@ -44,6 +44,37 @@ class Phase17LiveDataPlaneDeviceTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun boundaryObserverFailsClosedForRoutesDnsBypassAndCoverage() {
+        val passing = Phase17FieldHarness.BoundarySnapshot(
+            vpnActive = true,
+            ipv4Default = true,
+            ipv6Default = true,
+            dnsPinned = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+        assertTrue(Phase17FieldHarness.evaluateBoundarySnapshot(passing, verifyIpv6 = true))
+
+        listOf<(Phase17FieldHarness.BoundarySnapshot) -> Phase17FieldHarness.BoundarySnapshot>(
+            { it.copy(vpnActive = false) },
+            { it.copy(ipv4Default = false) },
+            { it.copy(ipv6Default = false) },
+            { it.copy(dnsPinned = false) },
+            { it.copy(bypassBlocked = false) },
+            { it.copy(coverageGap = true) },
+        ).forEach { mutation ->
+            assertFalse(Phase17FieldHarness.evaluateBoundarySnapshot(mutation(passing), verifyIpv6 = true))
+        }
+
+        assertTrue(
+            Phase17FieldHarness.evaluateBoundarySnapshot(
+                passing.copy(ipv6Default = false),
+                verifyIpv6 = false,
+            ),
+        )
+    }
+
+    @Test
     fun dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected() {
         assertTrue(
             Phase17FieldHarness.isExpectedDnsUnavailableFailure(

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-candidate-manifest-v1.schema.json",
+  "title": "Kurdistan Phase 17 qualification candidate manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "source", "comparisonSha256", "roots", "subjects"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-candidate-manifest-v1"},
+    "source": {"$ref": "#/$defs/source"},
+    "comparisonSha256": {"$ref": "#/$defs/digest"},
+    "roots": {"$ref": "#/$defs/roots"},
+    "subjects": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/subject"}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\\\]+$"},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "baselineCommitSha", "commitSha", "treeSha", "changedPathsSha256", "toolchainDeclarationsSha256", "dependencyLocksSha256"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+        "baselineCommitSha": {"$ref": "#/$defs/hex40"},
+        "commitSha": {"$ref": "#/$defs/hex40"},
+        "treeSha": {"$ref": "#/$defs/hex40"},
+        "changedPathsSha256": {"$ref": "#/$defs/digest"},
+        "toolchainDeclarationsSha256": {"$ref": "#/$defs/digest"},
+        "dependencyLocksSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha256", "productSha256", "harnessSha256", "workloadSha256", "verifierSha256", "candidateId"],
+      "properties": {
+        "sourceSha256": {"$ref": "#/$defs/digest"},
+        "productSha256": {"$ref": "#/$defs/digest"},
+        "harnessSha256": {"$ref": "#/$defs/digest"},
+        "workloadSha256": {"$ref": "#/$defs/digest"},
+        "verifierSha256": {"$ref": "#/$defs/digest"},
+        "candidateId": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "name", "rootSha256", "entries"],
+      "properties": {
+        "schema": {"const": "kurdistan-phase17-subject-manifest-v1"},
+        "name": {"enum": ["PQS", "QHS", "QWS", "OVS"]},
+        "rootSha256": {"$ref": "#/$defs/digest"},
+        "entries": {"type": "array", "minItems": 1, "maxItems": 4096, "items": {"$ref": "#/$defs/entry"}}
+      }
+    }
+  }
+}

@@ -115,7 +115,7 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_sha256": "3de491ac11b03002a2e4d9c3d7d48be78138408ac28b13d21fc11273aa36cb68",
-      "post_sha256": "cb4e2b318b2629d013eef66c6ec993fd3c517ead0ea345412e109ca0b9905db5"
+      "post_sha256": "feab53f4c8f10279f211cf411d5fb546850118cc526ae8d6c1a1f8c572876f3e"
     },
     {
       "path": ".github/workflows/candidate.yml",
@@ -130,7 +130,7 @@
     {
       "path": ".github/workflows/pr.yml",
       "pre_sha256": "c002c3f6796544048de3764d39ce45bfee4483e05fc7977b2eaf83bd9e3c875e",
-      "post_sha256": "70882e2928ce4fce109f93ab48d429ca0737ab538b95802e24b179a2bcfc1c90"
+      "post_sha256": "6095fa9a5bbcc6e4607591fe4b9ea68f10806c8232e37c89baa1b4154aad3bcb"
     },
     {
       "path": ".github/workflows/scheduled.yml",
@@ -155,17 +155,17 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldActionDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6b3364a75ceeb8e0366207a033e4c9845c159a62eb1cc1d60e2edf83783ea082"
+      "post_sha256": "10b7357c242e2039f2ebcf5d41cac6ecd440b1dba6da5d50429ff2bbbcbc369f"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0aba5cde3e46b1cc0baa616fa431beeb509641853144491b074174c993185404"
+      "post_sha256": "3c853d35648126a7dbbae0970ddbebe938043f97d2dfb2578ae8ac92125e8648"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "fd20756149cf8ffb116bbb606e400a2b9f60fc057c053cd21e511dfe5cea212f"
+      "post_sha256": "92ff78ea543b27e124358dfcadf9197f6242193cb313334c849b67984a9c51d9"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
@@ -205,7 +205,7 @@
     {
       "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/RuntimeReconnectPolicy.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "512a97d183759ea5e6aebf1df2823aaafd49cfe7b9f5e2c8eb91af7f153ca4e6"
+      "post_sha256": "35d9abbb6e3db4ab3dc731231488491d7c4d54785891531617d68f9d0820af7a"
     },
     {
       "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnNetworkTeardownBarrier.kt",
@@ -235,7 +235,7 @@
     {
       "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/RuntimeReconnectCoordinatorTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "579f62077e52ab857a5570cd8c6011a54e2d90cf9f1299791b44c73b7a58dd52"
+      "post_sha256": "7d9a464e539db5a52631b22298525ff92a5343e49881e60fc2cba5b87ced7577"
     },
     {
       "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/VpnNetworkTeardownBarrierTest.kt",
@@ -245,12 +245,12 @@
     {
       "path": "android/build.gradle.kts",
       "pre_sha256": "0b5ce80b1e6d8e7c6d1ffe1b1704066ce2b84ed564116c4fe62348e850e2195a",
-      "post_sha256": "f220cf901726934bb9e6a8d4e259f1565a19bf0519fe68f67ad7a7913f911b78"
+      "post_sha256": "4a4a6d5d6f023081e41845503022cee648c96b545772e0290b2ef7c41af40ae8"
     },
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6d8a1c71fde69648d7aa389a6fe912cf6fb0a1d2e11b1a2599931b8085a18684"
+      "post_sha256": "0cb83cfe0cbd27f9cfdc71bb8596f220e40c93bf800591d0ccc2c91725d5b68e"
     },
     {
       "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
@@ -450,22 +450,22 @@
     {
       "path": "cmd/assure/candidate_test.go",
       "pre_sha256": "019ace76e3fc77f19754241fe12decf0a339005a3bb5c439203125909e9fa31e",
-      "post_sha256": "b5e66fc3046d14e56c55c30abfcecac3966b054ecc391ffc073ec5bb8dfa37b0"
+      "post_sha256": "9b45921630aa459bbbf1585a76c84299d7b053fae75a5694cdce31b7afbe1838"
     },
     {
       "path": "cmd/assure/main_test.go",
       "pre_sha256": "791933e26f51eb1b485d8fb73e901b76f4dbc17991ff14e60f779680a78eb6f1",
-      "post_sha256": "12034ebde8072fa4ab72b3dc01c7c0b0cf8f8a27a08f9025feb4fd61b3922787"
+      "post_sha256": "66b153a71b0c3590de043315d4ac37908a90ca69ab043f7659d0de6812c980ac"
     },
     {
       "path": "cmd/gate/main.go",
       "pre_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1",
-      "post_sha256": "7fb55a9073d9fa2c78138872ef685301c0756a2aae9fccf32f083480ae3d35e3"
+      "post_sha256": "98de3e177ea725e358d69feaa23294b775b4221d2d4d03b11579abefd04cddf0"
     },
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "5f50044106819bee677b7da34802e0a4554347dd6649c73b48f382cd907cc4e3"
+      "post_sha256": "6ae14279c61c2d18423ada89605ee6e3a8da9926bff90a61993e22b4ee1028bd"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -603,9 +603,19 @@
       "post_sha256": "78dd8e7cf5fc33d7338a86fc62af5d417379b89be46d939385d06555ff64fb46"
     },
     {
+      "path": "cmd/phase17boundary/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "49c8f55b7eeddbd2cbeb54da80746dce4f7cc6864aa4f71a46fdc2bb12902a19"
+    },
+    {
+      "path": "cmd/phase17boundary/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8b3e6ff6f55e600dc4aef063e40a10a5769ec4c48e766985a485ea81a07bcf51"
+    },
+    {
       "path": "cmd/phase17devicegate/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "9db4d713940619c28379a824af1103ba98250ad60d893c8253a5778cb3b0a79a"
+      "post_sha256": "b0d16699431c4331a30602d05c5af116246f5d18a5c533b70ffbd563cb663965"
     },
     {
       "path": "cmd/phase17devicegate/main_test.go",
@@ -615,12 +625,52 @@
     {
       "path": "cmd/phase17evidence/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "828334af0fe668064a52e85cdfa4ef2292304be5bfb4ca70e74c4289a436071f"
+      "post_sha256": "3ccdade78679af201955bc1bedcb6edf193aacc4f846d73e88efcc951ce6c69b"
     },
     {
       "path": "cmd/phase17evidence/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "ecb9fac1401889eb94cda2917d927e9793e741b0a6d3967444ab1f98243dfef1"
+      "post_sha256": "a6bd58c7d94425f30614166e4d525d82df987d6969b2a28bc5ee6e69401aa85d"
+    },
+    {
+      "path": "cmd/phase17field/atomic_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "50860d40441363fb736aecc68bc222841c1f40ed14a0dbce35295051dcca582c"
+    },
+    {
+      "path": "cmd/phase17field/boundary.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "88a0d89e7a1be3a4e58b085f01a16d188c7e5cd5fe3071e334d6f85f35ddde33"
+    },
+    {
+      "path": "cmd/phase17field/boundary_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "14b4a9bba37dabb73489264a4b0dda4c03fdd9c20ba04be41e7ed77f2c13f41f"
+    },
+    {
+      "path": "cmd/phase17field/campaign.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d447359838fe65c7a023f4124184707bda09d7d6b4eee6867cf378942aabc74d"
+    },
+    {
+      "path": "cmd/phase17field/campaign_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "228a41218bee12d6ab66eead08b5ccd3d4519fc5fbd07802152334c2a3056407"
+    },
+    {
+      "path": "cmd/phase17field/command_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "177ba3b2c57ec3613ba5180ba3387eaa0a77789ccd79b835a463939bc785c5a7"
+    },
+    {
+      "path": "cmd/phase17field/evidence_v3.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d2323a39f2dddce082a0d90b5196513a12e6fa8f17db22510aa684733c293827"
+    },
+    {
+      "path": "cmd/phase17field/evidence_v3_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a51445df1b0364373da1c27849da64ffa47f379a6b16ed7ec85f0270fc9e9558"
     },
     {
       "path": "cmd/phase17field/host_awake.go",
@@ -630,7 +680,7 @@
     {
       "path": "cmd/phase17field/host_awake_other.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "53e63fa2f6b4fbe33629f8930e0d26714320cfe679e6533b14d003f529ce1600"
+      "post_sha256": "47b2f1e492507b8feec7144b67e2fd9cd1132102c9bb263c6b6c58f4252bd4af"
     },
     {
       "path": "cmd/phase17field/host_awake_windows.go",
@@ -643,14 +693,59 @@
       "post_sha256": "5f88d1e2bac31b61e5abf4cdfa60ae1dab33d89d5e1744d426da45e37152fec7"
     },
     {
+      "path": "cmd/phase17field/host_environment.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "4cb3731d58dbc3e440e8f4f0d7184395bf0ed14a5f61680211f54cb41cb0f368"
+    },
+    {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b0e8a1f37cfb14b0e4db9710578a0716ea1999f6f14222ee2340e2480787a50c"
+      "post_sha256": "71254048bfc1d74e1bc7597febb67ea0edfdb53a61065116fc4b809815e4f6cf"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "1fbdb5ee5eb35eedd865dc17d22b042c571868d142446e69f5ac1ae486d74473"
+      "post_sha256": "3c014ab18aee91e7cf2575bc2b863752898493de767ad408dc6337853ef1f2a4"
+    },
+    {
+      "path": "cmd/phase17field/privacy.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "c58933793af8aba2151ecd66279a9d45ff12aa4b6031c9f1f56235e4c4fc68dd"
+    },
+    {
+      "path": "cmd/phase17field/privacy_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "0fdc1fea9a46aee17158d09115417b20ea2ba41185d47269c60f70be90eb1029"
+    },
+    {
+      "path": "cmd/phase17field/qualification.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "31e055099b7e748d8ef2dfb5fcd6988660ec7e6b60f3168a1b4c3d3a23960605"
+    },
+    {
+      "path": "cmd/phase17field/qualification_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7007acaa142f2c8e7e1c67eb49192c9a57112cd8f3bd499749953815d0847b12"
+    },
+    {
+      "path": "cmd/phase17qual/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "61b95e01fb50f7f11acdc5b072767ddbe39ac6f5facd90f6620a621f1b24b425"
+    },
+    {
+      "path": "cmd/phase17qual/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "cace1a552d1f44053f665cf676e7a828e29bbfa362fcf4997d965da90b5e7fbe"
+    },
+    {
+      "path": "cmd/phase17scan/main.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d24e918cf7567151a77f94d1fb58e3c9d79fe0da290123b53f388f2947689905"
+    },
+    {
+      "path": "cmd/phase17scan/main_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a3376b81f478608f05f7ad696743945e1f186760260872c6797df7e4bd9a847b"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -665,7 +760,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "683dcdd9f036dff6e13c47821de6004aa3897bef16851eddbcebe4afe9751872"
+      "post_sha256": "7c40f62e32cf1ec688d295f674c8435f959a2cc86e82653c83b80456af01dfa0"
     },
     {
       "path": "cmd/phase17verify/inventory_test.go",
@@ -675,12 +770,27 @@
     {
       "path": "cmd/phase17verify/main.go",
       "pre_sha256": "ebd5cb489c690c0e875aee536ee75e8ba37d717cb3f5945db0ed345efa140e96",
-      "post_sha256": "7d74302199381f8b5f45119919724e28bbcaa1083e21ce04e3644b939de6c847"
+      "post_sha256": "865d1c50eb4f72069e613c1e8d6cea619879077cfd9d873b4d02bd244633c908"
     },
     {
       "path": "cmd/phase17verify/main_test.go",
       "pre_sha256": "92eee6cd7d76309b8ee315e48f5d51af1fd726000e6b1ece5cfcec8d2f5dbb77",
-      "post_sha256": "c9a33198a6e9b357365622cd52a4e9bf6e583609c792d98343c4a1a5240ce6b1"
+      "post_sha256": "2c4a1fc28caedffb04571226c6bb287a973d0695c159c2cd6805fbd3f0fab916"
+    },
+    {
+      "path": "cmd/phase17verify/qualification.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3cfcf7589ec9afe083bea90581650fab0bddc23ed9e07d0a16c8e1e6e60c9940"
+    },
+    {
+      "path": "cmd/phase17verify/qualification_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "05906f160e60bc6ae85e72f4d78f0e8fa9e33c5bde07f08552b4ac50c488b94c"
+    },
+    {
+      "path": "cmd/phase9devicegate/main_test.go",
+      "pre_sha256": "dc66838303e24265cdbbafd90711906661d72c58d99d7e1597027f51d0b7c6f2",
+      "post_sha256": "7714e03eb9f858118ba1a3796d5d0209c487a01778d69488d84dd3b379c4b303"
     },
     {
       "path": "cmd/phase9verify/main.go",
@@ -690,12 +800,17 @@
     {
       "path": "config/ci/impact-policy.json",
       "pre_sha256": "1251aef3d1e7f7ba6dcc9875d0cf95c1795d8e00c6729c6ef1467419769d3044",
-      "post_sha256": "d869223dfae58d226289a2e80967dc0a01ff634bd9c7315b54636e101cafffc4"
+      "post_sha256": "1362ecff7278686c7a9a00c18df246bfc3ab7e19037baebe254bea4a3d257d5e"
     },
     {
       "path": "config/ci/proof-policy.json",
       "pre_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e",
-      "post_sha256": "dd60eb898b6acf781824d2a3856a9f260de764c0ce9d3d134e11e15f7ef101f7"
+      "post_sha256": "a273b6fd618db25fb76754ea6065e6d5595d9fdc9653b33d6cd9c697afbd9355"
+    },
+    {
+      "path": "config/phase17/qualification-policy-v1.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "af94720c7af2cfec51e7e1b489e9d59702f87a0c31d92cc2d22e25880b10ad72"
     },
     {
       "path": "config/runtime/live-data-plane-v1.json",
@@ -890,12 +1005,12 @@
     {
       "path": "internal/audit/security.go",
       "pre_sha256": "fc98db2a301d8c4545457d271a761891bdea542b6ea8aa620eec03880fc4ee8c",
-      "post_sha256": "fedab85c491b0e26f4fb74c79d2987a271fb5e045a2fa4d67e7af99be8dc8edc"
+      "post_sha256": "1fa41a24e1f9a78a7aa907d2ba96c5c14abc7a9d0a29550fd72c1f66f428d143"
     },
     {
       "path": "internal/audit/security_test.go",
       "pre_sha256": "79da303348668dcc3414ea104d92edb616f174ee28a5a9bbbb2f54904c27c227",
-      "post_sha256": "f81d82c8bfca69ca063ff226852e88b0b142894addfe2fcb860af61942a180f1"
+      "post_sha256": "c09cafdd78fb7750ac5b4bc67ca222c98b7adc6b3faff631f961e94246b5b1ec"
     },
     {
       "path": "internal/codegen/authorization_v1_test.go",
@@ -958,6 +1073,16 @@
       "post_sha256": "cd30452079d49aebf3ec8cd06b82a13416d344cfb1a284c02728d25898d44974"
     },
     {
+      "path": "internal/phase17boundary/monitor.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e7ac4b15e88d2f74bbfda0760766e2f1be6568daa56e0800ac68971d8a1cbbd8"
+    },
+    {
+      "path": "internal/phase17boundary/monitor_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b6a428fcea9e2c44b69758ef154e0d8ae99e4daee53149e295547f0ae1e3b6bc"
+    },
+    {
       "path": "internal/phase17evidence/evidence.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "9252d2773e2d5329ec10b4dc64b9d0be114613131ad1198764413190716b5732"
@@ -970,7 +1095,197 @@
     {
       "path": "internal/phase17evidence/field_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "d741c47d33caafc5c5a4d4edf780125ca44587de8e16fdd3c93a59f05e468c6c"
+      "post_sha256": "998bb29fc007ba1e933d34a6dbbdfcd7e4bbca3e4204ee18fa08abbe2f8a4300"
+    },
+    {
+      "path": "internal/phase17evidence/field_v3.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "bcde5ea03a88ecce7364deb468cef054e099144dce1cbfba28a453e4606bdd79"
+    },
+    {
+      "path": "internal/phase17evidence/field_v3_schema_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "4824a15463cee47e3ff0f06ffde9458931b2fc098a9f2afd578c1b88030ae147"
+    },
+    {
+      "path": "internal/phase17evidence/field_v3_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "268023e99b24797d83cac30100ab4a2a3b95b74bda38fb70bdc455892a5489a5"
+    },
+    {
+      "path": "internal/phase17evidence/fuzz_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fc213c0551107f326ef372348a052b8f67c2ef925531a05cf2e3771b2b870ea7"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/corpus_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "4e7a9bc53b0160955787926ab769ba60f54e440f5e19d9be5ef08bbe83cc83fa"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/fuzz_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "48cbdef10fe5a56f70485fede0adf1341f213e47b3495c972a4f976c96e06a78"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/scanner.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "eb8f515b1d6f2f8c46a8e288c8ddc6da9104952fe6cd1509eac867f21d50dbde"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/scanner_b_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8dc3e584f47748d1ec02574ad88ec19c1dfdae985aa00c2097815b659f9a3543"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/scanner_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "dab6d13bf1f918b8bc0ee726f0c446ba74552ed40323adc0f6b68c237f711b05"
+    },
+    {
+      "path": "internal/phase17qualification/atomic.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7a1117c0df4eb96498d10a1be643866a007be847092bdac7d730c290e4652f5e"
+    },
+    {
+      "path": "internal/phase17qualification/atomic_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9df8837e347b83a18c80153fb3d36cb5e0a674de6ca5e4df5f8ac3f46e4d25a8"
+    },
+    {
+      "path": "internal/phase17qualification/canonical.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "f8bf990a6a11b480a9a306ee4491470cb01016589fe067c637975c23b055f6c6"
+    },
+    {
+      "path": "internal/phase17qualification/canonical_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d538cdd0f26e828471b60ef47517c17a1bfa11db6ead4ab488a35aa0b8d57640"
+    },
+    {
+      "path": "internal/phase17qualification/comparison.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ea9aa9b978fb6dad3f1565323ad8455af31bddad543b125fda6fe03b94a9e3ca"
+    },
+    {
+      "path": "internal/phase17qualification/comparison_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b3f43c48188195523856ccebd931b15678b07f42e9f63513f4a3f7cc3772fa5b"
+    },
+    {
+      "path": "internal/phase17qualification/environment_private.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "775849066b5fd0c055e7dd6cc81312d68567df5920d938de32e6a9281ff983ba"
+    },
+    {
+      "path": "internal/phase17qualification/environment_private_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "373685f0b1032786b47d6d1f0314e1abdabc9553bf029bbf46662fe4dafc9b5e"
+    },
+    {
+      "path": "internal/phase17qualification/fuzz_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8c0d1e1ad90910ae26e02d4779ac9755cc7c19a4311f322896a3b2ea5330a444"
+    },
+    {
+      "path": "internal/phase17qualification/host_boot.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "37d53952fc2872351150ef8a6bb22132ded915307160751a2a84a2e152e99a69"
+    },
+    {
+      "path": "internal/phase17qualification/host_boot_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7ce7d8751ea271ef822f8c9e6a5b55eeed54f0b6141509530e3f3ca88afa8d82"
+    },
+    {
+      "path": "internal/phase17qualification/key.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "66114fb72990a3b7a14b3e3703dcf755d2897e97ace1a14cccf45e0bfcfe40fb"
+    },
+    {
+      "path": "internal/phase17qualification/key_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1063cb12150648a644442b0b14250d5189c628d0941a0ddeca4c4c840e2a3332"
+    },
+    {
+      "path": "internal/phase17qualification/ledger.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "86027580ab5da9cb2d2e914a71f97bd133bae63cf0446d62cf3258e94777dd98"
+    },
+    {
+      "path": "internal/phase17qualification/ledger_lock.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e5d8e6b126245ad6ff26352af124adadd82c483d3698f4affd017a5cdaa13f04"
+    },
+    {
+      "path": "internal/phase17qualification/ledger_lock_unix.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "8fe0072703a9c3c66d9426c93d9ca37f54fb12d00d80a0f291ecb40820f2b008"
+    },
+    {
+      "path": "internal/phase17qualification/ledger_lock_windows.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "79791a8d67a16317722543324c447924fcfcbeaaa29b1aa0100c63ad627a9d75"
+    },
+    {
+      "path": "internal/phase17qualification/ledger_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "237e0f2cfb370233924d49dee07acd510071baa55d6e7a4dd05f503c7ef3904c"
+    },
+    {
+      "path": "internal/phase17qualification/policy.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "0f67a9059d624584815e04a526cc1f6a29f4657bd901dfd94094c17d6ee36753"
+    },
+    {
+      "path": "internal/phase17qualification/policy_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "fc529107ceb3c86f6205766a312c52b4c300a1aebce83207bd6fe706695bf766"
+    },
+    {
+      "path": "internal/phase17qualification/preflight.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d7caa7054560780e6da25777de26590fcb9b6029e09ff2c46c0fdfb69cfd46da"
+    },
+    {
+      "path": "internal/phase17qualification/preflight_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1b29191d0bc8d345d660d764a9e084ac6b50888d917bec0525d0ca3a284bddb3"
+    },
+    {
+      "path": "internal/phase17qualification/readiness.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "d5c0a8e3148abdd68ade82b6cbcdcf7938c22c7000b242c010d24b06f892b152"
+    },
+    {
+      "path": "internal/phase17qualification/readiness_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "2125e00f6076a3f4dbdb44a9263f3c62baa5836823e3c16e54afeaf9b33d40c2"
+    },
+    {
+      "path": "internal/phase17qualification/receipt.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "26f644f06d6744dcb3b26702eed7a65ddf9a21f7c300b8519ed953e95696c3d3"
+    },
+    {
+      "path": "internal/phase17qualification/receipt_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "24a48e0837bdaa8227a01896637049a940e260df975a29723573c2fc06bafdd3"
+    },
+    {
+      "path": "internal/phase17qualification/schema_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7626300c93138e3d0064db82fb3b1a53dbcea6d1f582caf12bc05f7a79f0806b"
+    },
+    {
+      "path": "internal/phase17qualification/subject.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a6e4dad8f84c2364678e89b6c1918886d7a775779efcc16e9043a424b490f796"
+    },
+    {
+      "path": "internal/phase17qualification/subject_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b5ed831416587ac679586a232f69c4659d907e72a5ae6c61a17c5f1e51e6aa60"
     },
     {
       "path": "internal/product/enrollment/request_lifecycle_test.go",
@@ -1470,7 +1785,7 @@
     {
       "path": "internal/testkit/importrules/importrules_test.go",
       "pre_sha256": "8f0839ceec00baa62a7bb53035fba7706519d8225684b507251e4b91c2fb36d1",
-      "post_sha256": "963e2cbd1a5557c48234b1ba8485dce42bbba57b42ad01a62574dc54a30ec28b"
+      "post_sha256": "9d17bcca71c4a2ba63991db2d5b0e59b0cf4072acffaf33cf5800195ebf5aa05"
     },
     {
       "path": "internal/testkit/phase8assurance/manifest.go",
@@ -1481,6 +1796,11 @@
       "path": "internal/testkit/phase8issuancefixture/generate.go",
       "pre_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "post_sha256": "c53797166271672b99a1d6bfad5381c67d1040a32ce7a2383960f7cbd0c50ed0"
+    },
+    {
+      "path": "scripts/phase17/build-qualification-candidate.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "45156b861ad4c148a11c3f56160baa4cefcc4aa5bb1d2f8fcfbcf8053b2a0260"
     },
     {
       "path": "scripts/phase17/netns-e2e.sh",
@@ -1500,22 +1820,37 @@
     {
       "path": "scripts/phase17/owned-vps-e2e.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0e91961c753c1b66111485be19cc08d8b232b66289a7a18e3f96ca945faef5e9"
+      "post_sha256": "d0cbd59cc665932b9d5984c2d4ece1cc0ad3313fbd42512012c8a85b7dd56b9c"
     },
     {
       "path": "scripts/phase17/owned-vps-preflight.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b9049f6731c29eeebd36d889213a62acb9b42beb8ac0d465b0bacc7181f116b5"
+      "post_sha256": "c0d297ba47f996cb95652b1df04befacb31104e8d08ce084b12a6916e6c08619"
     },
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "df85118aca5895d8887eda7a5eb14854977468455e2749bc60baffaa5882d158"
+      "post_sha256": "4d9d211c3296b9e3139ec39211c6493518e9202c7e193f2f416a8354bbfb3a30"
+    },
+    {
+      "path": "scripts/phase17/privacy_scan_b_test.py",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "0b7b5ad4efdffa99fb5f70c2eedafa67bc3193d56226f01d97386c1bf1fc2266"
+    },
+    {
+      "path": "scripts/phase17/privacy_scanner_b.py",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "b10a886f88f123ebbfc9a123e784f594dc75a697dcfd324a8a38e5878b4be749"
+    },
+    {
+      "path": "scripts/phase17/run-qualified-campaign.ps1",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "9c3707700238b3673468e96a25f199eefa65b49791ea429c50ae83de86049a40"
     },
     {
       "path": "scripts/phase17/sanitize-field-evidence.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3cd7ecb6fb91a44716238c47b608409a1f1b75369c652fa2539931cfb7333ccd"
+      "post_sha256": "06965679f5107a8fe655ca75a2669d1cf6caefaff5c106a2c54c1f1094b8a8c3"
     },
     {
       "path": "testdata/evidence/phase16/decentralized-self-hosted-overlay.json",
@@ -1538,19 +1873,74 @@
       "post_sha256": "b78f5b7350777675e0c9fb9f92169fedeabb74c3a80c799454344c19fa0de365"
     },
     {
+      "path": "testdata/fixtures/phase17/privacy-scanner/corpus-v1.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "01067fa9f798033db33c4de543d7d72b58432c1d834ea7f19f67e966ef5970c5"
+    },
+    {
+      "path": "testdata/schemas/engineering-candidate-provenance-v1.schema.json",
+      "pre_sha256": "2c9646641c4c19da90ba1dc8d6df0956e1d59b20a43ea8fa058b2bc64e53fd70",
+      "post_sha256": "8d0f1fb0abaaa4d06fce58380df21e1aa0ba586b9b6b436b9f66c550fc059444"
+    },
+    {
+      "path": "testdata/schemas/phase17-candidate-comparison-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1b3fe60bbd4f57de04526bed73efc01d8fc75024e89230c1bb9a0483f5f02256"
+    },
+    {
+      "path": "testdata/schemas/phase17-candidate-manifest-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1fc37289b3565e6102418aa10eef2606091880aeb9d04450a50366f7111c5668"
+    },
+    {
+      "path": "testdata/schemas/phase17-environment-context-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "09765f641c8353995bfd675d6b94c044ffaed326eadeaf82967ebb12223073f1"
+    },
+    {
       "path": "testdata/schemas/phase17-historical-gate-supersession-v1.schema.json",
       "pre_evidence": "ABSENT",
       "post_sha256": "28f06780952141724f8a58be41d5b5c8ca221b8b73a6e457289cdcf0b5bea5da"
     },
     {
+      "path": "testdata/schemas/phase17-owned-vps-evidence-v3.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "329303823fbe5c6777a7002ccba3e0742e0282cdec50c4894c11294f6a35c510"
+    },
+    {
+      "path": "testdata/schemas/phase17-owned-vps-preflight-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "2a031d484c6f3896dac296cfd33b76248110c329ddc9af9f705d29f72d4e2d68"
+    },
+    {
+      "path": "testdata/schemas/phase17-qualification-envelope-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "53c9944d17923b4ab6f25c98fd29076ff1371172f246133d248cd386522ff49d"
+    },
+    {
+      "path": "testdata/schemas/phase17-qualification-policy-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "1c858551b97d68f35dd8352ee55b8f420b35d3fad3601f70c0fd3704a6739c45"
+    },
+    {
+      "path": "testdata/schemas/phase17-readiness-evidence-index-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "7a8faa9b2c5de0828e731a0c69cf5fac4927662ba36594d8e2c99f3ded179f42"
+    },
+    {
+      "path": "testdata/schemas/phase17-readiness-proof-v1.schema.json",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "07da5df1d80431c915a8358fdf739795f3ec846740462b1c3915f1d473e64e26"
+    },
+    {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_sha256": "e1c87306ff625d578aa2091fb6125e6c458554f20d5e19d2fee5ae50896a07b1",
-      "post_sha256": "6828b0d782432b2966aa16b3cd43d62ff5ce616b5b9341c02090cd97d0c6810a"
+      "post_sha256": "65656613c64ca6cf1671e288577449cea4e8de250c04d2e170c22eba548db745"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
       "pre_sha256": "76b791a60eab9578b7e2a582cf5d2a6b4bb47d447ebda2025aa7c5a5f61534f8",
-      "post_sha256": "326682ee16de0e19b307bead76b1a5fac60caf3513f29b0773f84511613e7d1a"
+      "post_sha256": "97a382a73216fd7d1f8e4dd6fb90007de5a44b9dadc00959f1faf9616a285cb8"
     },
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",

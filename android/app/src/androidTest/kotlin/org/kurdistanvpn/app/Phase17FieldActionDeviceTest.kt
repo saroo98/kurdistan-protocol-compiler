@@ -14,7 +14,7 @@ import org.junit.Test
  * Field-only entry point that deliberately has no Activity or Compose rule.
  * Repeated owner-VPS actions must not launch and tear down the product UI.
  */
-@SdkSuppress(minSdkVersion = 34)
+@SdkSuppress(minSdkVersion = 26)
 class Phase17FieldActionDeviceTest {
     @Test
     fun runRequestedFieldAction() = runBlocking {

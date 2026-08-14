@@ -835,7 +835,13 @@ func validateM14AssuranceOverlayV1(root string, overlays map[string]m2Maintenanc
 	if err != nil {
 		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
 	}
-	pre := make(map[string]string, len(overlay.Paths))
+	pre := make(map[string]string, len(successor)+len(overlay.Paths))
+	for path, hash := range successor {
+		if path == m2MaintenanceSelfPathV1 {
+			continue
+		}
+		pre[path] = hash
+	}
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
 	last := ""
@@ -1793,19 +1799,39 @@ var m0LineEndingOverlaysV1 = map[string]m0LineEndingOverlayV1{
 }
 
 func m0LineEndingHistoricalHashesV1(root string, overlays map[string]m0LineEndingOverlayV1) (map[string]string, error) {
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return nil, err
+	}
+	return m0LineEndingHistoricalHashesAtPostV1(root, overlays, successor)
+}
+
+func m0LineEndingHistoricalHashesAtPostV1(root string, overlays map[string]m0LineEndingOverlayV1, successor map[string]string) (map[string]string, error) {
 	historical := make(map[string]string, len(overlays))
 	for path, overlay := range overlays {
 		if !validSHA256V1(overlay.CanonicalSHA256) || !validSHA256V1(overlay.HistoricalSHA256) {
 			return nil, fmt.Errorf("invalid M0 line-ending overlay hash: %s", path)
 		}
-		effective, err := evidenceoverlay.ResolveCurrentSHA256(root, path)
-		if err == nil && effective == overlay.CanonicalSHA256 {
+		effective, present := successor[path]
+		var content []byte
+		if !present {
+			var err error
+			content, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if err != nil {
+				return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
+			}
+			effective = fmt.Sprintf("%x", sha256.Sum256(content))
+		}
+		if effective == overlay.CanonicalSHA256 {
 			historical[path] = overlay.HistoricalSHA256
 			continue
 		}
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
+		if content == nil {
+			var err error
+			content, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			if err != nil {
+				return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
+			}
 		}
 		canonical := bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
 		if bytes.Contains(canonical, []byte{'\r'}) {
@@ -1841,12 +1867,16 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	for _, part := range bytes.Split(raw, []byte{0}) {
 		parts = append(parts, filepath.ToSlash(string(part)))
 	}
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		return m0CandidateManifestV1{}, err
+	}
 	preHashes, err := loadM2MaintenancePreHashesV1(root)
 	if err != nil {
 		return m0CandidateManifestV1{}, err
 	}
 	preHashes = m0CandidateMaintenancePreHashesV1(preHashes)
-	lineEndingPreHashes, err := m0LineEndingHistoricalHashesV1(root, m0LineEndingOverlaysV1)
+	lineEndingPreHashes, err := m0LineEndingHistoricalHashesAtPostV1(root, m0LineEndingOverlaysV1, successor)
 	if err != nil {
 		return m0CandidateManifestV1{}, err
 	}
@@ -1983,11 +2013,7 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 			}
 		}
 	}
-	phase15Pre, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
-	if err != nil {
-		return m0CandidateManifestV1{}, err
-	}
-	for path, predecessor := range phase15Pre {
+	for path, predecessor := range successor {
 		if predecessor == "ABSENT" {
 			preHashes[path] = "ABSENT"
 		} else if _, reconstructed := preHashes[path]; !reconstructed {

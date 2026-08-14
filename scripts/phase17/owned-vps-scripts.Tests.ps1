@@ -4,8 +4,10 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $required = @(
+    'build-qualification-candidate.ps1',
     'owned-vps-preflight.ps1',
     'owned-vps-e2e.ps1',
+    'run-qualified-campaign.ps1',
     'sanitize-field-evidence.ps1'
 )
 
@@ -32,11 +34,82 @@ foreach ($marker in @(
     'ipv6DefaultRoute',
     'ipv6Forwarding',
     'ipv6NftPolicy',
-    'ipv6External'
+    'ipv6External',
+    'hostClockToVps',
+    'preflightId',
+    'environmentSha256',
+    'remoteEpoch'
 )) {
     if (-not $preflight.Contains($marker)) {
         throw "preflight script is missing $marker"
     }
+}
+foreach ($marker in @('[string]$PrivateEnvironment', '[string]$Environment', '[string]$PreflightId', '[string]$Output')) {
+    if (-not $preflight.Contains($marker)) {
+        throw "preflight script is missing private-file interface: $marker"
+    }
+}
+foreach ($forbidden in @('[string]$SshAlias', '[string]$EvidenceRoot', '[string]$SshExecutable', 'Set-Content')) {
+    if ($preflight.Contains($forbidden)) {
+        throw "preflight script retains an unsafe interface or publication primitive: $forbidden"
+    }
+}
+
+$preflightFixture = Join-Path ([IO.Path]::GetTempPath()) ('phase17-preflight-test-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $preflightFixture | Out-Null
+try {
+    $fakeSsh = Join-Path $preflightFixture 'fake-ssh.ps1'
+    $privateEnvironment = Join-Path $preflightFixture 'private-environment.json'
+    $environmentContext = Join-Path $preflightFixture 'environment.json'
+    $preflightResult = Join-Path $preflightFixture 'preflight.json'
+    [IO.File]::WriteAllText($fakeSsh, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+Write-Output ('{"schema":"kurdistan-phase17-owned-vps-preflight-v1","hostClass":"OWNER_CONTROLLED_VPS","os":true,"arch":true,"systemd":true,"networkd":true,"nft":true,"unbound":true,"tun":true,"timeSynchronized":true,"memory":true,"disk":true,"ipv4":true,"ipv6":false,"ipv6Global":false,"ipv6DefaultRoute":false,"ipv6Forwarding":false,"ipv6NftPolicy":false,"ipv6External":false,"sudo":true,"remoteEpoch":' + $epoch + ',"rawLogRetained":false}')
+'@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($privateEnvironment, ([ordered]@{
+        schema = 'kurdistan-phase17-private-environment-v1'
+        sshAlias = 'fixture-node'
+        avdName = 'fixture-avd'
+        deviceSerial = ''
+        probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
+        probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
+        ipv6ProbeAddress = '2001:db8::1'
+        relayPort = 8443
+        pythonExecutable = $fakeSsh
+        adbExecutable = $fakeSsh
+        sshExecutable = $fakeSsh
+        scpExecutable = $fakeSsh
+        powershellExecutable = $fakeSsh
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($environmentContext, ([ordered]@{
+        schema = 'kurdistan-phase17-environment-context-v1'
+        vpsOs = 'linux'
+        vpsArch = 'amd64'
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    $preflightId = '11111111111111111111111111111111'
+    $resultLine = & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $privateEnvironment -Environment $environmentContext -PreflightId $preflightId -Output $preflightResult
+    if ($resultLine -cne 'PHASE17_OWNER_VPS_PREFLIGHT_PASS') {
+        throw 'preflight fixture did not emit the categorical PASS marker'
+    }
+    $result = Get-Content -LiteralPath $preflightResult -Raw | ConvertFrom-Json
+    $environmentDigest = (Get-FileHash -LiteralPath $environmentContext -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($result.preflightId -cne $preflightId -or $result.environmentSha256 -cne $environmentDigest -or
+        $result.status -cne 'PASS' -or $result.hostClass -cne 'OWNER_CONTROLLED_VPS' -or
+        $result.hostClockToVps -ne $true -or $result.rawLogRetained -ne $false) {
+        throw 'preflight fixture did not publish sanitized PASS evidence'
+    }
+    try {
+        & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $privateEnvironment -Environment $environmentContext -PreflightId $preflightId -Output $preflightResult | Out-Null
+        throw 'preflight overwrote an existing result'
+    } catch {
+        if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_OUTPUT_REJECTED') {
+            throw
+        }
+    }
+} finally {
+    Remove-Item -LiteralPath $preflightFixture -Recurse -Force
 }
 
 $nativePreflight = Get-Content -Raw (Join-Path $root 'deploy/selfhost/native/preflight.sh')
@@ -50,81 +123,99 @@ foreach ($marker in @('ipv6Global', 'ipv6DefaultRoute', 'ipv6Forwarding', 'ipv6N
 }
 
 $e2e = Get-Content -Raw (Join-Path $PSScriptRoot 'owned-vps-e2e.ps1')
-foreach ($marker in @('go run ./cmd/phase17field', '-ssh-alias', '-relay-port', '-mode', 'field-result.json')) {
+foreach ($marker in @('candidate-A\QHS\scripts\run-qualified-campaign.ps1', 'CandidateRoot', 'TrustedPublicKey', 'PriorStressResult', 'PrivateEnvironment', 'EnvironmentSalt')) {
     if (-not $e2e.Contains($marker)) {
         throw "owned VPS e2e script is missing $marker"
     }
+}
+if ($e2e.Contains('go run')) {
+    throw 'owned VPS e2e script still permits a dynamically compiled qualified runner'
 }
 foreach ($placeholder in @("= 'PENDING'", 'FIELD_MATRIX_INCOMPLETE', "result = 'IN_PROGRESS'")) {
     if ($e2e.Contains($placeholder)) {
         throw "owned VPS e2e script still contains incomplete field behavior: $placeholder"
     }
 }
-foreach ($marker in @('RelayPort', '-relay-port')) {
-    if (-not $e2e.Contains($marker)) {
-        throw "owned VPS e2e script does not preserve configurable relay port marker $marker"
+foreach ($forbidden in @('[string]$SshAlias', '[string]$AvdName', '[string]$DeviceSerial', '[string]$ProbeUrlFile', '[int]$RelayPort')) {
+    if ($e2e.Contains($forbidden)) {
+        throw "owned VPS e2e command line still carries a private selector: $forbidden"
+    }
+}
+
+$builder = Get-Content -Raw (Join-Path $PSScriptRoot 'build-qualification-candidate.ps1')
+foreach ($marker in @('candidate-A', 'candidate-B', 'worktree', "'candidate', 'validate'", "'source', 'create'", "'candidate', 'create'", 'IsReadOnly', "'status', '--porcelain=v1', '--untracked-files=all'")) {
+    if (-not $builder.Contains($marker)) {
+        throw "qualification candidate builder is missing $marker"
+    }
+}
+if ($builder.Contains('go run')) {
+    throw 'qualification candidate builder contains go run'
+}
+if ($builder.Contains('--untracked-files=no')) {
+    throw 'qualification candidate builder ignores untracked source inputs'
+}
+
+$qualified = Get-Content -Raw (Join-Path $PSScriptRoot 'run-qualified-campaign.ps1')
+foreach ($marker in @(
+    "'attempt', 'begin'",
+    "'attempt', 'finish'",
+    "'attempt', 'close'",
+    "'soak', 'consume'",
+    'candidate-A',
+    'PHASE17_CAMPAIGN_EXACT_RESULT_MISSING',
+    'RUNNER_LAUNCH_FAILED',
+    'RUNNER_RESULT_MISSING',
+    'RUNNER_RESULT_AMBIGUOUS',
+    'RUNNER_RESULT_INVALID',
+    'EndsWith(',
+    '& $runner @runnerArguments 2> $null',
+    "'-wrapper', `$PSCommandPath",
+    "'-wrapper-entry', 'scripts/run-qualified-campaign.ps1'",
+    "'-private-environment', `$PrivateEnvironment",
+    "'-environment-salt', `$EnvironmentSalt",
+    "'candidate', 'artifact', 'verify'",
+    "'scripts/owned-vps-preflight.ps1'",
+    "'-preflight', `$preflight",
+    "'-preflight-entry', 'scripts/owned-vps-preflight.ps1'"
+)) {
+    if (-not $qualified.Contains($marker)) {
+        throw "qualified campaign wrapper is missing $marker"
+    }
+}
+$preflightVerifyIndex = $qualified.IndexOf("'candidate', 'artifact', 'verify'", [StringComparison]::Ordinal)
+$preflightRunIndex = $qualified.IndexOf('& $preflight', [StringComparison]::Ordinal)
+$soakConsumeIndex = $qualified.IndexOf("'soak', 'consume'", [StringComparison]::Ordinal)
+$attemptBeginIndex = $qualified.IndexOf("'attempt', 'begin'", [StringComparison]::Ordinal)
+if ($preflightVerifyIndex -lt 0 -or $preflightRunIndex -lt 0 -or $soakConsumeIndex -lt 0 -or $attemptBeginIndex -lt 0 -or
+    $preflightVerifyIndex -ge $preflightRunIndex -or $preflightRunIndex -ge $soakConsumeIndex -or $preflightRunIndex -ge $attemptBeginIndex) {
+    throw 'qualified campaign does not verify and run preflight before authorization consumption and attempt begin'
+}
+foreach ($forbidden in @('runner.stdout.tmp', 'runner.stderr.tmp', 'PHASE17_CAMPAIGN_EPHEMERAL_OUTPUT_RETENTION_REJECTED')) {
+    if ($qualified.Contains($forbidden)) {
+        throw "qualified campaign wrapper retains crash-surviving child output through $forbidden"
+    }
+}
+foreach ($forbidden in @("'-ssh-alias',", "'-avd-name',", "'-device-serial',", "'-probe-url-file',", "'-probe-digest-file',", "'-python',", "'-adb',", "'-ssh',", "'-scp',", "'-relay-port',")) {
+    if ($qualified.Contains($forbidden)) {
+        throw "qualified campaign command line still carries a private selector: $forbidden"
+    }
+}
+foreach ($forbidden in @('go run', 'Sort-Object LastWriteTimeUtc', 'Select-Object -First 1')) {
+    if ($qualified.Contains($forbidden)) {
+        throw "qualified campaign wrapper contains forbidden behavior: $forbidden"
     }
 }
 
 $sanitizer = Get-Content -Raw (Join-Path $PSScriptRoot 'sanitize-field-evidence.ps1')
-foreach ($marker in @('kurdistan-phase17-owned-vps-evidence-v2', 'campaign', 'private key', 'System.Net.IPAddress')) {
+foreach ($marker in @('-sanitize-v3-input', '-sanitize-v3-output', 'EvidenceTool', 'PHASE17_SANITIZER_OUTPUT_EXISTS')) {
     if (-not $sanitizer.Contains($marker)) {
         throw "field sanitizer is missing $marker"
     }
 }
-
-$sanitizerTestRoot = Join-Path ([IO.Path]::GetTempPath()) ('phase17-sanitizer-' + [Guid]::NewGuid().ToString('N'))
-try {
-    New-Item -ItemType Directory -Path $sanitizerTestRoot | Out-Null
-    $numericInputRoot = Join-Path $sanitizerTestRoot 'numeric-record'
-    New-Item -ItemType Directory -Path $numericInputRoot | Out-Null
-    $numericRecord = [ordered]@{
-        schema = 'kurdistan-phase17-owned-vps-raw-v2'
-        result = 'PASS'
-        subject = [ordered]@{}
-        environment = [ordered]@{ androidApi = 36 }
-        checks = [ordered]@{}
-        metrics = [ordered]@{ durationMs = 43413312; reconnects = 200 }
-        privacy = [ordered]@{}
-        limitations = @('external evidence remains')
-        campaign = [ordered]@{ soakDurationMs = 43413312; soakCycles = 142 }
+foreach ($forbidden in @('Sort-Object LastWriteTimeUtc', 'Get-ChildItem -Recurse', 'kurdistan-phase17-owned-vps-evidence-v2')) {
+    if ($sanitizer.Contains($forbidden)) {
+        throw "field sanitizer contains obsolete or ambiguous behavior: $forbidden"
     }
-    $numericRecord | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $numericInputRoot 'field-result.json') -Encoding utf8NoBOM
-    $numericOutput = Join-Path $numericInputRoot 'safe.json'
-    & (Join-Path $PSScriptRoot 'sanitize-field-evidence.ps1') -InputRoot $numericInputRoot -Output $numericOutput | Out-Null
-    if (-not (Test-Path -LiteralPath $numericOutput -PathType Leaf)) {
-        throw 'field sanitizer rejected an endpoint-free record containing ordinary numeric evidence'
-    }
-
-    foreach ($endpoint in @('192.0.2.10:443', 'https://198.51.100.20/check', '[2001:db8::10]:443', 'fe80::1%eth0')) {
-        $inputRoot = Join-Path $sanitizerTestRoot ([Guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $inputRoot | Out-Null
-        $raw = [ordered]@{
-            schema = 'kurdistan-phase17-owned-vps-raw-v2'
-            result = 'PASS'
-            endpoint = $endpoint
-            subject = [ordered]@{}
-            environment = [ordered]@{}
-            checks = [ordered]@{}
-            metrics = [ordered]@{}
-            privacy = [ordered]@{}
-            limitations = @()
-            campaign = [ordered]@{}
-        }
-        $raw | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $inputRoot 'field-result.json') -Encoding utf8NoBOM
-        $rejected = $false
-        try {
-            & (Join-Path $PSScriptRoot 'sanitize-field-evidence.ps1') -InputRoot $inputRoot -Output (Join-Path $inputRoot 'safe.json') | Out-Null
-        } catch {
-            if (-not $_.ToString().Contains('FIELD_EVIDENCE_ENDPOINT_PRESENT')) {
-                throw "unexpected field-sanitizer failure: $($_.ToString())"
-            }
-            $rejected = $true
-        }
-        if (-not $rejected) { throw "field sanitizer accepted endpoint form: $endpoint" }
-    }
-} finally {
-    Remove-Item -LiteralPath $sanitizerTestRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $upgrade = Get-Content -Raw (Join-Path $root 'deploy/selfhost/native/upgrade.sh')

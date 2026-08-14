@@ -129,6 +129,27 @@ jobs:
         shell: pwsh
         run: throw 'proof failed; terminal evidence was retained'
 
+  phase17-qualification:
+    name: Phase 17 qualification (${{ matrix.os }})
+    needs: policy
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+      - name: Run exact non-authoritative Phase 17 qualification
+        run: go run ./cmd/gate -proof phase17-qualification
+
   linux-netns:
     name: phase17 Linux namespace proof
     runs-on: ubuntu-24.04
@@ -427,7 +448,7 @@ jobs:
 
   certificate:
     name: exact-subject assurance certificate
-    needs: [policy, go-proof, linux-netns, android-host, android-device]
+    needs: [policy, go-proof, phase17-qualification, linux-netns, android-host, android-device]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-readiness-proof-v1.schema.json",
+  "title": "Kurdistan Phase 17 categorical readiness proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "kind", "candidateId", "roots", "result", "rawLogRetained"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-readiness-proof-v1"},
+    "kind": {"enum": ["SOURCE_GATES", "REPRODUCIBILITY", "DETERMINISTIC_GAUNTLET", "PRIVACY_SCANNERS", "BOUNDARY_MONITOR"]},
+    "candidateId": {"$ref": "#/$defs/digest"},
+    "roots": {"$ref": "#/$defs/roots"},
+    "result": {"const": "PASS"},
+    "rawLogRetained": {"const": false}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha256", "productSha256", "harnessSha256", "workloadSha256", "verifierSha256", "candidateId"],
+      "properties": {
+        "sourceSha256": {"$ref": "#/$defs/digest"},
+        "productSha256": {"$ref": "#/$defs/digest"},
+        "harnessSha256": {"$ref": "#/$defs/digest"},
+        "workloadSha256": {"$ref": "#/$defs/digest"},
+        "verifierSha256": {"$ref": "#/$defs/digest"},
+        "candidateId": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

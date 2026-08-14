@@ -443,6 +443,42 @@ func assertNoImportV1(t *testing.T, root, sourceRoot, forbidden string) {
 	}
 }
 
+func TestPhase17QualificationScannerAndConverterBoundariesV1(t *testing.T) {
+	root := repoRoot(t)
+	for _, sourceRoot := range []string{"cmd/phase17scan", "internal/phase17privacy/scannera"} {
+		assertNoImportV1(t, root, sourceRoot, modulePath+"/internal/phase17evidence")
+		assertNoImportV1(t, root, sourceRoot, modulePath+"/internal/phase17qualification")
+	}
+
+	runnerRoot := filepath.Join(root, "cmd", "phase17field")
+	err := filepath.WalkDir(runnerRoot, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, forbidden := range []string{
+			modulePath + "/cmd/phase17evidence",
+			"phase17evidence.exe",
+			"./cmd/phase17evidence",
+		} {
+			if bytes.Contains(raw, []byte(forbidden)) {
+				relative, _ := filepath.Rel(root, path)
+				t.Errorf("active Phase 17 runner %s reaches offline evidence converter %q", filepath.ToSlash(relative), forbidden)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGeneratedStrictBoundaryDiscoveredStrictPathsV1(t *testing.T) {
 	root := repoRoot(t)
 	strictDeclarations := 0

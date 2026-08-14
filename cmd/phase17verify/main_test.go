@@ -66,6 +66,21 @@ func TestPhase17GateDoesNotApplyHistoricalPhase9ArtifactEvidenceToCurrentAPK(t *
 	}
 }
 
+func TestPhase17GateRequiresSourceQualificationProof(t *testing.T) {
+	build, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "build.gradle.kts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(build)
+	if !strings.Contains(source, `val verifyPhase17QualificationSource = tasks.register<Exec>("verifyPhase17QualificationSource")`) {
+		t.Fatal("Phase 17 Android build lacks the source qualification proof task")
+	}
+	phase17 := taskBody(t, source, `val phase17Gate = tasks.register("phase17Gate")`)
+	if !strings.Contains(phase17, "verifyPhase17QualificationSource") {
+		t.Fatal("phase17Gate does not require the source qualification proof")
+	}
+}
+
 func TestHistoricalAndroidGatesDoNotBuildOrInspectCurrentAPK(t *testing.T) {
 	build, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "build.gradle.kts"))
 	if err != nil {
