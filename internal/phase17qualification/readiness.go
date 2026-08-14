@@ -305,7 +305,8 @@ func VerifyReadinessEvidenceFiles(root string, index ReadinessEvidenceIndex, can
 }
 
 func safeReadinessPath(value string) bool {
-	if value == "" || len(value) > 512 || filepath.IsAbs(value) || strings.Contains(value, "\\") ||
+	if value == "" || len(value) > 512 || filepath.IsAbs(value) || strings.HasPrefix(value, "/") ||
+		hasWindowsDrivePrefix(value) || strings.Contains(value, "\\") ||
 		filepath.ToSlash(filepath.Clean(filepath.FromSlash(value))) != value || value == "." || value == ".." || strings.HasPrefix(value, "../") {
 		return false
 	}

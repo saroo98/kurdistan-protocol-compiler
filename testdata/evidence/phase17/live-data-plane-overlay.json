@@ -725,7 +725,7 @@
     {
       "path": "cmd/phase17field/qualification_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "7007acaa142f2c8e7e1c67eb49192c9a57112cd8f3bd499749953815d0847b12"
+      "post_sha256": "b25c1de7087e42870872550a2adf5c16169b4afffd7347b587689320c263be55"
     },
     {
       "path": "cmd/phase17qual/main.go",
@@ -1190,12 +1190,12 @@
     {
       "path": "internal/phase17qualification/host_boot.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "37d53952fc2872351150ef8a6bb22132ded915307160751a2a84a2e152e99a69"
+      "post_sha256": "8ecf15614c36b7e7456353a4284988aa8f0170c9cd7d6e9f2776b48014441b3f"
     },
     {
       "path": "internal/phase17qualification/host_boot_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "7ce7d8751ea271ef822f8c9e6a5b55eeed54f0b6141509530e3f3ca88afa8d82"
+      "post_sha256": "5d09e99a6aed423f80cdf33dc484db5adb011c4670531388b4f5d4d30808e248"
     },
     {
       "path": "internal/phase17qualification/key.go",
@@ -1255,12 +1255,12 @@
     {
       "path": "internal/phase17qualification/readiness.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "d5c0a8e3148abdd68ade82b6cbcdcf7938c22c7000b242c010d24b06f892b152"
+      "post_sha256": "946b65eeb4860a30f21069869fe79c2915d97f931659fec83c6d344e9c79534e"
     },
     {
       "path": "internal/phase17qualification/readiness_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "2125e00f6076a3f4dbdb44a9263f3c62baa5836823e3c16e54afeaf9b33d40c2"
+      "post_sha256": "e0459e234771c30f10b2d58bde054c3e9b2fe61e6faa254f1f10dbf82e005146"
     },
     {
       "path": "internal/phase17qualification/receipt.go",

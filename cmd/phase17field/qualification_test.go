@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -292,7 +293,7 @@ func newQualifiedRunFixture(t *testing.T, mode string) qualifiedRunFixture {
 	rcDigest := sha256.Sum256(rcRaw)
 	rcDigestHex := hex.EncodeToString(rcDigest[:])
 	environment := phase17qualification.EnvironmentContext{
-		Schema: phase17qualification.EnvironmentSchema, HostOS: "windows", HostArch: "amd64", HostBootClass: "BOUND_CURRENT_BOOT",
+		Schema: phase17qualification.EnvironmentSchema, HostOS: runtime.GOOS, HostArch: runtime.GOARCH, HostBootClass: "BOUND_CURRENT_BOOT",
 		AndroidClass: "EMULATOR", AndroidAPI: 36, AndroidABI: "x86_64", VPSOS: "linux", VPSArch: "amd64",
 		ProviderClass: "PRIMARY", TimeSource: "OWNER_VPS_INTERVAL_REQUIRED", PowerPolicy: "RUNNER_SYSTEM_REQUIRED",
 		PythonSHA256: fileDigestHexForFixture(t, paths["python"]), ADBSHA256: fileDigestHexForFixture(t, paths["adb"]),
