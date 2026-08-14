@@ -10,6 +10,7 @@ import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.Locales
 import androidx.compose.ui.test.WindowSize
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.accessibility.disableAccessibilityChecks
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -187,9 +188,21 @@ class Phase13ProductSurfaceDeviceTest {
     @Test
     fun api34AutomatedAccessibilityChecksPassForPrimarySettingsSurface() {
         compose.setContent { settingsIndex() }
+        assertAccessibilityAtIdle()
+
+        compose.onNodeWithTag("settings_expert").performScrollTo()
+        assertAccessibilityAtIdle()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun assertAccessibilityAtIdle() {
+        compose.waitForIdle()
         compose.enableAccessibilityChecks()
-        compose.onRoot().tryPerformAccessibilityChecks()
-        compose.onNodeWithTag("settings_expert").performScrollTo().performClick()
+        try {
+            compose.onRoot().tryPerformAccessibilityChecks()
+        } finally {
+            compose.disableAccessibilityChecks()
+        }
     }
 
     @Test
