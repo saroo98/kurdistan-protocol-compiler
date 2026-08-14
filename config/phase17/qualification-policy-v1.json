@@ -1,0 +1,116 @@
+{
+  "schema": "kurdistan-phase17-qualification-policy-v1",
+  "requiredChecks": [
+    "preflight",
+    "packageVerification",
+    "install",
+    "serviceHealth",
+    "enrollment",
+    "sealedImport",
+    "connect",
+    "ipv4Tcp",
+    "ipv4Udp",
+    "dnsHealthy",
+    "dnsFailClosed",
+    "egressIdentity",
+    "ipv6",
+    "routeDnsLeak",
+    "boundedFallback",
+    "revocation",
+    "restart",
+    "drainResume",
+    "emergencyDisable",
+    "backupRestore",
+    "upgradeRollback",
+    "androidCrashFree",
+    "privacy"
+  ],
+  "privacyPredicates": [
+    "payloadRetained",
+    "destinationRetained",
+    "dnsNameRetained",
+    "credentialRetained",
+    "keyRetained",
+    "profileRetained",
+    "rawLogRetained"
+  ],
+  "outcomes": [
+    "PASS",
+    "FAIL_PRODUCT",
+    "FAIL_PRIVACY",
+    "FAIL_HARNESS",
+    "ABORT_ENVIRONMENT",
+    "INVALID_IDENTITY",
+    "INCONCLUSIVE"
+  ],
+  "campaigns": [
+    {
+      "mode": "Functional",
+      "restartReconnectCycles": 0,
+      "profileRotationCycles": 0,
+      "impairments": [],
+      "minimumDurationMs": 0,
+      "cadenceMs": 0,
+      "minimumCycles": 0
+    },
+    {
+      "mode": "Stress",
+      "restartReconnectCycles": 100,
+      "profileRotationCycles": 100,
+      "impairments": ["bandwidth", "latency", "loss", "combined", "carrier-reset"],
+      "minimumDurationMs": 0,
+      "cadenceMs": 0,
+      "minimumCycles": 0
+    },
+    {
+      "mode": "Soak60m",
+      "restartReconnectCycles": 0,
+      "profileRotationCycles": 0,
+      "impairments": [],
+      "minimumDurationMs": 3600000,
+      "cadenceMs": 300000,
+      "minimumCycles": 12
+    },
+    {
+      "mode": "Soak90m",
+      "restartReconnectCycles": 0,
+      "profileRotationCycles": 0,
+      "impairments": [],
+      "minimumDurationMs": 5400000,
+      "cadenceMs": 300000,
+      "minimumCycles": 18
+    },
+    {
+      "mode": "Soak120m",
+      "restartReconnectCycles": 0,
+      "profileRotationCycles": 0,
+      "impairments": [],
+      "minimumDurationMs": 7200000,
+      "cadenceMs": 300000,
+      "minimumCycles": 24
+    },
+    {
+      "mode": "Soak12h",
+      "restartReconnectCycles": 0,
+      "profileRotationCycles": 0,
+      "impairments": [],
+      "minimumDurationMs": 43200000,
+      "cadenceMs": 300000,
+      "minimumCycles": 144
+    }
+  ],
+  "resources": {
+    "maximumRssBytes": 402653184,
+    "maximumFileDescriptors": 1024,
+    "maximumSwapBytes": 67108864
+  },
+  "retry": {
+    "instrumentationLaunchAttempts": 2,
+    "qualifiedCampaignAutoRetries": 0,
+    "environmentAbortRequiresNewAuthorization": true
+  },
+  "evidenceOnlyPaths": [
+    "testdata/evidence/phase17/acceptance-status.json",
+    "testdata/evidence/phase17/live-data-plane-overlay.json"
+  ]
+}

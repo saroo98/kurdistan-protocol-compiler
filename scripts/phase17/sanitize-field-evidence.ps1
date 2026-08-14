@@ -3,53 +3,45 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$InputRoot,
-    [Parameter(Mandatory = $true)][string]$Output
+    [Parameter(Mandatory = $true)][string]$Input,
+    [Parameter(Mandatory = $true)][string]$Output,
+    [Parameter(Mandatory = $true)][string]$EvidenceTool
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$files = @(Get-ChildItem -LiteralPath $InputRoot -Recurse -Filter 'field-result.json' -File | Sort-Object LastWriteTimeUtc -Descending)
-if ($files.Count -eq 0) { throw 'FIELD_EVIDENCE_MISSING' }
-$raw = Get-Content -Raw -LiteralPath $files[0].FullName
-$lower = $raw.ToLowerInvariant()
-foreach ($marker in @('private key', 'begin openssh', 'ssh-rsa', 'ssh-ed25519', 'password', 'passphrase', 'bearer token', 'c:\users\', '/home/')) {
-    if ($lower.Contains($marker)) { throw 'FIELD_EVIDENCE_SENSITIVE' }
-}
-$ipCandidates = [regex]::Matches($raw, '[0-9A-Fa-f:.%]+')
-foreach ($match in $ipCandidates) {
-    $candidate = $match.Value
-    $zone = $candidate.IndexOf('%')
-    if ($zone -ge 0) { $candidate = $candidate.Substring(0, $zone) }
-    if (-not $candidate.Contains('.') -and -not $candidate.Contains(':')) { continue }
-    $parsed = $null
-    if ([System.Net.IPAddress]::TryParse($candidate, [ref]$parsed)) { throw 'FIELD_EVIDENCE_ENDPOINT_PRESENT' }
-    if (@($candidate.ToCharArray() | Where-Object { $_ -eq ':' }).Count -eq 1) {
-        $addressHost = $candidate.Substring(0, $candidate.IndexOf(':'))
-        if ([System.Net.IPAddress]::TryParse($addressHost, [ref]$parsed)) { throw 'FIELD_EVIDENCE_ENDPOINT_PRESENT' }
+
+function Assert-RegularFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or ($null -ne $item.LinkType) -or ($item.Length -lt 1)) {
+        throw 'PHASE17_SANITIZER_REGULAR_FILE_REJECTED'
     }
 }
-$record = $raw | ConvertFrom-Json
-if ($record.schema -ne 'kurdistan-phase17-owned-vps-raw-v2' -or $record.result -ne 'PASS') { throw 'FIELD_EVIDENCE_INCOMPLETE' }
-$safe = [ordered]@{
-    schema = 'kurdistan-phase17-owned-vps-evidence-v2'
-    result = 'PASS'
-    subject = $record.subject
-    environment = $record.environment
-    checks = $record.checks
-    metrics = $record.metrics
-    privacy = $record.privacy
-    limitations = @($record.limitations)
-    campaign = $record.campaign
+
+$inputPath = [IO.Path]::GetFullPath($Input)
+$outputPath = [IO.Path]::GetFullPath($Output)
+$toolPath = [IO.Path]::GetFullPath($EvidenceTool)
+if ($inputPath -eq $outputPath) {
+    throw 'PHASE17_SANITIZER_PATH_OVERLAP_REJECTED'
 }
-$destination = [IO.Path]::GetFullPath($Output)
-$directory = Split-Path -Parent $destination
-New-Item -ItemType Directory -Force -Path $directory | Out-Null
-$temporary = Join-Path $directory ('.phase17-field-' + [Guid]::NewGuid().ToString('N') + '.tmp')
-try {
-    $safe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $temporary -Encoding utf8NoBOM
-    Move-Item -LiteralPath $temporary -Destination $destination -Force
-} finally {
-    Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+Assert-RegularFile -Path $inputPath
+Assert-RegularFile -Path $toolPath
+if (Test-Path -LiteralPath $outputPath) {
+    throw 'PHASE17_SANITIZER_OUTPUT_EXISTS'
 }
-[ordered]@{ schema = 'kurdistan-phase17-field-sanitizer-result-v1'; status = 'PASS' } | ConvertTo-Json -Compress
+$outputDirectory = Split-Path -Parent $outputPath
+if (-not (Test-Path -LiteralPath $outputDirectory -PathType Container)) {
+    New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+}
+$directoryItem = Get-Item -LiteralPath $outputDirectory -Force
+if ((-not $directoryItem.PSIsContainer) -or ($null -ne $directoryItem.LinkType)) {
+    throw 'PHASE17_SANITIZER_OUTPUT_DIRECTORY_REJECTED'
+}
+
+$toolOutput = @(& $toolPath '-sanitize-v3-input' $inputPath '-sanitize-v3-output' $outputPath 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw 'PHASE17_SANITIZER_TOOL_REJECTED'
+}
+Assert-RegularFile -Path $outputPath
+[ordered]@{ schema = 'kurdistan-phase17-field-sanitizer-result-v2'; status = 'PASS' } | ConvertTo-Json -Compress

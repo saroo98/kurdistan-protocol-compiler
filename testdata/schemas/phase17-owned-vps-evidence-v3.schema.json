@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-owned-vps-evidence-v3.schema.json",
+  "title": "Kurdistan Phase 17 owner-VPS field evidence v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "outcome", "subject", "attempt", "environment", "checks", "metrics", "privacy", "scanners", "boundary", "campaign"],
+  "properties": {
+    "schema": {"enum": ["kurdistan-phase17-owned-vps-raw-v3", "kurdistan-phase17-owned-vps-evidence-v3"]},
+    "outcome": {"enum": ["PASS", "FAIL_PRODUCT", "FAIL_PRIVACY", "FAIL_HARNESS", "ABORT_ENVIRONMENT", "INVALID_IDENTITY", "INCONCLUSIVE"]},
+    "subject": {"$ref": "#/$defs/subject"},
+    "attempt": {"$ref": "#/$defs/attempt"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "checks": {"type": "array", "minItems": 23, "maxItems": 23, "items": {"$ref": "#/$defs/check"}},
+    "metrics": {"$ref": "#/$defs/metrics"},
+    "privacy": {"$ref": "#/$defs/privacy"},
+    "scanners": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/scanner"}},
+    "boundary": {"$ref": "#/$defs/boundary"},
+    "campaign": {"$ref": "#/$defs/campaign"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "optionalDigest": {"type": "string", "pattern": "^(|[0-9a-f]{64})$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commitSha", "treeSha", "candidateId", "sourceSha256", "productSha256", "harnessSha256", "workloadSha256", "verifierSha256", "comparisonSha256", "policySha256", "packageSha256", "appApkSha256", "testApkSha256"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+        "commitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "treeSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "candidateId": {"$ref": "#/$defs/digest"},
+        "sourceSha256": {"$ref": "#/$defs/digest"},
+        "productSha256": {"$ref": "#/$defs/digest"},
+        "harnessSha256": {"$ref": "#/$defs/digest"},
+        "workloadSha256": {"$ref": "#/$defs/digest"},
+        "verifierSha256": {"$ref": "#/$defs/digest"},
+        "comparisonSha256": {"$ref": "#/$defs/digest"},
+        "policySha256": {"$ref": "#/$defs/digest"},
+        "packageSha256": {"$ref": "#/$defs/digest"},
+        "appApkSha256": {"$ref": "#/$defs/digest"},
+        "testApkSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "rcLockedSha256", "authorizationSha256", "environmentSha256", "preflightSha256", "priorStressResultSha256", "soakReadySha256"],
+      "properties": {
+        "attemptId": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "rcLockedSha256": {"$ref": "#/$defs/digest"},
+        "authorizationSha256": {"$ref": "#/$defs/digest"},
+        "environmentSha256": {"$ref": "#/$defs/digest"},
+        "preflightSha256": {"$ref": "#/$defs/digest"},
+        "priorStressResultSha256": {"$ref": "#/$defs/optionalDigest"},
+        "soakReadySha256": {"$ref": "#/$defs/optionalDigest"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostOs", "hostArch", "androidClass", "androidApi", "androidAbi", "vpsOs", "vpsArch", "providerClass", "ipv4", "ipv6"],
+      "properties": {
+        "hostOs": {"enum": ["windows", "linux", "darwin"]},
+        "hostArch": {"enum": ["amd64", "arm64"]},
+        "androidClass": {"enum": ["EMULATOR", "PHYSICAL"]},
+        "androidApi": {"enum": [26, 34, 36]},
+        "androidAbi": {"enum": ["x86_64", "arm64-v8a"]},
+        "vpsOs": {"const": "linux"},
+        "vpsArch": {"const": "amd64"},
+        "providerClass": {"enum": ["PRIMARY", "UNRELATED_SECONDARY"]},
+        "ipv4": {"const": true},
+        "ipv6": {"type": "boolean"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "result"],
+      "properties": {
+        "name": {"enum": ["preflight", "packageVerification", "install", "serviceHealth", "enrollment", "sealedImport", "connect", "ipv4Tcp", "ipv4Udp", "dnsHealthy", "dnsFailClosed", "egressIdentity", "ipv6", "routeDnsLeak", "boundedFallback", "revocation", "restart", "drainResume", "emergencyDisable", "backupRestore", "upgradeRollback", "androidCrashFree", "privacy"]},
+        "result": {"enum": ["PASS", "FAIL", "NOT_RUN"]}
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationMs", "peakRssBytes", "peakFileDescriptors", "peakSwapBytes", "oomKills", "reconnects", "terminalGaps"],
+      "properties": {
+        "durationMs": {"type": "integer", "minimum": 0, "maximum": 604800000},
+        "peakRssBytes": {"type": "integer", "minimum": 0, "maximum": 402653184},
+        "peakFileDescriptors": {"type": "integer", "minimum": 0, "maximum": 1024},
+        "peakSwapBytes": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "oomKills": {"type": "integer", "minimum": 0},
+        "reconnects": {"type": "integer", "minimum": 0, "maximum": 2000},
+        "terminalGaps": {"type": "integer", "minimum": 0, "maximum": 1}
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payloadRetained", "destinationRetained", "dnsNameRetained", "credentialRetained", "keyRetained", "profileRetained", "rawLogRetained"],
+      "properties": {
+        "payloadRetained": {"type": "boolean"},
+        "destinationRetained": {"type": "boolean"},
+        "dnsNameRetained": {"type": "boolean"},
+        "credentialRetained": {"type": "boolean"},
+        "keyRetained": {"type": "boolean"},
+        "profileRetained": {"type": "boolean"},
+        "rawLogRetained": {"type": "boolean"}
+      }
+    },
+    "scanner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "identitySha256", "inputSha256", "bytesConsumed", "recordsConsumed", "result", "truncated", "parseFailure", "backpressureFailure", "coverageGap", "privacy"],
+      "properties": {
+        "name": {"enum": ["GO_A", "PYTHON_B"]},
+        "identitySha256": {"$ref": "#/$defs/optionalDigest"},
+        "inputSha256": {"$ref": "#/$defs/optionalDigest"},
+        "bytesConsumed": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "recordsConsumed": {"type": "integer", "minimum": 0, "maximum": 4096},
+        "result": {"enum": ["PASS", "FAIL", "NOT_RUN"]},
+        "truncated": {"type": "boolean"},
+        "parseFailure": {"type": "boolean"},
+        "backpressureFailure": {"type": "boolean"},
+        "coverageGap": {"type": "boolean"},
+        "privacy": {"$ref": "#/$defs/privacy"}
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "monitorSha256", "routeLeak", "dnsLeak"],
+      "properties": {
+        "result": {"enum": ["PASS", "FAIL", "NOT_RUN"]},
+        "monitorSha256": {"$ref": "#/$defs/optionalDigest"},
+        "routeLeak": {"type": "boolean"},
+        "dnsLeak": {"type": "boolean"}
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "restartReconnectCycles", "profileRotationCycles", "impairments", "soakDurationMs", "cadenceMs", "soakCycles"],
+      "properties": {
+        "mode": {"enum": ["Functional", "Stress", "Soak60m", "Soak90m", "Soak120m", "Soak12h"]},
+        "restartReconnectCycles": {"type": "integer", "minimum": 0, "maximum": 100},
+        "profileRotationCycles": {"type": "integer", "minimum": 0, "maximum": 100},
+        "impairments": {"type": "array", "maxItems": 5, "uniqueItems": true, "items": {"enum": ["bandwidth", "latency", "loss", "combined", "carrier-reset"]}},
+        "soakDurationMs": {"type": "integer", "minimum": 0, "maximum": 43800000},
+        "cadenceMs": {"type": "integer", "minimum": 0, "maximum": 300000},
+        "soakCycles": {"type": "integer", "minimum": 0, "maximum": 146}
+      }
+    }
+  }
+}

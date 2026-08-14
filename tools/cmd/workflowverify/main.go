@@ -151,11 +151,142 @@ func verifyWorkflow(path, name string) error {
 	if err := inspectNode(root, strings.Contains(name, "promote") || strings.Contains(name, "sign")); err != nil {
 		return err
 	}
+	if name == "assurance.yml" {
+		if err := verifyAssuranceQualificationTopology(root); err != nil {
+			return err
+		}
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	return verifyKnownWorkflowContract(name, string(raw))
+}
+
+func verifyAssuranceQualificationTopology(root *yaml.Node) error {
+	jobs := mappingValue(root, "jobs")
+	if jobs == nil || jobs.Kind != yaml.MappingNode {
+		return errors.New("assurance workflow jobs must be a mapping")
+	}
+	goProof := mappingValue(jobs, "go-proof")
+	if goProof == nil || goProof.Kind != yaml.MappingNode {
+		return errors.New("assurance workflow is missing the receipt-producing go-proof job")
+	}
+	strategy := mappingValue(goProof, "strategy")
+	matrix := mappingValue(strategy, "matrix")
+	include := mappingValue(matrix, "include")
+	if include == nil || include.Kind != yaml.SequenceNode {
+		return errors.New("assurance go-proof receipt matrix is missing")
+	}
+	for _, lane := range include.Content {
+		if lane.Kind != yaml.MappingNode {
+			return errors.New("assurance go-proof receipt lane must be a mapping")
+		}
+		proof := mappingValue(lane, "proof")
+		if proof != nil && proof.Kind == yaml.ScalarNode && proof.Value == "phase17-qualification" {
+			return errors.New("Phase 17 qualification must not widen the immutable assurance receipt authority")
+		}
+	}
+
+	qualification := mappingValue(jobs, "phase17-qualification")
+	if qualification == nil || qualification.Kind != yaml.MappingNode {
+		return errors.New("assurance workflow is missing the required non-receipt Phase 17 qualification job")
+	}
+	runsOn := mappingValue(qualification, "runs-on")
+	if runsOn == nil || runsOn.Kind != yaml.ScalarNode || runsOn.Value != "${{ matrix.os }}" {
+		return errors.New("Phase 17 qualification must run on its exact OS matrix")
+	}
+	qualificationStrategy := mappingValue(qualification, "strategy")
+	qualificationMatrix := mappingValue(qualificationStrategy, "matrix")
+	operatingSystems := mappingValue(qualificationMatrix, "os")
+	if !exactScalarSet(operatingSystems, []string{"ubuntu-24.04", "windows-2025"}) {
+		return errors.New("Phase 17 qualification must run exactly on ubuntu-24.04 and windows-2025")
+	}
+	if !nodeContainsCommand(qualification, "go run ./cmd/gate -proof phase17-qualification") {
+		return errors.New("Phase 17 qualification job is missing its exact gate command")
+	}
+	if nodeContainsSubstring(qualification, "cmd/assure receipt") || nodeContainsSubstring(qualification, "-receipt") {
+		return errors.New("Phase 17 qualification job must not issue or upload assurance receipts")
+	}
+	if !nodeContainsExactScalar(mappingValue(qualification, "needs"), "policy") {
+		return errors.New("Phase 17 qualification must depend on workflow policy verification")
+	}
+
+	certificate := mappingValue(jobs, "certificate")
+	if certificate == nil || certificate.Kind != yaml.MappingNode || !nodeContainsExactScalar(mappingValue(certificate, "needs"), "phase17-qualification") {
+		return errors.New("assurance certificate must fail closed on Phase 17 qualification")
+	}
+	return nil
+}
+
+func exactScalarSet(node *yaml.Node, expected []string) bool {
+	if node == nil || node.Kind != yaml.SequenceNode || len(node.Content) != len(expected) {
+		return false
+	}
+	want := make(map[string]bool, len(expected))
+	for _, value := range expected {
+		want[value] = true
+	}
+	for _, child := range node.Content {
+		if child.Kind != yaml.ScalarNode || !want[child.Value] {
+			return false
+		}
+		delete(want, child.Value)
+	}
+	return len(want) == 0
+}
+
+func nodeContainsExactScalar(node *yaml.Node, wanted string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == yaml.ScalarNode && node.Value == wanted {
+		return true
+	}
+	for _, child := range node.Content {
+		if nodeContainsExactScalar(child, wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeContainsCommand(node *yaml.Node, wanted string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == yaml.MappingNode {
+		for index := 0; index < len(node.Content); index += 2 {
+			if node.Content[index].Value == "run" && node.Content[index+1].Kind == yaml.ScalarNode && strings.TrimSpace(node.Content[index+1].Value) == wanted {
+				return true
+			}
+			if nodeContainsCommand(node.Content[index+1], wanted) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, child := range node.Content {
+		if nodeContainsCommand(child, wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeContainsSubstring(node *yaml.Node, wanted string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == yaml.ScalarNode && strings.Contains(node.Value, wanted) {
+		return true
+	}
+	for _, child := range node.Content {
+		if nodeContainsSubstring(child, wanted) {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyKnownWorkflowContract(name, content string) error {
@@ -365,6 +496,9 @@ func inspectNode(node *yaml.Node, prohibitBuild bool) error {
 }
 
 func mappingValue(mapping *yaml.Node, wanted string) *yaml.Node {
+	if mapping == nil || mapping.Kind != yaml.MappingNode {
+		return nil
+	}
 	for index := 0; index < len(mapping.Content); index += 2 {
 		if mapping.Content[index].Value == wanted {
 			return mapping.Content[index+1]

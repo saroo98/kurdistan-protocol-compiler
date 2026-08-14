@@ -60,6 +60,7 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 		{name: "dependency freshness", proof: "dependency-freshness", want: []string{"build-govulncheck", "go-vulnerability-analysis", "fetch-osv-scanner", "android-runtime-vulnerability-analysis"}},
 		{name: "Linux namespace", proof: "linux-netns", want: []string{"phase17-linux-netns"}, arg: "--preserve-env=PATH"},
 		{name: "Linux namespace PR contract", proof: "linux-netns-contract", want: []string{"phase17-netns-shell", "phase17-netns-witness-cli", "phase17-netns-probe-cli", "phase17-netns-tagged-tests"}},
+		{name: "Phase 17 qualification", proof: "phase17-qualification", want: []string{"phase17-qualification-tests", "phase17-qualification-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
 		{name: "Android host", proof: "android-host", want: []string{"android-assurance-host"}, arg: "ciAssuranceHostGate"},
 		{name: "Android PR host", proof: "android-pr-host", want: []string{"android-pr-host"}, arg: "ciPrHostGate"},
 		{name: "Android API 26 device", proof: "android-device-api26", want: []string{"android-device-api26"}},
@@ -151,6 +152,60 @@ func TestOperatorProofPolicyMatchesGateInventory(t *testing.T) {
 	}
 }
 
+func TestPhase17QualificationProofPolicyMatchesGateInventory(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy struct {
+		Proofs []struct {
+			ID                        string                `json:"id"`
+			CommandsByOperatingSystem map[string][][]string `json:"commandsByOperatingSystem"`
+			InvalidatedBy             []string              `json:"invalidatedBy"`
+		} `json:"proofs"`
+	}
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		t.Fatal(err)
+	}
+	var commands [][]string
+	var invalidatedBy []string
+	for _, proof := range policy.Proofs {
+		if proof.ID == "phase17-qualification" {
+			commands = proof.CommandsByOperatingSystem[runtime.GOOS]
+			invalidatedBy = proof.InvalidatedBy
+			break
+		}
+	}
+	if commands == nil {
+		t.Fatal("Phase 17 qualification proof missing from policy")
+	}
+	steps, err := proofSteps("phase17-qualification", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) != len(steps) {
+		t.Fatalf("qualification policy command count = %d, gate command count = %d", len(commands), len(steps))
+	}
+	for index, step := range steps {
+		want := append([]string{step.program}, step.args...)
+		if !equalStrings(commands[index], want) {
+			t.Fatalf("qualification policy command %d = %v, gate command = %v", index, commands[index], want)
+		}
+	}
+	for _, required := range []string{
+		".github/**", "android/**", "cmd/assure/**", "cmd/gate/**", "cmd/phase17boundary/**", "cmd/phase17evidence/**",
+		"cmd/phase17field/**", "cmd/phase17qual/**", "cmd/phase17scan/**", "cmd/phase17verify/**",
+		"config/ci/**", "config/phase17/**", "config/release/**", "go.mod", "go.sum", "internal/assurance/**",
+		"internal/phase17boundary/**", "internal/phase17evidence/**",
+		"internal/phase17privacy/**", "internal/phase17qualification/**", "internal/testkit/importrules/**",
+		"scripts/phase17/**", "testdata/fixtures/phase17/privacy-scanner/**", "testdata/schemas/**",
+	} {
+		if !containsString(invalidatedBy, required) {
+			t.Fatalf("qualification policy invalidation paths missing %q: %v", required, invalidatedBy)
+		}
+	}
+}
+
 func TestDefaultGateRunsExecutableEvidenceExactlyOnce(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
 	count := 0
@@ -224,9 +279,9 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 		options gateOptions
 		want    []string
 	}{
-		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet"}},
-		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet"}},
-		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "android-assurance-host"}},
+		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
+		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
+		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests", "android-assurance-host"}},
 		{name: "Android only", options: gateOptions{androidOnly: true}, want: []string{"android-assurance-host"}},
 		{name: "proof", options: gateOptions{proof: "operator"}, want: []string{"phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet"}},
 	}
@@ -418,8 +473,8 @@ func containsString(values []string, target string) bool {
 
 func TestGateStepsRemainCacheProof(t *testing.T) {
 	steps := gateSteps(false, "report.json", "status.md")
-	if len(steps) != 10 {
-		t.Fatalf("got %d Go gate steps", len(steps))
+	if len(steps) != 14 {
+		t.Fatalf("got %d default gate steps", len(steps))
 	}
 	if got := steps[0].args; len(got) != 2 || got[0] != "mod" || got[1] != "verify" {
 		t.Fatalf("module verification gate missing: %v", got)
@@ -427,10 +482,19 @@ func TestGateStepsRemainCacheProof(t *testing.T) {
 	if got := steps[3].args; len(got) < 3 || got[0] != "test" || !containsString(got, "-timeout=15m") || !containsString(got, "-count=1") {
 		t.Fatalf("test gate is not cache-proof: %v", got)
 	}
-	for _, value := range steps {
+	for _, value := range steps[:12] {
 		if value.program != "go" {
 			t.Fatalf("unexpected Go gate program %q", value.program)
 		}
+	}
+	if steps[12].name != "phase17-privacy-python" || (steps[12].program != "python" && steps[12].program != "python3") {
+		t.Fatalf("Phase 17 Python privacy gate missing: %#v", steps[12])
+	}
+	if want := []string{"-B", "-I", "scripts/phase17/privacy_scan_b_test.py"}; !equalStrings(steps[12].args, want) {
+		t.Fatalf("Phase 17 Python privacy gate can write bytecode: args=%v want=%v", steps[12].args, want)
+	}
+	if steps[13].name != "phase17-wrapper-tests" || steps[13].program != "pwsh" {
+		t.Fatalf("Phase 17 wrapper gate missing: %#v", steps[13])
 	}
 	if got := steps[6].args; len(got) != 3 || got[0] != "run" || got[1] != "./cmd/koperator" || got[2] != "verify" {
 		t.Fatalf("Phase 12 control-plane gate missing: %v", got)

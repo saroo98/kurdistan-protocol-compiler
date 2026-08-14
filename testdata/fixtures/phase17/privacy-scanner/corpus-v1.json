@@ -1,0 +1,212 @@
+{
+  "schema": "kurdistan-phase17-privacy-corpus-v1",
+  "cases": [
+    {
+      "name": "safe-categorical",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "lifecycle=CONNECTED result=PASS",
+      "wantPass": true,
+      "wantPrivacy": {}
+    },
+    {
+      "name": "safe-numeric-metrics",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "rss_bytes=1048576 fds=12 latency_ms=42 reconnects=4",
+      "wantPass": true,
+      "wantPrivacy": {}
+    },
+    {
+      "name": "safe-unicode-whitespace-and-bom",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "﻿status PASS",
+      "wantPass": true,
+      "wantPrivacy": {}
+    },
+    {
+      "name": "safe-android-frametracker-lf",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "W/FrameTracker(23097): Missed SF frame:JANK_COMPOSER, 140916, 49415893, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@1@org.kurdistanvpn.app.internal>\n",
+      "wantPass": true,
+      "wantPrivacy": {}
+    },
+    {
+      "name": "safe-android-frametracker-crlf",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "W/FrameTracker(23097): Missed SF frame:JANK_COMPOSER, 140916, 49415893, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@1@org.kurdistanvpn.app.internal>\r\n",
+      "wantPass": true,
+      "wantPrivacy": {}
+    },
+    {
+      "name": "payload-canary",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "PHASE17_PAYLOAD_CANARY_deadbeef",
+      "wantPass": false,
+      "wantPrivacy": {"payloadRetained": true}
+    },
+    {
+      "name": "destination-canary",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "PHASE17_DESTINATION_CANARY_deadbeef",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "ipv4-literal",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "endpoint 198.51.100.7",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "ipv6-compressed",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "endpoint 2001:db8::7",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "ipv6-expanded",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "2001:0db8:0000:0000:0000:0000:0000:0007",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "ipv4-mapped-ipv6",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "::ffff:192.0.2.7",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "zoned-ipv6",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "fe80::1%wlan0",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "bracketed-ipv6-url",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "https://[2001:db8::8]:443/check",
+      "wantPass": false,
+      "wantPrivacy": {"destinationRetained": true}
+    },
+    {
+      "name": "dns-canary",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "PHASE17_DNS_CANARY_deadbeef",
+      "wantPass": false,
+      "wantPrivacy": {"dnsNameRetained": true}
+    },
+    {
+      "name": "dns-name",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "lookup phase17-probe.invalid",
+      "wantPass": false,
+      "wantPrivacy": {"dnsNameRetained": true}
+    },
+    {
+      "name": "password",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "password=secret",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "bearer-token",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "Authorization: Bearer secret.value",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "nul-split-password",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "pass\u0000word=secret",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "invalid-utf8-split-password",
+      "source": "ANDROID_LOGCAT",
+      "payloadHex": "70617373ff776f72643d736563726574",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "ansi-split-password",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "pass\u001b[31mword=secret",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "percent-encoded-password",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "%70%61%73%73%77%6f%72%64%3d%73%65%63%72%65%74",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "base64-password",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "cGFzc3dvcmQ9c2VjcmV0",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "windows-owner-path",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "C:\\Users\\Owner\\private",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "unix-owner-path",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "/home/owner/private",
+      "wantPass": false,
+      "wantPrivacy": {"credentialRetained": true}
+    },
+    {
+      "name": "key-canary",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "PHASE17_KEY_CANARY_deadbeef",
+      "wantPass": false,
+      "wantPrivacy": {"keyRetained": true}
+    },
+    {
+      "name": "private-key-header",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "-----BEGIN PRIVATE KEY-----",
+      "wantPass": false,
+      "wantPrivacy": {"keyRetained": true}
+    },
+    {
+      "name": "profile-canary",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "PHASE17_PROFILE_CANARY_deadbeef",
+      "wantPass": false,
+      "wantPrivacy": {"profileRetained": true}
+    },
+    {
+      "name": "native-profile",
+      "source": "REMOTE_JOURNAL",
+      "payloadUtf8": "kurd://private-profile",
+      "wantPass": false,
+      "wantPrivacy": {"profileRetained": true}
+    },
+    {
+      "name": "multiple-forbidden-classes",
+      "source": "ANDROID_LOGCAT",
+      "payloadUtf8": "password=secret endpoint 198.51.100.8 kurd://private",
+      "wantPass": false,
+      "wantPrivacy": {
+        "destinationRetained": true,
+        "credentialRetained": true,
+        "profileRetained": true
+      }
+    }
+  ]
+}

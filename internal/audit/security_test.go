@@ -909,6 +909,40 @@ func TestPhase14AssuranceOverlayRejectsMutationV1(t *testing.T) {
 	}
 }
 
+func TestPhase14AssuranceOverlayCarriesValidatedSuccessorStateV1(t *testing.T) {
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest m2MaintenanceManifestV1
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const phase17OnlyPath = "cmd/phase17field/main.go"
+	want, ok := successor[phase17OnlyPath]
+	if !ok {
+		t.Fatalf("successor fixture is missing %s", phase17OnlyPath)
+	}
+	pre, err := validateM14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := pre[phase17OnlyPath]; !ok || got != want {
+		t.Fatalf("phase14 boundary discarded validated successor state for %s: got %q present=%v want %q", phase17OnlyPath, got, ok, want)
+	}
+	if got, ok := pre[m2MaintenanceSelfPathV1]; ok {
+		t.Fatalf("phase14 boundary imported self-owned manifest state through the ordinary successor map: %q", got)
+	}
+}
+
 func TestPhase17LiveDataPlaneOverlayRejectsMutationV1(t *testing.T) {
 	root, err := repoRoot()
 	if err != nil {

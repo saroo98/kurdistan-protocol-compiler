@@ -296,6 +296,9 @@ func verify(root string) error {
 	if err := verifyDeviceTestInventory(root); err != nil {
 		return err
 	}
+	if err := verifyQualificationInfrastructure(root); err != nil {
+		return fmt.Errorf("Phase 17 qualification infrastructure: %w", err)
+	}
 	if err := phase17evidence.Verify(root); err != nil {
 		return fmt.Errorf("Phase 17 evidence: %w", err)
 	}

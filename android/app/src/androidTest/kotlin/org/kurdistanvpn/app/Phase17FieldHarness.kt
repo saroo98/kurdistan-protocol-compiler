@@ -15,6 +15,8 @@ import java.net.HttpURLConnection
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.net.URI
@@ -49,10 +51,12 @@ import org.kurdistanvpn.runtime.api.VpnRuntimeState
  */
 internal object Phase17FieldHarness {
     private const val ARG_ACTION = "phase17FieldAction"
+    private const val ARG_ATTEMPT_ID = "phase17AttemptId"
     private const val FIELD_DIRECTORY = "phase17-field"
     private const val RECIPIENT_REQUEST = "recipient-request.bin"
     private const val SEALED_PROFILE = "sealed-profile.bin"
     private const val RESULT = "result.txt"
+    private const val ATTEMPT = "attempt.txt"
     private const val MAX_RECIPIENT_REQUEST_BYTES = 512
     private const val MAX_PROFILE_BYTES = 1_500_000
     private const val ARG_PROBE_URL = "phase17ProbeUrl"
@@ -66,6 +70,27 @@ internal object Phase17FieldHarness {
     private const val LIVE_RECONNECT_READY_TIMEOUT_MILLIS = 120_000L
     private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
     private const val VPN_NETWORK_POLL_MILLIS = 50L
+    private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
+
+    internal data class BoundarySnapshot(
+        val vpnActive: Boolean,
+        val ipv4Default: Boolean,
+        val ipv6Default: Boolean,
+        val dnsPinned: Boolean,
+        val bypassBlocked: Boolean,
+        val coverageGap: Boolean,
+    )
+
+    internal fun evaluateBoundarySnapshot(
+        value: BoundarySnapshot,
+        verifyIpv6: Boolean,
+    ): Boolean =
+        value.vpnActive &&
+            value.ipv4Default &&
+            (!verifyIpv6 || value.ipv6Default) &&
+            value.dnsPinned &&
+            value.bypassBlocked &&
+            !value.coverageGap
 
     internal fun isExpectedDnsUnavailableFailure(
         expectAvailable: Boolean,
@@ -245,10 +270,16 @@ internal object Phase17FieldHarness {
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val application = instrumentation.targetContext.applicationContext as KurdistanApplication
-        val root = application.compositionRoot
         val fieldRoot = File(application.filesDir, FIELD_DIRECTORY).apply {
             check(isDirectory || mkdirs()) { "FIELD_DIRECTORY_UNAVAILABLE" }
         }
+        val attemptId = InstrumentationRegistry.getArguments()
+            .getString(ARG_ATTEMPT_ID)
+            ?.trim()
+            .orEmpty()
+        check(attemptId.matches(Regex("[0-9a-f]{32}"))) { "FIELD_ATTEMPT_ID_REJECTED" }
+        writeAtomic(File(fieldRoot, ATTEMPT), "STARTED:$attemptId\n".encodeToByteArray())
+        val root = application.compositionRoot
         when (action) {
             "export-recipient" -> exportRecipient(root, fieldRoot)
             "import-profile" -> importProfile(root, fieldRoot)
@@ -265,6 +296,21 @@ internal object Phase17FieldHarness {
                     fieldRoot,
                     shouldVerifyDataPlane = true,
                     trafficDnsFamilies = if (verifyIPv6) listOf(4, 6) else listOf(4),
+                )
+            }
+            "boundary" -> {
+                val verifyIPv6 = InstrumentationRegistry.getArguments()
+                    .getString(ARG_VERIFY_IPV6)
+                    ?.toBooleanStrictOrNull()
+                    ?: error("DNS_EXPECTATION_REJECTED")
+                connect(
+                    application,
+                    root,
+                    fieldRoot,
+                    shouldVerifyDataPlane = false,
+                    verifyBoundary = true,
+                    boundaryVerifyIPv6 = verifyIPv6,
+                    attemptId = attemptId,
                 )
             }
             "dns-probe" -> {
@@ -363,6 +409,9 @@ internal object Phase17FieldHarness {
         dnsFamily: Int? = null,
         expectDnsAvailable: Boolean = true,
         trafficDnsFamilies: List<Int> = emptyList(),
+        verifyBoundary: Boolean = false,
+        boundaryVerifyIPv6: Boolean = false,
+        attemptId: String = "",
     ) {
         val coordinators = Phase13Coordinators.create(root)
         val localRecordId = root.settingsStore.settings.first().profiles.activeLocalRecordId
@@ -440,7 +489,7 @@ internal object Phase17FieldHarness {
             check(snapshot.maxReconnectAttempts in 1..5) {
                 "LIVE_RECONNECT_POLICY_MISSING"
             }
-            if (shouldVerifyDataPlane || dnsFamily != null || trafficDnsFamilies.isNotEmpty()) {
+            if (shouldVerifyDataPlane || dnsFamily != null || trafficDnsFamilies.isNotEmpty() || verifyBoundary) {
                 val requiredDnsFamilies = when {
                     trafficDnsFamilies.isNotEmpty() -> trafficDnsFamilies
                     dnsFamily != null -> listOf(dnsFamily)
@@ -452,15 +501,34 @@ internal object Phase17FieldHarness {
                         (stable.packetDisposition ?: "NONE")
                 }
                 try {
+                    var boundarySnapshot: BoundarySnapshot? = null
                     runVerifiedProbeWithReconnect(
                         initialSnapshot = stable,
                         runtimeSnapshots = controller.snapshot,
                         authorityPreparationCount = authorityPreparations::get,
                         reconnectTimeoutMillis = LIVE_RECONNECT_READY_TIMEOUT_MILLIS,
                         acquireNetwork = {
-                            awaitVerifiedVpnNetwork(application, requiredDnsFamilies)
+                            if (verifyBoundary) {
+                                awaitVpnNetwork(application)
+                            } else {
+                                awaitVerifiedVpnNetwork(application, requiredDnsFamilies)
+                            }
                         },
                         verify = { vpnNetwork ->
+                            val observedBoundary = observeNetworkBoundary(
+                                application,
+                                vpnNetwork,
+                                verifyIpv6 = if (verifyBoundary) boundaryVerifyIPv6 else trafficDnsFamilies.contains(6),
+                            )
+                            boundarySnapshot = observedBoundary
+                            if (!verifyBoundary) {
+                                check(
+                                    evaluateBoundarySnapshot(
+                                        observedBoundary,
+                                        verifyIpv6 = trafficDnsFamilies.contains(6),
+                                    ),
+                                ) { "BOUNDARY_LEAK" }
+                            }
                             if (trafficDnsFamilies.isNotEmpty()) {
                                 trafficDnsFamilies.forEach { family ->
                                     verifyDnsPlane(vpnNetwork, family, expectAvailable = true)
@@ -473,7 +541,13 @@ internal object Phase17FieldHarness {
                             }
                         },
                     )
-                    if (trafficDnsFamilies.isNotEmpty()) {
+                    if (verifyBoundary) {
+                        writeBoundaryObservation(
+                            fieldRoot = fieldRoot,
+                            attemptId = attemptId,
+                            value = requireNotNull(boundarySnapshot) { "BOUNDARY_COVERAGE_GAP" },
+                        )
+                    } else if (trafficDnsFamilies.isNotEmpty()) {
                         writeAtomic(File(fieldRoot, RESULT), "TRAFFIC_VERIFIED\n".encodeToByteArray())
                     } else if (dnsFamily == null) {
                         writeAtomic(File(fieldRoot, RESULT), "DATA_PLANE_VERIFIED\n".encodeToByteArray())
@@ -485,6 +559,10 @@ internal object Phase17FieldHarness {
                         )
                     }
                 } catch (failure: Throwable) {
+                    if (failure.message == "BOUNDARY_LEAK") {
+                        writeAtomic(File(fieldRoot, RESULT), "BOUNDARY_LEAK\n".encodeToByteArray())
+                        throw failure
+                    }
                     val category = if (failure is SocketTimeoutException) "TIMEOUT" else "PROBE_FAILED"
                     val diagnostics = controller.snapshot.value.diagnostics.let { value ->
                             ":tun-read=${value.tunPacketsRead}" +
@@ -569,6 +647,94 @@ internal object Phase17FieldHarness {
             @Suppress("UNREACHABLE_CODE")
             null
         } ?: error("VPN_NETWORK_NOT_READY")
+    }
+
+    private suspend fun awaitVpnNetwork(context: Context): Network {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        return withTimeoutOrNull(VPN_NETWORK_READY_TIMEOUT_MILLIS) {
+            while (true) {
+                val network = connectivity.activeNetwork
+                val capabilities = network?.let(connectivity::getNetworkCapabilities)
+                if (network != null && capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) {
+                    return@withTimeoutOrNull network
+                }
+                delay(VPN_NETWORK_POLL_MILLIS)
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
+        } ?: error("VPN_NETWORK_NOT_READY")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun observeNetworkBoundary(
+        context: Context,
+        vpnNetwork: Network,
+        verifyIpv6: Boolean,
+    ): BoundarySnapshot {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        val capabilities = connectivity.getNetworkCapabilities(vpnNetwork)
+        val properties = connectivity.getLinkProperties(vpnNetwork)
+        val expectedDns = buildSet {
+            add(InetAddress.getByName("10.77.0.1"))
+            if (verifyIpv6) add(InetAddress.getByName("fd4b:7572:6400::1"))
+        }
+        val routes = properties?.routes.orEmpty()
+        val underlying = connectivity.allNetworks.filter { network ->
+            if (network == vpnNetwork) return@filter false
+            val value = connectivity.getNetworkCapabilities(network) ?: return@filter false
+            !value.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                value.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }
+        val bypassBlocked = underlying.isNotEmpty() && underlying.all { network ->
+            DatagramSocket().use { socket ->
+                runCatching { network.bindSocket(socket) }.isFailure
+            }
+        }
+        return BoundarySnapshot(
+            vpnActive = connectivity.activeNetwork == vpnNetwork &&
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true,
+            ipv4Default = routes.any { route ->
+                route.destination.prefixLength == 0 && route.destination.address is Inet4Address
+            },
+            ipv6Default = routes.any { route ->
+                route.destination.prefixLength == 0 && route.destination.address is Inet6Address
+            },
+            dnsPinned = properties != null && properties.dnsServers.toSet() == expectedDns,
+            bypassBlocked = bypassBlocked,
+            coverageGap = properties == null || underlying.isEmpty(),
+        )
+    }
+
+    private fun writeBoundaryObservation(
+        fieldRoot: File,
+        attemptId: String,
+        value: BoundarySnapshot,
+    ) {
+        check(attemptId.matches(Regex("[0-9a-f]{32}"))) { "FIELD_ATTEMPT_ID_REJECTED" }
+        val raw = buildString(320) {
+            append("{\"schema\":\"")
+            append(BOUNDARY_ANDROID_SCHEMA)
+            append("\",\"attemptId\":\"")
+            append(attemptId)
+            append("\",\"vpnActive\":")
+            append(value.vpnActive)
+            append(",\"ipv4Default\":")
+            append(value.ipv4Default)
+            append(",\"ipv6Default\":")
+            append(value.ipv6Default)
+            append(",\"dnsPinned\":")
+            append(value.dnsPinned)
+            append(",\"bypassBlocked\":")
+            append(value.bypassBlocked)
+            append(",\"coverageGap\":")
+            append(value.coverageGap)
+            append('}')
+        }.encodeToByteArray()
+        try {
+            writeAtomic(File(fieldRoot, RESULT), raw)
+        } finally {
+            raw.fill(0)
+        }
     }
 
     private suspend fun verifyDataPlane(vpnNetwork: Network) = withContext(Dispatchers.IO) {

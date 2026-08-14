@@ -5,6 +5,8 @@
 
 package main
 
+import "errors"
+
 func acquireHostWakeInhibitor() (func(), error) {
-	return func() {}, nil
+	return nil, errors.New("host wake inhibition unsupported")
 }

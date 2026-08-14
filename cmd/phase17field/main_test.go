@@ -19,6 +19,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"kurdistan/internal/phase17qualification"
 )
 
 func TestRunWithHostWakeGuardAcquiresBeforeCampaignAndReleasesAfterFailure(t *testing.T) {
@@ -1362,11 +1364,16 @@ func TestRunFieldActionDeletesStaleEvidenceBeforeInstrumentation(t *testing.T) {
 			}
 			return nil, nil
 		case 2:
+			if !strings.Contains(strings.Join(arguments, " "), "run-as "+appPackage+" sh -c") {
+				return nil, errors.New("pending attempt marker was not written second")
+			}
+			return nil, nil
+		case 3:
 			if !strings.Contains(strings.Join(arguments, " "), "am instrument") {
-				return nil, errors.New("instrumentation was not second")
+				return nil, errors.New("instrumentation was not third")
 			}
 			return []byte("OK"), nil
-		case 3:
+		case 4:
 			if !strings.Contains(strings.Join(arguments, " "), "run-as "+appPackage+" cat "+fieldResultFile) {
 				return nil, errors.New("evidence read was not last")
 			}
@@ -1395,6 +1402,8 @@ func TestRunFieldActionAllowsBoundedADBReadinessAfterEmulatorBoot(t *testing.T) 
 				sawShortResetDeadline = true
 			}
 			return nil, nil
+		case strings.Contains(joined, "run-as "+appPackage+" sh -c") && strings.Contains(joined, "PENDING:"):
+			return nil, nil
 		case strings.Contains(joined, "am instrument"):
 			return []byte("OK"), nil
 		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldResultFile):
@@ -1409,6 +1418,94 @@ func TestRunFieldActionAllowsBoundedADBReadinessAfterEmulatorBoot(t *testing.T) 
 	}
 	if sawShortResetDeadline {
 		t.Fatal("ADB evidence reset retained a sub-five-second readiness deadline")
+	}
+}
+
+func TestSelectDeviceClassifiesADBLossAndEmulatorDeathAsEnvironmentAbort(t *testing.T) {
+	for name, run := range map[string]func(context.Context, []byte, string, string, ...string) ([]byte, error){
+		"adb unavailable": func(context.Context, []byte, string, string, ...string) ([]byte, error) {
+			return nil, errors.New("synthetic adb loss")
+		},
+		"emulator disappeared": func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+			if reflect.DeepEqual(arguments, []string{"devices"}) {
+				return []byte("List of devices attached\n"), nil
+			}
+			return nil, errors.New("unexpected command")
+		},
+		"identity query lost device": func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+			joined := strings.Join(arguments, " ")
+			switch {
+			case joined == "devices":
+				return []byte("List of devices attached\nemulator-5554\tdevice\n"), nil
+			case joined == "-s emulator-5554 emu avd name":
+				return []byte("Phase17_API34\nOK\n"), nil
+			case strings.Contains(joined, "getprop ro.build.version.sdk"):
+				return nil, errors.New("synthetic emulator death")
+			case strings.Contains(joined, "getprop ro.product.cpu.abi"):
+				return []byte("x86_64\n"), nil
+			default:
+				return nil, errors.New("unexpected command")
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, _, err := selectDevice(
+				context.Background(), commandRunner{runFunc: run}, config{adbPath: "adb", avdName: "Phase17_API34"}, "EMULATOR",
+			)
+			if !errors.Is(err, errAndroidEnvironmentUnavailable) {
+				t.Fatalf("error=%v, want Android environment loss", err)
+			}
+			if outcome, check := classifyFieldFailure(err, functionalOutcome{}); outcome != "ABORT_ENVIRONMENT" || check != "preflight" {
+				t.Fatalf("environment loss classified as outcome=%q check=%q", outcome, check)
+			}
+		})
+	}
+}
+
+func TestSelectDeviceSupportsExactPhysicalUSBClassAndRejectsEmulatorSubstitution(t *testing.T) {
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch joined {
+		case "devices":
+			return []byte("List of devices attached\nphysical-unit\tdevice\nemulator-5554\tdevice\n"), nil
+		case "-s physical-unit shell getprop ro.kernel.qemu":
+			return []byte("0\n"), nil
+		case "-s physical-unit shell getprop ro.build.version.sdk":
+			return []byte("26\n"), nil
+		case "-s physical-unit shell getprop ro.product.cpu.abi":
+			return []byte("arm64-v8a\n"), nil
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	serial, api, abi, err := selectDevice(
+		context.Background(), runner, config{adbPath: "adb", deviceSerial: "physical-unit"}, "PHYSICAL",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serial != "physical-unit" || api != 26 || abi != "arm64-v8a" {
+		t.Fatalf("physical identity serial=%q api=%d abi=%q", serial, api, abi)
+	}
+
+	emulatorRunner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		joined := strings.Join(arguments, " ")
+		switch joined {
+		case "devices":
+			return []byte("List of devices attached\nemulator-5554\tdevice\n"), nil
+		case "-s emulator-5554 shell getprop ro.kernel.qemu":
+			return []byte("1\n"), nil
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	if _, _, _, err := selectDevice(
+		context.Background(), emulatorRunner, config{adbPath: "adb", deviceSerial: "emulator-5554"}, "PHYSICAL",
+	); err == nil {
+		t.Fatal("emulator satisfied the physical-device qualification class")
 	}
 }
 
@@ -1471,6 +1568,8 @@ func TestRunFieldActionReportsCategoricalInstrumentationFailureWithoutReadingMis
 		case 1:
 			return nil, nil
 		case 2:
+			return nil, nil
+		case 3:
 			return []byte("INSTRUMENTATION_STATUS: stack=java.lang.IllegalStateException: LIVE_CONNECT_FAILED:LIVE_TLS_REJECTED:LIVE_STAGE_SOCKET_PROTECTED\nFAILURES!!!\n"), nil
 		default:
 			return nil, errors.New("missing evidence must not be read after a reported instrumentation failure")
@@ -1481,9 +1580,179 @@ func TestRunFieldActionReportsCategoricalInstrumentationFailureWithoutReadingMis
 	if err == nil || err.Error() != "Android field action dns-probe failed: LIVE_CONNECT_FAILED:LIVE_TLS_REJECTED:LIVE_STAGE_SOCKET_PROTECTED" {
 		t.Fatalf("unexpected categorical failure: %v", err)
 	}
-	if step != 2 {
-		t.Fatalf("steps=%d, want 2", step)
+	if step != 3 {
+		t.Fatalf("steps=%d, want 3", step)
 	}
+}
+
+func TestRunFieldActionClassifiesCorruptedResultAsHarnessFailure(t *testing.T) {
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch {
+		case strings.Contains(joined, "run-as "+appPackage+" rm -f "+fieldResultFile):
+			return nil, nil
+		case strings.Contains(joined, "run-as "+appPackage+" sh -c") && strings.Contains(joined, "PENDING:"):
+			return nil, nil
+		case strings.Contains(joined, "am instrument"):
+			return []byte("OK"), nil
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldResultFile):
+			return []byte("CORRUPTED_RESULT"), nil
+		default:
+			return nil, fmt.Errorf("unexpected command: %s", joined)
+		}
+	}}
+	err := runFieldAction(
+		context.Background(), runner, config{adbPath: "adb"}, "", "emulator-5554", "connect", nil, "CONNECTED",
+	)
+	if err == nil {
+		t.Fatal("corrupted field result was accepted")
+	}
+	if outcome, check := classifyFieldFailure(err, functionalOutcome{}); outcome != "FAIL_HARNESS" || check != "androidCrashFree" {
+		t.Fatalf("corrupted result classified as outcome=%q check=%q error=%v", outcome, check, err)
+	}
+}
+
+func TestRunFieldActionRetriesOnlyWhenTheCorrelatedActionNeverStarted(t *testing.T) {
+	instrumentationAttempts := 0
+	recoveryCommands := 0
+	var attemptID string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch {
+		case strings.Contains(joined, "run-as "+appPackage+" rm -f "+fieldResultFile):
+			return nil, nil
+		case strings.Contains(joined, "run-as "+appPackage+" sh -c") && strings.Contains(joined, "PENDING:"):
+			return nil, nil
+		case strings.Contains(joined, "am instrument"):
+			instrumentationAttempts++
+			attemptID = instrumentationExtraValue(arguments, "phase17AttemptId")
+			if attemptID == "" {
+				return nil, errors.New("missing correlated attempt id")
+			}
+			if instrumentationAttempts == 1 {
+				return nil, errors.New("transient host launch failure")
+			}
+			return []byte("OK"), nil
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldAttemptFile):
+			return []byte("PENDING:" + attemptID), nil
+		case strings.Contains(joined, "wait-for-device"):
+			recoveryCommands++
+			return nil, nil
+		case strings.Contains(joined, "am force-stop "+appPackage), strings.Contains(joined, "am force-stop "+testPackage):
+			recoveryCommands++
+			return nil, nil
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldResultFile):
+			return []byte("CONNECTED"), nil
+		default:
+			return nil, fmt.Errorf("unexpected command: %s", joined)
+		}
+	}}
+	value := config{adbPath: "adb"}
+	if err := runFieldAction(context.Background(), runner, value, "", "emulator-5554", "connect", nil, "CONNECTED"); err != nil {
+		t.Fatal(err)
+	}
+	if instrumentationAttempts != 2 {
+		t.Fatalf("instrumentation attempts=%d, want 2", instrumentationAttempts)
+	}
+	if recoveryCommands != 3 {
+		t.Fatalf("recovery commands=%d, want 3", recoveryCommands)
+	}
+}
+
+func TestRunFieldActionDoesNotRetryWhenTheCorrelatedActionStarted(t *testing.T) {
+	instrumentationAttempts := 0
+	var attemptID string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch {
+		case strings.Contains(joined, "run-as "+appPackage+" rm -f "+fieldResultFile):
+			return nil, nil
+		case strings.Contains(joined, "run-as "+appPackage+" sh -c") && strings.Contains(joined, "PENDING:"):
+			return nil, nil
+		case strings.Contains(joined, "am instrument"):
+			instrumentationAttempts++
+			attemptID = instrumentationExtraValue(arguments, "phase17AttemptId")
+			return nil, errors.New("host lost the terminal instrumentation response")
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldAttemptFile):
+			return []byte("STARTED:" + attemptID), nil
+		default:
+			return nil, fmt.Errorf("unexpected command: %s", joined)
+		}
+	}}
+	value := config{adbPath: "adb"}
+	err := runFieldAction(context.Background(), runner, value, "", "emulator-5554", "connect", nil, "CONNECTED")
+	if err == nil || err.Error() != "Android field action connect failed: INSTRUMENTATION_STARTED_WITHOUT_TERMINAL_RESULT" {
+		t.Fatalf("error=%v", err)
+	}
+	if instrumentationAttempts != 1 {
+		t.Fatalf("instrumentation attempts=%d, want 1", instrumentationAttempts)
+	}
+}
+
+func TestRunFieldActionFailsClosedAfterTwoUnstartedLaunchFailures(t *testing.T) {
+	instrumentationAttempts := 0
+	var attemptID string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "adb" {
+			return nil, errors.New("unexpected executable")
+		}
+		joined := strings.Join(arguments, " ")
+		switch {
+		case strings.Contains(joined, "run-as "+appPackage+" rm -f "+fieldResultFile),
+			strings.Contains(joined, "run-as "+appPackage+" sh -c") && strings.Contains(joined, "PENDING:"),
+			strings.Contains(joined, "wait-for-device"),
+			strings.Contains(joined, "am force-stop "+appPackage),
+			strings.Contains(joined, "am force-stop "+testPackage):
+			return nil, nil
+		case strings.Contains(joined, "am instrument"):
+			instrumentationAttempts++
+			attemptID = instrumentationExtraValue(arguments, "phase17AttemptId")
+			return nil, errors.New("host launch failed")
+		case strings.Contains(joined, "run-as "+appPackage+" cat "+fieldAttemptFile):
+			return []byte("PENDING:" + attemptID), nil
+		default:
+			return nil, fmt.Errorf("unexpected command: %s", joined)
+		}
+	}}
+	value := config{adbPath: "adb"}
+	err := runFieldAction(context.Background(), runner, value, "", "emulator-5554", "connect", nil, "CONNECTED")
+	if err == nil || err.Error() != "Android field action connect failed: INSTRUMENTATION_LAUNCH_FAILED" {
+		t.Fatalf("error=%v", err)
+	}
+	if instrumentationAttempts != 2 {
+		t.Fatalf("instrumentation attempts=%d, want 2", instrumentationAttempts)
+	}
+}
+
+func TestFieldHarnessRecordsTheCorrelatedStartBeforeCompositionOrAction(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "android", "app", "src", "androidTest", "kotlin", "org", "kurdistanvpn", "app", "Phase17FieldHarness.kt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := bytes.Index(source, []byte("writeAtomic(File(fieldRoot, ATTEMPT), \"STARTED:$attemptId\\n\""))
+	composition := bytes.Index(source, []byte("val root = application.compositionRoot"))
+	dispatch := bytes.Index(source, []byte("when (action)"))
+	if marker < 0 || composition < 0 || dispatch < 0 || marker > composition || marker > dispatch {
+		t.Fatal("correlated instrumentation start marker must precede composition and action dispatch")
+	}
+}
+
+func instrumentationExtraValue(arguments []string, key string) string {
+	for index := 0; index+2 < len(arguments); index++ {
+		if arguments[index] == "-e" && arguments[index+1] == key {
+			return arguments[index+2]
+		}
+	}
+	return ""
 }
 
 func TestInstrumentationFailureCategoryNeverSurfacesSurroundingPrivateOutput(t *testing.T) {
@@ -1513,8 +1782,54 @@ func TestValidateConfigAcceptsBoundedFunctionalRun(t *testing.T) {
 		sshAlias: "kurd-node", avdName: "Pixel_10_Pro", evidenceRoot: ".tools/phase17/field",
 		mode: "Functional", relayPort: 8443, packagePath: "node.tar.gz", appAPK: "app.apk",
 		testAPK: "test.apk", adbPath: "adb", sshPath: "ssh", scpPath: "scp",
+		policyPath:       "config/phase17/qualification-policy-v1.json",
 		ipv6ProbeAddress: "2001:db8::53",
 	}
+	populateQualificationConfigForValidation(&value)
+	if err := validateConfig(value); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateLaunchConfigRequiresPrivateFilesAndRejectsInlineSelectors(t *testing.T) {
+	value := config{
+		privateEnvironmentPath: "private-environment.json", environmentSaltPath: "environment-salt.bin",
+		evidenceRoot: ".tools/phase17/field", mode: "Functional",
+		packagePath: "node.tar.gz", appAPK: "app.apk", testAPK: "test.apk",
+		policyPath: "config/phase17/qualification-policy-v1.json",
+	}
+	populateQualificationConfigForValidation(&value)
+	value.pythonPath = ""
+	value.powershellPath = ""
+	if err := validateLaunchConfig(value); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*config){
+		"missing private environment": func(value *config) { value.privateEnvironmentPath = "" },
+		"missing salt":                func(value *config) { value.environmentSaltPath = "" },
+		"inline SSH selector":         func(value *config) { value.sshAlias = "owner-node" },
+		"inline Android selector":     func(value *config) { value.avdName = "api36-field" },
+		"inline probe selector":       func(value *config) { value.probeURLFile = "probe-url.txt" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := value
+			mutate(&changed)
+			if err := validateLaunchConfig(changed); err == nil {
+				t.Fatal("unsafe launch configuration accepted")
+			}
+		})
+	}
+}
+
+func TestValidateConfigAcceptsExactPhysicalUSBSelector(t *testing.T) {
+	value := config{
+		sshAlias: "kurd-node", deviceSerial: "physical-unit", evidenceRoot: ".tools/phase17/field",
+		mode: "Functional", relayPort: 8443, packagePath: "node.tar.gz", appAPK: "app.apk",
+		testAPK: "test.apk", adbPath: "adb", sshPath: "ssh", scpPath: "scp",
+		policyPath:       "config/phase17/qualification-policy-v1.json",
+		ipv6ProbeAddress: "2001:db8::53",
+	}
+	populateQualificationConfigForValidation(&value)
 	if err := validateConfig(value); err != nil {
 		t.Fatal(err)
 	}
@@ -1525,11 +1840,17 @@ func TestValidateConfigAcceptsStressAndSoakModes(t *testing.T) {
 		sshAlias: "kurd-node", avdName: "Pixel_10_Pro", evidenceRoot: ".tools/phase17/field",
 		relayPort: 8443, packagePath: "node.tar.gz", appAPK: "app.apk",
 		testAPK: "test.apk", adbPath: "adb", sshPath: "ssh", scpPath: "scp",
+		policyPath:       "config/phase17/qualification-policy-v1.json",
 		ipv6ProbeAddress: "2001:db8::53",
 	}
-	for _, mode := range []string{"Stress", "Soak12h"} {
+	for _, mode := range []string{"Stress", "Soak60m", "Soak90m", "Soak120m", "Soak12h"} {
 		value := base
 		value.mode = mode
+		populateQualificationConfigForValidation(&value)
+		if mode == "Soak12h" {
+			value.qualification.soakReadyPath = "soak-ready.json"
+			value.qualification.priorStressPath = "stress.json"
+		}
 		if err := validateConfig(value); err != nil {
 			t.Fatalf("mode %q rejected: %v", mode, err)
 		}
@@ -1554,7 +1875,8 @@ func TestExecuteStressCampaignRunsExactFrozenInventory(t *testing.T) {
 			progress = append(progress, fmt.Sprintf("%s:%d/%d", category, completed, total))
 		},
 	}
-	if err := executeStressCampaign(context.Background(), actions); err != nil {
+	policy, _ := phase17qualification.CampaignPolicyForMode("Stress")
+	if err := executeStressCampaign(context.Background(), policy, actions); err != nil {
 		t.Fatal(err)
 	}
 	if restarts != frozenRestartCycles {
@@ -1725,7 +2047,8 @@ func TestExecuteStressCampaignStopsAtFirstFailure(t *testing.T) {
 		impair:        func(context.Context, string) error { return nil },
 		sample:        func(context.Context) error { return nil },
 	}
-	err := executeStressCampaign(context.Background(), actions)
+	policy, _ := phase17qualification.CampaignPolicyForMode("Stress")
+	err := executeStressCampaign(context.Background(), policy, actions)
 	if err == nil || !strings.Contains(err.Error(), "restart/reconnect cycle 7") {
 		t.Fatalf("unexpected failure: %v", err)
 	}
@@ -1799,11 +2122,15 @@ func TestValidateConfigRejectsUnsafeSelectors(t *testing.T) {
 		sshAlias: "kurd-node", avdName: "Pixel_10_Pro", evidenceRoot: ".tools/phase17/field",
 		mode: "Functional", relayPort: 8443, packagePath: "node.tar.gz", appAPK: "app.apk",
 		testAPK: "test.apk", adbPath: "adb", sshPath: "ssh", scpPath: "scp",
+		policyPath:       "config/phase17/qualification-policy-v1.json",
 		ipv6ProbeAddress: "2001:db8::53",
 	}
+	populateQualificationConfigForValidation(&base)
 	for name, mutate := range map[string]func(*config){
 		"ssh shell input": func(value *config) { value.sshAlias = "node;id" },
 		"empty avd":       func(value *config) { value.avdName = "" },
+		"both selectors":  func(value *config) { value.deviceSerial = "physical-unit" },
+		"unsafe physical": func(value *config) { value.avdName, value.deviceSerial = "", "unit;id" },
 		"unknown mode":    func(value *config) { value.mode = "Quick" },
 		"invalid port":    func(value *config) { value.relayPort = 0 },
 		"IPv4 probe":      func(value *config) { value.ipv6ProbeAddress = "192.0.2.53" },
@@ -1815,6 +2142,50 @@ func TestValidateConfigRejectsUnsafeSelectors(t *testing.T) {
 				t.Fatal("unsafe configuration accepted")
 			}
 		})
+	}
+}
+
+func populateQualificationConfigForValidation(value *config) {
+	value.packageEntry = "node.tar.gz"
+	value.appEntry = "app.apk"
+	value.testEntry = "test.apk"
+	value.runnerPath = "phase17field.exe"
+	value.runnerEntry = "phase17field.exe"
+	value.wrapperPath = "run-qualified-campaign.ps1"
+	value.wrapperEntry = "run-qualified-campaign.ps1"
+	value.preflightPath = "owned-vps-preflight.ps1"
+	value.preflightEntry = "owned-vps-preflight.ps1"
+	value.policyEntry = "qualification-policy-v1.json"
+	value.packageVerifierPath = "kurdpackage.exe"
+	value.packageVerifierEntry = "kurdpackage.exe"
+	value.scannerAPath = "phase17scan.exe"
+	value.scannerAEntry = "phase17scan.exe"
+	value.scannerBPath = "privacy_scanner_b.py"
+	value.scannerBEntry = "privacy_scanner_b.py"
+	value.boundaryPath = "phase17boundary.exe"
+	value.boundaryEntry = "phase17boundary.exe"
+	value.pythonPath = "python.exe"
+	value.powershellPath = "powershell.exe"
+	value.qualification = qualifiedInputPaths{
+		candidatePath: "candidate.json", rcLockedPath: "rc-locked.json", attemptPath: "attempt.json",
+		environmentPath: "environment.json", preflightResultPath: "preflight-result.json",
+		policyPath: value.policyPath, ledgerPath: "ledger",
+		trustedPublicKeyPath: "qualification.pub",
+	}
+}
+
+func TestReadTrimmedSecretRejectsSymlinkedPrivateInput(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "probe-target.txt")
+	link := filepath.Join(directory, "probe-link.txt")
+	if err := os.WriteFile(target, []byte("private-probe\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := readTrimmedSecret(link, 2048); err == nil {
+		t.Fatal("symlinked private probe input was accepted")
 	}
 }
 
