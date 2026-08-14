@@ -86,6 +86,8 @@ var (
 	hex64Pattern           = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
 	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
+	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*$`)
+	frameTrackerCUJIndexV1 = regexp.MustCompile(`::[0-9]{1,3}@`)
 	frozenImpairmentMatrix = []impairmentScenario{
 		{name: "bandwidth", netem: "rate 5mbit"},
 		{name: "latency", netem: "delay 150ms 25ms distribution normal"},
@@ -1602,7 +1604,7 @@ func assertAndroidPrivacy(ctx context.Context, runner commandRunner, value confi
 		return errors.New("Android privacy log scan unavailable")
 	}
 	defer clear(raw)
-	if !safeCategory(raw) {
+	if !safeAndroidPrivacyLog(raw) {
 		return errors.New("Android privacy log scan found sensitive material")
 	}
 	if containsForbiddenProbeLogValue(raw, forbiddenProbeURL, value.ipv6ProbeAddress) {
@@ -1615,6 +1617,14 @@ func assertAndroidPrivacy(ctx context.Context, runner commandRunner, value confi
 		}
 	}
 	return nil
+}
+
+func safeAndroidPrivacyLog(raw []byte) bool {
+	normalized := frameTrackerCUJLineV1.ReplaceAllFunc(raw, func(line []byte) []byte {
+		return frameTrackerCUJIndexV1.ReplaceAll(line, []byte("-ui-index-@"))
+	})
+	defer clear(normalized)
+	return safeCategory(normalized)
 }
 
 func containsForbiddenProbeLogValue(raw, probeURL []byte, ipv6ProbeAddress string) bool {

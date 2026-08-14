@@ -310,6 +310,55 @@ func TestAssertAndroidPrivacyRejectsPrivateProbeEndpointInLogcat(t *testing.T) {
 	}
 }
 
+func TestAssertAndroidPrivacyAcceptsFrameworkCujSequenceWithoutWeakeningEndpointScan(t *testing.T) {
+	const frameworkLine = "W/FrameTracker(23097): Missed SF frame:JANK_COMPOSER, 140916, 49415893, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@1@" + appPackage + ">\n"
+	for name, test := range map[string]struct {
+		log     string
+		wantErr bool
+	}{
+		"framework delimiter": {log: frameworkLine},
+		"ipv4 remains rejected": {
+			log:     frameworkLine + "I/KurdistanVPN: endpoint 198.51.100.7\n",
+			wantErr: true,
+		},
+		"ipv6 remains rejected": {
+			log:     frameworkLine + "I/KurdistanVPN: endpoint 2001:db8::7\n",
+			wantErr: true,
+		},
+		"same framework line endpoint remains rejected": {
+			log:     strings.TrimSuffix(frameworkLine, "\n") + " endpoint 2001:db8::8\n",
+			wantErr: true,
+		},
+		"credential remains rejected": {
+			log:     frameworkLine + "I/KurdistanVPN: password=secret\n",
+			wantErr: true,
+		},
+		"unscoped loopback remains rejected": {
+			log:     "I/KurdistanVPN: endpoint ::1\n",
+			wantErr: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			step := 0
+			runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, _ ...string) ([]byte, error) {
+				if name != "adb" {
+					return nil, errors.New("unexpected command")
+				}
+				step++
+				if step == 1 {
+					return []byte("package:" + appPackage + " uid:10288\n"), nil
+				}
+				return []byte(test.log), nil
+			}}
+			value := config{adbPath: "adb", ipv6ProbeAddress: "2001:db8::7"}
+			err := assertAndroidPrivacy(context.Background(), runner, value, ".", "emulator-5554", []byte("https://private-probe.invalid/check"))
+			if (err != nil) != test.wantErr {
+				t.Fatalf("error=%v, wantErr=%t", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestAssertAndroidPrivacyScansCompleteBufferBeyondGenericCommandLimit(t *testing.T) {
 	benign := bytes.Repeat([]byte{'x'}, maxOutputBytes+1024)
 	if len(benign) <= maxOutputBytes {
