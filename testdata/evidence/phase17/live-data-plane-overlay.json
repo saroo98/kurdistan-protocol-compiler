@@ -138,6 +138,11 @@
       "post_sha256": "40c6cdb1e82ccf2c7f262a016842c071895469cf97e0b0c36c2c3df6f3963e66"
     },
     {
+      "path": "README.md",
+      "pre_sha256": "a739d0e7295aed5553bfce45810fed0f3871db887b5b5e2cbda2cdfb09c6fbae",
+      "post_sha256": "f31187f91448730c5f6005a95e521a409d2f74d2a573511513c522b7fb57611f"
+    },
+    {
       "path": "android/app/build.gradle.kts",
       "pre_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45",
       "post_sha256": "6c4eaafb44228ccb7ae15dae019b528ebe09939c7a10760c5a59e1a12faa969c"
@@ -455,17 +460,17 @@
     {
       "path": "cmd/assure/main_test.go",
       "pre_sha256": "791933e26f51eb1b485d8fb73e901b76f4dbc17991ff14e60f779680a78eb6f1",
-      "post_sha256": "66b153a71b0c3590de043315d4ac37908a90ca69ab043f7659d0de6812c980ac"
+      "post_sha256": "ac58ed21aac2e6669fc373a118b9a8ccd051c5937171ce62a036c6de7e5d8fae"
     },
     {
       "path": "cmd/gate/main.go",
       "pre_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1",
-      "post_sha256": "98de3e177ea725e358d69feaa23294b775b4221d2d4d03b11579abefd04cddf0"
+      "post_sha256": "365fe5b093f9b636bfdc5f2f0b0ccb8e3edd6a988d30cbe71b7756404ac0e489"
     },
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "6ae14279c61c2d18423ada89605ee6e3a8da9926bff90a61993e22b4ee1028bd"
+      "post_sha256": "063ae3da84e8f4021b1fbfdf1da618442054e46addc27bd16a9c9efdf21ae029"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -565,7 +570,7 @@
     {
       "path": "cmd/kurdctl/localpath_windows.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "bc62cf5086fc41a773834d693c7b0f40d2a50c59a8011fc5f6d99dcba5330ab8"
+      "post_sha256": "6b5446b906cdcc3f2d135c2082f8ea715b2cd2695147c0ef696a4ff4eb88f702"
     },
     {
       "path": "cmd/kurdctl/localpath_windows_test.go",
@@ -625,7 +630,7 @@
     {
       "path": "cmd/phase17evidence/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3ccdade78679af201955bc1bedcb6edf193aacc4f846d73e88efcc951ce6c69b"
+      "post_sha256": "2cfd54523b91301e655029f9eab9751495e0e6e4b0f5b141a7ccb4e1d90363d2"
     },
     {
       "path": "cmd/phase17evidence/main_test.go",
@@ -700,7 +705,7 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "71254048bfc1d74e1bc7597febb67ea0edfdb53a61065116fc4b809815e4f6cf"
+      "post_sha256": "7b3c4538296f5251508821d4bc869ef68b9a65e0def688686004de633dc059ce"
     },
     {
       "path": "cmd/phase17field/main_test.go",
@@ -730,7 +735,7 @@
     {
       "path": "cmd/phase17qual/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "61b95e01fb50f7f11acdc5b072767ddbe39ac6f5facd90f6620a621f1b24b425"
+      "post_sha256": "a111ebe919f26e83b4b9b824387d021f7939b98fc0181a677b8c056a6eb4b467"
     },
     {
       "path": "cmd/phase17qual/main_test.go",
@@ -780,7 +785,7 @@
     {
       "path": "cmd/phase17verify/qualification.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3cfcf7589ec9afe083bea90581650fab0bddc23ed9e07d0a16c8e1e6e60c9940"
+      "post_sha256": "f5ad9fe6766f848f38a16591772d5c91222a050dcb40025a82415477ba3811ce"
     },
     {
       "path": "cmd/phase17verify/qualification_test.go",
@@ -805,7 +810,7 @@
     {
       "path": "config/ci/proof-policy.json",
       "pre_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e",
-      "post_sha256": "a273b6fd618db25fb76754ea6065e6d5595d9fdc9653b33d6cd9c697afbd9355"
+      "post_sha256": "6c9b9c9bc35e6ce9a1e5f6d8a547fea9de8e128df378dc0c19116433fb9645d2"
     },
     {
       "path": "config/phase17/qualification-policy-v1.json",
@@ -940,7 +945,7 @@
     {
       "path": "go.mod",
       "pre_sha256": "eb395171fa822c678e4313cba9efa9d619c2c6cc6c8adf26891ab610e7dba742",
-      "post_sha256": "bf7c349b7c4a0c6c79822601b9fef7109c910bbd9c099dfb2f6ecc550bfabca8"
+      "post_sha256": "2106b3729f6b2f4ccdc83230d483bc3d6a20fbb2624235ca389f21fda71fc475"
     },
     {
       "path": "go.sum",
@@ -1015,7 +1020,7 @@
     {
       "path": "internal/codegen/authorization_v1_test.go",
       "pre_sha256": "3f19e467f59f7375e5d4b2ea71517b246be3a476c48e0c213b946bcacb34ad5a",
-      "post_sha256": "a28555ceee0ea3c050ae4d12b7efdeb796197d24e128624fd145a376b6fa27a9"
+      "post_sha256": "aa88ac2d9018ff8b5b5663b532f67ec7dc1c824be7fd500d9720799d37aa96d6"
     },
     {
       "path": "internal/codegen/generator.go",
@@ -1025,7 +1030,7 @@
     {
       "path": "internal/codegen/generator_test.go",
       "pre_sha256": "4fb57b8c87cdb40809be2918ca8bc36e111eccd309e506cafe5d048adac1f625",
-      "post_sha256": "8b8db637cb638657519c3e64efcf9552476641793cf8c14c6bc5adafc4f41327"
+      "post_sha256": "254c3606fb38d1a2cfd591f680206a18e1081e288a6bf6aa7db0aacc7ae5caa3"
     },
     {
       "path": "internal/codegen/templates.go",
@@ -1200,7 +1205,7 @@
     {
       "path": "internal/phase17qualification/key.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "66114fb72990a3b7a14b3e3703dcf755d2897e97ace1a14cccf45e0bfcfe40fb"
+      "post_sha256": "a3d8550d7ac8af4138d92eda66d013b91baf476f768f36eba394247f50fdbdf4"
     },
     {
       "path": "internal/phase17qualification/key_test.go",
@@ -1233,6 +1238,26 @@
       "post_sha256": "237e0f2cfb370233924d49dee07acd510071baa55d6e7a4dd05f503c7ef3904c"
     },
     {
+      "path": "internal/phase17qualification/path.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ace69a9232c1ba53af4115a9bbcf8330bef9eb5c7a7308b5b83cf8b7724b2b72"
+    },
+    {
+      "path": "internal/phase17qualification/path_nonwindows.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "a179c492783e345f9d7bc834d53c0109effb0d3db05e8f7202d5636daa696dd0"
+    },
+    {
+      "path": "internal/phase17qualification/path_windows.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "e92d8a07063f318640d198afcf228157917726500813ffd61eb16918df1d02cd"
+    },
+    {
+      "path": "internal/phase17qualification/path_windows_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ae97956cf65b5eef1ffba00329675b2d5744cfc9da0a3e26da5e2bcac3f87461"
+    },
+    {
       "path": "internal/phase17qualification/policy.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "0f67a9059d624584815e04a526cc1f6a29f4657bd901dfd94094c17d6ee36753"
@@ -1255,7 +1280,7 @@
     {
       "path": "internal/phase17qualification/readiness.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "946b65eeb4860a30f21069869fe79c2915d97f931659fec83c6d344e9c79534e"
+      "post_sha256": "a054c87723a17d63f0b1e830ca69cc9d02dd0592c8d7ccf8419a74e040535dee"
     },
     {
       "path": "internal/phase17qualification/readiness_test.go",
@@ -1280,7 +1305,7 @@
     {
       "path": "internal/phase17qualification/subject.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "a6e4dad8f84c2364678e89b6c1918886d7a775779efcc16e9043a424b490f796"
+      "post_sha256": "7f6778fa0fe6d2eba577d3ad756b5d1678f8ee74bbda54c464b2d4c324adb0e1"
     },
     {
       "path": "internal/phase17qualification/subject_test.go",
@@ -1306,6 +1331,46 @@
       "path": "internal/product/enrollment/request_v1_test.go",
       "pre_evidence": "ABSENT",
       "post_sha256": "32284643158d04102d0ed76a718da910fc84a640259f9d67d9e007cbea00a52d"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-profile.txt",
+      "pre_sha256": "f512ae71554e22352bcdd0933ead5c6a7d4e4029189c46eaa8836becb87a530d",
+      "post_sha256": "6a9eb28fe991ed21671dc69908059d3e6ab7a4bd48bd64d1f5d3621a60f977ce"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-qr.txt",
+      "pre_sha256": "bad75925ddaa482cdb1c7e7ad5954ca6c0929fbcc9770187369133108b06e3f0",
+      "post_sha256": "a44a6ff8cf73fc087b1af7e0990518a17c2446da3fe53e847711b142dfbed698"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-sealed.txt",
+      "pre_sha256": "9b0df92ece694e2a6862ac6c7f4b14f6180ebefb3224c2bf78b0cdf48249801d",
+      "post_sha256": "56b3fa230615ae8f882204131a2fa2282930d5382e1f44cbee05ffeadb3aa127"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-signed.txt",
+      "pre_sha256": "5771f8581e3945e396f28f5cddd81ffe7b3860901c031fe89d4300816f451ff4",
+      "post_sha256": "c280cf883db4af92e2145c18ad83df4b9e25a49f1182f55e54d663fbb01eda7f"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-transcript.json",
+      "pre_sha256": "8d65830f20ac299c9f9fbf8592b6e0725a35de8f616ab57f5ea9af7aedbd8763",
+      "post_sha256": "c8fb740cbd864002771f10387ef88c92a6518babb8195cd9e9ebd66aedb01a13"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/fuzz-uri.txt",
+      "pre_sha256": "f6e0970aa86d5738c17eb50ff4d1e24cd2e1cd91b1a6789782fc63ead1c02a35",
+      "post_sha256": "8849f45fd1ac735b146414a10e40f0ed2faae790c0ca90c2a97e01d36fe0f247"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/reference-host-resource-raw.json",
+      "pre_sha256": "ec568f0131c06e00d62bd952f29289295ee871678b5855a712afc1983cf36d12",
+      "post_sha256": "37266a5feb8ad887f1f9ba82247b728ba7b548ab759dae8652018f897e5a533f"
+    },
+    {
+      "path": "internal/product/envelope/testdata/phase8-codec/reference-host-resource-report.json",
+      "pre_sha256": "3885c3054fa6bc7fcc5d72a479e80f1853f804e34742f3993630eb6572b7775d",
+      "post_sha256": "2bf464f4ce7d331b0ee13cfa8673597d4660b0e034d57cd6214a4ea1b4524482"
     },
     {
       "path": "internal/product/livecarrier/livecarrier_v2.go",
@@ -1680,7 +1745,7 @@
     {
       "path": "internal/selfhost/private_path_windows.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "95ecc26dc6e662a46efc53572e04f9ecce6e0b8bf21dc594b870fc09f22e1814"
+      "post_sha256": "38dc637f3355591aaad124a18f0584e9f4090db7fdb0cad4020a9b9e3092085a"
     },
     {
       "path": "internal/selfhost/private_path_windows_test.go",

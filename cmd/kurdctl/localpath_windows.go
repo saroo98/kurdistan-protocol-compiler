@@ -59,7 +59,7 @@ func protectPrivatePath(path string, directory bool) error {
 	if err != nil {
 		return fmt.Errorf("%w: acl", errUnsupportedFilesystem)
 	}
-	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil); err != nil {
+	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, user.User.Sid, nil, acl, nil); err != nil {
 		return fmt.Errorf("%w: set dacl", errUnsupportedFilesystem)
 	}
 	return verifyWindowsPrivatePath(path, directory)

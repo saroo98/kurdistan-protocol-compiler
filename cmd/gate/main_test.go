@@ -224,16 +224,20 @@ func TestDependencyFreshnessProofUsesPolicyExactCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	govulncheckOutput := "../.tools/bin/govulncheck"
+	govulncheckProgram := "./.tools/bin/govulncheck"
 	osvScanner := "./.tools/bin/osv-scanner_linux_amd64"
 	if runtime.GOOS == "windows" {
+		govulncheckOutput += ".exe"
+		govulncheckProgram += ".exe"
 		osvScanner = ".tools\\bin\\osv-scanner_windows_amd64.exe"
 	}
 	want := []struct {
 		program string
 		args    []string
 	}{
-		{program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"}},
-		{program: "./.tools/bin/govulncheck", args: []string{"./..."}},
+		{program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", govulncheckOutput, "golang.org/x/vuln/cmd/govulncheck"}},
+		{program: govulncheckProgram, args: []string{"./..."}},
 		{program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
 		{program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
 	}

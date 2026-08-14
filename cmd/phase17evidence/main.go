@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	phase17 "kurdistan/internal/phase17evidence"
+	"kurdistan/internal/phase17qualification"
 )
 
 type predecessor = phase17.Predecessor
@@ -132,8 +133,7 @@ func writeExclusiveSyncedWith(path string, raw []byte, syncDirectory func(string
 	if err != nil {
 		return err
 	}
-	resolved, err := filepath.EvalSymlinks(directoryAbs)
-	if err != nil || !samePath(directoryAbs, resolved) {
+	if err := phase17qualification.ValidateNoLinkedPath(directoryAbs); err != nil {
 		return errors.New("field evidence output directory rejected")
 	}
 	file, err := os.CreateTemp(directory, ".phase17-evidence-*.tmp")

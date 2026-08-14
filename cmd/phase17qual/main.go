@@ -379,8 +379,7 @@ func runSource(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil || !sameFilesystemPath(rootAbs, resolvedRoot) {
+	if err := phase17qualification.ValidateNoLinkedPath(rootAbs); err != nil {
 		return errors.New("qualification repository root rejected")
 	}
 	outputPath, err := resolveRootPath(rootAbs, *outputRelative)
@@ -583,8 +582,7 @@ func runEvidenceOnly(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil || !sameFilesystemPath(rootAbs, resolvedRoot) {
+	if err := phase17qualification.ValidateNoLinkedPath(rootAbs); err != nil {
 		return errors.New("qualification repository root rejected")
 	}
 	candidate, err := loadCandidateIdentity(*candidatePath)
@@ -894,8 +892,7 @@ func runCandidateCreate(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil || !sameFilesystemPath(rootAbs, resolvedRoot) {
+	if err := phase17qualification.ValidateNoLinkedPath(rootAbs); err != nil {
 		return errors.New("qualification repository root rejected")
 	}
 	artifactsPath, err := resolveRootPath(rootAbs, *artifactsRelative)
@@ -1724,8 +1721,7 @@ func writeExclusiveOutput(path string, raw []byte) (resultErr error) {
 	if err != nil {
 		return err
 	}
-	resolved, err := filepath.EvalSymlinks(directoryAbs)
-	if err != nil || !sameFilesystemPath(directoryAbs, resolved) {
+	if err := phase17qualification.ValidateNoLinkedPath(directoryAbs); err != nil {
 		return errors.New("qualification output directory rejected")
 	}
 	return phase17qualification.WriteExclusiveFile(path, raw)

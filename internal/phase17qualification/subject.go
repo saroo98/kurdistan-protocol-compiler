@@ -106,11 +106,7 @@ func BuildSubjectManifest(name, root string, paths []string) (SubjectManifest, e
 	if err != nil {
 		return SubjectManifest{}, err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil {
-		return SubjectManifest{}, err
-	}
-	if !samePath(rootAbs, resolvedRoot) {
+	if err := ValidateNoLinkedPath(rootAbs); err != nil {
 		return SubjectManifest{}, errors.New("qualification subject root contains a symbolic link")
 	}
 	normalized := make([]string, 0, len(paths))
@@ -202,11 +198,7 @@ func BuildSubjectManifestTree(name, root string) (SubjectManifest, error) {
 	if err != nil {
 		return SubjectManifest{}, err
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
-	if err != nil {
-		return SubjectManifest{}, err
-	}
-	if !samePath(rootAbs, resolvedRoot) {
+	if err := ValidateNoLinkedPath(rootAbs); err != nil {
 		return SubjectManifest{}, errors.New("qualification subject root contains a symbolic link")
 	}
 	paths := make([]string, 0, 64)
