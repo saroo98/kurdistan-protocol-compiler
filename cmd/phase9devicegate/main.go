@@ -397,7 +397,71 @@ func summarizeInstrumentation(input string) string {
 	for _, test := range failedInstrumentationTests(input, 64) {
 		summary += "failed_test=" + test + "\n"
 	}
+	if failure {
+		category, exception := instrumentationFailureDetails(input)
+		summary += "failure_category=" + category + "\n"
+		if exception != "" {
+			summary += "failure_exception=" + exception + "\n"
+		}
+	}
 	return summary
+}
+
+func instrumentationFailureDetails(input string) (string, string) {
+	lower := strings.ToLower(input)
+	category := "test_failure"
+	switch {
+	case strings.Contains(lower, "accessibilityviewcheckexception"),
+		strings.Contains(lower, "accessibility check"):
+		category = "accessibility_assertion"
+	case strings.Contains(lower, "composenotidleexception"),
+		strings.Contains(lower, "idlingresourcetimeoutexception"),
+		strings.Contains(lower, "appnotidleexception"),
+		strings.Contains(lower, "timeoutexception"):
+		category = "test_timeout"
+	case strings.Contains(lower, "assertionerror"),
+		strings.Contains(lower, "assertionfailederror"):
+		category = "assertion"
+	case strings.Contains(lower, "process crashed"),
+		strings.Contains(lower, "instrumentation_failed"),
+		strings.Contains(lower, "shortmsg=process crashed"):
+		category = "process_failure"
+	}
+
+	for _, raw := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(raw)
+		if !strings.HasPrefix(line, "INSTRUMENTATION_STATUS: stack=") {
+			continue
+		}
+		stack := strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: stack="))
+		fields := strings.Fields(stack)
+		if len(fields) == 0 {
+			break
+		}
+		candidate := strings.TrimSuffix(fields[0], ":")
+		if safeExceptionIdentity(candidate) {
+			return category, candidate
+		}
+		break
+	}
+	return category, ""
+}
+
+func safeExceptionIdentity(value string) bool {
+	if len(value) == 0 || len(value) > 160 ||
+		(!strings.HasSuffix(value, "Error") && !strings.HasSuffix(value, "Exception")) {
+		return false
+	}
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '.' || char == '$' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func instrumentationProgress(input string) (string, string) {

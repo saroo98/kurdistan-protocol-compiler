@@ -324,6 +324,31 @@ func TestInstrumentationSummaryKeepsOnlyBoundedTestIdentity(t *testing.T) {
 	}
 }
 
+func TestInstrumentationSummaryClassifiesAccessibilityAssertionWithoutRetainingRawStack(t *testing.T) {
+	raw := strings.Join([]string{
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.Phase13ProductSurfaceDeviceTest",
+		"INSTRUMENTATION_STATUS: test=api34AutomatedAccessibilityChecksPassForPrimarySettingsSurface",
+		"INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: AccessibilityViewCheckException token=secret-value https://10.0.0.8/profile MainActivity.kt:7781",
+		"INSTRUMENTATION_STATUS_CODE: -2",
+		"FAILURES!!!",
+	}, "\n")
+
+	summary := summarizeInstrumentation(raw)
+	for _, expected := range []string{
+		"failure_category=accessibility_assertion",
+		"failure_exception=java.lang.AssertionError",
+	} {
+		if !strings.Contains(summary, expected) {
+			t.Fatalf("summary omitted %q: %q", expected, summary)
+		}
+	}
+	for _, forbidden := range []string{"secret-value", "10.0.0.8", "https://", "MainActivity.kt", "7781", "stack="} {
+		if strings.Contains(summary, forbidden) {
+			t.Fatalf("summary retained raw instrumentation data %q: %q", forbidden, summary)
+		}
+	}
+}
+
 func TestInstrumentationSummaryRecordsOnlySafeProgressIdentities(t *testing.T) {
 	raw := strings.Join([]string{
 		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.FirstTest",
