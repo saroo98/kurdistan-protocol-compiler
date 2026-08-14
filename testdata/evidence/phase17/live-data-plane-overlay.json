@@ -458,6 +458,16 @@
       "post_sha256": "9b45921630aa459bbbf1585a76c84299d7b053fae75a5694cdce31b7afbe1838"
     },
     {
+      "path": "cmd/assure/issue.go",
+      "pre_sha256": "af37de21e8d2f95f0f6ae376b5c00e7c489ae93d384aa9a606b214ed488d3fb2",
+      "post_sha256": "1673759d29e6cab082c72e1dcfe7914e1fd4aa21c9ef754047c14691115f40ab"
+    },
+    {
+      "path": "cmd/assure/issue_test.go",
+      "pre_sha256": "4e0112e03985232e9e30873a44af51290a72676fd44e68f639e8dd46a70b7d1c",
+      "post_sha256": "56837c2994a85149af9091e60b0053c29ff9261a4b4b46baa953defa7c22e4c5"
+    },
+    {
       "path": "cmd/assure/main_test.go",
       "pre_sha256": "791933e26f51eb1b485d8fb73e901b76f4dbc17991ff14e60f779680a78eb6f1",
       "post_sha256": "ac58ed21aac2e6669fc373a118b9a8ccd051c5937171ce62a036c6de7e5d8fae"

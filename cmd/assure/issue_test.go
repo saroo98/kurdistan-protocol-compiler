@@ -8,11 +8,44 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"kurdistan/internal/assurance"
 )
+
+func TestToolIdentityAtLookupPathSupportsWindowsLongPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows executable-path regression")
+	}
+	source, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	for len(directory) < 280 {
+		directory = filepath.Join(directory, "toolchain-path-segment")
+	}
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "go.exe")
+	if err := os.WriteFile(path, raw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := toolIdentityAtLookupPath("go", path, "version")
+	if err != nil {
+		t.Fatalf("tool identity through Windows long lookup path: %v", err)
+	}
+	if identity.Name != "go" || identity.SHA256 != digestBytes(raw) || !strings.HasPrefix(identity.Version, "go version ") {
+		t.Fatalf("unexpected tool identity: %+v", identity)
+	}
+}
 
 func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
 	root := t.TempDir()
