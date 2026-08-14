@@ -6,8 +6,8 @@ package org.kurdistanvpn.app
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -21,7 +21,10 @@ class Phase17FieldActionDeviceTest {
         val requested = InstrumentationRegistry.getArguments()
             .getString("phase17FieldAction")
             ?.isNotBlank() == true
-        assumeTrue("Phase 17 field action not requested", requested)
+        if (!requested) {
+            assertFalse(Phase17FieldHarness.runIfRequested())
+            return@runBlocking
+        }
         assertTrue(Phase17FieldHarness.runIfRequested())
     }
 }

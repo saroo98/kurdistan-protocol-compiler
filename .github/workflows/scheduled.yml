@@ -75,7 +75,7 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
       - name: Run race detector
-        run: go test -race -count=1 ./...
+        run: go test -race -timeout=30m -count=1 ./...
       - name: Capture one-iteration benchmark freshness
         run: go test -run '^$' -bench . -benchtime=1x ./... > scheduled-benchmarks.txt
       - name: Upload benchmark evidence

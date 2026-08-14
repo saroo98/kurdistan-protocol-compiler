@@ -144,7 +144,7 @@ func ValidateV1(p ProgramV1) error {
 	}
 	seenWire := make(map[string]struct{}, len(p.Messages))
 	for _, message := range p.Messages {
-		if !safeToken(message.WireSymbol) || message.Direction != "bidirectional" || message.MinPayloadBytes < 0 || message.MaxPayloadBytes < message.MinPayloadBytes || message.MaxPayloadBytes > p.Limits.MaxPayloadBytes {
+		if !IsSafeWireSymbolV1(message.WireSymbol) || message.Direction != "bidirectional" || message.MinPayloadBytes < 0 || message.MaxPayloadBytes < message.MinPayloadBytes || message.MaxPayloadBytes > p.Limits.MaxPayloadBytes {
 			return fail(ErrorInvalid)
 		}
 		if _, exists := seenWire[message.WireSymbol]; exists {
@@ -183,6 +183,11 @@ func ValidateV1(p ProgramV1) error {
 	}
 	return nil
 }
+
+// IsSafeWireSymbolV1 reports whether a model-provided wire symbol is safe to
+// project into a product live program. Owner-side compilers use this exact
+// predicate to classify retryable source-symbol collisions before encoding.
+func IsSafeWireSymbolV1(value string) bool { return safeToken(value) }
 
 func validateSecurity(value SecurityV1) error {
 	p := value.Policy

@@ -21,6 +21,7 @@ foreach ($match in $ipCandidates) {
     $candidate = $match.Value
     $zone = $candidate.IndexOf('%')
     if ($zone -ge 0) { $candidate = $candidate.Substring(0, $zone) }
+    if (-not $candidate.Contains('.') -and -not $candidate.Contains(':')) { continue }
     $parsed = $null
     if ([System.Net.IPAddress]::TryParse($candidate, [ref]$parsed)) { throw 'FIELD_EVIDENCE_ENDPOINT_PRESENT' }
     if (@($candidate.ToCharArray() | Where-Object { $_ -eq ':' }).Count -eq 1) {

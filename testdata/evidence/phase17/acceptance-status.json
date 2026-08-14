@@ -4,14 +4,14 @@
   "complete": false,
   "status": "IN_PROGRESS",
   "local": {
-    "currentArtifactPolicy": "PASS",
-    "historicalSupersession": "PASS",
     "api26Emulator": "PENDING",
     "api34Emulator": "PENDING",
-    "api36Emulator": "PENDING",
+    "api36Emulator": "PASS",
+    "currentArtifactPolicy": "PASS",
+    "historicalSupersession": "PASS",
     "linuxNamespace": "PENDING",
-    "ownedVps": "PENDING",
-    "loadRecoveryPrivacyCampaign": "PENDING"
+    "loadRecoveryPrivacyCampaign": "PASS",
+    "ownedVps": "PASS"
   },
   "external": {
     "physicalApi26Device": "UNVERIFIED",
@@ -19,7 +19,7 @@
     "secondVpsProvider": "UNVERIFIED"
   },
   "limitations": [
-    "emulator, Linux namespace, owned-VPS, load, recovery, and privacy campaigns remain to be executed",
-    "physical devices and a second unrelated VPS remain external evidence"
+    "remaining local emulator, namespace, or load, recovery, privacy, and endurance evidence is not yet complete",
+    "physical Android devices and a second unrelated VPS provider remain external evidence"
   ]
 }
