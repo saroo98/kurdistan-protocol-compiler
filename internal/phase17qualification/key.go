@@ -93,15 +93,7 @@ func prepareKeyParent(directory string) error {
 	if err != nil {
 		return err
 	}
-	resolved, err := filepath.EvalSymlinks(directory)
-	if err != nil {
-		return err
-	}
-	resolvedAbs, err := filepath.Abs(resolved)
-	if err != nil {
-		return err
-	}
-	if !samePath(abs, resolvedAbs) {
+	if err := ValidateNoLinkedPath(abs); err != nil {
 		return errors.New("qualification key directory contains a symbolic link")
 	}
 	if runtime.GOOS != "windows" {

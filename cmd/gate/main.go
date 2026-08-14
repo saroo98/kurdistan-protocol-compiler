@@ -199,13 +199,17 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 			{name: "release-metadata", program: "go", args: []string{"run", "./cmd/releaseverify", "-root", "."}},
 		}, nil
 	case "dependency-freshness":
+		govulncheckOutput := "../.tools/bin/govulncheck"
+		govulncheckProgram := "./.tools/bin/govulncheck"
 		osvScanner := "./.tools/bin/osv-scanner_linux_amd64"
 		if runtime.GOOS == "windows" {
+			govulncheckOutput += ".exe"
+			govulncheckProgram += ".exe"
 			osvScanner = ".tools\\bin\\osv-scanner_windows_amd64.exe"
 		}
 		return []step{
-			{name: "build-govulncheck", program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", "../.tools/bin/govulncheck", "golang.org/x/vuln/cmd/govulncheck"}},
-			{name: "go-vulnerability-analysis", program: "./.tools/bin/govulncheck", args: []string{"./..."}},
+			{name: "build-govulncheck", program: "go", args: []string{"-C", "tools", "build", "-trimpath", "-o", govulncheckOutput, "golang.org/x/vuln/cmd/govulncheck"}},
+			{name: "go-vulnerability-analysis", program: govulncheckProgram, args: []string{"./..."}},
 			{name: "fetch-osv-scanner", program: "pwsh", args: []string{"-File", "tools/scripts/fetch-osv-scanner.ps1", "-RepositoryRoot", ".", "-OutputDirectory", ".tools/bin"}},
 			{name: "android-runtime-vulnerability-analysis", program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
 		}, nil

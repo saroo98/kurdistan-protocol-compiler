@@ -3,7 +3,7 @@
 
 # Kurdistan Protocol Compiler
 
-[![Go](https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26.6-00ADD8?logo=go)](go.mod)
 [![Android](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?logo=android)](android/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 [![Release status](https://img.shields.io/badge/release-pre--release-orange)](#current-boundary)
@@ -119,7 +119,7 @@ developers to implement.
 
 ## Requirements
 
-- Go 1.26.5 or newer in the Go 1.26 line;
+- Go 1.26.6 or newer in the Go 1.26 line;
 - Git;
 - for Android builds: JDK 17 and Android SDK 36;
 - for native node installation: a supported 64-bit Linux system with systemd.
