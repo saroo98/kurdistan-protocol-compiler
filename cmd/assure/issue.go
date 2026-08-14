@@ -332,23 +332,7 @@ func stringSlicesEqual(left, right []string) bool {
 }
 
 func goToolIdentity() (assurance.ToolIdentity, error) {
-	path, err := exec.LookPath("go")
-	if err != nil {
-		return assurance.ToolIdentity{}, err
-	}
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return assurance.ToolIdentity{}, err
-	}
-	raw, err := os.ReadFile(resolved)
-	if err != nil {
-		return assurance.ToolIdentity{}, err
-	}
-	versionRaw, err := exec.Command("go", "version").Output()
-	if err != nil {
-		return assurance.ToolIdentity{}, err
-	}
-	return assurance.ToolIdentity{Name: "go", Version: strings.TrimSpace(string(versionRaw)), SHA256: digestBytes(raw)}, nil
+	return executableToolIdentity("go", "go", "version")
 }
 
 func proofToolchain(root, proof string, artifacts []assurance.Artifact) ([]assurance.ToolIdentity, error) {
@@ -473,19 +457,22 @@ func (value emulatorPackageIdentity) validate(proof string) error {
 func executableToolIdentity(name, executable string, versionArgs ...string) (assurance.ToolIdentity, error) {
 	path, err := exec.LookPath(executable)
 	if err != nil {
-		return assurance.ToolIdentity{}, err
+		return assurance.ToolIdentity{}, fmt.Errorf("locate %s executable: %w", name, err)
 	}
-	resolved, err := filepath.EvalSymlinks(path)
+	return toolIdentityAtLookupPath(name, path, versionArgs...)
+}
+
+func toolIdentityAtLookupPath(name, path string, versionArgs ...string) (assurance.ToolIdentity, error) {
+	// Read and invoke the exact path selected by LookPath. os.ReadFile and
+	// CreateProcess follow links themselves; pre-resolving them is unnecessary
+	// and breaks on some Windows hosted-runner tool-cache directory links.
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return assurance.ToolIdentity{}, err
+		return assurance.ToolIdentity{}, fmt.Errorf("read %s executable: %w", name, err)
 	}
-	raw, err := os.ReadFile(resolved)
+	versionRaw, err := exec.Command(path, versionArgs...).CombinedOutput()
 	if err != nil {
-		return assurance.ToolIdentity{}, err
-	}
-	versionRaw, err := exec.Command(executable, versionArgs...).CombinedOutput()
-	if err != nil {
-		return assurance.ToolIdentity{}, err
+		return assurance.ToolIdentity{}, fmt.Errorf("query %s version: %w", name, err)
 	}
 	version := strings.TrimSpace(strings.Split(strings.ReplaceAll(string(versionRaw), "\r\n", "\n"), "\n")[0])
 	return assurance.ToolIdentity{Name: name, Version: version, SHA256: digestBytes(raw)}, nil
