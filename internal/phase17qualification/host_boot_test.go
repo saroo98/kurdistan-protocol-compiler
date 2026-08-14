@@ -33,6 +33,27 @@ func TestReadCurrentHostBootIdentityCanonicalizesDocumentedWMIValue(t *testing.T
 	}
 }
 
+func TestQualificationWindowsExecutablePathValidationIsHostIndependent(t *testing.T) {
+	tests := map[string]struct {
+		path string
+		want bool
+	}{
+		"drive backslash": {path: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, want: true},
+		"drive slash":     {path: `C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`, want: true},
+		"drive relative":  {path: `C:powershell.exe`, want: false},
+		"posix absolute":  {path: `/usr/bin/pwsh`, want: false},
+		"unc":             {path: `\\server\share\powershell.exe`, want: false},
+		"newline":         {path: "C:\\Windows\\powershell.exe\nignored", want: false},
+	}
+	for name, testCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := isQualifiedWindowsAbsolutePath(testCase.path); got != testCase.want {
+				t.Fatalf("path=%q got=%t want=%t", testCase.path, got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestReadCurrentHostBootIdentityFailsClosed(t *testing.T) {
 	tests := map[string]struct {
 		raw []byte
