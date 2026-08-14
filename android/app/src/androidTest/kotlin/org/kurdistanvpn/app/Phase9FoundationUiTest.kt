@@ -4,12 +4,15 @@
 package org.kurdistanvpn.app
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.Uri
 import android.net.VpnService
@@ -34,6 +37,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -55,6 +60,7 @@ import org.kurdistanvpn.data.secure.SecureDataClass
 import org.kurdistanvpn.runtime.android.KurdVpnService
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
@@ -447,92 +453,91 @@ class Phase9FoundationUiTest {
         assertTrue(authority.all { it == 0.toByte() })
         assertEquals("AUTHORITY_BIND_FAILED", handoffFailure)
 
-        val controller = VpnRuntimeController(context)
+        resetRuntimeService(context)
+        val requestId = "0123456789abcdef0123456789abcdef"
+        val probe = DirectRuntimeStatusProbe(context, requestId)
         try {
-            resetRuntime(controller)
-            val requestId = "0123456789abcdef0123456789abcdef"
             context.startForegroundService(
                 Intent(context, KurdVpnService::class.java)
                     .setAction(VpnRuntimeContract.ACTION_START)
                     .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, requestId),
             )
             val terminal = runBlocking {
-                withTimeout(runtimeTimeout(10_000)) {
-                    controller.snapshot.first {
-                        it.state == VpnRuntimeState.FAILED &&
-                            it.failure == "AUTHORITY_HANDOFF_TIMEOUT"
-                    }
-                }
+                probe.await(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "AUTHORITY_HANDOFF_TIMEOUT",
+                    timeoutMillis = runtimeTimeout(10_000),
+                )
             }
             assertEquals(VpnRuntimeState.FAILED, terminal.state)
             assertEquals("AUTHORITY_HANDOFF_TIMEOUT", terminal.failure)
             assertEquals(0L, terminal.packetsRead)
             assertEquals(0L, terminal.packetsWritten)
         } finally {
-            controller.stop()
-            controller.close()
+            probe.close()
+            resetRuntimeService(context)
         }
     }
 
     @Test
     fun malformedAuthorityRequestIsRejectedBeforeTunEstablishment() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val controller = VpnRuntimeController(context)
+        resetRuntimeService(context)
+        val probe = DirectRuntimeStatusProbe(context, requestId = null)
         try {
-            resetRuntime(controller)
             context.startForegroundService(
                 Intent(context, KurdVpnService::class.java)
                     .setAction(VpnRuntimeContract.ACTION_START)
                     .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, "not-a-valid-request"),
             )
             val terminal = runBlocking {
-                withTimeout(runtimeTimeout(5_000)) {
-                    controller.snapshot.first {
-                        it.state == VpnRuntimeState.FAILED &&
-                            it.failure == "MISSING_VERIFIED_AUTHORITY"
-                    }
-                }
+                probe.await(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "MISSING_VERIFIED_AUTHORITY",
+                    timeoutMillis = runtimeTimeout(5_000),
+                )
             }
             assertEquals(0L, terminal.packetsRead)
             assertEquals(0L, terminal.packetsWritten)
             assertNull(terminal.planDigest)
         } finally {
-            controller.stop()
-            controller.close()
+            probe.close()
+            resetRuntimeService(context)
         }
     }
 
     @Test
     fun duplicateAuthorityRequestIsRejectedBeforeTunEstablishment() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val controller = VpnRuntimeController(context)
+        resetRuntimeService(context)
+        val requestId = "fedcba9876543210fedcba9876543210"
+        val probe = DirectRuntimeStatusProbe(context, requestId)
         try {
-            resetRuntime(controller)
-            val requestId = "fedcba9876543210fedcba9876543210"
             val start = Intent(context, KurdVpnService::class.java)
                 .setAction(VpnRuntimeContract.ACTION_START)
                 .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, requestId)
             context.startForegroundService(start)
             runBlocking {
-                withTimeout(runtimeTimeout(5_000)) {
-                    controller.snapshot.first { it.state == VpnRuntimeState.PREPARING }
-                }
+                probe.await(
+                    state = VpnRuntimeState.PREPARING,
+                    failure = null,
+                    timeoutMillis = runtimeTimeout(5_000),
+                )
             }
             context.startForegroundService(Intent(start))
             val terminal = runBlocking {
-                withTimeout(runtimeTimeout(5_000)) {
-                    controller.snapshot.first {
-                        it.state == VpnRuntimeState.FAILED &&
-                            it.failure == "MISSING_VERIFIED_AUTHORITY"
-                    }
-                }
+                probe.await(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "MISSING_VERIFIED_AUTHORITY",
+                    timeoutMillis = runtimeTimeout(5_000),
+                )
             }
             assertEquals(0L, terminal.packetsRead)
             assertEquals(0L, terminal.packetsWritten)
             assertNull(terminal.planDigest)
         } finally {
-            controller.stop()
-            controller.close()
+            probe.close()
+            resetRuntimeService(context)
         }
     }
 
@@ -590,6 +595,18 @@ class Phase9FoundationUiTest {
                 controller.snapshot.first { it.state == VpnRuntimeState.IDLE }
             }
         }
+        resetRuntimeService(InstrumentationRegistry.getInstrumentation().targetContext)
+    }
+
+    private fun resetRuntimeService(context: Context) {
+        context.stopService(Intent(context, KurdVpnService::class.java))
+        runBlocking {
+            withTimeout(runtimeTimeout(10_000)) {
+                while (isKurdVpnServiceRunning(context)) {
+                    delay(25)
+                }
+            }
+        }
     }
 
     private fun runtimeTimeout(baseMillis: Long): Long {
@@ -602,6 +619,67 @@ class Phase9FoundationUiTest {
             else -> baseMillis
         }
     }
+}
+
+private class DirectRuntimeStatusProbe(
+    private val context: Context,
+    private val requestId: String?,
+) : AutoCloseable {
+    private val snapshots = Channel<VpnRuntimeSnapshot>(Channel.UNLIMITED)
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != VpnRuntimeContract.ACTION_STATUS) return
+            val incomingRequestId = intent.getStringExtra(VpnRuntimeContract.EXTRA_RUNTIME_REQUEST)
+            if (requestId != null && incomingRequestId != requestId) return
+            val state = intent.getStringExtra(VpnRuntimeContract.EXTRA_STATE)
+                ?.let { runCatching { VpnRuntimeState.valueOf(it) }.getOrNull() }
+                ?: return
+            snapshots.trySend(
+                VpnRuntimeSnapshot(
+                    state = state,
+                    packetsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_PACKETS, 0),
+                    packetsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_PACKETS_WRITTEN, 0),
+                    failure = intent.getStringExtra(VpnRuntimeContract.EXTRA_FAILURE),
+                    planDigest = intent.getStringExtra(VpnRuntimeContract.EXTRA_PLAN_DIGEST),
+                    runtimeRequestId = incomingRequestId,
+                ),
+            )
+        }
+    }
+
+    init {
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(VpnRuntimeContract.ACTION_STATUS),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
+    suspend fun await(
+        state: VpnRuntimeState,
+        failure: String?,
+        timeoutMillis: Long,
+    ): VpnRuntimeSnapshot = withTimeout(timeoutMillis) {
+        while (true) {
+            val snapshot = snapshots.receive()
+            if (snapshot.state == state && snapshot.failure == failure) return@withTimeout snapshot
+        }
+        @Suppress("UNREACHABLE_CODE")
+        error("unreachable")
+    }
+
+    override fun close() {
+        runCatching { context.unregisterReceiver(receiver) }
+        snapshots.close()
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun isKurdVpnServiceRunning(context: Context): Boolean {
+    val activityManager = context.getSystemService(ActivityManager::class.java)
+    val component = ComponentName(context, KurdVpnService::class.java)
+    return activityManager.getRunningServices(Int.MAX_VALUE).any { it.service == component }
 }
 
 private const val INTERNAL_SIGNED_PROFILE_LINK =

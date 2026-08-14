@@ -201,10 +201,22 @@ func TestPacketPumpV1CarriesPacketsBothDirections(t *testing.T) {
 		t.Fatalf("client packet mismatch")
 	}
 
-	for name, snapshot := range map[string]PacketPumpSnapshotV1{
-		"client": clientPump.SnapshotV1(),
-		"relay":  relayPump.SnapshotV1(),
-	} {
+	var snapshots map[string]PacketPumpSnapshotV1
+	deadline := time.Now().Add(time.Second)
+	for {
+		snapshots = map[string]PacketPumpSnapshotV1{
+			"client": clientPump.SnapshotV1(),
+			"relay":  relayPump.SnapshotV1(),
+		}
+		if snapshots["client"].CarrierRecordsWritten > 0 && snapshots["relay"].CarrierRecordsWritten > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	for name, snapshot := range snapshots {
 		if snapshot.TUNPacketsRead != 1 || snapshot.OutboundPacketsAccepted != 1 || snapshot.CarrierRecordsWritten == 0 ||
 			snapshot.CarrierRecordsRead == 0 || snapshot.AuthenticatedOperations != 1 || snapshot.InnerPacketsAccepted != 1 ||
 			snapshot.InnerPacketsRejected != 0 || snapshot.TUNWriteAttempts != 1 || snapshot.TUNWriteFailures != 0 ||

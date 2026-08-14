@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"io"
 	"strconv"
 	"time"
@@ -88,6 +89,9 @@ func compileLiveProgramCandidateV1(seed int64) ([]byte, bool, error) {
 		Profile: model, ClientMandatoryFeatures: append([]string(nil), liveProgramCapabilitiesV1[:2]...),
 		RelayMandatoryFeatures: append([]string(nil), liveProgramCapabilitiesV1[:2]...), SelectedFeatures: append([]string(nil), liveProgramCapabilitiesV1...),
 	})
+	if errors.Is(err, liveprogramcompile.ErrProjectionCollisionV1) {
+		return nil, true, nil
+	}
 	if err != nil || liveprogram.ValidateV1(program) != nil {
 		return nil, false, errCLIInvalidInput
 	}

@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -64,6 +65,41 @@ func TestCompileLiveProgramFailsClosedAfterCollisionBudget(t *testing.T) {
 	})
 	if !errors.Is(err, errCLIInvalidInput) || calls != maxLiveProgramCompileAttemptsV1 {
 		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}
+
+func TestCompileLiveProgramCandidateClassifiesUnsafeProjectionAsCollision(t *testing.T) {
+	encoded, collision, err := compileLiveProgramCandidateV1(1_610_178_124_615_707_266)
+	if err != nil || !collision || len(encoded) != 0 {
+		t.Fatalf("encoded=%x collision=%v err=%v", encoded, collision, err)
+	}
+}
+
+func TestCompileLiveProgramHighRangeCandidatesAreUsableOrRetryable(t *testing.T) {
+	rng := rand.New(rand.NewSource(17017))
+	collisions := 0
+	for index := 0; index < 2048; index++ {
+		seed := rng.Int63()
+		if seed == 0 {
+			seed = 1
+		}
+		encoded, collision, err := compileLiveProgramCandidateV1(seed)
+		if err != nil {
+			t.Fatalf("candidate %d failed: %v", index, err)
+		}
+		if collision {
+			collisions++
+			if len(encoded) != 0 {
+				t.Fatalf("candidate %d returned bytes with collision", index)
+			}
+			continue
+		}
+		if _, err := liveprogram.DecodeV1(encoded); err != nil {
+			t.Fatalf("candidate %d decode: %v", index, err)
+		}
+	}
+	if collisions == 0 {
+		t.Fatal("high-range sample did not exercise a retryable projection collision")
 	}
 }
 

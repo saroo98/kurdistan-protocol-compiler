@@ -5,6 +5,7 @@ package liveprogramcompile
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 	"testing"
 
@@ -48,5 +49,27 @@ func TestCompileV1RejectsNilAndGenerationHashDrift(t *testing.T) {
 	profile.GenerationHash = "00"
 	if _, err := CompileV1(InputV1{Profile: profile, ClientMandatoryFeatures: []string{"multi_stream"}, RelayMandatoryFeatures: []string{"multi_stream"}, SelectedFeatures: []string{"multi_stream"}}); err == nil {
 		t.Fatal("generation hash drift accepted")
+	}
+}
+
+func TestCompileV1ClassifiesUnsafeProductTokenAsProjectionCollision(t *testing.T) {
+	profile, err := compiler.Generate(29)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range profile.Messages {
+		if profile.Messages[index].Semantic == ir.SemanticData {
+			profile.Messages[index].WireSymbol = "opaquekeymarker"
+		}
+	}
+	profile.GenerationHash = ""
+	profile.GenerationHash, err = ir.CanonicalHash(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities := ir.SecurityCapabilities()
+	_, err = CompileV1(InputV1{Profile: profile, ClientMandatoryFeatures: capabilities[:2], RelayMandatoryFeatures: capabilities[:2], SelectedFeatures: capabilities})
+	if !errors.Is(err, ErrProjectionCollisionV1) {
+		t.Fatalf("error=%v want projection collision", err)
 	}
 }
