@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -31,6 +32,7 @@ import (
 	"time"
 
 	"kurdistan/internal/phase17evidence"
+	"kurdistan/internal/phase17qualification"
 )
 
 const (
@@ -50,12 +52,14 @@ const (
 	recipientFile               = fieldDirectory + "/recipient-request.bin"
 	profileFile                 = fieldDirectory + "/sealed-profile.bin"
 	fieldResultFile             = fieldDirectory + "/result.txt"
+	fieldAttemptFile            = fieldDirectory + "/attempt.txt"
 	fieldEvidenceResetAttempts  = 31
 	fieldEvidenceResetDelay     = time.Second
 	fieldEvidenceResetTimeout   = 30 * time.Second
 	fieldEvidenceAttemptTimeout = 10 * time.Second
 	impairmentVerificationTries = 3
 	impairmentRetryDelay        = 250 * time.Millisecond
+	fieldActionLaunchAttempts   = 2
 	frozenRestartCycles         = 100
 	frozenProfileRotationCycles = 100
 	maximumRelayRSSBytes        = 384 << 20
@@ -84,6 +88,7 @@ var (
 	selectorPattern        = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 	hex40Pattern           = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	hex64Pattern           = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	fieldAttemptIDPattern  = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
 	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
 	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*\r?$`)
@@ -95,7 +100,11 @@ var (
 		{name: "combined", netem: "delay 100ms 20ms distribution normal loss 1% rate 5mbit"},
 		{name: "carrier-reset", carrierReset: true},
 	}
-	errProfileIssuanceTransport = errors.New("profile issuance transport failed")
+	errProfileIssuanceTransport      = errors.New("profile issuance transport failed")
+	errAndroidEnvironmentUnavailable = errors.New("authorized Android environment unavailable")
+	errVPSEnvironmentUnavailable     = errors.New("owner VPS environment unavailable")
+	errFieldCleanup                  = errors.New("field campaign cleanup failed")
+	errFieldEvidenceInvalid          = errors.New("field evidence invalid")
 )
 
 type impairmentScenario struct {
@@ -121,6 +130,7 @@ type resourceTracker struct {
 	samples               []resourceSample
 	peakRSS, peakFDs      uint64
 	peakSwap, peakThreads uint64
+	peakOOMKills          uint64
 }
 
 func (tracker *resourceTracker) observe(sample resourceSample) error {
@@ -135,6 +145,7 @@ func (tracker *resourceTracker) observe(sample resourceSample) error {
 	tracker.peakFDs = max(tracker.peakFDs, sample.fds)
 	tracker.peakSwap = max(tracker.peakSwap, sample.swapBytes)
 	tracker.peakThreads = max(tracker.peakThreads, sample.threads)
+	tracker.peakOOMKills = max(tracker.peakOOMKills, sample.oomKills)
 	if len(tracker.samples) < 8 {
 		return nil
 	}
@@ -153,49 +164,62 @@ func (tracker *resourceTracker) observe(sample resourceSample) error {
 	return nil
 }
 
-func executeStressCampaign(ctx context.Context, actions stressActions) error {
-	for cycle := 0; cycle < frozenRestartCycles; cycle++ {
-		if err := actions.restartReconnect(ctx, cycle); err != nil {
+func executeStressCampaign(ctx context.Context, policy phase17qualification.CampaignPolicy, actions stressActions) error {
+	if policy.Mode != "Stress" || policy.MinimumDurationMS != 0 || policy.CadenceMS != 0 || policy.MinimumCycles != 0 ||
+		policy.RestartReconnectCycles == 0 || policy.ProfileRotationCycles == 0 || len(policy.Impairments) == 0 {
+		return errors.New("stress campaign policy rejected")
+	}
+	for cycle := uint64(0); cycle < policy.RestartReconnectCycles; cycle++ {
+		if err := actions.restartReconnect(ctx, int(cycle)); err != nil {
 			return fmt.Errorf("restart/reconnect cycle %d failed: %w", cycle, err)
 		}
 		if err := actions.sample(ctx); err != nil {
 			return fmt.Errorf("restart/reconnect resource sample %d failed: %w", cycle, err)
 		}
 		if actions.progress != nil {
-			actions.progress("restart-reconnect", cycle+1, frozenRestartCycles)
+			actions.progress("restart-reconnect", int(cycle+1), int(policy.RestartReconnectCycles))
 		}
 	}
-	for cycle := 0; cycle < frozenProfileRotationCycles; cycle++ {
-		if err := actions.rotateReissue(ctx, cycle); err != nil {
+	for cycle := uint64(0); cycle < policy.ProfileRotationCycles; cycle++ {
+		if err := actions.rotateReissue(ctx, int(cycle)); err != nil {
 			return fmt.Errorf("profile revoke/reissue cycle %d failed: %w", cycle, err)
 		}
 		if err := actions.sample(ctx); err != nil {
 			return fmt.Errorf("profile revoke/reissue resource sample %d failed: %w", cycle, err)
 		}
 		if actions.progress != nil {
-			actions.progress("profile-rotation", cycle+1, frozenProfileRotationCycles)
+			actions.progress("profile-rotation", int(cycle+1), int(policy.ProfileRotationCycles))
 		}
 	}
-	for index, scenario := range frozenImpairmentMatrix {
-		if err := actions.impair(ctx, scenario.name); err != nil {
-			return fmt.Errorf("impairment %s failed: %w", scenario.name, err)
+	for index, impairment := range policy.Impairments {
+		if err := actions.impair(ctx, impairment); err != nil {
+			return fmt.Errorf("impairment %s failed: %w", impairment, err)
 		}
 		if err := actions.sample(ctx); err != nil {
-			return fmt.Errorf("impairment %s resource sample failed: %w", scenario.name, err)
+			return fmt.Errorf("impairment %s resource sample failed: %w", impairment, err)
 		}
 		if actions.progress != nil {
-			actions.progress("impairment", index+1, len(frozenImpairmentMatrix))
+			actions.progress("impairment", index+1, len(policy.Impairments))
 		}
 	}
 	return nil
 }
 
 type config struct {
-	sshAlias, avdName, evidenceRoot, mode                   string
-	packagePath, appAPK, testAPK, adbPath, sshPath, scpPath string
-	probeURLFile, probeDigestFile                           string
-	ipv6ProbeAddress                                        string
-	relayPort                                               int
+	sshAlias, avdName, deviceSerial, evidenceRoot, mode      string
+	privateEnvironmentPath, environmentSaltPath              string
+	packagePath, appAPK, testAPK, adbPath, sshPath, scpPath  string
+	policyPath                                               string
+	packageEntry, appEntry, testEntry, runnerEntry           string
+	policyEntry, packageVerifierPath, packageVerifierEntry   string
+	scannerAPath, scannerAEntry, scannerBPath, scannerBEntry string
+	boundaryPath, boundaryEntry, pythonPath, powershellPath  string
+	runnerPath, wrapperPath, wrapperEntry                    string
+	preflightPath, preflightEntry                            string
+	qualification                                            qualifiedInputPaths
+	probeURLFile, probeDigestFile                            string
+	ipv6ProbeAddress                                         string
+	relayPort                                                int
 }
 
 type fieldIdentity struct {
@@ -208,6 +232,8 @@ type fieldIdentity struct {
 type functionalOutcome struct {
 	reconnects uint64
 	campaign   rawCampaign
+	scanners   []phase17evidence.FieldScannerV3
+	boundary   phase17evidence.FieldBoundaryV3
 }
 
 type rawEvidence struct {
@@ -303,6 +329,14 @@ type commandRunner struct {
 	remoteCommands map[string]struct{}
 }
 
+type commandExitFailure struct {
+	code int
+}
+
+func (failure *commandExitFailure) Error() string {
+	return fmt.Sprintf("command exited with status %d", failure.code)
+}
+
 type connectionGate interface {
 	wait(context.Context) error
 }
@@ -332,22 +366,49 @@ func (gate *pacedConnectionGate) wait(ctx context.Context) error {
 
 func main() {
 	value := config{}
-	flag.StringVar(&value.sshAlias, "ssh-alias", "", "strict SSH config alias")
-	flag.StringVar(&value.avdName, "avd-name", "", "exact running Android virtual device name")
 	flag.StringVar(&value.evidenceRoot, "evidence-root", ".tools/phase17/field", "ignored raw evidence root")
 	flag.StringVar(&value.mode, "mode", "Functional", "Functional, Stress, or Soak12h")
-	flag.IntVar(&value.relayPort, "relay-port", 8443, "signed Kurd relay port")
+	flag.StringVar(&value.policyPath, "policy", "config/phase17/qualification-policy-v1.json", "frozen Phase 17 qualification policy")
+	flag.StringVar(&value.qualification.candidatePath, "candidate", "", "locked candidate manifest")
+	flag.StringVar(&value.qualification.rcLockedPath, "rc-lock", "", "signed RC_LOCKED receipt")
+	flag.StringVar(&value.qualification.attemptPath, "attempt", "", "signed attempt begin receipt")
+	flag.StringVar(&value.qualification.environmentPath, "environment", "", "canonical environment context")
+	flag.StringVar(&value.qualification.preflightResultPath, "preflight-result", "", "fresh owner-VPS preflight evidence")
+	flag.StringVar(&value.privateEnvironmentPath, "private-environment", "", "ignored owner-local private environment input")
+	flag.StringVar(&value.environmentSaltPath, "environment-salt", "", "ignored owner-local environment commitment salt")
+	flag.StringVar(&value.qualification.ledgerPath, "ledger", "", "append-only qualification ledger")
+	flag.StringVar(&value.qualification.trustedPublicKeyPath, "trusted-public-key", "", "pinned qualification public key")
+	flag.StringVar(&value.qualification.soakReadyPath, "soak-ready", "", "signed final-soak readiness receipt")
+	flag.StringVar(&value.qualification.priorStressPath, "prior-stress-result", "", "exact prior Stress PASS result")
 	flag.StringVar(&value.packagePath, "package", "", "verified Linux amd64 package")
+	flag.StringVar(&value.packageEntry, "package-entry", "", "exact PQS package entry")
 	flag.StringVar(&value.appAPK, "app-apk", "android/app/build/outputs/apk/internal/app-internal.apk", "internal application APK")
+	flag.StringVar(&value.appEntry, "app-entry", "", "exact PQS application entry")
 	flag.StringVar(&value.testAPK, "test-apk", "android/app/build/outputs/apk/androidTest/internal/app-internal-androidTest.apk", "instrumentation APK")
-	flag.StringVar(&value.adbPath, "adb", "adb", "adb executable")
-	flag.StringVar(&value.sshPath, "ssh", "ssh", "ssh executable")
-	flag.StringVar(&value.scpPath, "scp", "scp", "scp executable")
-	flag.StringVar(&value.probeURLFile, "probe-url-file", ".tools/phase17/field/runtime-stage/probe-url.txt", "ignored probe URL file")
-	flag.StringVar(&value.probeDigestFile, "probe-digest-file", ".tools/phase17/field/runtime-stage/probe-digest.txt", "ignored expected response digest file")
-	flag.StringVar(&value.ipv6ProbeAddress, "ipv6-probe-address", "2606:4700:4700::1111", "public IPv6 literal used only for owner-VPS reachability preflight")
+	flag.StringVar(&value.testEntry, "test-entry", "", "exact QHS instrumentation entry")
+	flag.StringVar(&value.runnerEntry, "runner-entry", "", "exact QHS phase17field entry")
+	flag.StringVar(&value.wrapperPath, "wrapper", "", "active locked campaign wrapper")
+	flag.StringVar(&value.wrapperEntry, "wrapper-entry", "", "exact QHS campaign wrapper entry")
+	flag.StringVar(&value.preflightPath, "preflight", "", "active locked VPS preflight")
+	flag.StringVar(&value.preflightEntry, "preflight-entry", "", "exact QHS VPS preflight entry")
+	flag.StringVar(&value.policyEntry, "policy-entry", "", "exact QWS policy entry")
+	flag.StringVar(&value.packageVerifierPath, "package-verifier", "", "compiled locked kurdpackage executable")
+	flag.StringVar(&value.packageVerifierEntry, "package-verifier-entry", "", "exact QHS kurdpackage entry")
+	flag.StringVar(&value.scannerAPath, "privacy-scanner-a", "", "compiled locked Go privacy scanner")
+	flag.StringVar(&value.scannerAEntry, "privacy-scanner-a-entry", "", "exact QHS Go privacy scanner entry")
+	flag.StringVar(&value.scannerBPath, "privacy-scanner-b", "", "locked Python privacy scanner")
+	flag.StringVar(&value.scannerBEntry, "privacy-scanner-b-entry", "", "exact QHS Python privacy scanner entry")
+	flag.StringVar(&value.boundaryPath, "boundary-monitor", "", "compiled locked boundary monitor")
+	flag.StringVar(&value.boundaryEntry, "boundary-monitor-entry", "", "exact QHS boundary monitor entry")
 	flag.Parse()
-	if err := validateConfig(value); err != nil {
+	runnerPath, err := os.Executable()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "PHASE 17 FIELD FAILED: runner identity unavailable")
+		os.Exit(2)
+	}
+	value.runnerPath = runnerPath
+	value.qualification.policyPath = value.policyPath
+	if err := validateLaunchConfig(value); err != nil {
 		fmt.Fprintf(os.Stderr, "PHASE 17 FIELD FAILED: %v\n", err)
 		os.Exit(2)
 	}
@@ -359,6 +420,20 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("PHASE 17 OWNED-VPS FIELD MATRIX PASSED")
+}
+
+func validateLaunchConfig(value config) error {
+	if value.sshAlias != "" || value.avdName != "" || value.deviceSerial != "" || value.relayPort != 0 ||
+		value.probeURLFile != "" || value.probeDigestFile != "" || value.ipv6ProbeAddress != "" ||
+		value.pythonPath != "" || value.adbPath != "" || value.sshPath != "" || value.scpPath != "" || value.powershellPath != "" {
+		return errors.New("inline private environment rejected")
+	}
+	for _, path := range []string{value.privateEnvironmentPath, value.environmentSaltPath} {
+		if strings.TrimSpace(path) == "" || strings.ContainsAny(path, "\r\n\x00") {
+			return errors.New("private environment path rejected")
+		}
+	}
+	return validateCommonConfig(value)
 }
 
 func terminalFailureLine(err error) string {
@@ -374,11 +449,13 @@ func terminalFailureLine(err error) string {
 }
 
 func validateConfig(value config) error {
-	if !selectorPattern.MatchString(value.sshAlias) || !selectorPattern.MatchString(value.avdName) {
-		return errors.New("SSH alias or AVD selector rejected")
+	if !selectorPattern.MatchString(value.sshAlias) {
+		return errors.New("SSH alias rejected")
 	}
-	if value.mode != "Functional" && value.mode != "Stress" && value.mode != "Soak12h" {
-		return errors.New("mode rejected")
+	emulatorSelected := selectorPattern.MatchString(value.avdName) && value.deviceSerial == ""
+	physicalSelected := value.avdName == "" && selectorPattern.MatchString(value.deviceSerial)
+	if !emulatorSelected && !physicalSelected {
+		return errors.New("Android selector rejected")
 	}
 	if value.relayPort < 1 || value.relayPort > 65535 {
 		return errors.New("relay port rejected")
@@ -387,10 +464,40 @@ func validateConfig(value config) error {
 	if probeAddress == nil || probeAddress.To4() != nil || strings.ContainsAny(value.ipv6ProbeAddress, "\r\n\x00") {
 		return errors.New("IPv6 probe address rejected")
 	}
-	for _, required := range []string{value.evidenceRoot, value.packagePath, value.appAPK, value.testAPK, value.adbPath, value.sshPath, value.scpPath} {
+	for _, required := range []string{value.adbPath, value.sshPath, value.scpPath, value.pythonPath, value.powershellPath} {
+		if strings.TrimSpace(required) == "" || strings.ContainsAny(required, "\r\n\x00") {
+			return errors.New("private executable path rejected")
+		}
+	}
+	return validateCommonConfig(value)
+}
+
+func validateCommonConfig(value config) error {
+	if _, found := phase17qualification.CampaignPolicyForMode(value.mode); !found {
+		return errors.New("mode rejected")
+	}
+	for _, required := range []string{
+		value.evidenceRoot, value.packagePath, value.packageEntry, value.appAPK, value.appEntry, value.testAPK, value.testEntry,
+		value.policyPath, value.policyEntry, value.runnerPath, value.runnerEntry,
+		value.wrapperPath, value.wrapperEntry,
+		value.preflightPath, value.preflightEntry,
+		value.packageVerifierPath, value.packageVerifierEntry, value.qualification.candidatePath, value.qualification.rcLockedPath,
+		value.scannerAPath, value.scannerAEntry, value.scannerBPath, value.scannerBEntry,
+		value.boundaryPath, value.boundaryEntry,
+		value.qualification.attemptPath, value.qualification.environmentPath, value.qualification.ledgerPath,
+		value.qualification.preflightResultPath,
+		value.qualification.trustedPublicKeyPath,
+	} {
 		if strings.TrimSpace(required) == "" || strings.ContainsAny(required, "\r\n\x00") {
 			return errors.New("required path rejected")
 		}
+	}
+	if value.mode == "Soak12h" {
+		if value.qualification.soakReadyPath == "" || value.qualification.priorStressPath == "" {
+			return errors.New("final soak prerequisites rejected")
+		}
+	} else if value.qualification.soakReadyPath != "" || value.qualification.priorStressPath != "" {
+		return errors.New("non-final campaign received final-soak prerequisites")
 	}
 	return nil
 }
@@ -423,41 +530,102 @@ func marshalEvidence(value rawEvidence) ([]byte, error) {
 	return append(encoded, '\n'), nil
 }
 
-func runField(parent context.Context, runner commandRunner, value config) error {
+func runField(parent context.Context, runner commandRunner, value config) (resultErr error) {
 	started := time.Now()
-	if runner.runFunc == nil {
-		runner.remoteGate = &pacedConnectionGate{interval: 7 * time.Second}
-		runner.remoteCommands = map[string]struct{}{value.sshPath: {}, value.scpPath: {}}
+	value, environmentSalt, probeURL, probeDigest, err := loadPrivateRuntime(value)
+	if err != nil {
+		return errors.New("private environment unavailable")
 	}
-	for _, path := range []string{value.packagePath, value.appAPK, value.testAPK, value.probeURLFile, value.probeDigestFile} {
-		if info, err := os.Stat(path); err != nil || info.IsDir() || info.Size() == 0 {
-			return fmt.Errorf("required field input unavailable")
-		}
+	defer clear(environmentSalt)
+	defer clear(probeURL)
+	defer clear(probeDigest)
+	if err := validateConfig(value); err != nil {
+		return errors.New("private environment rejected")
 	}
+	runner = prepareProductionCommandRunner(runner, value)
 	root, err := os.Getwd()
 	if err != nil {
+		return err
+	}
+	qualified, err := loadQualifiedRun(value.mode, value.qualification, qualifiedArtifactPaths{
+		packagePath: value.packagePath, packageEntry: value.packageEntry,
+		appPath: value.appAPK, appEntry: value.appEntry,
+		testPath: value.testAPK, testEntry: value.testEntry,
+		runnerPath: value.runnerPath, runnerEntry: value.runnerEntry,
+		wrapperPath: value.wrapperPath, wrapperEntry: value.wrapperEntry,
+		preflightPath: value.preflightPath, preflightEntry: value.preflightEntry,
+		packageVerifierPath: value.packageVerifierPath, packageVerifierEntry: value.packageVerifierEntry,
+		scannerAPath: value.scannerAPath, scannerAEntry: value.scannerAEntry,
+		scannerBPath: value.scannerBPath, scannerBEntry: value.scannerBEntry,
+		boundaryPath: value.boundaryPath, boundaryEntry: value.boundaryEntry,
+		pythonPath: value.pythonPath, adbPath: value.adbPath, sshPath: value.sshPath, scpPath: value.scpPath,
+		powershellPath: value.powershellPath,
+		policyPath:     value.policyPath, policyEntry: value.policyEntry,
+	})
+	if err != nil {
+		return errors.New("qualification identity rejected")
+	}
+	tracker := &resourceTracker{}
+	api := qualified.environment.AndroidAPI
+	abi := qualified.environment.AndroidABI
+	ipv6Authorized := false
+	outcome := functionalOutcome{
+		campaign: rawCampaign{Mode: value.mode, Impairments: []string{}},
+	}
+	defer func() {
+		durationMS := terminalDurationMilliseconds(time.Since(started))
+		terminal, err := buildTerminalEvidenceV3(qualified, api, abi, ipv6Authorized, durationMS, *tracker, outcome, resultErr)
+		if err != nil {
+			resultErr = errors.Join(resultErr, errors.New("terminal field evidence construction failed"))
+			return
+		}
+		encoded, err := phase17evidence.MarshalOwnedVPSRawV3(terminal)
+		if err != nil || !safeCategory(encoded) {
+			resultErr = errors.Join(resultErr, errors.New("terminal field evidence privacy validation failed"))
+			return
+		}
+		runRoot := filepath.Join(value.evidenceRoot, time.Now().UTC().Format("20060102T150405Z")+"-"+qualified.attempt.AttemptID)
+		if err := os.MkdirAll(runRoot, 0o700); err != nil {
+			resultErr = errors.Join(resultErr, errors.New("terminal field evidence directory failed"))
+			return
+		}
+		if err := writeAtomic(filepath.Join(runRoot, "field-result.json"), encoded, 0o600); err != nil {
+			resultErr = errors.Join(resultErr, errors.New("terminal field evidence write failed"))
+		}
+	}()
+	if err := verifyPrivateEnvironmentCommitment(parent, qualified, value, environmentSalt, probeURL, probeDigest); err != nil {
+		return err
+	}
+	if err := verifyOwnerVPSClock(parent, runner, value, root, time.Now); err != nil {
 		return err
 	}
 	commit, tree, err := readCleanSourceIdentity(parent, runner, root)
 	if err != nil {
 		return err
 	}
-	if _, err := runBytes(parent, runner, nil, root, 2*time.Minute, "go", "run", "./cmd/kurdpackage", "verify", "-archive", value.packagePath); err != nil {
+	if commit != qualified.candidate.CommitSHA || tree != qualified.candidate.TreeSHA {
+		return errors.New("source identity differs from locked candidate")
+	}
+	if _, err := runBytes(parent, runner, nil, root, 2*time.Minute, value.packageVerifierPath, "verify", "-archive", value.packagePath); err != nil {
 		return errors.New("package verification failed")
 	}
 	remotePackage, err := stageAndVerifyPackage(parent, runner, value, root)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = remoteService(context.Background(), runner, value, root, "sudo -n rm -rf "+remotePackage) }()
-	serial, api, abi, err := selectDevice(parent, runner, value)
+	defer func() {
+		joinFieldCleanup(&resultErr, remoteService(context.Background(), runner, value, root, "sudo -n rm -rf "+remotePackage))
+	}()
+	serial, observedAPI, observedABI, err := selectDevice(parent, runner, value, qualified.environment.AndroidClass)
 	if err != nil {
 		return err
 	}
+	api = observedAPI
+	abi = observedABI
 	if err := prepareAndroidPackages(parent, runner, value, root, serial); err != nil {
 		return err
 	}
-	ipv6Authorized, err := prepareIPv6Capability(parent, runner, value, root)
+	ipv6Authorized, err = prepareIPv6Capability(parent, runner, value, root)
 	if err != nil {
 		return err
 	}
@@ -467,10 +635,9 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 	if err := prepareRemoteCampaignAuthority(parent, runner, value, root); err != nil {
 		return err
 	}
-	tracker := &resourceTracker{}
-	outcome, err := runFunctional(parent, runner, value, root, serial, remotePackage, ipv6Authorized, tracker)
+	outcome, err = runFunctional(parent, runner, value, qualified, root, serial, remotePackage, probeURL, probeDigest, ipv6Authorized, tracker)
 	if err != nil {
-		_ = safeStop(parent, runner, value, root)
+		joinFieldCleanup(&err, safeStop(parent, runner, value, root))
 		return err
 	}
 	last := tracker.samples[len(tracker.samples)-1]
@@ -481,24 +648,28 @@ func runField(parent context.Context, runner commandRunner, value config) error 
 	if err != nil || finalCommit != commit || finalTree != tree {
 		return errors.New("source identity changed during field run")
 	}
-	identity := fieldIdentity{strings.TrimSpace(commit), strings.TrimSpace(tree), fileSHA256(value.packagePath), fileSHA256(value.appAPK), fileSHA256(value.testAPK), api, abi, ipv6Authorized}
+	identity := fieldIdentity{strings.TrimSpace(commit), strings.TrimSpace(tree), qualified.packageDigest, qualified.appDigest, qualified.testDigest, api, abi, ipv6Authorized}
 	if !hex64Pattern.MatchString(identity.packageSHA) || !hex64Pattern.MatchString(identity.appSHA) || !hex64Pattern.MatchString(identity.testSHA) {
 		return errors.New("artifact digest rejected")
 	}
-	evidence := passingEvidence(identity, uint64(time.Since(started).Milliseconds()), tracker.peakRSS, tracker.peakFDs, outcome.reconnects)
-	evidence.Campaign = outcome.campaign
-	encoded, err := marshalEvidence(evidence)
-	if err != nil || !safeCategory(encoded) {
-		return errors.New("field evidence privacy validation failed")
-	}
-	runRoot := filepath.Join(value.evidenceRoot, time.Now().UTC().Format("20060102T150405Z")+"-"+strconv.FormatInt(time.Now().UnixNano()&0xfffffff, 16))
-	if err := os.MkdirAll(runRoot, 0o700); err != nil {
-		return err
-	}
-	if err := writeAtomic(filepath.Join(runRoot, "field-result.json"), encoded, 0o600); err != nil {
-		return err
-	}
 	return nil
+}
+
+func prepareProductionCommandRunner(runner commandRunner, value config) commandRunner {
+	if runner.runFunc != nil {
+		return runner
+	}
+	runner.remoteGate = &pacedConnectionGate{interval: 7 * time.Second}
+	runner.remoteCommands = map[string]struct{}{value.sshPath: {}, value.scpPath: {}}
+	return runner
+}
+
+func terminalDurationMilliseconds(elapsed time.Duration) uint64 {
+	milliseconds := elapsed.Milliseconds()
+	if milliseconds < 1 {
+		return 1
+	}
+	return uint64(milliseconds)
 }
 
 func prepareAndroidPackages(ctx context.Context, runner commandRunner, value config, root, serial string) error {
@@ -540,23 +711,19 @@ func readCleanSourceIdentity(ctx context.Context, runner commandRunner, root str
 	return commit, tree, nil
 }
 
-func runFunctional(ctx context.Context, runner commandRunner, value config, root, serial, remotePackage string, ipv6Authorized bool, tracker *resourceTracker) (functionalOutcome, error) {
-	outcome := functionalOutcome{campaign: rawCampaign{Mode: value.mode, Impairments: []string{}}}
+func runFunctional(ctx context.Context, runner commandRunner, value config, qualified qualifiedRun, root, serial, remotePackage string, probeURL, probeDigest []byte, ipv6Authorized bool, tracker *resourceTracker) (outcome functionalOutcome, resultErr error) {
+	campaignStarted := time.Now()
+	campaignPolicy := qualified.campaign
+	outcome = functionalOutcome{
+		campaign: rawCampaign{Mode: value.mode, Impairments: []string{}},
+	}
 	profileID, err := issueAndActivateProfile(ctx, runner, value, root, serial)
 	if err != nil {
 		return outcome, err
 	}
-	defer func() { _ = removeRemoteProfile(context.Background(), runner, value, root, profileID) }()
-	probeURL, err := readTrimmedSecret(value.probeURLFile, 2048)
-	if err != nil {
-		return outcome, errors.New("probe URL unavailable")
-	}
-	defer clear(probeURL)
-	probeDigest, err := readTrimmedSecret(value.probeDigestFile, 64)
-	if err != nil || !hex64Pattern.Match(probeDigest) {
-		return outcome, errors.New("probe digest unavailable")
-	}
-	defer clear(probeDigest)
+	defer func() {
+		joinFieldCleanup(&resultErr, removeRemoteProfile(context.Background(), runner, value, root, profileID))
+	}()
 	if err := verifyFieldTraffic(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized); err != nil {
 		return outcome, err
 	}
@@ -582,28 +749,26 @@ func runFunctional(ctx context.Context, runner commandRunner, value config, root
 	if err := exerciseRemoteRecovery(ctx, runner, value, root, profileID, remotePackage); err != nil {
 		return outcome, err
 	}
-	if value.mode == "Stress" || value.mode == "Soak12h" {
+	if value.mode == "Stress" {
 		stressReconnects, err := runOwnedVPSStressCampaign(
-			ctx, runner, value, root, serial, &profileID, probeURL, probeDigest, ipv6Authorized, tracker,
+			ctx, runner, value, campaignPolicy, root, serial, &profileID, probeURL, probeDigest, ipv6Authorized, tracker,
 		)
 		if err != nil {
 			return outcome, err
 		}
 		outcome.reconnects += stressReconnects
-		outcome.campaign.RestartReconnectCycles = frozenRestartCycles
-		outcome.campaign.ProfileRotationCycles = frozenProfileRotationCycles
-		for _, scenario := range frozenImpairmentMatrix {
-			outcome.campaign.Impairments = append(outcome.campaign.Impairments, scenario.name)
-		}
+		outcome.campaign.RestartReconnectCycles = campaignPolicy.RestartReconnectCycles
+		outcome.campaign.ProfileRotationCycles = campaignPolicy.ProfileRotationCycles
+		outcome.campaign.Impairments = append([]string{}, campaignPolicy.Impairments...)
 	}
-	if value.mode == "Soak12h" {
-		soakReconnects, soakDurationMS, soakCycles, err := soak(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized, tracker)
+	if campaignPolicy.MinimumDurationMS > 0 {
+		soakResult, err := runOwnedVPSSoakCampaign(ctx, runner, value, campaignPolicy, realCampaignClock{}, root, serial, probeURL, probeDigest, ipv6Authorized, tracker)
 		if err != nil {
 			return outcome, err
 		}
-		outcome.reconnects += soakReconnects
-		outcome.campaign.SoakDurationMS = soakDurationMS
-		outcome.campaign.SoakCycles = soakCycles
+		outcome.reconnects += soakResult.reconnects
+		outcome.campaign.SoakDurationMS = soakResult.durationMS
+		outcome.campaign.SoakCycles = soakResult.cycles
 	}
 	if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
 		return outcome, err
@@ -612,7 +777,14 @@ func runFunctional(ctx context.Context, runner commandRunner, value config, root
 		return outcome, err
 	}
 	profileID = ""
-	if err := assertAndroidPrivacy(ctx, runner, value, root, serial, probeURL); err != nil {
+	boundary, err := runBoundaryMonitor(ctx, runner, value, qualified, root, serial, ipv6Authorized)
+	outcome.boundary = boundary
+	if err != nil {
+		return outcome, err
+	}
+	scanners, err := assertQualifiedAndroidPrivacy(ctx, runner, value, qualified, root, serial, campaignStarted, probeURL)
+	outcome.scanners = scanners
+	if err != nil {
 		return outcome, err
 	}
 	return outcome, nil
@@ -763,10 +935,10 @@ printf IPV6_AUTHORIZED
 `, encodedProbe, remotePassFile, remoteRecovery, remoteDataDir)
 }
 
-func selectDevice(ctx context.Context, runner commandRunner, value config) (string, int, string, error) {
+func selectDevice(ctx context.Context, runner commandRunner, value config, androidClass string) (string, int, string, error) {
 	raw, err := runBytes(ctx, runner, nil, "", 30*time.Second, value.adbPath, "devices")
 	if err != nil {
-		return "", 0, "", errors.New("ADB device discovery failed")
+		return "", 0, "", fmt.Errorf("%w: ADB device discovery failed", errAndroidEnvironmentUnavailable)
 	}
 	for _, line := range strings.Split(string(raw), "\n") {
 		fields := strings.Fields(line)
@@ -774,14 +946,36 @@ func selectDevice(ctx context.Context, runner commandRunner, value config) (stri
 			continue
 		}
 		serial := fields[0]
-		name, nameErr := runText(ctx, runner, nil, "", value.adbPath, "-s", serial, "emu", "avd", "name")
-		if nameErr != nil || strings.TrimSpace(strings.Split(name, "\n")[0]) != value.avdName {
-			continue
+		switch androidClass {
+		case "EMULATOR":
+			if value.deviceSerial != "" || value.avdName == "" {
+				return "", 0, "", errors.New("Android emulator selector rejected")
+			}
+			name, nameErr := runText(ctx, runner, nil, "", value.adbPath, "-s", serial, "emu", "avd", "name")
+			if nameErr != nil || strings.TrimSpace(strings.Split(name, "\n")[0]) != value.avdName {
+				continue
+			}
+		case "PHYSICAL":
+			if value.avdName != "" || serial != value.deviceSerial {
+				continue
+			}
+			qemu, qemuErr := runText(ctx, runner, nil, "", value.adbPath, "-s", serial, "shell", "getprop", "ro.kernel.qemu")
+			if qemuErr != nil {
+				return "", 0, "", fmt.Errorf("%w: Android class query failed", errAndroidEnvironmentUnavailable)
+			}
+			if qemu != "" && qemu != "0" {
+				return "", 0, "", errors.New("Android physical-device class rejected")
+			}
+		default:
+			return "", 0, "", errors.New("Android device class rejected")
 		}
 		apiRaw, apiErr := runText(ctx, runner, nil, "", value.adbPath, "-s", serial, "shell", "getprop", "ro.build.version.sdk")
 		abi, abiErr := runText(ctx, runner, nil, "", value.adbPath, "-s", serial, "shell", "getprop", "ro.product.cpu.abi")
 		api, parseErr := strconv.Atoi(strings.TrimSpace(apiRaw))
-		if apiErr != nil || abiErr != nil || parseErr != nil || api != 26 && api != 34 && api != 36 {
+		if apiErr != nil || abiErr != nil {
+			return "", 0, "", fmt.Errorf("%w: Android identity query failed", errAndroidEnvironmentUnavailable)
+		}
+		if parseErr != nil || api != 26 && api != 34 && api != 36 {
 			return "", 0, "", errors.New("Android identity rejected")
 		}
 		abi = strings.TrimSpace(abi)
@@ -790,38 +984,106 @@ func selectDevice(ctx context.Context, runner commandRunner, value config) (stri
 		}
 		return serial, api, abi, nil
 	}
-	return "", 0, "", errors.New("requested AVD is not the active authorized emulator")
+	return "", 0, "", fmt.Errorf("%w: requested Android device is not active", errAndroidEnvironmentUnavailable)
 }
 
 func runFieldAction(ctx context.Context, runner commandRunner, value config, root, serial, action string, extras map[string]string, expected string) error {
-	resetCtx, cancelReset := context.WithTimeout(ctx, fieldEvidenceResetTimeout)
-	err := retryFieldEvidenceReset(resetCtx, fieldEvidenceResetAttempts, fieldEvidenceResetDelay, func(attemptCtx context.Context) error {
-		raw, resetErr := runBytes(attemptCtx, runner, nil, root, fieldEvidenceAttemptTimeout, value.adbPath,
-			"-s", serial, "shell", "run-as", appPackage, "rm", "-f", fieldResultFile)
+	for launchAttempt := 0; launchAttempt < fieldActionLaunchAttempts; launchAttempt++ {
+		attemptID, err := newFieldAttemptID()
+		if err != nil {
+			return fmt.Errorf("Android field action %s attempt identity unavailable", action)
+		}
+		resetCtx, cancelReset := context.WithTimeout(ctx, fieldEvidenceResetTimeout)
+		err = retryFieldEvidenceReset(resetCtx, fieldEvidenceResetAttempts, fieldEvidenceResetDelay, func(attemptCtx context.Context) error {
+			raw, resetErr := runBytes(attemptCtx, runner, nil, root, fieldEvidenceAttemptTimeout, value.adbPath,
+				"-s", serial, "shell", "run-as", appPackage, "rm", "-f", fieldResultFile, fieldAttemptFile)
+			clear(raw)
+			return resetErr
+		})
+		cancelReset()
+		if err != nil {
+			return fmt.Errorf("Android field action %s evidence reset failed", action)
+		}
+		if err := writePendingFieldAttempt(ctx, runner, value, root, serial, attemptID); err != nil {
+			return fmt.Errorf("Android field action %s attempt correlation failed", action)
+		}
+		arguments := []string{"-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "phase17FieldAction", action}
+		for key, item := range extras {
+			arguments = append(arguments, "-e", key, item)
+		}
+		arguments = append(arguments, "-e", "phase17AttemptId", attemptID, "-e", "class", fieldTest, testRunner)
+		instrumentation, instrumentationErr := runBytes(ctx, runner, nil, root, 3*time.Minute, value.adbPath, arguments...)
+		category := instrumentationFailureCategory(instrumentation)
+		clear(instrumentation)
+		if category != "" {
+			return &fieldActionFailure{action: action, category: category}
+		}
+		if instrumentationErr != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			state, stateErr := runText(ctx, runner, nil, root, value.adbPath,
+				"-s", serial, "shell", "run-as", appPackage, "cat", fieldAttemptFile)
+			if stateErr != nil || !safeCategory([]byte(state)) {
+				return &fieldActionFailure{action: action, category: "INSTRUMENTATION_ATTEMPT_STATE_UNAVAILABLE"}
+			}
+			switch strings.TrimSpace(state) {
+			case "STARTED:" + attemptID:
+				return &fieldActionFailure{action: action, category: "INSTRUMENTATION_STARTED_WITHOUT_TERMINAL_RESULT"}
+			case "PENDING:" + attemptID:
+				if launchAttempt+1 == fieldActionLaunchAttempts {
+					return &fieldActionFailure{action: action, category: "INSTRUMENTATION_LAUNCH_FAILED"}
+				}
+				if err := synchronizeFieldInstrumentationRunner(ctx, runner, value, root, serial); err != nil {
+					return &fieldActionFailure{action: action, category: "INSTRUMENTATION_RECOVERY_FAILED"}
+				}
+				continue
+			default:
+				return &fieldActionFailure{action: action, category: "INSTRUMENTATION_ATTEMPT_STATE_REJECTED"}
+			}
+		}
+		result, err := runText(ctx, runner, nil, root, value.adbPath, "-s", serial, "shell", "run-as", appPackage, "cat", fieldResultFile)
+		if err != nil || strings.TrimSpace(result) != expected || !safeCategory([]byte(result)) {
+			return fmt.Errorf("%w: Android field action %s returned invalid evidence", errFieldEvidenceInvalid, action)
+		}
+		return nil
+	}
+	return &fieldActionFailure{action: action, category: "INSTRUMENTATION_LAUNCH_FAILED"}
+}
+
+func newFieldAttemptID() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
 		clear(raw)
-		return resetErr
-	})
-	cancelReset()
-	if err != nil {
-		return fmt.Errorf("Android field action %s evidence reset failed", action)
+		return "", err
 	}
-	arguments := []string{"-s", serial, "shell", "am", "instrument", "-w", "-r", "-e", "phase17FieldAction", action}
-	for key, item := range extras {
-		arguments = append(arguments, "-e", key, item)
+	encoded := hex.EncodeToString(raw)
+	clear(raw)
+	return encoded, nil
+}
+
+func writePendingFieldAttempt(ctx context.Context, runner commandRunner, value config, root, serial, attemptID string) error {
+	if !fieldAttemptIDPattern.MatchString(attemptID) {
+		return errors.New("field attempt identity rejected")
 	}
-	arguments = append(arguments, "-e", "class", fieldTest, testRunner)
-	instrumentation, err := runBytes(ctx, runner, nil, root, 3*time.Minute, value.adbPath, arguments...)
-	category := instrumentationFailureCategory(instrumentation)
-	clear(instrumentation)
-	if category != "" {
-		return &fieldActionFailure{action: action, category: category}
-	}
-	if err != nil {
-		return fmt.Errorf("Android field action %s failed", action)
-	}
-	result, err := runText(ctx, runner, nil, root, value.adbPath, "-s", serial, "shell", "run-as", appPackage, "cat", fieldResultFile)
-	if err != nil || strings.TrimSpace(result) != expected || !safeCategory([]byte(result)) {
-		return fmt.Errorf("Android field action %s returned invalid evidence", action)
+	script := fmt.Sprintf("umask 077; mkdir -p %s; printf 'PENDING:%s\\n' > %s", fieldDirectory, attemptID, fieldAttemptFile)
+	raw, err := runBytes(ctx, runner, nil, root, fieldEvidenceAttemptTimeout, value.adbPath,
+		"-s", serial, "shell", "run-as", appPackage, "sh", "-c", shellQuote(script))
+	clear(raw)
+	return err
+}
+
+func synchronizeFieldInstrumentationRunner(ctx context.Context, runner commandRunner, value config, root, serial string) error {
+	for _, arguments := range [][]string{
+		{"-s", serial, "wait-for-device"},
+		{"-s", serial, "shell", "am", "force-stop", appPackage},
+		{"-s", serial, "shell", "am", "force-stop", testPackage},
+	} {
+		raw, err := runBytes(ctx, runner, nil, root, fieldEvidenceAttemptTimeout, value.adbPath, arguments...)
+		clear(raw)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1589,25 +1851,85 @@ func removeRemoteProfile(ctx context.Context, runner commandRunner, value config
 	return revokeRemoteProfile(ctx, runner, value, root, profileID)
 }
 
-func assertAndroidPrivacy(ctx context.Context, runner commandRunner, value config, root, serial string, forbiddenProbeURL []byte) error {
+func assertQualifiedAndroidPrivacy(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	qualified qualifiedRun,
+	root, serial string,
+	campaignStarted time.Time,
+	forbiddenProbeURL []byte,
+) ([]phase17evidence.FieldScannerV3, error) {
+	raw, err := captureAndroidPrivacyLog(ctx, runner, value, root, serial)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(raw)
+	journal, err := ssh(ctx, runner, value, root, 2*time.Minute, remotePrivacyJournalCommand(campaignStarted))
+	if err != nil {
+		return nil, errors.New("remote privacy journal scan unavailable")
+	}
+	defer clear(journal)
+	stream, records, err := marshalPrivacyObservationStream([]privacyObservation{
+		{source: "ANDROID_LOGCAT", data: raw},
+		{source: "REMOTE_JOURNAL", data: journal},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer clear(stream)
+	receipts, scannerErr := runPrivacyScanners(ctx, runner, value, qualified, root, stream, records)
+	if scannerErr != nil {
+		return receipts, scannerErr
+	}
+	if err := validateAndroidPrivacyLog(raw, forbiddenProbeURL, value.ipv6ProbeAddress); err != nil {
+		return receipts, err
+	}
+	return receipts, nil
+}
+
+func assertAndroidPrivacy(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	root, serial string,
+	forbiddenProbeURL []byte,
+) error {
+	raw, err := captureAndroidPrivacyLog(ctx, runner, value, root, serial)
+	if err != nil {
+		return err
+	}
+	defer clear(raw)
+	return validateAndroidPrivacyLog(raw, forbiddenProbeURL, value.ipv6ProbeAddress)
+}
+
+func captureAndroidPrivacyLog(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	root, serial string,
+) ([]byte, error) {
 	packageIdentity, err := runText(ctx, runner, nil, root, value.adbPath, "-s", serial, "shell", "cmd", "package", "list", "packages", "-U", appPackage)
 	if err != nil {
-		return errors.New("Android package identity unavailable for privacy scan")
+		return nil, errors.New("Android package identity unavailable for privacy scan")
 	}
 	uid, err := parsePackageUID(packageIdentity, appPackage)
 	if err != nil {
-		return errors.New("Android package identity rejected")
+		return nil, errors.New("Android package identity rejected")
 	}
 	arguments := []string{"-s", serial, "logcat", "-d", "-v", "brief", "--uid=" + uid}
 	raw, err := runBytesWithLimit(ctx, runner, nil, root, 2*time.Minute, maxAndroidPrivacyLogBytes, value.adbPath, arguments...)
 	if err != nil {
-		return errors.New("Android privacy log scan unavailable")
+		return nil, errors.New("Android privacy log scan unavailable")
 	}
-	defer clear(raw)
+	return raw, nil
+}
+
+func validateAndroidPrivacyLog(raw, forbiddenProbeURL []byte, ipv6ProbeAddress string) error {
 	if !safeAndroidPrivacyLog(raw) {
 		return errors.New("Android privacy log scan found sensitive material")
 	}
-	if containsForbiddenProbeLogValue(raw, forbiddenProbeURL, value.ipv6ProbeAddress) {
+	if containsForbiddenProbeLogValue(raw, forbiddenProbeURL, ipv6ProbeAddress) {
 		return errors.New("Android privacy log scan found a private probe endpoint")
 	}
 	lower := bytes.ToLower(raw)
@@ -1617,6 +1939,10 @@ func assertAndroidPrivacy(ctx context.Context, runner commandRunner, value confi
 		}
 	}
 	return nil
+}
+
+func remotePrivacyJournalCommand(started time.Time) string {
+	return fmt.Sprintf("sudo -n journalctl --no-pager -o cat -u kurd-node.service --since @%d", started.UTC().Unix())
 }
 
 func safeAndroidPrivacyLog(raw []byte) bool {
@@ -1673,6 +1999,7 @@ func runOwnedVPSStressCampaign(
 	ctx context.Context,
 	runner commandRunner,
 	value config,
+	campaignPolicy phase17qualification.CampaignPolicy,
 	root, serial string,
 	profileID *string,
 	probeURL, probeDigest []byte,
@@ -1743,7 +2070,7 @@ func runOwnedVPSStressCampaign(
 			fmt.Printf("PHASE17_PROGRESS %s %d/%d\n", category, completed, total)
 		},
 	}
-	if err := executeStressCampaign(ctx, actions); err != nil {
+	if err := executeStressCampaign(ctx, campaignPolicy, actions); err != nil {
 		return reconnects, err
 	}
 	return reconnects, nil
@@ -1783,43 +2110,48 @@ func remoteImpairmentCleanupScript() string {
 	return "sudo -n sh -c 'tc qdisc del dev kurd0 root 2>/dev/null || true'"
 }
 
-func soak(ctx context.Context, runner commandRunner, value config, root, serial string, probeURL, probeDigest []byte, ipv6Authorized bool, tracker *resourceTracker) (uint64, uint64, uint64, error) {
-	started := time.Now()
-	deadline := started.Add(12 * time.Hour)
-	var reconnects uint64
-	var cycles uint64
-	for cycle := 0; time.Now().Before(deadline); cycle++ {
-		if err := verifyFieldTraffic(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized); err != nil {
-			return reconnects, 0, cycles, fmt.Errorf("soak cycle %d failed", cycle)
-		}
-		cycles++
-		if cycle%10 == 9 {
-			if err := remoteService(ctx, runner, value, root, "sudo -n systemctl restart kurd-node.service"); err != nil {
-				return reconnects, 0, cycles, errors.New("soak restart failed")
+func runOwnedVPSSoakCampaign(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	campaignPolicy phase17qualification.CampaignPolicy,
+	clock campaignClock,
+	root, serial string,
+	probeURL, probeDigest []byte,
+	ipv6Authorized bool,
+	tracker *resourceTracker,
+) (soakCampaignResult, error) {
+	return executeSoakCampaign(ctx, campaignPolicy, clock, soakActions{
+		cycle: func(ctx context.Context, cycle uint64) (uint64, error) {
+			if err := verifyFieldTraffic(ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized); err != nil {
+				return 0, err
 			}
-			if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
-				return reconnects, 0, cycles, err
+			var reconnects uint64
+			if cycle%10 == 9 {
+				if err := remoteService(ctx, runner, value, root, "sudo -n systemctl restart kurd-node.service"); err != nil {
+					return reconnects, errors.New("soak restart failed")
+				}
+				if err := assertRemoteHealth(ctx, runner, value, root); err != nil {
+					return reconnects, err
+				}
+				reconnects++
 			}
-			reconnects++
-		}
-		if cycle%12 == 11 {
-			if err := exerciseRemoteImpairment(
-				ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized, frozenImpairmentMatrix[3],
-			); err != nil {
-				return reconnects, 0, cycles, fmt.Errorf("soak bounded interruption failed: %w", err)
+			if cycle%12 == 11 {
+				if err := exerciseRemoteImpairment(
+					ctx, runner, value, root, serial, probeURL, probeDigest, ipv6Authorized, frozenImpairmentMatrix[3],
+				); err != nil {
+					return reconnects, fmt.Errorf("soak bounded interruption failed: %w", err)
+				}
 			}
-		}
-		if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
-			return reconnects, 0, cycles, fmt.Errorf("soak resource sample %d failed: %w", cycle, err)
-		}
-		fmt.Printf("PHASE17_PROGRESS soak %d elapsed_minutes=%d\n", cycles, uint64(time.Since(started).Minutes()))
-		select {
-		case <-ctx.Done():
-			return reconnects, 0, cycles, ctx.Err()
-		case <-time.After(5 * time.Minute):
-		}
-	}
-	return reconnects, uint64(time.Since(started).Milliseconds()), cycles, nil
+			if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
+				return reconnects, fmt.Errorf("soak resource sample failed: %w", err)
+			}
+			return reconnects, nil
+		},
+		progress: func(completed, _ uint64, elapsed time.Duration) {
+			fmt.Printf("PHASE17_PROGRESS soak %d elapsed_minutes=%d\n", completed, uint64(elapsed.Minutes()))
+		},
+	})
 }
 
 func remoteMetrics(ctx context.Context, runner commandRunner, value config, root string) (resourceSample, error) {
@@ -1881,13 +2213,23 @@ func remoteService(ctx context.Context, runner commandRunner, value config, root
 }
 
 func ssh(ctx context.Context, runner commandRunner, value config, root string, timeout time.Duration, command string) ([]byte, error) {
-	return runBytes(ctx, runner, nil, root, timeout, value.sshPath,
+	raw, err := runBytes(ctx, runner, nil, root, timeout, value.sshPath,
 		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=20", "--", value.sshAlias, command)
+	return classifySSHFailure(raw, err)
 }
 
 func sshScript(ctx context.Context, runner commandRunner, value config, root string, timeout time.Duration, script string) ([]byte, error) {
-	return runBytes(ctx, runner, []byte(script), root, timeout, value.sshPath,
+	raw, err := runBytes(ctx, runner, []byte(script), root, timeout, value.sshPath,
 		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=20", "--", value.sshAlias, "sudo -n sh -s")
+	return classifySSHFailure(raw, err)
+}
+
+func classifySSHFailure(raw []byte, err error) ([]byte, error) {
+	var exitFailure *commandExitFailure
+	if errors.As(err, &exitFailure) && exitFailure.code == 255 {
+		return raw, fmt.Errorf("%w: secure shell transport failed", errVPSEnvironmentUnavailable)
+	}
+	return raw, err
 }
 
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
@@ -1926,7 +2268,11 @@ func (runner commandRunner) runWithLimit(ctx context.Context, stdin []byte, dire
 		return nil, errors.New("command output exceeded bound")
 	}
 	if err != nil {
-		return output.data, fmt.Errorf("command failed")
+		var exitFailure *exec.ExitError
+		if errors.As(err, &exitFailure) {
+			return output.data, &commandExitFailure{code: exitFailure.ExitCode()}
+		}
+		return output.data, errors.New("command launch failed")
 	}
 	return output.data, nil
 }
@@ -1986,7 +2332,10 @@ func fileSHA256(path string) string {
 }
 
 func readTrimmedSecret(path string, maximum int) ([]byte, error) {
-	raw, err := os.ReadFile(path)
+	if maximum < 1 {
+		return nil, errors.New("secret input rejected")
+	}
+	raw, err := readQualifiedRegular(path, int64(maximum+2))
 	if err != nil {
 		return nil, err
 	}
@@ -2086,30 +2435,116 @@ func packageManifestDigest(path string) (string, error) {
 }
 
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
+	return writeExclusiveAtomic(path, data, mode, syncFieldEvidenceDirectory)
+}
+
+type atomicEvidenceOps struct {
+	createTemp func(string, string) (*os.File, error)
+	chmod      func(*os.File, os.FileMode) error
+	write      func(*os.File, []byte) (int, error)
+	sync       func(*os.File) error
+	close      func(*os.File) error
+	link       func(string, string) error
+	remove     func(string) error
+}
+
+func systemAtomicEvidenceOps() atomicEvidenceOps {
+	return atomicEvidenceOps{
+		createTemp: os.CreateTemp,
+		chmod:      func(file *os.File, mode os.FileMode) error { return file.Chmod(mode) },
+		write:      func(file *os.File, data []byte) (int, error) { return file.Write(data) },
+		sync:       func(file *os.File) error { return file.Sync() },
+		close:      func(file *os.File) error { return file.Close() },
+		link:       os.Link,
+		remove:     os.Remove,
+	}
+}
+
+func writeExclusiveAtomic(path string, data []byte, mode os.FileMode, syncDirectory func(string) error) error {
+	return writeExclusiveAtomicWithOps(path, data, mode, syncDirectory, systemAtomicEvidenceOps())
+}
+
+func writeExclusiveAtomicWithOps(
+	path string,
+	data []byte,
+	mode os.FileMode,
+	syncDirectory func(string) error,
+	operations atomicEvidenceOps,
+) error {
+	if path == "" || len(data) == 0 || syncDirectory == nil {
+		return errors.New("atomic evidence output rejected")
+	}
+	if operations.createTemp == nil || operations.chmod == nil || operations.write == nil || operations.sync == nil ||
+		operations.close == nil || operations.link == nil || operations.remove == nil {
+		return errors.New("atomic evidence operations rejected")
+	}
 	directory := filepath.Dir(path)
-	file, err := os.CreateTemp(directory, ".phase17-field-*.tmp")
+	absDirectory, err := filepath.Abs(directory)
+	if err != nil {
+		return err
+	}
+	resolvedDirectory, err := filepath.EvalSymlinks(absDirectory)
+	if err != nil || !sameFieldPath(absDirectory, resolvedDirectory) {
+		return errors.New("atomic evidence directory rejected")
+	}
+	file, err := operations.createTemp(directory, ".phase17-field-*.tmp")
 	if err != nil {
 		return err
 	}
 	name := file.Name()
-	failed := true
+	closed := false
 	defer func() {
-		_ = file.Close()
-		if failed {
-			_ = os.Remove(name)
+		if !closed {
+			_ = operations.close(file)
 		}
+		_ = operations.remove(name)
 	}()
-	if err := file.Chmod(mode); err != nil {
+	if err := operations.chmod(file, mode); err != nil {
 		return err
 	}
-	if _, err := file.Write(data); err != nil || file.Sync() != nil || file.Close() != nil {
-		return errors.New("atomic evidence write failed")
-	}
-	if err := os.Rename(name, path); err != nil {
+	written, err := operations.write(file, data)
+	if err != nil {
 		return err
 	}
-	failed = false
-	return nil
+	if written != len(data) {
+		return io.ErrShortWrite
+	}
+	if err := operations.sync(file); err != nil {
+		return err
+	}
+	if err := operations.close(file); err != nil {
+		return err
+	}
+	closed = true
+	if err := operations.link(name, path); err != nil {
+		return err
+	}
+	if err := operations.remove(name); err != nil {
+		return err
+	}
+	return syncDirectory(directory)
+}
+
+func syncFieldEvidenceDirectory(directory string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	file, err := os.Open(directory)
+	if err != nil {
+		return err
+	}
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	return errors.Join(syncErr, closeErr)
+}
+
+func sameFieldPath(left, right string) bool {
+	left = filepath.Clean(left)
+	right = filepath.Clean(right)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
 }
 
 func clear(value []byte) {

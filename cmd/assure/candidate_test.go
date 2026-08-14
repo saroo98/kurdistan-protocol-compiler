@@ -18,15 +18,29 @@ func TestCandidateProvenanceSchemaTracksStrictModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	var schema struct {
-		Dialect              string         `json:"$schema"`
-		AdditionalProperties bool           `json:"additionalProperties"`
-		Properties           map[string]any `json:"properties"`
+		Dialect              string                     `json:"$schema"`
+		AdditionalProperties bool                       `json:"additionalProperties"`
+		Properties           map[string]json.RawMessage `json:"properties"`
 	}
 	if err := json.Unmarshal(raw, &schema); err != nil {
 		t.Fatal(err)
 	}
 	if schema.Dialect != "https://json-schema.org/draft/2020-12/schema" || schema.AdditionalProperties || schema.Properties["assurance"] == nil || schema.Properties["selectedArtifacts"] == nil {
 		t.Fatalf("candidate provenance schema does not track strict model: %+v", schema)
+	}
+	var assurance struct {
+		Properties struct {
+			Receipts struct {
+				Minimum int `json:"minItems"`
+				Maximum int `json:"maxItems"`
+			} `json:"receipts"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(schema.Properties["assurance"], &assurance); err != nil {
+		t.Fatal(err)
+	}
+	if assurance.Properties.Receipts.Minimum != 16 || assurance.Properties.Receipts.Maximum != 16 {
+		t.Fatalf("candidate provenance receipt cardinality=(%d,%d), want (16,16)", assurance.Properties.Receipts.Minimum, assurance.Properties.Receipts.Maximum)
 	}
 }
 

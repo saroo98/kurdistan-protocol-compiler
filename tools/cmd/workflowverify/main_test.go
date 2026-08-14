@@ -115,6 +115,70 @@ func TestVerifyKnownWorkflowContractRejectsAttemptAmbiguityAndUnboundDeviceBytes
 	}
 }
 
+func TestRepositoryAssuranceRequiresPhase17QualificationWithoutWideningReceiptAuthority(t *testing.T) {
+	path := filepath.Join("..", "..", "..", ".github", "workflows", "assurance.yml")
+	root, err := decodeYAMLFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyAssuranceQualificationTopology(root); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAssuranceQualificationTopologyRejectsAuthorityWideningAndDetachedGates(t *testing.T) {
+	repositoryPath := filepath.Join("..", "..", "..", ".github", "workflows", "assurance.yml")
+	raw, err := os.ReadFile(repositoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{
+			name: "receipt authority widened",
+			old:  "          - {os: windows-2025, proof: operator}\n",
+			new:  "          - {os: windows-2025, proof: operator}\n          - {os: ubuntu-24.04, proof: phase17-qualification}\n",
+		},
+		{
+			name: "certificate detached",
+			old:  "needs: [policy, go-proof, phase17-qualification, linux-netns, android-host, android-device]",
+			new:  "needs: [policy, go-proof, linux-netns, android-host, android-device]",
+		},
+		{
+			name: "windows qualification removed",
+			old:  "os: [ubuntu-24.04, windows-2025]",
+			new:  "os: [ubuntu-24.04]",
+		},
+		{
+			name: "qualification issues receipt",
+			old:  "run: go run ./cmd/gate -proof phase17-qualification",
+			new:  "run: go run ./cmd/gate -proof phase17-qualification -receipt result.json",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !strings.Contains(string(raw), test.old) {
+				t.Fatalf("repository fixture is missing %q", test.old)
+			}
+			path := filepath.Join(t.TempDir(), "assurance.yml")
+			mutated := strings.Replace(string(raw), test.old, test.new, 1)
+			if err := os.WriteFile(path, []byte(mutated), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root, err := decodeYAMLFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyAssuranceQualificationTopology(root); err == nil {
+				t.Fatal("invalid assurance qualification topology accepted")
+			}
+		})
+	}
+}
+
 func TestVerifyEmulatorProofScriptRequiresSharedAVDHomeAndBoundedDiscovery(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "run-android-emulator-proof.ps1")
 	bad := `$env:ANDROID_AVD_HOME = $avdHome

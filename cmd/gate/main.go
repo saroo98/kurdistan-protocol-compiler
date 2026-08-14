@@ -135,7 +135,7 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 	if quick {
 		auditMode = "--quick"
 	}
-	return []step{
+	steps := []step{
 		{"module-verify", "go", []string{"mod", "verify"}, ""},
 		{"build", "go", []string{"build", "./..."}, ""},
 		{"vet", "go", []string{"vet", "./..."}, ""},
@@ -147,6 +147,35 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"phase16-selfhost-tests", "go", []string{"test", "-count=1", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
 		{"phase16-selfhost-vet", "go", []string{"vet", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
 	}
+	return append(steps, phase17QualificationSourceSteps(false)...)
+}
+
+func phase17QualificationPackages() []string {
+	return []string{
+		"./internal/phase17qualification", "./internal/phase17evidence", "./internal/phase17privacy/...", "./internal/phase17boundary",
+		"./cmd/phase17qual", "./cmd/phase17scan", "./cmd/phase17boundary", "./cmd/phase17field", "./cmd/phase17evidence", "./cmd/phase17verify",
+		"./internal/testkit/importrules",
+	}
+}
+
+func phase17QualificationSourceSteps(includeGo bool) []step {
+	python := "python3"
+	if runtime.GOOS == "windows" {
+		python = "python"
+	}
+	steps := make([]step, 0, 6)
+	if includeGo {
+		steps = append(steps,
+			step{name: "phase17-qualification-tests", program: "go", args: append([]string{"test", "-count=1"}, phase17QualificationPackages()...)},
+			step{name: "phase17-qualification-vet", program: "go", args: append([]string{"vet"}, phase17QualificationPackages()...)},
+		)
+	}
+	return append(steps,
+		step{name: "phase17-workflow-contract", program: "go", args: []string{"run", "./cmd/assure", "workflow", "-root", "."}},
+		step{name: "phase17-qualification-verifier", program: "go", args: []string{"run", "./cmd/phase17verify", "-root", "."}},
+		step{name: "phase17-privacy-python", program: python, args: []string{"-B", "-I", "scripts/phase17/privacy_scan_b_test.py"}},
+		step{name: "phase17-wrapper-tests", program: "pwsh", args: []string{"-NoProfile", "-File", "scripts/phase17/owned-vps-scripts.Tests.ps1"}},
+	)
 }
 
 func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, error) {
@@ -163,7 +192,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 		audit.args = []string{"run", "./cmd/kcheck", "--full"}
 		return []step{audit}, nil
 	case "operator":
-		return steps[6:], nil
+		return steps[6:10], nil
 	case "docs-evidence":
 		return []step{
 			{name: "phase15-evidence", program: "go", args: []string{"run", "./cmd/phase15verify", "-root", "."}},
@@ -189,6 +218,8 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 			{name: "phase17-netns-probe-cli", program: "python3", args: []string{"scripts/phase17/netns_probe.py", "--help"}},
 			{name: "phase17-netns-tagged-tests", program: "go", args: []string{"test", "-tags=phase17integration", "./internal/relay/...", "./internal/runtime", "-count=1"}},
 		}, nil
+	case "phase17-qualification":
+		return phase17QualificationSourceSteps(true), nil
 	case "android-host":
 		return []step{androidAssuranceStep()}, nil
 	case "android-pr-host":

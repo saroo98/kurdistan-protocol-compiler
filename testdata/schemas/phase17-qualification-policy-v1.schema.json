@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-qualification-policy-v1.schema.json",
+  "title": "Kurdistan Phase 17 qualification policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "requiredChecks", "privacyPredicates", "outcomes", "campaigns", "resources", "retry", "evidenceOnlyPaths"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-qualification-policy-v1"},
+    "requiredChecks": {"type": "array", "minItems": 23, "maxItems": 23, "uniqueItems": true, "items": {"type": "string"}},
+    "privacyPredicates": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"type": "string"}},
+    "outcomes": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"enum": ["PASS", "FAIL_PRODUCT", "FAIL_PRIVACY", "FAIL_HARNESS", "ABORT_ENVIRONMENT", "INVALID_IDENTITY", "INCONCLUSIVE"]}},
+    "campaigns": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"$ref": "#/$defs/campaign"}},
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumRssBytes", "maximumFileDescriptors", "maximumSwapBytes"],
+      "properties": {
+        "maximumRssBytes": {"const": 402653184},
+        "maximumFileDescriptors": {"const": 1024},
+        "maximumSwapBytes": {"const": 67108864}
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentationLaunchAttempts", "qualifiedCampaignAutoRetries", "environmentAbortRequiresNewAuthorization"],
+      "properties": {
+        "instrumentationLaunchAttempts": {"const": 2},
+        "qualifiedCampaignAutoRetries": {"const": 0},
+        "environmentAbortRequiresNewAuthorization": {"const": true}
+      }
+    },
+    "evidenceOnlyPaths": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 256}}
+  },
+  "$defs": {
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "restartReconnectCycles", "profileRotationCycles", "impairments", "minimumDurationMs", "cadenceMs", "minimumCycles"],
+      "properties": {
+        "mode": {"enum": ["Functional", "Stress", "Soak60m", "Soak90m", "Soak120m", "Soak12h"]},
+        "restartReconnectCycles": {"type": "integer", "minimum": 0, "maximum": 100},
+        "profileRotationCycles": {"type": "integer", "minimum": 0, "maximum": 100},
+        "impairments": {"type": "array", "maxItems": 5, "uniqueItems": true, "items": {"enum": ["bandwidth", "latency", "loss", "combined", "carrier-reset"]}},
+        "minimumDurationMs": {"type": "integer", "minimum": 0, "maximum": 43200000},
+        "cadenceMs": {"type": "integer", "minimum": 0, "maximum": 300000},
+        "minimumCycles": {"type": "integer", "minimum": 0, "maximum": 144}
+      }
+    }
+  }
+}

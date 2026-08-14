@@ -176,6 +176,20 @@ func TestExpectedTestsForSDKFiltersGuardedCasesWithoutWeakeningExactManifest(t *
 	}
 }
 
+func TestPhase17FieldQualificationRunsOnTheMinimumSupportedAPI(t *testing.T) {
+	tests, err := readExpectedTests(filepath.Join("..", "..", "android", "config", "phase17-required-device-tests.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const fieldAction = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
+	for _, test := range expectedTestsForSDK(tests, 26) {
+		if test == fieldAction {
+			return
+		}
+	}
+	t.Fatal("Phase 17 field qualification is skipped on the supported API 26 lane")
+}
+
 func TestEvaluateInstrumentationRejectsZeroTests(t *testing.T) {
 	if err := evaluateInstrumentation("OK (0 tests)", "clean", defaultAppPackage, 1); err == nil {
 		t.Fatal("evaluateInstrumentation() accepted a zero-test run")

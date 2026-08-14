@@ -21,7 +21,7 @@
         "workflowPath": {"const": ".github/workflows/assurance.yml"},
         "certificatePath": {"const": "assurance-certificate.json"},
         "certificateSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "receipts": {"type": "array", "minItems": 15, "maxItems": 15, "items": {"$ref": "#/$defs/artifact"}},
+        "receipts": {"type": "array", "minItems": 16, "maxItems": 16, "items": {"$ref": "#/$defs/artifact"}},
         "inventories": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"$ref": "#/$defs/artifact"}}
       }
     },

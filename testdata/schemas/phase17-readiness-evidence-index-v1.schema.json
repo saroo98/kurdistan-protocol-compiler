@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-readiness-evidence-index-v1.schema.json",
+  "title": "Kurdistan Phase 17 readiness evidence index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidateId", "roots", "rcLockedSha256", "ledgerHeadSha256", "entries"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-readiness-evidence-index-v1"},
+    "candidateId": {"$ref": "#/$defs/digest"},
+    "roots": {"$ref": "#/$defs/roots"},
+    "rcLockedSha256": {"$ref": "#/$defs/digest"},
+    "ledgerHeadSha256": {"$ref": "#/$defs/digest"},
+    "entries": {"type": "array", "minItems": 13, "maxItems": 13, "items": {"$ref": "#/$defs/entry"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha256", "productSha256", "harnessSha256", "workloadSha256", "verifierSha256", "candidateId"],
+      "properties": {
+        "sourceSha256": {"$ref": "#/$defs/digest"},
+        "productSha256": {"$ref": "#/$defs/digest"},
+        "harnessSha256": {"$ref": "#/$defs/digest"},
+        "workloadSha256": {"$ref": "#/$defs/digest"},
+        "verifierSha256": {"$ref": "#/$defs/digest"},
+        "candidateId": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "size", "evidenceSha256", "result", "rawLogRetained"],
+      "properties": {
+        "kind": {"enum": ["SOURCE_GATES", "REPRODUCIBILITY", "FUNCTIONAL", "DETERMINISTIC_GAUNTLET", "STRESS", "SOAK_60M", "SOAK_90M", "SOAK_120M", "PHYSICAL_API26", "PHYSICAL_CURRENT", "SECOND_PROVIDER", "PRIVACY_SCANNERS", "BOUNDARY_MONITOR"]},
+        "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\\\]+$"},
+        "size": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "evidenceSha256": {"$ref": "#/$defs/digest"},
+        "result": {"const": "PASS"},
+        "rawLogRetained": {"const": false}
+      }
+    }
+  }
+}

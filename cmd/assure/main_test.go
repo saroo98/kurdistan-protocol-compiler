@@ -198,6 +198,7 @@ func TestQualificationWorkflowImpactSelectsCompletePRProofSet(t *testing.T) {
 		"go-executable-evidence",
 		"linux-netns-contract",
 		"operator",
+		"phase17-qualification",
 	}
 	if !reflect.DeepEqual(output.Proofs, want) {
 		t.Fatalf("qualification workflow proofs = %v, want %v", output.Proofs, want)
@@ -227,7 +228,7 @@ func TestRepositoryImpactPolicyPreservesEvidenceInvalidators(t *testing.T) {
 		{
 			name: "Go dependencies require freshness",
 			path: "go.mod",
-			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-pr-host", "dependency-freshness", "go-audit", "go-core", "go-executable-evidence", "linux-netns-contract", "operator"},
+			want: []string{"android-device-api26", "android-device-api34", "android-device-api36", "android-pr-host", "dependency-freshness", "go-audit", "go-core", "go-executable-evidence", "linux-netns-contract", "operator", "phase17-qualification"},
 		},
 		{
 			name: "evidence validator changes require their own proof",

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-environment-context-v1.schema.json",
+  "title": "Kurdistan Phase 17 private environment context v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "hostOs", "hostArch", "hostBootClass", "androidClass", "androidApi", "androidAbi", "vpsOs", "vpsArch", "providerClass", "timeSource", "powerPolicy", "pythonSha256", "adbSha256", "sshSha256", "scpSha256", "powershellSha256", "privateCommitment"],
+  "properties": {
+    "schema": {"const": "kurdistan-phase17-environment-context-v1"},
+    "hostOs": {"enum": ["windows", "linux", "darwin"]},
+    "hostArch": {"enum": ["amd64", "arm64"]},
+    "hostBootClass": {"const": "BOUND_CURRENT_BOOT"},
+    "androidClass": {"enum": ["EMULATOR", "PHYSICAL"]},
+    "androidApi": {"enum": [26, 34, 36]},
+    "androidAbi": {"enum": ["x86_64", "arm64-v8a"]},
+    "vpsOs": {"const": "linux"},
+    "vpsArch": {"const": "amd64"},
+    "providerClass": {"enum": ["PRIMARY", "UNRELATED_SECONDARY"]},
+    "timeSource": {"const": "OWNER_VPS_INTERVAL_REQUIRED"},
+    "powerPolicy": {"const": "RUNNER_SYSTEM_REQUIRED"},
+    "pythonSha256": {"$ref": "#/$defs/digest"},
+    "adbSha256": {"$ref": "#/$defs/digest"},
+    "sshSha256": {"$ref": "#/$defs/digest"},
+    "scpSha256": {"$ref": "#/$defs/digest"},
+    "powershellSha256": {"$ref": "#/$defs/digest"},
+    "privateCommitment": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -103,7 +103,7 @@ func TestConvertOwnedVPSSoakPromotesCompletedLoadRecoveryPrivacyCampaign(t *test
 	}
 }
 
-func validOwnedVPSEvidence(t *testing.T) []byte {
+func validOwnedVPSEvidence(t testing.TB) []byte {
 	t.Helper()
 	checks := ""
 	for index, name := range RequiredOwnedVPSChecks() {
