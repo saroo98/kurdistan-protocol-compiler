@@ -26,6 +26,10 @@ type InputV1 struct {
 	SelectedFeatures        []string
 }
 
+// ErrProjectionCollisionV1 marks a source-dependent projection collision that
+// an owner-side compiler may safely retry with a fresh source candidate.
+var ErrProjectionCollisionV1 = errors.New("live program projection collision")
+
 func CompileV1(input InputV1) (liveprogram.ProgramV1, error) {
 	if input.Profile == nil {
 		return liveprogram.ProgramV1{}, errors.New("live program compilation rejected")
@@ -52,6 +56,9 @@ func CompileV1(input InputV1) (liveprogram.ProgramV1, error) {
 	if !dataOK || !paddingOK || countSemantic(input.Profile.Messages, ir.SemanticData) != 1 || countSemantic(input.Profile.Messages, ir.SemanticPadding) != 1 {
 		return liveprogram.ProgramV1{}, errors.New("live program compilation rejected")
 	}
+	if !liveprogram.IsSafeWireSymbolV1(data.WireSymbol) || !liveprogram.IsSafeWireSymbolV1(padding.WireSymbol) {
+		return liveprogram.ProgramV1{}, ErrProjectionCollisionV1
+	}
 	program := liveprogram.ProgramV1{
 		Schema:               liveprogram.SchemaV1,
 		ProgramID:            liveprogram.DeriveProgramIDV1(sourceHash),
@@ -72,6 +79,9 @@ func CompileV1(input InputV1) (liveprogram.ProgramV1, error) {
 		Security:  projectSecurity(input.Profile, effective),
 		Limits:    liveprogram.LimitsV1{MaxFrameBytes: input.Profile.Limits.MaxFrameBytes, MaxPayloadBytes: input.Profile.Limits.MaxPayloadBytes, MaxSessionMillis: input.Profile.Limits.MaxSessionMillis, MaxSessionMessages: input.Profile.Security.MaxSessionMessages, MaxKeyLifetimeMessages: input.Profile.Security.MaxKeyLifetimeMessages},
 	}
+	if bytes.Equal(program.Frame.Compiled.DataTypeTag, program.Frame.Compiled.PaddingTypeTag) {
+		return liveprogram.ProgramV1{}, ErrProjectionCollisionV1
+	}
 	if err := liveprogram.ValidateV1(program); err != nil {
 		return liveprogram.ProgramV1{}, errors.New("live program compilation rejected")
 	}
@@ -80,8 +90,11 @@ func CompileV1(input InputV1) (liveprogram.ProgramV1, error) {
 		return liveprogram.ProgramV1{}, errors.New("live program compilation rejected")
 	}
 	decoded, err := liveprogram.DecodeV1(encoded)
-	if err != nil || !reflect.DeepEqual(program, decoded) || bytes.Contains(encoded, []byte(input.Profile.ID)) {
+	if err != nil || !reflect.DeepEqual(program, decoded) {
 		return liveprogram.ProgramV1{}, errors.New("live program compilation rejected")
+	}
+	if bytes.Contains(encoded, []byte(input.Profile.ID)) {
+		return liveprogram.ProgramV1{}, ErrProjectionCollisionV1
 	}
 	return decoded.Clone(), nil
 }

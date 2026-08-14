@@ -55,6 +55,7 @@ type gateOptions struct {
 const (
 	gateExecutionSchema = "kurdistan-gate-execution-v1"
 	gateTimingsSchema   = "kurdistan-gate-timings-v1"
+	goSuiteTimeout      = "15m"
 )
 
 type gateStepExecution struct {
@@ -138,7 +139,7 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"module-verify", "go", []string{"mod", "verify"}, ""},
 		{"build", "go", []string{"build", "./..."}, ""},
 		{"vet", "go", []string{"vet", "./..."}, ""},
-		{"test", "go", []string{"test", "-count=1", "./..."}, ""},
+		{"test", "go", []string{"test", "-timeout=" + goSuiteTimeout, "-count=1", "./..."}, ""},
 		{"executable-evidence", "go", []string{"run", "./cmd/executableevidence"}, ""},
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
 		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
@@ -153,7 +154,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 	switch proof {
 	case "go-core":
 		core := append([]step(nil), steps[:4]...)
-		core[3].args = []string{"test", "-json", "-count=1", "./..."}
+		core[3].args = []string{"test", "-json", "-timeout=" + goSuiteTimeout, "-count=1", "./..."}
 		return core, nil
 	case "go-executable-evidence":
 		return steps[4:5], nil

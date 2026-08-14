@@ -36,11 +36,11 @@ func TestGoCoreProofUsesPolicyExactJSONTestCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := proof[3].args, []string{"test", "-json", "-count=1", "./..."}; !equalStrings(got, want) {
+	if got, want := proof[3].args, []string{"test", "-json", "-timeout=15m", "-count=1", "./..."}; !equalStrings(got, want) {
 		t.Fatalf("go-core test command = %v, want %v", got, want)
 	}
 	legacy := gateSteps(false, "report.json", "status.md")
-	if got, want := legacy[3].args, []string{"test", "-count=1", "./..."}; !equalStrings(got, want) {
+	if got, want := legacy[3].args, []string{"test", "-timeout=15m", "-count=1", "./..."}; !equalStrings(got, want) {
 		t.Fatalf("legacy test command = %v, want %v", got, want)
 	}
 }
@@ -424,7 +424,7 @@ func TestGateStepsRemainCacheProof(t *testing.T) {
 	if got := steps[0].args; len(got) != 2 || got[0] != "mod" || got[1] != "verify" {
 		t.Fatalf("module verification gate missing: %v", got)
 	}
-	if got := steps[3].args; len(got) < 2 || got[0] != "test" || got[1] != "-count=1" {
+	if got := steps[3].args; len(got) < 3 || got[0] != "test" || !containsString(got, "-timeout=15m") || !containsString(got, "-count=1") {
 		t.Fatalf("test gate is not cache-proof: %v", got)
 	}
 	for _, value := range steps {

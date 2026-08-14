@@ -76,6 +76,26 @@ foreach ($marker in @('kurdistan-phase17-owned-vps-evidence-v2', 'campaign', 'pr
 $sanitizerTestRoot = Join-Path ([IO.Path]::GetTempPath()) ('phase17-sanitizer-' + [Guid]::NewGuid().ToString('N'))
 try {
     New-Item -ItemType Directory -Path $sanitizerTestRoot | Out-Null
+    $numericInputRoot = Join-Path $sanitizerTestRoot 'numeric-record'
+    New-Item -ItemType Directory -Path $numericInputRoot | Out-Null
+    $numericRecord = [ordered]@{
+        schema = 'kurdistan-phase17-owned-vps-raw-v2'
+        result = 'PASS'
+        subject = [ordered]@{}
+        environment = [ordered]@{ androidApi = 36 }
+        checks = [ordered]@{}
+        metrics = [ordered]@{ durationMs = 43413312; reconnects = 200 }
+        privacy = [ordered]@{}
+        limitations = @('external evidence remains')
+        campaign = [ordered]@{ soakDurationMs = 43413312; soakCycles = 142 }
+    }
+    $numericRecord | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $numericInputRoot 'field-result.json') -Encoding utf8NoBOM
+    $numericOutput = Join-Path $numericInputRoot 'safe.json'
+    & (Join-Path $PSScriptRoot 'sanitize-field-evidence.ps1') -InputRoot $numericInputRoot -Output $numericOutput | Out-Null
+    if (-not (Test-Path -LiteralPath $numericOutput -PathType Leaf)) {
+        throw 'field sanitizer rejected an endpoint-free record containing ordinary numeric evidence'
+    }
+
     foreach ($endpoint in @('192.0.2.10:443', 'https://198.51.100.20/check', '[2001:db8::10]:443', 'fe80::1%eth0')) {
         $inputRoot = Join-Path $sanitizerTestRoot ([Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $inputRoot | Out-Null

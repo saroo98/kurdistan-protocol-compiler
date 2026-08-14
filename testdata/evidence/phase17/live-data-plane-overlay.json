@@ -133,6 +133,11 @@
       "post_sha256": "70882e2928ce4fce109f93ab48d429ca0737ab538b95802e24b179a2bcfc1c90"
     },
     {
+      "path": ".github/workflows/scheduled.yml",
+      "pre_sha256": "7d03339bed65003b59b6088809cc48d6763df3e0b97bb60f5b86d8bbd38f7ff9",
+      "post_sha256": "40c6cdb1e82ccf2c7f262a016842c071895469cf97e0b0c36c2c3df6f3963e66"
+    },
+    {
       "path": "android/app/build.gradle.kts",
       "pre_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45",
       "post_sha256": "6c4eaafb44228ccb7ae15dae019b528ebe09939c7a10760c5a59e1a12faa969c"
@@ -150,7 +155,7 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldActionDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f642236a1e1509bff6dcabeaccb4a592035dde8e590faecb36b70f78b98477ee"
+      "post_sha256": "6b3364a75ceeb8e0366207a033e4c9845c159a62eb1cc1d60e2edf83783ea082"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
@@ -165,7 +170,7 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
       "pre_sha256": "37ad84cebaa7a7d04cf010976794f0c0a7dd972d0d527ebf5eea42e78b3a37b5",
-      "post_sha256": "92a1e595835323f91781f0cc597d527ad8c983c88f40b09a8ef064ea1b4c85ad"
+      "post_sha256": "70ee1b7612a9d8034486e1be12e8a9b3059f2ac26a3c5247bda0de554f363d1f"
     },
     {
       "path": "android/app/src/main/AndroidManifest.xml",
@@ -455,12 +460,12 @@
     {
       "path": "cmd/gate/main.go",
       "pre_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1",
-      "post_sha256": "8bed03c504f593764941d013f1b548ebad6b303708cb572a2cc3f5a1c3ae1f38"
+      "post_sha256": "7fb55a9073d9fa2c78138872ef685301c0756a2aae9fccf32f083480ae3d35e3"
     },
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "945d5eb5f68f048d237eb74d0f7be9e5b4dc9c4cd820fc03d6500d1c12abf5aa"
+      "post_sha256": "5f50044106819bee677b7da34802e0a4554347dd6649c73b48f382cd907cc4e3"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -530,12 +535,12 @@
     {
       "path": "cmd/kurdctl/liveprogram.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6fd5a2126f3d2fd634322aba9651286ae3e19c24e7d57b1a964447d76993d163"
+      "post_sha256": "e2ca26fb1b855d0e81adf377fe15ffe8705ef7d6b54b9fd4878cd1480c669edb"
     },
     {
       "path": "cmd/kurdctl/liveprogram_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "60c1362b3bb11bf2334331b5558525904553c17a36593ab47ed02e432d72909d"
+      "post_sha256": "ae7e46b21018b3fb98f67ad90c732c6099800718509b42d1be4dc81446b2d4cd"
     },
     {
       "path": "cmd/kurdctl/localpath.go",
@@ -690,7 +695,7 @@
     {
       "path": "config/ci/proof-policy.json",
       "pre_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e",
-      "post_sha256": "3cd06249460d96c832e9f94fed6c4fe3e3dca6a6bffa8f69015fa036c4e49a33"
+      "post_sha256": "dd60eb898b6acf781824d2a3856a9f260de764c0ce9d3d134e11e15f7ef101f7"
     },
     {
       "path": "config/runtime/live-data-plane-v1.json",
@@ -1080,12 +1085,22 @@
     {
       "path": "internal/protocol/liveprogram/program_v1.go",
       "pre_sha256": "2aa869225b91a52de2e6c302f1320f7a172b63abaf85bd542f66f12221310442",
-      "post_sha256": "525669fc6d915c83204788dba3a6307e547a5db026fea433a46dde78a2856c6d"
+      "post_sha256": "cc7a045463d186f7a61153320a328d03fce3968d9b3d2d868c7e5b5a869fba3d"
     },
     {
       "path": "internal/protocol/liveprogram/program_v1_test.go",
       "pre_sha256": "cdc0ac77310ed60c1ea267b6c61107dde0fa9dc7e16b3a1e8399a06e8e291498",
       "post_sha256": "aabcd7acb6212d00a56976088e0422ca6c74ae3b8b6da160e191654ab61331ad"
+    },
+    {
+      "path": "internal/protocol/liveprogramcompile/compile_v1.go",
+      "pre_sha256": "171399b5fba7f7284c65da036a2d0387868359ee96f135316a3eee4ff34de5cc",
+      "post_sha256": "1fe9c6e21222849dad8cfb75a20706b8ad1398ea2c073c7500a95e82d4c5773a"
+    },
+    {
+      "path": "internal/protocol/liveprogramcompile/compile_v1_test.go",
+      "pre_sha256": "0a07031ced471d0d0a57291032ea50c3a0e10bd2f0aa431ada95d57f4d27f990",
+      "post_sha256": "08e285f6e200b8e950c431ee7ee0814bff38e79b055ea527f16de0dd594fbf75"
     },
     {
       "path": "internal/relay/node/config.go",
@@ -1245,7 +1260,7 @@
     {
       "path": "internal/runtime/ip_tunnel_v1_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "22080d4fe42777dc010d0090ab72abf9d8ffedd30769ebc2836af26e6040b0e0"
+      "post_sha256": "6a13cc1d50ed3b0d320791a96ec85220b914e4795359bc38e9330ada695b0dca"
     },
     {
       "path": "internal/runtime/network_tlstcp_integration_test.go",
@@ -1495,12 +1510,12 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b0b48069c14f95c7bd58a0892a7da3d0df372ec8c2b22667251d8377cde381aa"
+      "post_sha256": "df85118aca5895d8887eda7a5eb14854977468455e2749bc60baffaa5882d158"
     },
     {
       "path": "scripts/phase17/sanitize-field-evidence.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "aed49e60f5f8a658731c5d6753d1b947ada9842b2e4ca02361b0f5dd7e7f7c9f"
+      "post_sha256": "3cd7ecb6fb91a44716238c47b608409a1f1b75369c652fa2539931cfb7333ccd"
     },
     {
       "path": "testdata/evidence/phase16/decentralized-self-hosted-overlay.json",
@@ -1510,7 +1525,7 @@
     {
       "path": "testdata/evidence/phase17/acceptance-status.json",
       "pre_evidence": "ABSENT",
-      "post_sha256": "5b7ebe6bf0b915b19d9a9090e520e53d3d125cde9601b9a8acf7612ae698c697"
+      "post_sha256": "78d8df70b0b3cef0309bae3f7ba7f337e2923b0aee9b752fe74a9566a3621cd8"
     },
     {
       "path": "testdata/evidence/phase17/historical-gate-supersession.json",
