@@ -8,6 +8,7 @@ import (
 	"errors"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -131,9 +132,19 @@ func TestCommandRunnerPreservesRealChildExitCodeForTransportClassification(t *te
 	}
 }
 
+func TestExitCommandUsesLightweightWindowsShell(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-only fixture contract")
+	}
+	name, arguments := exitCommand(255)
+	if got := name + " " + strings.Join(arguments, " "); got != "cmd.exe /d /s /c exit /b 255" {
+		t.Fatalf("exit command=%q", got)
+	}
+}
+
 func exitCommand(code int) (string, []string) {
 	if runtime.GOOS == "windows" {
-		return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", "exit " + strconv.Itoa(code)}
+		return "cmd.exe", []string{"/d", "/s", "/c", "exit /b " + strconv.Itoa(code)}
 	}
 	return "sh", []string{"-c", "exit " + strconv.Itoa(code)}
 }
