@@ -85,6 +85,14 @@ func TestVerifyQualificationInfrastructureRejectsPolicySchemaAndBoundaryDrift(t 
 			old: `throw $primaryFailure`, new: `throw $maskedFailure`,
 		},
 		{
+			name: "builder enables persistent Gradle daemon", path: "scripts/phase17/build-qualification-candidate.ps1",
+			old: `'--no-daemon'`, new: `'--daemon'`,
+		},
+		{
+			name: "builder enables persistent Kotlin daemon", path: "scripts/phase17/build-qualification-candidate.ps1",
+			old: `'-Pkotlin.compiler.execution.strategy=in-process'`, new: `'-Pkotlin.compiler.execution.strategy=daemon'`,
+		},
+		{
 			name: "wrapper skips private environment verification", path: "scripts/phase17/run-qualified-campaign.ps1",
 			old: `'environment', 'verify'`, new: `'environment', 'removed'`,
 		},
