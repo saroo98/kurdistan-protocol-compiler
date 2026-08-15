@@ -155,6 +155,8 @@ foreach ($marker in @(
     "('p17q-' +",
     'Remove-QualificationWorktree',
     "'-c', 'core.longpaths=true'",
+    "'--no-daemon'",
+    "'-Pkotlin.compiler.execution.strategy=in-process'",
     'throw $primaryFailure',
     'PHASE17_BUILD_CLEANUP_FAILED'
 )) {

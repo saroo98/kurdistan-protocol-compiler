@@ -118,15 +118,23 @@ function Remove-QualificationTree {
         [Parameter(Mandatory = $true)][string]$Parent,
         [Parameter(Mandatory = $true)][string]$Child
     )
-    try {
-        Assert-ChildPath -Parent $Parent -Child $Child
-        if (Test-Path -LiteralPath $Child) {
-            Remove-Item -LiteralPath $Child -Recurse -Force -ErrorAction Stop
+    Assert-ChildPath -Parent $Parent -Child $Child
+    for ($attempt = 1; $attempt -le 6; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $Child) {
+                Remove-Item -LiteralPath $Child -Recurse -Force -ErrorAction Stop
+            }
+            if (-not (Test-Path -LiteralPath $Child)) {
+                return $true
+            }
+        } catch {
+            if ($attempt -eq 6) {
+                return $false
+            }
         }
-        return -not (Test-Path -LiteralPath $Child)
-    } catch {
-        return $false
+        Start-Sleep -Milliseconds (250 * $attempt)
     }
+    return $false
 }
 
 function Copy-ExactFile {
@@ -256,6 +264,7 @@ function Build-CandidateRoot {
     try {
         Invoke-Checked -FilePath (Join-Path $SourceRoot 'android\gradlew.bat') -Arguments @(
             'clean', ':app:assembleInternal', ':app:assembleInternalAndroidTest', 'cyclonedxBom',
+            '--no-daemon', '-Pkotlin.compiler.execution.strategy=in-process',
             '--no-build-cache', '--no-configuration-cache', '--rerun-tasks'
         ) -Failure 'PHASE17_BUILD_ANDROID_FAILED'
     } finally {
