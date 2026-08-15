@@ -107,6 +107,43 @@ func TestLinuxNamespaceProofUsesExplicitShellInterpreter(t *testing.T) {
 	}
 }
 
+func TestLinuxNamespaceProofPolicyMatchesGateInventory(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy struct {
+		Proofs []struct {
+			ID       string     `json:"id"`
+			Commands [][]string `json:"commands"`
+		} `json:"proofs"`
+	}
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		t.Fatal(err)
+	}
+	var commands [][]string
+	for _, proof := range policy.Proofs {
+		if proof.ID == "linux-netns" {
+			commands = proof.Commands
+			break
+		}
+	}
+	if len(commands) != 1 {
+		t.Fatalf("linux-netns policy commands = %v, want one command", commands)
+	}
+	steps, err := proofSteps("linux-netns", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("linux-netns steps = %v, want one step", stepNames(steps))
+	}
+	want := append([]string{steps[0].program}, steps[0].args...)
+	if !equalStrings(commands[0], want) {
+		t.Fatalf("linux-netns policy command = %v, gate command = %v", commands[0], want)
+	}
+}
+
 func TestOperatorProofPolicyMatchesGateInventory(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
 	if err != nil {

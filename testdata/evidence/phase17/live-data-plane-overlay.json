@@ -480,7 +480,7 @@
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "06b5fa88a1b20a068c9bebf67da8b07305014d9b0ec9e9f1288c5120549a7bbf"
+      "post_sha256": "ba78c515fadd2536ee090391c9c8f84f178cfb00eae4f02c3fca0601612467b9"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -825,7 +825,7 @@
     {
       "path": "config/ci/proof-policy.json",
       "pre_sha256": "6bb60506cb69f545797f02e27b5a3b5d48ece9967f708066c9a390e02563f07e",
-      "post_sha256": "6c9b9c9bc35e6ce9a1e5f6d8a547fea9de8e128df378dc0c19116433fb9645d2"
+      "post_sha256": "428934f4a9c4a6d723ee894b0ac98c53a71429c63de672890cf30d3ee2545b21"
     },
     {
       "path": "config/phase17/qualification-policy-v1.json",

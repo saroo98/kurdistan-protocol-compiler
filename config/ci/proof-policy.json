@@ -35,7 +35,7 @@
     },
     {
       "id": "linux-netns",
-      "commands": [["sudo", "--preserve-env=PATH", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"]],
+      "commands": [["sudo", "--preserve-env=PATH", "bash", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"]],
       "operatingSystems": ["linux"],
       "cachePolicy": "CACHE_INDEPENDENT",
       "deterministic": false,
