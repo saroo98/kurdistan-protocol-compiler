@@ -684,7 +684,8 @@ func verifyQualificationScripts(files map[string][]byte) error {
 		"'-trimpath'", "'candidate', 'create'", "android\\config\\phase17-required-device-tests.txt",
 		"phase17-historical-gate-supersession-v1.schema.json", "phase17-owned-vps-preflight-v1.schema.json",
 		"'status', '--porcelain=v1', '--untracked-files=all'", "('p17q-' +", "Remove-QualificationWorktree",
-		"'-c', 'core.longpaths=true'", "throw $primaryFailure", "PHASE17_BUILD_CLEANUP_FAILED",
+		"'-c', 'core.longpaths=true'", "'--no-daemon'", "'-Pkotlin.compiler.execution.strategy=in-process'",
+		"throw $primaryFailure", "PHASE17_BUILD_CLEANUP_FAILED",
 	} {
 		if !strings.Contains(builder, required) {
 			return fmt.Errorf("qualification candidate builder is missing %q", required)
