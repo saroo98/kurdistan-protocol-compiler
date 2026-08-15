@@ -144,6 +144,29 @@ func TestLinuxNamespaceProofPolicyMatchesGateInventory(t *testing.T) {
 	}
 }
 
+func TestLinuxNamespaceProofReturnsPrivateEvidenceToSudoCaller(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "phase17", "netns-e2e.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(raw)
+	for _, required := range []string{
+		"chmod chown",
+		"local caller_uid=${SUDO_UID:-}",
+		"local caller_gid=${SUDO_GID:-}",
+		"chmod 0600 \"$EVIDENCE\"",
+		"chown -- \"$caller_uid:$caller_gid\" \"$EVIDENCE\"",
+		"handoff_evidence",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("namespace evidence handoff missing %q", required)
+		}
+	}
+	if strings.Index(script, "handoff_evidence\nFAILURE=0") < strings.Index(script, "os.replace(temporary, path)") {
+		t.Fatal("namespace evidence ownership must transfer only after the atomic evidence write")
+	}
+}
+
 func TestOperatorProofPolicyMatchesGateInventory(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
 	if err != nil {
