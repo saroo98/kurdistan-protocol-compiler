@@ -173,6 +173,7 @@ type Service struct {
 	Exported              bool
 	Process               string
 	ForegroundServiceType string
+	SupportsAlwaysOn      *bool
 }
 
 type xmlManifest struct {
@@ -191,11 +192,17 @@ type xmlApplication struct {
 }
 
 type xmlService struct {
-	Name                  string `xml:"name,attr"`
-	Permission            string `xml:"permission,attr"`
-	Exported              string `xml:"exported,attr"`
-	Process               string `xml:"process,attr"`
-	ForegroundServiceType string `xml:"foregroundServiceType,attr"`
+	Name                  string        `xml:"name,attr"`
+	Permission            string        `xml:"permission,attr"`
+	Exported              string        `xml:"exported,attr"`
+	Process               string        `xml:"process,attr"`
+	ForegroundServiceType string        `xml:"foregroundServiceType,attr"`
+	MetaData              []xmlMetaData `xml:"meta-data"`
+}
+
+type xmlMetaData struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
 }
 
 // ParseManifest parses a text merged Android manifest into a canonical surface.
@@ -231,12 +238,31 @@ func ParseManifest(raw []byte) (Manifest, error) {
 		if err != nil {
 			return Manifest{}, fmt.Errorf("service %q exported: %w", service.Name, err)
 		}
+		var supportsAlwaysOn *bool
+		seenSupportsAlwaysOn := false
+		for _, metadata := range service.MetaData {
+			if metadata.Name != "android.net.VpnService.SUPPORTS_ALWAYS_ON" {
+				continue
+			}
+			if seenSupportsAlwaysOn {
+				return Manifest{}, fmt.Errorf("service %q contains duplicate always-on metadata", service.Name)
+			}
+			seenSupportsAlwaysOn = true
+			supportsAlwaysOn, err = parseOptionalBool(metadata.Value)
+			if err != nil {
+				return Manifest{}, fmt.Errorf("service %q always-on metadata: %w", service.Name, err)
+			}
+			if supportsAlwaysOn == nil {
+				return Manifest{}, fmt.Errorf("service %q always-on metadata is missing a value", service.Name)
+			}
+		}
 		result.Services = append(result.Services, Service{
 			Name:                  service.Name,
 			Permission:            service.Permission,
 			Exported:              exported,
 			Process:               service.Process,
 			ForegroundServiceType: service.ForegroundServiceType,
+			SupportsAlwaysOn:      supportsAlwaysOn,
 		})
 	}
 	sort.Slice(result.Services, func(i, j int) bool { return result.Services[i].Name < result.Services[j].Name })
