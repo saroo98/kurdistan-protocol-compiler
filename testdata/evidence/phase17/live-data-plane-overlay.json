@@ -480,7 +480,7 @@
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "ba78c515fadd2536ee090391c9c8f84f178cfb00eae4f02c3fca0601612467b9"
+      "post_sha256": "805d22887fdd41b17f45415b5ea43ac7bb75d350620c65dd12790bf1f3e3c8b1"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
@@ -1885,7 +1885,7 @@
     {
       "path": "scripts/phase17/netns-e2e.sh",
       "pre_evidence": "ABSENT",
-      "post_sha256": "326b4de8b0feaf936997e433d0d502c6f613bf0c7c7dc9efc1c4289c20e3777b"
+      "post_sha256": "8161de7db879ee9307177fdbe889616ca5ec0df28ada384476d0490daea0e64c"
     },
     {
       "path": "scripts/phase17/netns_probe.py",

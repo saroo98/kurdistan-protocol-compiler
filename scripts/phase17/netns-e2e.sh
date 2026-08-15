@@ -14,7 +14,7 @@ done
 case "$MODE" in quick|full) ;; *) echo "mode must be quick or full" >&2; exit 64 ;; esac
 
 [[ $(id -u) -eq 0 ]] || { echo "root is required for isolated namespaces" >&2; exit 77; }
-for command in go ip nft tc python3 sha256sum mktemp ping seq awk; do
+for command in go ip nft tc python3 sha256sum mktemp ping seq awk chmod chown; do
   command -v "$command" >/dev/null || { echo "missing required command: $command" >&2; exit 69; }
 done
 [[ -c /dev/net/tun ]] || { echo "/dev/net/tun is unavailable" >&2; exit 69; }
@@ -105,6 +105,20 @@ PY
   rm -rf "$RUN_DIR"
 }
 trap cleanup EXIT INT TERM
+
+handoff_evidence() {
+  local caller_uid=${SUDO_UID:-}
+  local caller_gid=${SUDO_GID:-}
+  chmod 0600 "$EVIDENCE"
+  if [[ -z "$caller_uid" && -z "$caller_gid" ]]; then
+    return 0
+  fi
+  if [[ ! "$caller_uid" =~ ^[0-9]+$ || ! "$caller_gid" =~ ^[0-9]+$ ]]; then
+    echo "invalid sudo caller identity" >&2
+    return 70
+  fi
+  chown -- "$caller_uid:$caller_gid" "$EVIDENCE"
+}
 
 wait_file() {
   local file=$1
@@ -388,5 +402,6 @@ finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
 PY
+handoff_evidence
 FAILURE=0
 echo "PHASE 17 NETWORK NAMESPACE PROOF PASSED"
