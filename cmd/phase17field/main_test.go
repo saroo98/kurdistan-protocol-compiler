@@ -534,6 +534,9 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 	var commands []string
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		commands = append(commands, name+" "+strings.Join(arguments, " "))
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.INTERNET\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n"), nil
+		}
 		if len(arguments) >= 7 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
 			return []byte("Success\n"), nil
 		}
@@ -546,6 +549,7 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 	want := []string{
 		"adb -s emulator-5554 install -r -t app.apk",
 		"adb -s emulator-5554 install -r -t test.apk",
+		"adb -s emulator-5554 shell dumpsys package org.kurdistanvpn.app.internal.test",
 		"adb -s emulator-5554 shell cmd package compile -m speed -f org.kurdistanvpn.app.internal",
 		"adb -s emulator-5554 shell cmd package compile -m speed -f org.kurdistanvpn.app.internal.test",
 		"adb -s emulator-5554 shell appops set org.kurdistanvpn.app.internal ACTIVATE_VPN allow",
@@ -558,6 +562,9 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 func TestPrepareAndroidPackagesAllowsBoundedColdPackageCompilation(t *testing.T) {
 	compileCalls := 0
 	runner := commandRunner{runFunc: func(ctx context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n"), nil
+		}
 		if len(arguments) >= 7 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
 			compileCalls++
 			deadline, ok := ctx.Deadline()
@@ -573,6 +580,40 @@ func TestPrepareAndroidPackagesAllowsBoundedColdPackageCompilation(t *testing.T)
 	}
 	if compileCalls != 2 {
 		t.Fatalf("compile calls=%d, want 2", compileCalls)
+	}
+}
+
+func TestPackageRequestsPermissionRequiresRequestedPermissionsSection(t *testing.T) {
+	const permission = "android.permission.ACCESS_NETWORK_STATE"
+	if !packageRequestsPermission([]byte(
+		"  requested permissions:\n    android.permission.INTERNET\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n",
+	), permission) {
+		t.Fatal("declared probe permission was not recognized")
+	}
+	for name, raw := range map[string]string{
+		"missing":           "  requested permissions:\n    android.permission.INTERNET\n  install permissions:\n",
+		"granted only":      "  requested permissions:\n    android.permission.INTERNET\n  install permissions:\n    android.permission.ACCESS_NETWORK_STATE: granted=true\n",
+		"malformed heading": "  requested permissions\n    android.permission.ACCESS_NETWORK_STATE\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if packageRequestsPermission([]byte(raw), permission) {
+				t.Fatal("permission outside the exact requested-permissions section was accepted")
+			}
+		})
+	}
+}
+
+func TestPrepareAndroidPackagesRejectsProbeWithoutNetworkStatePermission(t *testing.T) {
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.INTERNET\n  install permissions:\n"), nil
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	err := prepareAndroidPackages(context.Background(), runner, value, ".", "emulator-5554")
+	if err == nil || err.Error() != "Android boundary probe permission unavailable" {
+		t.Fatalf("error=%v, want Android boundary probe permission unavailable", err)
 	}
 }
 
@@ -771,6 +812,8 @@ func TestUnrelatedUIDProbeActivityRemainsTestOnlyAndExported(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range [][]byte{
+		[]byte(`android:name="android.permission.INTERNET"`),
+		[]byte(`android:name="android.permission.ACCESS_NETWORK_STATE"`),
 		[]byte(`android:name="org.kurdistanvpn.app.VpnProbeActivity"`),
 		[]byte(`android:exported="true"`),
 	} {

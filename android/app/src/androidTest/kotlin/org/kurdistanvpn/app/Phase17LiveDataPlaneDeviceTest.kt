@@ -148,6 +148,19 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun unrelatedUidProbePackageDeclaresNetworkStateAccess() {
+        val probeContext = InstrumentationRegistry.getInstrumentation().context
+        assertTrue(probeContext.packageName.endsWith(".test"))
+        assertEquals(
+            PackageManager.PERMISSION_GRANTED,
+            probeContext.packageManager.checkPermission(
+                Manifest.permission.ACCESS_NETWORK_STATE,
+                probeContext.packageName,
+            ),
+        )
+    }
+
+    @Test
     fun unrelatedUidBoundaryRunsForTrafficAndBoundaryButNotDnsOnlyActions() {
         assertTrue(
             Phase17FieldHarness.requiresUnrelatedUidBoundary(
