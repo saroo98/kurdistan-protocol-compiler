@@ -126,6 +126,51 @@ func TestRepositoryAssuranceRequiresPhase17QualificationWithoutWideningReceiptAu
 	}
 }
 
+func TestRepositoryCarriesOnePortableAssuranceBundleIntoCandidateBuild(t *testing.T) {
+	assurancePath := filepath.Join("..", "..", "..", ".github", "workflows", "assurance.yml")
+	candidatePath := filepath.Join("..", "..", "..", ".github", "workflows", "candidate.yml")
+	assuranceRoot, err := decodeYAMLFile(assurancePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidateRoot, err := decodeYAMLFile(candidatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyPortableAssuranceBundleHandoff(assuranceRoot, candidateRoot); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPortableAssuranceBundleHandoffRejectsFlattenedCandidateDownload(t *testing.T) {
+	assurancePath := filepath.Join("..", "..", "..", ".github", "workflows", "assurance.yml")
+	candidatePath := filepath.Join("..", "..", "..", ".github", "workflows", "candidate.yml")
+	assuranceRoot, err := decodeYAMLFile(assurancePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(candidatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := "          name: shadow-certificate-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}\n"
+	new := "          pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}\n          merge-multiple: true\n"
+	if !strings.Contains(string(raw), old) {
+		t.Fatalf("repository fixture is missing %q", old)
+	}
+	mutatedPath := filepath.Join(t.TempDir(), "candidate.yml")
+	if err := os.WriteFile(mutatedPath, []byte(strings.Replace(string(raw), old, new, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	candidateRoot, err := decodeYAMLFile(mutatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyPortableAssuranceBundleHandoff(assuranceRoot, candidateRoot); err == nil {
+		t.Fatal("flattened multi-artifact candidate handoff passed")
+	}
+}
+
 func TestAssuranceQualificationTopologyRejectsAuthorityWideningAndDetachedGates(t *testing.T) {
 	repositoryPath := filepath.Join("..", "..", "..", ".github", "workflows", "assurance.yml")
 	raw, err := os.ReadFile(repositoryPath)
