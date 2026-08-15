@@ -73,6 +73,18 @@ func TestVerifyQualificationInfrastructureRejectsPolicySchemaAndBoundaryDrift(t 
 			old: `'phase17-historical-gate-supersession-v1.schema.json'`, new: `'phase17-historical-gate-supersession-removed.schema.json'`,
 		},
 		{
+			name: "builder disables long path worktree cleanup", path: "scripts/phase17/build-qualification-candidate.ps1",
+			old: `'-c', 'core.longpaths=true'`, new: `'-c', 'core.longpaths=false'`,
+		},
+		{
+			name: "builder restores long temporary root", path: "scripts/phase17/build-qualification-candidate.ps1",
+			old: `('p17q-' +`, new: `('kurdistan-phase17-build-' +`,
+		},
+		{
+			name: "builder drops primary failure preservation", path: "scripts/phase17/build-qualification-candidate.ps1",
+			old: `throw $primaryFailure`, new: `throw $maskedFailure`,
+		},
+		{
 			name: "wrapper skips private environment verification", path: "scripts/phase17/run-qualified-campaign.ps1",
 			old: `'environment', 'verify'`, new: `'environment', 'removed'`,
 		},
