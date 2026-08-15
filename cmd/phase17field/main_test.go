@@ -530,6 +530,27 @@ func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions
 	}
 }
 
+func TestPrepareAndroidPackagesAllowsBoundedColdPackageCompilation(t *testing.T) {
+	compileCalls := 0
+	runner := commandRunner{runFunc: func(ctx context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 7 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
+			compileCalls++
+			deadline, ok := ctx.Deadline()
+			if !ok || time.Until(deadline) < 90*time.Second {
+				return nil, errors.New("cold package compilation timeout is too short")
+			}
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	if err := prepareAndroidPackages(context.Background(), runner, value, ".", "emulator-5554"); err != nil {
+		t.Fatal(err)
+	}
+	if compileCalls != 2 {
+		t.Fatalf("compile calls=%d, want 2", compileCalls)
+	}
+}
+
 func TestVerifyFieldTrafficProvesTunnelDNSAndHostnameDataPlaneInOneVpnSession(t *testing.T) {
 	for _, test := range []struct {
 		name           string
