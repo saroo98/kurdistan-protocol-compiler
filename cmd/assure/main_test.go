@@ -78,6 +78,115 @@ func TestRunCertificateValidate(t *testing.T) {
 	}
 }
 
+func TestRunCertificateIssueSupportsPortableReceiptRoot(t *testing.T) {
+	root, policy, policyRaw := writeTestPolicy(t)
+	_, receiptRaw := writeTestReceipt(t, root, policy, policyRaw)
+	bundleReceipt := filepath.Join(root, "bundle", "receipts", "go-core-linux.json")
+	if err := os.MkdirAll(filepath.Dir(bundleReceipt), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bundleReceipt, receiptRaw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	err := run([]string{
+		"certificate", "issue", "-root", root,
+		"-receipt-root", "bundle",
+		"-out", "bundle/assurance-certificate.json",
+		"-certificate-id", "portable-assurance",
+		"-required", "go-core",
+		"-receipt", "receipts/go-core-linux.json",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run portable certificate issue: %v (stderr %q)", err, stderr.String())
+	}
+	certificateRaw, err := os.ReadFile(filepath.Join(root, "bundle", "assurance-certificate.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := assurance.DecodeCertificate(bytes.NewReader(certificateRaw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(certificate.Receipts) != 1 || certificate.Receipts[0].Path != "receipts/go-core-linux.json" {
+		t.Fatalf("portable receipt reference = %+v", certificate.Receipts)
+	}
+	stderr.Reset()
+	if err := run([]string{
+		"certificate", "validate", "-root", root,
+		"-certificate", "bundle/assurance-certificate.json",
+		"-receipts-root", "bundle",
+		"-required", "go-core",
+		"-now", "2026-08-02T10:02:00Z",
+	}, &bytes.Buffer{}, &stderr); err != nil {
+		t.Fatalf("validate portable certificate bundle: %v (stderr %q)", err, stderr.String())
+	}
+}
+
+func TestValidateCertificateDeviceInventoriesBindsReceiptArtifacts(t *testing.T) {
+	root, policy, policyRaw := writeTestPolicy(t)
+	base, _ := writeTestReceipt(t, root, policy, policyRaw)
+	certificate := assurance.Certificate{}
+	for _, api := range []int{26, 34, 36} {
+		identityRaw := []byte(fmt.Sprintf("emulator-identity-api-%d", api))
+		identityName := fmt.Sprintf("emulator-api%d-identity.json", api)
+		identityPath := filepath.Join(root, "verified", "inventories", identityName)
+		if err := os.MkdirAll(filepath.Dir(identityPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(identityPath, identityRaw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		receipt := base
+		receipt.ReceiptID = fmt.Sprintf("android-device-api%d", api)
+		receipt.Proof.ID = fmt.Sprintf("android-device-api%d", api)
+		receipt.Runner.OperatingSystem = "android-emulator"
+		receipt.Runner.RequestedLabel = fmt.Sprintf("api-%d-x86_64", api)
+		receipt.Artifacts = []assurance.Artifact{{
+			Path: fmt.Sprintf(".tools/phase17/emulator-api%d-identity.json", api),
+			Size: int64(len(identityRaw)), SHA256: fmt.Sprintf("%x", sha256.Sum256(identityRaw)),
+		}}
+		receiptRaw, err := json.Marshal(receipt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		referencePath := fmt.Sprintf("receipts/android-device-api%d.json", api)
+		writeCandidateFile(t, root, filepath.ToSlash(filepath.Join("verified", referencePath)), string(receiptRaw))
+		certificate.Receipts = append(certificate.Receipts, assurance.ReceiptReference{
+			ProofID: receipt.Proof.ID, OperatingSystem: receipt.Runner.OperatingSystem,
+			ReceiptID: receipt.ReceiptID, Path: referencePath, SHA256: fmt.Sprintf("%x", sha256.Sum256(receiptRaw)),
+		})
+	}
+	if err := validateCertificateDeviceInventories(root, "verified", "verified/inventories", certificate); err != nil {
+		t.Fatalf("valid receipt-bound inventories rejected: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "verified", "inventories", "emulator-api34-identity.json"), []byte("tampered"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateCertificateDeviceInventories(root, "verified", "verified/inventories", certificate); err == nil {
+		t.Fatal("inventory bytes not bound by the certified device receipt")
+	}
+	if err := os.WriteFile(filepath.Join(root, "verified", "inventories", "emulator-api34-identity.json"), []byte("emulator-identity-api-34"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extra := filepath.Join(root, "verified", "inventories", "undeclared.json")
+	if err := os.WriteFile(extra, []byte("undeclared"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateCertificateDeviceInventories(root, "verified", "verified/inventories", certificate); err == nil {
+		t.Fatal("undeclared inventory file passed")
+	}
+	if err := os.Remove(extra); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "verified", "inventories", "undeclared-link.json")
+	if err := os.Symlink("emulator-api26-identity.json", link); err == nil {
+		if err := validateCertificateDeviceInventories(root, "verified", "verified/inventories", certificate); err == nil {
+			t.Fatal("symbolic-link inventory file passed")
+		}
+	}
+}
+
 func TestRunCertificateValidateRejectsUnexpectedWorkflowExecution(t *testing.T) {
 	root, policy, policyRaw := writeTestPolicy(t)
 	receipt, receiptRaw := writeTestReceipt(t, root, policy, policyRaw)

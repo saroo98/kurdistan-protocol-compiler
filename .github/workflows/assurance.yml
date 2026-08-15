@@ -466,7 +466,13 @@ jobs:
           pattern: shadow-*-${{ github.run_id }}-*
           path: .tools/collected-attempts
           merge-multiple: false
-      - name: Select newest receipt for each proof identity
+      - name: Download exact-run device identity artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
+        with:
+          pattern: device-log-android-device-api*-${{ github.run_id }}-*
+          path: .tools/device-identity-attempts
+          merge-multiple: false
+      - name: Select newest receipts and bind device identities
         shell: pwsh
         run: |
           $latest = @{}
@@ -487,20 +493,42 @@ jobs:
             }
           }
           if ($latest.Count -ne 16) { throw "expected 16 proof identities, found $($latest.Count)" }
-          New-Item -ItemType Directory -Force .tools/collected | Out-Null
+          New-Item -ItemType Directory -Force .tools/assurance-bundle/receipts | Out-Null
+          New-Item -ItemType Directory -Force .tools/assurance-bundle/inventories | Out-Null
           foreach ($identity in ($latest.Keys | Sort-Object)) {
             $safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '-receipt.json'
-            Copy-Item -LiteralPath $latest[$identity].File.FullName -Destination (Join-Path '.tools/collected' $safeName)
+            $selected = $latest[$identity]
+            Copy-Item -LiteralPath $selected.File.FullName -Destination (Join-Path '.tools/assurance-bundle/receipts' $safeName)
+            $receipt = Get-Content -LiteralPath $selected.File.FullName -Raw | ConvertFrom-Json
+            $proof = [string]$receipt.proof.id
+            if ($proof -match '^android-device-api(26|34|36)$') {
+              $api = $Matches[1]
+              $identityPath = ".tools/phase17/emulator-api$api-identity.json"
+              $declared = @($receipt.artifacts | Where-Object { [string]$_.path -ceq $identityPath })
+              if ($declared.Count -ne 1) { throw "receipt $proof must declare exactly one emulator identity" }
+              $artifactRoot = Join-Path '.tools/device-identity-attempts' "device-log-$proof-${{ github.run_id }}-$($selected.Attempt)"
+              if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) { throw "missing device identity artifact for $proof attempt $($selected.Attempt)" }
+              $identityFiles = @(Get-ChildItem -LiteralPath $artifactRoot -Filter "emulator-api$api-identity.json" -File -Recurse)
+              if ($identityFiles.Count -ne 1) { throw "expected one identity file for $proof attempt $($selected.Attempt), found $($identityFiles.Count)" }
+              $identityFile = $identityFiles[0]
+              $identityDigest = (Get-FileHash -LiteralPath $identityFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($identityFile.Length -ne [int64]$declared[0].size -or $identityDigest -cne [string]$declared[0].sha256) { throw "device identity bytes do not match certified receipt $proof" }
+              Copy-Item -LiteralPath $identityFile.FullName -Destination (Join-Path '.tools/assurance-bundle/inventories' $identityFile.Name)
+            }
           }
-      - name: Issue and validate aggregate certificate
+          $inventories = @(Get-ChildItem -LiteralPath .tools/assurance-bundle/inventories -Filter 'emulator-api*-identity.json' -File)
+          if ($inventories.Count -ne 3) { throw "expected three receipt-bound emulator identities, found $($inventories.Count)" }
+      - name: Issue and validate portable assurance bundle
         shell: pwsh
         run: |
-          $receipts = Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse | Sort-Object Name
+          $bundleRoot = (Resolve-Path -LiteralPath .tools/assurance-bundle).Path
+          $receipts = Get-ChildItem -LiteralPath .tools/assurance-bundle/receipts -Filter '*-receipt.json' -File | Sort-Object Name
           if ($receipts.Count -ne 16) { throw "expected 16 proof receipts, found $($receipts.Count)" }
           $arguments = @(
             'run', './cmd/assure', 'certificate', 'issue',
             '-root', '.',
-            '-out', '.tools/assurance-certificate.json',
+            '-receipt-root', '.tools/assurance-bundle',
+            '-out', '.tools/assurance-bundle/assurance-certificate.json',
             '-certificate-id', "main-${{ github.run_id }}-${{ github.run_attempt }}",
             '-required', 'android-device-api26',
             '-required', 'android-device-api34',
@@ -515,15 +543,16 @@ jobs:
             '-required', 'operator'
           )
           foreach ($receipt in $receipts) {
-            $relative = [System.IO.Path]::GetRelativePath((Get-Location).Path, $receipt.FullName).Replace('\', '/')
+            $relative = [System.IO.Path]::GetRelativePath($bundleRoot, $receipt.FullName).Replace('\', '/')
             $arguments += @('-receipt', $relative)
           }
           & go @arguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & go run ./cmd/assure certificate validate `
             -root . `
-            -certificate .tools/assurance-certificate.json `
-            -receipts-root . `
+            -certificate .tools/assurance-bundle/assurance-certificate.json `
+            -receipts-root .tools/assurance-bundle `
+            -inventories-root .tools/assurance-bundle/inventories `
             -required android-device-api26 `
             -required android-device-api34 `
             -required android-device-api36 `
@@ -536,11 +565,11 @@ jobs:
             -required linux-netns `
             -required operator
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload aggregate certificate
+      - name: Upload portable assurance bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         with:
           name: shadow-certificate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .tools/assurance-certificate.json
+          path: .tools/assurance-bundle/
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
