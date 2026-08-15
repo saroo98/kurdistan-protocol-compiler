@@ -214,7 +214,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 			{name: "android-runtime-vulnerability-analysis", program: osvScanner, args: []string{"scan", "source", "-L", "testdata/evidence/phase9/android-sbom.cdx.json"}},
 		}, nil
 	case "linux-netns":
-		return []step{{name: "phase17-linux-netns", program: "sudo", args: []string{"--preserve-env=PATH", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"}}}, nil
+		return []step{{name: "phase17-linux-netns", program: "sudo", args: []string{"--preserve-env=PATH", "bash", "./scripts/phase17/netns-e2e.sh", "--mode", "full", "--evidence-dir", ".tools/phase17/netns"}}}, nil
 	case "linux-netns-contract":
 		return []step{
 			{name: "phase17-netns-shell", program: "bash", args: []string{"-n", "scripts/phase17/netns-e2e.sh"}},
