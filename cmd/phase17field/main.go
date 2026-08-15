@@ -36,35 +36,36 @@ import (
 )
 
 const (
-	rawSchema                   = "kurdistan-phase17-owned-vps-raw-v2"
-	maxOutputBytes              = 2 << 20
-	maxAndroidPrivacyLogBytes   = 16 << 20
-	appPackage                  = "org.kurdistanvpn.app.internal"
-	testPackage                 = "org.kurdistanvpn.app.internal.test"
-	testRunner                  = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
-	fieldTest                   = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
-	remoteDataDir               = "/var/lib/kurd-node"
-	remoteRegistry              = "/var/lib/kurd-node/recipient-registry"
-	remoteControl               = "/run/kurd-node/control.sock"
-	remotePassFile              = "/root/.kurd-node-field/current-passphrase"
-	remoteRecovery              = "/root/.kurd-node-field/current.kurd-recovery"
-	fieldDirectory              = "files/phase17-field"
-	recipientFile               = fieldDirectory + "/recipient-request.bin"
-	profileFile                 = fieldDirectory + "/sealed-profile.bin"
-	fieldResultFile             = fieldDirectory + "/result.txt"
-	fieldAttemptFile            = fieldDirectory + "/attempt.txt"
-	fieldEvidenceResetAttempts  = 31
-	fieldEvidenceResetDelay     = time.Second
-	fieldEvidenceResetTimeout   = 30 * time.Second
-	fieldEvidenceAttemptTimeout = 10 * time.Second
-	impairmentVerificationTries = 3
-	impairmentRetryDelay        = 250 * time.Millisecond
-	fieldActionLaunchAttempts   = 2
-	frozenRestartCycles         = 100
-	frozenProfileRotationCycles = 100
-	maximumRelayRSSBytes        = 384 << 20
-	maximumRelayFileDescriptors = 1024
-	maximumRelaySwapBytes       = 64 << 20
+	rawSchema                    = "kurdistan-phase17-owned-vps-raw-v2"
+	maxOutputBytes               = 2 << 20
+	maxAndroidPrivacyLogBytes    = 16 << 20
+	appPackage                   = "org.kurdistanvpn.app.internal"
+	testPackage                  = "org.kurdistanvpn.app.internal.test"
+	testRunner                   = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
+	fieldTest                    = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
+	remoteDataDir                = "/var/lib/kurd-node"
+	remoteRegistry               = "/var/lib/kurd-node/recipient-registry"
+	remoteControl                = "/run/kurd-node/control.sock"
+	remotePassFile               = "/root/.kurd-node-field/current-passphrase"
+	remoteRecovery               = "/root/.kurd-node-field/current.kurd-recovery"
+	fieldDirectory               = "files/phase17-field"
+	recipientFile                = fieldDirectory + "/recipient-request.bin"
+	profileFile                  = fieldDirectory + "/sealed-profile.bin"
+	fieldResultFile              = fieldDirectory + "/result.txt"
+	fieldAttemptFile             = fieldDirectory + "/attempt.txt"
+	fieldEvidenceResetAttempts   = 31
+	fieldEvidenceResetDelay      = time.Second
+	fieldEvidenceResetTimeout    = 30 * time.Second
+	fieldEvidenceAttemptTimeout  = 10 * time.Second
+	androidPackageCompileTimeout = 2 * time.Minute
+	impairmentVerificationTries  = 3
+	impairmentRetryDelay         = 250 * time.Millisecond
+	fieldActionLaunchAttempts    = 2
+	frozenRestartCycles          = 100
+	frozenProfileRotationCycles  = 100
+	maximumRelayRSSBytes         = 384 << 20
+	maximumRelayFileDescriptors  = 1024
+	maximumRelaySwapBytes        = 64 << 20
 )
 
 type fieldActionFailure struct {
@@ -679,9 +680,11 @@ func prepareAndroidPackages(ctx context.Context, runner commandRunner, value con
 		}
 	}
 	for _, packageName := range []string{appPackage, testPackage} {
-		output, err := runText(ctx, runner, nil, root, value.adbPath,
+		output, err := runBytes(ctx, runner, nil, root, androidPackageCompileTimeout, value.adbPath,
 			"-s", serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", packageName)
-		if err != nil || output != "Success" {
+		compiled := err == nil && bytes.Equal(bytes.TrimSpace(output), []byte("Success"))
+		clear(output)
+		if !compiled {
 			return errors.New("Android package compilation failed")
 		}
 	}
