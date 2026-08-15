@@ -21,6 +21,7 @@ func runCertificateIssue(args []string, stdout, stderr io.Writer) error {
 	flags.SetOutput(stderr)
 	root := flags.String("root", ".", "repository root")
 	policyPath := flags.String("policy", "config/ci/proof-policy.json", "proof policy path under root")
+	receiptRoot := flags.String("receipt-root", ".", "receipt directory under root")
 	outPath := flags.String("out", "", "certificate output path under root")
 	certificateID := flags.String("certificate-id", "", "bounded certificate identity")
 	var required stringList
@@ -38,6 +39,10 @@ func runCertificateIssue(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	policyDigest := digestBytes(policyRaw)
+	receiptDirectory, err := resolveRootDirectory(*root, *receiptRoot)
+	if err != nil {
+		return fmt.Errorf("resolve receipt directory: %w", err)
+	}
 	requiredProofs := sortedUnique(required)
 	if len(requiredProofs) != len(required) {
 		return errors.New("duplicate required proof")
@@ -52,7 +57,7 @@ func runCertificateIssue(args []string, stdout, stderr io.Writer) error {
 	var issuedAt time.Time
 	var expiresAt time.Time
 	for _, path := range sortedPaths {
-		raw, readErr := readRootFile(*root, path)
+		raw, readErr := readRootFile(receiptDirectory, path)
 		if readErr != nil {
 			return fmt.Errorf("read receipt %q: %w", path, readErr)
 		}
