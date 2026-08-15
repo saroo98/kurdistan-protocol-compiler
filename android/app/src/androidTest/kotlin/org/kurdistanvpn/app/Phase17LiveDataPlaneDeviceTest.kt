@@ -100,6 +100,30 @@ class Phase17LiveDataPlaneDeviceTest {
                 probeUid = 10_002,
             ),
         )
+        assertTrue(
+            Phase17FieldHarness.isExpectedProbeResultIdentity(
+                expectedPackage = "org.kurdistanvpn.app.internal.test",
+                expectedUid = 10_002,
+                observedPackage = "org.kurdistanvpn.app.internal.test",
+                observedUid = 10_002,
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedProbeResultIdentity(
+                expectedPackage = "org.kurdistanvpn.app.internal.test",
+                expectedUid = 10_002,
+                observedPackage = "org.kurdistanvpn.app.internal.test",
+                observedUid = 10_003,
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isExpectedProbeResultIdentity(
+                expectedPackage = "org.kurdistanvpn.app.internal.test",
+                expectedUid = 10_002,
+                observedPackage = "org.kurdistanvpn.app.internal.other",
+                observedUid = 10_002,
+            ),
+        )
         val passing = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
             tunneledTraffic = true,
             bypassBlocked = true,
