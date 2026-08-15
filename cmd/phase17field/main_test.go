@@ -505,6 +505,31 @@ func TestFieldRuntimeMetricsStayInsideLiveProfileWindow(t *testing.T) {
 	}
 }
 
+func TestBoundaryMonitorRunsBeforeProfileRevocation(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runFunctionalStart := bytes.Index(source, []byte("func runFunctional("))
+	functionalEnd := bytes.Index(source[runFunctionalStart:], []byte("\n}\n\nfunc issueAndActivateProfile("))
+	if runFunctionalStart < 0 || functionalEnd < 0 {
+		t.Fatal("field orchestration boundary unavailable")
+	}
+	functionalBody := source[runFunctionalStart : runFunctionalStart+functionalEnd]
+	boundaryStart := bytes.Index(functionalBody, []byte("runBoundaryMonitor("))
+	revokeStart := bytes.Index(functionalBody, []byte("revokeRemoteProfile("))
+	if boundaryStart < 0 || revokeStart < 0 {
+		t.Fatal("live boundary or revocation action unavailable")
+	}
+	if boundaryStart > revokeStart {
+		t.Fatalf(
+			"live boundary observer runs after profile revocation: boundary=%d revoke=%d",
+			boundaryStart,
+			revokeStart,
+		)
+	}
+}
+
 func TestPrepareAndroidPackagesCompilesExactInstalledArtifactsBeforeFieldActions(t *testing.T) {
 	var commands []string
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
@@ -649,6 +674,94 @@ func TestFieldHarnessBindsDNSAndHostnameTrafficToTheSameVerifiedVpnNetwork(t *te
 	}
 }
 
+func TestFieldBoundaryUsesUnrelatedUIDForUnderlayBypassProof(t *testing.T) {
+	harness, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "app", "src", "androidTest", "kotlin",
+		"org", "kurdistanvpn", "app", "Phase17FieldHarness.kt",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "app", "src", "androidTest", "java",
+		"org", "kurdistanvpn", "app", "VpnProbeActivity.java",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range [][]byte{
+		[]byte("awaitUnrelatedUidBoundary"),
+		[]byte("EXTRA_UNDERLYING_NETWORK"),
+		[]byte("EXTRA_UNDERLAY_TARGET_ADDRESS"),
+		[]byte("EXTRA_UNDERLAY_TARGET_PORT"),
+		[]byte("EXTRA_BYPASS_BLOCKED"),
+		[]byte("ContextCompat.registerReceiver"),
+		[]byte("RECEIVER_EXPORTED"),
+		[]byte("resolveOwnerProbeTargets"),
+		[]byte("vpnNetwork.getAllByName(uri.host)"),
+		[]byte("selectReachableUnderlayProbeTarget"),
+		[]byte("canReachUnderlayTarget"),
+		[]byte("toSet() != underlying.toSet()"),
+		[]byte("!uri.host.contains(':')"),
+	} {
+		if !bytes.Contains(harness, required) {
+			t.Fatalf("field harness missing unrelated-UID boundary contract %q", required)
+		}
+	}
+	start := bytes.Index(harness, []byte("private fun observeNetworkBoundary"))
+	end := bytes.Index(harness, []byte("private fun writeBoundaryObservation"))
+	if start < 0 || end <= start {
+		t.Fatal("field harness boundary observer not found")
+	}
+	ownerObserver := harness[start:end]
+	if bytes.Contains(ownerObserver, []byte("bindSocket")) || bytes.Contains(ownerObserver, []byte("DatagramSocket")) {
+		t.Fatal("VPN owner UID must not be used to prove that unrelated applications cannot bypass lockdown")
+	}
+	for _, required := range [][]byte{
+		[]byte("EXTRA_UNDERLYING_NETWORK"),
+		[]byte("EXTRA_UNDERLAY_TARGET_ADDRESS"),
+		[]byte("EXTRA_UNDERLAY_TARGET_PORT"),
+		[]byte("EXTRA_BYPASS_BLOCKED"),
+		[]byte("underlyingNetwork.bindSocket(socket)"),
+		[]byte("socket.connect("),
+		[]byte("UNDERLAY_ATTEMPT_TIMEOUT_MILLIS"),
+		[]byte("underlayConnectionIsBlocked"),
+	} {
+		if !bytes.Contains(probe, required) {
+			t.Fatalf("unrelated-UID probe missing underlay bypass proof %q", required)
+		}
+	}
+	if bytes.Contains(probe, []byte("underlayBindIsBlocked")) {
+		t.Fatal("a successful bind alone must not be treated as a lockdown bypass")
+	}
+}
+
+func TestUnrelatedUIDProbeActivityRemainsTestOnlyAndExported(t *testing.T) {
+	testManifest, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "app", "src", "androidTest", "AndroidManifest.xml",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	productionManifest, err := os.ReadFile(filepath.Join(
+		"..", "..", "android", "app", "src", "main", "AndroidManifest.xml",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range [][]byte{
+		[]byte(`android:name="org.kurdistanvpn.app.VpnProbeActivity"`),
+		[]byte(`android:exported="true"`),
+	} {
+		if !bytes.Contains(testManifest, required) {
+			t.Fatalf("test-only unrelated-UID probe manifest missing %q", required)
+		}
+	}
+	if bytes.Contains(productionManifest, []byte("VpnProbeActivity")) {
+		t.Fatal("unrelated-UID qualification probe must not ship in the production manifest")
+	}
+}
+
 func TestVpnServiceDeclaresUnderlyingNetworkOnBuilderBeforeEstablish(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join(
 		"..", "..", "android", "runtime", "android", "src", "main", "kotlin",
@@ -714,6 +827,11 @@ func TestInstrumentationFailureCategoryClassifiesSafeDataPlaneBoundary(t *testin
 			name: "teardown readiness timeout",
 			raw:  "VPN_NETWORK_TEARDOWN_TIMEOUT\nFAILURES!!!\n",
 			want: "VPN_NETWORK_TEARDOWN_TIMEOUT",
+		},
+		{
+			name: "route and DNS boundary leak",
+			raw:  "BOUNDARY_LEAK\nFAILURES!!!\n",
+			want: "BOUNDARY_LEAK",
 		},
 	}
 	for _, test := range tests {

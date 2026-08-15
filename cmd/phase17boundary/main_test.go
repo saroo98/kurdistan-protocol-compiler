@@ -42,7 +42,8 @@ func TestRunActivelyObservesAndroidAndVPSAndEmitsOnlyCategoricalReceipt(t *testi
 			return nil, nil
 		case strings.Contains(joined, " am instrument "):
 			if !strings.Contains(joined, "phase17FieldAction boundary") ||
-				!strings.Contains(joined, "phase17AttemptId "+request.AttemptID) {
+				!strings.Contains(joined, "phase17AttemptId "+request.AttemptID) ||
+				!strings.Contains(joined, "phase17ProbeUrl "+request.ProbeURL) {
 				t.Fatalf("instrumentation arguments=%q", joined)
 			}
 			return []byte("OK"), nil
@@ -66,8 +67,19 @@ func TestRunActivelyObservesAndroidAndVPSAndEmitsOnlyCategoricalReceipt(t *testi
 		receipt.AttemptID != request.AttemptID || stderr.Len() != 0 {
 		t.Fatalf("receipt=%+v stderr=%q", receipt, stderr.String())
 	}
-	if bytes.Contains(stdout.Bytes(), []byte(request.SSHAlias)) || bytes.Contains(stdout.Bytes(), []byte(request.DeviceSerial)) {
-		t.Fatal("private selector retained in receipt")
+	for _, private := range []string{request.SSHAlias, request.DeviceSerial, request.ProbeURL} {
+		if bytes.Contains(stdout.Bytes(), []byte(private)) {
+			t.Fatal("private selector retained in receipt")
+		}
+	}
+}
+
+func TestBoundaryObserverTargetsExactQualifiedInternalPackages(t *testing.T) {
+	if boundaryAppPackage != "org.kurdistanvpn.app.internal" {
+		t.Fatalf("boundary app package=%q", boundaryAppPackage)
+	}
+	if boundaryTestRunner != "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner" {
+		t.Fatalf("boundary test runner=%q", boundaryTestRunner)
 	}
 }
 
@@ -109,7 +121,7 @@ func TestRunRejectsSymlinkChildCrashAndDoesNotEchoPrivateInput(t *testing.T) {
 	if code := runWithObserver([]string{"-request", target}, &stdout, &stderr, runner); code == 0 {
 		t.Fatal("child crash accepted")
 	}
-	for _, secret := range []string{request.SSHAlias, request.DeviceSerial, "owner-private-endpoint.invalid"} {
+	for _, secret := range []string{request.SSHAlias, request.DeviceSerial, request.ProbeURL, "owner-private-endpoint.invalid"} {
 		if strings.Contains(stdout.String(), secret) || strings.Contains(stderr.String(), secret) {
 			t.Fatalf("private input echoed: %q", secret)
 		}
@@ -141,7 +153,8 @@ func boundaryRequestForTest() phase17boundary.Request {
 	return phase17boundary.Request{
 		Schema: phase17boundary.RequestSchema, CampaignMode: "Functional", AttemptID: strings.Repeat("a", 32),
 		ADBPath: "adb-private", DeviceSerial: "emulator-private", SSHPath: "ssh-private",
-		SSHAlias: "owner-private", RelayPort: 8443, VerifyIPv6: true,
+		SSHAlias: "owner-private", ProbeURL: "https://probe.invalid/check",
+		RelayPort: 8443, VerifyIPv6: true,
 	}
 }
 
