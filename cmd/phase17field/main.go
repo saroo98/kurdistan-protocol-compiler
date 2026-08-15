@@ -41,6 +41,7 @@ const (
 	maxAndroidPrivacyLogBytes    = 16 << 20
 	appPackage                   = "org.kurdistanvpn.app.internal"
 	testPackage                  = "org.kurdistanvpn.app.internal.test"
+	probeNetworkStatePermission  = "android.permission.ACCESS_NETWORK_STATE"
 	testRunner                   = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
 	fieldTest                    = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
 	remoteDataDir                = "/var/lib/kurd-node"
@@ -679,6 +680,13 @@ func prepareAndroidPackages(ctx context.Context, runner commandRunner, value con
 			return errors.New("APK installation failed")
 		}
 	}
+	permissionDump, err := runBytes(ctx, runner, nil, root, 30*time.Second, value.adbPath,
+		"-s", serial, "shell", "dumpsys", "package", testPackage)
+	permissionAvailable := err == nil && packageRequestsPermission(permissionDump, probeNetworkStatePermission)
+	clear(permissionDump)
+	if !permissionAvailable {
+		return errors.New("Android boundary probe permission unavailable")
+	}
 	for _, packageName := range []string{appPackage, testPackage} {
 		output, err := runBytes(ctx, runner, nil, root, androidPackageCompileTimeout, value.adbPath,
 			"-s", serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", packageName)
@@ -693,6 +701,30 @@ func prepareAndroidPackages(ctx context.Context, runner commandRunner, value con
 		return errors.New("Android VPN permission preparation failed")
 	}
 	return nil
+}
+
+func packageRequestsPermission(raw []byte, permission string) bool {
+	if strings.TrimSpace(permission) == "" || strings.ContainsAny(permission, "\r\n\x00") {
+		return false
+	}
+	inRequestedPermissions := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "requested permissions:" {
+			inRequestedPermissions = true
+			continue
+		}
+		if !inRequestedPermissions {
+			continue
+		}
+		if strings.HasSuffix(trimmed, ":") {
+			return false
+		}
+		if trimmed == permission {
+			return true
+		}
+	}
+	return false
 }
 
 func readCleanSourceIdentity(ctx context.Context, runner commandRunner, root string) (string, string, error) {
