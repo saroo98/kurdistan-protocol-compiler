@@ -72,6 +72,13 @@ func TestValidateCandidateProvenanceBindsEveryCarriedByte(t *testing.T) {
 	if err := validateCandidateProvenance(root, "candidate/a", "verified", "comparison.json", provenance); err != nil {
 		t.Fatalf("valid provenance rejected: %v", err)
 	}
+	writeCandidateFile(t, root, "verified/receipts/undeclared.json", "undeclared")
+	if err := validateCandidateProvenance(root, "candidate/a", "verified", "comparison.json", provenance); err == nil {
+		t.Fatal("undeclared carried receipt passed")
+	}
+	if err := os.Remove(filepath.Join(root, "verified", "receipts", "undeclared.json")); err != nil {
+		t.Fatal(err)
+	}
 	allInventories := provenance.Assurance.Inventories
 	provenance.Assurance.Inventories = provenance.Assurance.Inventories[:2]
 	if err := validateCandidateProvenance(root, "candidate/a", "verified", "comparison.json", provenance); err == nil {

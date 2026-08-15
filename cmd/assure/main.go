@@ -156,6 +156,7 @@ func runCertificateValidate(args []string, stdout, stderr io.Writer) error {
 	policyPath := flags.String("policy", "config/ci/proof-policy.json", "proof policy path under root")
 	certificatePath := flags.String("certificate", "", "certificate path under root")
 	receiptsRoot := flags.String("receipts-root", ".", "receipt directory under root")
+	inventoriesRoot := flags.String("inventories-root", "", "optional certified device inventory directory under root")
 	nowText := flags.String("now", "", "validation time in canonical UTC RFC3339")
 	expectedRepository := flags.String("expected-repository", "", "optional exact repository owner/name")
 	expectedCommit := flags.String("expected-commit", "", "optional exact subject commit")
@@ -226,6 +227,11 @@ func runCertificateValidate(args []string, stdout, stderr io.Writer) error {
 	policyDigest := fmt.Sprintf("%x", sha256.Sum256(policyRaw))
 	if err := assurance.ValidateCertificate(certificate, documents, policy, policyDigest, []string(required), now); err != nil {
 		return err
+	}
+	if *inventoriesRoot != "" {
+		if err := validateCertificateDeviceInventories(*root, *receiptsRoot, *inventoriesRoot, certificate); err != nil {
+			return fmt.Errorf("validate certified device inventories: %w", err)
+		}
 	}
 	_, err = fmt.Fprintf(stdout, "valid certificate %s\n", certificate.CertificateID)
 	return err

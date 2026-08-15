@@ -58,6 +58,21 @@ func verifyRoot(root string) error {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
+	hasAssurance := containsName(names, "assurance.yml")
+	hasCandidate := containsName(names, "candidate.yml")
+	if hasAssurance || hasCandidate {
+		if !hasAssurance || !hasCandidate {
+			return errors.New("assurance and candidate workflows must be present together")
+		}
+		assuranceRoot, assuranceErr := decodeYAMLFile(filepath.Join(directory, "assurance.yml"))
+		candidateRoot, candidateErr := decodeYAMLFile(filepath.Join(directory, "candidate.yml"))
+		if assuranceErr != nil || candidateErr != nil {
+			return errors.New("assurance and candidate workflows are required for portable evidence verification")
+		}
+		if err := verifyPortableAssuranceBundleHandoff(assuranceRoot, candidateRoot); err != nil {
+			return err
+		}
+	}
 	if workflowReferencesEmulatorProof(directory, names) {
 		if err := verifyEmulatorProofScript(filepath.Join(root, "tools", "scripts", "run-android-emulator-proof.ps1")); err != nil {
 			return err
@@ -82,6 +97,15 @@ func verifyRoot(root string) error {
 		return err
 	}
 	return nil
+}
+
+func containsName(names []string, wanted string) bool {
+	for _, name := range names {
+		if name == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func workflowReferencesEmulatorProof(directory string, names []string) bool {
@@ -219,6 +243,73 @@ func verifyAssuranceQualificationTopology(root *yaml.Node) error {
 	return nil
 }
 
+func verifyPortableAssuranceBundleHandoff(assuranceRoot, candidateRoot *yaml.Node) error {
+	assuranceJobs := mappingValue(assuranceRoot, "jobs")
+	certificateJob := mappingValue(assuranceJobs, "certificate")
+	if certificateJob == nil || certificateJob.Kind != yaml.MappingNode {
+		return errors.New("assurance workflow is missing its certificate job")
+	}
+	identityDownload := namedStep(certificateJob, "Download exact-run device identity artifacts")
+	if identityDownload == nil || !stepWithScalarEquals(identityDownload, "pattern", "device-log-android-device-api*-${{ github.run_id }}-*") || !stepWithScalarEquals(identityDownload, "path", ".tools/device-identity-attempts") || !stepWithScalarEquals(identityDownload, "merge-multiple", "false") {
+		return errors.New("assurance certificate must download exact-run device identities without flattening")
+	}
+	issue := namedStep(certificateJob, "Issue and validate portable assurance bundle")
+	for _, token := range []string{"-receipt-root", ".tools/assurance-bundle", "-receipts-root", "-inventories-root", ".tools/assurance-bundle/inventories"} {
+		if issue == nil || !nodeContainsSubstring(issue, token) {
+			return fmt.Errorf("assurance certificate is missing portable bundle contract %q", token)
+		}
+	}
+	upload := namedStep(certificateJob, "Upload portable assurance bundle")
+	if upload == nil || !stepWithScalarEquals(upload, "name", "shadow-certificate-${{ github.run_id }}-${{ github.run_attempt }}") || !stepWithScalarEquals(upload, "path", ".tools/assurance-bundle/") {
+		return errors.New("assurance certificate must upload one complete portable bundle artifact")
+	}
+
+	candidateJobs := mappingValue(candidateRoot, "jobs")
+	verifyJob := mappingValue(candidateJobs, "verify-assurance")
+	if verifyJob == nil || verifyJob.Kind != yaml.MappingNode {
+		return errors.New("candidate workflow is missing exact-subject assurance verification")
+	}
+	download := namedStep(verifyJob, "Download portable assurance bundle")
+	if download == nil || !stepWithScalarEquals(download, "name", "shadow-certificate-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}") || !stepWithScalarEquals(download, "path", ".tools/verified-assurance") {
+		return errors.New("candidate verification must download the exact portable assurance artifact")
+	}
+	if with := mappingValue(download, "with"); mappingValue(with, "pattern") != nil || mappingValue(with, "merge-multiple") != nil {
+		return errors.New("candidate verification must not reconstruct a flattened assurance bundle")
+	}
+	validate := namedStep(verifyJob, "Validate portable bundle against requested commit and tree")
+	for _, token := range []string{".tools/verified-assurance/assurance-certificate.json", "-receipts-root .tools/verified-assurance", "-inventories-root .tools/verified-assurance/inventories"} {
+		if validate == nil || !nodeContainsSubstring(validate, token) {
+			return fmt.Errorf("candidate verification is missing portable bundle validation %q", token)
+		}
+	}
+	for _, prohibited := range []string{".tools/collected", ".tools/assurance-input"} {
+		if nodeContainsSubstring(verifyJob, prohibited) {
+			return fmt.Errorf("candidate verification reconstructs issuer-local state %q", prohibited)
+		}
+	}
+	return nil
+}
+
+func namedStep(job *yaml.Node, name string) *yaml.Node {
+	steps := mappingValue(job, "steps")
+	if steps == nil || steps.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, step := range steps.Content {
+		stepName := mappingValue(step, "name")
+		if stepName != nil && stepName.Kind == yaml.ScalarNode && stepName.Value == name {
+			return step
+		}
+	}
+	return nil
+}
+
+func stepWithScalarEquals(step *yaml.Node, key, wanted string) bool {
+	with := mappingValue(step, "with")
+	value := mappingValue(with, key)
+	return value != nil && value.Kind == yaml.ScalarNode && value.Value == wanted
+}
+
 func exactScalarSet(node *yaml.Node, expected []string) bool {
 	if node == nil || node.Kind != yaml.SequenceNode || len(node.Content) != len(expected) {
 		return false
@@ -303,9 +394,13 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"-artifact .tools/phase17/emulator-api${{ matrix.api }}-identity.json",
 			"pattern: shadow-*-${{ github.run_id }}-*",
 			"path: .tools/collected-attempts",
-			"Select newest receipt for each proof identity",
+			"pattern: device-log-android-device-api*-${{ github.run_id }}-*",
+			"path: .tools/device-identity-attempts",
+			"Select newest receipts and bind device identities",
 			"$safeName = ($identity -replace '[^A-Za-z0-9._-]', '_') + '-receipt.json'",
-			"Get-ChildItem -LiteralPath .tools/collected -Filter '*-receipt.json' -File -Recurse",
+			"Get-ChildItem -LiteralPath .tools/assurance-bundle/receipts -Filter '*-receipt.json' -File",
+			"-receipt-root', '.tools/assurance-bundle'",
+			"-inventories-root .tools/assurance-bundle/inventories",
 			"name: device-log-${{ matrix.proof }}-${{ github.run_id }}-${{ github.run_attempt }}",
 			"include-hidden-files: true",
 			"-ref refs/subjects/${{ inputs.sha || github.sha }}",
@@ -322,13 +417,14 @@ func verifyKnownWorkflowContract(name, content string) error {
 			"refs/heads/main:refs/remotes/origin/main",
 			"actions/runs/${{ inputs.assurance_run_id }}/attempts/${{ inputs.assurance_run_attempt }}",
 			".github/workflows/assurance.yml",
-			"pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}",
+			"name: shadow-certificate-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}",
+			"path: .tools/verified-assurance",
 			"expected 16 receipts",
 			"-required go-executable-evidence",
 			"-required linux-netns",
-			"expected one API $api emulator identity",
 			"expected three emulator identity inventories",
-			"Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)",
+			"-receipts-root .tools/verified-assurance",
+			"-inventories-root .tools/verified-assurance/inventories",
 			"-expected-run-id '${{ inputs.assurance_run_id }}'",
 			"-expected-run-attempt '${{ inputs.assurance_run_attempt }}'",
 			"-expected-workflow-path .github/workflows/assurance.yml",

@@ -115,12 +115,12 @@
     {
       "path": ".github/workflows/assurance.yml",
       "pre_sha256": "3de491ac11b03002a2e4d9c3d7d48be78138408ac28b13d21fc11273aa36cb68",
-      "post_sha256": "feab53f4c8f10279f211cf411d5fb546850118cc526ae8d6c1a1f8c572876f3e"
+      "post_sha256": "17f55e3e8342e0b42ee116508e0cbd0265e1dbe23923c33a1b1947c5c43594e7"
     },
     {
       "path": ".github/workflows/candidate.yml",
       "pre_sha256": "1af68be52273bda0278252a91f9caca03e60cc1508f812cb3191fb42687e7404",
-      "post_sha256": "e757753fe06dd10d30f6fc6fd7acdced3492e1efab1e6325d5ad261a358f51c8"
+      "post_sha256": "c761598bd2df2788e285d1c715f8be03f8edb09ed850021c6ddd9842a8fe33cd"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -450,12 +450,22 @@
     {
       "path": "cmd/assure/candidate.go",
       "pre_sha256": "11af5b5916c42074c3b5d7c2780cda1d36fd5658e99df487ea5de9e7f8f2d110",
-      "post_sha256": "d397f6b1678d2b4a27a91a724abd5b575cdfb786ce83397473010cf79493ab1e"
+      "post_sha256": "2daa37950d0f383e87e1e068a065fda7860059271a86a1b4c2feb615899b98dc"
     },
     {
       "path": "cmd/assure/candidate_test.go",
       "pre_sha256": "019ace76e3fc77f19754241fe12decf0a339005a3bb5c439203125909e9fa31e",
-      "post_sha256": "9b45921630aa459bbbf1585a76c84299d7b053fae75a5694cdce31b7afbe1838"
+      "post_sha256": "e4b18130d556d431f5fcec9ff78855a044c3fce66b641a0e7126d1a8f0e6a29b"
+    },
+    {
+      "path": "cmd/assure/certificate_inventory.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "eaf0581cebb610507d7857e766e3f8580113f9370d309a32e797fad1d9a9e7fa"
+    },
+    {
+      "path": "cmd/assure/certificate_issue.go",
+      "pre_sha256": "5bcb50d308cba6576b50932181a2fb26e81bf199631ac455cd6e5fac29d12299",
+      "post_sha256": "a732705358ee22b18e0ed9d0ae53216609f0c165f0c1f467bde44709e03ae13f"
     },
     {
       "path": "cmd/assure/issue.go",
@@ -468,9 +478,14 @@
       "post_sha256": "b65acf3ed1ef16197ef572d358a6c6f6b8047f4874291554fd09716edfe885a1"
     },
     {
+      "path": "cmd/assure/main.go",
+      "pre_sha256": "573bea557c46aee80b6ad4672af916215ee0544a01321b040bd60219131f3239",
+      "post_sha256": "531658c8576047d61c3a5e79c49637e3cd93d5d1233f4c00ef335b71320ce4af"
+    },
+    {
       "path": "cmd/assure/main_test.go",
       "pre_sha256": "791933e26f51eb1b485d8fb73e901b76f4dbc17991ff14e60f779680a78eb6f1",
-      "post_sha256": "ac58ed21aac2e6669fc373a118b9a8ccd051c5937171ce62a036c6de7e5d8fae"
+      "post_sha256": "19696577a62361325dfb758b36e6e93479252662bf30f18856ea8fe3fff93998"
     },
     {
       "path": "cmd/gate/main.go",
@@ -2015,12 +2030,12 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_sha256": "e1c87306ff625d578aa2091fb6125e6c458554f20d5e19d2fee5ae50896a07b1",
-      "post_sha256": "65656613c64ca6cf1671e288577449cea4e8de250c04d2e170c22eba548db745"
+      "post_sha256": "7b46efc224efc4b3eb118e2da0547bee79f27e2ebf731f3d6ef9457783183c46"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
       "pre_sha256": "76b791a60eab9578b7e2a582cf5d2a6b4bb47d447ebda2025aa7c5a5f61534f8",
-      "post_sha256": "97a382a73216fd7d1f8e4dd6fb90007de5a44b9dadc00959f1faf9616a285cb8"
+      "post_sha256": "d2b24c00b9a67227fe2518027a291b696c841847fa0ac897301821b046f5c898"
     },
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"kurdistan/internal/assurance"
 )
@@ -91,11 +92,13 @@ func runCandidateValidate(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	certificatePath := filepath.ToSlash(filepath.Join(*assuranceRoot, provenance.Assurance.CertificatePath))
-	receiptsRoot := filepath.ToSlash(filepath.Join(*assuranceRoot, "receipts"))
+	receiptsRoot := filepath.ToSlash(filepath.Clean(*assuranceRoot))
+	inventoriesRoot := filepath.ToSlash(filepath.Join(*assuranceRoot, "inventories"))
 	certificateArgs := []string{
 		"-root", *root,
 		"-certificate", certificatePath,
 		"-receipts-root", receiptsRoot,
+		"-inventories-root", inventoriesRoot,
 		"-expected-repository", *expectedRepository,
 		"-expected-commit", *expectedCommit,
 		"-expected-tree", *expectedTree,
@@ -143,7 +146,15 @@ func validateCandidateProvenance(root, candidateRoot, assuranceRoot, comparisonP
 	if err != nil || certificateSize < 1 || certificateDigest != provenance.Assurance.CertificateSHA256 {
 		return errors.New("candidate assurance certificate digest mismatch")
 	}
-	if err := validateDeclaredArtifacts(root, assuranceRoot, provenance.Assurance.Receipts, false); err != nil {
+	receipts := make([]candidateArtifact, len(provenance.Assurance.Receipts))
+	for index, receipt := range provenance.Assurance.Receipts {
+		if !strings.HasPrefix(receipt.Path, "receipts/") {
+			return fmt.Errorf("candidate assurance receipt %q is outside the portable receipt directory", receipt.Path)
+		}
+		receipt.Path = strings.TrimPrefix(receipt.Path, "receipts/")
+		receipts[index] = receipt
+	}
+	if err := validateDeclaredArtifacts(root, filepath.ToSlash(filepath.Join(assuranceRoot, "receipts")), receipts, true); err != nil {
 		return fmt.Errorf("candidate assurance receipts: %w", err)
 	}
 	if err := validateDeclaredArtifacts(root, filepath.ToSlash(filepath.Join(assuranceRoot, "inventories")), provenance.Assurance.Inventories, true); err != nil {

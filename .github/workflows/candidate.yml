@@ -84,32 +84,28 @@ jobs:
             status = $run.status
             conclusion = $run.conclusion
           } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath .tools/assurance-run.json -Encoding utf8NoBOM
-      - name: Download assurance run evidence
+      - name: Download portable assurance bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
           run-id: ${{ inputs.assurance_run_id }}
           github-token: ${{ github.token }}
-          pattern: shadow-*-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}
-          path: .tools/assurance-input
-          merge-multiple: true
-      - name: Validate certificate against requested commit and tree
+          name: shadow-certificate-${{ inputs.assurance_run_id }}-${{ inputs.assurance_run_attempt }}
+          path: .tools/verified-assurance
+      - name: Validate portable bundle against requested commit and tree
         shell: pwsh
         run: |
           $run = Get-Content -LiteralPath .tools/assurance-run.json -Raw | ConvertFrom-Json
-          $certificate = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*certificate*.json' -File -Recurse
-          if ($certificate.Count -ne 1) { throw "expected one certificate, found $($certificate.Count)" }
-          $receipts = Get-ChildItem -LiteralPath .tools/assurance-input -Filter '*-receipt.json' -File -Recurse
+          $certificate = Get-Item -LiteralPath .tools/verified-assurance/assurance-certificate.json
+          $receipts = @(Get-ChildItem -LiteralPath .tools/verified-assurance/receipts -Filter '*-receipt.json' -File)
           if ($receipts.Count -ne 16) { throw "expected 16 receipts, found $($receipts.Count)" }
-          New-Item -ItemType Directory -Force .tools/collected | Out-Null
-          foreach ($receipt in $receipts) {
-            Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/collected $receipt.Name)
-          }
+          $inventories = @(Get-ChildItem -LiteralPath .tools/verified-assurance/inventories -Filter 'emulator-api*-identity.json' -File)
+          if ($inventories.Count -ne 3) { throw "expected three emulator identity inventories, found $($inventories.Count)" }
           $tree = (git rev-parse '${{ inputs.sha }}^{tree}').Trim()
-          $certificatePath = [System.IO.Path]::GetRelativePath((Get-Location).Path, $certificate.FullName).Replace('\', '/')
           go run ./cmd/assure certificate validate `
             -root . `
-            -certificate $certificatePath `
-            -receipts-root . `
+            -certificate .tools/verified-assurance/assurance-certificate.json `
+            -receipts-root .tools/verified-assurance `
+            -inventories-root .tools/verified-assurance/inventories `
             -expected-repository '${{ github.repository }}' `
             -expected-commit '${{ inputs.sha }}' `
             -expected-tree $tree `
@@ -130,15 +126,6 @@ jobs:
             -required linux-netns `
             -required operator
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          New-Item -ItemType Directory -Force .tools/verified-assurance/receipts | Out-Null
-          New-Item -ItemType Directory -Force .tools/verified-assurance/inventories | Out-Null
-          Copy-Item -LiteralPath $certificate.FullName -Destination .tools/verified-assurance/assurance-certificate.json
-          foreach ($receipt in $receipts) { Copy-Item -LiteralPath $receipt.FullName -Destination (Join-Path .tools/verified-assurance/receipts $receipt.Name) }
-          foreach ($api in 26, 34, 36) {
-            $identity = Get-ChildItem -LiteralPath .tools/assurance-input -Filter "emulator-api$api-identity.json" -File -Recurse
-            if ($identity.Count -ne 1) { throw "expected one API $api emulator identity, found $($identity.Count)" }
-            Copy-Item -LiteralPath $identity.FullName -Destination (Join-Path .tools/verified-assurance/inventories $identity.Name)
-          }
           Copy-Item -LiteralPath .tools/assurance-run.json -Destination .tools/verified-assurance/assurance-run.json
       - name: Upload authenticated assurance bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
