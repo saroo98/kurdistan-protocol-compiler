@@ -124,6 +124,13 @@ internal object Phase17FieldHarness {
         probeUid: Int,
     ): Boolean = targetPackage != probePackage && targetUid != probeUid
 
+    internal fun isExpectedProbeResultIdentity(
+        expectedPackage: String,
+        expectedUid: Int,
+        observedPackage: String?,
+        observedUid: Int,
+    ): Boolean = expectedPackage == observedPackage && expectedUid == observedUid
+
     internal fun requiresUnrelatedUidBoundary(
         shouldVerifyDataPlane: Boolean,
         dnsFamily: Int?,
@@ -732,13 +739,14 @@ internal object Phase17FieldHarness {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val probeContext = instrumentation.context
         val probePackage = probeContext.packageName
+        val probeUid = probeContext.applicationInfo.uid
         if (
             !probePackage.endsWith(".test") ||
             !isIndependentProbeIdentity(
                 targetPackage = context.packageName,
                 targetUid = context.applicationInfo.uid,
                 probePackage = probePackage,
-                probeUid = probeContext.applicationInfo.uid,
+                probeUid = probeUid,
             )
         ) {
             return UnrelatedUidBoundaryObservation(false, false, true)
@@ -762,10 +770,10 @@ internal object Phase17FieldHarness {
                     coverageGap = true
                     continue
                 }
-                val observed = awaitUnrelatedUidBoundaryOnNetwork(
+                val observed = awaitUnrelatedUidBoundaryForTarget(
                     context = context,
                     probePackage = probePackage,
-                    underlyingNetwork = network,
+                    probeUid = probeUid,
                     target = target,
                 )
                 try {
@@ -788,10 +796,10 @@ internal object Phase17FieldHarness {
         return UnrelatedUidBoundaryObservation(tunneledTraffic, bypassBlocked, coverageGap)
     }
 
-    private suspend fun awaitUnrelatedUidBoundaryOnNetwork(
+    private suspend fun awaitUnrelatedUidBoundaryForTarget(
         context: Context,
         probePackage: String,
-        underlyingNetwork: Network,
+        probeUid: Int,
         target: UnderlayProbeTarget,
     ): UnrelatedUidBoundaryObservation {
         val tokenBytes = ByteArray(16).also(SecureRandom()::nextBytes)
@@ -805,7 +813,15 @@ internal object Phase17FieldHarness {
                     intent.getStringExtra(VpnProbeActivity.EXTRA_TOKEN) != token ||
                     !intent.hasExtra(VpnProbeActivity.EXTRA_SUCCESS) ||
                     !intent.hasExtra(VpnProbeActivity.EXTRA_BYPASS_BLOCKED) ||
-                    !intent.hasExtra(VpnProbeActivity.EXTRA_COVERAGE_GAP)
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_COVERAGE_GAP) ||
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_PROBE_PACKAGE) ||
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_PROBE_UID) ||
+                    !isExpectedProbeResultIdentity(
+                        expectedPackage = probePackage,
+                        expectedUid = probeUid,
+                        observedPackage = intent.getStringExtra(VpnProbeActivity.EXTRA_PROBE_PACKAGE),
+                        observedUid = intent.getIntExtra(VpnProbeActivity.EXTRA_PROBE_UID, -1),
+                    )
                 ) {
                     return
                 }
@@ -834,10 +850,9 @@ internal object Phase17FieldHarness {
             context.startActivity(
                 Intent()
                     .setComponent(ComponentName(probePackage, VpnProbeActivity::class.java.name))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .putExtra(VpnProbeActivity.EXTRA_TOKEN, token)
                     .putExtra(VpnProbeActivity.EXTRA_TARGET_PACKAGE, context.packageName)
-                    .putExtra(VpnProbeActivity.EXTRA_UNDERLYING_NETWORK, underlyingNetwork)
                     .putExtra(VpnProbeActivity.EXTRA_UNDERLAY_TARGET_ADDRESS, target.address)
                     .putExtra(VpnProbeActivity.EXTRA_UNDERLAY_TARGET_PORT, target.port),
             )

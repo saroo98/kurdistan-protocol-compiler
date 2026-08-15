@@ -5,9 +5,11 @@ package org.kurdistanvpn.app;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.ConnectivityManager;
 import android.net.Network;
-import android.os.Build;
+import android.net.NetworkCapabilities;
 import android.os.Bundle;
+import android.os.Process;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -22,14 +24,16 @@ public final class VpnProbeActivity extends Activity {
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_SUCCESS = "success";
     public static final String EXTRA_TARGET_PACKAGE = "target-package";
-    public static final String EXTRA_UNDERLYING_NETWORK = "underlying-network";
     public static final String EXTRA_UNDERLAY_TARGET_ADDRESS = "underlay-target-address";
     public static final String EXTRA_UNDERLAY_TARGET_PORT = "underlay-target-port";
     public static final String EXTRA_BYPASS_BLOCKED = "bypass-blocked";
     public static final String EXTRA_COVERAGE_GAP = "coverage-gap";
+    public static final String EXTRA_PROBE_PACKAGE = "probe-package";
+    public static final String EXTRA_PROBE_UID = "probe-uid";
     private static final long PROBE_DEADLINE_NANOS = TimeUnit.SECONDS.toNanos(5);
     private static final int ATTEMPT_TIMEOUT_MILLIS = 750;
     private static final int UNDERLAY_ATTEMPT_TIMEOUT_MILLIS = 2_000;
+    private static final int MAX_VISIBLE_UNDERLAY_NETWORKS = 4;
     private static final long RETRY_DELAY_MILLIS = 100;
 
     @Override
@@ -37,10 +41,9 @@ public final class VpnProbeActivity extends Activity {
         super.onCreate(savedInstanceState);
         final String token = getIntent().getStringExtra(EXTRA_TOKEN);
         final String targetPackage = getIntent().getStringExtra(EXTRA_TARGET_PACKAGE);
-        final Network underlyingNetwork = readUnderlyingNetwork(getIntent());
         final InetAddress underlayTargetAddress = readUnderlayTargetAddress(getIntent());
         final int underlayTargetPort = getIntent().getIntExtra(EXTRA_UNDERLAY_TARGET_PORT, 0);
-        if (token == null || targetPackage == null || targetPackage.isBlank()) {
+        if (!isValidToken(token) || !isExpectedTargetPackage(targetPackage)) {
             finish();
             return;
         }
@@ -48,18 +51,23 @@ public final class VpnProbeActivity extends Activity {
             boolean tunneledTraffic = false;
             boolean bypassBlocked = false;
             boolean coverageGap = false;
-            if (underlyingNetwork != null && underlayTargetAddress != null &&
-                underlayTargetPort > 0 && underlayTargetPort <= 65535) {
+            if (underlayTargetAddress != null && underlayTargetPort > 0 &&
+                underlayTargetPort <= 65535) {
                 try {
-                    bypassBlocked = underlayConnectionIsBlocked(
-                        underlyingNetwork,
+                    final ConnectivityManager connectivity =
+                        getSystemService(ConnectivityManager.class);
+                    if (connectivity == null) {
+                        throw new IllegalStateException("CONNECTIVITY_SERVICE_UNAVAILABLE");
+                    }
+                    bypassBlocked = underlayConnectionIsBlockedForVisibleNetworks(
+                        connectivity,
                         underlayTargetAddress,
                         underlayTargetPort
                     );
                 } catch (Exception ignored) {
                     coverageGap = true;
                 }
-            } else if (underlyingNetwork != null) {
+            } else {
                 coverageGap = true;
             }
             try {
@@ -67,26 +75,32 @@ public final class VpnProbeActivity extends Activity {
             } catch (Exception ignored) {
                 tunneledTraffic = false;
             }
-            sendBroadcast(
-                new Intent(ACTION_RESULT)
-                    .setPackage(targetPackage)
-                    .putExtra(EXTRA_TOKEN, token)
-                    .putExtra(EXTRA_SUCCESS, tunneledTraffic)
-                    .putExtra(EXTRA_BYPASS_BLOCKED, bypassBlocked)
-                    .putExtra(EXTRA_COVERAGE_GAP, coverageGap)
-            );
-            runOnUiThread(this::finish);
+            final Intent result = new Intent(ACTION_RESULT)
+                .setPackage(targetPackage)
+                .putExtra(EXTRA_TOKEN, token)
+                .putExtra(EXTRA_SUCCESS, tunneledTraffic)
+                .putExtra(EXTRA_BYPASS_BLOCKED, bypassBlocked)
+                .putExtra(EXTRA_COVERAGE_GAP, coverageGap)
+                .putExtra(EXTRA_PROBE_PACKAGE, getPackageName())
+                .putExtra(EXTRA_PROBE_UID, Process.myUid());
+            runOnUiThread(() -> {
+                sendBroadcast(result);
+                finish();
+            });
         }, "vpn-probe");
         probe.setDaemon(true);
         probe.start();
     }
 
-    @SuppressWarnings("deprecation")
-    private static Network readUnderlyingNetwork(Intent intent) {
-        if (Build.VERSION.SDK_INT >= 33) {
-            return intent.getParcelableExtra(EXTRA_UNDERLYING_NETWORK, Network.class);
-        }
-        return intent.getParcelableExtra(EXTRA_UNDERLYING_NETWORK);
+    private static boolean isValidToken(String token) {
+        return token != null && token.matches("[0-9a-f]{32}");
+    }
+
+    private boolean isExpectedTargetPackage(String targetPackage) {
+        final String probePackage = getPackageName();
+        return probePackage.endsWith(".test") &&
+            probePackage.substring(0, probePackage.length() - ".test".length())
+                .equals(targetPackage);
     }
 
     private static InetAddress readUnderlayTargetAddress(Intent intent) {
@@ -103,14 +117,44 @@ public final class VpnProbeActivity extends Activity {
         }
     }
 
+    @SuppressWarnings("deprecation")
+    static boolean underlayConnectionIsBlockedForVisibleNetworks(
+        ConnectivityManager connectivity,
+        InetAddress targetAddress,
+        int targetPort
+    ) throws Exception {
+        final Network[] visibleNetworks = connectivity.getAllNetworks();
+        if (visibleNetworks == null) {
+            throw new IllegalStateException("VISIBLE_NETWORKS_UNAVAILABLE");
+        }
+        int candidateCount = 0;
+        for (Network candidateNetwork : visibleNetworks) {
+            final NetworkCapabilities capabilities =
+                connectivity.getNetworkCapabilities(candidateNetwork);
+            if (capabilities == null ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                continue;
+            }
+            candidateCount++;
+            if (candidateCount > MAX_VISIBLE_UNDERLAY_NETWORKS) {
+                throw new IllegalStateException("VISIBLE_NETWORK_LIMIT_EXCEEDED");
+            }
+            if (!underlayConnectionIsBlocked(candidateNetwork, targetAddress, targetPort)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static boolean underlayConnectionIsBlocked(
-        Network underlyingNetwork,
+        Network candidateNetwork,
         InetAddress targetAddress,
         int targetPort
     ) throws Exception {
         try (Socket socket = new Socket()) {
             try {
-                underlyingNetwork.bindSocket(socket);
+                candidateNetwork.bindSocket(socket);
                 socket.connect(
                     new InetSocketAddress(targetAddress, targetPort),
                     UNDERLAY_ATTEMPT_TIMEOUT_MILLIS
