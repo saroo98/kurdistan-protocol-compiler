@@ -465,7 +465,7 @@
     {
       "path": "cmd/assure/issue_test.go",
       "pre_sha256": "4e0112e03985232e9e30873a44af51290a72676fd44e68f639e8dd46a70b7d1c",
-      "post_sha256": "56837c2994a85149af9091e60b0053c29ff9261a4b4b46baa953defa7c22e4c5"
+      "post_sha256": "b65acf3ed1ef16197ef572d358a6c6f6b8047f4874291554fd09716edfe885a1"
     },
     {
       "path": "cmd/assure/main_test.go",

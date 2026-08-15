@@ -19,11 +19,21 @@ func TestToolIdentityAtLookupPathSupportsWindowsLongPath(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows executable-path regression")
 	}
-	source, err := exec.LookPath("go")
+	goExecutable, err := exec.LookPath("go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(source)
+	fixtureDirectory := t.TempDir()
+	fixtureSource := filepath.Join(fixtureDirectory, "main.go")
+	if err := os.WriteFile(fixtureSource, []byte("package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"fixture version 1\") }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fixtureExecutable := filepath.Join(fixtureDirectory, "fixture-tool.exe")
+	command := exec.Command(goExecutable, "build", "-trimpath", "-o", fixtureExecutable, fixtureSource)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("build fixture executable: %v\n%s", err, output)
+	}
+	raw, err := os.ReadFile(fixtureExecutable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,15 +44,15 @@ func TestToolIdentityAtLookupPathSupportsWindowsLongPath(t *testing.T) {
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(directory, "go.exe")
+	path := filepath.Join(directory, "fixture-tool.exe")
 	if err := os.WriteFile(path, raw, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	identity, err := toolIdentityAtLookupPath("go", path, "version")
+	identity, err := toolIdentityAtLookupPath("fixture-tool", path)
 	if err != nil {
 		t.Fatalf("tool identity through Windows long lookup path: %v", err)
 	}
-	if identity.Name != "go" || identity.SHA256 != digestBytes(raw) || !strings.HasPrefix(identity.Version, "go version ") {
+	if identity.Name != "fixture-tool" || identity.SHA256 != digestBytes(raw) || identity.Version != "fixture version 1" {
 		t.Fatalf("unexpected tool identity: %+v", identity)
 	}
 }
