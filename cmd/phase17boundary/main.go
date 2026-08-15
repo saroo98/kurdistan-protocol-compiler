@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	boundaryAppPackage  = "org.kurdistanvpn.app"
-	boundaryTestRunner  = "androidx.test.runner.AndroidJUnitRunner"
+	boundaryAppPackage  = "org.kurdistanvpn.app.internal"
+	boundaryTestRunner  = "org.kurdistanvpn.app.internal.test/androidx.test.runner.AndroidJUnitRunner"
 	boundaryTestClass   = "org.kurdistanvpn.app.Phase17FieldActionDeviceTest#runRequestedFieldAction"
 	boundaryDirectory   = "files/phase17-field"
 	boundaryResultFile  = boundaryDirectory + "/result.txt"
@@ -135,6 +135,7 @@ func observeAndroid(ctx context.Context, runner observerRunner, request phase17b
 	raw, err = runner.Run(ctx, nil, request.ADBPath,
 		"-s", request.DeviceSerial, "shell", "am", "instrument", "-w", "-r",
 		"-e", "phase17FieldAction", "boundary",
+		"-e", "phase17ProbeUrl", request.ProbeURL,
 		"-e", "phase17VerifyIPv6", verifyIPv6,
 		"-e", "phase17AttemptId", request.AttemptID,
 		"-e", "class", boundaryTestClass, boundaryTestRunner)

@@ -75,6 +75,91 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun unrelatedUidBoundaryRequiresTunneledTrafficAndBlockedUnderlay() {
+        assertTrue(
+            Phase17FieldHarness.isIndependentProbeIdentity(
+                targetPackage = "org.kurdistanvpn.app.internal",
+                targetUid = 10_001,
+                probePackage = "org.kurdistanvpn.app.internal.test",
+                probeUid = 10_002,
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isIndependentProbeIdentity(
+                targetPackage = "org.kurdistanvpn.app.internal",
+                targetUid = 10_001,
+                probePackage = "org.kurdistanvpn.app.internal.test",
+                probeUid = 10_001,
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isIndependentProbeIdentity(
+                targetPackage = "org.kurdistanvpn.app.internal",
+                targetUid = 10_001,
+                probePackage = "org.kurdistanvpn.app.internal",
+                probeUid = 10_002,
+            ),
+        )
+        val passing = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
+            tunneledTraffic = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+        assertTrue(Phase17FieldHarness.evaluateUnrelatedUidBoundary(passing))
+        assertFalse(
+            Phase17FieldHarness.evaluateUnrelatedUidBoundary(
+                passing.copy(tunneledTraffic = false),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.evaluateUnrelatedUidBoundary(
+                passing.copy(bypassBlocked = false),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.evaluateUnrelatedUidBoundary(
+                passing.copy(coverageGap = true),
+            ),
+        )
+    }
+
+    @Test
+    fun unrelatedUidBoundaryRunsForTrafficAndBoundaryButNotDnsOnlyActions() {
+        assertTrue(
+            Phase17FieldHarness.requiresUnrelatedUidBoundary(
+                shouldVerifyDataPlane = true,
+                dnsFamily = null,
+                trafficDnsFamilies = emptyList(),
+                verifyBoundary = false,
+            ),
+        )
+        assertTrue(
+            Phase17FieldHarness.requiresUnrelatedUidBoundary(
+                shouldVerifyDataPlane = false,
+                dnsFamily = null,
+                trafficDnsFamilies = listOf(4, 6),
+                verifyBoundary = false,
+            ),
+        )
+        assertTrue(
+            Phase17FieldHarness.requiresUnrelatedUidBoundary(
+                shouldVerifyDataPlane = false,
+                dnsFamily = null,
+                trafficDnsFamilies = emptyList(),
+                verifyBoundary = true,
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.requiresUnrelatedUidBoundary(
+                shouldVerifyDataPlane = false,
+                dnsFamily = 4,
+                trafficDnsFamilies = emptyList(),
+                verifyBoundary = false,
+            ),
+        )
+    }
+
+    @Test
     fun dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected() {
         assertTrue(
             Phase17FieldHarness.isExpectedDnsUnavailableFailure(

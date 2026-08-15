@@ -22,6 +22,7 @@ func TestRunBoundaryMonitorBindsExactLockedActiveObserverAndDeletesRequest(t *te
 		adbPath: "adb-private", sshPath: "ssh-private", sshAlias: "owner-private", relayPort: 8443,
 	}
 	qualified := qualifiedRun{boundaryDigest: strings.Repeat("4", 64)}
+	probeURL := []byte("https://probe.invalid/check")
 	commands := []string{}
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		commands = append(commands, name)
@@ -43,12 +44,15 @@ func TestRunBoundaryMonitorBindsExactLockedActiveObserverAndDeletesRequest(t *te
 		}
 		if request.ADBPath != value.adbPath || request.SSHPath != value.sshPath ||
 			request.SSHAlias != value.sshAlias || request.DeviceSerial != "emulator-private" ||
-			!request.VerifyIPv6 || request.RelayPort != uint16(value.relayPort) {
+			request.ProbeURL != string(probeURL) || !request.VerifyIPv6 ||
+			request.RelayPort != uint16(value.relayPort) {
 			t.Fatalf("request=%+v", request)
 		}
 		return json.Marshal(passingBoundaryReceipt(request))
 	}}
-	receipt, err := runBoundaryMonitor(context.Background(), runner, value, qualified, root, "emulator-private", true)
+	receipt, err := runBoundaryMonitor(
+		context.Background(), runner, value, qualified, root, "emulator-private", probeURL, true,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +92,8 @@ func TestRunBoundaryMonitorFailsClosedOnLeakChildFailureAndReceiptMismatch(t *te
 			_, err := runBoundaryMonitor(
 				context.Background(), commandRunner{runFunc: run},
 				config{evidenceRoot: root, mode: "Functional", boundaryPath: "boundary-monitor", adbPath: "adb", sshPath: "ssh", sshAlias: "owner", relayPort: 8443},
-				qualifiedRun{boundaryDigest: strings.Repeat("4", 64)}, root, "emulator-5554", true,
+				qualifiedRun{boundaryDigest: strings.Repeat("4", 64)}, root, "emulator-5554",
+				[]byte("https://probe.invalid/check"), true,
 			)
 			if err == nil {
 				t.Fatal("boundary failure accepted")

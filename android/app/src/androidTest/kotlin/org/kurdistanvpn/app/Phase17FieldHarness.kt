@@ -3,11 +3,16 @@
 
 package org.kurdistanvpn.app
 
-import androidx.test.platform.app.InstrumentationRegistry
+import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import androidx.core.content.ContextCompat
+import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -17,12 +22,15 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.Inet4Address
 import java.net.Inet6Address
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -70,6 +78,8 @@ internal object Phase17FieldHarness {
     private const val LIVE_RECONNECT_READY_TIMEOUT_MILLIS = 120_000L
     private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
     private const val VPN_NETWORK_POLL_MILLIS = 50L
+    private const val UNRELATED_UID_BOUNDARY_TIMEOUT_MILLIS = 20_000L
+    private const val UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS = 2_000
     private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
 
     internal data class BoundarySnapshot(
@@ -79,6 +89,17 @@ internal object Phase17FieldHarness {
         val dnsPinned: Boolean,
         val bypassBlocked: Boolean,
         val coverageGap: Boolean,
+    )
+
+    internal data class UnrelatedUidBoundaryObservation(
+        val tunneledTraffic: Boolean,
+        val bypassBlocked: Boolean,
+        val coverageGap: Boolean,
+    )
+
+    private data class UnderlayProbeTarget(
+        val address: ByteArray,
+        val port: Int,
     )
 
     internal fun evaluateBoundarySnapshot(
@@ -91,6 +112,32 @@ internal object Phase17FieldHarness {
             value.dnsPinned &&
             value.bypassBlocked &&
             !value.coverageGap
+
+    internal fun evaluateUnrelatedUidBoundary(
+        value: UnrelatedUidBoundaryObservation,
+    ): Boolean = value.tunneledTraffic && value.bypassBlocked && !value.coverageGap
+
+    internal fun isIndependentProbeIdentity(
+        targetPackage: String,
+        targetUid: Int,
+        probePackage: String,
+        probeUid: Int,
+    ): Boolean = targetPackage != probePackage && targetUid != probeUid
+
+    internal fun requiresUnrelatedUidBoundary(
+        shouldVerifyDataPlane: Boolean,
+        dnsFamily: Int?,
+        trafficDnsFamilies: List<Int>,
+        verifyBoundary: Boolean,
+    ): Boolean {
+        if (
+            dnsFamily != null && !shouldVerifyDataPlane &&
+            trafficDnsFamilies.isEmpty() && !verifyBoundary
+        ) {
+            return false
+        }
+        return shouldVerifyDataPlane || trafficDnsFamilies.isNotEmpty() || verifyBoundary
+    }
 
     internal fun isExpectedDnsUnavailableFailure(
         expectAvailable: Boolean,
@@ -515,10 +562,23 @@ internal object Phase17FieldHarness {
                             }
                         },
                         verify = { vpnNetwork ->
+                            val unrelatedUidBoundary = if (
+                                requiresUnrelatedUidBoundary(
+                                    shouldVerifyDataPlane = shouldVerifyDataPlane,
+                                    dnsFamily = dnsFamily,
+                                    trafficDnsFamilies = trafficDnsFamilies,
+                                    verifyBoundary = verifyBoundary,
+                                )
+                            ) {
+                                awaitUnrelatedUidBoundary(application, vpnNetwork)
+                            } else {
+                                null
+                            }
                             val observedBoundary = observeNetworkBoundary(
                                 application,
                                 vpnNetwork,
                                 verifyIpv6 = if (verifyBoundary) boundaryVerifyIPv6 else trafficDnsFamilies.contains(6),
+                                unrelatedUidBoundary = unrelatedUidBoundary,
                             )
                             boundarySnapshot = observedBoundary
                             if (!verifyBoundary) {
@@ -665,11 +725,191 @@ internal object Phase17FieldHarness {
         } ?: error("VPN_NETWORK_NOT_READY")
     }
 
+    private suspend fun awaitUnrelatedUidBoundary(
+        context: Context,
+        vpnNetwork: Network,
+    ): UnrelatedUidBoundaryObservation {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val probeContext = instrumentation.context
+        val probePackage = probeContext.packageName
+        if (
+            !probePackage.endsWith(".test") ||
+            !isIndependentProbeIdentity(
+                targetPackage = context.packageName,
+                targetUid = context.applicationInfo.uid,
+                probePackage = probePackage,
+                probeUid = probeContext.applicationInfo.uid,
+            )
+        ) {
+            return UnrelatedUidBoundaryObservation(false, false, true)
+        }
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        val underlying = unrelatedUidUnderlyingNetworks(connectivity, vpnNetwork)
+        if (underlying.isEmpty()) {
+            return UnrelatedUidBoundaryObservation(false, false, true)
+        }
+        val ownerProbeTargets = resolveOwnerProbeTargets(vpnNetwork)
+        if (ownerProbeTargets.isEmpty()) {
+            return UnrelatedUidBoundaryObservation(false, false, true)
+        }
+        var tunneledTraffic = true
+        var bypassBlocked = true
+        var coverageGap = false
+        try {
+            for (network in underlying) {
+                val target = selectReachableUnderlayProbeTarget(network, ownerProbeTargets)
+                if (target == null) {
+                    coverageGap = true
+                    continue
+                }
+                val observed = awaitUnrelatedUidBoundaryOnNetwork(
+                    context = context,
+                    probePackage = probePackage,
+                    underlyingNetwork = network,
+                    target = target,
+                )
+                try {
+                    tunneledTraffic = tunneledTraffic && observed.tunneledTraffic
+                    bypassBlocked = bypassBlocked && observed.bypassBlocked
+                    coverageGap = coverageGap || observed.coverageGap ||
+                        !withContext(Dispatchers.IO) {
+                            canReachUnderlayTarget(network, target)
+                        }
+                } finally {
+                    target.address.fill(0)
+                }
+            }
+        } finally {
+            ownerProbeTargets.forEach { target -> target.address.fill(0) }
+        }
+        if (unrelatedUidUnderlyingNetworks(connectivity, vpnNetwork).toSet() != underlying.toSet()) {
+            coverageGap = true
+        }
+        return UnrelatedUidBoundaryObservation(tunneledTraffic, bypassBlocked, coverageGap)
+    }
+
+    private suspend fun awaitUnrelatedUidBoundaryOnNetwork(
+        context: Context,
+        probePackage: String,
+        underlyingNetwork: Network,
+        target: UnderlayProbeTarget,
+    ): UnrelatedUidBoundaryObservation {
+        val tokenBytes = ByteArray(16).also(SecureRandom()::nextBytes)
+        val token = tokenBytes.joinToString("") { byte -> "%02x".format(byte) }
+        tokenBytes.fill(0)
+        val deferred = CompletableDeferred<UnrelatedUidBoundaryObservation>()
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                if (
+                    intent?.action != VpnProbeActivity.ACTION_RESULT ||
+                    intent.getStringExtra(VpnProbeActivity.EXTRA_TOKEN) != token ||
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_SUCCESS) ||
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_BYPASS_BLOCKED) ||
+                    !intent.hasExtra(VpnProbeActivity.EXTRA_COVERAGE_GAP)
+                ) {
+                    return
+                }
+                deferred.complete(
+                    UnrelatedUidBoundaryObservation(
+                        tunneledTraffic = intent.getBooleanExtra(VpnProbeActivity.EXTRA_SUCCESS, false),
+                        bypassBlocked = intent.getBooleanExtra(
+                            VpnProbeActivity.EXTRA_BYPASS_BLOCKED,
+                            false,
+                        ),
+                        coverageGap = intent.getBooleanExtra(
+                            VpnProbeActivity.EXTRA_COVERAGE_GAP,
+                            true,
+                        ),
+                    ),
+                )
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(VpnProbeActivity.ACTION_RESULT),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+        return try {
+            context.startActivity(
+                Intent()
+                    .setComponent(ComponentName(probePackage, VpnProbeActivity::class.java.name))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra(VpnProbeActivity.EXTRA_TOKEN, token)
+                    .putExtra(VpnProbeActivity.EXTRA_TARGET_PACKAGE, context.packageName)
+                    .putExtra(VpnProbeActivity.EXTRA_UNDERLYING_NETWORK, underlyingNetwork)
+                    .putExtra(VpnProbeActivity.EXTRA_UNDERLAY_TARGET_ADDRESS, target.address)
+                    .putExtra(VpnProbeActivity.EXTRA_UNDERLAY_TARGET_PORT, target.port),
+            )
+            withTimeoutOrNull(UNRELATED_UID_BOUNDARY_TIMEOUT_MILLIS) {
+                deferred.await()
+            } ?: UnrelatedUidBoundaryObservation(false, false, true)
+        } catch (_: Throwable) {
+            UnrelatedUidBoundaryObservation(false, false, true)
+        } finally {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    private suspend fun resolveOwnerProbeTargets(
+        vpnNetwork: Network,
+    ): List<UnderlayProbeTarget> = withContext(Dispatchers.IO) {
+        val uri = verifiedProbeUri()
+        val port = if (uri.port == -1) 443 else uri.port
+        vpnNetwork.getAllByName(uri.host).mapNotNull { address ->
+            val encoded = address.address
+            if (encoded.size != 4 && encoded.size != 16) {
+                null
+            } else {
+                UnderlayProbeTarget(encoded.copyOf(), port)
+            }
+        }
+    }
+
+    private suspend fun selectReachableUnderlayProbeTarget(
+        network: Network,
+        candidates: List<UnderlayProbeTarget>,
+    ): UnderlayProbeTarget? = withContext(Dispatchers.IO) {
+        for (candidate in candidates) {
+            val target = UnderlayProbeTarget(candidate.address.copyOf(), candidate.port)
+            if (canReachUnderlayTarget(network, target)) {
+                return@withContext target
+            }
+            target.address.fill(0)
+        }
+        null
+    }
+
+    private fun canReachUnderlayTarget(
+        network: Network,
+        target: UnderlayProbeTarget,
+    ): Boolean = runCatching {
+        Socket().use { socket ->
+            network.bindSocket(socket)
+            socket.connect(
+                InetSocketAddress(InetAddress.getByAddress(target.address), target.port),
+                UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS,
+            )
+        }
+    }.isSuccess
+
+    @Suppress("DEPRECATION")
+    private fun unrelatedUidUnderlyingNetworks(
+        connectivity: ConnectivityManager,
+        vpnNetwork: Network,
+    ): List<Network> = connectivity.allNetworks.filter { network ->
+        if (network == vpnNetwork) return@filter false
+        val value = connectivity.getNetworkCapabilities(network) ?: return@filter false
+        !value.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+            value.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     @Suppress("DEPRECATION")
     private fun observeNetworkBoundary(
         context: Context,
         vpnNetwork: Network,
         verifyIpv6: Boolean,
+        unrelatedUidBoundary: UnrelatedUidBoundaryObservation?,
     ): BoundarySnapshot {
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
         val capabilities = connectivity.getNetworkCapabilities(vpnNetwork)
@@ -679,17 +919,7 @@ internal object Phase17FieldHarness {
             if (verifyIpv6) add(InetAddress.getByName("fd4b:7572:6400::1"))
         }
         val routes = properties?.routes.orEmpty()
-        val underlying = connectivity.allNetworks.filter { network ->
-            if (network == vpnNetwork) return@filter false
-            val value = connectivity.getNetworkCapabilities(network) ?: return@filter false
-            !value.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-                value.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        }
-        val bypassBlocked = underlying.isNotEmpty() && underlying.all { network ->
-            DatagramSocket().use { socket ->
-                runCatching { network.bindSocket(socket) }.isFailure
-            }
-        }
+        val underlying = unrelatedUidUnderlyingNetworks(connectivity, vpnNetwork)
         return BoundarySnapshot(
             vpnActive = connectivity.activeNetwork == vpnNetwork &&
                 capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true,
@@ -700,8 +930,11 @@ internal object Phase17FieldHarness {
                 route.destination.prefixLength == 0 && route.destination.address is Inet6Address
             },
             dnsPinned = properties != null && properties.dnsServers.toSet() == expectedDns,
-            bypassBlocked = bypassBlocked,
-            coverageGap = properties == null || underlying.isEmpty(),
+            bypassBlocked = unrelatedUidBoundary?.bypassBlocked ?: true,
+            coverageGap = properties == null || underlying.isEmpty() ||
+                unrelatedUidBoundary?.let { value ->
+                    value.coverageGap || !value.tunneledTraffic
+                } == true,
         )
     }
 
@@ -737,16 +970,24 @@ internal object Phase17FieldHarness {
         }
     }
 
-    private suspend fun verifyDataPlane(vpnNetwork: Network) = withContext(Dispatchers.IO) {
+    private fun verifiedProbeUri(): URI {
         val arguments = InstrumentationRegistry.getArguments()
         val rawUrl = arguments.getString(ARG_PROBE_URL)?.trim().orEmpty()
-        val expectedDigest = arguments.getString(ARG_EXPECTED_RESPONSE_SHA256)?.trim().orEmpty()
-        require(expectedDigest.matches(Regex("^[0-9a-f]{64}$"))) { "PROBE_DIGEST_REJECTED" }
         val uri = runCatching { URI(rawUrl) }.getOrElse { error("PROBE_URL_REJECTED") }
         require(
             rawUrl.length in 1..2048 && uri.scheme == "https" && !uri.host.isNullOrBlank() &&
-                uri.host.any(Char::isLetter) && uri.userInfo == null && uri.fragment == null,
+                uri.host.any(Char::isLetter) && !uri.host.contains(':') &&
+                uri.userInfo == null && uri.fragment == null &&
+                (uri.port == -1 || uri.port in 1..65535),
         ) { "PROBE_URL_REJECTED" }
+        return uri
+    }
+
+    private suspend fun verifyDataPlane(vpnNetwork: Network) = withContext(Dispatchers.IO) {
+        val arguments = InstrumentationRegistry.getArguments()
+        val uri = verifiedProbeUri()
+        val expectedDigest = arguments.getString(ARG_EXPECTED_RESPONSE_SHA256)?.trim().orEmpty()
+        require(expectedDigest.matches(Regex("^[0-9a-f]{64}$"))) { "PROBE_DIGEST_REJECTED" }
         awaitNetworkScopedDnsReadiness(
             timeoutMillis = VPN_DNS_RESOLVER_READY_TIMEOUT_MILLIS,
             pollMillis = VPN_NETWORK_POLL_MILLIS,
