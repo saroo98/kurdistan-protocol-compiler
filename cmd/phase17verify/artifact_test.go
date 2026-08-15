@@ -41,6 +41,15 @@ func TestPhase17ManifestRequiresExactLiveVPNBoundary(t *testing.T) {
 			value.Services[0].Permission = ""
 			return value
 		},
+		"always-on opt-out": func(value androidartifact.Manifest) androidartifact.Manifest {
+			disabled := false
+			value.Services[0].SupportsAlwaysOn = &disabled
+			return value
+		},
+		"missing always-on declaration": func(value androidartifact.Manifest) androidartifact.Manifest {
+			value.Services[0].SupportsAlwaysOn = nil
+			return value
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := verifyPhase17Manifest(mutate(valid)); err == nil {
@@ -99,6 +108,7 @@ func phase17ManifestFixture(t *testing.T, extraPermissions []string, cleartext b
 	permissions := append([]string(nil), phase17RequiredManifestPermissions...)
 	permissions = append(permissions, extraPermissions...)
 	allowBackup := false
+	supportsAlwaysOn := true
 	return androidartifact.Manifest{
 		Permissions:          permissions,
 		UsesCleartextTraffic: &cleartext,
@@ -109,7 +119,43 @@ func phase17ManifestFixture(t *testing.T, extraPermissions []string, cleartext b
 			Exported:              false,
 			Process:               ":vpn",
 			ForegroundServiceType: "specialUse",
+			SupportsAlwaysOn:      &supportsAlwaysOn,
 		}},
+	}
+}
+
+func TestPhase17SourceManifestRejectsAlwaysOnOptOut(t *testing.T) {
+	root := t.TempDir()
+	manifestPath := filepath.Join(root, filepath.FromSlash(phase17RuntimeAndroidManifestPath))
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeManifest := func(value string) {
+		t.Helper()
+		raw := `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <service android:name="org.kurdistanvpn.runtime.android.KurdVpnService"
+      android:permission="android.permission.BIND_VPN_SERVICE"
+      android:exported="false"
+      android:process=":vpn"
+      android:foregroundServiceType="specialUse">
+      <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="` + value + `" />
+    </service>
+  </application>
+</manifest>`
+		if err := os.WriteFile(manifestPath, []byte(raw), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	writeManifest("false")
+	if err := verifyPhase17SourceManifest(root); err == nil {
+		t.Fatal("source manifest opting out of system-managed always-on VPN was accepted")
+	}
+	writeManifest("true")
+	if err := verifyPhase17SourceManifest(root); err != nil {
+		t.Fatalf("source manifest enabling system-managed always-on VPN was rejected: %v", err)
 	}
 }
 

@@ -293,6 +293,9 @@ func verify(root string) error {
 	if err := verifyPublicDocumentation(root, value); err != nil {
 		return err
 	}
+	if err := verifyPhase17SourceManifest(root); err != nil {
+		return err
+	}
 	if err := verifyDeviceTestInventory(root); err != nil {
 		return err
 	}

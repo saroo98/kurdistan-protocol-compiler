@@ -551,8 +551,8 @@ class Phase17LiveDataPlaneDeviceTest {
         assertTrue(
             service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE != 0,
         )
-        assertFalse(
-            service.metaData.getBoolean("android.net.VpnService.SUPPORTS_ALWAYS_ON", true),
+        assertTrue(
+            service.metaData.getBoolean("android.net.VpnService.SUPPORTS_ALWAYS_ON", false),
         )
 
         compose.onNodeWithTag("connection_hero").assertIsDisplayed()

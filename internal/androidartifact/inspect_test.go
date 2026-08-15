@@ -87,7 +87,11 @@ func TestParseManifestReturnsCanonicalSecuritySurface(t *testing.T) {
       android:permission="android.permission.BIND_VPN_SERVICE"
       android:exported="false"
       android:process=":vpn"
-      android:foregroundServiceType="specialUse" />
+      android:foregroundServiceType="specialUse">
+      <meta-data
+        android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+        android:value="true" />
+    </service>
   </application>
 </manifest>`)
 
@@ -114,7 +118,8 @@ func TestParseManifestReturnsCanonicalSecuritySurface(t *testing.T) {
 	service := manifest.Services[0]
 	if service.Name != "org.kurdistanvpn.runtime.android.KurdVpnService" ||
 		service.Permission != "android.permission.BIND_VPN_SERVICE" || service.Exported ||
-		service.Process != ":vpn" || service.ForegroundServiceType != "specialUse" {
+		service.Process != ":vpn" || service.ForegroundServiceType != "specialUse" ||
+		service.SupportsAlwaysOn == nil || !*service.SupportsAlwaysOn {
 		t.Fatalf("unexpected service: %+v", service)
 	}
 }
@@ -123,6 +128,8 @@ func TestParseManifestRejectsDuplicatePermissionsAndInvalidBooleans(t *testing.T
 	for name, raw := range map[string]string{
 		"duplicate permission": `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.INTERNET"/><application/></manifest>`,
 		"invalid cleartext":    `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:usesCleartextTraffic="sometimes"/></manifest>`,
+		"invalid always-on":    `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="Vpn" android:exported="false"><meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="sometimes"/></service></application></manifest>`,
+		"duplicate always-on":  `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="Vpn" android:exported="false"><meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="true"/><meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="true"/></service></application></manifest>`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := ParseManifest([]byte(raw)); err == nil {
