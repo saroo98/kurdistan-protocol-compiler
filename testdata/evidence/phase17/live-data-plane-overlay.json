@@ -810,12 +810,12 @@
     {
       "path": "cmd/phase17verify/qualification.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "f5ad9fe6766f848f38a16591772d5c91222a050dcb40025a82415477ba3811ce"
+      "post_sha256": "b8e7dbf1983f660806201571707c666a02d180ecf787043b1bcdb2a539ec3101"
     },
     {
       "path": "cmd/phase17verify/qualification_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "05906f160e60bc6ae85e72f4d78f0e8fa9e33c5bde07f08552b4ac50c488b94c"
+      "post_sha256": "bb6b8f1c064d3806a6364e17d7ce89c394c18b8f3db7c9e72f9ec4f5fbc38cf1"
     },
     {
       "path": "cmd/phase9devicegate/main.go",
@@ -1895,7 +1895,7 @@
     {
       "path": "scripts/phase17/build-qualification-candidate.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "45156b861ad4c148a11c3f56160baa4cefcc4aa5bb1d2f8fcfbcf8053b2a0260"
+      "post_sha256": "dfd29090acc4ac420fa7a480aea5122a048e5e4003d3dfe189b4cb0ccc67d793"
     },
     {
       "path": "scripts/phase17/netns-e2e.sh",
@@ -1925,7 +1925,7 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "4d9d211c3296b9e3139ec39211c6493518e9202c7e193f2f416a8354bbfb3a30"
+      "post_sha256": "99371bba77f38ea1eeb8a5465a841a0da04fcb393bda74b95627615965bdf9ce"
     },
     {
       "path": "scripts/phase17/privacy_scan_b_test.py",
