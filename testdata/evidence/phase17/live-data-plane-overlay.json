@@ -2035,17 +2035,17 @@
     {
       "path": "tools/cmd/workflowverify/main.go",
       "pre_sha256": "e1c87306ff625d578aa2091fb6125e6c458554f20d5e19d2fee5ae50896a07b1",
-      "post_sha256": "7b46efc224efc4b3eb118e2da0547bee79f27e2ebf731f3d6ef9457783183c46"
+      "post_sha256": "d3a3d924bf4ec9013eeda3eadd70b9b50e3bae791363787a1c6a39a8fad086ed"
     },
     {
       "path": "tools/cmd/workflowverify/main_test.go",
       "pre_sha256": "76b791a60eab9578b7e2a582cf5d2a6b4bb47d447ebda2025aa7c5a5f61534f8",
-      "post_sha256": "d2b24c00b9a67227fe2518027a291b696c841847fa0ac897301821b046f5c898"
+      "post_sha256": "a9d956d93f0d8db841a2752653ca989a5a3c25b8660c0edc1c8574d59f850f55"
     },
     {
       "path": "tools/scripts/run-android-emulator-proof.ps1",
       "pre_sha256": "23755adffdc4d08b164930d93d7f1b2b07bafc5308dc6dcc3ba079349e1da9d6",
-      "post_sha256": "ba4c09a2556f3d30870bdfbaac559177c0ce1e6cbc5f85aaadffd96114ddc118"
+      "post_sha256": "0b86215699e069891dd141f6d65d3ec925e41dfac6ba3a272fbfa3c8fc730889"
     }
   ]
 }

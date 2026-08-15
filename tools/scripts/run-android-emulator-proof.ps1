@@ -79,6 +79,30 @@ function Get-SdkPackageRevision {
     return "$major.$minor.$micro"
 }
 
+function Install-SdkPackageWithBoundedRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Package,
+        [Parameter(Mandatory = $true)][string]$PackageRoot
+    )
+    $maxAttempts = 2
+    $sdkTemp = Join-Path $env:ANDROID_HOME '.temp'
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        & $sdkManager $Package
+        if ($LASTEXITCODE -eq 0) { return }
+        if ($attempt -eq $maxAttempts) {
+            throw "sdkmanager failed for required package after bounded clean retry: $Package"
+        }
+        Write-Warning "sdkmanager failed for required package; deleting only its partial package and SDK temporary state before one retry: $Package"
+        if (Test-Path -LiteralPath $PackageRoot) {
+            Remove-Item -LiteralPath $PackageRoot -Recurse -Force
+        }
+        if (Test-Path -LiteralPath $sdkTemp) {
+            Remove-Item -LiteralPath $sdkTemp -Recurse -Force
+        }
+    }
+    throw "sdkmanager failed for required package after bounded clean retry: $Package"
+}
+
 function Write-CategoricalSummary {
     param(
         [Parameter(Mandatory = $true)][string]$InputPath,
@@ -123,14 +147,18 @@ New-Item -ItemType Directory -Force $avdHome | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $GateReceipt) | Out-Null
 New-Item -ItemType Directory -Force (Split-Path -Parent $Timings) | Out-Null
 $env:ANDROID_AVD_HOME = $avdHome
-& $sdkManager 'platform-tools' 'emulator' $systemImage
-if ($LASTEXITCODE -ne 0) { throw 'sdkmanager failed' }
+$platformToolsRoot = Join-Path $env:ANDROID_HOME 'platform-tools'
+$emulatorRoot = Join-Path $env:ANDROID_HOME 'emulator'
+$systemImageRoot = Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64"
+Install-SdkPackageWithBoundedRetry -Package 'platform-tools' -PackageRoot $platformToolsRoot
+Install-SdkPackageWithBoundedRetry -Package 'emulator' -PackageRoot $emulatorRoot
+Install-SdkPackageWithBoundedRetry -Package $systemImage -PackageRoot $systemImageRoot
 $emulatorDigest = (Get-FileHash -LiteralPath $emulator -Algorithm SHA256).Hash.ToLowerInvariant()
 $adbDigest = (Get-FileHash -LiteralPath $adb -Algorithm SHA256).Hash.ToLowerInvariant()
-$emulatorPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'emulator')
-$platformToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'platform-tools')
+$emulatorPackage = Resolve-SdkPackageMetadata -PackageRoot $emulatorRoot
+$platformToolsPackage = Resolve-SdkPackageMetadata -PackageRoot $platformToolsRoot
 $commandLineToolsPackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME 'cmdline-tools/latest')
-$systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot (Join-Path $env:ANDROID_HOME "system-images/android-$Api/google_apis/x86_64")
+$systemImagePackage = Resolve-SdkPackageMetadata -PackageRoot $systemImageRoot
 $emulatorPackageRevision = Get-SdkPackageRevision -MetadataPath $emulatorPackage
 $emulatorVersionText = (@(& $emulator -version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
 $adbVersionText = (@(& $adb version 2>&1) | ForEach-Object { [string]$_ }) -join "`n"
