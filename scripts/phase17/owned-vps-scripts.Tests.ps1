@@ -143,7 +143,21 @@ foreach ($forbidden in @('[string]$SshAlias', '[string]$AvdName', '[string]$Devi
 }
 
 $builder = Get-Content -Raw (Join-Path $PSScriptRoot 'build-qualification-candidate.ps1')
-foreach ($marker in @('candidate-A', 'candidate-B', 'worktree', "'candidate', 'validate'", "'source', 'create'", "'candidate', 'create'", 'IsReadOnly', "'status', '--porcelain=v1', '--untracked-files=all'")) {
+foreach ($marker in @(
+    'candidate-A',
+    'candidate-B',
+    'worktree',
+    "'candidate', 'validate'",
+    "'source', 'create'",
+    "'candidate', 'create'",
+    'IsReadOnly',
+    "'status', '--porcelain=v1', '--untracked-files=all'",
+    "('p17q-' +",
+    'Remove-QualificationWorktree',
+    "'-c', 'core.longpaths=true'",
+    'throw $primaryFailure',
+    'PHASE17_BUILD_CLEANUP_FAILED'
+)) {
     if (-not $builder.Contains($marker)) {
         throw "qualification candidate builder is missing $marker"
     }

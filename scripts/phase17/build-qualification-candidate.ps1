@@ -40,7 +40,7 @@ $candidateA = Join-Path $candidateRoot 'candidate-A'
 $candidateB = Join-Path $candidateRoot 'candidate-B'
 $comparisonPath = Join-Path $candidateRoot 'candidate-comparison.json'
 $manifestPath = Join-Path $candidateRoot 'candidate-manifest.json'
-$temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ('kurdistan-phase17-build-' + [Guid]::NewGuid().ToString('N'))
+$temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ('p17q-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 $worktreeA = Join-Path $temporaryRoot 'source-a'
 $worktreeB = Join-Path $temporaryRoot 'source-b'
 
@@ -90,6 +90,42 @@ function Assert-ChildPath {
     $childFull = [IO.Path]::GetFullPath($Child)
     if (-not $childFull.StartsWith($parentFull, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'PHASE17_BUILD_PATH_SCOPE_REJECTED'
+    }
+}
+
+function Remove-QualificationWorktree {
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$Worktree
+    )
+    $arguments = @('-c', 'core.longpaths=true', '-C', $RepositoryRoot, 'worktree', 'remove', '--force', $Worktree)
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $null = & git @arguments 2>&1
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+}
+
+function Remove-QualificationTree {
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory = $true)][string]$Parent,
+        [Parameter(Mandatory = $true)][string]$Child
+    )
+    try {
+        Assert-ChildPath -Parent $Parent -Child $Child
+        if (Test-Path -LiteralPath $Child) {
+            Remove-Item -LiteralPath $Child -Recurse -Force -ErrorAction Stop
+        }
+        return -not (Test-Path -LiteralPath $Child)
+    } catch {
+        return $false
     }
 }
 
@@ -332,6 +368,8 @@ if (-not [string]::IsNullOrEmpty($sourceStatus)) {
 $worktreeAAdded = $false
 $worktreeBAdded = $false
 $completed = $false
+$primaryFailure = $null
+$cleanupFailures = [Collections.Generic.List[string]]::new()
 try {
     New-Item -ItemType Directory -Path $temporaryRoot, $candidateA, $candidateB | Out-Null
     Invoke-Checked -FilePath 'git' -Arguments @('-C', $repoRoot, 'worktree', 'add', '--detach', $worktreeA, $Commit) -Failure 'PHASE17_BUILD_WORKTREE_A_FAILED'
@@ -388,19 +426,36 @@ try {
     }
     $completed = $true
     Write-Output ('PHASE17_QUALIFICATION_CANDIDATE_BUILT ' + $candidateId)
+} catch {
+    $primaryFailure = $_.Exception.Message
 } finally {
     if ($worktreeAAdded) {
-        & git -C $repoRoot worktree remove --force $worktreeA 2>$null | Out-Null
+        if (-not (Remove-QualificationWorktree -RepositoryRoot $repoRoot -Worktree $worktreeA)) {
+            $cleanupFailures.Add('WORKTREE_A')
+        }
     }
     if ($worktreeBAdded) {
-        & git -C $repoRoot worktree remove --force $worktreeB 2>$null | Out-Null
+        if (-not (Remove-QualificationWorktree -RepositoryRoot $repoRoot -Worktree $worktreeB)) {
+            $cleanupFailures.Add('WORKTREE_B')
+        }
     }
     if (Test-Path -LiteralPath $temporaryRoot) {
-        Assert-ChildPath -Parent ([IO.Path]::GetTempPath()) -Child $temporaryRoot
-        Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Remove-QualificationTree -Parent ([IO.Path]::GetTempPath()) -Child $temporaryRoot)) {
+            $cleanupFailures.Add('TEMPORARY_ROOT')
+        }
     }
     if ((-not $completed) -and (Test-Path -LiteralPath $candidateRoot)) {
-        Assert-ChildPath -Parent $qualificationRoot -Child $candidateRoot
-        Remove-Item -LiteralPath $candidateRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Remove-QualificationTree -Parent $qualificationRoot -Child $candidateRoot)) {
+            $cleanupFailures.Add('CANDIDATE_ROOT')
+        }
     }
+}
+if ($null -ne $primaryFailure) {
+    if ($cleanupFailures.Count -gt 0) {
+        throw ($primaryFailure + ' / PHASE17_BUILD_CLEANUP_FAILED')
+    }
+    throw $primaryFailure
+}
+if ($cleanupFailures.Count -gt 0) {
+    throw 'PHASE17_BUILD_CLEANUP_FAILED'
 }
