@@ -8,6 +8,7 @@ import (
 	"debug/elf"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -114,6 +115,22 @@ var phase17JNISymbols = []string{
 }
 
 const phase17MaxReleaseAPKBytes = 40 * 1024 * 1024
+const phase17RuntimeAndroidManifestPath = "android/runtime/android/src/main/AndroidManifest.xml"
+
+func verifyPhase17SourceManifest(root string) error {
+	manifest, err := androidartifact.ReadManifest(filepath.Join(root, filepath.FromSlash(phase17RuntimeAndroidManifestPath)))
+	if err != nil {
+		return fmt.Errorf("read runtime Android manifest: %w", err)
+	}
+	vpn, err := phase17VPNService(manifest)
+	if err != nil {
+		return fmt.Errorf("runtime Android manifest: %w", err)
+	}
+	if vpn.SupportsAlwaysOn == nil || !*vpn.SupportsAlwaysOn {
+		return fmt.Errorf("runtime Android manifest must explicitly support system-managed always-on VPN")
+	}
+	return nil
+}
 
 func verifyPhase17Artifacts(releasePath, internalPath, manifestPath string) error {
 	info, err := os.Stat(releasePath)
@@ -171,6 +188,20 @@ func verifyPhase17Manifest(manifest androidartifact.Manifest) error {
 	if strings.Join(permissions, "\n") != strings.Join(want, "\n") {
 		return fmt.Errorf("release permissions = %v, want %v", permissions, want)
 	}
+	vpn, err := phase17VPNService(manifest)
+	if err != nil {
+		return err
+	}
+	if vpn.Exported || vpn.Permission != "android.permission.BIND_VPN_SERVICE" || vpn.Process != ":vpn" || vpn.ForegroundServiceType != "specialUse" {
+		return fmt.Errorf("invalid Kurd VpnService boundary: %+v", vpn)
+	}
+	if vpn.SupportsAlwaysOn == nil || !*vpn.SupportsAlwaysOn {
+		return fmt.Errorf("Kurd VpnService must explicitly support system-managed always-on VPN")
+	}
+	return nil
+}
+
+func phase17VPNService(manifest androidartifact.Manifest) (androidartifact.Service, error) {
 	var vpnServices []androidartifact.Service
 	for _, service := range manifest.Services {
 		if strings.HasSuffix(service.Name, ".KurdVpnService") {
@@ -178,13 +209,9 @@ func verifyPhase17Manifest(manifest androidartifact.Manifest) error {
 		}
 	}
 	if len(vpnServices) != 1 {
-		return fmt.Errorf("Kurd VpnService declarations = %d, want 1", len(vpnServices))
+		return androidartifact.Service{}, fmt.Errorf("Kurd VpnService declarations = %d, want 1", len(vpnServices))
 	}
-	vpn := vpnServices[0]
-	if vpn.Exported || vpn.Permission != "android.permission.BIND_VPN_SERVICE" || vpn.Process != ":vpn" || vpn.ForegroundServiceType != "specialUse" {
-		return fmt.Errorf("invalid Kurd VpnService boundary: %+v", vpn)
-	}
-	return nil
+	return vpnServices[0], nil
 }
 
 func verifyPhase17APKMarkers(artifact androidartifact.APK) error {
