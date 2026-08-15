@@ -691,10 +691,11 @@ func TestFieldBoundaryUsesUnrelatedUIDForUnderlayBypassProof(t *testing.T) {
 	}
 	for _, required := range [][]byte{
 		[]byte("awaitUnrelatedUidBoundary"),
-		[]byte("EXTRA_UNDERLYING_NETWORK"),
 		[]byte("EXTRA_UNDERLAY_TARGET_ADDRESS"),
 		[]byte("EXTRA_UNDERLAY_TARGET_PORT"),
 		[]byte("EXTRA_BYPASS_BLOCKED"),
+		[]byte("EXTRA_PROBE_PACKAGE"),
+		[]byte("EXTRA_PROBE_UID"),
 		[]byte("ContextCompat.registerReceiver"),
 		[]byte("RECEIVER_EXPORTED"),
 		[]byte("resolveOwnerProbeTargets"),
@@ -718,17 +719,37 @@ func TestFieldBoundaryUsesUnrelatedUIDForUnderlayBypassProof(t *testing.T) {
 		t.Fatal("VPN owner UID must not be used to prove that unrelated applications cannot bypass lockdown")
 	}
 	for _, required := range [][]byte{
-		[]byte("EXTRA_UNDERLYING_NETWORK"),
 		[]byte("EXTRA_UNDERLAY_TARGET_ADDRESS"),
 		[]byte("EXTRA_UNDERLAY_TARGET_PORT"),
 		[]byte("EXTRA_BYPASS_BLOCKED"),
-		[]byte("underlyingNetwork.bindSocket(socket)"),
+		[]byte("EXTRA_PROBE_PACKAGE"),
+		[]byte("EXTRA_PROBE_UID"),
+		[]byte("getSystemService(ConnectivityManager.class)"),
+		[]byte("getAllNetworks()"),
+		[]byte("NetworkCapabilities.TRANSPORT_VPN"),
+		[]byte("NetworkCapabilities.NET_CAPABILITY_INTERNET"),
+		[]byte("MAX_VISIBLE_UNDERLAY_NETWORKS"),
+		[]byte("candidateNetwork.bindSocket(socket)"),
 		[]byte("socket.connect("),
 		[]byte("UNDERLAY_ATTEMPT_TIMEOUT_MILLIS"),
 		[]byte("underlayConnectionIsBlocked"),
+		[]byte("Process.myUid()"),
+		[]byte("getPackageName()"),
+		[]byte("isValidToken"),
+		[]byte("isExpectedTargetPackage"),
+		[]byte("runOnUiThread"),
 	} {
 		if !bytes.Contains(probe, required) {
-			t.Fatalf("unrelated-UID probe missing underlay bypass proof %q", required)
+			t.Fatalf("self-discovering unrelated-UID probe missing boundary proof %q", required)
+		}
+	}
+	for _, forbidden := range [][]byte{
+		[]byte("EXTRA_UNDERLYING_NETWORK"),
+		[]byte("readUnderlyingNetwork"),
+		[]byte("putExtra(VpnProbeActivity.EXTRA_UNDERLYING_NETWORK"),
+	} {
+		if bytes.Contains(harness, forbidden) || bytes.Contains(probe, forbidden) {
+			t.Fatalf("unrelated-UID probe accepts an artificial cross-UID network capability %q", forbidden)
 		}
 	}
 	if bytes.Contains(probe, []byte("underlayBindIsBlocked")) {
