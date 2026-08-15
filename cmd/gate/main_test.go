@@ -83,6 +83,30 @@ func TestProofStepsSelectExactProofBoundary(t *testing.T) {
 	}
 }
 
+func TestLinuxNamespaceProofUsesExplicitShellInterpreter(t *testing.T) {
+	steps, err := proofSteps("linux-netns", false, "report.json", "status.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("linux-netns steps = %v, want one step", stepNames(steps))
+	}
+	if got, want := steps[0].program, "sudo"; got != want {
+		t.Fatalf("linux-netns program = %q, want %q", got, want)
+	}
+	if got, want := steps[0].args, []string{
+		"--preserve-env=PATH",
+		"bash",
+		"./scripts/phase17/netns-e2e.sh",
+		"--mode",
+		"full",
+		"--evidence-dir",
+		".tools/phase17/netns",
+	}; !equalStrings(got, want) {
+		t.Fatalf("linux-netns args = %v, want %v", got, want)
+	}
+}
+
 func TestOperatorProofPolicyMatchesGateInventory(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "config", "ci", "proof-policy.json"))
 	if err != nil {

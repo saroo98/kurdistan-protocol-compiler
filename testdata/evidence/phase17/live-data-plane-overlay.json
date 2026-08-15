@@ -475,12 +475,12 @@
     {
       "path": "cmd/gate/main.go",
       "pre_sha256": "494bd1c4ece86961ce3ecf70dcb37a9f750898fd566aa49df80a7f063fd99bc1",
-      "post_sha256": "365fe5b093f9b636bfdc5f2f0b0ccb8e3edd6a988d30cbe71b7756404ac0e489"
+      "post_sha256": "ea2b190b5bfa1878801a5812ed3844c76fbe825ba4e10ca1b642d480c1c03afa"
     },
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "dabe5fb9852120c17bcc41531bdb495f9010dabe1732fab44a75124d3723bdcc",
-      "post_sha256": "063ae3da84e8f4021b1fbfdf1da618442054e46addc27bd16a9c9efdf21ae029"
+      "post_sha256": "06b5fa88a1b20a068c9bebf67da8b07305014d9b0ec9e9f1288c5120549a7bbf"
     },
     {
       "path": "cmd/kandroidbridge/environment.go",
