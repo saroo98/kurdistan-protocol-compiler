@@ -23,6 +23,7 @@ func runBoundaryMonitor(
 	value config,
 	qualified qualifiedRun,
 	root, serial string,
+	probeURL []byte,
 	ipv6Authorized bool,
 ) (result phase17evidence.FieldBoundaryV3, resultErr error) {
 	if qualified.boundaryDigest == "" || value.boundaryPath == "" {
@@ -35,7 +36,8 @@ func runBoundaryMonitor(
 	request := phase17boundary.Request{
 		Schema: phase17boundary.RequestSchema, CampaignMode: value.mode, AttemptID: attemptID,
 		ADBPath: value.adbPath, DeviceSerial: serial, SSHPath: value.sshPath,
-		SSHAlias: value.sshAlias, RelayPort: uint16(value.relayPort), VerifyIPv6: ipv6Authorized,
+		SSHAlias: value.sshAlias, ProbeURL: string(probeURL),
+		RelayPort: uint16(value.relayPort), VerifyIPv6: ipv6Authorized,
 	}
 	raw, err := phase17boundary.MarshalRequest(request)
 	if err != nil {
