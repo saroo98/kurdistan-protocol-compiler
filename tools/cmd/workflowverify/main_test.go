@@ -239,6 +239,15 @@ Resolve-SdkPackageMetadata
 source.properties
 $emulatorPackageRevision = Get-SdkPackageRevision
 $emulatorVersionSource = if ($emulatorVersionMatch.Success)
+function Install-SdkPackageWithBoundedRetry
+$maxAttempts = 2
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++)
+Remove-Item -LiteralPath $PackageRoot -Recurse -Force
+Remove-Item -LiteralPath $sdkTemp -Recurse -Force
+Install-SdkPackageWithBoundedRetry -Package 'platform-tools'
+Install-SdkPackageWithBoundedRetry -Package 'emulator'
+Install-SdkPackageWithBoundedRetry -Package $systemImage
+sdkmanager failed for required package after bounded clean retry
 Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError
 `
 	if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
@@ -254,6 +263,33 @@ Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError
 	}
 	if err := verifyEmulatorProofScript(path); err != nil {
 		t.Fatalf("verify bounded emulator proof script: %v", err)
+	}
+}
+
+func TestRepositoryEmulatorProofScriptRequiresBoundedCleanSDKRetry(t *testing.T) {
+	path := filepath.Join("..", "..", "scripts", "run-android-emulator-proof.ps1")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(raw)
+	for _, token := range []string{
+		"function Install-SdkPackageWithBoundedRetry",
+		"$maxAttempts = 2",
+		"for ($attempt = 1; $attempt -le $maxAttempts; $attempt++)",
+		"Remove-Item -LiteralPath $PackageRoot -Recurse -Force",
+		"Remove-Item -LiteralPath $sdkTemp -Recurse -Force",
+		"Install-SdkPackageWithBoundedRetry -Package 'platform-tools'",
+		"Install-SdkPackageWithBoundedRetry -Package 'emulator'",
+		"Install-SdkPackageWithBoundedRetry -Package $systemImage",
+		"sdkmanager failed for required package after bounded clean retry",
+	} {
+		if !strings.Contains(content, token) {
+			t.Fatalf("Android emulator proof script is missing bounded SDK recovery contract %q", token)
+		}
+	}
+	if strings.Contains(content, "Remove-Item -LiteralPath $env:ANDROID_HOME -Recurse") {
+		t.Fatal("Android emulator proof script must not delete the complete SDK installation")
 	}
 }
 

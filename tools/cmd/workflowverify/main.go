@@ -137,6 +137,15 @@ func verifyEmulatorProofScript(path string) error {
 		"source.properties",
 		"$emulatorPackageRevision = Get-SdkPackageRevision",
 		"$emulatorVersionSource = if ($emulatorVersionMatch.Success)",
+		"function Install-SdkPackageWithBoundedRetry",
+		"$maxAttempts = 2",
+		"for ($attempt = 1; $attempt -le $maxAttempts; $attempt++)",
+		"Remove-Item -LiteralPath $PackageRoot -Recurse -Force",
+		"Remove-Item -LiteralPath $sdkTemp -Recurse -Force",
+		"Install-SdkPackageWithBoundedRetry -Package 'platform-tools'",
+		"Install-SdkPackageWithBoundedRetry -Package 'emulator'",
+		"Install-SdkPackageWithBoundedRetry -Package $systemImage",
+		"sdkmanager failed for required package after bounded clean retry",
 		"Remove-Item -LiteralPath $rawPostRunLogcat, $rawEmulatorLog, $rawEmulatorError",
 	} {
 		if !strings.Contains(content, token) {
@@ -148,6 +157,9 @@ func verifyEmulatorProofScript(path string) error {
 	}
 	if strings.Contains(content, "Join-Path '.tools/phase16' \"avd-api$Api\"") {
 		return errors.New("Android emulator proof script stores disposable AVD state in uploaded evidence")
+	}
+	if strings.Contains(content, "Remove-Item -LiteralPath $env:ANDROID_HOME -Recurse") {
+		return errors.New("Android emulator proof script deletes the complete SDK installation")
 	}
 	for _, prohibited := range []string{".tools/phase17/emulator-api$Api.log", ".tools/phase17/logcat-api$Api.txt"} {
 		if strings.Contains(content, prohibited) {
