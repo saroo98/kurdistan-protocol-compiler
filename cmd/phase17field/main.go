@@ -776,15 +776,15 @@ func runFunctional(ctx context.Context, runner commandRunner, value config, qual
 	if err := observeRemoteMetrics(ctx, runner, value, root, tracker); err != nil {
 		return outcome, err
 	}
-	if err := revokeRemoteProfile(ctx, runner, value, root, profileID); err != nil {
-		return outcome, err
-	}
-	profileID = ""
-	boundary, err := runBoundaryMonitor(ctx, runner, value, qualified, root, serial, ipv6Authorized)
+	boundary, err := runBoundaryMonitor(ctx, runner, value, qualified, root, serial, probeURL, ipv6Authorized)
 	outcome.boundary = boundary
 	if err != nil {
 		return outcome, err
 	}
+	if err := revokeRemoteProfile(ctx, runner, value, root, profileID); err != nil {
+		return outcome, err
+	}
+	profileID = ""
 	scanners, err := assertQualifiedAndroidPrivacy(ctx, runner, value, qualified, root, serial, campaignStarted, probeURL)
 	outcome.scanners = scanners
 	if err != nil {
@@ -1160,6 +1160,7 @@ func instrumentationFailureCategory(raw []byte) string {
 		"RUNTIME_AUTHORITY_FAILED": true, "RUNTIME_AUTHORITY_UNAVAILABLE": true,
 		"SEALED_PROFILE_UNAVAILABLE": true, "VPN_CONSENT_REQUIRED": true,
 		"VPN_NETWORK_NOT_READY": true, "VPN_NETWORK_TEARDOWN_TIMEOUT": true,
+		"BOUNDARY_LEAK": true,
 	}
 	for _, match := range instrumentCategoryV1.FindAll(raw, -1) {
 		value := string(match)

@@ -148,6 +148,11 @@
       "post_sha256": "6c4eaafb44228ccb7ae15dae019b528ebe09939c7a10760c5a59e1a12faa969c"
     },
     {
+      "path": "android/app/src/androidTest/java/org/kurdistanvpn/app/VpnProbeActivity.java",
+      "pre_sha256": "feced9dae060061c97c426094aa003946be9f9d69b95e9e586c0404debdf6a97",
+      "post_sha256": "b454580fd3ace2f78521d99040fcd6e75a84e979649c88d666db7aff6180bd84"
+    },
+    {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt",
       "pre_sha256": "4774aa58da7c8c9740c2e8c676dc89813f54d4169fcd026d3dd96b008df7b78f",
       "post_sha256": "b11e9f4fad363f087ad85f6f59751b6bd8ec29c8098738f58079cef73452d2cc"
@@ -165,12 +170,12 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "3c853d35648126a7dbbae0970ddbebe938043f97d2dfb2578ae8ac92125e8648"
+      "post_sha256": "24608598667b67ad565c36cd42d8a2c630c019413d8e98dc6021b438891a4120"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "60408aadc3575d59deb0034f47e51d276810a9e0d25526839ae1ccd55f611df8"
+      "post_sha256": "a572d4a38b8922a57b42da7d4e69c84ce7dbdb870b19392e39ee2dee5981e092"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase9FoundationUiTest.kt",
@@ -255,7 +260,7 @@
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_evidence": "ABSENT",
-      "post_sha256": "0cb83cfe0cbd27f9cfdc71bb8596f220e40c93bf800591d0ccc2c91725d5b68e"
+      "post_sha256": "cdf4c1eacc6f369f0cabaede58c4e50a28d33429b1615ed0870cd37dc4acde28"
     },
     {
       "path": "android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
@@ -635,12 +640,12 @@
     {
       "path": "cmd/phase17boundary/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "49c8f55b7eeddbd2cbeb54da80746dce4f7cc6864aa4f71a46fdc2bb12902a19"
+      "post_sha256": "34ddd40a0ead9272524cc3d080dcfb326845680a91094ed69e9861fab500908a"
     },
     {
       "path": "cmd/phase17boundary/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8b3e6ff6f55e600dc4aef063e40a10a5769ec4c48e766985a485ea81a07bcf51"
+      "post_sha256": "6badffbca26feeb70809b6d7de9e6548fc300da15fafe5eba2424a0e8119c3f6"
     },
     {
       "path": "cmd/phase17devicegate/main.go",
@@ -670,12 +675,12 @@
     {
       "path": "cmd/phase17field/boundary.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "88a0d89e7a1be3a4e58b085f01a16d188c7e5cd5fe3071e334d6f85f35ddde33"
+      "post_sha256": "4f53ed563bc311103702b45e44c3cdf4c5d5c3470f23d939a4ff7cc80edafa6d"
     },
     {
       "path": "cmd/phase17field/boundary_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "14b4a9bba37dabb73489264a4b0dda4c03fdd9c20ba04be41e7ed77f2c13f41f"
+      "post_sha256": "9ac4a10f617399bffa3b610b56888c823c951c2326b850896677fcc4b448ce63"
     },
     {
       "path": "cmd/phase17field/campaign.go",
@@ -730,12 +735,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "5e6dbb146e779c36d523fb1b65f30434d6f4e580b7124842402ce6f22d78354a"
+      "post_sha256": "adc55a36ac01fbf34542059f805b8ac4a6058b20024dd33409b86e279e8bfd06"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "721a02c12ef13817e5e42bb26d41e5bd48688c8d43c3c2b40aac8c1d15aa4fab"
+      "post_sha256": "816c9aa99ced79d4713bd9780a183786108af207d1aac4b9143c6201dc131123"
     },
     {
       "path": "cmd/phase17field/privacy.go",
@@ -790,7 +795,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "7c40f62e32cf1ec688d295f674c8435f959a2cc86e82653c83b80456af01dfa0"
+      "post_sha256": "d066b6da681d703886b9f0dbb97cb744b496b3e6298503fcb96eeece85d433b3"
     },
     {
       "path": "cmd/phase17verify/inventory_test.go",
@@ -1110,12 +1115,12 @@
     {
       "path": "internal/phase17boundary/monitor.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e7ac4b15e88d2f74bbfda0760766e2f1be6568daa56e0800ac68971d8a1cbbd8"
+      "post_sha256": "027369f907be5157dd46d92a0bba706dd7ba9b5c85a420ce57b4018ebc23fffb"
     },
     {
       "path": "internal/phase17boundary/monitor_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "b6a428fcea9e2c44b69758ef154e0d8ae99e4daee53149e295547f0ae1e3b6bc"
+      "post_sha256": "67fc284ddc209f064db8206854ae49c843b41270a61dc30c915d89e7245c08cc"
     },
     {
       "path": "internal/phase17evidence/evidence.go",

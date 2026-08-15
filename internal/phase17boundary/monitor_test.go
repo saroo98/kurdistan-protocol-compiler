@@ -109,6 +109,24 @@ func TestRequestDecoderRejectsMalformedNoncanonicalAndPrivateFieldAbuse(t *testi
 	if _, err := MarshalRequest(bad); err == nil {
 		t.Fatal("control character accepted")
 	}
+	for _, invalid := range []string{
+		"",
+		"http://probe.invalid/check",
+		"https://127.0.0.1/check",
+		"https://[2001:db8::1]/check",
+		"https://probe.invalid:/check",
+		"https://probe.invalid:0/check",
+		"https://probe.invalid:65536/check",
+		"https://user@probe.invalid/check",
+		"https://probe.invalid/check#fragment",
+		"https://probe.invalid/" + strings.Repeat("a", 2049),
+	} {
+		bad = validRequest()
+		bad.ProbeURL = invalid
+		if _, err := MarshalRequest(bad); err == nil {
+			t.Fatalf("invalid probe URL accepted: %q", invalid)
+		}
+	}
 	if _, err := DecodeRequest(strings.NewReader("{}"), MaximumRequestBytes+1); err == nil {
 		t.Fatal("oversized request accepted")
 	}
@@ -118,7 +136,7 @@ func validRequest() Request {
 	return Request{
 		Schema: RequestSchema, CampaignMode: "Functional", AttemptID: strings.Repeat("a", 32),
 		ADBPath: "adb", DeviceSerial: "emulator-5554", SSHPath: "ssh", SSHAlias: "owner-node",
-		RelayPort: 8443, VerifyIPv6: true,
+		ProbeURL: "https://probe.invalid/check", RelayPort: 8443, VerifyIPv6: true,
 	}
 }
 

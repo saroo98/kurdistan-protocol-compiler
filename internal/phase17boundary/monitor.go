@@ -12,14 +12,17 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"kurdistan/internal/assurance"
 )
 
 const (
-	RequestSchema       = "kurdistan-phase17-boundary-request-v1"
+	RequestSchema       = "kurdistan-phase17-boundary-request-v2"
 	AndroidSchema       = "kurdistan-phase17-boundary-android-v1"
 	VPSSchema           = "kurdistan-phase17-boundary-vps-v1"
 	ReceiptSchema       = "kurdistan-phase17-boundary-monitor-v2"
@@ -40,6 +43,7 @@ type Request struct {
 	DeviceSerial string `json:"deviceSerial"`
 	SSHPath      string `json:"sshPath"`
 	SSHAlias     string `json:"sshAlias"`
+	ProbeURL     string `json:"probeUrl"`
 	RelayPort    uint16 `json:"relayPort"`
 	VerifyIPv6   bool   `json:"verifyIpv6"`
 }
@@ -216,7 +220,31 @@ func validateRequest(value Request) error {
 			return errors.New("boundary request selector rejected")
 		}
 	}
+	if !validProbeURL(value.ProbeURL) {
+		return errors.New("boundary request probe rejected")
+	}
 	return nil
+}
+
+func validProbeURL(value string) bool {
+	if len(value) > 2048 || !validPrivateSelector(value) {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "" || net.ParseIP(host) != nil ||
+		!strings.ContainsAny(strings.ToLower(host), "abcdefghijklmnopqrstuvwxyz") {
+		return false
+	}
+	port := parsed.Port()
+	if port == "" {
+		return parsed.Host == host
+	}
+	portNumber, err := strconv.Atoi(port)
+	return err == nil && portNumber >= 1 && portNumber <= 65535 && parsed.Host == net.JoinHostPort(host, port)
 }
 
 func validPrivateSelector(value string) bool {
