@@ -113,6 +113,26 @@ internal object Phase17FieldHarness {
             value.bypassBlocked &&
             !value.coverageGap
 
+    internal fun boundaryFailureCategory(
+        value: BoundarySnapshot,
+        verifyIpv6: Boolean,
+        unrelatedUidBoundary: UnrelatedUidBoundaryObservation?,
+    ): String? {
+        if (evaluateBoundarySnapshot(value, verifyIpv6)) return null
+
+        fun result(passed: Boolean): String = if (passed) "PASS" else "FAIL"
+        val ipv6 = if (verifyIpv6) result(value.ipv6Default) else "NA"
+        val tunneled = unrelatedUidBoundary?.let { result(it.tunneledTraffic) } ?: "NA"
+        return "BOUNDARY_LEAK" +
+            ":VPN_${result(value.vpnActive)}" +
+            ":IPV4_${result(value.ipv4Default)}" +
+            ":IPV6_$ipv6" +
+            ":DNS_${result(value.dnsPinned)}" +
+            ":BYPASS_${result(value.bypassBlocked)}" +
+            ":TUNNEL_$tunneled" +
+            ":COVERAGE_${result(!value.coverageGap)}"
+    }
+
     internal fun evaluateUnrelatedUidBoundary(
         value: UnrelatedUidBoundaryObservation,
     ): Boolean = value.tunneledTraffic && value.bypassBlocked && !value.coverageGap
@@ -554,6 +574,7 @@ internal object Phase17FieldHarness {
                     "LIVE_RUNTIME_UNSTABLE:${stable.failure ?: stable.state.name}:" +
                         (stable.packetDisposition ?: "NONE")
                 }
+                var boundaryFailure: String? = null
                 try {
                     var boundarySnapshot: BoundarySnapshot? = null
                     runVerifiedProbeWithReconnect(
@@ -589,12 +610,12 @@ internal object Phase17FieldHarness {
                             )
                             boundarySnapshot = observedBoundary
                             if (!verifyBoundary) {
-                                check(
-                                    evaluateBoundarySnapshot(
-                                        observedBoundary,
-                                        verifyIpv6 = trafficDnsFamilies.contains(6),
-                                    ),
-                                ) { "BOUNDARY_LEAK" }
+                                boundaryFailure = boundaryFailureCategory(
+                                    value = observedBoundary,
+                                    verifyIpv6 = trafficDnsFamilies.contains(6),
+                                    unrelatedUidBoundary = unrelatedUidBoundary,
+                                )
+                                boundaryFailure?.let(::error)
                             }
                             if (trafficDnsFamilies.isNotEmpty()) {
                                 trafficDnsFamilies.forEach { family ->
@@ -626,8 +647,8 @@ internal object Phase17FieldHarness {
                         )
                     }
                 } catch (failure: Throwable) {
-                    if (failure.message == "BOUNDARY_LEAK") {
-                        writeAtomic(File(fieldRoot, RESULT), "BOUNDARY_LEAK\n".encodeToByteArray())
+                    if (boundaryFailure != null && failure.message == boundaryFailure) {
+                        writeAtomic(File(fieldRoot, RESULT), "$boundaryFailure\n".encodeToByteArray())
                         throw failure
                     }
                     val category = if (failure is SocketTimeoutException) "TIMEOUT" else "PROBE_FAILED"

@@ -75,6 +75,57 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun boundaryFailureCategoryPreservesOnlyBoundedPredicateResults() {
+        val passingBoundary = Phase17FieldHarness.BoundarySnapshot(
+            vpnActive = true,
+            ipv4Default = true,
+            ipv6Default = true,
+            dnsPinned = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+        val passingUnrelatedUid = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
+            tunneledTraffic = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+
+        assertNull(
+            Phase17FieldHarness.boundaryFailureCategory(
+                value = passingBoundary,
+                verifyIpv6 = true,
+                unrelatedUidBoundary = passingUnrelatedUid,
+            ),
+        )
+        assertEquals(
+            "BOUNDARY_LEAK:VPN_FAIL:IPV4_PASS:IPV6_FAIL:DNS_FAIL:BYPASS_FAIL:TUNNEL_FAIL:COVERAGE_FAIL",
+            Phase17FieldHarness.boundaryFailureCategory(
+                value = passingBoundary.copy(
+                    vpnActive = false,
+                    ipv6Default = false,
+                    dnsPinned = false,
+                    bypassBlocked = false,
+                    coverageGap = true,
+                ),
+                verifyIpv6 = true,
+                unrelatedUidBoundary = passingUnrelatedUid.copy(
+                    tunneledTraffic = false,
+                    bypassBlocked = false,
+                    coverageGap = true,
+                ),
+            ),
+        )
+        assertEquals(
+            "BOUNDARY_LEAK:VPN_PASS:IPV4_PASS:IPV6_NA:DNS_PASS:BYPASS_PASS:TUNNEL_NA:COVERAGE_FAIL",
+            Phase17FieldHarness.boundaryFailureCategory(
+                value = passingBoundary.copy(ipv6Default = false, coverageGap = true),
+                verifyIpv6 = false,
+                unrelatedUidBoundary = null,
+            ),
+        )
+    }
+
+    @Test
     fun unrelatedUidBoundaryRequiresTunneledTrafficAndBlockedUnderlay() {
         assertTrue(
             Phase17FieldHarness.isIndependentProbeIdentity(

@@ -109,7 +109,7 @@ func classifyFieldFailure(runErr error, outcome functionalOutcome) (string, stri
 	}
 	var actionFailure *fieldActionFailure
 	if errors.As(runErr, &actionFailure) {
-		if actionFailure.category == "BOUNDARY_LEAK" {
+		if actionFailure.category == "BOUNDARY_LEAK" || strings.HasPrefix(actionFailure.category, "BOUNDARY_LEAK:") {
 			return "FAIL_PRIVACY", "routeDnsLeak"
 		}
 		if strings.HasPrefix(actionFailure.category, "INSTRUMENTATION_") {
