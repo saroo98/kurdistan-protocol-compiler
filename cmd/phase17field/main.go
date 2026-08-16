@@ -92,6 +92,8 @@ var (
 	hex64Pattern           = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	fieldAttemptIDPattern  = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
+	remotePackagePattern   = regexp.MustCompile(`^/var/tmp/phase17-package-[0-9a-f]{1,16}$`)
+	remoteArchivePattern   = regexp.MustCompile(`^/tmp/phase17-package-[0-9a-f]{1,16}\.tar\.gz$`)
 	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
 	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*\r?$`)
 	frameTrackerCUJIndexV1 = regexp.MustCompile(`::[0-9]{1,3}@`)
@@ -440,6 +442,7 @@ func validateLaunchConfig(value config) error {
 
 func terminalFailureLine(err error) string {
 	const fallback = "PHASE17_FAILURE FIELD_FAILURE"
+	err = primaryFieldFailure(err)
 	if err == nil {
 		return fallback
 	}
@@ -616,7 +619,7 @@ func runField(parent context.Context, runner commandRunner, value config) (resul
 		return err
 	}
 	defer func() {
-		joinFieldCleanup(&resultErr, remoteService(context.Background(), runner, value, root, "sudo -n rm -rf "+remotePackage))
+		joinFieldCleanup(&resultErr, removeRemoteStagedPackage(context.Background(), runner, value, root, remotePackage))
 	}()
 	serial, observedAPI, observedABI, err := selectDevice(parent, runner, value, qualified.environment.AndroidClass)
 	if err != nil {
@@ -1884,7 +1887,9 @@ func removeRemoteProfile(ctx context.Context, runner commandRunner, value config
 	if profileID == "" {
 		return nil
 	}
-	return revokeRemoteProfile(ctx, runner, value, root, profileID)
+	return retryFieldCleanup(ctx, 3, time.Second, func(attemptContext context.Context) error {
+		return revokeRemoteProfile(attemptContext, runner, value, root, profileID)
+	})
 }
 
 func assertQualifiedAndroidPrivacy(
@@ -2240,7 +2245,70 @@ printf '{"rss":%s,"fds":%s,"swap":%s,"oomKills":%s,"threads":%s,"ipv6":%s}' "$rs
 }
 
 func safeStop(ctx context.Context, runner commandRunner, value config, root string) error {
-	return remoteService(ctx, runner, value, root, "sudo -n systemctl stop kurd-node.socket kurd-node.service")
+	return retryFieldCleanup(ctx, 3, time.Second, func(attemptContext context.Context) error {
+		return remoteService(attemptContext, runner, value, root, "sudo -n systemctl stop kurd-node.socket kurd-node.service")
+	})
+}
+
+func removeRemoteStagedPackage(ctx context.Context, runner commandRunner, value config, root, remotePackage string) error {
+	return removeRemotePackageArtifacts(ctx, runner, value, root, remotePackage, "")
+}
+
+func removeRemotePackageArtifacts(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	root, remotePackage, remoteArchive string,
+) error {
+	if !remotePackagePattern.MatchString(remotePackage) {
+		return errors.New("remote package cleanup path rejected")
+	}
+	cleanup := "rm -rf " + remotePackage
+	verify := "test ! -e " + remotePackage
+	if remoteArchive != "" {
+		if !remoteArchivePattern.MatchString(remoteArchive) {
+			return errors.New("remote package cleanup path rejected")
+		}
+		cleanup += "; rm -f " + remoteArchive
+		verify += "; test ! -e " + remoteArchive
+	}
+	command := "sudo -n sh -c " + shellQuote(cleanup+"; "+verify)
+	return retryFieldCleanup(ctx, 3, time.Second, func(attemptContext context.Context) error {
+		return remoteService(attemptContext, runner, value, root, command)
+	})
+}
+
+func retryFieldCleanup(
+	ctx context.Context,
+	attempts int,
+	delay time.Duration,
+	action func(context.Context) error,
+) error {
+	if ctx == nil || attempts < 1 || delay < 0 || action == nil {
+		return errors.New("field cleanup retry rejected")
+	}
+	var last error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := action(ctx); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+		if attempt+1 == attempts || delay == 0 {
+			continue
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return last
 }
 
 func remoteService(ctx context.Context, runner commandRunner, value config, root, command string) error {
@@ -2392,8 +2460,12 @@ func stageAndVerifyPackage(ctx context.Context, runner commandRunner, value conf
 	token := strconv.FormatInt(time.Now().UnixNano(), 16)
 	remoteArchive := "/tmp/phase17-package-" + token + ".tar.gz"
 	remoteRoot := "/var/tmp/phase17-package-" + token
+	cleanupFailure := func(primary error) error {
+		joinFieldCleanup(&primary, removeRemotePackageArtifacts(context.Background(), runner, value, root, remoteRoot, remoteArchive))
+		return primary
+	}
 	if _, err := runBytes(ctx, runner, nil, root, 2*time.Minute, value.scpPath, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "--", value.packagePath, value.sshAlias+":"+remoteArchive); err != nil {
-		return "", errors.New("package transfer failed")
+		return "", cleanupFailure(errors.New("package transfer failed"))
 	}
 	script := fmt.Sprintf(`set -eu
 archive=%q
@@ -2426,12 +2498,11 @@ printf PACKAGE_MATCH_PASS
 `, remoteArchive, remoteRoot, manifestDigest, remotePassFile, value.relayPort, manifestDigest, value.relayPort)
 	raw, err := ssh(ctx, runner, value, root, 2*time.Minute, "sudo -n sh -c "+shellQuote(script))
 	if err != nil || strings.TrimSpace(string(raw)) != "PACKAGE_MATCH_PASS" {
-		_ = remoteService(context.Background(), runner, value, root, "sudo -n rm -rf "+remoteArchive+" "+remoteRoot)
 		category := strings.TrimSpace(string(raw))
 		if category != "" && len(category) <= 256 && safeCategory([]byte(category)) {
-			return "", fmt.Errorf("installed package identity rejected: %s", category)
+			return "", cleanupFailure(fmt.Errorf("installed package identity rejected: %s", category))
 		}
-		return "", errors.New("installed package identity rejected")
+		return "", cleanupFailure(errors.New("installed package identity rejected"))
 	}
 	return remoteRoot, nil
 }

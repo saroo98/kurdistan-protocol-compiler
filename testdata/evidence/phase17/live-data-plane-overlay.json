@@ -705,12 +705,12 @@
     {
       "path": "cmd/phase17field/evidence_v3.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "d2323a39f2dddce082a0d90b5196513a12e6fa8f17db22510aa684733c293827"
+      "post_sha256": "34a846f0fb54e1195c0d208fee55cea13c9597a0af173d2fd5167168ecb7e1bd"
     },
     {
       "path": "cmd/phase17field/evidence_v3_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "a51445df1b0364373da1c27849da64ffa47f379a6b16ed7ec85f0270fc9e9558"
+      "post_sha256": "9bead0eb37e65d24f807f5385a81e7e3e0a35f172f72033bd629e46479b16a73"
     },
     {
       "path": "cmd/phase17field/host_awake.go",
@@ -740,12 +740,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "9ec87821eeb77ae97e1db23fcc18b33c7c871296fe2980cb8b026b7bcf9f8c40"
+      "post_sha256": "f0485e89bcd48b6aee847b97f1c7c40da0b6e2c43236a488d2ca56de4adc3d66"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "1fe19f17d7d0021cdc060f25821fa763159a46b76e35e8fa3627bb357605befe"
+      "post_sha256": "60f5f895a976e2458ba3ccdb168393fdbbb45b662615a16c06aa65a30efced96"
     },
     {
       "path": "cmd/phase17field/privacy.go",
