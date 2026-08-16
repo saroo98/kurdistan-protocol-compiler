@@ -133,6 +133,12 @@ func TestCleanupFailureIsHarnessFailureWithoutErasingEarlierProductFailure(t *te
 	if outcome, check := classifyFieldFailure(primary, functionalOutcome{}); outcome != "FAIL_PRODUCT" || check != "connect" {
 		t.Fatalf("joined classification=(%s,%s)", outcome, check)
 	}
+
+	primary = errors.New("IPv6 capability unavailable")
+	joinFieldCleanup(&primary, errors.New("synthetic cleanup failure"))
+	if outcome, check := classifyFieldFailure(primary, functionalOutcome{}); outcome != "FAIL_PRODUCT" || check != "ipv6" {
+		t.Fatalf("generic joined classification=(%s,%s)", outcome, check)
+	}
 }
 
 func checkResultV3(values []phase17evidence.FieldCheckV3, name string) string {
