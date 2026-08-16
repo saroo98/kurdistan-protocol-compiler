@@ -14,6 +14,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -209,6 +211,42 @@ class Phase17LiveDataPlaneDeviceTest {
                 probeContext.packageName,
             ),
         )
+    }
+
+    @Test
+    fun unrelatedUidTunnelProbeUsesTheSuppliedLiveEndpoint() {
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            assertTrue(
+                VpnProbeActivity.tcpAttempt(
+                    InetAddress.getLoopbackAddress(),
+                    server.localPort,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun unrelatedUidDnsProbeBuildsAndValidatesThePhase17Query() {
+        val identifier = 0x1234
+        val query = VpnProbeActivity.buildDnsQuery(identifier)
+        assertArrayEquals(
+            byteArrayOf(
+                0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x07, 'e'.code.toByte(), 'x'.code.toByte(), 'a'.code.toByte(),
+                'm'.code.toByte(), 'p'.code.toByte(), 'l'.code.toByte(), 'e'.code.toByte(),
+                0x03, 'c'.code.toByte(), 'o'.code.toByte(), 'm'.code.toByte(),
+                0x00, 0x00, 0x01, 0x00, 0x01,
+            ),
+            query,
+        )
+
+        val response = query.copyOf().also { bytes -> bytes[2] = 0x81.toByte() }
+        assertTrue(VpnProbeActivity.isDnsResponseValid(response, response.size, identifier))
+        assertFalse(VpnProbeActivity.isDnsResponseValid(response, response.size, 0xabcd))
+        response[2] = 0x01
+        assertFalse(VpnProbeActivity.isDnsResponseValid(response, response.size, identifier))
+        assertFalse(VpnProbeActivity.isDnsResponseValid(response, 11, identifier))
     }
 
     @Test
