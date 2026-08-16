@@ -95,6 +95,11 @@ func buildTerminalEvidenceV3(
 }
 
 func classifyFieldFailure(runErr error, outcome functionalOutcome) (string, string) {
+	primary := primaryFieldFailure(runErr)
+	if primary == nil {
+		return "FAIL_HARNESS", "preflight"
+	}
+	runErr = primary
 	if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
 		return "INCONCLUSIVE", "preflight"
 	}
@@ -141,12 +146,62 @@ func classifyFieldFailure(runErr error, outcome functionalOutcome) (string, stri
 		strings.Contains(message, "instrumentation") || strings.Contains(message, "evidence reset") {
 		return "FAIL_HARNESS", "androidCrashFree"
 	}
+	if strings.Contains(message, "ipv6") {
+		return "FAIL_PRODUCT", "ipv6"
+	}
+	if strings.Contains(message, "package verification") {
+		return "FAIL_HARNESS", "packageVerification"
+	}
+	if strings.Contains(message, "package manifest") || strings.Contains(message, "package transfer") ||
+		strings.Contains(message, "installed package") {
+		return "FAIL_PRODUCT", "install"
+	}
+	if strings.Contains(message, "apk installation") || strings.Contains(message, "android package") ||
+		strings.Contains(message, "android vpn permission") {
+		return "FAIL_HARNESS", "install"
+	}
+	if strings.Contains(message, "remote service health") || strings.Contains(message, "campaign authority") {
+		return "FAIL_PRODUCT", "serviceHealth"
+	}
 	if strings.Contains(message, "identity") || strings.Contains(message, "locked candidate") ||
 		strings.Contains(message, "qualification") || strings.Contains(message, "artifact differs") ||
 		strings.Contains(message, "source state") {
 		return "INVALID_IDENTITY", "preflight"
 	}
 	return "FAIL_PRODUCT", "connect"
+}
+
+// primaryFieldFailure removes only secondary cleanup branches from an
+// errors.Join tree. The primary campaign error must remain authoritative for
+// terminal classification and operator diagnostics. A cleanup-only failure is
+// represented by nil so callers can classify it explicitly as harness failure.
+func primaryFieldFailure(runErr error) error {
+	if runErr == nil {
+		return nil
+	}
+	type multiUnwrapper interface {
+		Unwrap() []error
+	}
+	if joined, ok := runErr.(multiUnwrapper); ok {
+		primary := make([]error, 0, len(joined.Unwrap()))
+		for _, child := range joined.Unwrap() {
+			if value := primaryFieldFailure(child); value != nil {
+				primary = append(primary, value)
+			}
+		}
+		switch len(primary) {
+		case 0:
+			return nil
+		case 1:
+			return primary[0]
+		default:
+			return errors.Join(primary...)
+		}
+	}
+	if errors.Is(runErr, errFieldCleanup) {
+		return nil
+	}
+	return runErr
 }
 
 func joinFieldCleanup(target *error, cleanupErr error) {

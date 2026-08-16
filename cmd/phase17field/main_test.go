@@ -62,6 +62,13 @@ func TestTerminalFailureLinePreservesOnlyBoundedSafeCategory(t *testing.T) {
 	if got := terminalFailureLine(errors.New("profile revoke/reissue cycle 47 failed: VPN_NETWORK_NOT_READY")); got != want {
 		t.Fatalf("terminal failure line = %q, want %q", got, want)
 	}
+	joined := errors.Join(
+		errors.New("IPv6 capability unavailable"),
+		fmt.Errorf("%w: secure shell transport failed", errFieldCleanup),
+	)
+	if got := terminalFailureLine(joined); got != "PHASE17_FAILURE IPv6 capability unavailable" {
+		t.Fatalf("joined terminal failure line = %q", got)
+	}
 
 	for _, unsafe := range []error{
 		errors.New("request failed for https://private.example.invalid/path"),
@@ -71,6 +78,128 @@ func TestTerminalFailureLinePreservesOnlyBoundedSafeCategory(t *testing.T) {
 			t.Fatalf("unsafe terminal failure line = %q", got)
 		}
 	}
+}
+
+func TestRetryFieldCleanupRetriesTransientFailureAndHonorsCancellation(t *testing.T) {
+	attempts := 0
+	err := retryFieldCleanup(context.Background(), 3, 0, func(context.Context) error {
+		attempts++
+		if attempts < 3 {
+			return errors.New("transient cleanup failure")
+		}
+		return nil
+	})
+	if err != nil || attempts != 3 {
+		t.Fatalf("retry cleanup error=%v attempts=%d", err, attempts)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	attempts = 0
+	err = retryFieldCleanup(ctx, 3, time.Second, func(context.Context) error {
+		attempts++
+		return errors.New("must not run")
+	})
+	if !errors.Is(err, context.Canceled) || attempts != 0 {
+		t.Fatalf("cancelled cleanup error=%v attempts=%d", err, attempts)
+	}
+}
+
+func TestRemoveRemoteStagedPackageIsBoundedIdempotentAndRejectsUnsafePath(t *testing.T) {
+	attempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		attempts++
+		if name != "ssh" || !strings.Contains(arguments[len(arguments)-1], "rm -rf /var/tmp/phase17-package-abc123") ||
+			!strings.Contains(arguments[len(arguments)-1], "test ! -e /var/tmp/phase17-package-abc123") {
+			return nil, errors.New("unexpected cleanup command")
+		}
+		if attempts < 3 {
+			return nil, errors.New("transient cleanup transport failure")
+		}
+		return nil, nil
+	}}
+	if err := removeRemoteStagedPackage(
+		context.Background(), runner, config{sshPath: "ssh", sshAlias: "owner-node"}, ".", "/var/tmp/phase17-package-abc123",
+	); err != nil || attempts != 3 {
+		t.Fatalf("staged package cleanup error=%v attempts=%d", err, attempts)
+	}
+
+	attempts = 0
+	if err := removeRemoteStagedPackage(
+		context.Background(), runner, config{sshPath: "ssh", sshAlias: "owner-node"}, ".", "/var/tmp/phase17-package-abc123/../escape",
+	); err == nil || attempts != 0 {
+		t.Fatalf("unsafe staged cleanup error=%v attempts=%d", err, attempts)
+	}
+}
+
+func TestStageAndVerifyPackageRetriesAndVerifiesCleanupAfterRejectedInstall(t *testing.T) {
+	packagePath := writeFieldPackageFixture(t)
+	cleanupAttempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		switch name {
+		case "scp":
+			return nil, nil
+		case "ssh":
+			command := arguments[len(arguments)-1]
+			if strings.Contains(command, "printf PACKAGE_MATCH_PASS") {
+				return []byte("PACKAGE_PREFLIGHT_FAILED"), errors.New("remote package preflight failed")
+			}
+			if !strings.Contains(command, "rm -f /tmp/phase17-package-") ||
+				!strings.Contains(command, "rm -rf /var/tmp/phase17-package-") ||
+				!strings.Contains(command, "test ! -e /tmp/phase17-package-") ||
+				!strings.Contains(command, "test ! -e /var/tmp/phase17-package-") {
+				return nil, errors.New("unexpected cleanup command")
+			}
+			cleanupAttempts++
+			if cleanupAttempts < 3 {
+				return nil, errors.New("transient cleanup transport failure")
+			}
+			return nil, nil
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	_, err := stageAndVerifyPackage(context.Background(), runner, config{
+		packagePath: packagePath,
+		scpPath:     "scp",
+		sshPath:     "ssh",
+		sshAlias:    "owner-node",
+		relayPort:   8443,
+	}, ".")
+	if err == nil || !strings.Contains(err.Error(), "installed package identity rejected") {
+		t.Fatalf("stage error=%v", err)
+	}
+	if cleanupAttempts != 3 {
+		t.Fatalf("cleanup attempts=%d, want 3", cleanupAttempts)
+	}
+}
+
+func writeFieldPackageFixture(t *testing.T) string {
+	t.Helper()
+	manifest := []byte("{\"schema\":\"kurd-node-native-package-v1\"}\n")
+	path := filepath.Join(t.TempDir(), "package.tar.gz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zipper := gzip.NewWriter(file)
+	writer := tar.NewWriter(zipper)
+	if err := writer.WriteHeader(&tar.Header{Name: "kurd-node/manifest.json", Mode: 0o644, Size: int64(len(manifest))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipper.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.T) {
