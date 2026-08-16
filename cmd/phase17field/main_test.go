@@ -1026,6 +1026,11 @@ func TestInstrumentationFailureCategoryClassifiesSafeDataPlaneBoundary(t *testin
 			raw:  "BOUNDARY_LEAK\nFAILURES!!!\n",
 			want: "BOUNDARY_LEAK",
 		},
+		{
+			name: "bounded boundary predicate results",
+			raw:  "BOUNDARY_LEAK:VPN_PASS:IPV4_PASS:IPV6_PASS:DNS_FAIL:BYPASS_PASS:TUNNEL_PASS:COVERAGE_PASS\nFAILURES!!!\n",
+			want: "BOUNDARY_LEAK:VPN_PASS:IPV4_PASS:IPV6_PASS:DNS_FAIL:BYPASS_PASS:TUNNEL_PASS:COVERAGE_PASS",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

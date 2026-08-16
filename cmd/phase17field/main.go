@@ -94,7 +94,7 @@ var (
 	terminalFailurePattern = regexp.MustCompile(`^[A-Za-z0-9 _():/-]{1,512}$`)
 	remotePackagePattern   = regexp.MustCompile(`^/var/tmp/phase17-package-[0-9a-f]{1,16}$`)
 	remoteArchivePattern   = regexp.MustCompile(`^/tmp/phase17-package-[0-9a-f]{1,16}\.tar\.gz$`)
-	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,4}`)
+	instrumentCategoryV1   = regexp.MustCompile(`[A-Z][A-Z0-9_]{2,63}(?::[A-Z0-9_-]{1,64}){0,7}`)
 	frameTrackerCUJLineV1  = regexp.MustCompile(`(?m)^[A-Z]/FrameTracker\(\s*[0-9]+\):[^\r\n]*CUJ=J<[A-Z0-9_]+::[0-9]{1,3}@[0-9]{1,3}@org\.kurdistanvpn\.app\.internal>[^\r\n]*\r?$`)
 	frameTrackerCUJIndexV1 = regexp.MustCompile(`::[0-9]{1,3}@`)
 	frozenImpairmentMatrix = []impairmentScenario{
