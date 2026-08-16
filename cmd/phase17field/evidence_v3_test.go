@@ -95,6 +95,14 @@ func TestBuildTerminalEvidenceV3ClassifiesPrivacyAndIdentityFailuresFailClosed(t
 	}{
 		"privacy":             {err: errors.New("boundary monitor found route or DNS leakage"), wantOutcome: "FAIL_PRIVACY", wantCheck: "routeDnsLeak"},
 		"continuous boundary": {err: &fieldActionFailure{action: "traffic", category: "BOUNDARY_LEAK"}, wantOutcome: "FAIL_PRIVACY", wantCheck: "routeDnsLeak"},
+		"detailed boundary": {
+			err: &fieldActionFailure{
+				action:   "traffic",
+				category: "BOUNDARY_LEAK:VPN_PASS:IPV4_PASS:IPV6_PASS:DNS_FAIL:BYPASS_PASS:TUNNEL_PASS:COVERAGE_PASS",
+			},
+			wantOutcome: "FAIL_PRIVACY",
+			wantCheck:   "routeDnsLeak",
+		},
 		"identity":            {err: errors.New("source identity differs from locked candidate"), wantOutcome: "INVALID_IDENTITY", wantCheck: "preflight"},
 		"forward suspend gap": {err: errCampaignClockGap, wantOutcome: "ABORT_ENVIRONMENT", wantCheck: "preflight"},
 		"backward clock jump": {err: errCampaignClockReversed, wantOutcome: "ABORT_ENVIRONMENT", wantCheck: "preflight"},
