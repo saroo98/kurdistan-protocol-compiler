@@ -16,6 +16,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +36,7 @@ public final class VpnProbeActivity extends Activity {
     private static final int UNDERLAY_ATTEMPT_TIMEOUT_MILLIS = 2_000;
     private static final int MAX_VISIBLE_UNDERLAY_NETWORKS = 4;
     private static final long RETRY_DELAY_MILLIS = 100;
+    private static final String INTERNAL_DNS_IPV4 = "10.77.0.1";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,10 +72,14 @@ public final class VpnProbeActivity extends Activity {
             } else {
                 coverageGap = true;
             }
-            try {
-                tunneledTraffic = echoProbe() && dnsProbe();
-            } catch (Exception ignored) {
-                tunneledTraffic = false;
+            if (underlayTargetAddress != null && underlayTargetPort > 0 &&
+                underlayTargetPort <= 65535) {
+                try {
+                    tunneledTraffic = tcpProbe(underlayTargetAddress, underlayTargetPort) &&
+                        dnsProbe();
+                } catch (Exception ignored) {
+                    tunneledTraffic = false;
+                }
             }
             final Intent result = new Intent(ACTION_RESULT)
                 .setPackage(targetPackage)
@@ -166,29 +172,20 @@ public final class VpnProbeActivity extends Activity {
         }
     }
 
-    private static boolean echoProbe() throws Exception {
-        return retryUntilDeadline(VpnProbeActivity::echoAttempt);
+    private static boolean tcpProbe(InetAddress targetAddress, int targetPort) throws Exception {
+        return retryUntilDeadline(() -> tcpAttempt(targetAddress, targetPort));
     }
 
-    private static boolean echoAttempt() throws Exception {
-        final byte[] payload = new byte[] {0x4b, 0x56, 0x50, 0x4e};
-        final byte[] replyBytes = new byte[32];
-        try (DatagramSocket socket = new DatagramSocket()) {
-            socket.setSoTimeout(ATTEMPT_TIMEOUT_MILLIS);
-            socket.send(
-                new DatagramPacket(
-                    payload,
-                    payload.length,
-                    InetAddress.getByName("198.18.0.53"),
-                    5353
-                )
+    static boolean tcpAttempt(InetAddress targetAddress, int targetPort) throws Exception {
+        if (targetAddress == null || targetPort <= 0 || targetPort > 65535) {
+            return false;
+        }
+        try (Socket socket = new Socket()) {
+            socket.connect(
+                new InetSocketAddress(targetAddress, targetPort),
+                ATTEMPT_TIMEOUT_MILLIS
             );
-            final DatagramPacket reply = new DatagramPacket(replyBytes, replyBytes.length);
-            socket.receive(reply);
-            return Arrays.equals(payload, Arrays.copyOf(reply.getData(), reply.getLength()));
-        } finally {
-            Arrays.fill(payload, (byte) 0);
-            Arrays.fill(replyBytes, (byte) 0);
+            return socket.isConnected();
         }
     }
 
@@ -197,13 +194,8 @@ public final class VpnProbeActivity extends Activity {
     }
 
     private static boolean dnsAttempt() throws Exception {
-        final byte[] query = new byte[] {
-            0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
-            0x07, 'p', 'h', 'a', 's', 'e', '1', '0',
-            0x04, 't', 'e', 's', 't',
-            0x00, 0x00, 0x01, 0x00, 0x01
-        };
+        final int identifier = new SecureRandom().nextInt(0x10000);
+        final byte[] query = buildDnsQuery(identifier);
         final byte[] replyBytes = new byte[512];
         try (DatagramSocket socket = new DatagramSocket()) {
             socket.setSoTimeout(ATTEMPT_TIMEOUT_MILLIS);
@@ -211,24 +203,40 @@ public final class VpnProbeActivity extends Activity {
                 new DatagramPacket(
                     query,
                     query.length,
-                    InetAddress.getByName("198.18.0.53"),
+                    InetAddress.getByName(INTERNAL_DNS_IPV4),
                     53
                 )
             );
             final DatagramPacket reply = new DatagramPacket(replyBytes, replyBytes.length);
             socket.receive(reply);
-            final int length = reply.getLength();
-            return length == query.length + 16
-                && (replyBytes[6] & 0xff) == 0
-                && (replyBytes[7] & 0xff) == 1
-                && (replyBytes[length - 4] & 0xff) == 198
-                && (replyBytes[length - 3] & 0xff) == 18
-                && (replyBytes[length - 2] & 0xff) == 0
-                && (replyBytes[length - 1] & 0xff) == 42;
+            return isDnsResponseValid(replyBytes, reply.getLength(), identifier);
         } finally {
             Arrays.fill(query, (byte) 0);
             Arrays.fill(replyBytes, (byte) 0);
         }
+    }
+
+    static byte[] buildDnsQuery(int identifier) {
+        if (identifier < 0 || identifier > 0xffff) {
+            throw new IllegalArgumentException("DNS_QUERY_REJECTED");
+        }
+        return new byte[] {
+            (byte) (identifier >>> 8), (byte) identifier,
+            0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e',
+            0x03, 'c', 'o', 'm',
+            0x00, 0x00, 0x01, 0x00, 0x01
+        };
+    }
+
+    static boolean isDnsResponseValid(byte[] response, int length, int identifier) {
+        if (response == null || length < 12 || length > response.length ||
+            identifier < 0 || identifier > 0xffff) {
+            return false;
+        }
+        final int observedIdentifier = ((response[0] & 0xff) << 8) | (response[1] & 0xff);
+        return observedIdentifier == identifier && (response[2] & 0x80) != 0;
     }
 
     private static boolean retryUntilDeadline(ProbeAttempt attempt) throws Exception {
