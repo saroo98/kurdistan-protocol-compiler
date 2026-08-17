@@ -14,7 +14,7 @@ import (
 
 func TestWO806ProductionWiringIsolation(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", "./cmd/kprofile", "./internal/product/...")
+	cmd := exec.Command("go", "list", "-buildvcs=false", "-deps", "-f", "{{.ImportPath}}", "./cmd/kprofile", "./internal/product/...")
 	cmd.Dir = root
 	raw, err := cmd.Output()
 	if err != nil {

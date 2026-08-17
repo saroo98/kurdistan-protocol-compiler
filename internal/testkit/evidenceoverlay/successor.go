@@ -37,6 +37,7 @@ type overlay struct {
 	PredecessorBindingSHA256 string  `json:"predecessor_binding_sha256,omitempty"`
 	Entries                  []entry `json:"entries"`
 	SuccessorEntries         []entry `json:"successor_entries,omitempty"`
+	SuccessorEntriesV2       []entry `json:"successor_entries_v2,omitempty"`
 }
 
 type entry struct {
@@ -63,6 +64,7 @@ func LoadSuccessorAtPost(root string, currentAtPost map[string]string, expectedV
 		optional bool
 		entries  func(overlay) []entry
 	}{
+		{Phase17SuccessorPath, "phase17-live-data-plane-v1", true, func(value overlay) []entry { return value.SuccessorEntriesV2 }},
 		{Phase17SuccessorPath, "phase17-live-data-plane-v1", true, func(value overlay) []entry { return value.SuccessorEntries }},
 		{Phase17SuccessorPath, "phase17-live-data-plane-v1", true, func(value overlay) []entry { return value.Entries }},
 		{Phase16DecentralizedSuccessorPath, "phase16-decentralized-self-hosted-v1", true, func(value overlay) []entry { return value.SuccessorEntries }},
@@ -173,8 +175,8 @@ func loadPhase17Predecessors(root string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	pre := make(map[string]string, len(value.Entries)+len(value.SuccessorEntries))
-	for _, entries := range [][]entry{value.SuccessorEntries, value.Entries} {
+	pre := make(map[string]string, len(value.Entries)+len(value.SuccessorEntries)+len(value.SuccessorEntriesV2))
+	for _, entries := range [][]entry{value.SuccessorEntriesV2, value.SuccessorEntries, value.Entries} {
 		for index, item := range entries {
 			observed, ok := pre[item.Path]
 			if !ok {
@@ -223,16 +225,22 @@ func readOverlay(root, relative, expectedVersion string) (overlay, error) {
 	if relative == Phase17SuccessorPath {
 		successorLimit = Phase17SuccessorEntryLimit
 	}
-	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > successorLimit {
+	if value.Version != expectedVersion || len(value.Entries) == 0 || len(value.Entries) > 128 || len(value.SuccessorEntries) > successorLimit || len(value.SuccessorEntriesV2) > successorLimit {
 		return overlay{}, fmt.Errorf("invalid successor overlay identity or cardinality: %s", relative)
 	}
 	if relative != Phase16DecentralizedSuccessorPath && relative != Phase17SuccessorPath && len(value.SuccessorEntries) != 0 {
 		return overlay{}, fmt.Errorf("successor entries are only valid in %s", Phase16DecentralizedSuccessorPath)
 	}
+	if relative != Phase17SuccessorPath && len(value.SuccessorEntriesV2) != 0 {
+		return overlay{}, fmt.Errorf("successor v2 entries are only valid in %s", Phase17SuccessorPath)
+	}
 	if err := validateEntries(value.Entries, relative, "entries"); err != nil {
 		return overlay{}, err
 	}
 	if err := validateEntries(value.SuccessorEntries, relative, "successor_entries"); err != nil {
+		return overlay{}, err
+	}
+	if err := validateEntries(value.SuccessorEntriesV2, relative, "successor_entries_v2"); err != nil {
 		return overlay{}, err
 	}
 	return value, nil

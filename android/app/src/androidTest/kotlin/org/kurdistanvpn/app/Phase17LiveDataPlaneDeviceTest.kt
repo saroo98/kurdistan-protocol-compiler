@@ -26,6 +26,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -47,7 +48,29 @@ class Phase17LiveDataPlaneDeviceTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun ownerUnderlayReachabilityProtectsBeforeBindingAndFailsClosed() {
+    fun ownerUnderlayProtectionBridgeIsPrivateAndRunsInTheVpnProcess() {
+        val activity = compose.activity
+        val packageManager = activity.packageManager
+        val vpnService = packageManager.getServiceInfo(
+            ComponentName(activity, KurdVpnService::class.java),
+            PackageManager.GET_META_DATA,
+        )
+        val bridgeService = runCatching {
+            packageManager.getServiceInfo(
+                ComponentName(activity, InternalVpnSocketProtectionService::class.java),
+                PackageManager.GET_META_DATA,
+            )
+        }.getOrNull()
+
+        assertNotNull("internal owner-underlay protection bridge is missing", bridgeService)
+        requireNotNull(bridgeService)
+        assertFalse(bridgeService.exported)
+        assertNull(bridgeService.permission)
+        assertEquals(vpnService.processName, bridgeService.processName)
+    }
+
+    @Test
+    fun ownerUnderlayReachabilityProtectsBeforeBindingAndFailsClosed() = runBlocking {
         val events = mutableListOf<String>()
         Socket().use { socket ->
             assertTrue(

@@ -36,6 +36,9 @@ func TestGoCoreProofUsesPolicyExactJSONTestCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got, want := proof[1].args, []string{"build", "-buildvcs=false", "./..."}; !equalStrings(got, want) {
+		t.Fatalf("go-core build command = %v, want %v", got, want)
+	}
 	if got, want := proof[3].args, []string{"test", "-json", "-timeout=15m", "-count=1", "./..."}; !equalStrings(got, want) {
 		t.Fatalf("go-core test command = %v, want %v", got, want)
 	}

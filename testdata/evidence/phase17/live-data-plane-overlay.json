@@ -111,6 +111,133 @@
       "post_sha256": "9d823811b27f78a497365d51c4a02b704107b71402b252b59e577eb614ef9e99"
     }
   ],
+  "successor_entries_v2": [
+    {
+      "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
+      "pre_sha256": "3d61003915f5567f6f71bf2e155e730e786023ce93a0b6b3da219dd73dc94ad4",
+      "post_sha256": "f5235a96d2415610bf569545408fa340ea554217f162a4680588dda3371140be"
+    },
+    {
+      "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
+      "pre_sha256": "79954e682b8ea505859d0cad9f7a2d900a3a5166594dd220d2266498f9c93cf9",
+      "post_sha256": "3b60642e3bd7313299f26e50d115fc6cee31f96d61ac844e3e1f2ca8384dc261"
+    },
+    {
+      "path": "android/app/src/internal/AndroidManifest.xml",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "911fad160fdce86a62d148d8a5dce9b3c35567f59ee8ac042b16d8fa17823656"
+    },
+    {
+      "path": "android/app/src/internal/kotlin/org/kurdistanvpn/app/InternalVpnSocketProtectionService.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "15a2ab2a9cda4a9d2039da24339dca97b3c67765a22168b0c25d2eb31e9e6572"
+    },
+    {
+      "path": "android/config/phase17-required-device-tests.txt",
+      "pre_sha256": "a3314ad75a04107527d4b810b2e076c9e7a666b66c21b1e92cae6809adbd66ce",
+      "post_sha256": "2398d95c7d5488f9a5b7043f293eab4a7b5bb4dcb5fe510fe9b1dc28946359b7"
+    },
+    {
+      "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnOwnerSocketProtector.kt",
+      "pre_sha256": "da446d5b14a47cb3c3aebf93a10e5c65d11b53acfe08e7116cfbac8a2edc9946",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnUnderlyingNetwork.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "3d1cfd3a5d6009b0084e968e45604d864272eb43b6b0f2e6ca509e85ff7576e0"
+    },
+    {
+      "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt",
+      "pre_sha256": "c6ebfdea5d4ecc8a467276ca43fd0435bee5fa5c31b1a2f6dbd7d14ca1388f68",
+      "post_sha256": "17cea150315d4e5f7d8e5cd8c0fc61215755595c38bf90508bca592ef6500382"
+    },
+    {
+      "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnOwnerSocketProtectorRegistryTest.kt",
+      "pre_sha256": "e2301bc843d49c030eaa0f11ce5e43b3e07ba23634f085c63f5250cf93556e26",
+      "post_evidence": "ABSENT"
+    },
+    {
+      "path": "android/runtime/android/src/test/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnUnderlyingNetworkTest.kt",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "406f0485ebb269d138b583deeb352104ec45e2e6fe4a194c6e4cfce59d90d3ba"
+    },
+    {
+      "path": "cmd/gate/main.go",
+      "pre_sha256": "ea2b190b5bfa1878801a5812ed3844c76fbe825ba4e10ca1b642d480c1c03afa",
+      "post_sha256": "5b1fe060fa42435729cb3a78754daddc47ee16ae787045be969b0a413c9a0f19"
+    },
+    {
+      "path": "cmd/gate/main_test.go",
+      "pre_sha256": "805d22887fdd41b17f45415b5ea43ac7bb75d350620c65dd12790bf1f3e3c8b1",
+      "post_sha256": "3a76e63c358a308f430c95dad70bcc3efa2da6cdc72fe5232e6f3f2f852d30b2"
+    },
+    {
+      "path": "cmd/phase16verify/main.go",
+      "pre_sha256": "78dd8e7cf5fc33d7338a86fc62af5d417379b89be46d939385d06555ff64fb46",
+      "post_sha256": "f18970e9c42a6875158289ea30c6412d6aaae149cb27ea679b400e85ab459f1e"
+    },
+    {
+      "path": "cmd/phase17field/main_test.go",
+      "pre_sha256": "8f8f6194adf947232ad18a488614647dcbd30c1beb972e95e57b883794fc5336",
+      "post_sha256": "a7df09f7e7e63e54d8516b05cacce95b73cdd4fbd52a5d05f2c524f7de942e65"
+    },
+    {
+      "path": "cmd/phase17verify/artifact.go",
+      "pre_sha256": "b442a9649ab406be49c4c032bc160a3302ee39e0fe8f051a4dc8d16aa32c82f3",
+      "post_sha256": "63f4029198490909ea682fb0552d89f896cfe45c70941942f4e1a7f6635e6e12"
+    },
+    {
+      "path": "cmd/phase17verify/artifact_test.go",
+      "pre_sha256": "0cc297c1f18b47ef8c695a1468a25888db54b38b06be6f3a380adb6b0321baf6",
+      "post_sha256": "1d942643b040d395f8dbf2e77eb15eb1820299aff1d639c8e333dcff81064c7b"
+    },
+    {
+      "path": "cmd/phase17verify/inventory.go",
+      "pre_sha256": "8513d1924510bd5f98ead2fceac4a5bc4362a2ce33bded05dade20dd1edccdb8",
+      "post_sha256": "5d28f4096ce5f238e12e54c1214482b1fb6f81c7eea14e33a4aad0d56b7c52f6"
+    },
+    {
+      "path": "cmd/phase17verify/qualification.go",
+      "pre_sha256": "fd9983099a5162c6af3a5407e1685a5f795c73e61508aea4d34386f33af6148e",
+      "post_sha256": "12b3a3a925b963ab1168ed794f93a545025673a6a9e9e4f0e16592b6dcb7767a"
+    },
+    {
+      "path": "config/ci/proof-policy.json",
+      "pre_sha256": "428934f4a9c4a6d723ee894b0ac98c53a71429c63de672890cf30d3ee2545b21",
+      "post_sha256": "eafe7b48c9070e673a2a645ce063ef691bd2a004cd7cc500234c4f48257eb188"
+    },
+    {
+      "path": "internal/audit/security.go",
+      "pre_sha256": "1fa41a24e1f9a78a7aa907d2ba96c5c14abc7a9d0a29550fd72c1f66f428d143",
+      "post_sha256": "a4b2ad46d14b1dc73faca0388e6dbb9a3ccd36b7759872643cef1fe65ef9608a"
+    },
+    {
+      "path": "internal/audit/security_test.go",
+      "pre_sha256": "c09cafdd78fb7750ac5b4bc67ca222c98b7adc6b3faff631f961e94246b5b1ec",
+      "post_sha256": "5e54cdc018d1f0f862e8e07370340f4ac6e48771e6b4076e3c94f0ff1cc5b5eb"
+    },
+    {
+      "path": "internal/testkit/evidenceoverlay/successor.go",
+      "pre_sha256": "0a6aefe9cfd7c8e855e915d748c2e8f5718c08d458bc952c5129abff5f207daf",
+      "post_sha256": "1161e2db5c146af9a7da979039886d266b0bf18470dda512f0dccf90fa0b205d"
+    },
+    {
+      "path": "internal/testkit/importrules/importrules_test.go",
+      "pre_sha256": "9d17bcca71c4a2ba63991db2d5b0e59b0cf4072acffaf33cf5800195ebf5aa05",
+      "post_sha256": "c6ef7d36001d6f365ce7bf2961b909422eddb2287ded35f20eb2359eda8fa98f"
+    },
+    {
+      "path": "internal/testkit/phase8issuancefixture/isolation_test.go",
+      "pre_sha256": "0632fe57346d31bfe3caad31deb7b37ac2cfb9940d0a93c63ea3e4370f6d7dd5",
+      "post_sha256": "e601bcaf64c3005230da135af0be03144239a0bf11482264d6b8cdc44fc32325"
+    },
+    {
+      "path": "testdata/evidence/phase17/historical-gate-supersession.json",
+      "pre_sha256": "b8443257e2b9631a064ba46d9de80f4b3ab40cb0e51f4abc05b1ad8ffaa4dbcf",
+      "post_sha256": "8e11333f6557afb6e8880508d03d468f08f64aeeb32c0cfbd885027e72848a6f"
+    }
+  ],
   "successor_entries": [
     {
       "path": ".github/workflows/assurance.yml",
