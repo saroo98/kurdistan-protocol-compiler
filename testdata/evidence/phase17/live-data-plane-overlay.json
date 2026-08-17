@@ -165,12 +165,12 @@
     {
       "path": "cmd/gate/main.go",
       "pre_sha256": "ea2b190b5bfa1878801a5812ed3844c76fbe825ba4e10ca1b642d480c1c03afa",
-      "post_sha256": "5b1fe060fa42435729cb3a78754daddc47ee16ae787045be969b0a413c9a0f19"
+      "post_sha256": "0a56d3bf19321f3eaf03c050b1043d96ecbc0b2fb92b13dedfbf242aa3e5134a"
     },
     {
       "path": "cmd/gate/main_test.go",
       "pre_sha256": "805d22887fdd41b17f45415b5ea43ac7bb75d350620c65dd12790bf1f3e3c8b1",
-      "post_sha256": "3a76e63c358a308f430c95dad70bcc3efa2da6cdc72fe5232e6f3f2f852d30b2"
+      "post_sha256": "285988291e5f3491a3063bdfc74b732b3fe8be5b7114a137515799263b5cff39"
     },
     {
       "path": "cmd/phase16verify/main.go",
@@ -201,11 +201,6 @@
       "path": "cmd/phase17verify/qualification.go",
       "pre_sha256": "fd9983099a5162c6af3a5407e1685a5f795c73e61508aea4d34386f33af6148e",
       "post_sha256": "12b3a3a925b963ab1168ed794f93a545025673a6a9e9e4f0e16592b6dcb7767a"
-    },
-    {
-      "path": "config/ci/proof-policy.json",
-      "pre_sha256": "428934f4a9c4a6d723ee894b0ac98c53a71429c63de672890cf30d3ee2545b21",
-      "post_sha256": "eafe7b48c9070e673a2a645ce063ef691bd2a004cd7cc500234c4f48257eb188"
     },
     {
       "path": "internal/audit/security.go",

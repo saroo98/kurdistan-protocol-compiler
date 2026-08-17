@@ -183,6 +183,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 	switch proof {
 	case "go-core":
 		core := append([]step(nil), steps[:4]...)
+		core[1].args = []string{"build", "./..."}
 		core[3].args = []string{"test", "-json", "-timeout=" + goSuiteTimeout, "-count=1", "./..."}
 		return core, nil
 	case "go-executable-evidence":
