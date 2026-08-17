@@ -872,7 +872,9 @@ func TestFieldBoundaryUsesUnrelatedUIDForUnderlayBypassProof(t *testing.T) {
 		[]byte("vpnNetwork.getAllByName(uri.host)"),
 		[]byte("selectReachableUnderlayProbeTarget"),
 		[]byte("canReachUnderlayTarget"),
-		[]byte("toSet() != underlying.toSet()"),
+		[]byte("protectAndBindOwnerSocket"),
+		[]byte("val topologyStable"),
+		[]byte("ownerStillReachable"),
 		[]byte("!uri.host.contains(':')"),
 	} {
 		if !bytes.Contains(harness, required) {

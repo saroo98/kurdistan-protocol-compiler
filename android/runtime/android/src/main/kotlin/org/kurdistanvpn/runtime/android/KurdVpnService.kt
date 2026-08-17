@@ -14,7 +14,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ComponentName
 import android.content.ServiceConnection
-import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.VpnService
@@ -129,14 +128,6 @@ class KurdVpnService : VpnService() {
             getSystemService(ConnectivityManager::class.java),
             ::onUnderlyingNetworkTransition,
         ).also(UnderlyingNetworkMonitor::start)
-        ActiveVpnOwnerSocketProtector.register(
-            owner = this,
-            debuggable = internalQualificationSocketProtectionEnabled(
-                packageName = packageName,
-                debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
-            ),
-            protect = { socket -> this.protect(socket) },
-        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -189,7 +180,6 @@ class KurdVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        ActiveVpnOwnerSocketProtector.unregister(this)
         runCatching { unregisterReceiver(statusQueryReceiver) }
         mainHandler.removeCallbacks(authorityArrivalTimeout)
         mainHandler.removeCallbacks(runtimeHealthCheck)
@@ -393,6 +383,7 @@ class KurdVpnService : VpnService() {
         runCatching { tunnelController?.close() }
         tunnelController = null
         runCatching { setUnderlyingNetworks(null) }
+        ActiveVpnUnderlyingNetwork.publish(null)
         activeConfig = null
     }
 
@@ -553,6 +544,7 @@ class KurdVpnService : VpnService() {
             else -> true
         }
         underlyingNetworkAvailability.update(transition.current, bound)
+        ActiveVpnUnderlyingNetwork.publish(transition.current.takeIf { bound })
         if (transition.current == null) {
             runCatching { setUnderlyingNetworks(null) }
         }

@@ -1008,6 +1008,31 @@ func TestPhase17LiveDataPlaneOverlayRejectsMutationV1(t *testing.T) {
 			t.Fatal("changed added file accepted")
 		}
 	})
+	deletionIndex := -1
+	for index, entry := range overlay.SuccessorEntriesV2 {
+		if entry.PostEvidence == "ABSENT" {
+			deletionIndex = index
+			break
+		}
+	}
+	if deletionIndex < 0 {
+		t.Fatal("phase17 successor-v2 fixture has no deletion entry")
+	}
+	t.Run("deletion-with-post-hash", func(t *testing.T) {
+		candidate := clone()
+		candidate.SuccessorEntriesV2[deletionIndex].PostSHA256 = strings.Repeat("5", 64)
+		if _, err := validateM17LiveDataPlaneOverlayAtPostV1(root, nil, candidate); err == nil {
+			t.Fatal("deletion with a post hash accepted")
+		}
+	})
+	t.Run("deleted-path-present", func(t *testing.T) {
+		candidate := clone()
+		entry := candidate.SuccessorEntriesV2[deletionIndex]
+		current := map[string]string{entry.Path: entry.PreSHA256}
+		if _, err := validateM17LiveDataPlaneOverlayAtPostV1(root, current, candidate); err == nil {
+			t.Fatal("present successor deletion path accepted")
+		}
+	})
 }
 
 func TestPhase13AndroidProductOverlayRejectsMutationV1(t *testing.T) {

@@ -883,7 +883,16 @@ type m17LiveDataPlaneOverlayV1 struct {
 	SelfPreSHA256            string                 `json:"self_pre_sha256"`
 	PredecessorBindingSHA256 string                 `json:"predecessor_binding_sha256"`
 	Entries                  []m2MaintenanceEntryV1 `json:"entries"`
-	SuccessorEntries         []m2MaintenanceEntryV1 `json:"successor_entries"`
+	SuccessorEntries         []m17SuccessorEntryV1  `json:"successor_entries"`
+	SuccessorEntriesV2       []m17SuccessorEntryV1  `json:"successor_entries_v2"`
+}
+
+type m17SuccessorEntryV1 struct {
+	Path         string `json:"path"`
+	PreEvidence  string `json:"pre_evidence"`
+	PreSHA256    string `json:"pre_sha256"`
+	PostEvidence string `json:"post_evidence"`
+	PostSHA256   string `json:"post_sha256"`
 }
 
 var m17LiveDataPlanePathsV1 = []string{
@@ -939,10 +948,14 @@ func validateM17LiveDataPlaneOverlayV1(root string) (m17LiveDataPlaneOverlayV1, 
 func validateM17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[string]string, overlay m17LiveDataPlaneOverlayV1) (m17LiveDataPlaneOverlayV1, error) {
 	const name = "phase17-live-data-plane-v1"
 	const predecessorBinding = "77772a0daab7ba1bd148fcd437ee1c18be535bb0c4272cbc0f84d5dc0b764cf4"
-	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(m17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > evidenceoverlay.Phase17SuccessorEntryLimit {
+	if overlay.Version != name || overlay.SelfPath != evidenceoverlay.Phase17SuccessorPath || overlay.SelfPreEvidence != "ABSENT" || overlay.SelfPreSHA256 != "" || overlay.PredecessorBindingSHA256 != predecessorBinding || len(overlay.Entries) != len(m17LiveDataPlanePathsV1) || len(overlay.SuccessorEntries) > evidenceoverlay.Phase17SuccessorEntryLimit || len(overlay.SuccessorEntriesV2) > evidenceoverlay.Phase17SuccessorEntryLimit {
 		return m17LiveDataPlaneOverlayV1{}, fmt.Errorf("invalid phase17 live-data-plane overlay identity/cardinality")
 	}
-	baseAtPost, err := m17SuccessorPreAtPostV1(root, currentAtPost, overlay.SuccessorEntries)
+	baseAtSuccessorV2, err := m17SuccessorPreAtPostV1(root, currentAtPost, overlay.SuccessorEntriesV2)
+	if err != nil {
+		return m17LiveDataPlaneOverlayV1{}, err
+	}
+	baseAtPost, err := m17SuccessorPreAtPostV1(root, baseAtSuccessorV2, overlay.SuccessorEntries)
 	if err != nil {
 		return m17LiveDataPlaneOverlayV1{}, err
 	}
@@ -983,15 +996,24 @@ func validateM17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[stri
 	return overlay, nil
 }
 
-func m17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, entries []m2MaintenanceEntryV1) (map[string]string, error) {
+func m17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, entries []m17SuccessorEntryV1) (map[string]string, error) {
 	pre := make(map[string]string, len(currentAtPost)+len(entries))
 	for path, hash := range currentAtPost {
 		pre[path] = hash
 	}
 	last := ""
 	for index, entry := range entries {
-		if entry.Path <= last || strings.HasPrefix(entry.Path, ".tools/") || strings.HasPrefix(entry.Path, "planning/") || !validSHA256V1(entry.PostSHA256) {
+		if entry.Path <= last || strings.HasPrefix(entry.Path, ".tools/") || strings.HasPrefix(entry.Path, "planning/") {
 			return nil, fmt.Errorf("invalid phase17 successor entry %d", index)
+		}
+		post := entry.PostSHA256
+		if entry.PostEvidence == "ABSENT" {
+			if entry.PostSHA256 != "" {
+				return nil, fmt.Errorf("invalid phase17 absent successor post-state %d", index)
+			}
+			post = "ABSENT"
+		} else if entry.PostEvidence != "" || !validSHA256V1(entry.PostSHA256) {
+			return nil, fmt.Errorf("invalid phase17 successor post-state %d", index)
 		}
 		predecessor := entry.PreSHA256
 		if entry.PreEvidence == "ABSENT" {
@@ -999,19 +1021,32 @@ func m17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, entri
 				return nil, fmt.Errorf("invalid phase17 absent successor %d", index)
 			}
 			predecessor = "ABSENT"
-		} else if entry.PreEvidence != "" || !validSHA256V1(entry.PreSHA256) || entry.PreSHA256 == entry.PostSHA256 {
+		} else if entry.PreEvidence != "" || !validSHA256V1(entry.PreSHA256) {
 			return nil, fmt.Errorf("invalid phase17 successor predecessor %d", index)
+		}
+		if predecessor == post {
+			return nil, fmt.Errorf("phase17 successor entry does not change state %d", index)
 		}
 		actual, found := pre[entry.Path]
 		if !found {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
-			if err != nil {
-				return nil, err
+			path := filepath.Join(root, filepath.FromSlash(entry.Path))
+			if post == "ABSENT" {
+				if _, err := os.Lstat(path); err == nil {
+					return nil, fmt.Errorf("phase17 successor deletion path still exists: %s", entry.Path)
+				} else if !errors.Is(err, os.ErrNotExist) {
+					return nil, err
+				}
+				actual = "ABSENT"
+			} else {
+				content, err := os.ReadFile(path)
+				if err != nil {
+					return nil, err
+				}
+				actual = fmt.Sprintf("%x", sha256.Sum256(content))
 			}
-			actual = fmt.Sprintf("%x", sha256.Sum256(content))
 		}
-		if actual != entry.PostSHA256 {
-			return nil, fmt.Errorf("phase17 successor hash drift %s=%s want %s", entry.Path, actual, entry.PostSHA256)
+		if actual != post {
+			return nil, fmt.Errorf("phase17 successor hash drift %s=%s want %s", entry.Path, actual, post)
 		}
 		pre[entry.Path] = predecessor
 		last = entry.Path

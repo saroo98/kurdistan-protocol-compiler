@@ -8,9 +8,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.IBinder
+import android.os.Parcel
+import android.os.ParcelFileDescriptor
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
@@ -46,7 +50,6 @@ import org.kurdistanvpn.platform.importing.ArtifactClass
 import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.IngressKind
 import org.kurdistanvpn.platform.importing.VerifyRequestEncoder
-import org.kurdistanvpn.runtime.android.ActiveVpnOwnerSocketProtector
 import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
@@ -81,6 +84,7 @@ internal object Phase17FieldHarness {
     private const val VPN_NETWORK_POLL_MILLIS = 50L
     private const val UNRELATED_UID_BOUNDARY_TIMEOUT_MILLIS = 20_000L
     private const val UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS = 2_000
+    private const val OWNER_SOCKET_PROTECTION_TIMEOUT_MILLIS = 2_000L
     private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
 
     internal data class BoundarySnapshot(
@@ -152,9 +156,9 @@ internal object Phase17FieldHarness {
         observedUid: Int,
     ): Boolean = expectedPackage == observedPackage && expectedUid == observedUid
 
-    internal fun prepareOwnerUnderlaySocket(
+    internal suspend fun prepareOwnerUnderlaySocket(
         socket: Socket,
-        protect: (Socket) -> Boolean,
+        protect: suspend (Socket) -> Boolean,
         bind: (Socket) -> Unit,
     ): Boolean = runCatching {
         check(protect(socket)) { "OWNER_UNDERLAY_SOCKET_PROTECT_FAILED" }
@@ -791,40 +795,32 @@ internal object Phase17FieldHarness {
         if (ownerProbeTargets.isEmpty()) {
             return UnrelatedUidBoundaryObservation(false, false, true)
         }
-        var tunneledTraffic = true
-        var bypassBlocked = true
-        var coverageGap = false
+        val target = selectReachableUnderlayProbeTarget(context, ownerProbeTargets)
+        if (target == null) {
+            ownerProbeTargets.forEach { candidate -> candidate.address.fill(0) }
+            return UnrelatedUidBoundaryObservation(false, false, true)
+        }
         try {
-            for (network in underlying) {
-                val target = selectReachableUnderlayProbeTarget(network, ownerProbeTargets)
-                if (target == null) {
-                    coverageGap = true
-                    continue
-                }
-                val observed = awaitUnrelatedUidBoundaryForTarget(
-                    context = context,
-                    probePackage = probePackage,
-                    probeUid = probeUid,
-                    target = target,
-                )
-                try {
-                    tunneledTraffic = tunneledTraffic && observed.tunneledTraffic
-                    bypassBlocked = bypassBlocked && observed.bypassBlocked
-                    coverageGap = coverageGap || observed.coverageGap ||
-                        !withContext(Dispatchers.IO) {
-                            canReachUnderlayTarget(network, target)
-                        }
-                } finally {
-                    target.address.fill(0)
-                }
+            val observed = awaitUnrelatedUidBoundaryForTarget(
+                context = context,
+                probePackage = probePackage,
+                probeUid = probeUid,
+                target = target,
+            )
+            val ownerStillReachable = withContext(Dispatchers.IO) {
+                canReachUnderlayTarget(context, target)
             }
+            val topologyStable =
+                unrelatedUidUnderlyingNetworks(connectivity, vpnNetwork).toSet() == underlying.toSet()
+            return UnrelatedUidBoundaryObservation(
+                tunneledTraffic = observed.tunneledTraffic,
+                bypassBlocked = observed.bypassBlocked,
+                coverageGap = observed.coverageGap || !ownerStillReachable || !topologyStable,
+            )
         } finally {
-            ownerProbeTargets.forEach { target -> target.address.fill(0) }
+            target.address.fill(0)
+            ownerProbeTargets.forEach { candidate -> candidate.address.fill(0) }
         }
-        if (unrelatedUidUnderlyingNetworks(connectivity, vpnNetwork).toSet() != underlying.toSet()) {
-            coverageGap = true
-        }
-        return UnrelatedUidBoundaryObservation(tunneledTraffic, bypassBlocked, coverageGap)
     }
 
     private suspend fun awaitUnrelatedUidBoundaryForTarget(
@@ -913,12 +909,12 @@ internal object Phase17FieldHarness {
     }
 
     private suspend fun selectReachableUnderlayProbeTarget(
-        network: Network,
+        context: Context,
         candidates: List<UnderlayProbeTarget>,
     ): UnderlayProbeTarget? = withContext(Dispatchers.IO) {
         for (candidate in candidates) {
             val target = UnderlayProbeTarget(candidate.address.copyOf(), candidate.port)
-            if (canReachUnderlayTarget(network, target)) {
+            if (canReachUnderlayTarget(context, target)) {
                 return@withContext target
             }
             target.address.fill(0)
@@ -926,16 +922,18 @@ internal object Phase17FieldHarness {
         null
     }
 
-    private fun canReachUnderlayTarget(
-        network: Network,
+    private suspend fun canReachUnderlayTarget(
+        context: Context,
         target: UnderlayProbeTarget,
     ): Boolean = runCatching {
         Socket().use { socket ->
             check(
                 prepareOwnerUnderlaySocket(
                     socket = socket,
-                    protect = ActiveVpnOwnerSocketProtector::protect,
-                    bind = network::bindSocket,
+                    protect = { candidate ->
+                        protectAndBindOwnerSocket(context, candidate)
+                    },
+                    bind = {},
                 ),
             ) { "OWNER_UNDERLAY_SOCKET_PREPARATION_FAILED" }
             socket.connect(
@@ -944,6 +942,91 @@ internal object Phase17FieldHarness {
             )
         }
     }.isSuccess
+
+    internal suspend fun protectAndBindOwnerSocket(
+        context: Context,
+        socket: Socket,
+    ): Boolean {
+        val descriptor = runCatching {
+            if (!socket.isBound) socket.bind(InetSocketAddress(0))
+            // The extra dup is required on API 26-28 because fromSocket did not
+            // yet duplicate the Socket's descriptor on those releases.
+            ParcelFileDescriptor.fromSocket(socket).dup()
+        }.getOrNull() ?: return false
+        val outcome = CompletableDeferred<Boolean>()
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                outcome.complete(
+                    service?.let { remote ->
+                        transactSocketProtection(remote, descriptor)
+                    } == true,
+                )
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                outcome.complete(false)
+            }
+
+            override fun onNullBinding(name: ComponentName?) {
+                outcome.complete(false)
+            }
+
+            override fun onBindingDied(name: ComponentName?) {
+                outcome.complete(false)
+            }
+        }
+        var bound = false
+        return try {
+            bound = runCatching {
+                context.bindService(
+                    Intent(context, InternalVpnSocketProtectionService::class.java)
+                        .setAction(InternalVpnSocketProtectionService.ACTION_BIND),
+                    connection,
+                    Context.BIND_AUTO_CREATE,
+                )
+            }.getOrDefault(false)
+            if (!bound) {
+                false
+            } else {
+                withTimeoutOrNull(OWNER_SOCKET_PROTECTION_TIMEOUT_MILLIS) {
+                    outcome.await()
+                } ?: false
+            }
+        } finally {
+            if (bound) runCatching { context.unbindService(connection) }
+            runCatching { descriptor.close() }
+        }
+    }
+
+    private fun transactSocketProtection(
+        remote: IBinder,
+        descriptor: ParcelFileDescriptor,
+    ): Boolean {
+        val request = Parcel.obtain()
+        val response = Parcel.obtain()
+        return try {
+            request.writeInterfaceToken(InternalVpnSocketProtectionService.DESCRIPTOR)
+            request.writeInt(1)
+            descriptor.writeToParcel(request, 0)
+            if (
+                !remote.transact(
+                    InternalVpnSocketProtectionService.TRANSACTION_PROTECT_SOCKET,
+                    request,
+                    response,
+                    0,
+                )
+            ) {
+                return false
+            }
+            response.readException()
+            response.readInt() == 1
+        } catch (_: Throwable) {
+            false
+        } finally {
+            request.recycle()
+            response.recycle()
+        }
+    }
 
     @Suppress("DEPRECATION")
     private fun unrelatedUidUnderlyingNetworks(

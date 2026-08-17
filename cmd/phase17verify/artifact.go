@@ -46,7 +46,10 @@ var phase17ForbiddenAPKMarkers = []string{
 	"com/google/firebase/crashlytics",
 	"io/sentry/",
 	"com/google/android/gms/ads",
+	"InternalVpnSocketProtectionService",
 }
+
+const phase17InternalSocketProtectionMarker = "InternalVpnSocketProtectionService"
 
 var phase17BridgeSymbols = []string{
 	"kvpn_abi_info",
@@ -164,6 +167,16 @@ func verifyPhase17Artifacts(releasePath, internalPath, manifestPath string) erro
 	}
 	if err := verifyPhase17NativeSurface(internal, true); err != nil {
 		return fmt.Errorf("internal APK: %w", err)
+	}
+	if err := verifyPhase17InternalAPKMarkers(internal); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyPhase17InternalAPKMarkers(artifact androidartifact.APK) error {
+	if !artifact.Contains(phase17InternalSocketProtectionMarker) {
+		return fmt.Errorf("internal APK is missing owner socket-protection bridge")
 	}
 	return nil
 }
