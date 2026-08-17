@@ -16,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -44,6 +45,61 @@ import org.kurdistanvpn.runtime.api.VpnRuntimeState
 class Phase17LiveDataPlaneDeviceTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun ownerUnderlayReachabilityProtectsBeforeBindingAndFailsClosed() {
+        val events = mutableListOf<String>()
+        Socket().use { socket ->
+            assertTrue(
+                Phase17FieldHarness.prepareOwnerUnderlaySocket(
+                    socket = socket,
+                    protect = { candidate ->
+                        assertTrue(candidate === socket)
+                        events += "protect"
+                        true
+                    },
+                    bind = { candidate ->
+                        assertTrue(candidate === socket)
+                        events += "bind"
+                    },
+                ),
+            )
+        }
+        assertEquals(listOf("protect", "bind"), events)
+
+        events.clear()
+        Socket().use { socket ->
+            assertFalse(
+                Phase17FieldHarness.prepareOwnerUnderlaySocket(
+                    socket = socket,
+                    protect = {
+                        events += "protect"
+                        false
+                    },
+                    bind = { events += "bind" },
+                ),
+            )
+        }
+        assertEquals(listOf("protect"), events)
+
+        events.clear()
+        Socket().use { socket ->
+            assertFalse(
+                Phase17FieldHarness.prepareOwnerUnderlaySocket(
+                    socket = socket,
+                    protect = {
+                        events += "protect"
+                        true
+                    },
+                    bind = {
+                        events += "bind"
+                        throw IOException("synthetic bind failure")
+                    },
+                ),
+            )
+        }
+        assertEquals(listOf("protect", "bind"), events)
+    }
 
     @Test
     fun boundaryObserverFailsClosedForRoutesDnsBypassAndCoverage() {
