@@ -209,6 +209,17 @@ internal object Phase17FieldHarness {
             failure in setOf("LIVE_TLS_REJECTED", "LIVE_FALLBACK_EXHAUSTED") &&
             packetDisposition == "LIVE_STAGE_SOCKET_PROTECTED"
 
+    internal fun isTerminalFieldConnectOutcome(
+        expectDnsAvailable: Boolean,
+        snapshot: VpnRuntimeSnapshot,
+    ): Boolean =
+        isExpectedDnsStartupFailure(
+            expectAvailable = expectDnsAvailable,
+            state = snapshot.state,
+            failure = snapshot.failure,
+            packetDisposition = snapshot.packetDisposition,
+        ) || isTerminalInitialRuntimeOutcome(snapshot)
+
     internal suspend fun awaitNetworkScopedDnsReadiness(
         timeoutMillis: Long,
         pollMillis: Long,
@@ -540,7 +551,12 @@ internal object Phase17FieldHarness {
             controller.stageAuthority(encoded, authorityProvider)
             controller.startStaged()
             val snapshot = withTimeoutOrNull(120_000) {
-                controller.snapshot.first(::isTerminalInitialRuntimeOutcome)
+                controller.snapshot.first { candidate ->
+                    isTerminalFieldConnectOutcome(
+                        expectDnsAvailable = expectDnsAvailable,
+                        snapshot = candidate,
+                    )
+                }
             } ?: error(
                 "LIVE_CONNECT_TIMEOUT:${controller.snapshot.value.state.name}:" +
                     (controller.snapshot.value.packetDisposition

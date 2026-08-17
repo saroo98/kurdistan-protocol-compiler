@@ -115,12 +115,12 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_sha256": "3d61003915f5567f6f71bf2e155e730e786023ce93a0b6b3da219dd73dc94ad4",
-      "post_sha256": "b8a213ce5aee47d476eadc7ddb5d48af93a1fc7b191a83dc15e6fee9c3537e21"
+      "post_sha256": "37665f2e5ee788111ab460f7a233c2845b769d3565da2a0d5ab648cb36235835"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_sha256": "79954e682b8ea505859d0cad9f7a2d900a3a5166594dd220d2266498f9c93cf9",
-      "post_sha256": "3b60642e3bd7313299f26e50d115fc6cee31f96d61ac844e3e1f2ca8384dc261"
+      "post_sha256": "4e4c88bd158f13b954569fbf25abc2bc2eeebdd5ee9d9e2fef238333b94a8bc7"
     },
     {
       "path": "android/app/src/internal/AndroidManifest.xml",
