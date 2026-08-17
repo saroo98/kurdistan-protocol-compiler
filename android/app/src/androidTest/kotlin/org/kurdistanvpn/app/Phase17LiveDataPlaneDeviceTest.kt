@@ -429,6 +429,36 @@ class Phase17LiveDataPlaneDeviceTest {
                 packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
             ),
         )
+
+        assertTrue(
+            Phase17FieldHarness.isTerminalFieldConnectOutcome(
+                expectDnsAvailable = false,
+                snapshot = VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "LIVE_FALLBACK_EXHAUSTED",
+                    packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
+                ),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isTerminalFieldConnectOutcome(
+                expectDnsAvailable = true,
+                snapshot = VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "LIVE_FALLBACK_EXHAUSTED",
+                    packetDisposition = "LIVE_STAGE_SOCKET_PROTECTED",
+                ),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.isTerminalFieldConnectOutcome(
+                expectDnsAvailable = false,
+                snapshot = VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "NETWORK_UNAVAILABLE",
+                ),
+            ),
+        )
     }
 
     @Test
