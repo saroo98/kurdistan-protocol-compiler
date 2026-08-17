@@ -5,6 +5,8 @@ package org.kurdistanvpn.app
 
 import kotlin.math.roundToLong
 import kotlin.random.Random
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
+import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 internal class RuntimeReconnectPolicy(
     private val jitter: (Long) -> Long = { baseDelayMillis ->
@@ -36,6 +38,19 @@ internal fun isRetryableRuntimeFailure(failure: String?): Boolean = failure in s
     "LIVE_NETWORK_UNAVAILABLE",
     "LIVE_FALLBACK_EXHAUSTED",
 )
+
+internal fun isTerminalInitialRuntimeOutcome(snapshot: VpnRuntimeSnapshot): Boolean =
+    when (snapshot.state) {
+        VpnRuntimeState.ACTIVE_KURD_LIVE,
+        VpnRuntimeState.REVOKED,
+        VpnRuntimeState.IDLE,
+        VpnRuntimeState.STOPPING,
+        -> true
+        VpnRuntimeState.FAILED,
+        VpnRuntimeState.BLOCKED,
+        -> !isRetryableRuntimeFailure(snapshot.failure)
+        else -> false
+    }
 
 internal fun jitterReconnectDelay(baseDelayMillis: Long, sample: Double): Long {
     require(baseDelayMillis > 0L) { "base delay must be positive" }

@@ -8,6 +8,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
+import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 class Phase17RuntimeReconnectPolicyTest {
     @Test
@@ -55,6 +57,52 @@ class Phase17RuntimeReconnectPolicyTest {
         assertFalse(isRetryableRuntimeFailure("AUTHORITY_TRUST_REJECTED"))
         assertFalse(isRetryableRuntimeFailure("PROFILE_REVOKED"))
         assertFalse(isRetryableRuntimeFailure(""))
+    }
+
+    @Test
+    fun fieldQualificationWaitsThroughRetryableInitialFailuresOnly() {
+        assertFalse(
+            isTerminalInitialRuntimeOutcome(
+                VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "LIVE_FALLBACK_EXHAUSTED",
+                ),
+            ),
+        )
+        assertFalse(
+            isTerminalInitialRuntimeOutcome(
+                VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.BLOCKED,
+                    failure = "NETWORK_UNAVAILABLE",
+                ),
+            ),
+        )
+        assertFalse(
+            isTerminalInitialRuntimeOutcome(VpnRuntimeSnapshot(VpnRuntimeState.RECONNECTING)),
+        )
+
+        assertTrue(
+            isTerminalInitialRuntimeOutcome(VpnRuntimeSnapshot(VpnRuntimeState.ACTIVE_KURD_LIVE)),
+        )
+        assertTrue(
+            isTerminalInitialRuntimeOutcome(
+                VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "RECONNECT_EXHAUSTED",
+                ),
+            ),
+        )
+        assertTrue(
+            isTerminalInitialRuntimeOutcome(
+                VpnRuntimeSnapshot(
+                    state = VpnRuntimeState.FAILED,
+                    failure = "LIVE_TLS_REJECTED",
+                ),
+            ),
+        )
+        assertTrue(isTerminalInitialRuntimeOutcome(VpnRuntimeSnapshot(VpnRuntimeState.REVOKED)))
+        assertTrue(isTerminalInitialRuntimeOutcome(VpnRuntimeSnapshot(VpnRuntimeState.IDLE)))
+        assertTrue(isTerminalInitialRuntimeOutcome(VpnRuntimeSnapshot(VpnRuntimeState.STOPPING)))
     }
 
     @Test
