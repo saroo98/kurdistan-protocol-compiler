@@ -540,12 +540,7 @@ internal object Phase17FieldHarness {
             controller.stageAuthority(encoded, authorityProvider)
             controller.startStaged()
             val snapshot = withTimeoutOrNull(120_000) {
-                controller.snapshot.first { value ->
-                    value.state == VpnRuntimeState.ACTIVE_KURD_LIVE ||
-                        value.state == VpnRuntimeState.FAILED ||
-                        value.state == VpnRuntimeState.BLOCKED ||
-                        value.state == VpnRuntimeState.REVOKED
-                }
+                controller.snapshot.first(::isTerminalInitialRuntimeOutcome)
             } ?: error(
                 "LIVE_CONNECT_TIMEOUT:${controller.snapshot.value.state.name}:" +
                     (controller.snapshot.value.packetDisposition
