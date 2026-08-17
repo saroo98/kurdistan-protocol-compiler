@@ -797,7 +797,7 @@ func verifyPortableImplementation(root string) error {
 	if err := verifyContainerDefinition(root); err != nil {
 		return err
 	}
-	command := exec.Command("go", "list", "-deps", "./cmd/kurd-node", "./cmd/kurdctl", "./internal/selfhost")
+	command := exec.Command("go", "list", "-buildvcs=false", "-deps", "./cmd/kurd-node", "./cmd/kurdctl", "./internal/selfhost")
 	command.Dir = root
 	output, err := command.CombinedOutput()
 	if err != nil {

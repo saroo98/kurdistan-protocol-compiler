@@ -242,23 +242,33 @@ func (pump *PacketPumpV1) Run(ctx context.Context) error {
 	if pump == nil || pump.closed == nil {
 		return ErrPacketPumpConfig
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	parentCtx := ctx
+	workerCtx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 	outbound := make(chan []byte, pump.config.QueuePackets)
 	inbound := make(chan authenticatedPacketV1, pump.config.IncompleteOps)
 	errorsOut := make(chan error, 5)
-	go pump.readTUNV1(ctx, outbound, errorsOut)
-	go pump.sealCarrierV1(ctx, outbound, errorsOut)
-	go pump.readCarrierV1(ctx, inbound, errorsOut)
-	go pump.writeTUNV1(ctx, inbound, errorsOut)
-	go pump.watchIdleV1(ctx, errorsOut)
+	go pump.readTUNV1(workerCtx, outbound, errorsOut)
+	go pump.sealCarrierV1(workerCtx, outbound, errorsOut)
+	go pump.readCarrierV1(workerCtx, inbound, errorsOut)
+	go pump.writeTUNV1(workerCtx, inbound, errorsOut)
+	go pump.watchIdleV1(workerCtx, errorsOut)
 	select {
-	case <-ctx.Done():
+	case <-parentCtx.Done():
 		_ = pump.Close()
-		return ctx.Err()
+		return parentCtx.Err()
 	case <-pump.closed:
 		return nil
 	case err := <-errorsOut:
+		if parentCtx.Err() != nil {
+			_ = pump.Close()
+			return parentCtx.Err()
+		}
+		select {
+		case <-pump.closed:
+			return nil
+		default:
+		}
 		_ = pump.Close()
 		return err
 	}
@@ -703,6 +713,14 @@ func writeFullV1(writer io.Writer, data []byte) error {
 }
 
 func (pump *PacketPumpV1) reportFailureV1(ctx context.Context, output chan<- error, err error) {
+	if ctx.Err() != nil {
+		return
+	}
+	select {
+	case <-pump.closed:
+		return
+	default:
+	}
 	select {
 	case output <- err:
 	case <-ctx.Done():
