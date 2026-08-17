@@ -137,7 +137,7 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 	}
 	steps := []step{
 		{"module-verify", "go", []string{"mod", "verify"}, ""},
-		{"build", "go", []string{"build", "./..."}, ""},
+		{"build", "go", []string{"build", "-buildvcs=false", "./..."}, ""},
 		{"vet", "go", []string{"vet", "./..."}, ""},
 		{"test", "go", []string{"test", "-timeout=" + goSuiteTimeout, "-count=1", "./..."}, ""},
 		{"executable-evidence", "go", []string{"run", "./cmd/executableevidence"}, ""},

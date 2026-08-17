@@ -91,6 +91,17 @@ func TestPhase17NativeSurfaceRejectsMissingBridge(t *testing.T) {
 	}
 }
 
+func TestPhase17InternalAPKRequiresOwnerSocketProtectionBridge(t *testing.T) {
+	withBridge := phase17APKFixture(t, []string{phase17InternalSocketProtectionMarker})
+	if err := verifyPhase17InternalAPKMarkers(withBridge); err != nil {
+		t.Fatal(err)
+	}
+	withoutBridge := phase17APKFixture(t, nil)
+	if err := verifyPhase17InternalAPKMarkers(withoutBridge); err == nil {
+		t.Fatal("internal APK without owner socket-protection bridge was accepted")
+	}
+}
+
 func TestArtifactPathsRequireAllOrNone(t *testing.T) {
 	if enabled, err := validateArtifactPaths("", "", ""); err != nil || enabled {
 		t.Fatalf("empty artifact paths = %v, %v", enabled, err)
