@@ -46,6 +46,7 @@ import org.kurdistanvpn.platform.importing.ArtifactClass
 import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.IngressKind
 import org.kurdistanvpn.platform.importing.VerifyRequestEncoder
+import org.kurdistanvpn.runtime.android.ActiveVpnOwnerSocketProtector
 import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
@@ -150,6 +151,15 @@ internal object Phase17FieldHarness {
         observedPackage: String?,
         observedUid: Int,
     ): Boolean = expectedPackage == observedPackage && expectedUid == observedUid
+
+    internal fun prepareOwnerUnderlaySocket(
+        socket: Socket,
+        protect: (Socket) -> Boolean,
+        bind: (Socket) -> Unit,
+    ): Boolean = runCatching {
+        check(protect(socket)) { "OWNER_UNDERLAY_SOCKET_PROTECT_FAILED" }
+        bind(socket)
+    }.isSuccess
 
     internal fun requiresUnrelatedUidBoundary(
         shouldVerifyDataPlane: Boolean,
@@ -921,7 +931,13 @@ internal object Phase17FieldHarness {
         target: UnderlayProbeTarget,
     ): Boolean = runCatching {
         Socket().use { socket ->
-            network.bindSocket(socket)
+            check(
+                prepareOwnerUnderlaySocket(
+                    socket = socket,
+                    protect = ActiveVpnOwnerSocketProtector::protect,
+                    bind = network::bindSocket,
+                ),
+            ) { "OWNER_UNDERLAY_SOCKET_PREPARATION_FAILED" }
             socket.connect(
                 InetSocketAddress(InetAddress.getByAddress(target.address), target.port),
                 UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS,
