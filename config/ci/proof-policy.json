@@ -5,7 +5,7 @@
       "id": "go-core",
       "commands": [
         ["go", "mod", "verify"],
-        ["go", "build", "-buildvcs=false", "./..."],
+        ["go", "build", "./..."],
         ["go", "vet", "./..."],
         ["go", "test", "-json", "-timeout=15m", "-count=1", "./..."]
       ],
