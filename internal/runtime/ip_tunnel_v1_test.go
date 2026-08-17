@@ -208,7 +208,8 @@ func TestPacketPumpV1CarriesPacketsBothDirections(t *testing.T) {
 			"client": clientPump.SnapshotV1(),
 			"relay":  relayPump.SnapshotV1(),
 		}
-		if snapshots["client"].CarrierRecordsWritten > 0 && snapshots["relay"].CarrierRecordsWritten > 0 {
+		if snapshots["client"].CarrierRecordsWritten > 0 && snapshots["relay"].CarrierRecordsWritten > 0 &&
+			snapshots["client"].TUNPacketsWritten == 1 && snapshots["relay"].TUNPacketsWritten == 1 {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -224,15 +225,20 @@ func TestPacketPumpV1CarriesPacketsBothDirections(t *testing.T) {
 			t.Fatalf("%s packet-pump snapshot=%+v", name, snapshot)
 		}
 	}
+	for name, results := range map[string]<-chan error{"client": clientResults, "relay": relayResults} {
+		select {
+		case err := <-results:
+			t.Fatalf("%s pump stopped before cancellation: %v", name, err)
+		default:
+		}
+	}
 
 	cancel()
-	_ = clientPump.Close()
-	_ = relayPump.Close()
-	for _, results := range []<-chan error{clientResults, relayResults} {
+	for name, results := range map[string]<-chan error{"client": clientResults, "relay": relayResults} {
 		select {
 		case err := <-results:
 			if err != nil && !errors.Is(err, context.Canceled) {
-				t.Fatalf("pump=%v", err)
+				t.Fatalf("%s pump=%v", name, err)
 			}
 		case <-time.After(2 * time.Second):
 			t.Fatal("pump did not stop")
@@ -622,6 +628,33 @@ func TestPacketPumpV1ReportsUnexpectedCarrierClosureCategorically(t *testing.T) 
 	err = pump.Run(context.Background())
 	if stage, ok := PacketPumpFailureStageV1(err); !ok || stage != PacketPumpStageCarrierReadV1 || !errors.Is(err, io.EOF) {
 		t.Fatalf("unexpected terminal result: stage=%q ok=%v err=%v", stage, ok, err)
+	}
+}
+
+func TestPacketPumpV1SuppressesFailuresAfterAuthoritativeTeardown(t *testing.T) {
+	t.Run("canceled", func(t *testing.T) {
+		pump := &PacketPumpV1{closed: make(chan struct{})}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		assertPacketPumpFailureSuppressedV1(t, pump, ctx)
+	})
+	t.Run("closed", func(t *testing.T) {
+		pump := &PacketPumpV1{closed: make(chan struct{})}
+		close(pump.closed)
+		assertPacketPumpFailureSuppressedV1(t, pump, context.Background())
+	})
+}
+
+func assertPacketPumpFailureSuppressedV1(t *testing.T, pump *PacketPumpV1, ctx context.Context) {
+	t.Helper()
+	for attempt := 0; attempt < 256; attempt++ {
+		failures := make(chan error, 1)
+		pump.reportFailureV1(ctx, failures, ErrPacketPumpIO)
+		select {
+		case err := <-failures:
+			t.Fatalf("teardown failure escaped on attempt %d: %v", attempt, err)
+		default:
+		}
 	}
 }
 
