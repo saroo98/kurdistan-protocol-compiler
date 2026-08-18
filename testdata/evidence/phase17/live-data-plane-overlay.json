@@ -188,9 +188,14 @@
       "post_sha256": "f18970e9c42a6875158289ea30c6412d6aaae149cb27ea679b400e85ab459f1e"
     },
     {
+      "path": "cmd/phase17field/main.go",
+      "pre_sha256": "65aa4029140c7cd33b0204b3e01c8ad87463935382353156597774c73eec6980",
+      "post_sha256": "719cf0a81c498d2ae84cc5b9d1d3a6c442ebc93ee7089072dc3ca86a6dffc82c"
+    },
+    {
       "path": "cmd/phase17field/main_test.go",
       "pre_sha256": "8f8f6194adf947232ad18a488614647dcbd30c1beb972e95e57b883794fc5336",
-      "post_sha256": "a7df09f7e7e63e54d8516b05cacce95b73cdd4fbd52a5d05f2c524f7de942e65"
+      "post_sha256": "97f2dd51b624e30999edd733f162be6c7bcc91c7da9076248e4ae627fa385471"
     },
     {
       "path": "cmd/phase17verify/artifact.go",

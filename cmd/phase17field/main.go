@@ -1820,19 +1820,35 @@ printf DEPLOYMENT_RECONCILE_PASS
 }
 
 func revokeRemoteProfile(ctx context.Context, runner commandRunner, value config, root, profileID string) error {
-	raw, err := ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationScript(profileID)))
-	category := strings.TrimSpace(string(raw))
-	if err == nil && category == "REVOKE_PASS" {
-		return nil
-	}
-	if err == nil || category != "REVOKE_COMMITTED_PENDING" {
+	return revokeRemoteProfileWithDelay(ctx, runner, value, root, profileID, time.Second)
+}
+
+func revokeRemoteProfileWithDelay(
+	ctx context.Context,
+	runner commandRunner,
+	value config,
+	root, profileID string,
+	delay time.Duration,
+) error {
+	return retryFieldCleanup(ctx, 3, delay, func(attemptContext context.Context) error {
+		raw, err := ssh(attemptContext, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationScript(profileID)))
+		category := strings.TrimSpace(string(raw))
+		if err == nil && category == "REVOKE_PASS" {
+			return nil
+		}
+
+		// A failed mutation can still have committed before runtime notification,
+		// even when transport loss prevents the exact pending marker reaching us.
+		// Reconcile authoritative state before deciding whether a retry is safe.
+		raw, reconcileErr := ssh(attemptContext, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationReconcileScript(profileID)))
+		if reconcileErr == nil && strings.TrimSpace(string(raw)) == "REVOKE_PASS" {
+			return nil
+		}
+		if category == "REVOKE_COMMITTED_PENDING" {
+			return errors.New("profile revocation reconciliation failed")
+		}
 		return errors.New("profile revocation failed")
-	}
-	raw, err = ssh(ctx, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationReconcileScript(profileID)))
-	if err != nil || strings.TrimSpace(string(raw)) != "REVOKE_PASS" {
-		return errors.New("profile revocation reconciliation failed")
-	}
-	return nil
+	})
 }
 
 func remoteRevocationScript(profileID string) string {
