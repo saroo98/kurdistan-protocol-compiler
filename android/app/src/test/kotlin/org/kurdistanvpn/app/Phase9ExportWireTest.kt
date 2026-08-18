@@ -10,6 +10,7 @@ import org.junit.Test
 import org.kurdistanvpn.core.model.DiagnosticComponent
 import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
+import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 class Phase9ExportWireTest {
     @Test
@@ -31,6 +32,37 @@ class Phase9ExportWireTest {
         assertTrue(selectRuntimeStatus(current, null, current, null).accept)
         assertFalse(selectRuntimeStatus(current, null, stale, null).accept)
         assertFalse(selectRuntimeStatus(current, null, null, null).accept)
+    }
+
+    @Test
+    fun terminalIdleReleasesCorrelationBeforeAnOlderStoppingBroadcastCanArrive() {
+        val current = "0123456789abcdef0123456789abcdef"
+        val stale = "fedcba9876543210fedcba9876543210"
+
+        assertEquals(
+            current,
+            activeRequestIdAfterRuntimeStatus(
+                current,
+                current,
+                VpnRuntimeState.STOPPING,
+            ),
+        )
+        assertEquals(
+            null,
+            activeRequestIdAfterRuntimeStatus(
+                current,
+                current,
+                VpnRuntimeState.IDLE,
+            ),
+        )
+        assertEquals(
+            current,
+            activeRequestIdAfterRuntimeStatus(
+                current,
+                stale,
+                VpnRuntimeState.IDLE,
+            ),
+        )
     }
 
     @Test
