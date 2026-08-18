@@ -180,6 +180,14 @@ internal object Phase17FieldHarness {
         return shouldVerifyDataPlane || trafficDnsFamilies.isNotEmpty() || verifyBoundary
     }
 
+    internal fun requiresDirectDataPlaneProbe(
+        shouldVerifyDataPlane: Boolean,
+        dnsFamily: Int?,
+        trafficDnsFamilies: List<Int>,
+    ): Boolean =
+        trafficDnsFamilies.isNotEmpty() ||
+            (shouldVerifyDataPlane && dnsFamily == null)
+
     internal fun isExpectedDnsUnavailableFailure(
         expectAvailable: Boolean,
         failure: Throwable,
@@ -647,9 +655,15 @@ internal object Phase17FieldHarness {
                                     verifyDnsPlane(vpnNetwork, family, expectAvailable = true)
                                 }
                                 verifyDataPlane(vpnNetwork)
-                            } else if (dnsFamily == null) {
+                            } else if (
+                                requiresDirectDataPlaneProbe(
+                                    shouldVerifyDataPlane = shouldVerifyDataPlane,
+                                    dnsFamily = dnsFamily,
+                                    trafficDnsFamilies = trafficDnsFamilies,
+                                )
+                            ) {
                                 verifyDataPlane(vpnNetwork)
-                            } else {
+                            } else if (dnsFamily != null) {
                                 verifyDnsPlane(vpnNetwork, dnsFamily, expectDnsAvailable)
                             }
                         },
