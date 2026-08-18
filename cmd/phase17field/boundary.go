@@ -76,7 +76,11 @@ func runBoundaryMonitor(
 	if err := file.Close(); err != nil {
 		return result, errors.New("boundary request close failed")
 	}
+	if err := runner.reserveExternalRemote(ctx); err != nil {
+		return result, errors.New("boundary monitor remote connection budget unavailable")
+	}
 	output, err := runBytesWithLimit(ctx, runner, nil, root, 7*time.Minute, 1<<20, value.boundaryPath, "-request", path)
+	runner.markExternalRemote()
 	if err != nil {
 		return result, errors.New("boundary monitor process failed")
 	}
