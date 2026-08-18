@@ -299,6 +299,7 @@ func stripTerminalControls(raw []byte) []byte {
 
 func normalizeKnownAndroidFrameworkNoise(raw []byte) []byte {
 	result := bytes.Clone(raw)
+	normalizeKnownInstrumentationPackageReferences(result)
 	for offset := 0; offset < len(result); {
 		end := bytes.IndexByte(result[offset:], '\n')
 		if end < 0 {
@@ -326,6 +327,34 @@ func normalizeKnownAndroidFrameworkNoise(raw []byte) []byte {
 	}
 	clear(raw)
 	return result
+}
+
+func normalizeKnownInstrumentationPackageReferences(raw []byte) {
+	packageName := []byte("org.kurdistanvpn.app.internal.test")
+	for offset := 0; offset < len(raw); {
+		relative := bytes.Index(raw[offset:], packageName)
+		if relative < 0 {
+			return
+		}
+		start := offset + relative
+		end := start + len(packageName)
+		beforeStart := max(0, start-256)
+		afterEnd := min(len(raw), end+256)
+		before := bytes.ToLower(raw[beforeStart:start])
+		after := bytes.ToLower(raw[end:afterEnd])
+		frameworkReference :=
+			(bytes.HasSuffix(before, []byte("package [")) && bytes.HasPrefix(after, []byte("] reported as replaced"))) ||
+				bytes.HasSuffix(before, []byte("instrumentation[")) ||
+				(bytes.Contains(before, []byte("/data/app/")) && bytes.Contains(after, []byte("/base.apk")))
+		if frameworkReference {
+			for index := start; index < end; index++ {
+				if raw[index] == '.' {
+					raw[index] = '-'
+				}
+			}
+		}
+		offset = end
+	}
 }
 
 func containsIPAddress(raw []byte) bool {
