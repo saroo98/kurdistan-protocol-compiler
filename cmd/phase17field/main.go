@@ -59,14 +59,19 @@ const (
 	fieldEvidenceResetTimeout    = 30 * time.Second
 	fieldEvidenceAttemptTimeout  = 10 * time.Second
 	androidPackageCompileTimeout = 2 * time.Minute
-	impairmentVerificationTries  = 3
-	impairmentRetryDelay         = 250 * time.Millisecond
-	fieldActionLaunchAttempts    = 2
-	frozenRestartCycles          = 100
-	frozenProfileRotationCycles  = 100
-	maximumRelayRSSBytes         = 384 << 20
-	maximumRelayFileDescriptors  = 1024
-	maximumRelaySwapBytes        = 64 << 20
+	// Android forwards compilation to a lazily started ART service. Only its
+	// documented readiness response is transient; every other failure is terminal.
+	androidARTReadinessAttempts = 31
+	androidARTReadinessDelay    = time.Second
+	androidARTNotReadyOutput    = "ART Service is not ready. Please try again later"
+	impairmentVerificationTries = 3
+	impairmentRetryDelay        = 250 * time.Millisecond
+	fieldActionLaunchAttempts   = 2
+	frozenRestartCycles         = 100
+	frozenProfileRotationCycles = 100
+	maximumRelayRSSBytes        = 384 << 20
+	maximumRelayFileDescriptors = 1024
+	maximumRelaySwapBytes       = 64 << 20
 )
 
 type fieldActionFailure struct {
@@ -728,12 +733,8 @@ func prepareAndroidPackages(ctx context.Context, runner commandRunner, value con
 		return errors.New("Android boundary probe permission unavailable")
 	}
 	for _, packageName := range []string{appPackage, testPackage} {
-		output, err := runBytes(ctx, runner, nil, root, androidPackageCompileTimeout, value.adbPath,
-			"-s", serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", packageName)
-		compiled := err == nil && bytes.Equal(bytes.TrimSpace(output), []byte("Success"))
-		clear(output)
-		if !compiled {
-			return errors.New("Android package compilation failed")
+		if err := compileAndroidPackage(ctx, runner, value, root, serial, packageName); err != nil {
+			return err
 		}
 	}
 	if _, err := runBytes(ctx, runner, nil, root, 30*time.Second, value.adbPath,
@@ -741,6 +742,42 @@ func prepareAndroidPackages(ctx context.Context, runner commandRunner, value con
 		return errors.New("Android VPN permission preparation failed")
 	}
 	return nil
+}
+
+func compileAndroidPackage(ctx context.Context, runner commandRunner, value config, root, serial, packageName string) error {
+	for attempt := 0; attempt < androidARTReadinessAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		output, err := runBytes(ctx, runner, nil, root, androidPackageCompileTimeout, value.adbPath,
+			"-s", serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", packageName)
+		trimmed := bytes.TrimSpace(output)
+		compiled := err == nil && bytes.Equal(trimmed, []byte("Success"))
+		artNotReady := err != nil && bytes.Equal(trimmed, []byte(androidARTNotReadyOutput))
+		clear(output)
+		if compiled {
+			return nil
+		}
+		if parentErr := ctx.Err(); parentErr != nil {
+			return parentErr
+		}
+		if !artNotReady {
+			return errors.New("Android package compilation failed")
+		}
+		if attempt+1 == androidARTReadinessAttempts {
+			return errors.New("Android ART service readiness failed")
+		}
+		timer := time.NewTimer(androidARTReadinessDelay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return errors.New("Android ART service readiness failed")
 }
 
 func packageRequestsPermission(raw []byte, permission string) bool {
