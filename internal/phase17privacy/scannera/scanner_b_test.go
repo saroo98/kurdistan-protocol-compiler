@@ -30,6 +30,7 @@ func TestIndependentPythonScannerAgreesOnParityAndPrivacyCorpus(t *testing.T) {
 		{name: "instrumentation package replacement noise", payload: []byte("D/ActivityThread(23097): Package [org.kurdistanvpn.app.internal.test] reported as REPLACED, but missing application info. Assuming REMOVED."), wantPass: true},
 		{name: "instrumentation ABI noise", payload: []byte("W/ActivityThread(23097): Package uses different ABI(s) than its instrumentation: package[org.kurdistanvpn.app.internal]: x86_64, null instrumentation[org.kurdistanvpn.app.internal.test]: null, null"), wantPass: true},
 		{name: "instrumentation loader noise", payload: []byte("D/nativeloader(23097): Configuring clns-9 for other apk /data/app/random/org.kurdistanvpn.app.internal.test-random/base.apk"), wantPass: true},
+		{name: "instrumentation loader library path with later base apk", payload: []byte("D/nativeloader(23097): Configuring namespace library_path=/data/app/random/org.kurdistanvpn.app.internal.test-random/lib/x86_64 permitted_path=/data classpath=/data/app/random/org.kurdistanvpn.app.internal.test-random/base.apk"), wantPass: true},
 		{name: "instrumentation DNS use", payload: []byte("application resolved DNS name org.kurdistanvpn.app.internal.test"), wantPass: false},
 		{name: "destination", payload: []byte("https://198.51.100.7/check"), wantPass: false},
 		{name: "mapped IPv6", payload: []byte("::ffff:192.0.2.7"), wantPass: false},

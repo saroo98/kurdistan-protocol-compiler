@@ -245,7 +245,7 @@
     {
       "path": "internal/phase17privacy/scannera/scanner_b_test.go",
       "pre_sha256": "8dc3e584f47748d1ec02574ad88ec19c1dfdae985aa00c2097815b659f9a3543",
-      "post_sha256": "969d685bea622794ff53dae0849d41ac335d89ad1216f0ac2765b84758875e7d"
+      "post_sha256": "6d96b82dac112739e2a569006703879582d17f2126c4e19e34c2983ec636bad1"
     },
     {
       "path": "internal/phase17privacy/scannera/scanner_test.go",
@@ -280,7 +280,7 @@
     {
       "path": "scripts/phase17/privacy_scanner_b.py",
       "pre_sha256": "b10a886f88f123ebbfc9a123e784f594dc75a697dcfd324a8a38e5878b4be749",
-      "post_sha256": "247b8a6edbb952b4b7bba1cca9cb9b302f95cbc3c254aeef8cf60b4fca82b244"
+      "post_sha256": "99a74b8a496efb82c1dc969036ac978010b47b48753ec0f968b7837ea2e6b8e6"
     },
     {
       "path": "testdata/evidence/phase17/historical-gate-supersession.json",
