@@ -365,6 +365,38 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun dedicatedBoundaryDoesNotRequireResponseDigestDataPlaneProbe() {
+        assertTrue(
+            Phase17FieldHarness.requiresDirectDataPlaneProbe(
+                shouldVerifyDataPlane = true,
+                dnsFamily = null,
+                trafficDnsFamilies = emptyList(),
+            ),
+        )
+        assertTrue(
+            Phase17FieldHarness.requiresDirectDataPlaneProbe(
+                shouldVerifyDataPlane = false,
+                dnsFamily = null,
+                trafficDnsFamilies = listOf(4, 6),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.requiresDirectDataPlaneProbe(
+                shouldVerifyDataPlane = false,
+                dnsFamily = null,
+                trafficDnsFamilies = emptyList(),
+            ),
+        )
+        assertFalse(
+            Phase17FieldHarness.requiresDirectDataPlaneProbe(
+                shouldVerifyDataPlane = false,
+                dnsFamily = 4,
+                trafficDnsFamilies = emptyList(),
+            ),
+        )
+    }
+
+    @Test
     fun dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected() {
         assertTrue(
             Phase17FieldHarness.isExpectedDnsUnavailableFailure(
