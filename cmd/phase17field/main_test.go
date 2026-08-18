@@ -1067,12 +1067,20 @@ func TestFieldActionsUseDedicatedNonComposeInstrumentationEntryPoint(t *testing.
 	}
 }
 
-type countingConnectionGate struct{ calls int }
+type countingConnectionGate struct {
+	calls             int
+	marks             int
+	transportFailures int
+}
 
 func (gate *countingConnectionGate) wait(context.Context) error {
 	gate.calls++
 	return nil
 }
+
+func (gate *countingConnectionGate) mark() { gate.marks++ }
+
+func (gate *countingConnectionGate) transportFailure() { gate.transportFailures++ }
 
 func TestCommandRunnerPacesOnlyConfiguredRemoteConnections(t *testing.T) {
 	gate := &countingConnectionGate{}
@@ -1090,6 +1098,32 @@ func TestCommandRunnerPacesOnlyConfiguredRemoteConnections(t *testing.T) {
 	}
 	if gate.calls != 2 {
 		t.Fatalf("remote gate calls = %d, want 2", gate.calls)
+	}
+}
+
+func TestCommandRunnerAppliesCooldownAfterRemoteTransportFailure(t *testing.T) {
+	gate := &pacedConnectionGate{transportFailureDelay: 100 * time.Millisecond}
+	calls := 0
+	runner := commandRunner{
+		remoteGate:     gate,
+		remoteCommands: map[string]struct{}{"ssh": {}},
+		runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+			calls++
+			if calls == 1 {
+				return nil, &commandExitFailure{code: 255}
+			}
+			return nil, nil
+		},
+	}
+	if _, err := runner.run(context.Background(), nil, ".", "ssh"); err == nil {
+		t.Fatal("remote transport failure accepted")
+	}
+	started := time.Now()
+	if _, err := runner.run(context.Background(), nil, ".", "ssh"); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed < 70*time.Millisecond {
+		t.Fatalf("remote transport failure cooldown not applied: elapsed=%v", elapsed)
 	}
 }
 
