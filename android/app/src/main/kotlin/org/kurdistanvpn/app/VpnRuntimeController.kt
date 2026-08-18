@@ -72,6 +72,9 @@ class VpnRuntimeController(
             if (!decision.accept) return
             if (decision.consumeQuery) pendingStatusQueryId = null
             decision.bindRequestId?.let { activeRequestId = it }
+            val incomingRequestId = intent.getStringExtra(
+                VpnRuntimeContract.EXTRA_RUNTIME_REQUEST,
+            )
             val state = intent.getStringExtra(VpnRuntimeContract.EXTRA_STATE)
                 ?.let { runCatching { VpnRuntimeState.valueOf(it) }.getOrNull() }
                 ?: VpnRuntimeState.FAILED
@@ -118,9 +121,7 @@ class VpnRuntimeController(
                     VpnRuntimeContract.EXTRA_MAX_RECONNECT_ATTEMPTS,
                     0,
                 ),
-                runtimeRequestId = intent.getStringExtra(
-                    VpnRuntimeContract.EXTRA_RUNTIME_REQUEST,
-                ),
+                runtimeRequestId = incomingRequestId,
                 diagnostics = VpnRuntimeDiagnostics(
                     tunPacketsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, 0),
                     outboundPacketsAccepted = intent.getLongExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, 0),
@@ -141,6 +142,11 @@ class VpnRuntimeController(
                     ),
                 ),
             ))
+            activeRequestId = activeRequestIdAfterRuntimeStatus(
+                activeRequestId = activeRequestId,
+                incomingRequestId = incomingRequestId,
+                state = state,
+            )
         }
     }
 
@@ -402,3 +408,18 @@ internal fun selectRuntimeStatus(
         consumeQuery = true,
     )
 }
+
+internal fun activeRequestIdAfterRuntimeStatus(
+    activeRequestId: String?,
+    incomingRequestId: String?,
+    state: VpnRuntimeState,
+): String? =
+    if (
+        state == VpnRuntimeState.IDLE &&
+        activeRequestId != null &&
+        activeRequestId == incomingRequestId
+    ) {
+        null
+    } else {
+        activeRequestId
+    }

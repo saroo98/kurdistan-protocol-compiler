@@ -412,7 +412,7 @@
     {
       "path": "android/app/src/main/kotlin/org/kurdistanvpn/app/VpnRuntimeController.kt",
       "pre_sha256": "13a4d09b7c3594703d99061a983d94517fad4fb7b7067df82387098b30f53567",
-      "post_sha256": "671e8f5891bd5570d3cf09c9a0aef498afc852db86b5b12c8989627aa1522311"
+      "post_sha256": "9fe758c31c75f3c49020b76c376f0f3ef3268ce0f101bf5f807f79a8e1597668"
     },
     {
       "path": "android/app/src/main/res/xml/network_security_config.xml",
@@ -427,7 +427,7 @@
     {
       "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/Phase9ExportWireTest.kt",
       "pre_sha256": "078423dd0665df9641a16e3546b714b56e89897ae205fc3dae3e1540c7a109d2",
-      "post_sha256": "857fed9e267120f6ab0e720eba3636121b378890f5487702fbda92f52d618e4e"
+      "post_sha256": "89cab4315422f18310cd1098a3a31468d687059e61306e92751b5b1966ff5693"
     },
     {
       "path": "android/app/src/test/kotlin/org/kurdistanvpn/app/RuntimeReconnectCoordinatorTest.kt",
