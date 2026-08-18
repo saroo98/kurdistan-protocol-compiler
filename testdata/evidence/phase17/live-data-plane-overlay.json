@@ -200,12 +200,12 @@
     {
       "path": "cmd/phase17field/main.go",
       "pre_sha256": "65aa4029140c7cd33b0204b3e01c8ad87463935382353156597774c73eec6980",
-      "post_sha256": "d31f678d166e33535344b4c881dde2787f6066c8626813e8eb2d79e6efbc5375"
+      "post_sha256": "45ad6b3b08dcddabac7fd4a6bf4097456566985a3556064e8fddf4f8649b7349"
     },
     {
       "path": "cmd/phase17field/main_test.go",
       "pre_sha256": "8f8f6194adf947232ad18a488614647dcbd30c1beb972e95e57b883794fc5336",
-      "post_sha256": "ed9a252da109df3657315463224d43f5b9c39c64f01b86461be604b149a1ccff"
+      "post_sha256": "04f7b4bc7e6350e7cf561d208f4c50e5b6e436e70e0b545ab95bda47947c996b"
     },
     {
       "path": "cmd/phase17verify/artifact.go",
@@ -226,6 +226,11 @@
       "path": "cmd/phase17verify/qualification.go",
       "pre_sha256": "fd9983099a5162c6af3a5407e1685a5f795c73e61508aea4d34386f33af6148e",
       "post_sha256": "12b3a3a925b963ab1168ed794f93a545025673a6a9e9e4f0e16592b6dcb7767a"
+    },
+    {
+      "path": "internal/audit/codegen_test.go",
+      "pre_sha256": "120b281dcb237b97347a5db84c1866efccc3695d9941519e3c796eb6ad7a9023",
+      "post_sha256": "e987291cf28dbd144a0fcf0f01cab5e4bc5ea490f5ea9ed1b961608e528c64bb"
     },
     {
       "path": "internal/audit/security.go",

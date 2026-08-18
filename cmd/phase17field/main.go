@@ -1008,18 +1008,47 @@ func dnsProbeFamilies(ipv6Authorized bool) []string {
 }
 
 func authorizeIPv6Capability(ctx context.Context, runner commandRunner, value config, root string) (bool, error) {
-	raw, err := sshScript(ctx, runner, value, root, 45*time.Second, remoteIPv6CapabilityScript(value.ipv6ProbeAddress))
-	if err != nil {
-		return false, errors.New("IPv6 capability preflight failed")
+	return authorizeIPv6CapabilityWithDelay(ctx, runner, value, root, time.Second)
+}
+
+func authorizeIPv6CapabilityWithDelay(ctx context.Context, runner commandRunner, value config, root string, busyDelay time.Duration) (bool, error) {
+	const attempts = 3
+	if busyDelay < 0 {
+		return false, errors.New("IPv6 capability retry rejected")
 	}
-	switch strings.TrimSpace(string(raw)) {
-	case "IPV6_AUTHORIZED":
-		return true, nil
-	case "IPV6_UNAVAILABLE":
-		return false, nil
-	default:
-		return false, errors.New("IPv6 capability result rejected")
+	for attempt := 0; attempt < attempts; attempt++ {
+		raw, err := sshScript(ctx, runner, value, root, 45*time.Second, remoteIPv6CapabilityScript(value.ipv6ProbeAddress))
+		category := strings.TrimSpace(string(raw))
+		if err == nil {
+			switch category {
+			case "IPV6_AUTHORIZED":
+				return true, nil
+			case "IPV6_UNAVAILABLE":
+				return false, nil
+			default:
+				return false, errors.New("IPv6 capability result rejected")
+			}
+		}
+		if category != "IPV6_BUSY" {
+			return false, errors.New("IPv6 capability preflight failed")
+		}
+		if attempt+1 == attempts {
+			return false, errors.New("IPv6 capability state remained busy")
+		}
+		if busyDelay == 0 {
+			continue
+		}
+		timer := time.NewTimer(busyDelay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return false, errors.New("IPv6 capability authorization cancelled")
+		case <-timer.C:
+		}
 	}
+	return false, errors.New("IPv6 capability preflight failed")
 }
 
 func remoteIPv6CapabilityScript(probeAddress string) string {
@@ -1038,13 +1067,37 @@ if [ "$global:$default:$forward:$nft6:$external" != true:true:true:true:true ]; 
 pass=%q
 recovery=%q
 [ -f "$pass" ] && [ ! -L "$pass" ] && [ -f "$recovery" ] && [ ! -L "$recovery" ]
+state_lock=%q
+ready=0
+attempt=0
+while [ -d "$state_lock" ] || [ "$ready" -lt 2 ]; do
+  if [ ! -d "$state_lock" ]; then
+    ready=$((ready + 1))
+  else
+    ready=0
+  fi
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 120 ]; then
+    printf IPV6_BUSY
+    exit 5
+  fi
+  sleep 0.25
+done
 tmp=$(mktemp -d /var/tmp/phase17-ipv6.XXXXXX)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 chown kurd-node:kurd-node "$tmp"
 install -o kurd-node -g kurd-node -m 0600 "$recovery" "$tmp/recovery"
-runuser -u kurd-node -- /usr/local/bin/kurdctl network ipv6 enable --data-dir %q --recovery-file "$tmp/recovery" --confirm enable-ipv6 <"$pass" >/dev/null
+set +e
+runuser -u kurd-node -- /usr/local/bin/kurdctl network ipv6 enable --data-dir %q --recovery-file "$tmp/recovery" --confirm enable-ipv6 <"$pass" >/dev/null 2>"$tmp/enable.err"
+status=$?
+set -e
+if [ "$status" -eq 5 ] && grep -Fqx 'kurdctl: busy' "$tmp/enable.err"; then
+  printf IPV6_BUSY
+  exit 5
+fi
+[ "$status" -eq 0 ] || exit "$status"
 printf IPV6_AUTHORIZED
-`, encodedProbe, remotePassFile, remoteRecovery, remoteDataDir)
+`, encodedProbe, remotePassFile, remoteRecovery, remoteDataDir+"/.state.lock", remoteDataDir)
 }
 
 func selectDevice(ctx context.Context, runner commandRunner, value config, androidClass string) (string, int, string, error) {
