@@ -1831,7 +1831,7 @@ func revokeRemoteProfileWithDelay(
 	delay time.Duration,
 ) error {
 	return retryFieldCleanup(ctx, 3, delay, func(attemptContext context.Context) error {
-		raw, err := ssh(attemptContext, runner, value, root, 30*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationScript(profileID)))
+		raw, err := ssh(attemptContext, runner, value, root, 45*time.Second, "sudo -n sh -c "+shellQuote(remoteRevocationScript(profileID)))
 		category := strings.TrimSpace(string(raw))
 		if err == nil && category == "REVOKE_PASS" {
 			return nil
@@ -1856,11 +1856,27 @@ func remoteRevocationScript(profileID string) string {
 pass=%q
 recovery=%q
 profile_id=%s
+state_lock=%q/.state.lock
 [ -f "$pass" ] && [ ! -L "$pass" ] && [ -f "$recovery" ] && [ ! -L "$recovery" ]
 tmp=$(mktemp -d /var/tmp/phase17-revoke.XXXXXX)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 chown kurd-node:kurd-node "$tmp"
 install -o kurd-node -g kurd-node -m 0600 "$recovery" "$tmp/recovery"
+ready=0
+attempt=0
+while [ -d "$state_lock" ] || [ "$ready" -lt 2 ]; do
+  if [ ! -d "$state_lock" ]; then
+    ready=$((ready + 1))
+  else
+    ready=0
+  fi
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 120 ]; then
+    printf REVOKE_BUSY
+    exit 5
+  fi
+  sleep 0.25
+done
 set +e
 runuser -u kurd-node -- /usr/local/bin/kurdctl profile revoke --data-dir %q --profile-id "$profile_id" --recovery-file "$tmp/recovery" --confirm-profile "$profile_id" --control-socket %q <"$pass" >/dev/null 2>"$tmp/revoke.err"
 status=$?
@@ -1873,8 +1889,12 @@ if [ "$status" -eq 7 ] && grep -Fqx 'kurdctl: state committed; runtime notificat
   printf REVOKE_COMMITTED_PENDING
   exit 7
 fi
+if [ "$status" -eq 5 ] && grep -Fqx 'kurdctl: busy' "$tmp/revoke.err"; then
+  printf REVOKE_BUSY
+  exit 5
+fi
 exit "$status"
-`, remotePassFile, remoteRecovery, shellQuote(profileID), remoteDataDir, remoteControl)
+`, remotePassFile, remoteRecovery, shellQuote(profileID), remoteDataDir, remoteDataDir, remoteControl)
 }
 
 func remoteRevocationReconcileScript(profileID string) string {

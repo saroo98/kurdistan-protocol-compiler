@@ -1501,6 +1501,9 @@ func TestRemoteRevocationScriptGrantsKurdNodeAccessToPrivateWorkspace(t *testing
 	for _, required := range []string{
 		"chown kurd-node:kurd-node \"$tmp\"",
 		"install -o kurd-node -g kurd-node -m 0600 \"$recovery\" \"$tmp/recovery\"",
+		"while [ -d \"$state_lock\" ]",
+		"printf REVOKE_BUSY",
+		"grep -Fqx 'kurdctl: busy' \"$tmp/revoke.err\"",
 		"profile_id='profiles.test'",
 		"--profile-id \"$profile_id\"",
 		"--confirm-profile \"$profile_id\"",
@@ -1585,6 +1588,43 @@ func TestRevokeRemoteProfileRetriesAfterTransientUncommittedReadinessFailure(t *
 		case 3:
 			if !strings.Contains(command, "profile revoke") {
 				return nil, errors.New("revocation retry missing")
+			}
+			return []byte("REVOKE_PASS"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	if err := revokeRemoteProfileWithDelay(context.Background(), runner, value, "", "profiles.field", 0); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("revocation calls=%d, want 3", calls)
+	}
+}
+
+func TestRevokeRemoteProfileRetriesCategoricalTransactionBusyUntilReady(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "profile revoke") {
+				return nil, errors.New("initial revocation missing")
+			}
+			return []byte("REVOKE_BUSY"), errors.New("state transaction busy")
+		case 2:
+			if !strings.Contains(command, "profile show") {
+				return nil, errors.New("post-busy reconciliation missing")
+			}
+			return nil, errors.New("profile remains unrevoked")
+		case 3:
+			if !strings.Contains(command, "profile revoke") {
+				return nil, errors.New("revocation readiness retry missing")
 			}
 			return []byte("REVOKE_PASS"), nil
 		default:
