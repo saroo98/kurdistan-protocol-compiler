@@ -343,12 +343,15 @@ func (failure *commandExitFailure) Error() string {
 
 type connectionGate interface {
 	wait(context.Context) error
+	mark()
+	transportFailure()
 }
 
 type pacedConnectionGate struct {
-	mu       sync.Mutex
-	next     time.Time
-	interval time.Duration
+	mu                    sync.Mutex
+	next                  time.Time
+	interval              time.Duration
+	transportFailureDelay time.Duration
 }
 
 func (gate *pacedConnectionGate) wait(ctx context.Context) error {
@@ -366,6 +369,40 @@ func (gate *pacedConnectionGate) wait(ctx context.Context) error {
 	}
 	gate.next = time.Now().Add(gate.interval)
 	return nil
+}
+
+func (gate *pacedConnectionGate) mark() {
+	gate.mu.Lock()
+	defer gate.mu.Unlock()
+	next := time.Now().Add(gate.interval)
+	if next.After(gate.next) {
+		gate.next = next
+	}
+}
+
+func (gate *pacedConnectionGate) transportFailure() {
+	if gate.transportFailureDelay <= 0 {
+		return
+	}
+	gate.mu.Lock()
+	defer gate.mu.Unlock()
+	next := time.Now().Add(gate.transportFailureDelay)
+	if next.After(gate.next) {
+		gate.next = next
+	}
+}
+
+func (runner commandRunner) reserveExternalRemote(ctx context.Context) error {
+	if runner.remoteGate == nil {
+		return nil
+	}
+	return runner.remoteGate.wait(ctx)
+}
+
+func (runner commandRunner) markExternalRemote() {
+	if runner.remoteGate != nil {
+		runner.remoteGate.mark()
+	}
 }
 
 func main() {
@@ -664,7 +701,7 @@ func prepareProductionCommandRunner(runner commandRunner, value config) commandR
 	if runner.runFunc != nil {
 		return runner
 	}
-	runner.remoteGate = &pacedConnectionGate{interval: 7 * time.Second}
+	runner.remoteGate = &pacedConnectionGate{interval: 7 * time.Second, transportFailureDelay: 15 * time.Second}
 	runner.remoteCommands = map[string]struct{}{value.sshPath: {}, value.scpPath: {}}
 	return runner
 }
@@ -2382,7 +2419,8 @@ func (runner commandRunner) runWithLimit(ctx context.Context, stdin []byte, dire
 	if maximum < 1 {
 		return nil, errors.New("command output bound rejected")
 	}
-	if _, remote := runner.remoteCommands[name]; remote && runner.remoteGate != nil {
+	_, remote := runner.remoteCommands[name]
+	if remote && runner.remoteGate != nil {
 		if err := runner.remoteGate.wait(ctx); err != nil {
 			return nil, err
 		}
@@ -2393,6 +2431,7 @@ func (runner commandRunner) runWithLimit(ctx context.Context, stdin []byte, dire
 			clear(raw)
 			return nil, errors.New("command output exceeded bound")
 		}
+		runner.recordRemoteTransportFailure(ctx, remote, err)
 		return raw, err
 	}
 	command := exec.CommandContext(ctx, name, arguments...)
@@ -2410,11 +2449,24 @@ func (runner commandRunner) runWithLimit(ctx context.Context, stdin []byte, dire
 	if err != nil {
 		var exitFailure *exec.ExitError
 		if errors.As(err, &exitFailure) {
-			return output.data, &commandExitFailure{code: exitFailure.ExitCode()}
+			err = &commandExitFailure{code: exitFailure.ExitCode()}
+			runner.recordRemoteTransportFailure(ctx, remote, err)
+			return output.data, err
 		}
+		runner.recordRemoteTransportFailure(ctx, remote, ctx.Err())
 		return output.data, errors.New("command launch failed")
 	}
 	return output.data, nil
+}
+
+func (runner commandRunner) recordRemoteTransportFailure(ctx context.Context, remote bool, err error) {
+	if !remote || runner.remoteGate == nil || err == nil {
+		return
+	}
+	var exitFailure *commandExitFailure
+	if ctx.Err() != nil || errors.As(err, &exitFailure) && exitFailure.code == 255 {
+		runner.remoteGate.transportFailure()
+	}
 }
 
 type boundedBuffer struct {
