@@ -195,7 +195,7 @@
     {
       "path": "cmd/phase17field/boundary_test.go",
       "pre_sha256": "9ac4a10f617399bffa3b610b56888c823c951c2326b850896677fcc4b448ce63",
-      "post_sha256": "5c4802fda885ce0291a049e3fa4e518e5b6e1f3543b48e5432245175fac406e4"
+      "post_sha256": "57925e1b7b4bc8694d88200586f721fd95c3251f44f3ae9a5c717b9c195559b2"
     },
     {
       "path": "cmd/phase17field/main.go",
@@ -238,6 +238,21 @@
       "post_sha256": "5e54cdc018d1f0f862e8e07370340f4ac6e48771e6b4076e3c94f0ff1cc5b5eb"
     },
     {
+      "path": "internal/phase17privacy/scannera/scanner.go",
+      "pre_sha256": "eb8f515b1d6f2f8c46a8e288c8ddc6da9104952fe6cd1509eac867f21d50dbde",
+      "post_sha256": "85a1f0f07ba76f0fefcd9a9ddc2d0840d15bf8dc582c59d0561a8ffc9596518d"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/scanner_b_test.go",
+      "pre_sha256": "8dc3e584f47748d1ec02574ad88ec19c1dfdae985aa00c2097815b659f9a3543",
+      "post_sha256": "969d685bea622794ff53dae0849d41ac335d89ad1216f0ac2765b84758875e7d"
+    },
+    {
+      "path": "internal/phase17privacy/scannera/scanner_test.go",
+      "pre_sha256": "dab6d13bf1f918b8bc0ee726f0c446ba74552ed40323adc0f6b68c237f711b05",
+      "post_sha256": "493c2df8037038866640fbcf47ea993eed6f62df5921bc930cc045c67c2c93cd"
+    },
+    {
       "path": "internal/runtime/ip_tunnel_v1.go",
       "pre_sha256": "79f58fc3e5421cee9b7184eb805794831e483ced176779aff1233b171a66d2a9",
       "post_sha256": "45d822551c994bf8f34e85c558d6e03875232ef871a6a77b4bd8733172551307"
@@ -261,6 +276,11 @@
       "path": "internal/testkit/phase8issuancefixture/isolation_test.go",
       "pre_sha256": "0632fe57346d31bfe3caad31deb7b37ac2cfb9940d0a93c63ea3e4370f6d7dd5",
       "post_sha256": "e601bcaf64c3005230da135af0be03144239a0bf11482264d6b8cdc44fc32325"
+    },
+    {
+      "path": "scripts/phase17/privacy_scanner_b.py",
+      "pre_sha256": "b10a886f88f123ebbfc9a123e784f594dc75a697dcfd324a8a38e5878b4be749",
+      "post_sha256": "247b8a6edbb952b4b7bba1cca9cb9b302f95cbc3c254aeef8cf60b4fca82b244"
     },
     {
       "path": "testdata/evidence/phase17/historical-gate-supersession.json",
