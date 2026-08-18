@@ -86,6 +86,31 @@ func TestScanAcceptsKnownAndroidFrameworkAddressLookingNoise(t *testing.T) {
 	}
 }
 
+func TestScanAcceptsKnownAndroidInstrumentationPackageNoiseButStillDetectsDNSUse(t *testing.T) {
+	frameworkLines := []string{
+		"D/ActivityThread(23097): Package [org.kurdistanvpn.app.internal.test] reported as REPLACED, but missing application info. Assuming REMOVED.",
+		"W/ActivityThread(23097): Package uses different ABI(s) than its instrumentation: package[org.kurdistanvpn.app.internal]: x86_64, null instrumentation[org.kurdistanvpn.app.internal.test]: null, null",
+		"D/nativeloader(23097): Configuring clns-9 for other apk /data/app/random/org.kurdistanvpn.app.internal.test-random/base.apk",
+		"W/pn.app.internal(23097): ClassLoaderContext classpath size mismatch at /data/app/random/org.kurdistanvpn.app.internal.test-random/base.apk",
+	}
+	for _, frameworkLine := range frameworkLines {
+		raw := scannerStream([2]string{"ANDROID_LOGCAT", frameworkLine}, [2]string{"REMOTE_JOURNAL", "safe"})
+		receipt := Scan(bytes.NewReader(raw), int64(len(raw)))
+		if receipt.Result != "PASS" || receipt.Privacy != (Privacy{}) {
+			t.Fatalf("framework receipt=%+v", receipt)
+		}
+	}
+
+	raw := scannerStream(
+		[2]string{"ANDROID_LOGCAT", "application resolved DNS name org.kurdistanvpn.app.internal.test"},
+		[2]string{"REMOTE_JOURNAL", "safe"},
+	)
+	receipt := Scan(bytes.NewReader(raw), int64(len(raw)))
+	if receipt.Result != "FAIL" || !receipt.Privacy.DNSNameRetained {
+		t.Fatalf("application receipt=%+v", receipt)
+	}
+}
+
 func TestScanFailsClosedForMalformedTruncatedAndCoverageGap(t *testing.T) {
 	malformed := []byte("not-json\n")
 	if receipt := Scan(bytes.NewReader(malformed), int64(len(malformed))); receipt.Result != "FAIL" || !receipt.ParseFailure {
