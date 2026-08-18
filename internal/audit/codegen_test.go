@@ -461,7 +461,11 @@ func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committ
 }
 
 func validateEvidenceOverlaysV1(root string, manifest committedEvidenceManifestV1) (map[string]string, error) {
-	phase14Pre, err := validatePhase14AssuranceOverlayV1(root, manifest.Phase14AssuranceOverlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	phase14Pre, err := validatePhase14AssuranceOverlayAtPostV1(root, state.current, manifest.Phase14AssuranceOverlays)
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +680,11 @@ func validatePhase2CompleteOverlayV1(root string, currentAtPost map[string]strin
 }
 
 func validatePhase8ProfileCryptographyOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
-	return validatePhase8ProfileCryptographyOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase8ProfileCryptographyOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase8ProfileCryptographyOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
@@ -754,7 +762,11 @@ func validatePhase8ProfileCryptographyOverlayAtPostV1(root string, currentAtPost
 }
 
 func validatePhase8WO801ThreatModelOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
-	return validatePhase8WO801ThreatModelOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase8WO801ThreatModelOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase8WO801ThreatModelOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
@@ -820,7 +832,11 @@ func validatePhase8WO801ThreatModelOverlayAtPostV1(root string, currentAtPost ma
 }
 
 func validatePhase8GuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
-	return validatePhase8GuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase8GuardMaintenanceOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase8GuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
@@ -855,7 +871,11 @@ func validatePhase8GuardMaintenanceOverlayAtPostV1(root string, currentAtPost ma
 }
 
 func validatePhase8FinalGuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
-	return validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
@@ -943,6 +963,14 @@ func validatePhase8FinalGuardMaintenanceOverlayAtPostV1(root string, currentAtPo
 }
 
 func validatePhase14AssuranceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase14AssuranceOverlayAtPostV1(root, state.current, overlays)
+}
+
+func validatePhase14AssuranceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
 	const name = "phase14-assurance-v1"
 	const predecessorBinding = "eefcbeb7a93a4472fa7563a3b0fb8d7399001da4fe309ae735861369ed57a0fa"
 	overlay, ok := overlays[name]
@@ -951,14 +979,14 @@ func validatePhase14AssuranceOverlayV1(root string, overlays map[string]committe
 		len(overlay.Paths) == 0 || len(overlay.Paths) > 256 || len(overlay.Paths) != len(overlay.Entries) {
 		return nil, fmt.Errorf("invalid phase14 assurance overlay identity/cardinality")
 	}
-	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
-	if err != nil {
-		return nil, fmt.Errorf("load Phase 15 successor overlay: %w", err)
+	pre := make(map[string]string, len(currentAtPost)+len(overlay.Paths))
+	for path, digest := range currentAtPost {
+		pre[path] = digest
 	}
-	pre := make(map[string]string, len(overlay.Paths))
 	binding := sha256.New()
 	_, _ = fmt.Fprintln(binding, overlay.SelfPreSHA256)
 	last := ""
+	var err error
 	for index, path := range overlay.Paths {
 		entry := overlay.Entries[index]
 		if path != entry.Path || path <= last || path == overlay.SelfPath || strings.HasPrefix(path, ".tools/") || strings.HasPrefix(path, "planning/") || !validHelperOwnerSHA256V1(entry.PostSHA256) {
@@ -974,7 +1002,7 @@ func validatePhase14AssuranceOverlayV1(root string, overlays map[string]committe
 			return nil, fmt.Errorf("invalid phase14 predecessor %d", index)
 		}
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
-		actual, found := successor[path]
+		actual, found := currentAtPost[path]
 		if !found {
 			actual, err = fileSHA256V1(root, path)
 		}
@@ -1159,7 +1187,11 @@ func validatePhase12OperatorControlPlaneOverlayV1(root string, currentAtPost map
 }
 
 func validatePhase11LocalTransportOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
-	return validatePhase11LocalTransportOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase11LocalTransportOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase11LocalTransportOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
@@ -1208,7 +1240,11 @@ func validatePhase11LocalTransportOverlayAtPostV1(root string, currentAtPost map
 }
 
 func validatePhase10VPNRuntimeOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
-	return validatePhase10VPNRuntimeOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase10VPNRuntimeOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
@@ -1262,7 +1298,11 @@ func validatePhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost map[str
 }
 
 func validatePhase9GuardMaintenanceOverlayV1(root string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
-	return validatePhase9GuardMaintenanceOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase9GuardMaintenanceOverlayAtPostV1(root, state.current, overlays)
 }
 
 func validatePhase9GuardMaintenanceOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]committedMaintenanceOverlayV1) (map[string]string, error) {
@@ -1316,7 +1356,11 @@ func validatePhase9GuardMaintenanceOverlayAtPostV1(root string, currentAtPost ma
 }
 
 func validatePhase8WO801AdoptionOverlayV1(root string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
-	return validatePhase8WO801AdoptionOverlayAtPostV1(root, nil, overlays)
+	state, err := loadEvidenceStateV1(root, evidenceoverlay.LoadSuccessor)
+	if err != nil {
+		return nil, err
+	}
+	return validatePhase8WO801AdoptionOverlayAtPostV1(root, state.current, overlays)
 }
 func validatePhase8WO801AdoptionOverlayAtPostV1(root string, currentAtPost map[string]string, overlays map[string]phase2CompleteOverlayV1) (map[string]string, error) {
 	const name = "phase8-wo801-adoption-v1"
@@ -1615,8 +1659,35 @@ func validateConvergenceOverlayV1(currentAtPost map[string]string, overlays map[
 	return result, nil
 }
 
+type evidenceSuccessorLoaderV1 func(root, expectedVersion string) (map[string]string, error)
+
+type evidenceStateV1 struct {
+	root    string
+	current map[string]string
+}
+
+func loadEvidenceStateV1(root string, load evidenceSuccessorLoaderV1) (evidenceStateV1, error) {
+	current, err := load(root, "phase15-production-contract-v1")
+	if err != nil {
+		return evidenceStateV1{}, fmt.Errorf("load Phase 15 successor overlay: %w", err)
+	}
+	return evidenceStateV1{root: root, current: current}, nil
+}
+
+func (s evidenceStateV1) resolve(path string) (string, error) {
+	if digest, ok := s.current[path]; ok {
+		return digest, nil
+	}
+	return fileSHA256V1(s.root, path)
+}
+
 func fileSHA256V1(root, path string) (string, error) {
-	return evidenceoverlay.ResolveCurrentSHA256(root, path)
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
 }
 
 func validHelperOwnerSHA256V1(value string) bool {
@@ -1735,6 +1806,30 @@ func TestM2HelperOwnerOverlayCompositionMutationsV2(t *testing.T) {
 		if string(gotV1) != string(v1Raw) {
 			t.Fatalf("helper-owner v1 changed by mutation %d", i)
 		}
+	}
+}
+
+func TestEvidenceStateLoadsSuccessorOnceForManyHashes(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	loads := 0
+	state, err := loadEvidenceStateV1(root, func(root, expectedVersion string) (map[string]string, error) {
+		loads++
+		return evidenceoverlay.LoadSuccessor(root, expectedVersion)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"cmd/phase17field/main.go",
+		"internal/audit/security.go",
+		"go.mod",
+	} {
+		if _, err := state.resolve(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if loads != 1 {
+		t.Fatalf("successor loads=%d, want 1", loads)
 	}
 }
 

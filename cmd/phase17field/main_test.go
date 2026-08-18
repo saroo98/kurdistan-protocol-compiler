@@ -305,6 +305,62 @@ func TestPrepareIPv6CapabilityRestoresNetworkPolicyBeforeAuthorization(t *testin
 	}
 }
 
+func TestAuthorizeIPv6CapabilityRetriesOnlyCategoricalBusy(t *testing.T) {
+	attempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, stdin []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 || arguments[len(arguments)-1] != "sudo -n sh -s" {
+			return nil, errors.New("unexpected command")
+		}
+		if !strings.Contains(string(stdin), "IPV6_BUSY") || !strings.Contains(string(stdin), "kurdctl: busy") {
+			return nil, errors.New("busy result was not categorical")
+		}
+		attempts++
+		if attempts == 1 {
+			return []byte("IPV6_BUSY\n"), &commandExitFailure{code: 5}
+		}
+		return []byte("IPV6_AUTHORIZED\n"), nil
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", ipv6ProbeAddress: "2001:db8::1"}
+	authorized, err := authorizeIPv6CapabilityWithDelay(context.Background(), runner, value, ".", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !authorized || attempts != 2 {
+		t.Fatalf("authorized=%v attempts=%d", authorized, attempts)
+	}
+}
+
+func TestAuthorizeIPv6CapabilityDoesNotRetryNonBusyFailure(t *testing.T) {
+	attempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+		attempts++
+		return []byte("kurdctl: recovery rejected\n"), &commandExitFailure{code: 4}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", ipv6ProbeAddress: "2001:db8::1"}
+	if _, err := authorizeIPv6CapabilityWithDelay(context.Background(), runner, value, ".", 0); err == nil {
+		t.Fatal("non-busy IPv6 authorization failure was accepted")
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
+func TestAuthorizeIPv6CapabilityRejectsPersistentBusyState(t *testing.T) {
+	attempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+		attempts++
+		return []byte("IPV6_BUSY\n"), &commandExitFailure{code: 5}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", ipv6ProbeAddress: "2001:db8::1"}
+	_, err := authorizeIPv6CapabilityWithDelay(context.Background(), runner, value, ".", 0)
+	if err == nil || err.Error() != "IPv6 capability state remained busy" {
+		t.Fatalf("persistent busy error=%v", err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
 func TestPrepareRemoteCampaignAuthorityRotatesBeforeFieldTraffic(t *testing.T) {
 	step := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
@@ -2725,6 +2781,8 @@ func TestRemoteIPv6CapabilityScriptRequiresEveryPlanCapability(t *testing.T) {
 		"net.ipv6.conf.all.forwarding", "nft list table inet kurd_node",
 		"ip6 saddr fd4b:7572:6400::/64", "ping -6 -n -c 1",
 		"kurdctl network ipv6 enable", "--confirm enable-ipv6",
+		"state_lock=\"/var/lib/kurd-node/.state.lock\"", "ready=0", "attempt=0",
+		"grep -Fqx 'kurdctl: busy'", "printf IPV6_BUSY",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("IPv6 capability script missing %q", required)
