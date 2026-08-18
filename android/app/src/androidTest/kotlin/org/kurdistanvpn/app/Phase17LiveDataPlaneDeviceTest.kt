@@ -207,6 +207,117 @@ class Phase17LiveDataPlaneDeviceTest {
     }
 
     @Test
+    fun coverageOnlyBoundaryInstabilityIsReobservedUntilComplete() = runBlocking {
+        val passingBoundary = Phase17FieldHarness.BoundarySnapshot(
+            vpnActive = true,
+            ipv4Default = true,
+            ipv6Default = true,
+            dnsPinned = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+        val passingUnrelatedUid = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
+            tunneledTraffic = true,
+            bypassBlocked = true,
+            coverageGap = false,
+        )
+        val observations = ArrayDeque(
+            listOf(
+                Phase17FieldHarness.BoundaryObservation(
+                    boundary = passingBoundary.copy(coverageGap = true),
+                    unrelatedUidBoundary = passingUnrelatedUid.copy(coverageGap = true),
+                ),
+                Phase17FieldHarness.BoundaryObservation(
+                    boundary = passingBoundary,
+                    unrelatedUidBoundary = passingUnrelatedUid,
+                ),
+            ),
+        )
+        var attempts = 0
+
+        val result = Phase17FieldHarness.awaitCompleteBoundaryObservation(
+            verifyIpv6 = true,
+            maximumCoverageAttempts = 3,
+            retryDelayMillis = 0,
+            observe = {
+                attempts++
+                observations.removeFirst()
+            },
+        )
+
+        assertEquals(2, attempts)
+        assertFalse(result.boundary.coverageGap)
+        assertFalse(requireNotNull(result.unrelatedUidBoundary).coverageGap)
+    }
+
+    @Test
+    fun boundaryReobservationNeverRetriesConcreteLeak() = runBlocking {
+        val concreteLeak = Phase17FieldHarness.BoundaryObservation(
+            boundary = Phase17FieldHarness.BoundarySnapshot(
+                vpnActive = true,
+                ipv4Default = true,
+                ipv6Default = true,
+                dnsPinned = true,
+                bypassBlocked = false,
+                coverageGap = true,
+            ),
+            unrelatedUidBoundary = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
+                tunneledTraffic = true,
+                bypassBlocked = false,
+                coverageGap = true,
+            ),
+        )
+        var attempts = 0
+
+        val result = Phase17FieldHarness.awaitCompleteBoundaryObservation(
+            verifyIpv6 = true,
+            maximumCoverageAttempts = 3,
+            retryDelayMillis = 0,
+            observe = {
+                attempts++
+                concreteLeak
+            },
+        )
+
+        assertEquals(1, attempts)
+        assertFalse(result.boundary.bypassBlocked)
+    }
+
+    @Test
+    fun persistentCoverageGapRemainsFailClosedAfterBoundedAttempts() = runBlocking {
+        val persistentGap = Phase17FieldHarness.BoundaryObservation(
+            boundary = Phase17FieldHarness.BoundarySnapshot(
+                vpnActive = true,
+                ipv4Default = true,
+                ipv6Default = true,
+                dnsPinned = true,
+                bypassBlocked = true,
+                coverageGap = true,
+            ),
+            unrelatedUidBoundary = Phase17FieldHarness.UnrelatedUidBoundaryObservation(
+                tunneledTraffic = true,
+                bypassBlocked = true,
+                coverageGap = true,
+            ),
+        )
+        var attempts = 0
+
+        val result = Phase17FieldHarness.awaitCompleteBoundaryObservation(
+            verifyIpv6 = true,
+            maximumCoverageAttempts = 3,
+            retryDelayMillis = 0,
+            observe = {
+                attempts++
+                persistentGap
+            },
+        )
+
+        assertEquals(3, attempts)
+        assertTrue(result.boundary.coverageGap)
+        assertFalse(Phase17FieldHarness.evaluateBoundarySnapshot(result.boundary, verifyIpv6 = true))
+    }
+
+    @Test
     fun unrelatedUidBoundaryRequiresTunneledTrafficAndBlockedUnderlay() {
         assertTrue(
             Phase17FieldHarness.isIndependentProbeIdentity(

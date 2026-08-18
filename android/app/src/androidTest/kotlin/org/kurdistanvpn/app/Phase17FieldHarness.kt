@@ -83,6 +83,8 @@ internal object Phase17FieldHarness {
     private const val VPN_NETWORK_TEARDOWN_TIMEOUT_MILLIS = 15_000L
     private const val VPN_NETWORK_POLL_MILLIS = 50L
     private const val UNRELATED_UID_BOUNDARY_TIMEOUT_MILLIS = 20_000L
+    private const val BOUNDARY_COVERAGE_MAX_ATTEMPTS = 3
+    private const val BOUNDARY_COVERAGE_RETRY_DELAY_MILLIS = 100L
     private const val UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS = 2_000
     private const val OWNER_SOCKET_PROTECTION_TIMEOUT_MILLIS = 2_000L
     private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
@@ -100,6 +102,11 @@ internal object Phase17FieldHarness {
         val tunneledTraffic: Boolean,
         val bypassBlocked: Boolean,
         val coverageGap: Boolean,
+    )
+
+    internal data class BoundaryObservation(
+        val boundary: BoundarySnapshot,
+        val unrelatedUidBoundary: UnrelatedUidBoundaryObservation?,
     )
 
     private data class UnderlayProbeTarget(
@@ -141,6 +148,47 @@ internal object Phase17FieldHarness {
     internal fun evaluateUnrelatedUidBoundary(
         value: UnrelatedUidBoundaryObservation,
     ): Boolean = value.tunneledTraffic && value.bypassBlocked && !value.coverageGap
+
+    internal suspend fun awaitCompleteBoundaryObservation(
+        verifyIpv6: Boolean,
+        maximumCoverageAttempts: Int,
+        retryDelayMillis: Long,
+        observe: suspend () -> BoundaryObservation,
+    ): BoundaryObservation {
+        require(maximumCoverageAttempts > 0 && retryDelayMillis >= 0) {
+            "BOUNDARY_COVERAGE_RETRY_POLICY_REJECTED"
+        }
+        var observed = observe()
+        repeat(maximumCoverageAttempts - 1) {
+            // A cross-UID probe spans several Android network snapshots. Reobserve
+            // only when every concrete predicate passed and completeness alone
+            // changed; a concrete leak remains terminal on its first observation.
+            if (!isCoverageOnlyBoundaryFailure(observed, verifyIpv6)) {
+                return observed
+            }
+            if (retryDelayMillis > 0) {
+                delay(retryDelayMillis)
+            }
+            observed = observe()
+        }
+        return observed
+    }
+
+    private fun isCoverageOnlyBoundaryFailure(
+        observed: BoundaryObservation,
+        verifyIpv6: Boolean,
+    ): Boolean {
+        val boundary = observed.boundary
+        val unrelatedUid = observed.unrelatedUidBoundary
+        return boundary.coverageGap &&
+            boundary.vpnActive &&
+            boundary.ipv4Default &&
+            (!verifyIpv6 || boundary.ipv6Default) &&
+            boundary.dnsPinned &&
+            boundary.bypassBlocked &&
+            (unrelatedUid == null ||
+                (unrelatedUid.tunneledTraffic && unrelatedUid.bypassBlocked))
+    }
 
     internal fun isIndependentProbeIdentity(
         targetPackage: String,
@@ -623,24 +671,38 @@ internal object Phase17FieldHarness {
                             }
                         },
                         verify = { vpnNetwork ->
-                            val unrelatedUidBoundary = if (
+                            val requireUnrelatedUidBoundary =
                                 requiresUnrelatedUidBoundary(
                                     shouldVerifyDataPlane = shouldVerifyDataPlane,
                                     dnsFamily = dnsFamily,
                                     trafficDnsFamilies = trafficDnsFamilies,
                                     verifyBoundary = verifyBoundary,
                                 )
-                            ) {
-                                awaitUnrelatedUidBoundary(application, vpnNetwork)
-                            } else {
-                                null
-                            }
-                            val observedBoundary = observeNetworkBoundary(
-                                application,
-                                vpnNetwork,
-                                verifyIpv6 = if (verifyBoundary) boundaryVerifyIPv6 else trafficDnsFamilies.contains(6),
-                                unrelatedUidBoundary = unrelatedUidBoundary,
+                            val verifyBoundaryIpv6 =
+                                if (verifyBoundary) boundaryVerifyIPv6 else trafficDnsFamilies.contains(6)
+                            val observation = awaitCompleteBoundaryObservation(
+                                verifyIpv6 = verifyBoundaryIpv6,
+                                maximumCoverageAttempts = BOUNDARY_COVERAGE_MAX_ATTEMPTS,
+                                retryDelayMillis = BOUNDARY_COVERAGE_RETRY_DELAY_MILLIS,
+                                observe = {
+                                    val unrelatedUidBoundary = if (requireUnrelatedUidBoundary) {
+                                        awaitUnrelatedUidBoundary(application, vpnNetwork)
+                                    } else {
+                                        null
+                                    }
+                                    BoundaryObservation(
+                                        boundary = observeNetworkBoundary(
+                                            application,
+                                            vpnNetwork,
+                                            verifyIpv6 = verifyBoundaryIpv6,
+                                            unrelatedUidBoundary = unrelatedUidBoundary,
+                                        ),
+                                        unrelatedUidBoundary = unrelatedUidBoundary,
+                                    )
+                                },
                             )
+                            val observedBoundary = observation.boundary
+                            val unrelatedUidBoundary = observation.unrelatedUidBoundary
                             boundarySnapshot = observedBoundary
                             if (!verifyBoundary) {
                                 boundaryFailure = boundaryFailureCategory(

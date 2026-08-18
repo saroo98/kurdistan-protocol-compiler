@@ -115,12 +115,12 @@
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
       "pre_sha256": "3d61003915f5567f6f71bf2e155e730e786023ce93a0b6b3da219dd73dc94ad4",
-      "post_sha256": "94d1d1aa4fb8a9ef66edf01db26f396310f51e2caf660f8a40262aafd7e1224b"
+      "post_sha256": "ba6c85686f96c2d49fccf80098efef261e1d299cfefbcb204fa1d9e8ca79cf36"
     },
     {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
       "pre_sha256": "79954e682b8ea505859d0cad9f7a2d900a3a5166594dd220d2266498f9c93cf9",
-      "post_sha256": "31278530fa93048cd61973b97698d2079e53c429dba6a5a12891b9e0a033c9a7"
+      "post_sha256": "11932011c1717691d32d1b79cf23d0e9a5d3bbf8875f46052a382a58ae37b072"
     },
     {
       "path": "android/app/src/internal/AndroidManifest.xml",
@@ -145,7 +145,7 @@
     {
       "path": "android/config/phase17-required-device-tests.txt",
       "pre_sha256": "a3314ad75a04107527d4b810b2e076c9e7a666b66c21b1e92cae6809adbd66ce",
-      "post_sha256": "6c70dcd295628601466b9cf42e89dab399ce698c2b2579906dcee025aaafcdb3"
+      "post_sha256": "75451b4cde7811e16a8003d9b45dc2df4118de2dcac73bb09c7d37d5205ca591"
     },
     {
       "path": "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnOwnerSocketProtector.kt",
@@ -220,7 +220,7 @@
     {
       "path": "cmd/phase17verify/inventory.go",
       "pre_sha256": "8513d1924510bd5f98ead2fceac4a5bc4362a2ce33bded05dade20dd1edccdb8",
-      "post_sha256": "bf30237286cde42839beca744a4cb47ddef22f8d8016382c3f47ea78cfd78579"
+      "post_sha256": "893cc29e2c8ce4205957b53c4057063583368773104019124230dc39121d0777"
     },
     {
       "path": "cmd/phase17verify/qualification.go",
