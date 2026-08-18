@@ -1563,6 +1563,43 @@ func TestRevokeRemoteProfileReconcilesCommittedRuntimeNotification(t *testing.T)
 	}
 }
 
+func TestRevokeRemoteProfileRetriesAfterTransientUncommittedReadinessFailure(t *testing.T) {
+	calls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		if name != "ssh" || len(arguments) == 0 {
+			return nil, errors.New("unexpected executable")
+		}
+		calls++
+		command := arguments[len(arguments)-1]
+		switch calls {
+		case 1:
+			if !strings.Contains(command, "profile revoke") {
+				return nil, errors.New("initial revocation missing")
+			}
+			return nil, errors.New("runtime temporarily not ready")
+		case 2:
+			if !strings.Contains(command, "profile show") {
+				return nil, errors.New("post-failure state reconciliation missing")
+			}
+			return nil, errors.New("profile remains unrevoked")
+		case 3:
+			if !strings.Contains(command, "profile revoke") {
+				return nil, errors.New("revocation retry missing")
+			}
+			return []byte("REVOKE_PASS"), nil
+		default:
+			return nil, errors.New("unexpected extra command")
+		}
+	}}
+	value := config{sshPath: "ssh", sshAlias: "kurd-node"}
+	if err := revokeRemoteProfileWithDelay(context.Background(), runner, value, "", "profiles.field", 0); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("revocation calls=%d, want 3", calls)
+	}
+}
+
 func TestSetRemoteDeploymentReconcilesCommittedRuntimeNotification(t *testing.T) {
 	calls := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
