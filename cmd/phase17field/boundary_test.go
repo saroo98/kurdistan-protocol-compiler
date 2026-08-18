@@ -11,9 +11,52 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"kurdistan/internal/phase17boundary"
 )
+
+func TestRunBoundaryMonitorAccountsForItsOutOfProcessSSHConnection(t *testing.T) {
+	root := t.TempDir()
+	interval := 100 * time.Millisecond
+	gate := &pacedConnectionGate{interval: interval}
+	var boundaryStarted time.Time
+	runner := commandRunner{
+		remoteGate:     gate,
+		remoteCommands: map[string]struct{}{"ssh": {}},
+		runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+			if name == "ssh" {
+				return nil, nil
+			}
+			boundaryStarted = time.Now()
+			request := decodeBoundaryRequestForTest(t, arguments)
+			time.Sleep(10 * time.Millisecond)
+			return json.Marshal(passingBoundaryReceipt(request))
+		},
+	}
+	if _, err := runner.run(context.Background(), nil, root, "ssh", "true"); err != nil {
+		t.Fatal(err)
+	}
+	reservedAt := time.Now()
+	if _, err := runBoundaryMonitor(
+		context.Background(), runner,
+		config{evidenceRoot: root, mode: "Functional", boundaryPath: "boundary-monitor", adbPath: "adb", sshPath: "ssh", sshAlias: "owner", relayPort: 8443},
+		qualifiedRun{boundaryDigest: strings.Repeat("4", 64)}, root, "emulator-5554",
+		[]byte("https://probe.invalid/check"), true,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := boundaryStarted.Sub(reservedAt); elapsed < 70*time.Millisecond {
+		t.Fatalf("boundary SSH budget was not reserved: elapsed=%v", elapsed)
+	}
+	nextStarted := time.Now()
+	if _, err := runner.run(context.Background(), nil, root, "ssh", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(nextStarted); elapsed < 70*time.Millisecond {
+		t.Fatalf("boundary SSH activity was not recorded: elapsed=%v", elapsed)
+	}
+}
 
 func TestRunBoundaryMonitorBindsExactLockedActiveObserverAndDeletesRequest(t *testing.T) {
 	root := t.TempDir()
