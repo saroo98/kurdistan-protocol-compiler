@@ -712,6 +712,76 @@ func TestPrepareAndroidPackagesAllowsBoundedColdPackageCompilation(t *testing.T)
 	}
 }
 
+func TestPrepareAndroidPackagesWaitsForColdARTServiceReadiness(t *testing.T) {
+	compileCalls := map[string]int{}
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n"), nil
+		}
+		if len(arguments) >= 10 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
+			packageName := arguments[9]
+			compileCalls[packageName]++
+			if packageName == appPackage && compileCalls[packageName] < 3 {
+				return []byte("ART Service is not ready. Please try again later\n"), &commandExitFailure{code: 255}
+			}
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	if err := prepareAndroidPackages(context.Background(), runner, value, ".", "emulator-5554"); err != nil {
+		t.Fatal(err)
+	}
+	if compileCalls[appPackage] != 3 || compileCalls[testPackage] != 1 {
+		t.Fatalf("compile calls app=%d test=%d, want 3 and 1", compileCalls[appPackage], compileCalls[testPackage])
+	}
+}
+
+func TestPrepareAndroidPackagesDoesNotRetryOtherCompilationFailures(t *testing.T) {
+	compileCalls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n"), nil
+		}
+		if len(arguments) >= 10 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
+			compileCalls++
+			return []byte("Failure [dexopt failed]\n"), &commandExitFailure{code: 1}
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	err := prepareAndroidPackages(context.Background(), runner, value, ".", "emulator-5554")
+	if err == nil || err.Error() != "Android package compilation failed" {
+		t.Fatalf("error=%v, want Android package compilation failed", err)
+	}
+	if compileCalls != 1 {
+		t.Fatalf("compile calls=%d, want 1", compileCalls)
+	}
+}
+
+func TestPrepareAndroidPackagesHonorsCancellationDuringARTReadiness(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	compileCalls := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, arguments ...string) ([]byte, error) {
+		if len(arguments) >= 5 && arguments[2] == "shell" && arguments[3] == "dumpsys" && arguments[4] == "package" {
+			return []byte("  requested permissions:\n    android.permission.ACCESS_NETWORK_STATE\n  install permissions:\n"), nil
+		}
+		if len(arguments) >= 10 && arguments[2] == "shell" && arguments[3] == "cmd" && arguments[4] == "package" && arguments[5] == "compile" {
+			compileCalls++
+			cancel()
+			return []byte("ART Service is not ready. Please try again later\n"), &commandExitFailure{code: 255}
+		}
+		return []byte("Success\n"), nil
+	}}
+	value := config{adbPath: "adb", appAPK: "app.apk", testAPK: "test.apk"}
+	err := prepareAndroidPackages(ctx, runner, value, ".", "emulator-5554")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error=%v, want context cancellation", err)
+	}
+	if compileCalls != 1 {
+		t.Fatalf("compile calls=%d, want 1", compileCalls)
+	}
+}
+
 func TestPackageRequestsPermissionRequiresRequestedPermissionsSection(t *testing.T) {
 	const permission = "android.permission.ACCESS_NETWORK_STATE"
 	if !packageRequestsPermission([]byte(
