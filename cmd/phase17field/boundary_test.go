@@ -49,12 +49,11 @@ func TestRunBoundaryMonitorAccountsForItsOutOfProcessSSHConnection(t *testing.T)
 	if elapsed := boundaryStarted.Sub(reservedAt); elapsed < 70*time.Millisecond {
 		t.Fatalf("boundary SSH budget was not reserved: elapsed=%v", elapsed)
 	}
-	nextStarted := time.Now()
-	if _, err := runner.run(context.Background(), nil, root, "ssh", "true"); err != nil {
-		t.Fatal(err)
-	}
-	if elapsed := time.Since(nextStarted); elapsed < 70*time.Millisecond {
-		t.Fatalf("boundary SSH activity was not recorded: elapsed=%v", elapsed)
+	gate.mu.Lock()
+	markedDeadline := gate.next
+	gate.mu.Unlock()
+	if minimum := boundaryStarted.Add(interval); !markedDeadline.After(minimum) {
+		t.Fatalf("boundary SSH activity was not recorded: deadline=%v minimum=%v", markedDeadline, minimum)
 	}
 }
 
