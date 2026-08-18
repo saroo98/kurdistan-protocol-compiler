@@ -37,6 +37,15 @@ _BASE64_TOKEN = re.compile(r"[a-z0-9+/_-]{12,}={0,2}", flags=re.IGNORECASE)
 _FRAME_TRACKER_CUJ = re.compile(
     r"(?m)^(?=[A-Z]/FrameTracker\()(?=[^\r\n]*CUJ=J<)(?=[^\r\n]*@org\.kurdistanvpn\.app\.internal>)[^\r\n]*$"
 )
+_INSTRUMENTATION_PACKAGE = "org.kurdistanvpn.app.internal.test"
+_INSTRUMENTATION_FRAMEWORK_REFERENCE = re.compile(
+    r"(?:"
+    r"Package \[(?P<replaced>org\.kurdistanvpn\.app\.internal\.test)\] reported as REPLACED"
+    r"|instrumentation\[(?P<instrumentation>org\.kurdistanvpn\.app\.internal\.test)\]"
+    r"|/data/app/[^\s:|;]*/(?P<path>org\.kurdistanvpn\.app\.internal\.test)-[^\s:|;]*/base\.apk"
+    r")",
+    flags=re.IGNORECASE,
+)
 
 
 def _privacy() -> dict[str, bool]:
@@ -95,7 +104,12 @@ def _normalise_android_framework_noise(text: str) -> str:
     def replace(match: re.Match[str]) -> str:
         return re.sub(r"::(?=\d{1,3}@)", "--", match.group(0))
 
-    return _FRAME_TRACKER_CUJ.sub(replace, text)
+    text = _FRAME_TRACKER_CUJ.sub(replace, text)
+
+    def replace_instrumentation(match: re.Match[str]) -> str:
+        return match.group(0).replace(_INSTRUMENTATION_PACKAGE, _INSTRUMENTATION_PACKAGE.replace(".", "-"))
+
+    return _INSTRUMENTATION_FRAMEWORK_REFERENCE.sub(replace_instrumentation, text)
 
 
 def _contains_ip_address(text: str) -> bool:
