@@ -146,6 +146,13 @@ func issueLiveProfile(
 	if state == nil || len(master) == 0 || validateProfileTLSLifetime(state.TLS, now.Unix(), now.Add(validFor).Unix()) != nil {
 		return IssuedProfile{}, profileRecord{}, ErrTLSUnavailable
 	}
+	assignmentSlots := 1
+	if state.IPv6Pool.Enabled {
+		assignmentSlots++
+	}
+	if len(state.Assignments) > maxAssignments-assignmentSlots {
+		return IssuedProfile{}, profileRecord{}, ErrCapacityExhausted
+	}
 	bindingRecord, recipientPublic, clientKeyID, clientPublic, err := recipientCapabilityFromRequest(*state, request, recipientEpoch)
 	if err != nil {
 		return IssuedProfile{}, profileRecord{}, err
