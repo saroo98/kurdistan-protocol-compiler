@@ -157,6 +157,9 @@ func (hooks *stateWriteHooks) check(phase stateWritePhase) error {
 }
 
 func saveStateWithHooks(dataDir string, master []byte, state persistedState, hooks *stateWriteHooks) error {
+	if len(state.Assignments) > maxAssignments || len(state.Audit) > maxAuditEntries {
+		return ErrCapacityExhausted
+	}
 	if err := validateState(state, master); err != nil {
 		return err
 	}
@@ -328,7 +331,7 @@ func withStateTransactionClock(dataDir string, action, subject string, at int64,
 func validateState(state persistedState, master []byte) error {
 	if state.Schema != stateSchemaV2 || state.Version != stateVersionV2 || state.MigrationEpoch == 0 || state.RelayEpoch == 0 || state.Revision == 0 || !validName(state.DeploymentName) || !validID(state.DeploymentID) ||
 		!validEndpoint(state.Endpoint) || state.Generation > 1<<53 || state.LastObservedAt <= 0 || state.RootFingerprint != fingerprint(state.RootPublicDER) ||
-		len(state.Profiles) > maxProfiles || len(state.Audit) == 0 || len(state.Audit) > maxProfiles*8 || len(state.PublicationOutbox) != 1 ||
+		len(state.Profiles) > maxProfiles || len(state.Assignments) > maxAssignments || len(state.Audit) == 0 || len(state.Audit) > maxAuditEntries || len(state.PublicationOutbox) != 1 ||
 		state.PublicationOutbox[0].Revision != state.Revision || state.PublicationOutbox[0].CreatedAt <= 0 || !validName(state.PublicationOutbox[0].Action) {
 		return ErrStateCorrupt
 	}
@@ -394,7 +397,7 @@ func validateState(state persistedState, master []byte) error {
 func validateStateV1(state persistedStateV1) error {
 	if state.Schema != stateSchemaV1 || state.Revision == 0 || !validName(state.DeploymentName) || !validID(state.DeploymentID) ||
 		!validEndpoint(state.Endpoint) || state.Generation > 1<<53 || state.LastObservedAt <= 0 || state.RootFingerprint != fingerprint(state.RootPublicDER) ||
-		len(state.Profiles) > maxProfiles || len(state.Audit) == 0 || len(state.Audit) > maxProfiles*8 || len(state.PublicationOutbox) != 1 ||
+		len(state.Profiles) > maxProfiles || len(state.Audit) == 0 || len(state.Audit) > maxAuditEntries || len(state.PublicationOutbox) != 1 ||
 		state.PublicationOutbox[0].Revision != state.Revision || state.PublicationOutbox[0].CreatedAt <= 0 || !validName(state.PublicationOutbox[0].Action) {
 		return ErrStateCorrupt
 	}
@@ -451,6 +454,9 @@ func validateClockTransition(previous, current int64) error {
 func appendAudit(state *persistedState, at int64, action, subject string) error {
 	if state == nil || at <= 0 || !validName(action) || !validID(subject) {
 		return ErrInvalidInput
+	}
+	if len(state.Audit) >= maxAuditEntries {
+		return ErrCapacityExhausted
 	}
 	previous := ""
 	if len(state.Audit) != 0 {

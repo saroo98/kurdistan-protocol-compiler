@@ -24,7 +24,7 @@ func decodeCanonical(encoded []byte, destination any, maxBytes int) error {
 	}
 	options := cbor.DecOptions{
 		DupMapKey:         cbor.DupMapKeyEnforcedAPF,
-		MaxArrayElements:  maxProfiles + 64,
+		MaxArrayElements:  maxStateArrayElements,
 		MaxMapPairs:       256,
 		MaxNestedLevels:   16,
 		IndefLength:       cbor.IndefLengthForbidden,
