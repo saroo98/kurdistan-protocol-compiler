@@ -240,7 +240,11 @@ foreach ($marker in @(
     '--recipient-registry-dir "$recipient_registry"',
     'state_digest=$(sha256sum "$state_file" | cut -d'' '' -f1)',
     'backup_file=$backup_dir/pre-upgrade-$candidate_version-$state_digest.kurd-backup',
-    'backup_reused=true'
+    'backup_reused=true',
+    'node_state_transition()',
+    '[ "$status" -eq 0 ] || [ "$status" -eq 7 ]',
+    'node_state_transition drain || fail DRAIN_FAILED',
+    'node_state_transition resume || fail RESUME_FAILED'
 )) {
     if (-not $upgrade.Contains($marker)) {
         throw "native upgrade does not preserve the owner recipient registry: $marker"
