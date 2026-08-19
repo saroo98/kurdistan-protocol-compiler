@@ -1029,10 +1029,14 @@ func authorizeIPv6CapabilityWithDelay(ctx context.Context, runner commandRunner,
 				return false, errors.New("IPv6 capability result rejected")
 			}
 		}
-		if category != "IPV6_BUSY" {
+		transportFailure := errors.Is(err, errVPSEnvironmentUnavailable) || errors.Is(err, context.DeadlineExceeded)
+		if category != "IPV6_BUSY" && !transportFailure {
 			return false, errors.New("IPv6 capability preflight failed")
 		}
 		if attempt+1 == attempts {
+			if transportFailure {
+				return false, errors.New("IPv6 capability transport remained unavailable")
+			}
 			return false, errors.New("IPv6 capability state remained busy")
 		}
 		if busyDelay == 0 {
