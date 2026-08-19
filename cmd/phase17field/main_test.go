@@ -330,6 +330,25 @@ func TestAuthorizeIPv6CapabilityRetriesOnlyCategoricalBusy(t *testing.T) {
 	}
 }
 
+func TestAuthorizeIPv6CapabilityRetriesAmbiguousTransportFailure(t *testing.T) {
+	attempts := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {
+		attempts++
+		if attempts == 1 {
+			return nil, &commandExitFailure{code: 255}
+		}
+		return []byte("IPV6_AUTHORIZED\n"), nil
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", ipv6ProbeAddress: "2001:db8::1"}
+	authorized, err := authorizeIPv6CapabilityWithDelay(context.Background(), runner, value, ".", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !authorized || attempts != 2 {
+		t.Fatalf("authorized=%v attempts=%d", authorized, attempts)
+	}
+}
+
 func TestAuthorizeIPv6CapabilityDoesNotRetryNonBusyFailure(t *testing.T) {
 	attempts := 0
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, _ string, _ ...string) ([]byte, error) {

@@ -19,6 +19,8 @@ import (
 	"kurdistan/internal/product/profile"
 )
 
+var errStateUnchanged = errors.New("selfhost: state unchanged")
+
 func initializeStore(dataDir string, master []byte, state persistedState, recipientAuthority []byte) error {
 	if len(master) != 32 || dataDir == "" || len(recipientAuthority) == 0 {
 		return ErrInvalidInput
@@ -306,6 +308,9 @@ func withStateTransactionClock(dataDir string, action, subject string, at int64,
 		return err
 	}
 	if err := update(&state, master); err != nil {
+		if errors.Is(err, errStateUnchanged) {
+			return nil
+		}
 		return err
 	}
 	compactRevokedProfiles(&state)
