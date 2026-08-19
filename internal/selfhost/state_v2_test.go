@@ -85,6 +85,79 @@ func TestStateV2RoundTripDoesNotAliasMutableData(t *testing.T) {
 	}
 }
 
+func TestStateV2RoundTripSurvivesAuditBeyondLegacyDecoderLimit(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	for len(state.Audit) < maxProfiles+65 {
+		at := state.LastObservedAt + int64(len(state.Audit)) + 1
+		if err := appendAudit(&state, at, "stress-rotation", "profile.fixture"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := saveState(dataDir, master, state); err != nil {
+		t.Fatalf("writer rejected its validated audit state: %v", err)
+	}
+	reloaded, reloadedMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatalf("reader rejected writer-accepted audit state: %v", err)
+	}
+	defer zero(reloadedMaster)
+	if len(reloaded.Audit) != maxProfiles+65 {
+		t.Fatalf("reloaded audit entries = %d, want %d", len(reloaded.Audit), maxProfiles+65)
+	}
+}
+
+func TestCanonicalDecoderAcceptsValidatedAuditCapacity(t *testing.T) {
+	encoded, err := encodeCanonical(make([]uint64, maxAuditEntries))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []uint64
+	if err := decodeCanonical(encoded, &decoded, maxStateBytes); err != nil {
+		t.Fatalf("decoder rejected the writer's validated audit capacity: %v", err)
+	}
+	if len(decoded) != maxAuditEntries {
+		t.Fatalf("decoded entries = %d, want %d", len(decoded), maxAuditEntries)
+	}
+}
+
+func TestCanonicalDecoderRejectsArrayBeyondSharedCapacity(t *testing.T) {
+	encoded, err := encodeCanonical(make([]uint64, maxStateArrayElements+1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []uint64
+	if err := decodeCanonical(encoded, &decoded, maxStateBytes); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("decoder overflow error = %v, want invalid input", err)
+	}
+}
+
+func TestAppendAuditRejectsBeyondValidatedCapacity(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	for len(state.Audit) < maxAuditEntries {
+		at := state.LastObservedAt + int64(len(state.Audit)) + 1
+		if err := appendAudit(&state, at, "stress-rotation", "profile.fixture"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := state.LastObservedAt + int64(len(state.Audit)) + 1
+	if err := appendAudit(&state, at, "stress-rotation", "profile.fixture"); !errors.Is(err, ErrCapacityExhausted) {
+		t.Fatalf("audit append overflow error = %v, want capacity exhausted", err)
+	}
+	if len(state.Audit) != maxAuditEntries {
+		t.Fatalf("audit overflow mutated state: entries = %d, want %d", len(state.Audit), maxAuditEntries)
+	}
+}
+
 func TestStateEnvelopeRejectsFutureAndCrossVersionPayloads(t *testing.T) {
 	dataDir, _, _ := initializedV2TestState(t)
 	master, err := loadMasterKey(dataDir)

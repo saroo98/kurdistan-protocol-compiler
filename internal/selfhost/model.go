@@ -35,6 +35,9 @@ const (
 	maxStateBytes                     = 8 << 20
 	maxBackupBytes                    = 16 << 20
 	maxProfiles                       = 4096
+	maxStateArrayElements             = maxProfiles * 8
+	maxAssignments                    = maxStateArrayElements
+	maxAuditEntries                   = maxStateArrayElements
 	maxProfileValidity                = 30 * 24 * time.Hour
 )
 
