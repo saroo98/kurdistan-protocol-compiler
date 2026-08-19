@@ -760,12 +760,12 @@ func runDeployment(args []string, stdin io.Reader, stdout io.Writer) error {
 	return writeJSON(stdout, map[string]any{"schema": "kurdctl-deployment-state-v1", "disabled": args[0] == "disable"})
 }
 
-func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, required bool) error {
+func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, requireReady bool) error {
 	if path == "" {
 		return node.ErrControlConfig
 	}
 	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) && !required {
+	if errors.Is(err, os.ErrNotExist) && !requireReady {
 		return nil
 	}
 	if err != nil || info == nil || info.Mode()&os.ModeSocket == 0 {
@@ -781,10 +781,15 @@ func notifyRelayRuntimeV1(path string, request node.ControlRequestV1, required b
 	if err != nil {
 		return err
 	}
-	if !response.OK {
+	if !response.OK || requireReady && !requiredRelayRuntimeReadyV1(response) {
 		return node.ErrControlProtocol
 	}
 	return nil
+}
+
+func requiredRelayRuntimeReadyV1(response node.ControlResponseV1) bool {
+	return response.OK && response.Code == node.ControlCodeOKV1 && response.Health.State == node.HealthReady &&
+		response.Health.AcceptingSessions && response.Health.Missing == 0
 }
 
 func exchangeRelayRuntimeV1(connection net.Conn, request node.ControlRequestV1) (node.ControlResponseV1, error) {
