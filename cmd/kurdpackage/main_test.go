@@ -487,6 +487,28 @@ func TestUpgradeAndRollbackRecreateTheOwnedTUNFromTheActiveVersion(t *testing.T)
 	}
 }
 
+func TestUpgradeAcceptsOnlyCommittedRuntimeNotificationPendingForOfflineStateTransitions(t *testing.T) {
+	root := repositoryRootV1(t)
+	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "upgrade.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, required := range []string{
+		"node_state_transition()",
+		`[ "$status" -eq 0 ] || [ "$status" -eq 7 ]`,
+		"node_state_transition drain || fail DRAIN_FAILED",
+		"node_state_transition resume || fail RESUME_FAILED",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("upgrade must accept only the committed-runtime-pending exit after an offline state transition: missing %q", required)
+		}
+	}
+	if strings.Contains(text, `node "$action" --data-dir "$data_dir" >/dev/null || true`) {
+		t.Fatal("upgrade must not hide arbitrary node state-transition failures")
+	}
+}
+
 func TestRollbackRestoresTheOwnedTUNConfigurationWithNetworkdAccess(t *testing.T) {
 	root := repositoryRootV1(t)
 	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "rollback.sh"))

@@ -74,6 +74,15 @@ was_service_active=false
 was_socket_enabled=false
 v2_mutated=false
 
+node_state_transition() {
+  action=$1
+  set +e
+  runuser -u kurd-node -- /usr/local/bin/kurdctl node "$action" --data-dir "$data_dir" >/dev/null
+  status=$?
+  set -e
+  [ "$status" -eq 0 ] || [ "$status" -eq 7 ]
+}
+
 systemctl is-active --quiet kurd-node.service && was_service_active=true || true
 systemctl is-enabled --quiet kurd-node.socket && was_socket_enabled=true || true
 
@@ -89,7 +98,7 @@ if [ -f "$state_file" ]; then
   esac
   [ "${#state_digest}" -eq 64 ] || fail STATE_DIGEST_INVALID
   backup_file=$backup_dir/pre-upgrade-$candidate_version-$state_digest.kurd-backup
-  runuser -u kurd-node -- /usr/local/bin/kurdctl node drain --data-dir "$data_dir" >/dev/null || fail DRAIN_FAILED
+  node_state_transition drain || fail DRAIN_FAILED
   if [ -e "$backup_file" ]; then
     [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || fail BACKUP_INVALID
     backup_reused=true
@@ -136,7 +145,7 @@ if [ -f "$state_file" ]; then
   runuser -u kurd-node -- /usr/local/bin/kurdctl migration apply --data-dir "$data_dir" >/dev/null || fail MIGRATION_FAILED
   v2_mutated=true
   runuser -u kurd-node -- /usr/local/bin/kurdctl doctor --data-dir "$data_dir" >/dev/null || fail DOCTOR_FAILED
-  runuser -u kurd-node -- /usr/local/bin/kurdctl node resume --data-dir "$data_dir" >/dev/null || fail RESUME_FAILED
+  node_state_transition resume || fail RESUME_FAILED
 fi
 
 if [ "$was_socket_enabled" = true ] || [ "$was_service_active" = true ]; then

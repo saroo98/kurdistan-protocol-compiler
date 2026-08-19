@@ -847,7 +847,7 @@
     {
       "path": "cmd/kurdpackage/main_test.go",
       "pre_sha256": "a8bb87f03fc506667606b39a2fc4139858cf9aeb7c8400e00ad58884a707bfdd",
-      "post_sha256": "dad2f89e6bbd761aa559b0d4cfe3e02a8833b4b49fed77337fac6c704f2f3a74"
+      "post_sha256": "38381720341cf36281cfe90ea2d18704a51948639dc9646d30262b719436ec9a"
     },
     {
       "path": "cmd/kurdpackage/testdata/preflight-failures.json",
@@ -1157,7 +1157,7 @@
     {
       "path": "deploy/selfhost/native/upgrade.sh",
       "pre_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91",
-      "post_sha256": "bcc839c81b05960f16b7cbfec8be284c6caefce23d3327b42a44e04ecb72e88e"
+      "post_sha256": "8c4c9005e6c771d29f77123304dc43f08c1461dd85b2046349ce364ef9c6853b"
     },
     {
       "path": "docs/self-hosting/BACKUP-RESTORE.md",
@@ -2152,7 +2152,7 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "8ace7ea79230ff93d87a1eeedfc35223b9ef5be138a6ac793ea08e023c330b12"
+      "post_sha256": "e8e852f952f079db4e2556b5c4335d0d41ecb1732082de999df545296feca39e"
     },
     {
       "path": "scripts/phase17/privacy_scan_b_test.py",
