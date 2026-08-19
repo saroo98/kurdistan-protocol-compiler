@@ -160,6 +160,48 @@ func TestIPv6CapabilityIsDisabledByDefaultAndRequiresRecoveryAuthorization(t *te
 	}
 }
 
+func TestIPv6CapabilityReauthorizationIsIdempotent(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "offline", "recovery")
+	passphrase := []byte("correct horse battery staple")
+	now := time.Unix(1_800_400_000, 0).UTC()
+	if _, err := Initialize(InitOptions{
+		DataDir: dataDir, DeploymentName: "owner-node", Endpoint: "203.0.113.7:443",
+		RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetIPv6Enabled(dataDir, true, RecoveryActionOptions{
+		RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	first, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero(master)
+	if !first.IPv6Pool.Enabled {
+		t.Fatal("first recovery-authorized IPv6 enable was not persisted")
+	}
+
+	if err := SetIPv6Enabled(dataDir, true, RecoveryActionOptions{
+		RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now.Add(2 * time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	second, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	if second.Revision != first.Revision || len(second.Audit) != len(first.Audit) || second.LastObservedAt != first.LastObservedAt {
+		t.Fatalf("identical IPv6 reauthorization mutated state: revision %d->%d audit %d->%d clock %d->%d",
+			first.Revision, second.Revision, len(first.Audit), len(second.Audit), first.LastObservedAt, second.LastObservedAt)
+	}
+}
+
 func TestRecoveryRejectsWrongPassphraseAndTampering(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "node")

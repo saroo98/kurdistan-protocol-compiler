@@ -409,6 +409,9 @@ func SetIPv6Enabled(dataDir string, enabled bool, options RecoveryActionOptions)
 		if _, err := recoveryRootForState(*state, options.RecoveryPath, options.RecoveryPassphrase); err != nil {
 			return err
 		}
+		if state.IPv6Pool.Enabled == enabled {
+			return errStateUnchanged
+		}
 		if !enabled {
 			for _, assignment := range state.Assignments {
 				if assignment.Family == addressFamilyIPv6 && assignment.State == addressStateActive {
