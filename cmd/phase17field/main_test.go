@@ -211,9 +211,11 @@ func TestAssertRemoteHealthRestartsFailSafeStoppedNodeBeforeChecking(t *testing.
 		for _, required := range []string{
 			"sudo -n systemctl start kurd-node-network.service kurd-node.socket",
 			"sudo -n systemctl start kurd-node.service",
+			"kurdctl node reload",
 			"NETWORK_START_FAILED",
 			"TUN_UNAVAILABLE",
 			"DOCTOR_FAILED",
+			"RUNTIME_NOT_READY",
 			"SERVICE_HEALTH_PASS",
 		} {
 			if !strings.Contains(command, required) {
@@ -1516,6 +1518,52 @@ func TestIssueProfileReportsSSHTimeoutAfterCommittedOutputReconciliationFails(t 
 	}
 }
 
+func TestIssueProfileCommittedOutputReconciliationRequiresRuntimeReadiness(t *testing.T) {
+	reconcileChecks := 0
+	artifactDownloads := 0
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		switch name {
+		case "ssh":
+			command := arguments[len(arguments)-1]
+			switch {
+			case strings.Contains(command, "profile create"):
+				return []byte("PROFILE_RUNTIME_RELOAD_FAILED\n"), errors.New("command failed")
+			case strings.Contains(command, "PHASE17_ISSUE_READY"):
+				reconcileChecks++
+				if !strings.Contains(command, "kurdctl node reload") {
+					return []byte("PHASE17_ISSUE_READY\n"), nil
+				}
+				return []byte("PROFILE_RUNTIME_RELOAD_FAILED\n"), errors.New("command failed")
+			case strings.Contains(command, ".response"):
+				return []byte("{\"schema\":\"kurdctl-profile-create-v2\",\"profileId\":\"profile.pending\"}\n"), nil
+			default:
+				return nil, nil
+			}
+		case "scp":
+			destination := arguments[len(arguments)-1]
+			if strings.Contains(destination, ":/tmp/phase17-recipient-") {
+				return nil, nil
+			}
+			artifactDownloads++
+			return nil, os.WriteFile(destination, []byte("sealed-profile"), 0o600)
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	value := config{sshAlias: "kurd-node", sshPath: "ssh", scpPath: "scp"}
+	_, artifact, err := issueProfile(context.Background(), runner, value, t.TempDir(), []byte("recipient-request"))
+	clear(artifact)
+	if err == nil || err.Error() != "profile issuance committed: relay runtime reload failed" {
+		t.Fatalf("profile issuance error = %v", err)
+	}
+	if reconcileChecks == 0 {
+		t.Fatal("committed output was not reconciled")
+	}
+	if artifactDownloads != 0 {
+		t.Fatalf("artifact downloads=%d, want zero before runtime readiness", artifactDownloads)
+	}
+}
+
 func TestIssueProfileRecoversCommittedOutputWhenRuntimeReloadWasPending(t *testing.T) {
 	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
 		switch name {
@@ -1526,12 +1574,16 @@ func TestIssueProfileRecoversCommittedOutputWhenRuntimeReloadWasPending(t *testi
 				for _, required := range []string{
 					`status=0`,
 					`[ -s "$response" ] && sudo -n test -s "$out/profile.kurd-profile"`,
-					`[ "$status" -eq 7 ]`,
+					`[ "$status" -ne 0 ] && [ "$status" -ne 7 ]`,
+					`systemctl start kurd-node.service`,
 					`kurdctl node reload`,
 				} {
 					if !strings.Contains(command, required) {
 						return []byte("kurdctl: state committed; runtime notification pending\n"), errors.New("command failed")
 					}
+				}
+				if strings.Contains(command, `if [ "$status" -eq 7 ]; then`) {
+					return []byte("runtime readiness was conditional\n"), errors.New("command failed")
 				}
 				return []byte("PHASE17_ISSUE_READY\n"), nil
 			case strings.Contains(command, ".response"):

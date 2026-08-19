@@ -245,6 +245,43 @@ func TestCommittedOperationsNotifyRunningRelayImmediately(t *testing.T) {
 	}
 }
 
+func TestRequiredRelayRuntimeReadyRejectsNonAcceptingHealth(t *testing.T) {
+	ready := node.ControlResponseV1{
+		OK:   true,
+		Code: node.ControlCodeOKV1,
+		Health: node.HealthSnapshot{
+			State:             node.HealthReady,
+			AcceptingSessions: true,
+		},
+	}
+	if !requiredRelayRuntimeReadyV1(ready) {
+		t.Fatal("exact ready response was rejected")
+	}
+	for name, mutate := range map[string]func(*node.ControlResponseV1){
+		"command failed": func(response *node.ControlResponseV1) {
+			response.OK = false
+			response.Code = node.ControlCodeReloadFailedV1
+		},
+		"starting": func(response *node.ControlResponseV1) {
+			response.Health.State = node.HealthStarting
+		},
+		"not accepting": func(response *node.ControlResponseV1) {
+			response.Health.AcceptingSessions = false
+		},
+		"requirements missing": func(response *node.ControlResponseV1) {
+			response.Health.Missing = 1
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := ready
+			mutate(&response)
+			if requiredRelayRuntimeReadyV1(response) {
+				t.Fatal("non-accepting runtime response was accepted")
+			}
+		})
+	}
+}
+
 func TestCommittedOperationReportsNotificationFailureWithoutRepeatingMutation(t *testing.T) {
 	base := t.TempDir()
 	dataDir := filepath.Join(base, "node")
