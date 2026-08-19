@@ -1433,6 +1433,18 @@ func issueProfile(ctx context.Context, runner commandRunner, value config, root 
 	defer func() {
 		_ = remoteService(context.Background(), runner, value, root, "sudo -n sh -c 'rm -rf "+remoteRequest+" "+remoteResponse+" "+remoteError+" "+remoteArtifact+" "+remoteOutput+"'")
 	}()
+	runtimeReadiness := fmt.Sprintf(`runtime_ready=0
+attempt=0
+while [ "$attempt" -lt 3 ]; do
+  sudo -n systemctl start kurd-node.service >/dev/null 2>>"$error_output" || true
+  if systemctl is-active --quiet kurd-node.service && sudo -n -u kurd-node /usr/local/bin/kurdctl node reload --data-dir %q --control-socket %q >/dev/null 2>>"$error_output"; then
+    runtime_ready=1
+    break
+  fi
+  attempt=$((attempt + 1))
+  [ "$attempt" -ge 3 ] || sleep 1
+done
+[ "$runtime_ready" -eq 1 ] || { printf PROFILE_RUNTIME_RELOAD_FAILED; exit 7; }`, remoteDataDir, remoteControl)
 	script := fmt.Sprintf(`set -eu
 req=%q
 out=%q
@@ -1446,12 +1458,11 @@ status=0
 sudo -n -u kurd-node /usr/local/bin/kurdctl profile create --data-dir %q --name %s --valid-for 24h --recipient-request "$req" --recipient-registry-dir %q --output-dir "$out" --control-socket %q >"$response" 2>"$error_output" || status=$?
 if [ -s "$response" ] && sudo -n test -s "$out/profile.kurd-profile"; then
   sudo -n install -o "$(id -un)" -g "$(id -gn)" -m 0600 "$out/profile.kurd-profile" "$artifact" || { printf PROFILE_ARTIFACT_STAGE_FAILED; exit 6; }
-  if [ "$status" -eq 7 ]; then
-    sudo -n -u kurd-node /usr/local/bin/kurdctl node reload --data-dir %q --control-socket %q >/dev/null 2>>"$error_output" || { printf PROFILE_RUNTIME_RELOAD_FAILED; exit 7; }
-  elif [ "$status" -ne 0 ]; then
+  if [ "$status" -ne 0 ] && [ "$status" -ne 7 ]; then
     cat "$error_output"
     exit "$status"
   fi
+%s
   printf PHASE17_ISSUE_READY
   exit 0
 fi
@@ -1467,7 +1478,15 @@ cat "$error_output"
 [ -s "$error_output" ] || printf PROFILE_COMMAND_FAILED_%%s "$status"
 [ "$status" -ne 0 ] || status=6
 exit "$status"
-`, remoteRequest, remoteOutput, remoteResponse, remoteError, remoteArtifact, remoteDataDir, shellQuote(profileName), remoteRegistry, remoteControl, remoteDataDir, remoteControl)
+`, remoteRequest, remoteOutput, remoteResponse, remoteError, remoteArtifact, remoteDataDir, shellQuote(profileName), remoteRegistry, remoteControl, runtimeReadiness)
+	reconcileScript := fmt.Sprintf(`set -eu
+response=%q
+artifact=%q
+error_output=%q
+test -s "$response"
+test -s "$artifact"
+%s
+printf PHASE17_ISSUE_READY`, remoteResponse, remoteArtifact, remoteError, runtimeReadiness)
 	attemptIssuance := func() (bool, []byte, error) {
 		raw, commandErr := ssh(ctx, runner, value, root, 2*time.Minute, script)
 		ready := commandErr == nil && strings.TrimSpace(string(raw)) == "PHASE17_ISSUE_READY"
@@ -1484,8 +1503,7 @@ exit "$status"
 				case <-timer.C:
 				}
 			}
-			check, checkErr := ssh(ctx, runner, value, root, 15*time.Second,
-				fmt.Sprintf(`set -eu; test -s %q; test -s %q; printf PHASE17_ISSUE_READY`, remoteResponse, remoteArtifact))
+			check, checkErr := ssh(ctx, runner, value, root, 15*time.Second, reconcileScript)
 			ready = checkErr == nil && strings.TrimSpace(string(check)) == "PHASE17_ISSUE_READY"
 			clear(check)
 		}
@@ -1635,8 +1653,9 @@ systemctl is-active --quiet unbound.service || { printf DNS_INACTIVE; exit 8; }
 test -e /sys/class/net/kurd0/tun_flags || { printf TUN_UNAVAILABLE; exit 8; }
 ss -H -ltn 'sport = :%d' | grep -q . || { printf LISTENER_UNAVAILABLE; exit 8; }
 sudo -n -u kurd-node /usr/local/bin/kurdctl doctor --data-dir %s >/dev/null 2>&1 || { printf DOCTOR_FAILED; exit 8; }
+sudo -n -u kurd-node /usr/local/bin/kurdctl node reload --data-dir %s --control-socket %s >/dev/null 2>&1 || { printf RUNTIME_NOT_READY; exit 8; }
 printf SERVICE_HEALTH_PASS
-`, value.relayPort, remoteDataDir)
+`, value.relayPort, remoteDataDir, remoteDataDir, remoteControl)
 	return retryRemoteHealth(ctx, remoteHealthAttempts, 2*time.Second, func() error {
 		raw, err := ssh(ctx, runner, value, root, 30*time.Second, script)
 		if err != nil || strings.TrimSpace(string(raw)) != "SERVICE_HEALTH_PASS" {
@@ -1649,7 +1668,7 @@ printf SERVICE_HEALTH_PASS
 func remoteHealthError(raw []byte) error {
 	category := strings.TrimSpace(string(raw))
 	switch category {
-	case "NETWORK_START_FAILED", "RELAY_START_FAILED", "SOCKET_INACTIVE", "RELAY_INACTIVE", "DNS_INACTIVE", "TUN_UNAVAILABLE", "LISTENER_UNAVAILABLE", "DOCTOR_FAILED":
+	case "NETWORK_START_FAILED", "RELAY_START_FAILED", "SOCKET_INACTIVE", "RELAY_INACTIVE", "DNS_INACTIVE", "TUN_UNAVAILABLE", "LISTENER_UNAVAILABLE", "DOCTOR_FAILED", "RUNTIME_NOT_READY":
 		return fmt.Errorf("remote service health failed: %s", category)
 	default:
 		return errors.New("remote service health failed")
