@@ -107,3 +107,47 @@ func TestStateRejectsDuplicateAndAuthorityOnlyActiveAssignments(t *testing.T) {
 		t.Fatalf("duplicate assignment accepted: %v", err)
 	}
 }
+
+func TestStateV2RoundTripsValidatedAssignmentCapacity(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	state.Assignments = make([]addressAssignmentV1, 0, maxAssignments)
+	for offset := uint64(2); len(state.Assignments) < maxAssignments; offset++ {
+		address, err := addressAtOffset(state.IPv4Pool, offset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.Assignments = append(state.Assignments, addressAssignmentV1{
+			Family: addressFamilyIPv4, Address: address, ProfileID: "profiles.fixture", ContentID: "content.fixture",
+			Generation: offset, State: addressStateQuarantined, AssignedAt: 1, ProfileValidUntil: 2, ReleaseAt: 3,
+		})
+	}
+	if err := saveState(dataDir, master, state); err != nil {
+		t.Fatalf("writer rejected validated assignment capacity: %v", err)
+	}
+	reloaded, reloadedMaster, err := loadState(dataDir)
+	if err != nil {
+		t.Fatalf("reader rejected writer-accepted assignment capacity: %v", err)
+	}
+	defer zero(reloadedMaster)
+	if len(reloaded.Assignments) != maxAssignments {
+		t.Fatalf("reloaded assignments = %d, want %d", len(reloaded.Assignments), maxAssignments)
+	}
+}
+
+func TestSaveStateRejectsAssignmentsBeyondValidatedCapacity(t *testing.T) {
+	dataDir, _, _ := initializedV2TestState(t)
+	state, master, err := loadState(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zero(master)
+	state.Assignments = make([]addressAssignmentV1, maxAssignments+1)
+	if err := saveState(dataDir, master, state); !errors.Is(err, ErrCapacityExhausted) {
+		t.Fatalf("assignment overflow error = %v, want capacity exhausted", err)
+	}
+}
