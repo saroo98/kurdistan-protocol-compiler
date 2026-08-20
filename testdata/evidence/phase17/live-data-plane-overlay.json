@@ -882,7 +882,7 @@
     {
       "path": "cmd/kurdpackage/upgrade_behavior_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "ae74ad94667dd8a4200b7602d7bc94a4dbb1d0802b087eee8eca8970b719356b"
+      "post_sha256": "98f5e6ba36b21a81655a05ad2fa5847b582628ea402b5ff3ad0b36d7fc676faa"
     },
     {
       "path": "cmd/phase16verify/main.go",
