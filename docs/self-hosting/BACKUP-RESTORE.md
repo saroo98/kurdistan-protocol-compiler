@@ -65,3 +65,16 @@ file must be root-owned, non-symlinked, and mode `0400` or `0600`. The upgrade
 creates and verifies an encrypted backup under `/var/backups/kurd-node` before
 installing the candidate. The passphrase is inherited on standard input and is
 never placed in argv, an environment value, or a log.
+
+When the installed package and candidate both use state-v2, the native upgrade
+requires a root-owned, non-writable, link-free source tree, then copies the
+entire verified package into a root-controlled snapshot. The checksum-inventory
+and candidate-binary digests are captured before that boundary and the snapshot
+is independently reverified. Preflight and installation run only from the
+snapshot, while pre-install drain and backup use its temporary `kurdctl` bridge
+as the dedicated service account. The bridge remains root-owned and
+digest-bound, is executable only by root and the service group, and the
+installed binary must match the originally retained digest before migration or
+activation. Failed removal retains the exact paths for a bounded exit-trap
+retry. The bridge never directly edits or decodes state in shell and does not
+replace the normal restore or rollback contracts.
