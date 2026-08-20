@@ -521,7 +521,7 @@ else
   exit 64
 fi
 `)
-	output, err := command.CombinedOutput()
+	output, err := command.Output()
 	if err != nil {
 		t.Fatalf("detect bash path namespace: %v: %s", err, output)
 	}
@@ -530,13 +530,19 @@ fi
 		t.Fatalf("unsupported Windows fixture path %q", path)
 	}
 	remainder := filepath.ToSlash(strings.TrimPrefix(path, volume))
-	switch strings.TrimSpace(string(output)) {
+	namespace := ""
+	for _, field := range strings.Fields(strings.ReplaceAll(string(output), "\x00", "")) {
+		if field == "wsl" || field == "git-bash" {
+			namespace = field
+		}
+	}
+	switch namespace {
 	case "wsl":
 		return "/mnt/" + strings.ToLower(volume[:1]) + remainder
 	case "git-bash":
 		return "/" + strings.ToLower(volume[:1]) + remainder
 	default:
-		t.Fatalf("bash returned an unknown path namespace %q", strings.TrimSpace(string(output)))
+		t.Fatalf("bash returned an unknown path namespace %q", namespace)
 	}
 	return ""
 }
