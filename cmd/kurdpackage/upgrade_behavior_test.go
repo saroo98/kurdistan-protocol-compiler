@@ -507,17 +507,38 @@ func writeFixtureExecutable(t *testing.T, bash, path, contents string) {
 	}
 }
 
-func toPOSIXPath(t *testing.T, _ string, path string) string {
+func toPOSIXPath(t *testing.T, bash, path string) string {
 	t.Helper()
 	if runtime.GOOS != "windows" {
 		return filepath.ToSlash(path)
+	}
+	command := exec.Command(bash, "-lc", `
+if command -v cygpath >/dev/null 2>&1; then
+  printf 'git-bash\n'
+elif command -v wslpath >/dev/null 2>&1; then
+  printf 'wsl\n'
+else
+  exit 64
+fi
+`)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("detect bash path namespace: %v: %s", err, output)
 	}
 	volume := filepath.VolumeName(path)
 	if len(volume) != 2 || volume[1] != ':' {
 		t.Fatalf("unsupported Windows fixture path %q", path)
 	}
-	remainder := strings.TrimPrefix(path, volume)
-	return "/mnt/" + strings.ToLower(volume[:1]) + filepath.ToSlash(remainder)
+	remainder := filepath.ToSlash(strings.TrimPrefix(path, volume))
+	switch strings.TrimSpace(string(output)) {
+	case "wsl":
+		return "/mnt/" + strings.ToLower(volume[:1]) + remainder
+	case "git-bash":
+		return "/" + strings.ToLower(volume[:1]) + remainder
+	default:
+		t.Fatalf("bash returned an unknown path namespace %q", strings.TrimSpace(string(output)))
+	}
+	return ""
 }
 
 func shellQuote(value string) string {
