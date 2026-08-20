@@ -509,6 +509,100 @@ func TestUpgradeAcceptsOnlyCommittedRuntimeNotificationPendingForOfflineStateTra
 	}
 }
 
+func TestUpgradeUsesVerifiedCandidateBridgeForStateV2PreinstallOperations(t *testing.T) {
+	root := repositoryRootV1(t)
+	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "upgrade.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	required := []string{
+		"stage_candidate_package()",
+		"verify_candidate_package()",
+		"stage_candidate_bridge()",
+		"verify_candidate_bridge()",
+		"cleanup_candidate_bridge()",
+		`[ "$current_state_version" = "2" ]`,
+		`preinstall_kurdctl=$candidate_bridge`,
+		`runuser -u kurd-node -- "$preinstall_kurdctl" node "$action" --data-dir "$data_dir"`,
+		`runuser -u kurd-node -- "$preinstall_kurdctl" backup create`,
+		`runuser -u kurd-node -- "$preinstall_kurdctl" backup verify`,
+	}
+	for _, marker := range required {
+		if !strings.Contains(text, marker) {
+			t.Fatalf("state-v2 upgrade bridge is missing %q", marker)
+		}
+	}
+	packageAt := strings.Index(text, "stage_candidate_package || fail CANDIDATE_PACKAGE_FAILED")
+	stageAt := strings.Index(text, "stage_candidate_bridge || fail CANDIDATE_BRIDGE_FAILED")
+	checksumAt := strings.Index(text, "sha256sum -c SHA256SUMS")
+	drainAt := strings.Index(text, "node_state_transition drain || fail DRAIN_FAILED")
+	backupAt := strings.Index(text, `backup create --data-dir "$data_dir"`)
+	verifyAt := strings.Index(text, `backup verify --file "$backup_file"`)
+	installAt := strings.Index(text, "./install.sh --upgrade")
+	if checksumAt < 0 || packageAt < 0 || stageAt < 0 || drainAt < 0 || backupAt < 0 || verifyAt < 0 || installAt < 0 || !(checksumAt < packageAt && packageAt < stageAt && stageAt < drainAt && drainAt < backupAt && backupAt < verifyAt && verifyAt < installAt) {
+		t.Fatal("candidate bridge, drain, backup, verification, and installation ordering is not fail-closed")
+	}
+}
+
+func TestUpgradeCandidateBridgeIsRootControlledDigestBoundAndAlwaysCleaned(t *testing.T) {
+	root := repositoryRootV1(t)
+	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "upgrade.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, marker := range []string{
+		`[ -f bin/kurdctl ] && [ ! -L bin/kurdctl ]`,
+		`candidate_bridge_dir=$(mktemp -d /run/kurd-node-upgrade.XXXXXX)`,
+		`chown root:kurd-node "$candidate_bridge_dir"`,
+		`chmod 0750 "$candidate_bridge_dir"`,
+		`[ -d "$candidate_bridge_dir" ] && [ ! -L "$candidate_bridge_dir" ]`,
+		`install -o root -g kurd-node -m 0750 bin/kurdctl "$candidate_bridge"`,
+		`[ -f "$candidate_bridge" ] && [ ! -L "$candidate_bridge" ]`,
+		`[ "$(stat -c %u "$candidate_bridge")" -eq 0 ]`,
+		`[ "$(stat -c %g "$candidate_bridge")" -eq "$(id -g kurd-node)" ]`,
+		`[ "$(stat -c %a "$candidate_bridge")" = "750" ]`,
+		`candidate_kurdctl_digest=$(sed -n 's/^\([0-9a-f]\{64\}\)  bin\/kurdctl$/\1/p' SHA256SUMS)`,
+		`candidate_inventory_digest=$(sha256sum SHA256SUMS | cut -d' ' -f1)`,
+		`candidate_package_dir=$candidate_bridge_dir/package`,
+		`cp -R -- "$script_dir/." "$candidate_package_dir/"`,
+		`[ "$observed_inventory_digest" = "$candidate_inventory_digest" ]`,
+		`candidate_bridge_digest=$candidate_kurdctl_digest`,
+		`[ "$observed_bridge_digest" = "$candidate_bridge_digest" ]`,
+		`trap 'cleanup_and_exit 143' TERM`,
+		`trap 'rollback_and_exit 143' TERM`,
+		`cleanup_candidate_bridge_bounded`,
+		`[ "$installed_kurdctl_digest" = "$candidate_kurdctl_digest" ]`,
+		`cleanup_candidate_bridge`,
+	} {
+		if !strings.Contains(text, marker) {
+			t.Fatalf("candidate bridge hardening is missing %q", marker)
+		}
+	}
+	if strings.Count(text, "verify_candidate_bridge || fail CANDIDATE_BRIDGE_INVALID") < 3 {
+		t.Fatal("candidate bridge must be reverified before every state-v2 pre-install operation")
+	}
+	if strings.Count(text, "candidate_inventory_digest=") != 1 {
+		t.Fatal("candidate package identity must be captured exactly once before staging")
+	}
+}
+
+func TestUpgradeRetainsInstalledBinaryForLegacyStateV1Migration(t *testing.T) {
+	root := repositoryRootV1(t)
+	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "upgrade.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	legacyAt := strings.Index(text, "preinstall_kurdctl=/usr/local/bin/kurdctl")
+	v2At := strings.Index(text, `[ "$current_state_version" = "2" ]`)
+	bridgeAt := strings.Index(text, `preinstall_kurdctl=$candidate_bridge`)
+	if legacyAt < 0 || v2At < 0 || bridgeAt < 0 || !(legacyAt < v2At && v2At < bridgeAt) {
+		t.Fatal("upgrade must default to the installed binary and select the candidate bridge only for state-v2")
+	}
+}
+
 func TestRollbackRestoresTheOwnedTUNConfigurationWithNetworkdAccess(t *testing.T) {
 	root := repositoryRootV1(t)
 	script, err := os.ReadFile(filepath.Join(root, "deploy", "selfhost", "native", "rollback.sh"))

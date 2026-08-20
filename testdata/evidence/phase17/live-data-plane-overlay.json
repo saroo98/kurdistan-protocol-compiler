@@ -872,12 +872,17 @@
     {
       "path": "cmd/kurdpackage/main_test.go",
       "pre_sha256": "a8bb87f03fc506667606b39a2fc4139858cf9aeb7c8400e00ad58884a707bfdd",
-      "post_sha256": "38381720341cf36281cfe90ea2d18704a51948639dc9646d30262b719436ec9a"
+      "post_sha256": "f670bf6ef03dd23dfc9645c6fb3ee90b871a10d8234ff53b21864d286458c497"
     },
     {
       "path": "cmd/kurdpackage/testdata/preflight-failures.json",
       "pre_evidence": "ABSENT",
       "post_sha256": "a4110493e3be5a69f68d041e85f92c44a7d89a115b34961007f3647aa06902fc"
+    },
+    {
+      "path": "cmd/kurdpackage/upgrade_behavior_test.go",
+      "pre_evidence": "ABSENT",
+      "post_sha256": "ae74ad94667dd8a4200b7602d7bc94a4dbb1d0802b087eee8eca8970b719356b"
     },
     {
       "path": "cmd/phase16verify/main.go",
@@ -1182,12 +1187,12 @@
     {
       "path": "deploy/selfhost/native/upgrade.sh",
       "pre_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91",
-      "post_sha256": "8c4c9005e6c771d29f77123304dc43f08c1461dd85b2046349ce364ef9c6853b"
+      "post_sha256": "53044f60aaa2ab092fbe4d92d2cab12ce332eca9925b5870ea215fb24eaad4e4"
     },
     {
       "path": "docs/self-hosting/BACKUP-RESTORE.md",
       "pre_sha256": "14a5dc8f6dd6192510aebfe1f78ec45a73ca7e1917b6e8486377c582412859ae",
-      "post_sha256": "8b76828fd00129259cf2b229f1e0b25647c960a51c6dea4669d4191058f7aa56"
+      "post_sha256": "be8ac8e5d2787027f683117effe4627a63feec89187ca4b53f45776918bdb4bc"
     },
     {
       "path": "docs/self-hosting/CONTAINER.md",
@@ -1222,7 +1227,7 @@
     {
       "path": "docs/self-hosting/UPGRADE-ROLLBACK.md",
       "pre_sha256": "07d1efa1f48fb3d1f530dec7c986027536b99e8f804c76047a3668753e6681ca",
-      "post_sha256": "78bbecd934d4ad00515720d5bcc1be202d715fa0d629153b3bb47fd2d7348a72"
+      "post_sha256": "bebad97ed1ef670fc338965e3dbf35f5c2df26daddc2e957b7a75a95b8e02bd3"
     },
     {
       "path": "go.mod",
@@ -2177,7 +2182,7 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "e8e852f952f079db4e2556b5c4335d0d41ecb1732082de999df545296feca39e"
+      "post_sha256": "6f52ad713a07a9f5aa6974da1f33929966a4fb0c90e8fbee7bb591a795393fda"
     },
     {
       "path": "scripts/phase17/privacy_scan_b_test.py",

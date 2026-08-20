@@ -244,7 +244,23 @@ foreach ($marker in @(
     'node_state_transition()',
     '[ "$status" -eq 0 ] || [ "$status" -eq 7 ]',
     'node_state_transition drain || fail DRAIN_FAILED',
-    'node_state_transition resume || fail RESUME_FAILED'
+    'node_state_transition resume || fail RESUME_FAILED',
+    'stage_candidate_bridge()',
+    'stage_candidate_package()',
+    'verify_candidate_package()',
+    'verify_candidate_bridge()',
+    'cleanup_candidate_bridge()',
+    'cleanup_candidate_bridge_bounded()',
+    'candidate_kurdctl_digest=$(sed -n',
+    'candidate_inventory_digest=$(sha256sum SHA256SUMS',
+    'candidate_package_dir=$candidate_bridge_dir/package',
+    'cp -R -- "$script_dir/." "$candidate_package_dir/"',
+    'candidate_bridge_digest=$candidate_kurdctl_digest',
+    'preinstall_kurdctl=$candidate_bridge',
+    'verify_candidate_bridge || fail CANDIDATE_BRIDGE_INVALID',
+    'trap ''cleanup_and_exit 143'' TERM',
+    'trap ''rollback_and_exit 143'' TERM',
+    '[ "$installed_kurdctl_digest" = "$candidate_kurdctl_digest" ]'
 )) {
     if (-not $upgrade.Contains($marker)) {
         throw "native upgrade does not preserve the owner recipient registry: $marker"
