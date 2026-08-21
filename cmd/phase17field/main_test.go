@@ -174,6 +174,44 @@ func TestStageAndVerifyPackageRetriesAndVerifiesCleanupAfterRejectedInstall(t *t
 	}
 }
 
+func TestStageAndVerifyPackageRefreshesRollbackSnapshotWhenInstalledPackageAlreadyMatches(t *testing.T) {
+	packagePath := writeFieldPackageFixture(t)
+	var stageCommand string
+	runner := commandRunner{runFunc: func(_ context.Context, _ []byte, _ string, name string, arguments ...string) ([]byte, error) {
+		switch name {
+		case "scp":
+			return nil, nil
+		case "ssh":
+			command := arguments[len(arguments)-1]
+			if strings.Contains(command, "printf PACKAGE_MATCH_PASS") {
+				stageCommand = command
+				return []byte("PACKAGE_MATCH_PASS"), nil
+			}
+			return nil, nil
+		default:
+			return nil, errors.New("unexpected command")
+		}
+	}}
+	if _, err := stageAndVerifyPackage(context.Background(), runner, config{
+		packagePath: packagePath,
+		scpPath:     "scp",
+		sshPath:     "ssh",
+		sshAlias:    "owner-node",
+		relayPort:   8443,
+	}, "."); err != nil {
+		t.Fatal(err)
+	}
+	if stageCommand == "" {
+		t.Fatal("remote package preparation was not invoked")
+	}
+	if strings.Contains(stageCommand, `if [ "$observed" !=`) {
+		t.Fatal("matching installed identity must not skip the upgrade that refreshes the rollback snapshot")
+	}
+	if !strings.Contains(stageCommand, `"$root/upgrade.sh" --apply`) {
+		t.Fatal("remote package preparation must refresh the rollback snapshot through the authenticated upgrade path")
+	}
+}
+
 func writeFieldPackageFixture(t *testing.T) string {
 	t.Helper()
 	manifest := []byte("{\"schema\":\"kurd-node-native-package-v1\"}\n")
