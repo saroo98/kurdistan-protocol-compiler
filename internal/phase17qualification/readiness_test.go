@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -182,6 +183,26 @@ func TestReadinessProofIsCanonicalAndCandidateBound(t *testing.T) {
 	value.CandidateID = strings.Repeat("0", 64)
 	if _, err := MarshalReadinessProof(value); err == nil {
 		t.Fatal("cross-candidate readiness proof accepted")
+	}
+}
+
+func TestReadinessEvidenceKindsRequireOneCurrentPhysicalDevice(t *testing.T) {
+	want := []string{
+		"SOURCE_GATES",
+		"REPRODUCIBILITY",
+		"FUNCTIONAL",
+		"DETERMINISTIC_GAUNTLET",
+		"STRESS",
+		"SOAK_60M",
+		"SOAK_90M",
+		"SOAK_120M",
+		"PHYSICAL_CURRENT",
+		"SECOND_PROVIDER",
+		"PRIVACY_SCANNERS",
+		"BOUNDARY_MONITOR",
+	}
+	if got := ReadinessEvidenceKinds(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("readiness evidence kinds=%v, want %v", got, want)
 	}
 }
 

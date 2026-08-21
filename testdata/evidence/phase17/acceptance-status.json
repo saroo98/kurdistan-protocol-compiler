@@ -14,12 +14,11 @@
     "ownedVps": "PASS"
   },
   "external": {
-    "physicalApi26Device": "UNVERIFIED",
-    "physicalApi34Device": "UNVERIFIED",
+    "physicalCurrentDevice": "UNVERIFIED",
     "secondVpsProvider": "UNVERIFIED"
   },
   "limitations": [
     "remaining local emulator, namespace, or load, recovery, privacy, and endurance evidence is not yet complete",
-    "physical Android devices and a second unrelated VPS provider remain external evidence"
+    "a current physical Android device and a second unrelated VPS provider remain external evidence"
   ]
 }

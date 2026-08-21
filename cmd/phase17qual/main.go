@@ -777,10 +777,6 @@ func readinessEvidenceVerifier(attempts []phase17qualification.LedgerAttemptReco
 			return errors.New("qualification readiness campaign is not a completed PASS ledger result")
 		}
 		switch kind {
-		case "PHYSICAL_API26":
-			if result.Environment.AndroidClass != "PHYSICAL" || result.Environment.AndroidAPI != 26 {
-				return errors.New("qualification readiness API 26 physical result rejected")
-			}
 		case "PHYSICAL_CURRENT":
 			if result.Environment.AndroidClass != "PHYSICAL" || result.Environment.AndroidAPI < 34 {
 				return errors.New("qualification readiness current physical result rejected")
@@ -796,7 +792,7 @@ func readinessEvidenceVerifier(attempts []phase17qualification.LedgerAttemptReco
 
 func readinessCampaignMode(kind string) (string, bool) {
 	switch kind {
-	case "FUNCTIONAL", "PHYSICAL_API26", "PHYSICAL_CURRENT":
+	case "FUNCTIONAL", "PHYSICAL_CURRENT":
 		return "Functional", true
 	case "STRESS":
 		return "Stress", true

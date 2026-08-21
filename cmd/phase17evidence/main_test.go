@@ -241,11 +241,10 @@ func validAcceptanceForTest() acceptance {
 			"loadRecoveryPrivacyCampaign": "PENDING",
 		},
 		External: map[string]string{
-			"physicalApi26Device": "UNVERIFIED",
-			"physicalApi34Device": "UNVERIFIED",
-			"secondVpsProvider":   "UNVERIFIED",
+			"physicalCurrentDevice": "UNVERIFIED",
+			"secondVpsProvider":     "UNVERIFIED",
 		},
-		Limitations: []string{"physical devices and a second unrelated VPS remain external evidence"},
+		Limitations: []string{"a current physical device and a second unrelated VPS remain external evidence"},
 	}
 }
 

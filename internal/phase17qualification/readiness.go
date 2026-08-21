@@ -30,7 +30,6 @@ var exactReadinessEvidenceKinds = []string{
 	"SOAK_60M",
 	"SOAK_90M",
 	"SOAK_120M",
-	"PHYSICAL_API26",
 	"PHYSICAL_CURRENT",
 	"SECOND_PROVIDER",
 	"PRIVACY_SCANNERS",
