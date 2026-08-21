@@ -47,8 +47,7 @@ var (
 		"ownedVps",
 	}
 	requiredExternalKeys = []string{
-		"physicalApi26Device",
-		"physicalApi34Device",
+		"physicalCurrentDevice",
 		"secondVpsProvider",
 	}
 )
