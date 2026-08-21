@@ -11,7 +11,7 @@
     "roots": {"$ref": "#/$defs/roots"},
     "rcLockedSha256": {"$ref": "#/$defs/digest"},
     "ledgerHeadSha256": {"$ref": "#/$defs/digest"},
-    "entries": {"type": "array", "minItems": 13, "maxItems": 13, "items": {"$ref": "#/$defs/entry"}}
+    "entries": {"type": "array", "minItems": 12, "maxItems": 12, "items": {"$ref": "#/$defs/entry"}}
   },
   "$defs": {
     "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -33,7 +33,7 @@
       "additionalProperties": false,
       "required": ["kind", "path", "size", "evidenceSha256", "result", "rawLogRetained"],
       "properties": {
-        "kind": {"enum": ["SOURCE_GATES", "REPRODUCIBILITY", "FUNCTIONAL", "DETERMINISTIC_GAUNTLET", "STRESS", "SOAK_60M", "SOAK_90M", "SOAK_120M", "PHYSICAL_API26", "PHYSICAL_CURRENT", "SECOND_PROVIDER", "PRIVACY_SCANNERS", "BOUNDARY_MONITOR"]},
+        "kind": {"enum": ["SOURCE_GATES", "REPRODUCIBILITY", "FUNCTIONAL", "DETERMINISTIC_GAUNTLET", "STRESS", "SOAK_60M", "SOAK_90M", "SOAK_120M", "PHYSICAL_CURRENT", "SECOND_PROVIDER", "PRIVACY_SCANNERS", "BOUNDARY_MONITOR"]},
         "path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\\\]+$"},
         "size": {"type": "integer", "minimum": 1, "maximum": 67108864},
         "evidenceSha256": {"$ref": "#/$defs/digest"},
