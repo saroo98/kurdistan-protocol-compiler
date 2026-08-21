@@ -1085,6 +1085,54 @@ func TestReadinessEvidenceVerifierRequiresCandidateBoundProofAndLedgeredCampaign
 	}
 }
 
+func TestReadinessEvidenceVerifierAcceptsOnlyCurrentPhysicalFunctionalEvidence(t *testing.T) {
+	directory := t.TempDir()
+	_, manifest := writeCandidateManifestFixture(t, directory)
+	candidate, err := phase17qualification.CandidateIdentityFromManifest(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin := phase17qualification.AttemptPayload{
+		Schema: phase17qualification.AttemptSchema, CandidateID: candidate.Roots.CandidateID,
+		Sequence: 1, State: phase17qualification.AttemptBegin, AttemptID: strings.Repeat("8", 32), Mode: "Functional",
+		RCLockedSHA256: strings.Repeat("9", 64), AuthorizationSHA256: strings.Repeat("9", 64),
+		EnvironmentSHA256: strings.Repeat("a", 64), PreflightSHA256: strings.Repeat("c", 64),
+		RecordedAt: "2026-08-14T12:00:00Z",
+	}
+	verifyResult := func(result phase17evidence.OwnedVPSEvidenceV3) error {
+		raw, marshalErr := phase17evidence.MarshalOwnedVPSRawV3(result)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		digest := sha256.Sum256(raw)
+		terminal := begin
+		terminal.State = phase17qualification.AttemptTerminal
+		terminal.Outcome = "PASS"
+		terminal.ResultSHA256 = hex.EncodeToString(digest[:])
+		terminal.RecordedAt = "2026-08-14T12:01:00Z"
+		verify := readinessEvidenceVerifier([]phase17qualification.LedgerAttemptRecord{{Begin: begin, Terminal: terminal, Completed: true}})
+		return verify("PHYSICAL_CURRENT", raw, candidate)
+	}
+	physical := validFieldResultForAttempt(t, manifest, begin, strings.Repeat("b", 64))
+	physical.Environment.AndroidClass = "PHYSICAL"
+	physical.Environment.AndroidAPI = 36
+	physical.Environment.AndroidABI = "arm64-v8a"
+	if err := verifyResult(physical); err != nil {
+		t.Fatalf("current physical Functional evidence rejected: %v", err)
+	}
+	emulator := validFieldResultForAttempt(t, manifest, begin, strings.Repeat("b", 64))
+	if err := verifyResult(emulator); err == nil {
+		t.Fatal("emulator satisfied current physical readiness")
+	}
+	legacyPhysical := validFieldResultForAttempt(t, manifest, begin, strings.Repeat("b", 64))
+	legacyPhysical.Environment.AndroidClass = "PHYSICAL"
+	legacyPhysical.Environment.AndroidAPI = 26
+	legacyPhysical.Environment.AndroidABI = "arm64-v8a"
+	if err := verifyResult(legacyPhysical); err == nil {
+		t.Fatal("legacy physical device satisfied current physical readiness")
+	}
+}
+
 func TestParseChangedPathsRequiresSortedSafeUniqueInventory(t *testing.T) {
 	valid := []byte("testdata/evidence/phase17/acceptance-status.json\ntestdata/evidence/phase17/live-data-plane-overlay.json\n")
 	paths, err := parseChangedPaths(valid)

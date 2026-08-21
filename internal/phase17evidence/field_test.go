@@ -17,7 +17,7 @@ func TestConvertOwnedVPSMarksOnlyProvenLocalEvidence(t *testing.T) {
 			"loadRecoveryPrivacyCampaign": "PENDING", "ownedVps": "PENDING",
 		},
 		External: map[string]string{
-			"physicalApi26Device": "UNVERIFIED", "physicalApi34Device": "UNVERIFIED", "secondVpsProvider": "UNVERIFIED",
+			"physicalCurrentDevice": "UNVERIFIED", "secondVpsProvider": "UNVERIFIED",
 		},
 		Limitations: []string{"first-provider field evidence pending", "external evidence pending"},
 	}
@@ -84,7 +84,7 @@ func TestConvertOwnedVPSSoakPromotesCompletedLoadRecoveryPrivacyCampaign(t *test
 			"loadRecoveryPrivacyCampaign": "PENDING", "ownedVps": "PASS",
 		},
 		External: map[string]string{
-			"physicalApi26Device": "UNVERIFIED", "physicalApi34Device": "UNVERIFIED", "secondVpsProvider": "UNVERIFIED",
+			"physicalCurrentDevice": "UNVERIFIED", "secondVpsProvider": "UNVERIFIED",
 		},
 		Limitations: []string{"external evidence pending"},
 	}
