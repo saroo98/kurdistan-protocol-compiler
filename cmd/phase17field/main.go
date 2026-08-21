@@ -2678,16 +2678,13 @@ sudo -n tar -xzf "$archive" -C "$root" --strip-components=1 --no-same-owner
 sudo -n rm -f "$archive"
 cd "$root"
 sudo -n sha256sum -c SHA256SUMS >/dev/null
-observed=$(sha256sum /usr/local/share/doc/kurd-node/manifest.json | cut -d' ' -f1)
-if [ "$observed" != %q ]; then
-  pass=%q
-  [ -f "$pass" ] && [ ! -L "$pass" ]
-  if ! sudo -n env KURD_BACKUP_PASSPHRASE_FILE="$pass" "$root/upgrade.sh" --apply --port %d >"$log" 2>&1; then
-    printf PACKAGE_UPGRADE_FAILED
-    exit 2
-  fi
-  observed=$(sha256sum /usr/local/share/doc/kurd-node/manifest.json | cut -d' ' -f1)
+pass=%q
+[ -f "$pass" ] && [ ! -L "$pass" ]
+if ! sudo -n env KURD_BACKUP_PASSPHRASE_FILE="$pass" "$root/upgrade.sh" --apply --port %d >"$log" 2>&1; then
+  printf PACKAGE_UPGRADE_FAILED
+  exit 2
 fi
+observed=$(sha256sum /usr/local/share/doc/kurd-node/manifest.json | cut -d' ' -f1)
 [ "$observed" = %q ]
 if ! sudo -n ./preflight.sh --runtime --port %d --allow-systemd-socket >"$log" 2>&1; then
   printf PACKAGE_PREFLIGHT_FAILED
@@ -2696,7 +2693,7 @@ fi
 rm -f "$log"
 trap - EXIT HUP INT TERM
 printf PACKAGE_MATCH_PASS
-`, remoteArchive, remoteRoot, manifestDigest, remotePassFile, value.relayPort, manifestDigest, value.relayPort)
+`, remoteArchive, remoteRoot, remotePassFile, value.relayPort, manifestDigest, value.relayPort)
 	raw, err := ssh(ctx, runner, value, root, 2*time.Minute, "sudo -n sh -c "+shellQuote(script))
 	if err != nil || strings.TrimSpace(string(raw)) != "PACKAGE_MATCH_PASS" {
 		category := strings.TrimSpace(string(raw))
