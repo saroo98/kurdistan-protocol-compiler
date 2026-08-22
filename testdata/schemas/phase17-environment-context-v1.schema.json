@@ -11,7 +11,7 @@
     "hostArch": {"enum": ["amd64", "arm64"]},
     "hostBootClass": {"const": "BOUND_CURRENT_BOOT"},
     "androidClass": {"enum": ["EMULATOR", "PHYSICAL"]},
-    "androidApi": {"enum": [26, 34, 36]},
+    "androidApi": {"type": "integer", "minimum": 26},
     "androidAbi": {"enum": ["x86_64", "arm64-v8a"]},
     "vpsOs": {"const": "linux"},
     "vpsArch": {"const": "amd64"},
@@ -25,5 +25,16 @@
     "powershellSha256": {"$ref": "#/$defs/digest"},
     "privateCommitment": {"$ref": "#/$defs/digest"}
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"androidClass": {"const": "EMULATOR"}},
+        "required": ["androidClass"]
+      },
+      "then": {
+        "properties": {"androidApi": {"enum": [26, 34, 36]}}
+      }
+    }
+  ],
   "$defs": {"digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
 }

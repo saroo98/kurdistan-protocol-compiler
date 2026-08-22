@@ -291,7 +291,8 @@ func validateFieldAttemptV3(value FieldAttemptV3, mode string) error {
 
 func validateFieldEnvironmentV3(value FieldEnvironmentV3) error {
 	if !containsString([]string{"windows", "linux", "darwin"}, value.HostOS) || !containsString([]string{"amd64", "arm64"}, value.HostArch) ||
-		!containsString([]string{"EMULATOR", "PHYSICAL"}, value.AndroidClass) || !containsInt([]int{26, 34, 36}, value.AndroidAPI) ||
+		!containsString([]string{"EMULATOR", "PHYSICAL"}, value.AndroidClass) ||
+		!phase17qualification.ValidAndroidAPIForClass(value.AndroidClass, value.AndroidAPI) ||
 		!containsString([]string{"x86_64", "arm64-v8a"}, value.AndroidABI) || value.VPSOS != "linux" || value.VPSArch != "amd64" ||
 		!containsString([]string{"PRIMARY", "UNRELATED_SECONDARY"}, value.ProviderClass) || !value.IPv4 {
 		return errors.New("owned-VPS v3 environment rejected")
