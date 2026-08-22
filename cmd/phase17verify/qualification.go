@@ -761,9 +761,17 @@ func verifyQualificationScripts(files map[string][]byte) error {
 		}
 	}
 	sanitizer := string(files["scripts/phase17/sanitize-field-evidence.ps1"])
-	for _, required := range []string{"-sanitize-v3-input", "-sanitize-v3-output", "PHASE17_SANITIZER_OUTPUT_EXISTS"} {
+	for _, required := range []string{
+		"-sanitize-v3-input", "-sanitize-v3-output", "PHASE17_SANITIZER_OUTPUT_EXISTS",
+		"[Alias('Input')][string]$RawEvidence", "[Alias('Output')][string]$SanitizedEvidence",
+	} {
 		if !strings.Contains(sanitizer, required) {
 			return fmt.Errorf("qualification sanitizer is missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"[string]$Input", "[string]$Output"} {
+		if strings.Contains(sanitizer, forbidden) {
+			return fmt.Errorf("qualification sanitizer uses reserved automatic-variable parameter %q", forbidden)
 		}
 	}
 	foldedSanitizer := strings.ToLower(sanitizer)
