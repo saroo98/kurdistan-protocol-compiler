@@ -179,14 +179,18 @@ func createSelfhostPrivateDirectory(path string) error {
 }
 
 func ensureSelfhostPrivateDirectory(path string) error {
-	if err := createSelfhostPrivateDirectory(path); err == nil {
+	err := createSelfhostPrivateDirectory(path)
+	if err == nil {
 		return nil
+	}
+	if !errors.Is(err, ErrBusy) {
+		return ErrRecipientRegistry
 	}
 	info, statErr := os.Lstat(path)
 	if statErr != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || rejectSelfhostWindowsReparseComponents(path, true) != nil {
 		return ErrRecipientRegistry
 	}
-	return protectSelfhostPrivatePath(path, true)
+	return verifySelfhostPrivatePath(path, true)
 }
 
 func writeSelfhostPrivateFileExclusive(path string, value []byte) error {
