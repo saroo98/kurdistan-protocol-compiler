@@ -651,7 +651,7 @@ func validateEnvironment(value EnvironmentContext) error {
 	if value.Schema != EnvironmentSchema || !containsExact([]string{"windows", "linux", "darwin"}, value.HostOS) ||
 		!containsExact([]string{"amd64", "arm64"}, value.HostArch) || value.HostBootClass != "BOUND_CURRENT_BOOT" ||
 		!containsExact([]string{"EMULATOR", "PHYSICAL"}, value.AndroidClass) ||
-		(value.AndroidAPI != 26 && value.AndroidAPI != 34 && value.AndroidAPI != 36) ||
+		!ValidAndroidAPIForClass(value.AndroidClass, value.AndroidAPI) ||
 		!containsExact([]string{"x86_64", "arm64-v8a"}, value.AndroidABI) || value.VPSOS != "linux" ||
 		value.VPSArch != "amd64" ||
 		!containsExact([]string{"PRIMARY", "UNRELATED_SECONDARY"}, value.ProviderClass) ||
@@ -663,4 +663,18 @@ func validateEnvironment(value EnvironmentContext) error {
 		return errors.New("qualification environment context rejected")
 	}
 	return nil
+}
+
+// ValidAndroidAPIForClass keeps emulator evidence pinned to the frozen test
+// matrix while allowing a genuine physical device to report any API supported
+// by the product. PHYSICAL_CURRENT readiness applies its stricter API 34 floor.
+func ValidAndroidAPIForClass(androidClass string, androidAPI int) bool {
+	switch androidClass {
+	case "EMULATOR":
+		return androidAPI == 26 || androidAPI == 34 || androidAPI == 36
+	case "PHYSICAL":
+		return androidAPI >= 26
+	default:
+		return false
+	}
 }

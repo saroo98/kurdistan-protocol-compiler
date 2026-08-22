@@ -17,6 +17,7 @@ type fieldV3SchemaObject struct {
 	Type                 string                         `json:"type"`
 	Required             []string                       `json:"required"`
 	Properties           map[string]json.RawMessage     `json:"properties"`
+	AllOf                []json.RawMessage              `json:"allOf"`
 	Defs                 map[string]fieldV3SchemaObject `json:"$defs"`
 	AdditionalProperties *bool                          `json:"additionalProperties"`
 }
@@ -52,6 +53,22 @@ func TestOwnedVPSEvidenceV3SchemaMatchesGoTypes(t *testing.T) {
 		}
 		assertFieldV3SchemaObjectMatches(t, "$defs."+name, definition, goType)
 	}
+}
+
+func TestOwnedVPSEvidenceV3SchemaAcceptsCurrentPhysicalAPIWithoutWideningEmulatorMatrix(t *testing.T) {
+	raw, err := os.ReadFile("../../testdata/schemas/phase17-owned-vps-evidence-v3.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document fieldV3SchemaObject
+	if err := json.Unmarshal(raw, &document); err != nil {
+		t.Fatal(err)
+	}
+	environment, ok := document.Defs["environment"]
+	if !ok {
+		t.Fatal("missing $defs.environment")
+	}
+	assertFieldV3AndroidAPISchemaPolicy(t, environment.Properties, environment.AllOf)
 }
 
 func assertFieldV3SchemaObjectMatches(t *testing.T, location string, schema fieldV3SchemaObject, goType reflect.Type) {
@@ -93,4 +110,43 @@ func fieldV3JSONFields(t *testing.T, goType reflect.Type) []string {
 		fields = append(fields, tag)
 	}
 	return fields
+}
+
+func assertFieldV3AndroidAPISchemaPolicy(t *testing.T, properties map[string]json.RawMessage, allOf []json.RawMessage) {
+	t.Helper()
+	var api struct {
+		Type    string `json:"type"`
+		Minimum *int   `json:"minimum"`
+		Enum    []int  `json:"enum"`
+	}
+	if err := json.Unmarshal(properties["androidApi"], &api); err != nil {
+		t.Fatal(err)
+	}
+	if api.Type != "integer" || api.Minimum == nil || *api.Minimum != 26 || len(api.Enum) != 0 {
+		t.Fatalf("androidApi base policy=%+v", api)
+	}
+	if len(allOf) != 1 {
+		t.Fatalf("android API class rules=%d want=1", len(allOf))
+	}
+	var rule struct {
+		If struct {
+			Properties map[string]struct {
+				Const string `json:"const"`
+			} `json:"properties"`
+			Required []string `json:"required"`
+		} `json:"if"`
+		Then struct {
+			Properties map[string]struct {
+				Enum []int `json:"enum"`
+			} `json:"properties"`
+		} `json:"then"`
+	}
+	if err := json.Unmarshal(allOf[0], &rule); err != nil {
+		t.Fatal(err)
+	}
+	if rule.If.Properties["androidClass"].Const != "EMULATOR" ||
+		!reflect.DeepEqual(rule.If.Required, []string{"androidClass"}) ||
+		!reflect.DeepEqual(rule.Then.Properties["androidApi"].Enum, []int{26, 34, 36}) {
+		t.Fatalf("android API class rule=%+v", rule)
+	}
 }
