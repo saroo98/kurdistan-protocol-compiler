@@ -490,6 +490,48 @@ foreach ($forbidden in @('Sort-Object LastWriteTimeUtc', 'Get-ChildItem -Recurse
     }
 }
 
+$sanitizerFixture = Join-Path ([IO.Path]::GetTempPath()) ('phase17-sanitizer-test-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $sanitizerFixture | Out-Null
+try {
+    $sanitizerPath = Join-Path $PSScriptRoot 'sanitize-field-evidence.ps1'
+    $rawInput = Join-Path $sanitizerFixture 'raw.json'
+    $sanitizedOutput = Join-Path $sanitizerFixture 'sanitized.json'
+    [IO.File]::WriteAllText($rawInput, "{}`n", [Text.UTF8Encoding]::new($false))
+    if ($IsWindows) {
+        $fakeTool = Join-Path $sanitizerFixture 'fake-evidence-tool.cmd'
+        [IO.File]::WriteAllText($fakeTool, @'
+@echo off
+if /I not "%~1"=="-sanitize-v3-input" exit /b 64
+if /I not "%~3"=="-sanitize-v3-output" exit /b 65
+copy /b /y "%~2" "%~4" >nul
+exit /b 0
+'@, [Text.UTF8Encoding]::new($false))
+    } else {
+        $fakeTool = Join-Path $sanitizerFixture 'fake-evidence-tool'
+        [IO.File]::WriteAllText($fakeTool, @'
+#!/bin/sh
+[ "$1" = "-sanitize-v3-input" ] || exit 64
+[ "$3" = "-sanitize-v3-output" ] || exit 65
+cp -- "$2" "$4"
+'@, [Text.UTF8Encoding]::new($false))
+        & chmod u+x -- $fakeTool
+        if ($LASTEXITCODE -ne 0) { throw 'failed to make fake evidence tool executable' }
+    }
+    $wrapperResult = @(& $sanitizerPath -Input $rawInput -Output $sanitizedOutput -EvidenceTool $fakeTool)
+    if ($wrapperResult.Count -ne 1) { throw 'sanitizer wrapper result cardinality rejected' }
+    $wrapperRecord = $wrapperResult[0] | ConvertFrom-Json
+    if ($wrapperRecord.status -cne 'PASS' -or -not (Test-Path -LiteralPath $sanitizedOutput -PathType Leaf)) {
+        throw 'sanitizer wrapper did not publish PASS output'
+    }
+    if ((Get-Content -Raw -LiteralPath $sanitizedOutput) -cne (Get-Content -Raw -LiteralPath $rawInput)) {
+        throw 'sanitizer wrapper passed the wrong input or output path'
+    }
+} finally {
+    if (Test-Path -LiteralPath $sanitizerFixture) {
+        Remove-Item -LiteralPath $sanitizerFixture -Recurse -Force
+    }
+}
+
 $upgrade = Get-Content -Raw (Join-Path $root 'deploy/selfhost/native/upgrade.sh')
 foreach ($marker in @(
     'recipient_registry=$data_dir/recipient-registry',

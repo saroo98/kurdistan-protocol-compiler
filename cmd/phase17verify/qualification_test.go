@@ -57,6 +57,11 @@ func TestVerifyQualificationInfrastructureRejectsPolicySchemaAndBoundaryDrift(t 
 			appendix: "\n# forbidden: Get-ChildItem -Recurse\n",
 		},
 		{
+			name: "PowerShell automatic input collision", path: "scripts/phase17/sanitize-field-evidence.ps1",
+			old: `[Parameter(Mandatory = $true)][Alias('Input')][string]$RawEvidence`,
+			new: `[Parameter(Mandatory = $true)][string]$Input`,
+		},
+		{
 			name: "active runner invokes offline converter", path: "cmd/phase17field/main.go",
 			appendix: "\nfunc forbiddenOfflineConverterForTest() { _ = exec.Command(\"phase17evidence.exe\") }\n",
 		},
