@@ -134,10 +134,8 @@ func reserveOwnerRecipientUse(registryDir, expectedRegistryID, deploymentID, pro
 		if _, err := os.Lstat(registryDir); err != nil {
 			return recipientUseReservationV1{}, ErrRecipientRegistry
 		}
-	} else if err := ensureSelfhostPrivateDirectory(registryDir); err != nil {
-		return recipientUseReservationV1{}, ErrRecipientRegistry
 	}
-	if err := protectSelfhostPrivatePath(registryDir, true); err != nil {
+	if err := ensureSelfhostPrivateDirectory(registryDir); err != nil {
 		return recipientUseReservationV1{}, ErrRecipientRegistry
 	}
 	lock := filepath.Join(registryDir, ownerRecipientRegistryLock)

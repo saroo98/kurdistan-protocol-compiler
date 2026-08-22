@@ -358,9 +358,24 @@
       "post_sha256": "b30932d279f449e38067a0421c25524c8c1298bf845b63de32dd4f1d7d197ae6"
     },
     {
+      "path": "internal/selfhost/private_path_windows.go",
+      "pre_sha256": "38dc637f3355591aaad124a18f0584e9f4090db7fdb0cad4020a9b9e3092085a",
+      "post_sha256": "85cc674e79a73904687f46bf7a5e9a2507bcc597479f45566767ec07bf14ef1d"
+    },
+    {
+      "path": "internal/selfhost/private_path_windows_test.go",
+      "pre_sha256": "349e37e165966f571239f99f499941db5592a298c2f0b1349a192c79f91ac9f3",
+      "post_sha256": "1f3a3ba026511870443ddc8f4f5fd3f1bbd92b7c05182687dcc569cf4fc6536e"
+    },
+    {
       "path": "internal/selfhost/recipient_profile.go",
       "pre_sha256": "0e64b7f806385c1c7444a44fb14b54844e6c2167e9a84218c9a657fef3f29124",
       "post_sha256": "50176ae515e0294c28d14790d14cbf80ba268efe13c356da3051d32431e8b399"
+    },
+    {
+      "path": "internal/selfhost/recipient_registry.go",
+      "pre_sha256": "5fb9ba0bb61f1adef6d2cb856f3ffbd65096d32651604f171c80389b0287a735",
+      "post_sha256": "a4c1a4f3880e3c231ccf02c18382dab27d5f7724c026e660c6d7732257d797ab"
     },
     {
       "path": "internal/selfhost/service.go",
