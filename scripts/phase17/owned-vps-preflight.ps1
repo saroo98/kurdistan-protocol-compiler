@@ -84,6 +84,20 @@ function Write-ExclusiveUtf8Json {
     }
 }
 
+function Invoke-AdbCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$Adb,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Failure
+    )
+    $global:LASTEXITCODE = 0
+    $captured = @(& $Adb @Arguments 2>&1)
+    if ($global:LASTEXITCODE -ne 0) {
+        throw $Failure
+    }
+    return ,$captured
+}
+
 $privateRaw = Read-RegularUtf8 -Path $PrivateEnvironment -MaximumBytes (64KB)
 $environmentRaw = Read-RegularUtf8 -Path $Environment -MaximumBytes (64KB)
 if ($PreflightId -cnotmatch '^[0-9a-f]{32}$') {
@@ -107,7 +121,7 @@ $outputParent = Get-Item -LiteralPath (Split-Path -Parent $outputFull) -Force
 if ((-not $outputParent.PSIsContainer) -or ($null -ne $outputParent.LinkType) -or (Test-Path -LiteralPath $outputFull)) {
     throw 'PHASE17_PREFLIGHT_OUTPUT_REJECTED'
 }
-foreach ($field in @('schema', 'sshAlias', 'sshExecutable', 'powershellExecutable')) {
+foreach ($field in @('schema', 'sshAlias', 'deviceSerial', 'adbExecutable', 'sshExecutable', 'powershellExecutable')) {
     if ($null -eq $private.PSObject.Properties[$field]) {
         throw 'PHASE17_PREFLIGHT_PRIVATE_ENVIRONMENT_REJECTED'
     }
@@ -121,10 +135,64 @@ if ([string]$private.schema -cne 'kurdistan-phase17-private-environment-v1' -or
     [string]$environmentDocument.schema -cne 'kurdistan-phase17-environment-context-v1' -or
     [string]$environmentDocument.vpsOs -cne 'linux' -or [string]$environmentDocument.vpsArch -cne 'amd64' -or
     [string]::IsNullOrWhiteSpace([string]$private.sshAlias) -or
+    [string]::IsNullOrWhiteSpace([string]$private.deviceSerial) -or
+    [string]::IsNullOrWhiteSpace([string]$private.adbExecutable) -or
     [string]::IsNullOrWhiteSpace([string]$private.sshExecutable) -or
     [string]::IsNullOrWhiteSpace([string]$private.powershellExecutable)) {
     throw 'PHASE17_PREFLIGHT_ENVIRONMENT_REJECTED'
 }
+
+$adb = [IO.Path]::GetFullPath([string]$private.adbExecutable)
+$adbItem = Get-Item -LiteralPath $adb -Force
+if ($adbItem.PSIsContainer -or ($null -ne $adbItem.LinkType) -or $adbItem.Length -lt 1) {
+    throw 'PHASE17_PREFLIGHT_ADB_REJECTED'
+}
+$deviceSerial = [string]$private.deviceSerial
+$deviceLines = Invoke-AdbCapture -Adb $adb -Arguments @('devices') -Failure 'PHASE17_PREFLIGHT_ANDROID_DEVICE_QUERY_FAILED'
+$devices = @()
+foreach ($lineValue in $deviceLines) {
+    $line = ([string]$lineValue).Trim()
+    if ([string]::IsNullOrWhiteSpace($line) -or $line -ceq 'List of devices attached' -or $line.StartsWith('* daemon', [StringComparison]::Ordinal)) {
+        continue
+    }
+    if ($line -notmatch '^(\S+)\s+(\S+)$') {
+        throw 'PHASE17_PREFLIGHT_ANDROID_DEVICE_SET_REJECTED'
+    }
+    $devices += [pscustomobject]@{ Serial = [string]$Matches[1]; State = [string]$Matches[2] }
+}
+if ($devices.Count -ne 1 -or $devices[0].Serial -cne $deviceSerial -or $devices[0].State -cne 'device') {
+    throw 'PHASE17_PREFLIGHT_ANDROID_DEVICE_SET_REJECTED'
+}
+$bootLines = Invoke-AdbCapture -Adb $adb -Arguments @(
+    '-s', $deviceSerial, 'shell', 'getprop', 'sys.boot_completed'
+) -Failure 'PHASE17_PREFLIGHT_ANDROID_BOOT_QUERY_FAILED'
+$bootState = ($bootLines -join '').Trim()
+if ($bootState -cne '1') {
+    throw 'PHASE17_PREFLIGHT_ANDROID_BOOT_INCOMPLETE'
+}
+$userLines = Invoke-AdbCapture -Adb $adb -Arguments @('-s', $deviceSerial, 'shell', 'dumpsys', 'user') -Failure 'PHASE17_PREFLIGHT_ANDROID_USER_STATE_FAILED'
+$userZero = $false
+$userState = ''
+foreach ($lineValue in $userLines) {
+    $line = [string]$lineValue
+    if ($line -match '^\s*UserInfo\{') {
+        if ($userZero) {
+            break
+        }
+        $userZero = $line -match '^\s*UserInfo\{0:'
+        continue
+    }
+    if ($userZero -and $line -match '^\s*State:\s*(\S+)\s*$') {
+        $userState = [string]$Matches[1]
+        break
+    }
+}
+if ($userState -cne 'RUNNING_UNLOCKED') {
+    throw 'PHASE17_PREFLIGHT_ANDROID_USER_LOCKED'
+}
+Invoke-AdbCapture -Adb $adb -Arguments @(
+    '-s', $deviceSerial, 'shell', 'run-as', 'org.kurdistanvpn.app.internal', 'id'
+) -Failure 'PHASE17_PREFLIGHT_ANDROID_PRIVATE_STORAGE_UNAVAILABLE' | Out-Null
 
 $remote = @'
 set -eu

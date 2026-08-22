@@ -59,26 +59,238 @@ $preflightFixture = Join-Path ([IO.Path]::GetTempPath()) ('phase17-preflight-tes
 New-Item -ItemType Directory -Path $preflightFixture | Out-Null
 try {
     $fakeSsh = Join-Path $preflightFixture 'fake-ssh.ps1'
+    $fakeAdbUnlocked = Join-Path $preflightFixture 'fake-adb-unlocked.ps1'
+    $fakeAdbLocked = Join-Path $preflightFixture 'fake-adb-locked.ps1'
+    $fakeAdbPrivateUnavailable = Join-Path $preflightFixture 'fake-adb-private-unavailable.ps1'
+    $fakeAdbAmbiguous = Join-Path $preflightFixture 'fake-adb-ambiguous.ps1'
+    $fakeAdbBootIncomplete = Join-Path $preflightFixture 'fake-adb-boot-incomplete.ps1'
     $privateEnvironment = Join-Path $preflightFixture 'private-environment.json'
+    $lockedPrivateEnvironment = Join-Path $preflightFixture 'private-environment-locked.json'
+    $privateUnavailableEnvironment = Join-Path $preflightFixture 'private-environment-private-unavailable.json'
+    $ambiguousEnvironment = Join-Path $preflightFixture 'private-environment-ambiguous.json'
+    $bootIncompleteEnvironment = Join-Path $preflightFixture 'private-environment-boot-incomplete.json'
     $environmentContext = Join-Path $preflightFixture 'environment.json'
     $preflightResult = Join-Path $preflightFixture 'preflight.json'
+    $lockedPreflightResult = Join-Path $preflightFixture 'preflight-locked.json'
+    $privateUnavailableResult = Join-Path $preflightFixture 'preflight-private-unavailable.json'
+    $ambiguousResult = Join-Path $preflightFixture 'preflight-ambiguous.json'
+    $bootIncompleteResult = Join-Path $preflightFixture 'preflight-boot-incomplete.json'
     [IO.File]::WriteAllText($fakeSsh, @'
 [CmdletBinding()]
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 $epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 Write-Output ('{"schema":"kurdistan-phase17-owned-vps-preflight-v1","hostClass":"OWNER_CONTROLLED_VPS","os":true,"arch":true,"systemd":true,"networkd":true,"nft":true,"unbound":true,"tun":true,"timeSynchronized":true,"memory":true,"disk":true,"ipv4":true,"ipv6":false,"ipv6Global":false,"ipv6DefaultRoute":false,"ipv6Forwarding":false,"ipv6NftPolicy":false,"ipv6External":false,"sudo":true,"remoteEpoch":' + $epoch + ',"rawLogRetained":false}')
 '@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($fakeAdbUnlocked, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$joined = $Arguments -join ' '
+if ($joined -ceq 'devices') {
+    Write-Output 'List of devices attached'
+    Write-Output "fixture-device`tdevice"
+    exit 0
+}
+if ($joined -ceq '-s fixture-device get-state') {
+    Write-Output 'device'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell getprop sys.boot_completed') {
+    Write-Output '1'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell dumpsys user') {
+    Write-Output 'UserInfo{0:Owner:13} serialNo=0 isPrimary=true'
+    Write-Output 'State: RUNNING_UNLOCKED'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell run-as org.kurdistanvpn.app.internal id') {
+    Write-Output 'uid=20000(app) gid=20000(app)'
+    exit 0
+}
+exit 64
+'@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($fakeAdbBootIncomplete, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$joined = $Arguments -join ' '
+if ($joined -ceq 'devices') {
+    Write-Output 'List of devices attached'
+    Write-Output "fixture-device`tdevice"
+    exit 0
+}
+if ($joined -ceq '-s fixture-device get-state') {
+    Write-Output 'device'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell getprop sys.boot_completed') {
+    Write-Output '0'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell dumpsys user') {
+    Write-Output 'UserInfo{0:Owner:13} serialNo=0 isPrimary=true'
+    Write-Output 'State: RUNNING_UNLOCKED'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell run-as org.kurdistanvpn.app.internal id') {
+    Write-Output 'uid=20000(app) gid=20000(app)'
+    exit 0
+}
+exit 64
+'@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($fakeAdbAmbiguous, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$joined = $Arguments -join ' '
+if ($joined -ceq 'devices') {
+    Write-Output 'List of devices attached'
+    Write-Output "fixture-device`tdevice"
+    Write-Output "fixture-other`tdevice"
+    exit 0
+}
+if ($joined -ceq '-s fixture-device get-state') {
+    Write-Output 'device'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell getprop sys.boot_completed') {
+    Write-Output '1'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell dumpsys user') {
+    Write-Output 'UserInfo{0:Owner:13} serialNo=0 isPrimary=true'
+    Write-Output 'State: RUNNING_UNLOCKED'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell run-as org.kurdistanvpn.app.internal id') {
+    Write-Output 'uid=20000(app) gid=20000(app)'
+    exit 0
+}
+exit 64
+'@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($fakeAdbPrivateUnavailable, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$joined = $Arguments -join ' '
+if ($joined -ceq 'devices') {
+    Write-Output 'List of devices attached'
+    Write-Output "fixture-device`tdevice"
+    exit 0
+}
+if ($joined -ceq '-s fixture-device get-state') {
+    Write-Output 'device'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell getprop sys.boot_completed') {
+    Write-Output '1'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell dumpsys user') {
+    Write-Output 'UserInfo{0:Owner:13} serialNo=0 isPrimary=true'
+    Write-Output 'State: RUNNING_UNLOCKED'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell run-as org.kurdistanvpn.app.internal id') {
+    exit 1
+}
+exit 64
+'@, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($fakeAdbLocked, @'
+[CmdletBinding()]
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+$joined = $Arguments -join ' '
+if ($joined -ceq 'devices') {
+    Write-Output 'List of devices attached'
+    Write-Output "fixture-device`tdevice"
+    exit 0
+}
+if ($joined -ceq '-s fixture-device get-state') {
+    Write-Output 'device'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell getprop sys.boot_completed') {
+    Write-Output '1'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell dumpsys user') {
+    Write-Output 'UserInfo{0:Owner:13} serialNo=0 isPrimary=true'
+    Write-Output 'State: RUNNING_LOCKED'
+    exit 0
+}
+if ($joined -ceq '-s fixture-device shell run-as org.kurdistanvpn.app.internal id') {
+    exit 1
+}
+exit 64
+'@, [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText($privateEnvironment, ([ordered]@{
         schema = 'kurdistan-phase17-private-environment-v1'
         sshAlias = 'fixture-node'
         avdName = 'fixture-avd'
-        deviceSerial = ''
+        deviceSerial = 'fixture-device'
         probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
         probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
         ipv6ProbeAddress = '2001:db8::1'
         relayPort = 8443
         pythonExecutable = $fakeSsh
-        adbExecutable = $fakeSsh
+        adbExecutable = $fakeAdbUnlocked
+        sshExecutable = $fakeSsh
+        scpExecutable = $fakeSsh
+        powershellExecutable = $fakeSsh
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($lockedPrivateEnvironment, ([ordered]@{
+        schema = 'kurdistan-phase17-private-environment-v1'
+        sshAlias = 'fixture-node'
+        avdName = 'fixture-avd'
+        deviceSerial = 'fixture-device'
+        probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
+        probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
+        ipv6ProbeAddress = '2001:db8::1'
+        relayPort = 8443
+        pythonExecutable = $fakeSsh
+        adbExecutable = $fakeAdbLocked
+        sshExecutable = $fakeSsh
+        scpExecutable = $fakeSsh
+        powershellExecutable = $fakeSsh
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($privateUnavailableEnvironment, ([ordered]@{
+        schema = 'kurdistan-phase17-private-environment-v1'
+        sshAlias = 'fixture-node'
+        avdName = 'fixture-avd'
+        deviceSerial = 'fixture-device'
+        probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
+        probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
+        ipv6ProbeAddress = '2001:db8::1'
+        relayPort = 8443
+        pythonExecutable = $fakeSsh
+        adbExecutable = $fakeAdbPrivateUnavailable
+        sshExecutable = $fakeSsh
+        scpExecutable = $fakeSsh
+        powershellExecutable = $fakeSsh
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($ambiguousEnvironment, ([ordered]@{
+        schema = 'kurdistan-phase17-private-environment-v1'
+        sshAlias = 'fixture-node'
+        avdName = 'fixture-avd'
+        deviceSerial = 'fixture-device'
+        probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
+        probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
+        ipv6ProbeAddress = '2001:db8::1'
+        relayPort = 8443
+        pythonExecutable = $fakeSsh
+        adbExecutable = $fakeAdbAmbiguous
+        sshExecutable = $fakeSsh
+        scpExecutable = $fakeSsh
+        powershellExecutable = $fakeSsh
+    } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($bootIncompleteEnvironment, ([ordered]@{
+        schema = 'kurdistan-phase17-private-environment-v1'
+        sshAlias = 'fixture-node'
+        avdName = 'fixture-avd'
+        deviceSerial = 'fixture-device'
+        probeUrlFile = (Join-Path $preflightFixture 'probe-url.txt')
+        probeDigestFile = (Join-Path $preflightFixture 'probe-digest.txt')
+        ipv6ProbeAddress = '2001:db8::1'
+        relayPort = 8443
+        pythonExecutable = $fakeSsh
+        adbExecutable = $fakeAdbBootIncomplete
         sshExecutable = $fakeSsh
         scpExecutable = $fakeSsh
         powershellExecutable = $fakeSsh
@@ -107,6 +319,50 @@ Write-Output ('{"schema":"kurdistan-phase17-owned-vps-preflight-v1","hostClass":
         if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_OUTPUT_REJECTED') {
             throw
         }
+    }
+    try {
+        & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $lockedPrivateEnvironment -Environment $environmentContext -PreflightId '22222222222222222222222222222222' -Output $lockedPreflightResult | Out-Null
+        throw 'preflight accepted a credential-locked Android device'
+    } catch {
+        if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_ANDROID_USER_LOCKED') {
+            throw
+        }
+    }
+    if (Test-Path -LiteralPath $lockedPreflightResult) {
+        throw 'preflight published PASS evidence for a credential-locked Android device'
+    }
+    try {
+        & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $privateUnavailableEnvironment -Environment $environmentContext -PreflightId '33333333333333333333333333333333' -Output $privateUnavailableResult | Out-Null
+        throw 'preflight accepted inaccessible Android app-private storage'
+    } catch {
+        if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_ANDROID_PRIVATE_STORAGE_UNAVAILABLE') {
+            throw
+        }
+    }
+    if (Test-Path -LiteralPath $privateUnavailableResult) {
+        throw 'preflight published PASS evidence for inaccessible Android app-private storage'
+    }
+    try {
+        & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $ambiguousEnvironment -Environment $environmentContext -PreflightId '44444444444444444444444444444444' -Output $ambiguousResult | Out-Null
+        throw 'preflight accepted an ambiguous Android device inventory'
+    } catch {
+        if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_ANDROID_DEVICE_SET_REJECTED') {
+            throw
+        }
+    }
+    if (Test-Path -LiteralPath $ambiguousResult) {
+        throw 'preflight published PASS evidence for an ambiguous Android device inventory'
+    }
+    try {
+        & (Join-Path $PSScriptRoot 'owned-vps-preflight.ps1') -PrivateEnvironment $bootIncompleteEnvironment -Environment $environmentContext -PreflightId '55555555555555555555555555555555' -Output $bootIncompleteResult | Out-Null
+        throw 'preflight accepted an Android device before boot completion'
+    } catch {
+        if ($_.Exception.Message -cne 'PHASE17_PREFLIGHT_ANDROID_BOOT_INCOMPLETE') {
+            throw
+        }
+    }
+    if (Test-Path -LiteralPath $bootIncompleteResult) {
+        throw 'preflight published PASS evidence before Android boot completion'
     }
 } finally {
     Remove-Item -LiteralPath $preflightFixture -Recurse -Force
