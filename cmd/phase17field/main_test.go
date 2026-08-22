@@ -2159,7 +2159,7 @@ func TestSelectDeviceSupportsExactPhysicalUSBClassAndRejectsEmulatorSubstitution
 		case "-s physical-unit shell getprop ro.kernel.qemu":
 			return []byte("0\n"), nil
 		case "-s physical-unit shell getprop ro.build.version.sdk":
-			return []byte("26\n"), nil
+			return []byte("37\n"), nil
 		case "-s physical-unit shell getprop ro.product.cpu.abi":
 			return []byte("arm64-v8a\n"), nil
 		default:
@@ -2172,7 +2172,7 @@ func TestSelectDeviceSupportsExactPhysicalUSBClassAndRejectsEmulatorSubstitution
 	if err != nil {
 		t.Fatal(err)
 	}
-	if serial != "physical-unit" || api != 26 || abi != "arm64-v8a" {
+	if serial != "physical-unit" || api != 37 || abi != "arm64-v8a" {
 		t.Fatalf("physical identity serial=%q api=%d abi=%q", serial, api, abi)
 	}
 

@@ -321,6 +321,28 @@ func TestEnvironmentDigestIsBoundedAndExcludedFromCandidateIdentity(t *testing.T
 	}
 }
 
+func TestEnvironmentContextAcceptsCurrentPhysicalAPIWithoutWideningEmulatorMatrix(t *testing.T) {
+	physical := EnvironmentContext{
+		Schema: EnvironmentSchema, HostOS: "windows", HostArch: "amd64", HostBootClass: "BOUND_CURRENT_BOOT",
+		AndroidClass: "PHYSICAL", AndroidAPI: 37, AndroidABI: "arm64-v8a",
+		VPSOS: "linux", VPSArch: "amd64", ProviderClass: "PRIMARY",
+		TimeSource: "OWNER_VPS_INTERVAL_REQUIRED", PowerPolicy: "RUNNER_SYSTEM_REQUIRED",
+		PythonSHA256: strings.Repeat("1", 64), ADBSHA256: strings.Repeat("2", 64),
+		SSHSHA256: strings.Repeat("3", 64), SCPSHA256: strings.Repeat("4", 64), PowerShellSHA256: strings.Repeat("5", 64),
+		PrivateCommitment: strings.Repeat("f", 64),
+	}
+	if _, err := EnvironmentDigest(physical); err != nil {
+		t.Fatalf("current physical API rejected: %v", err)
+	}
+
+	emulator := physical
+	emulator.AndroidClass = "EMULATOR"
+	emulator.AndroidABI = "x86_64"
+	if _, err := EnvironmentDigest(emulator); err == nil {
+		t.Fatal("unqualified emulator API accepted")
+	}
+}
+
 func writeSubjectFixture(t *testing.T, root, relative, value string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(relative))
