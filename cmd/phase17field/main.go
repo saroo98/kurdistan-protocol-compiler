@@ -1144,7 +1144,7 @@ func selectDevice(ctx context.Context, runner commandRunner, value config, andro
 		if apiErr != nil || abiErr != nil {
 			return "", 0, "", fmt.Errorf("%w: Android identity query failed", errAndroidEnvironmentUnavailable)
 		}
-		if parseErr != nil || api != 26 && api != 34 && api != 36 {
+		if parseErr != nil || !phase17qualification.ValidAndroidAPIForClass(androidClass, api) {
 			return "", 0, "", errors.New("Android identity rejected")
 		}
 		abi = strings.TrimSpace(abi)

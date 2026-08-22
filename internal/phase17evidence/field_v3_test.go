@@ -58,6 +58,23 @@ func TestOwnedVPSV3PreservesV2AndSeparatesStressFromSoak(t *testing.T) {
 	}
 }
 
+func TestOwnedVPSV3AcceptsCurrentPhysicalAPIWithoutWideningEmulatorMatrix(t *testing.T) {
+	physical := validOwnedVPSV3(t, "Functional")
+	physical.Environment.AndroidClass = "PHYSICAL"
+	physical.Environment.AndroidAPI = 37
+	physical.Environment.AndroidABI = "arm64-v8a"
+	if _, err := MarshalOwnedVPSRawV3(physical); err != nil {
+		t.Fatalf("current physical API rejected: %v", err)
+	}
+
+	emulator := physical
+	emulator.Environment.AndroidClass = "EMULATOR"
+	emulator.Environment.AndroidABI = "x86_64"
+	if _, err := MarshalOwnedVPSRawV3(emulator); err == nil {
+		t.Fatal("unqualified emulator API accepted")
+	}
+}
+
 func TestOwnedVPSV3BindsCandidateAttemptAuthorizationScannersAndBoundary(t *testing.T) {
 	valid := validOwnedVPSV3(t, "Functional")
 	mutations := map[string]func(*OwnedVPSEvidenceV3){
