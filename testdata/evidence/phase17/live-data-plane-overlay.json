@@ -2277,12 +2277,12 @@
     {
       "path": "scripts/phase17/owned-vps-preflight.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c0d297ba47f996cb95652b1df04befacb31104e8d08ce084b12a6916e6c08619"
+      "post_sha256": "2a372b54ec7077522e92d7428813273d6f4be228a3ccc451bc90ded9ac17149c"
     },
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "6f52ad713a07a9f5aa6974da1f33929966a4fb0c90e8fbee7bb591a795393fda"
+      "post_sha256": "c6569ae07f6f648e4a466eb5364302a02b53627b27f56334c15c4e0725bc3c02"
     },
     {
       "path": "scripts/phase17/privacy_scan_b_test.py",
