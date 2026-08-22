@@ -250,7 +250,7 @@
     {
       "path": "cmd/phase17verify/qualification.go",
       "pre_sha256": "fd9983099a5162c6af3a5407e1685a5f795c73e61508aea4d34386f33af6148e",
-      "post_sha256": "12b3a3a925b963ab1168ed794f93a545025673a6a9e9e4f0e16592b6dcb7767a"
+      "post_sha256": "41626dbdbe7c4deffaa69bf0363d1ff186182907b5631d0e36bd6c35f62186f8"
     },
     {
       "path": "internal/audit/codegen_test.go",
@@ -1172,7 +1172,7 @@
     {
       "path": "cmd/phase17verify/qualification_test.go",
       "pre_evidence": "ABSENT",
-      "post_sha256": "be9ae27471a54fc0b4a7b7a8d3ae38cd4688ab248007545947d433e8942a7325"
+      "post_sha256": "377d51e2fd86343d37fa769bb63ce45a722e3c07a9ea4a0adda96082b1ce29a5"
     },
     {
       "path": "cmd/phase9devicegate/main.go",
@@ -2282,7 +2282,7 @@
     {
       "path": "scripts/phase17/owned-vps-scripts.Tests.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "c6569ae07f6f648e4a466eb5364302a02b53627b27f56334c15c4e0725bc3c02"
+      "post_sha256": "f676f9063cfea7a564d8514649ad7bab7e5860f0c8dd4d7721b36f47c553e7d8"
     },
     {
       "path": "scripts/phase17/privacy_scan_b_test.py",
@@ -2302,7 +2302,7 @@
     {
       "path": "scripts/phase17/sanitize-field-evidence.ps1",
       "pre_evidence": "ABSENT",
-      "post_sha256": "06965679f5107a8fe655ca75a2669d1cf6caefaff5c106a2c54c1f1094b8a8c3"
+      "post_sha256": "b5fff96a0f1a9c273916be8ddf1bd2eb6d537501452c9e66740b6e1916ec92f8"
     },
     {
       "path": "testdata/evidence/phase16/decentralized-self-hosted-overlay.json",
