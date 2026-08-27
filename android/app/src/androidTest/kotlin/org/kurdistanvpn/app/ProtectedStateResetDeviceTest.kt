@@ -7,9 +7,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
 
 @RunWith(AndroidJUnit4::class)
 class ProtectedStateResetDeviceTest {
@@ -20,9 +22,12 @@ class ProtectedStateResetDeviceTest {
                 .targetContext.applicationContext as KurdistanApplication
         val root = application.compositionRoot
 
-        assertTrue(root.resetProtectedState())
-        val replacement = root.admissionJournal
+        assertTrue(root.initializeProtectedStateForExplicitUserAction())
+        assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
+        assertNull("reset must not recreate state", root.protectedStateFacade())
+        assertTrue("replacement requires a distinct explicit action", root.initializeProtectedStateForExplicitUserAction())
+        val replacement = root.protectedStateFacade()
         assertNotNull(replacement)
-        assertTrue(replacement!!.listProfiles().isEmpty())
+        assertTrue(requireNotNull(replacement!!.readProjection()).profiles.isEmpty())
     }
 }

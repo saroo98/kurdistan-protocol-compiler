@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/lab/runtimeadversary"
 	ktrace "kurdistan/internal/observe/trace"
+	"kurdistan/internal/phase17evidence"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/evidenceoverlay"
 )
@@ -196,7 +196,7 @@ func loadHistoricalM2MaintenancePreHashesV1(root string) (map[string]string, err
 }
 
 func loadM2MaintenancePreHashesWithSuccessorV1(root string, validateSuccessor bool) (map[string]string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		return nil, fmt.Errorf("M2 maintenance manifest: %w", err)
 	}
@@ -920,7 +920,7 @@ var m17LiveDataPlanePathsV1 = []string{
 }
 
 func loadM17LiveDataPlaneOverlayV1(root string) (m17LiveDataPlaneOverlayV1, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(evidenceoverlay.Phase17SuccessorPath)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, evidenceoverlay.Phase17SuccessorPath)
 	if err != nil {
 		return m17LiveDataPlaneOverlayV1{}, err
 	}
@@ -979,7 +979,7 @@ func validateM17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[stri
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
 		actual, present := baseAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				return m17LiveDataPlaneOverlayV1{}, err
 			}
@@ -1029,20 +1029,10 @@ func m17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, entri
 		}
 		actual, found := pre[entry.Path]
 		if !found {
-			path := filepath.Join(root, filepath.FromSlash(entry.Path))
-			if post == "ABSENT" {
-				if _, err := os.Lstat(path); err == nil {
-					return nil, fmt.Errorf("phase17 successor deletion path still exists: %s", entry.Path)
-				} else if !errors.Is(err, os.ErrNotExist) {
-					return nil, err
-				}
-				actual = "ABSENT"
-			} else {
-				content, err := os.ReadFile(path)
-				if err != nil {
-					return nil, err
-				}
-				actual = fmt.Sprintf("%x", sha256.Sum256(content))
+			var err error
+			actual, err = evidenceoverlay.SubjectState(root, entry.Path)
+			if err != nil {
+				return nil, err
 			}
 		}
 		if actual != post {
@@ -1851,7 +1841,7 @@ func m0LineEndingHistoricalHashesAtPostV1(root string, overlays map[string]m0Lin
 		var content []byte
 		if !present {
 			var err error
-			content, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err = evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
 			}
@@ -1863,7 +1853,7 @@ func m0LineEndingHistoricalHashesAtPostV1(root string, overlays map[string]m0Lin
 		}
 		if content == nil {
 			var err error
-			content, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err = evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				return nil, fmt.Errorf("M0 line-ending overlay %s: %w", path, err)
 			}
@@ -1892,15 +1882,9 @@ type m0CandidateManifestV1 struct {
 }
 
 func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, error) {
-	cmd := exec.Command("git", "ls-files", "-z", "--cached")
-	cmd.Dir = root
-	raw, err := cmd.Output()
+	parts, err := evidenceoverlay.HistoricalPaths(root)
 	if err != nil {
-		return m0CandidateManifestV1{}, fmt.Errorf("git-visible candidate inventory: %w", err)
-	}
-	parts := make([]string, 0, len(bytes.Split(raw, []byte{0})))
-	for _, part := range bytes.Split(raw, []byte{0}) {
-		parts = append(parts, filepath.ToSlash(string(part)))
+		return m0CandidateManifestV1{}, fmt.Errorf("immutable historical candidate inventory: %w", err)
 	}
 	successor, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -1924,7 +1908,7 @@ func m0CandidateOutsideScopeManifestV1(root string) (m0CandidateManifestV1, erro
 	for path, hash := range m0StabilizationPreHashesV1 {
 		preHashes[path] = hash
 	}
-	rawManifest, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	rawManifest, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		return m0CandidateManifestV1{}, err
 	}
@@ -2108,7 +2092,7 @@ func m0CandidateManifestFromPathsWithPreHashesV1(root string, inventory []string
 		if expected, ok := m0WO058MaintenanceHashesV1[path]; ok {
 			actual := preHashes[path]
 			if actual == "" {
-				content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+				content, readErr := evidenceoverlay.ReadSubjectFile(root, path)
 				if readErr != nil {
 					return m0CandidateManifestV1{}, fmt.Errorf("WO-058 maintenance path %s: %w", path, readErr)
 				}
@@ -2158,7 +2142,7 @@ func m0CandidateManifestFromPathsWithPreHashesV1(root string, inventory []string
 			fileHash = preHashes[path]
 		}
 		if fileHash == "" {
-			content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, readErr := evidenceoverlay.ReadSubjectFile(root, path)
 			if readErr != nil {
 				return m0CandidateManifestV1{}, fmt.Errorf("candidate path %s: %w", path, readErr)
 			}
@@ -2216,6 +2200,10 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		return gate("security_m0_g1_g13_integration", false, "required", err.Error(), nil, []string{err.Error()})
 	}
 	failures := []string{}
+	availability, availabilityErr := phase17evidence.VerifyDevelopmentAvailability(root)
+	if availabilityErr != nil {
+		failures = append(failures, "immutable historical availability: "+availabilityErr.Error())
+	}
 	manifest, bindingErr := m0CandidateOutsideScopeManifestV1(root)
 	if bindingErr != nil {
 		failures = append(failures, bindingErr.Error())
@@ -2246,7 +2234,7 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		},
 	}
 	for path, markers := range requiredSource {
-		raw, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		raw, readErr := evidenceoverlay.ReadSubjectFile(root, path)
 		if readErr != nil {
 			failures = append(failures, path+": "+readErr.Error())
 			continue
@@ -2283,29 +2271,32 @@ func SecurityM0IntegratedEvidenceGate() GateResult {
 		seen[row.Goal] = true
 	}
 	return gate("security_m0_g1_g13_integration", len(failures) == 0, "required", "13 bounded M0 local strict-candidate rows reconciled; global/product obligations remain open", map[string]any{
-		"scope":                         "bounded M0 local strict-candidate",
-		"global_product_status":         "open",
-		"authorized_repo_state_hash":    m0AuthorizedRepoStateV1,
-		"lifecycle_evidence_sha256":     m0LifecycleEvidenceV1,
-		"outside_scope_manifest_sha256": manifest.OutsideScopeSHA256,
-		"outside_scope_file_count":      manifest.OutsideScopeFileCount,
-		"wo058_maintenance_paths":       manifest.MaintenancePaths,
-		"wo058_maintenance_file_count":  manifest.MaintenanceFileCount,
-		"wo058_maintenance_sha256":      manifest.MaintenanceSHA256,
-		"maintenance_union_paths":       manifest.MaintenanceUnionPaths,
-		"maintenance_union_file_count":  manifest.MaintenanceUnionCount,
-		"m2_maintenance_overlay":        m2MaintenanceOverlayV1,
-		"m2_maintenance_paths":          m2MaintenancePathsV1,
-		"m2_phase2_complete_overlay":    m2Phase2CompleteOverlayNameV1,
-		"m2_phase2_complete_paths":      m2Phase2CompletePathsV1,
-		"wo014_allowed_touches":         []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"},
-		"wo014_completion_hash":         "not-created-no-commit-authority",
-		"policy_seed_csv_sha256":        seedHash,
-		"policy_interaction_rows":       29,
-		"policy_pairwise_coverage":      "732/732",
-		"wo042_catalog_substitution":    false,
-		"opaque_digest_reproduction":    false,
-		"rows":                          rows,
+		"historical_subject_commit":        evidenceoverlay.HistoricalCommit,
+		"historical_subject_tree":          evidenceoverlay.HistoricalTree,
+		"current_development_availability": availability,
+		"scope":                            "bounded M0 local strict-candidate",
+		"global_product_status":            "open",
+		"authorized_repo_state_hash":       m0AuthorizedRepoStateV1,
+		"lifecycle_evidence_sha256":        m0LifecycleEvidenceV1,
+		"outside_scope_manifest_sha256":    manifest.OutsideScopeSHA256,
+		"outside_scope_file_count":         manifest.OutsideScopeFileCount,
+		"wo058_maintenance_paths":          manifest.MaintenancePaths,
+		"wo058_maintenance_file_count":     manifest.MaintenanceFileCount,
+		"wo058_maintenance_sha256":         manifest.MaintenanceSHA256,
+		"maintenance_union_paths":          manifest.MaintenanceUnionPaths,
+		"maintenance_union_file_count":     manifest.MaintenanceUnionCount,
+		"m2_maintenance_overlay":           m2MaintenanceOverlayV1,
+		"m2_maintenance_paths":             m2MaintenancePathsV1,
+		"m2_phase2_complete_overlay":       m2Phase2CompleteOverlayNameV1,
+		"m2_phase2_complete_paths":         m2Phase2CompletePathsV1,
+		"wo014_allowed_touches":            []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"},
+		"wo014_completion_hash":            "not-created-no-commit-authority",
+		"policy_seed_csv_sha256":           seedHash,
+		"policy_interaction_rows":          29,
+		"policy_pairwise_coverage":         "732/732",
+		"wo042_catalog_substitution":       false,
+		"opaque_digest_reproduction":       false,
+		"rows":                             rows,
 	}, failures)
 }
 

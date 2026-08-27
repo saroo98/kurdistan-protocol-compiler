@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-const phase17InventorySHA256 = "75451b4cde7811e16a8003d9b45dc2df4118de2dcac73bb09c7d37d5205ca591"
+const phase17InventorySHA256 = "d5d73321e50896a8a4103f2c7588fba9eba18b145e5b5c6bbb035f3f337b83b7"
 
 var (
 	packageDeclaration = regexp.MustCompile(`(?m)^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*$`)

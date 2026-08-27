@@ -70,6 +70,27 @@ data class VpnRuntimeDiagnostics(
     val rejectedTunPacketCode: Long = 0,
 )
 
+/** Sanitizes display data only. No status message is an authority or traffic proof. */
+fun VpnRuntimeSnapshot.validatedForDisplay(): VpnRuntimeSnapshot {
+    val digests = listOf(planDigest, profileFingerprint, strategyFingerprint, relayFingerprint)
+    val counters = listOf(packetsRead, packetsWritten, diagnostics.tunPacketsRead, diagnostics.outboundPacketsAccepted,
+        diagnostics.carrierRecordsWritten, diagnostics.carrierRecordsRead, diagnostics.authenticatedOperations,
+        diagnostics.innerPacketsAccepted, diagnostics.innerPacketsRejected, diagnostics.tunWriteAttempts,
+        diagnostics.tunWriteFailures, diagnostics.tunWriteFailureCode, diagnostics.tunWriteErrno,
+        diagnostics.tunPacketsWritten, diagnostics.rejectedTunPackets, diagnostics.rejectedTunPacketCode)
+    val wellFormed = counters.all { it >= 0 } && mtu in 1280..1500 && maxReconnectAttempts in 0..5 &&
+        profileGeneration >= 0 && startedAtElapsedRealtime >= 0 &&
+        (failure == null || failure.matches(Regex("[A-Z][A-Z0-9_]{0,63}"))) &&
+        (packetDisposition == null || packetDisposition.matches(Regex("[A-Z][A-Z0-9_]{0,63}"))) &&
+        (runtimeRequestId == null || RuntimeAuthorityLimits.validId(runtimeRequestId)) &&
+        digests.all { it == null || it.matches(Regex("[0-9a-f]{64}")) }
+    val completeActive = state != VpnRuntimeState.ACTIVE_KURD_LIVE ||
+        (runtimeRequestId != null && startedAtElapsedRealtime > 0 && profileGeneration > 0 &&
+            digests.all { it != null } && failure == null)
+    return if (wellFormed && completeActive) this else VpnRuntimeSnapshot(state = VpnRuntimeState.BLOCKED,
+        alwaysOn = alwaysOn, lockdown = lockdown, failure = "INVALID_RUNTIME_STATUS")
+}
+
 data class VpnRuntimeConfig(
     val routingPolicy: VpnRoutingPolicy,
     val selectionMode: SelectionMode = SelectionMode.AUTOMATIC,

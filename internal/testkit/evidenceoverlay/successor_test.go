@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -373,5 +374,188 @@ func writeOverlayForTest(t *testing.T, root, relative, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRepositoryHistoricalSubjectDoesNotReadDevelopmentPostState(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
+	if err != nil {
+		t.Fatalf("immutable historical verification must not read development post-state: %v", err)
+	}
+	if len(pre) == 0 {
+		t.Fatal("historical verification returned no reconstructed predecessors")
+	}
+}
+
+func TestHistoricalFileBindsExactGitIdentityAndReturnsDefensiveBytes(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	const path = "cmd/phase17verify/artifact.go"
+	file, err := ReadHistoricalFile(root, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Commit != "8ef19dd57520c2930d12e81ed7769a6ec6cf3326" ||
+		file.Tree != "3a51879991388775abffa9e3df7984d624b63852" || file.Path != path ||
+		file.Mode != "100644" || file.Type != "blob" || file.Length != 13048 ||
+		file.ObjectID != "14e2c24875e782519f5c460c4a70d34f8e89cbd6" ||
+		file.SHA256 != "63f4029198490909ea682fb0552d89f896cfe45c70941942f4e1a7f6635e6e12" ||
+		int64(len(file.Content)) != file.Length {
+		t.Fatalf("unbound historical file metadata: %+v", file)
+	}
+	file.Content[0] ^= 0xff
+	again, err := ReadHistoricalFile(root, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Content[0] != '/' || again.SHA256 != file.SHA256 {
+		t.Fatal("caller mutation escaped into immutable cache")
+	}
+}
+
+func TestHistoricalLookupNeverFallsBackToAnotherSubject(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	for _, pair := range [][2]string{
+		{strings.Repeat("f", 40), HistoricalTree}, {HistoricalCommit, HistoricalCommit},
+		{"HEAD", HistoricalTree}, {HistoricalCommit, "HEAD^{tree}"},
+	} {
+		if _, err := openHistoricalSubject(root, pair[0], pair[1]); err == nil {
+			t.Fatalf("wrong or symbolic subject accepted: %v", pair)
+		}
+	}
+	fixture := t.TempDir()
+	writeOverlayForTest(t, fixture, "cmd/phase17verify/artifact.go", "shadow policy")
+	if _, err := ReadHistoricalFile(fixture, "cmd/phase17verify/artifact.go"); err == nil {
+		t.Fatal("similarly named fixture substituted for immutable subject")
+	}
+	// This is a current-development addition, absent from the pinned tree even
+	// when it exists as an untracked or subsequently committed source file.
+	if _, err := ReadHistoricalFile(root, "config/phase17-acceptance-registry-v2.json"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("historically absent path was read from another subject: %v", err)
+	}
+	for _, path := range []string{"", "../go.mod", "/go.mod", "a/../go.mod", "a\\b", "a:b", ".git/config", ".codex-private/x", "a\x00b"} {
+		if _, err := ReadHistoricalFile(root, path); err == nil {
+			t.Fatalf("unsafe path accepted: %q", path)
+		}
+	}
+}
+
+func TestRepositoryMarkerFailureCannotSelectFixtureMode(t *testing.T) {
+	root := t.TempDir()
+	writeOverlayForTest(t, root, ".git", "gitdir: missing-subject\n")
+	writeOverlayForTest(t, root, "ROADMAP.md", "fixture that must not be read")
+	if _, err := ReadSubjectFile(root, "ROADMAP.md"); err == nil {
+		t.Fatal("broken immutable marker caused filesystem fallback")
+	}
+}
+
+func TestStandaloneModuleFixtureRemainsMutableAndCannotBeHistoricalEvidence(t *testing.T) {
+	root := t.TempDir()
+	writeOverlayForTest(t, root, "go.mod", "module synthetic.example/fixture\n")
+	writeOverlayForTest(t, root, "sample.txt", "first")
+	for _, want := range []string{"first", "mutated"} {
+		writeOverlayForTest(t, root, "sample.txt", want)
+		got, err := ReadSubjectFile(root, "sample.txt")
+		if err != nil || string(got) != want {
+			t.Fatalf("standalone fixture mutation was not observed: %q, %v", got, err)
+		}
+	}
+	if _, err := ReadHistoricalFile(root, "sample.txt"); err == nil {
+		t.Fatal("module fixture was accepted as immutable repository evidence")
+	}
+}
+
+func TestHistoricalObjectRejectsInvalidTypeLengthAndObjectIdentity(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	s, err := openHistoricalSubject(root, HistoricalCommit, HistoricalTree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const path = "cmd/phase17verify/artifact.go"
+	base := s.entries[path]
+	for name, mutate := range map[string]func(*HistoricalFile){
+		"tree":         func(f *HistoricalFile) { f.Type = "tree" },
+		"symlink":      func(f *HistoricalFile) { f.Mode = "120000" },
+		"negative":     func(f *HistoricalFile) { f.Length = -1 },
+		"oversize":     func(f *HistoricalFile) { f.Length = maximumObjectBytes + 1 },
+		"wrong-length": func(f *HistoricalFile) { f.Length++ },
+		"wrong-object": func(f *HistoricalFile) { f.ObjectID = HistoricalCommit },
+	} {
+		t.Run(name, func(t *testing.T) {
+			entry := base
+			mutate(&entry)
+			s.entries[path] = entry
+			if _, err := s.read(path); err == nil {
+				t.Fatal("invalid object binding accepted")
+			}
+		})
+	}
+}
+
+func TestHistoricalDirectoryIsNotAbsent(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	if state, err := SubjectState(root, "docs"); err == nil {
+		t.Fatalf("directory was treated as a missing file: %s", state)
+	}
+}
+
+func TestHistoricalCheckoutCRLFIsDerivedOnlyFromPinnedAttributes(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	file, err := ReadHistoricalFile(root, "android/gradlew.bat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Length != 2803 || file.SHA256 != "9ca26d733ada3a45f27b2151288f54e75c9f95b287d1f82ef942ec5cc2d4f006" {
+		t.Fatal("literal Git-object identity changed")
+	}
+	state, err := SubjectState(root, "android/gradlew.bat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state != "fedad02c18e266ec094995a5751b7fe1eb6e74f66bf75db64fae2e50eb22c234" {
+		t.Fatalf("frozen checkout projection was not reproduced: %s", state)
+	}
+}
+
+func TestImmutableReconstructionCacheIsDefensiveAndFixtureMutable(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	loads := 0
+	var computed map[string]string
+	compute := func() (map[string]string, error) {
+		loads++
+		computed = map[string]string{"synthetic": fmt.Sprint(loads)}
+		return computed, nil
+	}
+	first, err := immutableResult(root, "test:copy-isolation", compute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first["synthetic"] = "caller mutation"
+	computed["synthetic"] = "retained producer mutation"
+	second, err := immutableResult(root, "test:copy-isolation", compute)
+	if err != nil || loads != 1 || second["synthetic"] != "1" {
+		t.Fatalf("immutable reconstruction cache: loads=%d result=%v error=%v", loads, second, err)
+	}
+	fixture := t.TempDir()
+	for range 2 {
+		if _, err := immutableResult(fixture, "test:copy-isolation", compute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if loads != 3 {
+		t.Fatal("mutable fixture reconstruction was cached")
+	}
+	failures := 0
+	for range 2 {
+		_, err := immutableResult(root, "test:errors-are-not-cached", func() (map[string]string, error) {
+			failures++
+			return nil, errors.New("synthetic immutable read failure")
+		})
+		if err == nil {
+			t.Fatal("immutable reconstruction failure suppressed")
+		}
+	}
+	if failures != 2 {
+		t.Fatal("failed reconstruction was retained as a successful snapshot")
 	}
 }

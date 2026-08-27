@@ -1573,7 +1573,7 @@ var phase17LiveDataPlanePathsV1 = []string{
 }
 
 func loadPhase17LiveDataPlaneOverlayV1(root string) (phase17LiveDataPlaneOverlayV1, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(evidenceoverlay.Phase17SuccessorPath)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, evidenceoverlay.Phase17SuccessorPath)
 	if err != nil {
 		return phase17LiveDataPlaneOverlayV1{}, err
 	}
@@ -1632,7 +1632,7 @@ func validatePhase17LiveDataPlaneOverlayAtPostV1(root string, currentAtPost map[
 		_, _ = fmt.Fprintf(binding, "%s\x00%s\n", path, predecessor)
 		actual, present := baseAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				return phase17LiveDataPlaneOverlayV1{}, err
 			}
@@ -1682,20 +1682,10 @@ func phase17SuccessorPreAtPostV1(root string, currentAtPost map[string]string, e
 		}
 		actual, found := pre[entry.Path]
 		if !found {
-			path := filepath.Join(root, filepath.FromSlash(entry.Path))
-			if post == "ABSENT" {
-				if _, err := os.Lstat(path); err == nil {
-					return nil, fmt.Errorf("phase17 successor deletion path still exists: %s", entry.Path)
-				} else if !errors.Is(err, os.ErrNotExist) {
-					return nil, err
-				}
-				actual = "ABSENT"
-			} else {
-				content, err := os.ReadFile(path)
-				if err != nil {
-					return nil, err
-				}
-				actual = fmt.Sprintf("%x", sha256.Sum256(content))
+			var err error
+			actual, err = evidenceoverlay.SubjectState(root, entry.Path)
+			if err != nil {
+				return nil, err
 			}
 		}
 		if actual != post {

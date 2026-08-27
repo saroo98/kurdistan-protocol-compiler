@@ -30,8 +30,12 @@ type handleDestroyer interface {
 	Destroy()
 }
 
+type handleResultDestroyer interface {
+	DestroyResult() ErrorCode
+}
+
 type handleCanceller interface {
-	Cancel()
+	Cancel() ErrorCode
 }
 
 type HandleRegistry struct {
@@ -108,7 +112,7 @@ func (r *HandleRegistry) Cancel(handle Handle) ErrorCode {
 	value := slot.value
 	r.mu.Unlock()
 	if canceller, ok := value.(handleCanceller); ok {
-		canceller.Cancel()
+		return canceller.Cancel()
 	}
 	return CodeOK
 }
@@ -137,6 +141,9 @@ func (r *HandleRegistry) Free(handle Handle) ErrorCode {
 	slot.cancelled = false
 	slot.occupied = false
 	r.mu.Unlock()
+	if destroyer, ok := value.(handleResultDestroyer); ok {
+		return destroyer.DestroyResult()
+	}
 	if destroyer, ok := value.(handleDestroyer); ok {
 		destroyer.Destroy()
 	}

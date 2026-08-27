@@ -10,6 +10,67 @@ import org.junit.Test
 
 class ProductSettingsTest {
     @Test
+    fun protectedStateMigrationNeedsCurrentExplicitConfirmation() {
+        val initial = ProtectedStateMigrationConfirmation.UNCONFIRMED
+        assertEquals(false, initial.permitsMigration(available = true))
+        assertEquals(initial, initial.prepare(available = false))
+        val prepared = initial.prepare(available = true)
+        assertEquals(ProtectedStateMigrationConfirmation.PREPARED, prepared)
+        assertEquals(false, prepared.permitsMigration(available = false))
+        assertEquals(true, prepared.permitsMigration(available = true))
+        // UI consumes/cancels the prompt before invoking the mutation callback.
+        assertEquals(false, prepared.cancel().permitsMigration(available = true))
+        assertEquals(initial, prepared.cancel())
+    }
+
+    @Test
+    fun protectedRecoveryExposesOnlyTheBrokerBackedPresentationAction() {
+        val recoverable = ProtectedRecoveryPresentation.Required(
+            reason = ProtectedRecoveryReason.RECOVERY_REQUIRED,
+            action = ProtectedRecoveryAction.RECOVER_PRESENTATION,
+        )
+        assertEquals(true, recoverable.canRecoverPresentation)
+
+        listOf(
+            ProtectedRecoveryReason.QUARANTINED,
+            ProtectedRecoveryReason.INCONSISTENT,
+            ProtectedRecoveryReason.CLEANUP_UNPROVEN,
+            ProtectedRecoveryReason.MUTATION_UNPROVEN,
+        ).forEach { reason ->
+            val status = ProtectedRecoveryPresentation.Required(reason)
+            assertEquals(false, status.canRecoverPresentation)
+            assertThrows(IllegalArgumentException::class.java) {
+                ProtectedRecoveryPresentation.Required(reason, ProtectedRecoveryAction.RECOVER_PRESENTATION)
+            }
+        }
+    }
+
+    @Test
+    fun protectedRecoveryConfirmationIsCurrentExplicitAndCancellable() {
+        val unavailable = ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.QUARANTINED)
+        val available = ProtectedRecoveryPresentation.Required(
+            ProtectedRecoveryReason.RECOVERY_REQUIRED,
+            ProtectedRecoveryAction.RECOVER_PRESENTATION,
+        )
+        val initial = ProtectedRecoveryConfirmation.UNCONFIRMED
+        assertEquals(initial, initial.prepare(unavailable))
+        val prepared = initial.prepare(available)
+        assertEquals(ProtectedRecoveryConfirmation.PREPARED, prepared)
+        assertEquals(true, prepared.permits(available))
+        assertEquals(false, prepared.permits(unavailable))
+        assertEquals(initial, prepared.cancel())
+    }
+
+    @Test
+    fun pendingCredentialResetIsSeparateAndPreservesExistingScopeIdentities() {
+        assertEquals(listOf("SETTINGS", "PROFILES_PROVIDERS", "ROUTING", "DIAGNOSTICS", "EVERYTHING"),
+            ResetScope.entries.take(5).map { it.name })
+        assertEquals("PENDING_CREDENTIALS", ResetScope.PENDING_CREDENTIALS.name)
+        assertEquals(ResetScope.PENDING_CREDENTIALS, ResetScope.valueOf("PENDING_CREDENTIALS"))
+        assertEquals(6, ResetScope.entries.size)
+    }
+
+    @Test
     fun defaultsAreValidAndPrivacyPreserving() {
         val value = Phase9Settings().validated()
         assertEquals(DnsMode.INTERNAL_TUN, value.tunnel.dnsMode)

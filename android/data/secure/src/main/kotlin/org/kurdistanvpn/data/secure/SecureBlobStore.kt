@@ -9,12 +9,15 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-interface SecureBlobAccess {
-    fun stage(localRecordId: String, dataClass: SecureDataClass, exactBytes: ByteArray)
+interface SecureBlobReadAccess {
     fun reopen(localRecordId: String, dataClass: SecureDataClass): ByteArray
+    fun exists(localRecordId: String, dataClass: SecureDataClass): Boolean
+}
+
+interface SecureBlobAccess : SecureBlobReadAccess {
+    fun stage(localRecordId: String, dataClass: SecureDataClass, exactBytes: ByteArray)
     fun delete(localRecordId: String, dataClass: SecureDataClass)
     fun deleteAll()
-    fun exists(localRecordId: String, dataClass: SecureDataClass): Boolean
 }
 
 class SecureBlobStore(

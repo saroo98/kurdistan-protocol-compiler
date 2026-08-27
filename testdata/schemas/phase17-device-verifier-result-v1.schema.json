@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-device-verifier-result-v1.schema.json",
+  "title": "Kurdistan Phase 17 recomputed device-verifier result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verifierVersion",
+    "subject",
+    "subjectSha256",
+    "authorizationSha256",
+    "invocationId",
+    "journeyId",
+    "bootId",
+    "sessionId",
+    "provenance",
+    "requiredTiers",
+    "rawEvidenceSha256",
+    "receivedHeadSha256",
+    "firstReceivedMonoMs",
+    "lastReceivedMonoMs",
+    "outcome",
+    "processDeaths",
+    "failures",
+    "missing",
+    "tiers"
+  ],
+  "properties": {
+    "schema": {
+      "const": "kurdistan-phase17-device-verifier-result-v1"
+    },
+    "verifierVersion": {
+      "const": "phase17-device-core-1"
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "subjectSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "authorizationSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "invocationId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "journeyId": {
+      "type": "string",
+      "enum": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "FIXTURE_CORE"
+      ]
+    },
+    "bootId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "provenance": {
+      "type": "string",
+      "enum": [
+        "SYNTHETIC",
+        "AUTHORIZED_DEVICE"
+      ]
+    },
+    "requiredTiers": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["CONTROLLED_PROBE", "ROUTE_TUN", "DNS_TRANSACTION", "PER_UID", "DEVICE_WIDE"]},
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true
+    },
+    "rawEvidenceSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "receivedHeadSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "firstReceivedMonoMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "lastReceivedMonoMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INCOMPLETE"
+      ]
+    },
+    "processDeaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "DEFAULT",
+          "VPN"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+        "maxLength": 64
+      },
+      "minItems": 0,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+        "maxLength": 64
+      },
+      "minItems": 0,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "tiers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tier"
+      },
+      "minItems": 5,
+      "maxItems": 5
+    }
+  },
+  "$defs": {
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "manifestSha256",
+        "appPackage",
+        "testPackage",
+        "appApk",
+        "testApk",
+        "appCertificateSha256",
+        "testCertificateSha256",
+        "installId",
+        "appUid",
+        "versionCode"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "appPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "testPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "appApk": {
+          "$ref": "#/$defs/entry"
+        },
+        "testApk": {
+          "$ref": "#/$defs/entry"
+        },
+        "appCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "testCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "installId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "appUid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commitSha",
+        "treeSha",
+        "roots",
+        "comparisonSha256"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 201,
+          "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+        },
+        "commitSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "minLength": 40,
+          "maxLength": 40
+        },
+        "treeSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "minLength": 40,
+          "maxLength": 40
+        },
+        "roots": {
+          "$ref": "#/$defs/roots"
+        },
+        "comparisonSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceSha256",
+        "productSha256",
+        "harnessSha256",
+        "workloadSha256",
+        "verifierSha256",
+        "candidateId"
+      ],
+      "properties": {
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "productSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "harnessSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "workloadSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "verifierSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "candidateId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "size",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+\\.apk$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1073741824
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier",
+        "outcome",
+        "missing"
+      ],
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": [
+            "CONTROLLED_PROBE",
+            "ROUTE_TUN",
+            "DNS_TRANSACTION",
+            "PER_UID",
+            "DEVICE_WIDE"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCOMPLETE"
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "maxLength": 64
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

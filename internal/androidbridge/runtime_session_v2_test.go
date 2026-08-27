@@ -151,8 +151,8 @@ func TestRuntimeSessionV2RunsOnlyAfterAuthenticatedTUNAttach(t *testing.T) {
 	if code := RuntimeStop(&registry, handle); code != CodeOK {
 		t.Fatalf("stop code=%v", code)
 	}
-	if current, code := RuntimeStatus(&registry, handle); code != CodeOK || current != RuntimeStateClosed {
-		t.Fatalf("closed state=%v code=%v", current, code)
+	if _, code := RuntimeStatus(&registry, handle); code != CodeAlreadyClosed {
+		t.Fatalf("status after stop code=%v", code)
 	}
 }
 
@@ -257,6 +257,138 @@ func TestRuntimeSessionV2CancelClosesNetwork(t *testing.T) {
 	}
 	if code := registry.Free(handle); code != CodeOK {
 		t.Fatal(code)
+	}
+}
+
+func TestRuntimeStopRetiresHandleWhenNetworkCleanupFails(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	factory.network.closeCode = CodeTUNIOFailed
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateRunning,
+		plan: sessionplan.PlanV2{Digest: [32]byte{1}}, factory: factory, network: &factory.network,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+
+	if code := RuntimeStop(&registry, handle); code != CodeTUNIOFailed {
+		t.Fatalf("stop code=%v", code)
+	}
+	if factory.network.closeCount() != 1 {
+		t.Fatalf("close count=%d want=1", factory.network.closeCount())
+	}
+	if _, code := RuntimeStatus(&registry, handle); code != CodeAlreadyClosed {
+		t.Fatalf("status after failed cleanup code=%v", code)
+	}
+	if code := RuntimeStop(&registry, handle); code != CodeAlreadyClosed {
+		t.Fatalf("duplicate stop code=%v", code)
+	}
+	if code := registry.Free(handle); code != CodeAlreadyClosed {
+		t.Fatalf("free after stop code=%v", code)
+	}
+}
+
+func TestRuntimeCancellationRetainsCleanupFailureUntilHandleRelease(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	factory.network.closeCode = CodeInternalFailure
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateSocketPrepared,
+		plan: sessionplan.PlanV2{Digest: [32]byte{1}}, factory: factory, network: &factory.network,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+
+	if code := registry.Cancel(handle); code != CodeInternalFailure {
+		t.Fatalf("cancel code=%v", code)
+	}
+	if code := registry.Free(handle); code != CodeInternalFailure {
+		t.Fatalf("free code=%v", code)
+	}
+	if factory.network.closeCount() != 1 {
+		t.Fatalf("close count=%d want=1", factory.network.closeCount())
+	}
+	if _, code := RuntimeStatus(&registry, handle); code != CodeAlreadyClosed {
+		t.Fatalf("status after cancellation code=%v", code)
+	}
+}
+
+func TestRuntimeStopConcurrentCleanupFailureClosesOnce(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	factory.network.closeCode = CodeTUNIOFailed
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateRunning,
+		plan: sessionplan.PlanV2{Digest: [32]byte{1}}, factory: factory, network: &factory.network,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+
+	results := make(chan ErrorCode, 8)
+	var wait sync.WaitGroup
+	for range 8 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			results <- RuntimeStop(&registry, handle)
+		}()
+	}
+	wait.Wait()
+	close(results)
+	cleanupFailures, alreadyClosed := 0, 0
+	for result := range results {
+		switch result {
+		case CodeTUNIOFailed:
+			cleanupFailures++
+		case CodeAlreadyClosed:
+			alreadyClosed++
+		default:
+			t.Fatalf("concurrent stop code=%v", result)
+		}
+	}
+	if cleanupFailures != 1 || alreadyClosed != 7 {
+		t.Fatalf("cleanup failures=%d already closed=%d", cleanupFailures, alreadyClosed)
+	}
+	if factory.network.closeCount() != 1 {
+		t.Fatalf("close count=%d want=1", factory.network.closeCount())
+	}
+}
+
+func TestRuntimeSocketPrepareCleanupFailurePreventsReuse(t *testing.T) {
+	factory := &recordingRuntimeNetworkFactory{}
+	factory.network.socketCode = CodeInternalFailure
+	factory.network.closeCode = CodeTUNIOFailed
+	ctx, cancel := context.WithCancel(context.Background())
+	state := &runtimeSessionV2Handle{
+		ctx: ctx, cancel: cancel, state: RuntimeStateVerified,
+		plan: sessionplan.PlanV2{Digest: [32]byte{1}}, factory: factory,
+	}
+	registry := HandleRegistry{}
+	handle, code := registry.Open(HandleRuntimeSession, state)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodeTUNIOFailed {
+		t.Fatalf("prepare cleanup code=%v", code)
+	}
+	if _, code := RuntimeSocketPrepare(&registry, handle); code != CodePolicyRejected {
+		t.Fatalf("prepare after uncertain cleanup code=%v", code)
+	}
+	if current, code := RuntimeStatus(&registry, handle); code != CodeOK || current != RuntimeStateClosed {
+		t.Fatalf("state after uncertain cleanup=%v code=%v", current, code)
+	}
+	if code := RuntimeStop(&registry, handle); code != CodeTUNIOFailed {
+		t.Fatalf("stop after uncertain cleanup code=%v", code)
 	}
 }
 
@@ -449,10 +581,11 @@ func (network *cancellationRuntimeNetwork) Start(context.Context) ErrorCode {
 	return CodeOK
 }
 func (*cancellationRuntimeNetwork) Status() ErrorCode { return CodeOK }
-func (network *cancellationRuntimeNetwork) Close() {
+func (network *cancellationRuntimeNetwork) Close() ErrorCode {
 	network.mu.Lock()
 	network.isClosed = true
 	network.mu.Unlock()
+	return CodeOK
 }
 func (network *cancellationRuntimeNetwork) closed() bool {
 	network.mu.Lock()
@@ -523,17 +656,22 @@ func (*fallbackRuntimeNetwork) AuthenticateKurd(context.Context) ErrorCode { ret
 func (*fallbackRuntimeNetwork) AttachTUN(context.Context, int) ErrorCode   { return CodeOK }
 func (*fallbackRuntimeNetwork) Start(context.Context) ErrorCode            { return CodeOK }
 func (*fallbackRuntimeNetwork) Status() ErrorCode                          { return CodeOK }
-func (network *fallbackRuntimeNetwork) Close()                             { network.isClosed = true }
+func (network *fallbackRuntimeNetwork) Close() ErrorCode                   { network.isClosed = true; return CodeOK }
 
 type recordingRuntimeNetwork struct {
 	mu           sync.Mutex
 	history      []string
 	isClose      bool
+	closeCountV  int
+	closeCode    ErrorCode
+	socketCode   ErrorCode
 	terminalCode ErrorCode
 	diagnostics  RuntimeNetworkDiagnosticsV1
 }
 
-func (network *recordingRuntimeNetwork) SocketFD() (int, ErrorCode) { return 41, CodeOK }
+func (network *recordingRuntimeNetwork) SocketFD() (int, ErrorCode) {
+	return 41, network.socketCode
+}
 func (network *recordingRuntimeNetwork) ConnectProtected(context.Context) ErrorCode {
 	network.add("connect")
 	return CodeOK
@@ -564,10 +702,12 @@ func (network *recordingRuntimeNetwork) RuntimeNetworkDiagnosticsV1() RuntimeNet
 	defer network.mu.Unlock()
 	return network.diagnostics
 }
-func (network *recordingRuntimeNetwork) Close() {
+func (network *recordingRuntimeNetwork) Close() ErrorCode {
 	network.mu.Lock()
 	defer network.mu.Unlock()
 	network.isClose = true
+	network.closeCountV++
+	return network.closeCode
 }
 func (network *recordingRuntimeNetwork) add(value string) {
 	network.mu.Lock()
@@ -583,6 +723,11 @@ func (network *recordingRuntimeNetwork) closed() bool {
 	network.mu.Lock()
 	defer network.mu.Unlock()
 	return network.isClose
+}
+func (network *recordingRuntimeNetwork) closeCount() int {
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.closeCountV
 }
 func (network *recordingRuntimeNetwork) setStatus(code ErrorCode) {
 	network.mu.Lock()

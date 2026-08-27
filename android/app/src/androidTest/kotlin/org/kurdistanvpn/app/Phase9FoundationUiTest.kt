@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +35,6 @@ import androidx.compose.ui.test.click
 import androidx.core.content.ContextCompat
 import androidx.test.espresso.IdlingPolicies
 import androidx.test.platform.app.InstrumentationRegistry
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
@@ -51,13 +51,24 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kurdistanvpn.core.model.AppState
+import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
+import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProtectedRecoveryAction
+import org.kurdistanvpn.core.model.ProtectedRecoveryPresentation
+import org.kurdistanvpn.core.model.ProtectedRecoveryReason
 import org.kurdistanvpn.core.ui.R as UiR
 import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativejni.NativeBridge
 import org.kurdistanvpn.data.secure.AndroidKeystoreKek
 import org.kurdistanvpn.data.secure.SecureDataClass
+import org.kurdistanvpn.feature.settingsrecovery.SettingsRecoveryScreen
 import org.kurdistanvpn.runtime.android.KurdVpnService
+import org.kurdistanvpn.runtime.android.RuntimeActivationGuard
+import org.kurdistanvpn.runtime.android.RuntimeAuthorityReissueClient
+import org.kurdistanvpn.runtime.android.RuntimeCleanupState
+import org.kurdistanvpn.runtime.android.RuntimeResourceKind
+import org.kurdistanvpn.runtime.android.RuntimeServiceCommand
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 import org.kurdistanvpn.runtime.api.VpnRuntimeContract
 import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
@@ -73,6 +84,77 @@ class Phase9FoundationUiTest {
     fun configureHostedEmulatorIdlingBudget() {
         IdlingPolicies.setMasterPolicyTimeout(2, TimeUnit.MINUTES)
         IdlingPolicies.setIdlingResourceTimeout(2, TimeUnit.MINUTES)
+    }
+
+    @Test
+    fun protectedRecoveryUiRequiresCurrentConfirmationAndRejectsUnsupportedRepairActions() {
+        val recovery = androidx.compose.runtime.mutableStateOf<ProtectedRecoveryPresentation>(
+            ProtectedRecoveryPresentation.Required(
+                ProtectedRecoveryReason.RECOVERY_REQUIRED,
+                ProtectedRecoveryAction.RECOVER_PRESENTATION,
+            ),
+        )
+        var recovered = 0
+        var diagnostics = 0
+        val activity = compose.activity
+        compose.setContent {
+            SettingsRecoveryScreen(
+                backupState = BackupWorkflowState.Idle,
+                settings = Phase9Settings(),
+                onTheme = {},
+                onHighContrast = {},
+                onReducedMotion = {},
+                onCreateBackup = {},
+                onOpenBackup = {},
+                onConfirmRestore = {},
+                onCancelRestore = {},
+                onResetAll = {},
+                onBack = {},
+                protectedRecovery = recovery.value,
+                recoveryTitle = activity.getString(R.string.protected_recovery_title),
+                recoveryMessage = activity.getString(R.string.protected_recovery_required),
+                recoveryPrepareLabel = activity.getString(R.string.prepare_presentation_recovery),
+                recoveryConfirmLabel = activity.getString(R.string.confirm_presentation_recovery),
+                recoveryDiagnosticsLabel = activity.getString(R.string.open_privacy_safe_diagnostics),
+                onConfirmPresentationRecovery = { recovered++ },
+                onOpenDiagnostics = { diagnostics++ },
+            )
+        }
+        compose.onNodeWithTag("protected_recovery_status").assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            activity.getString(R.string.protected_recovery_title) + ". " +
+                activity.getString(R.string.protected_recovery_required),
+        ).assertIsDisplayed()
+        compose.onNodeWithTag("prepare_presentation_recovery").performScrollTo().performClick()
+        compose.onNodeWithTag("cancel_presentation_recovery").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(0, recovered) }
+        compose.onNodeWithTag("prepare_presentation_recovery").performScrollTo().performClick()
+        compose.onNodeWithTag("confirm_presentation_recovery").performScrollTo().performClick()
+        compose.onNodeWithTag("open_recovery_diagnostics").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(1, recovered)
+            assertEquals(1, diagnostics)
+            recovery.value = ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.QUARANTINED)
+        }
+        compose.onAllNodesWithTag("prepare_presentation_recovery").assertCountEquals(0)
+        compose.onNodeWithTag("open_recovery_diagnostics").assertIsDisplayed()
+        compose.runOnIdle {
+            recovery.value = ProtectedRecoveryPresentation.Required(
+                ProtectedRecoveryReason.MUTATION_UNPROVEN,
+            )
+        }
+        compose.onAllNodesWithTag("prepare_presentation_recovery").assertCountEquals(0)
+        compose.onNodeWithTag("open_recovery_diagnostics").assertIsDisplayed()
+        compose.runOnIdle {
+            recovery.value = ProtectedRecoveryPresentation.Required(
+                ProtectedRecoveryReason.RECOVERY_REQUIRED,
+                ProtectedRecoveryAction.RECOVER_PRESENTATION,
+            )
+        }
+        compose.onAllNodesWithTag("confirm_presentation_recovery").assertCountEquals(0)
+        compose.onNodeWithTag("prepare_presentation_recovery").assertIsDisplayed()
+        compose.runOnIdle { recovery.value = ProtectedRecoveryPresentation.NotRequired }
+        compose.onAllNodesWithTag("protected_recovery_status").assertCountEquals(0)
     }
 
     @Test
@@ -432,50 +514,32 @@ class Phase9FoundationUiTest {
     @Test
     fun missingAuthorityTimesOutFailClosed() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val authority = ByteArray(32) { 0x5a }
-        var handoffFailure: String? = null
-        val rejectingContext = object : ContextWrapper(context) {
-            override fun startForegroundService(service: Intent): ComponentName? =
-                ComponentName(packageName, KurdVpnService::class.java.name)
-
+        var unbound = 0
+        val unavailableContext = object : ContextWrapper(context) {
             override fun bindService(
                 service: Intent,
                 connection: ServiceConnection,
                 flags: Int,
-            ): Boolean = throw SecurityException("synthetic bind rejection")
+            ): Boolean = true // Model accepted binding whose provider never arrives.
+            override fun unbindService(connection: ServiceConnection) { unbound++ }
         }
-        KurdVpnService.start(
-            rejectingContext,
-            "0123456789abcdef0123456789abcdef",
-            authority,
-            Executor { command -> command.run() },
-        ) { category -> handoffFailure = category }
-        assertTrue(authority.all { it == 0.toByte() })
-        assertEquals("AUTHORITY_BIND_FAILED", handoffFailure)
-
-        resetRuntimeService(context)
-        val requestId = "0123456789abcdef0123456789abcdef"
-        val probe = DirectRuntimeStatusProbe(context, requestId)
+        val guard = RuntimeActivationGuard()
+        val outcome = CompletableDeferred<Boolean>()
+        val client = RuntimeAuthorityReissueClient(unavailableContext,
+            ComponentName(context, RuntimeAuthorityReissueService::class.java),
+            "0123456789abcdef0123456789abcdef", NativeBridge().durableFiles(), guard) {}
+        check(guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, client) != null)
         try {
-            context.startForegroundService(
-                Intent(context, KurdVpnService::class.java)
-                    .setAction(VpnRuntimeContract.ACTION_START)
-                    .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, requestId),
-            )
-            val terminal = runBlocking {
-                probe.await(
-                    state = VpnRuntimeState.FAILED,
-                    failure = "AUTHORITY_HANDOFF_TIMEOUT",
-                    timeoutMillis = runtimeTimeout(10_000),
-                )
+            assertTrue(client.bind { outcome.complete(it) })
+            val bound = runBlocking {
+                withTimeout(runtimeTimeout(40_000)) { outcome.await() }
             }
-            assertEquals(VpnRuntimeState.FAILED, terminal.state)
-            assertEquals("AUTHORITY_HANDOFF_TIMEOUT", terminal.failure)
-            assertEquals(0L, terminal.packetsRead)
-            assertEquals(0L, terminal.packetsWritten)
+            assertEquals(false, bound)
+            assertEquals(RuntimeCleanupState.CLEAN, guard.cancel())
+            assertEquals(false, guard.isActive())
+            assertEquals(1, unbound)
         } finally {
-            probe.close()
-            resetRuntimeService(context)
+            guard.cancel()
         }
     }
 
@@ -488,12 +552,13 @@ class Phase9FoundationUiTest {
             context.startForegroundService(
                 Intent(context, KurdVpnService::class.java)
                     .setAction(VpnRuntimeContract.ACTION_START)
+                    .putExtra(RuntimeServiceCommand.MARKER_KEY, RuntimeServiceCommand.MARKER_VERSION)
                     .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, "not-a-valid-request"),
             )
             val terminal = runBlocking {
                 probe.await(
-                    state = VpnRuntimeState.FAILED,
-                    failure = "MISSING_VERIFIED_AUTHORITY",
+                    state = VpnRuntimeState.BLOCKED,
+                    failure = "INVALID_REQUEST_ID",
                     timeoutMillis = runtimeTimeout(5_000),
                 )
             }
@@ -509,26 +574,28 @@ class Phase9FoundationUiTest {
     @Test
     fun duplicateAuthorityRequestIsRejectedBeforeTunEstablishment() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ensureLegacySignedProfileIsReady()
         resetRuntimeService(context)
         val requestId = "fedcba9876543210fedcba9876543210"
-        val probe = DirectRuntimeStatusProbe(context, requestId)
+        val probe = DirectRuntimeStatusProbe(context, requestId = null)
         try {
             val start = Intent(context, KurdVpnService::class.java)
                 .setAction(VpnRuntimeContract.ACTION_START)
+                .putExtra(RuntimeServiceCommand.MARKER_KEY, RuntimeServiceCommand.MARKER_VERSION)
                 .putExtra(VpnRuntimeContract.EXTRA_AUTHORITY_REQUEST, requestId)
             context.startForegroundService(start)
             runBlocking {
                 probe.await(
-                    state = VpnRuntimeState.PREPARING,
-                    failure = null,
-                    timeoutMillis = runtimeTimeout(5_000),
+                    state = VpnRuntimeState.BLOCKED,
+                    failure = "AUTHORITY_REJECTED",
+                    timeoutMillis = runtimeTimeout(40_000),
                 )
             }
             context.startForegroundService(Intent(start))
             val terminal = runBlocking {
                 probe.await(
-                    state = VpnRuntimeState.FAILED,
-                    failure = "MISSING_VERIFIED_AUTHORITY",
+                    state = VpnRuntimeState.BLOCKED,
+                    failure = "AUTHORITY_REJECTED",
                     timeoutMillis = runtimeTimeout(5_000),
                 )
             }
@@ -570,10 +637,9 @@ class Phase9FoundationUiTest {
         ensureLegacySignedProfileIsReady()
         val outcome = CompletableDeferred<String>()
         compose.activity.runOnUiThread {
-            compose.activity.prepareRuntimeAuthorityForTesting(
+            compose.activity.prepareManualStartForTesting(
                 config = VpnRuntimeConfig(routingPolicy = routingPolicy),
-                onReady = { authority ->
-                    authority.fill(0)
+                onReady = {
                     outcome.complete("UNEXPECTED_AUTHORITY")
                 },
                 onFailure = { error -> outcome.complete(error.name) },

@@ -10,6 +10,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VpnNetworkTeardownBarrierTest {
+    @Test fun unknownCapabilitiesNeverProveVpnAbsence() {
+        assertTrue(VpnNetworkTeardownBarrier.possiblyVpn(null))
+        assertTrue(VpnNetworkTeardownBarrier.possiblyVpn(true))
+        assertFalse(VpnNetworkTeardownBarrier.possiblyVpn(false))
+    }
+
+    @Test fun aVanishingCapabilityReadMustBeObservedAgainBeforeTeardownCompletes() = runBlocking {
+        var count = 0
+        assertTrue(VpnNetworkTeardownBarrier.awaitNoRegisteredVpn(1_000, 1,
+            vpnTransportSnapshot = {
+                count++
+                listOf(VpnNetworkTeardownBarrier.possiblyVpn(if (count == 1) null else false))
+            }, wait = { }))
+        assertEquals(2, count)
+    }
+
     @Test
     fun waitsForEveryRegisteredVpnAfterDefaultNetworkAlreadyChanged() = runBlocking {
         var samples = 0

@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">Kurdistan VPN</string>
+    <string name="reset_scope_pending_credentials">Pending enrollment credentials</string>
+    <string name="reset_pending_credentials_help">Delete only unbound enrollment credentials. Existing profile credentials, profiles, routing, and diagnostics are preserved. Pending enrollment requests will need to be created again.</string>
+    <string name="prepare_protected_state_migration">Review protected-storage migration</string>
+    <string name="protected_state_migration_help">Existing storage must be verified before connections can resume. Confirming starts a local protected-storage migration. Inconsistent or interrupted state remains blocked; no automatic repair or reset is performed. Existing records are preserved for recovery.</string>
+    <string name="confirm_protected_state_migration">Confirm protected-storage migration</string>
+    <string name="protected_recovery_title">Protected state needs attention</string>
+    <string name="protected_recovery_required">A previously confirmed presentation update could not be durably completed. You may explicitly ask the protected-state broker to verify and finish only that update.</string>
+    <string name="protected_recovery_quarantined">Protected profiles or credentials are quarantined because their consistency cannot be proven. Connections remain blocked. Review privacy-safe diagnostics, then choose a separately confirmed reset or deletion only if needed.</string>
+    <string name="protected_recovery_inconsistent">Protected storage is inconsistent or unavailable. The app will not repair, initialize, delete, or recreate keys automatically. Connections remain blocked until an explicit supported recovery or reset succeeds.</string>
+    <string name="protected_recovery_cleanup_unproven">Cleanup of a sensitive preview or native resource could not be proven. Reuse and connection activation remain blocked. Review privacy-safe diagnostics; restarting or resetting is never performed silently.</string>
+    <string name="protected_recovery_mutation_unproven">The durability or final state of a protected mutation could not be proven. The previous known-good state is preserved where possible, no new authority is activated, and an explicit recovery decision is required.</string>
+    <string name="prepare_presentation_recovery">Review presentation recovery</string>
+    <string name="confirm_presentation_recovery">Confirm presentation recovery</string>
+    <string name="open_privacy_safe_diagnostics">Open privacy-safe diagnostics</string>
 </resources>

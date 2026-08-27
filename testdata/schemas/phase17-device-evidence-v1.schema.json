@@ -1,0 +1,2119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurdistanvpn.org/schemas/phase17-device-evidence-v1.schema.json",
+  "title": "Kurdistan Phase 17 canonical raw device observations v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "subject",
+    "authorization",
+    "received",
+    "terminal"
+  ],
+  "properties": {
+    "schema": {
+      "const": "kurdistan-phase17-device-evidence-v1"
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "authorization": {
+      "$ref": "#/$defs/authorizationEnvelope"
+    },
+    "received": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/receivedEnvelope"
+      },
+      "minItems": 1,
+      "maxItems": 4096
+    },
+    "terminal": {
+      "$ref": "#/$defs/terminalEnvelope"
+    }
+  },
+  "$defs": {
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceSha256",
+        "productSha256",
+        "harnessSha256",
+        "workloadSha256",
+        "verifierSha256",
+        "candidateId"
+      ],
+      "properties": {
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "productSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "harnessSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "workloadSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "verifierSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "candidateId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commitSha",
+        "treeSha",
+        "roots",
+        "comparisonSha256"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 201,
+          "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+        },
+        "commitSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "minLength": 40,
+          "maxLength": 40
+        },
+        "treeSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "minLength": 40,
+          "maxLength": 40
+        },
+        "roots": {
+          "$ref": "#/$defs/roots"
+        },
+        "comparisonSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "size",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+\\.apk$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1073741824
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "manifestSha256",
+        "appPackage",
+        "testPackage",
+        "appApk",
+        "testApk",
+        "appCertificateSha256",
+        "testCertificateSha256",
+        "installId",
+        "appUid",
+        "versionCode"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "appPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "testPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "appApk": {
+          "$ref": "#/$defs/entry"
+        },
+        "testApk": {
+          "$ref": "#/$defs/entry"
+        },
+        "appCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "testCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "installId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "appUid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "egress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "kind",
+        "enabled"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "WIFI",
+            "CELLULAR",
+            "OTHER"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "subjectSha256",
+        "invocationId",
+        "sessionId",
+        "observerBootId",
+        "nonce",
+        "localMonoMs"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-device-clock-v1"
+        },
+        "subjectSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "invocationId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "observerBootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "localMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "clockEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "statementType",
+        "keyId",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-qualification-envelope-v1"
+        },
+        "statementType": {
+          "const": "DEVICE_CLOCK"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "payload": {
+          "$ref": "#/$defs/clock"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$",
+          "minLength": 128,
+          "maxLength": 128
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "observerBootId",
+        "controllerSendMonoMs",
+        "controllerReceiveMonoMs",
+        "driftPpm",
+        "receipt"
+      ],
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "observerBootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "controllerSendMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "controllerReceiveMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "driftPpm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "receipt": {
+          "$ref": "#/$defs/clockEnvelope"
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "subjectSha256",
+        "invocationId",
+        "journeyId",
+        "bootId",
+        "sessionId",
+        "issuedAt",
+        "issuedMonoMs",
+        "controllerSequence",
+        "startMonoMs",
+        "endMonoMs",
+        "provenance",
+        "egress",
+        "requiredTiers",
+        "calibrations"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-device-authorization-v1"
+        },
+        "subjectSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "invocationId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "journeyId": {
+          "type": "string",
+          "enum": [
+            "D01",
+            "D02",
+            "D03",
+            "D04",
+            "D05",
+            "D06",
+            "D07",
+            "D08",
+            "FIXTURE_CORE"
+          ]
+        },
+        "bootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "issuedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "issuedMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "controllerSequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "startMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "endMonoMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "SYNTHETIC",
+            "AUTHORIZED_DEVICE"
+          ]
+        },
+        "egress": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/egress"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "requiredTiers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CONTROLLED_PROBE",
+              "ROUTE_TUN",
+              "DNS_TRANSACTION",
+              "PER_UID",
+              "DEVICE_WIDE"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "calibrations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/calibration"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "journeyId": {
+                "const": "FIXTURE_CORE"
+              }
+            },
+            "required": [
+              "journeyId"
+            ]
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "const": "SYNTHETIC"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "authorizationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "statementType",
+        "keyId",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-qualification-envelope-v1"
+        },
+        "statementType": {
+          "const": "DEVICE_AUTHORIZATION"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "payload": {
+          "$ref": "#/$defs/authorization"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$",
+          "minLength": 128,
+          "maxLength": 128
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installId",
+        "appPackage",
+        "testPackage",
+        "appApkSha256",
+        "testApkSha256",
+        "appCertificateSha256",
+        "testCertificateSha256",
+        "appUid",
+        "versionCode"
+      ],
+      "properties": {
+        "installId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "appPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "testPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,15}$"
+        },
+        "appApkSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "testApkSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "appCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "testCertificateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "appUid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "name",
+        "uid",
+        "pid",
+        "startTimeMs",
+        "epoch",
+        "state"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "DEFAULT",
+            "VPN"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[a-zA-Z0-9_.:]+$"
+        },
+        "uid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "startTimeMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "epoch": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "ABSENT"
+          ]
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["process", "component", "method", "action", "startId", "callerUid", "flags", "dispatchId", "marker"],
+      "properties": {
+        "process": {"$ref": "#/$defs/process"},
+        "component": {"type":"string","minLength":1,"maxLength":256,"pattern":"^[a-zA-Z0-9_./]+$"},
+        "method": {"type":"string","enum":["ON_START_COMMAND","ON_REVOKE"]},
+        "action": {"type":"string","maxLength":160,"pattern":"^([a-zA-Z0-9_.]+)?$"},
+        "startId": {"type":"integer","minimum":0,"maximum":2147483647},
+        "callerUid": {"type":"integer","minimum":0,"maximum":4294967294},
+        "flags": {"type":"integer","minimum":0,"maximum":4294967295},
+        "dispatchId": {"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "marker": {"type":"string","enum":["ABSENT","PRIVATE_V2","MALFORMED"]}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "requestId", "process", "component", "method", "action", "startId", "callerUid", "flags", "dispatchId", "marker"],
+      "properties": {
+        "caseId": {"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96},
+        "requestId": {"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "process": {"$ref": "#/$defs/process"},
+        "component": {"type":"string","minLength":1,"maxLength":256,"pattern":"^[a-zA-Z0-9_./]+$"},
+        "method": {"const":"ON_START_COMMAND"},
+        "action": {"type":"string","maxLength":160,"pattern":"^([a-zA-Z0-9_.]+)?$"},
+        "startId": {"type":"integer","minimum":1,"maximum":2147483647},
+        "callerUid": {"type":"integer","minimum":0,"maximum":4294967294},
+        "flags": {"type":"integer","minimum":0,"maximum":4294967295},
+        "dispatchId": {"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "marker": {"type":"string","enum":["ABSENT","PRIVATE_V2","MALFORMED"]}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process",
+        "vpnEpoch",
+        "stage",
+        "requestId",
+        "generation",
+        "revision",
+        "purpose",
+        "capabilityChannelId",
+        "frameChannelId",
+        "descriptorId",
+        "nativeSessionId",
+        "vpnSessionId",
+        "tunId"
+      ],
+      "properties": {
+        "process": {
+          "$ref": "#/$defs/process"
+        },
+        "vpnEpoch": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "REQUEST",
+            "REVISION_READ",
+            "DESCRIPTOR_WRITE",
+            "ADMIT",
+            "NATIVE_AUTHENTICATED",
+            "ACTIVE",
+            "TERMINAL"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 9223372036854775806,
+          "multipleOf": 2
+        },
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "FULL_AUTHORITY",
+            "PRE_DESCRIPTOR",
+            "PRE_ACTIVE"
+          ]
+        },
+        "capabilityChannelId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "frameChannelId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "descriptorId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "nativeSessionId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "vpnSessionId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "tunId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        }
+      }
+    },
+    "tun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process",
+        "tunId",
+        "interfaceId",
+        "mtu",
+        "state"
+      ],
+      "properties": {
+        "process": {
+          "$ref": "#/$defs/process"
+        },
+        "tunId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "interfaceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "mtu": {
+          "type": "integer",
+          "minimum": 1280,
+          "maximum": 1500
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "ABSENT"
+          ]
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process",
+        "tunId",
+        "interfaceId",
+        "family",
+        "stage",
+        "destinationPrefix",
+        "mtu",
+        "addressPrefixes",
+        "policyRules",
+        "allowedUids",
+        "disallowedUids"
+      ],
+      "properties": {
+        "process": {
+          "$ref": "#/$defs/process"
+        },
+        "tunId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "interfaceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "BEFORE",
+            "AFTER"
+          ]
+        },
+        "destinationPrefix": {
+          "type": "string",
+          "enum": [
+            "0.0.0.0/0",
+            "::/0"
+          ]
+        },
+        "mtu": {
+          "type": "integer",
+          "minimum": 1280,
+          "maximum": 1500
+        },
+        "addressPrefixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 49,
+            "pattern": "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|f[cd][0-9a-f]{2}:)[0-9a-f.:]+/[0-9]{1,3}$"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "policyRules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "APP_UID_TUN",
+              "ALLOW_UID_SET",
+              "DENY_UID_SET"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "allowedUids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967294
+          },
+          "minItems": 0,
+          "maxItems": 256
+        },
+        "disallowedUids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967294
+          },
+          "minItems": 0,
+          "maxItems": 256
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": 4
+              }
+            },
+            "required": [
+              "family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "destinationPrefix": {
+                "const": "0.0.0.0/0"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "destinationPrefix": {
+                "const": "::/0"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "interfaces"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "BEFORE",
+            "AFTER"
+          ]
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/egress"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "captureId",
+        "egressId",
+        "family",
+        "stage",
+        "packetCount",
+        "dropCount",
+        "gapCount",
+        "interfaceRevision"
+      ],
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "egressId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "CLOSE"
+          ]
+        },
+        "packetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "dropCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "gapCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "interfaceRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "captureId",
+        "egressId",
+        "family",
+        "ordinal",
+        "direction",
+        "protocol",
+        "destinationRole",
+        "length",
+        "probeId",
+        "nonce",
+        "nativeSessionId",
+        "transcriptId",
+        "dnsTransactionId"
+      ],
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "egressId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "OUTBOUND",
+            "INBOUND"
+          ]
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "TCP",
+            "UDP"
+          ]
+        },
+        "destinationRole": {
+          "type": "string",
+          "enum": [
+            "TUNNEL_GATEWAY",
+            "CONTROLLED_PROBE",
+            "PROTECTED_RESOLVER",
+            "DIRECT_RESOLVER",
+            "OTHER"
+          ]
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "probeId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "nativeSessionId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "transcriptId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        },
+        "dnsTransactionId": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{32})?$",
+          "maxLength": 32
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probeId",
+        "nonce",
+        "nativeSessionId",
+        "transcriptId",
+        "family",
+        "protocol",
+        "stage",
+        "bytes"
+      ],
+      "properties": {
+        "probeId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "nativeSessionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "transcriptId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "TCP",
+            "UDP"
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "RECEIVED",
+            "RESPONDED"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "dns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "queryToken",
+        "family",
+        "direction",
+        "resolverRole",
+        "transport",
+        "queryType",
+        "responseCode",
+        "answerFamily",
+        "truncated",
+        "fallback",
+        "nativeSessionId",
+        "captureId",
+        "egressId",
+        "packetOrdinal",
+        "stage"
+      ],
+      "properties": {
+        "transactionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "queryToken": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "family": {
+          "type": "integer",
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "OUTBOUND",
+            "INBOUND"
+          ]
+        },
+        "resolverRole": {
+          "type": "string",
+          "enum": [
+            "PROTECTED_RESOLVER",
+            "DIRECT_RESOLVER"
+          ]
+        },
+        "transport": {
+          "type": "string",
+          "enum": [
+            "UDP",
+            "TCP"
+          ]
+        },
+        "queryType": {
+          "type": "string",
+          "enum": [
+            "A",
+            "AAAA"
+          ]
+        },
+        "responseCode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "answerFamily": {
+          "type": "integer",
+          "enum": [
+            0,
+            4,
+            6
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "fallback": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "TCP_COMPLETED"
+          ]
+        },
+        "nativeSessionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "captureId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "egressId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "packetOrdinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "QUERY",
+            "RESPONSE"
+          ]
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["action", "requestId", "process", "previousBootId", "currentBootId"],
+      "properties": {
+        "action": {"type":"string","enum":["BOOT","USER_LOCKED","USER_UNLOCKED","SERVICE_START","PROCESS_EXIT","PROCESS_START","ACTIVITY_ABSENT","TUN_REMOVED"]},
+        "requestId": {"type":"string","pattern":"^[0-9a-f]{0,32}$"},
+        "process": {"$ref":"#/$defs/lifecycleProcess"},
+        "previousBootId": {"type":"string","pattern":"^[0-9a-f]{0,32}$"},
+        "currentBootId": {"type":"string","pattern":"^[0-9a-f]{32}$"}
+      }
+    },
+    "lifecycleProcess": {
+      "oneOf": [
+        {"$ref":"#/$defs/process"},
+        {"type":"object","additionalProperties":false,"required":["role","name","uid","pid","startTimeMs","epoch","state"],"properties":{"role":{"const":""},"name":{"const":""},"uid":{"const":0},"pid":{"const":0},"startTimeMs":{"const":0},"epoch":{"const":""},"state":{"const":""}}}
+      ]
+    },
+    "interface": {
+      "type":"object", "additionalProperties":false,
+      "required":["interfaceId","egressId","family","state"],
+      "properties": {
+        "interfaceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "egressId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "family":{"type":"integer","enum":[4,6]}, "state":{"type":"string","enum":["PRESENT","ABSENT"]}
+      }
+    },
+    "case": {
+      "type":"object", "additionalProperties":false,
+      "required":["caseId","requestId","faultStage","faultMode","fixtureSha256","actionSha256"],
+      "properties": {
+        "caseId":{"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96},
+        "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "faultStage":{"type":"string","pattern":"^[A-Z0-9_]+$","maxLength":64},
+        "faultMode":{"type":"string","pattern":"^[A-Z0-9_]+$","maxLength":64},
+        "fixtureSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}, "actionSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+      }
+    },
+    "trace": {
+      "type":"object", "additionalProperties":false,
+      "required":["caseId","requestId","traceId","process","stage","eventCount","dropCount","gapCount"],
+      "properties": {
+        "caseId":{"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96}, "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "traceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "process":{"$ref":"#/$defs/process"},
+        "stage":{"type":"string","enum":["OPEN","CLOSE"]}, "eventCount":{"type":"integer","minimum":0,"maximum":4096},
+        "dropCount":{"type":"integer","minimum":0,"maximum":9007199254740991}, "gapCount":{"type":"integer","minimum":0,"maximum":9007199254740991}
+      }
+    },
+    "boundary": {
+      "type":"object", "additionalProperties":false,
+      "required":["caseId","requestId","traceId","process","ordinal","stage","event","code"],
+      "properties": {
+        "caseId":{"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96}, "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "traceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "process":{"$ref":"#/$defs/process"}, "ordinal":{"type":"integer","minimum":1,"maximum":4096},
+        "stage":{"type":"string","pattern":"^[A-Z0-9_]+$","maxLength":64}, "event":{"type":"string","enum":["ENTER","RETURN","THROW","CANCEL","TIMEOUT"]},
+        "code":{"type":"string","enum":["NONE","REJECTED","FALSE","NULL","INJECTED_EXCEPTION","STALE","STOPPED","REVOKED","BINDER_DEAD","PROVIDER_DEAD","TIMEOUT","CLEANUP_RETRYABLE","CLEANUP_UNPROVEN"]}
+      }
+    },
+    "resource": {
+      "type":"object", "additionalProperties":false,
+      "required":["caseId","requestId","traceId","process","ordinal","resourceKind","resourceId","operation"],
+      "properties": {
+        "caseId":{"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96}, "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "traceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "process":{"$ref":"#/$defs/process"}, "ordinal":{"type":"integer","minimum":1,"maximum":4096},
+        "resourceKind":{"type":"string","enum":["SENSITIVE_BUFFER","AUTHORITY_DESCRIPTOR","SOCKET","NATIVE_SESSION","TUN_DESCRIPTOR","CALLBACK","NOTIFICATION","HEALTH_MONITOR","REVISION_LEASE"]},
+        "resourceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "operation":{"type":"string","enum":["ACQUIRE","TRANSFER","CLOSE","WIPE","REGISTER","REMOVE"]}
+      }
+    },
+    "status": {
+      "type":"object", "additionalProperties":false,
+      "required":["caseId","requestId","process","surface","state","identity"],
+      "properties": {
+        "caseId":{"type":"string","pattern":"^D0[48]_[A-Z0-9_]+$","maxLength":96}, "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "process":{"$ref":"#/$defs/process"}, "surface":{"type":"string","enum":["FOREGROUND_NOTIFICATION","VPN_REGISTRATION","RUNTIME_PUBLICATION"]},
+        "state":{"type":"string","enum":["ABSENT","CONNECTING","FAILED","ACTIVE","CLEANUP_UNPROVEN"]}, "identity":{"type":"string","pattern":"^[0-9a-f]{32}$"}
+      }
+    },
+    "flow": {
+      "type":"object", "additionalProperties":false,
+      "required":["flowId","requestId","nativeSessionId","captureId","egressId","interfaceId","direction","protocol","destinationRole","correlationId","routeRule","routeAction","uid","family"],
+      "properties": {
+        "flowId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "requestId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "nativeSessionId":{"type":"string","pattern":"^[0-9a-f]{0,32}$"}, "captureId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "egressId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "interfaceId":{"type":"string","pattern":"^[0-9a-f]{32}$"}, "direction":{"type":"string","enum":["OUTBOUND","INBOUND"]},
+        "protocol":{"type":"string","enum":["TCP","UDP","DNS"]}, "destinationRole":{"type":"string","enum":["CONTROLLED_PROBE","PROTECTED_RESOLVER","DIRECT_RESOLVER"]}, "correlationId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "routeRule":{"type":"string","enum":["APP_UID_TUN","DENY_UID_SET"]}, "routeAction":{"type":"string","enum":["LOOKUP_TUN","LOOKUP_DENY"]},
+        "uid":{"type":"integer","minimum":0,"maximum":4294967294}, "family":{"type":"integer","enum":[4,6]}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "contextSha256",
+        "observerSequence",
+        "observerBootId",
+        "observedMonoMs",
+        "eventType",
+        "data"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-device-observation-v1"
+        },
+        "contextSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "observerSequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "observerBootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "observedMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "INSTALL",
+            "PROCESS",
+            "RUNTIME",
+            "TUN",
+            "ROUTE",
+            "EGRESS",
+            "CAPTURE",
+            "PACKET",
+            "PROBE",
+            "DNS",
+            "DNS_RECEIPT", "SERVICE", "COMMAND", "LIFECYCLE", "INTERFACE", "CASE", "TRACE", "BOUNDARY", "RESOURCE", "STATUS", "FLOW"
+          ]
+        },
+        "data": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/install"
+            },
+            {
+              "$ref": "#/$defs/process"
+            },
+            {
+              "$ref": "#/$defs/service"
+            },
+            {
+              "$ref": "#/$defs/command"
+            },
+            {
+              "$ref": "#/$defs/runtime"
+            },
+            {
+              "$ref": "#/$defs/tun"
+            },
+            {
+              "$ref": "#/$defs/route"
+            },
+            {
+              "$ref": "#/$defs/inventory"
+            },
+            {
+              "$ref": "#/$defs/capture"
+            },
+            {
+              "$ref": "#/$defs/packet"
+            },
+            {
+              "$ref": "#/$defs/probe"
+            },
+            {
+              "$ref": "#/$defs/dns"
+            },
+            {
+              "$ref": "#/$defs/lifecycle"
+            },
+            {"$ref":"#/$defs/interface"},
+            {"$ref":"#/$defs/case"},
+            {"$ref":"#/$defs/trace"},
+            {"$ref":"#/$defs/boundary"},
+            {"$ref":"#/$defs/resource"},
+            {"$ref":"#/$defs/status"},
+            {
+              "$ref": "#/$defs/flow"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "INSTALL"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/install"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "PROCESS"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/process"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "RUNTIME"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/runtime"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "TUN"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/tun"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "ROUTE"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/route"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "EGRESS"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/inventory"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "CAPTURE"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/capture"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "PACKET"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/packet"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "PROBE"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/probe"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "DNS"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/dns"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "const": "DNS_RECEIPT"
+              }
+            },
+            "required": [
+              "eventType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/dns"
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"SERVICE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/service"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"COMMAND"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/command"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"LIFECYCLE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/lifecycle"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"INTERFACE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/interface"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"CASE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/case"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"TRACE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/trace"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"BOUNDARY"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/boundary"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"RESOURCE"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/resource"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"STATUS"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/status"}}}
+        },
+        {
+          "if": {"properties":{"eventType":{"const":"FLOW"}},"required":["eventType"]},
+          "then": {"properties":{"data":{"$ref":"#/$defs/flow"}}}
+        }
+      ]
+    },
+    "observationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "statementType",
+        "keyId",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-qualification-envelope-v1"
+        },
+        "statementType": {
+          "const": "DEVICE_OBSERVATION"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "payload": {
+          "$ref": "#/$defs/observation"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$",
+          "minLength": 128,
+          "maxLength": 128
+        }
+      }
+    },
+    "received": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "contextSha256",
+        "receivedSequence",
+        "previousSha256",
+        "receiverBootId",
+        "receivedMonoMs",
+        "observation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-device-received-v1"
+        },
+        "contextSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "receivedSequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "previousSha256": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{64})?$",
+          "maxLength": 64
+        },
+        "receiverBootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "receivedMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "observation": {
+          "$ref": "#/$defs/observationEnvelope"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "receivedSequence": {
+                "const": 1
+              }
+            },
+            "required": [
+              "receivedSequence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "previousSha256": {
+                "const": ""
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "previousSha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              }
+            }
+          }
+        }
+      ]
+    },
+    "receivedEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "statementType",
+        "keyId",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-qualification-envelope-v1"
+        },
+        "statementType": {
+          "const": "DEVICE_RECEIVED"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "payload": {
+          "$ref": "#/$defs/received"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$",
+          "minLength": 128,
+          "maxLength": 128
+        }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "subjectSha256",
+        "authorizationSha256",
+        "invocationId",
+        "journeyId",
+        "bootId",
+        "sessionId",
+        "rawEvidenceSha256",
+        "receivedHeadSha256",
+        "verifierVersion",
+        "resultSha256",
+        "outcome",
+        "terminalMonoMs"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-device-terminal-v1"
+        },
+        "subjectSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "authorizationSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "invocationId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "journeyId": {
+          "type": "string",
+          "enum": [
+            "D01",
+            "D02",
+            "D03",
+            "D04",
+            "D05",
+            "D06",
+            "D07",
+            "D08",
+            "FIXTURE_CORE"
+          ]
+        },
+        "bootId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        "rawEvidenceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "receivedHeadSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "verifierVersion": {
+          "const": "phase17-device-core-1"
+        },
+        "resultSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCOMPLETE"
+          ]
+        },
+        "terminalMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "terminalEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "statementType",
+        "keyId",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "schema": {
+          "const": "kurdistan-phase17-qualification-envelope-v1"
+        },
+        "statementType": {
+          "const": "DEVICE_TERMINAL"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "payload": {
+          "$ref": "#/$defs/terminal"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$",
+          "minLength": 128,
+          "maxLength": 128
+        }
+      }
+    }
+  }
+}

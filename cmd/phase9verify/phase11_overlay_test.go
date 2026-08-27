@@ -32,7 +32,7 @@ type phase11OverlayV1 struct {
 
 func TestPhase11LocalTransportEvidenceOverlayV1(t *testing.T) {
 	root := phase11RepoRootV1(t)
-	raw, err := os.ReadFile(filepath.Join(root, "testdata", "evidence", "phase1-m0-committed-sha256.json"))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, "testdata/evidence/phase1-m0-committed-sha256.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		}
 		actual, present := currentAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -241,7 +241,7 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 		}
 		actual, present := currentAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				t.Fatal(err)
 			}

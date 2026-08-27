@@ -13,7 +13,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -22,6 +21,7 @@ import (
 	"testing"
 
 	"kurdistan/internal/crypto/auth"
+	"kurdistan/internal/phase17evidence"
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/testkit/evidenceoverlay"
@@ -1155,79 +1155,44 @@ func TestPolicyMatrixOwnerBypassGuardASTV1(t *testing.T) {
 	if len(wo044Seen) != 5 || !allowed["internal/runtime/policy_enforcement_test.go"] {
 		t.Fatalf("WO-044 owned paths=%d; exact six-path scope requires guard", len(wo044Seen))
 	}
-	command := exec.Command("git", "status", "--porcelain", "--untracked-files=no")
-	command.Dir = filepath.Join("..", "..")
-	output, err := command.Output()
-	if err != nil {
-		t.Fatalf("unscoped git status: %v", err)
-	}
-	changed := make(map[string]bool)
-	for _, line := range strings.Split(strings.TrimRight(string(output), "\r\n"), "\n") {
-		line = strings.TrimSuffix(line, "\r")
-		if line == "" {
-			continue
+	root := filepath.Join("..", "..")
+	// The historical committed subject has no pending changes. Bind all thirteen
+	// owner paths to its exact commit/tree/blob identities, not today's index or
+	// status. The complete frozen overlay chain must still verify below.
+	tracked := make(map[string]bool, len(manifestPaths))
+	for _, path := range manifestPaths {
+		if tracked[path] {
+			t.Fatalf("duplicate historical WO-050 path: %s", path)
 		}
-		if len(line) < 4 {
-			t.Fatalf("malformed git status line %q", line)
-		}
-		changed[filepath.ToSlash(strings.TrimSpace(line[3:]))] = true
-	}
-	hadPhysicalChanges := len(changed) != 0
-	if len(changed) != 0 {
-		successorPaths, err := evidenceoverlay.LoadSuccessor(filepath.Join("..", ".."), "phase15-production-contract-v1")
+		file, err := evidenceoverlay.ReadHistoricalFile(root, path)
 		if err != nil {
-			t.Fatalf("successor evidence: %v", err)
+			t.Fatalf("historical tracked WO-050 path missing: %s: %v", path, err)
 		}
-		for path := range successorPaths {
-			delete(changed, path)
+		if file.Path != path || file.Length != int64(len(file.Content)) || file.SHA256 != fmt.Sprintf("%x", sha256.Sum256(file.Content)) {
+			t.Fatalf("historical WO-050 object binding mismatch: %s", path)
 		}
-		delete(changed, evidenceoverlay.Phase16SuccessorPath)
-		delete(changed, evidenceoverlay.Phase16ProductionTrustSuccessorPath)
-		delete(changed, evidenceoverlay.Phase16RuntimeSuccessorPath)
-		delete(changed, evidenceoverlay.Phase16DecentralizedSuccessorPath)
-		delete(changed, evidenceoverlay.Phase17SuccessorPath)
-		delete(changed, evidenceoverlay.PublicDocumentationSuccessorPath)
+		tracked[path] = true
 	}
-	if len(changed) == 0 {
-		if hadPhysicalChanges {
-			if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
-				t.Fatal(err)
-			}
-		} else if len(output) != 0 {
-			t.Fatalf("clean status must be exactly empty, got %q", output)
-		} else {
-			args := append([]string{"ls-files", "--error-unmatch", "--"}, manifestPaths...)
-			trackedCommand := exec.Command("git", args...)
-			trackedCommand.Dir = filepath.Join("..", "..")
-			trackedOutput, err := trackedCommand.Output()
-			if err != nil {
-				t.Fatalf("clean status requires all WO-050 paths tracked: %v", err)
-			}
-			tracked := make(map[string]bool)
-			for _, line := range strings.Split(strings.TrimRight(string(trackedOutput), "\r\n"), "\n") {
-				line = filepath.ToSlash(strings.TrimSpace(strings.TrimSuffix(line, "\r")))
-				if line != "" {
-					tracked[line] = true
-				}
-			}
-			if len(tracked) != 13 {
-				t.Fatalf("clean tracked WO-050 paths=%d want 13", len(tracked))
-			}
-			for _, path := range manifestPaths {
-				if !tracked[path] {
-					t.Fatalf("clean WO-050 path is not tracked: %s", path)
-				}
-				if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(path))); err != nil {
-					t.Fatalf("clean tracked WO-050 path missing: %s: %v", path, err)
-				}
-			}
-			if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
-				t.Fatal(err)
-			}
-		}
-	} else if err := validatePolicyMaintenanceStatusV1(filepath.Join("..", ".."), changed, allowed); err != nil {
+	if len(tracked) != 13 {
+		t.Fatalf("historical tracked WO-050 paths=%d want 13", len(tracked))
+	}
+	if err := validatePolicyMaintenanceStatusV1(root, nil, allowed); err != nil {
 		t.Fatal(err)
 	}
+	availability, err := phase17evidence.VerifyDevelopmentAvailability(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if availability.HistoricalCommit != evidenceoverlay.HistoricalCommit || availability.HistoricalTree != evidenceoverlay.HistoricalTree || availability.HistoricalVerification != "VERIFIED" || availability.SuccessorEvidence != "NOT_AVAILABLE" {
+		t.Fatalf("historical/current subject separation: %+v", availability)
+	}
+	for name, state := range map[string]string{"candidate": availability.Candidate, "readiness": availability.Readiness, "Stress": availability.Stress, "campaign": availability.Campaign, "soak": availability.Soak, "release": availability.Release} {
+		if state != "BLOCKED" {
+			t.Fatalf("historical verification opened current %s gate: %s", name, state)
+		}
+	}
+	// These AST and API protections deliberately inspect live source. Historical
+	// evidence verification must not hide a newly introduced runtime bypass.
 	baselineExportedFunctions := map[string]map[string]bool{
 		"internal/runtime/implementation_support.go": {
 			"NewClientProfileAuthorization" + "RegistryV1": true,
@@ -1600,7 +1565,7 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	if len(changed) != 0 && exactPathSetV1(changed, historical) {
 		return nil
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		return err
 	}
@@ -1714,14 +1679,10 @@ func validatePolicyMaintenanceStatusV1(root string, changed, historical map[stri
 	if exactPathSetV1(changed, phase9Changed) || policyPhase9MaintenanceDirtyPathSetV1(changed, phase9OverlayPaths) {
 		return nil
 	}
-	candidate, err := policyPhase2CandidateInventoryV1(root)
-	if err != nil {
-		return err
-	}
-	if len(candidate) == 0 {
-		return nil
-	}
-	return validatePolicyM2ComposedStateV1(root, candidate, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase8WO801ThreatModelOverlays, manifest.Phase8ProfileCryptographyOverlays, manifest.BaselineStabilizationOverlays, manifest.Phase7AppRuntimeOverlays, manifest.Phase6DiagnosticExportOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
+	// Validate the explicit historical/fixture inventory, including unexpected
+	// paths. A live diff or untracked-file scan must never substitute another
+	// subject or turn an invalid supplied inventory into an empty accepted one.
+	return validatePolicyM2ComposedStateV1(root, changed, manifest.MaintenanceOverlays, manifest.HelperOwnerOverlays, manifest.ValidatorOverlays, manifest.ValidatorConsumerOverlays, manifest.EvidenceConvergenceOverlays, manifest.Phase8WO801ThreatModelOverlays, manifest.Phase8ProfileCryptographyOverlays, manifest.BaselineStabilizationOverlays, manifest.Phase7AppRuntimeOverlays, manifest.Phase6DiagnosticExportOverlays, manifest.Phase5RelayDescriptorOverlays, manifest.Phase4FallbackOverlays, manifest.Phase3ContractOverlays, manifest.Phase2CompleteOverlays)
 }
 
 func validatePolicyPhase14AssuranceOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
@@ -2453,7 +2414,7 @@ type policyWO812ManifestV1 struct {
 }
 
 func loadPolicyWO801AdoptionV1(root string) (map[string]string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		return nil, err
 	}
@@ -2740,7 +2701,7 @@ func validatePolicyPhase10VPNRuntimeOverlayAtPostV1(root string, currentAtPost m
 }
 
 func validatePolicyPhase9GuardMaintenanceOverlayV1(root string, overlays map[string]policyMaintenanceOverlayV1) (map[string]string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		return nil, err
 	}
@@ -3124,26 +3085,6 @@ func validatePolicyConvergenceV1(currentAtPost map[string]string, overlays map[s
 	return result, nil
 }
 
-func policyPhase2CandidateInventoryV1(root string) (map[string]bool, error) {
-	result := map[string]bool{}
-	commands := [][]string{{"diff", "--name-only", "0ab9f32", "--"}, {"ls-files", "--others", "--exclude-standard", "--"}}
-	for _, args := range commands {
-		command := exec.Command("git", args...)
-		command.Dir = root
-		output, err := command.Output()
-		if err != nil {
-			return nil, fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
-		}
-		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-			path := filepath.ToSlash(strings.TrimSpace(strings.TrimSuffix(line, "\r")))
-			if path != "" {
-				result[path] = true
-			}
-		}
-	}
-	return result, nil
-}
-
 func policyFileSHA256V1(root, path string) (string, error) {
 	return evidenceoverlay.ResolveCurrentSHA256(root, path)
 }
@@ -3166,7 +3107,7 @@ func validatePolicyM2MaintenanceV1(root string, changed map[string]bool, overlay
 		if entry.Path != policyMaintenancePathsV1[i] || !validPolicySHA256V1(entry.PreSHA256) || !validPolicySHA256V1(entry.PostSHA256) || entry.PreSHA256 == entry.PostSHA256 {
 			return fmt.Errorf("invalid M2 maintenance entry %d", i)
 		}
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+		content, err := evidenceoverlay.ReadSubjectFile(root, entry.Path)
 		if err != nil {
 			return err
 		}
@@ -3202,7 +3143,7 @@ type policyWO801ManifestV1 struct {
 
 func TestPolicyPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3284,9 +3225,23 @@ func TestPolicyMatrixMaintenanceExactStatesV1(t *testing.T) {
 	}
 }
 
+func TestPolicyMatrixMaintenanceRejectsUnlistedHistoricalInventoryV1(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	for _, path := range []string{"unexpected/policy-bypass.go", "internal/runtime/undeclared_authority.go"} {
+		t.Run(path, func(t *testing.T) {
+			// An explicit unlisted path must not be replaced by an empty live
+			// status or an unrelated working-tree inventory.
+			err := validatePolicyMaintenanceStatusV1(root, map[string]bool{path: true}, nil)
+			if err == nil || !strings.Contains(err.Error(), "neither historical M0 nor exact composed M2 state") {
+				t.Fatalf("unlisted historical inventory %q error=%v", path, err)
+			}
+		})
+	}
+}
+
 func TestPolicyMatrixComposedM2ExactStatesV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3470,7 +3425,7 @@ func clonePolicyLayeredOverlaysV1(source map[string]policyLayeredOverlayV1) map[
 }
 func TestPolicyPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3552,7 +3507,7 @@ func TestPolicyPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
 
 func TestPolicyPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3634,7 +3589,7 @@ func TestPolicyPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 
 func TestPolicyPhase8WorkOrderOverlayChainMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyMaintenanceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, policyMaintenanceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}

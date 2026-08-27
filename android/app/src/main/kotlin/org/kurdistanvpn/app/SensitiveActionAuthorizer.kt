@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-package org.kurdistanvpn.data.secure
+package org.kurdistanvpn.app
 
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt

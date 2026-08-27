@@ -27,11 +27,15 @@ internal object VpnNetworkTeardownBarrier {
 
     fun failedSnapshot(): List<Boolean> = listOf(true)
 
+    // A network can disappear between enumeration and its capability lookup.
+    // Missing capabilities are uncertainty, not an observation of no VPN.
+    fun possiblyVpn(observed: Boolean?): Boolean = observed != false
+
     @Suppress("DEPRECATION")
     fun snapshot(connectivity: ConnectivityManager): List<Boolean> = runCatching {
         connectivity.allNetworks.map { network ->
-            connectivity.getNetworkCapabilities(network)
-                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            possiblyVpn(connectivity.getNetworkCapabilities(network)
+                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
         }
     }.getOrElse { failedSnapshot() }
 }

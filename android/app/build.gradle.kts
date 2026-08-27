@@ -196,6 +196,7 @@ dependencies {
     implementation(project(":data:metadata"))
     implementation(project(":data:secure"))
     implementation(project(":data:settings"))
+    implementation(project(":data:protected-state"))
     implementation(project(":platform:import"))
     implementation(project(":runtime:api"))
     implementation(project(":runtime:android"))

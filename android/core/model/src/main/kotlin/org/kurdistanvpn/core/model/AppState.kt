@@ -20,6 +20,71 @@ sealed interface AppState {
     data object FatalRecovery : AppState
 }
 
+enum class ProtectedRecoveryReason {
+    RECOVERY_REQUIRED,
+    QUARANTINED,
+    INCONSISTENT,
+    CLEANUP_UNPROVEN,
+    MUTATION_UNPROVEN,
+}
+
+enum class ProtectedRecoveryAction {
+    RECOVER_PRESENTATION,
+}
+
+/**
+ * User-visible protected-state condition. Only an actual pending presentation mutation may expose
+ * the broker-backed recovery action; every other condition remains fail-closed and diagnostic-only.
+ */
+sealed interface ProtectedRecoveryPresentation {
+    data object NotRequired : ProtectedRecoveryPresentation
+
+    data class Required(
+        val reason: ProtectedRecoveryReason,
+        val action: ProtectedRecoveryAction? = null,
+    ) : ProtectedRecoveryPresentation {
+        init {
+            require(action == null || reason == ProtectedRecoveryReason.RECOVERY_REQUIRED)
+        }
+
+        val canRecoverPresentation: Boolean
+            get() = reason == ProtectedRecoveryReason.RECOVERY_REQUIRED &&
+                action == ProtectedRecoveryAction.RECOVER_PRESENTATION
+    }
+}
+
+/** Ephemeral UI confirmation. It is never persisted or restored after process recreation. */
+enum class ProtectedRecoveryConfirmation {
+    UNCONFIRMED,
+    PREPARED;
+
+    fun prepare(presentation: ProtectedRecoveryPresentation): ProtectedRecoveryConfirmation =
+        if ((presentation as? ProtectedRecoveryPresentation.Required)?.canRecoverPresentation == true) {
+            PREPARED
+        } else {
+            UNCONFIRMED
+        }
+
+    fun permits(presentation: ProtectedRecoveryPresentation): Boolean =
+        this == PREPARED &&
+            (presentation as? ProtectedRecoveryPresentation.Required)?.canRecoverPresentation == true
+
+    fun cancel(): ProtectedRecoveryConfirmation = UNCONFIRMED
+}
+
+/** Transient UI consent only. The broker still validates all migration preconditions. */
+enum class ProtectedStateMigrationConfirmation {
+    UNCONFIRMED,
+    PREPARED;
+
+    fun prepare(available: Boolean): ProtectedStateMigrationConfirmation =
+        if (available) PREPARED else UNCONFIRMED
+
+    fun permitsMigration(available: Boolean): Boolean = available && this == PREPARED
+
+    fun cancel(): ProtectedStateMigrationConfirmation = UNCONFIRMED
+}
+
 enum class ImportSource {
     FILE,
     KURD_URI,

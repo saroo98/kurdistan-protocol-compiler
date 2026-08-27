@@ -10,6 +10,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Ledger,
     [Parameter(Mandatory = $true)][string]$PrivateKey,
     [Parameter(Mandatory = $true)][string]$TrustedPublicKey,
+    [string]$CanonicalDeviceRoster = '',
     [Parameter(Mandatory = $true)][string]$AttemptRoot,
     [Parameter(Mandatory = $true)][string]$EvidenceRoot,
     [Parameter(Mandatory = $true)]
@@ -77,6 +78,18 @@ Assert-DirectoryNotLink -Path $candidateB
 foreach ($path in @($manifest, $comparison, $RCLock, $Environment, $PrivateEnvironment, $EnvironmentSalt, $PrivateKey, $TrustedPublicKey)) {
     Assert-RegularFile -Path $path
 }
+# G04: no campaign/ledger/attempt directory may be created from a legacy field PASS,
+# synthetic fixture, wrong-subject record, unsigned roster, or incomplete raw journey.
+if ([string]::IsNullOrWhiteSpace($CanonicalDeviceRoster)) { throw 'PHASE17_CAMPAIGN_CANONICAL_DEVICE_JOURNEYS_REQUIRED' }
+Assert-RegularFile -Path $CanonicalDeviceRoster
+$canonicalGate = Join-Path $candidateA 'QHS\bin\phase17devicegate.exe'
+Assert-RegularFile -Path $canonicalGate
+$canonicalSubject = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+Invoke-Checked -FilePath $canonicalGate -Arguments @('verify-canonical', '-purpose', 'CANDIDATE_CAMPAIGN',
+    '-manifest', $manifest, '-roster', $CanonicalDeviceRoster, '-trusted-public-key', $TrustedPublicKey,
+    '-expected-commit', [string]$canonicalSubject.source.commitSha,
+    '-expected-tree', [string]$canonicalSubject.source.treeSha
+) -Failure 'PHASE17_CAMPAIGN_CANONICAL_DEVICE_JOURNEYS_REQUIRED'
 if (-not (Test-Path -LiteralPath $Ledger -PathType Container)) {
     New-Item -ItemType Directory -Path $Ledger | Out-Null
 }

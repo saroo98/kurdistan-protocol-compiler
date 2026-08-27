@@ -10,6 +10,19 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class UnderlyingNetworkMonitorTest {
+    @Test fun callbackRegistrationOwnsPartialAcquisitionAndCloseUncertainty() {
+        var registered = 0; var closed = 0
+        val owner = NetworkCallbackOwnership({ registered++; error("partial register") }, { closed++ })
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { owner.start() }
+        owner.close(); owner.close()
+        assertEquals(1, registered); assertEquals(1, closed)
+        val uncertain = NetworkCallbackOwnership({}, { closed++; error("unregister failed") })
+        uncertain.start()
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { uncertain.close() }
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { uncertain.close() }
+        assertEquals(2, closed)
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { uncertain.start() }
+    }
     @Test
     fun retainsCurrentNetworkUntilLossThenPromotesAStandbyCandidate() {
         val transitions = mutableListOf<NetworkTransition<String>>()

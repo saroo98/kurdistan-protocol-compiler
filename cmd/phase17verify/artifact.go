@@ -47,6 +47,7 @@ var phase17ForbiddenAPKMarkers = []string{
 	"io/sentry/",
 	"com/google/android/gms/ads",
 	"InternalVpnSocketProtectionService",
+	"RuntimeAuthorityHandoffService",
 }
 
 const phase17InternalSocketProtectionMarker = "InternalVpnSocketProtectionService"
@@ -98,8 +99,19 @@ var phase17JNISymbols = []string{
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticConfirm",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticPrepare",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDiagnosticPreview",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableBootstrap",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableClose",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableCloseDirectory",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableCreateChild",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableList",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableMutate",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableOpen",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableOpenChild",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableRead",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableSyncExisting",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeFree",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePhase11RoundTrip",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePrepareBorrowedPipe",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientCreate",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientPrivateExport",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeRecipientRequest",
@@ -119,18 +131,39 @@ var phase17JNISymbols = []string{
 
 const phase17MaxReleaseAPKBytes = 40 * 1024 * 1024
 const phase17RuntimeAndroidManifestPath = "android/runtime/android/src/main/AndroidManifest.xml"
+const phase17AppAndroidManifestPath = "android/app/src/main/AndroidManifest.xml"
+const phase17VPNServiceName = "org.kurdistanvpn.runtime.android.KurdVpnService"
+const phase17ReissueServiceName = "org.kurdistanvpn.app.RuntimeAuthorityReissueService"
+const phase17AppPackage = "org.kurdistanvpn.app"
+const phase17SystemVPNAction = "android.net.VpnService"
 
 func verifyPhase17SourceManifest(root string) error {
 	manifest, err := androidartifact.ReadManifest(filepath.Join(root, filepath.FromSlash(phase17RuntimeAndroidManifestPath)))
 	if err != nil {
 		return fmt.Errorf("read runtime Android manifest: %w", err)
 	}
-	vpn, err := phase17VPNService(manifest)
+	app, err := androidartifact.ReadManifest(filepath.Join(root, filepath.FromSlash(phase17AppAndroidManifestPath)))
 	if err != nil {
-		return fmt.Errorf("runtime Android manifest: %w", err)
+		return fmt.Errorf("read application Android manifest: %w", err)
 	}
-	if vpn.SupportsAlwaysOn == nil || !*vpn.SupportsAlwaysOn {
-		return fmt.Errorf("runtime Android manifest must explicitly support system-managed always-on VPN")
+	// This is a focused source declaration gate, not an Android manifest-merger
+	// implementation. Library-level application overrides require merged proof.
+	if manifest.ApplicationProcess != "" || manifest.ApplicationPermission != "" || boolTrue(manifest.ApplicationDirectBootAware) || boolFalse(manifest.ApplicationEnabled) || boolTrue(manifest.DefaultToDeviceProtectedStorage) {
+		return fmt.Errorf("runtime library application defaults cannot establish the approved source boundary")
+	}
+	if app.PackageName != "" && app.PackageName != phase17AppPackage {
+		return fmt.Errorf("unexpected source application package")
+	}
+	app.PackageName = phase17AppPackage
+	for i := range app.Services {
+		app.Services[i].Name = phase17QualifiedServiceName(app.Services[i].Name, phase17AppPackage)
+	}
+	for _, service := range manifest.Services {
+		service.Name = phase17QualifiedServiceName(service.Name, "org.kurdistanvpn.runtime.android")
+		app.Services = append(app.Services, service)
+	}
+	if err := verifyPhase17ServiceBoundaries(app); err != nil {
+		return fmt.Errorf("corrected source service boundaries: %w", err)
 	}
 	return nil
 }
@@ -201,30 +234,72 @@ func verifyPhase17Manifest(manifest androidartifact.Manifest) error {
 	if strings.Join(permissions, "\n") != strings.Join(want, "\n") {
 		return fmt.Errorf("release permissions = %v, want %v", permissions, want)
 	}
-	vpn, err := phase17VPNService(manifest)
-	if err != nil {
-		return err
+	return verifyPhase17ServiceBoundaries(manifest)
+}
+
+func boolTrue(value *bool) bool  { return value != nil && *value }
+func boolFalse(value *bool) bool { return value != nil && !*value }
+
+func phase17QualifiedServiceName(name, namespace string) string {
+	if strings.HasPrefix(name, ".") {
+		return namespace + name
 	}
-	if vpn.Exported || vpn.Permission != "android.permission.BIND_VPN_SERVICE" || vpn.Process != ":vpn" || vpn.ForegroundServiceType != "specialUse" {
-		return fmt.Errorf("invalid Kurd VpnService boundary: %+v", vpn)
+	if !strings.Contains(name, ".") {
+		return namespace + "." + name
+	}
+	return name
+}
+
+func verifyPhase17ServiceBoundaries(manifest androidartifact.Manifest) error {
+	if manifest.PackageName != phase17AppPackage || (manifest.ApplicationProcess != "" && manifest.ApplicationProcess != phase17AppPackage) || manifest.ApplicationPermission != "" ||
+		boolTrue(manifest.ApplicationDirectBootAware) || boolTrue(manifest.DefaultToDeviceProtectedStorage) || boolFalse(manifest.ApplicationEnabled) {
+		return fmt.Errorf("application defaults violate the default-process credential-protected boundary")
+	}
+	var vpnServices, reissueServices []androidartifact.Service
+	potentialVPN := 0
+	for _, service := range manifest.Services {
+		service.Name = phase17QualifiedServiceName(service.Name, manifest.PackageName)
+		if strings.HasSuffix(service.Name, ".RuntimeAuthorityHandoffService") {
+			return fmt.Errorf("legacy authority handoff service remains declared")
+		}
+		if service.Name == phase17VPNServiceName {
+			vpnServices = append(vpnServices, service)
+		}
+		if service.Name == phase17ReissueServiceName {
+			reissueServices = append(reissueServices, service)
+		}
+		isVPN := service.Permission == "android.permission.BIND_VPN_SERVICE"
+		for _, action := range service.IntentActions {
+			if action == phase17SystemVPNAction {
+				isVPN = true
+			}
+		}
+		if isVPN {
+			potentialVPN++
+		}
+	}
+	if len(vpnServices) != 1 || potentialVPN != 1 {
+		return fmt.Errorf("Kurd VpnService declarations = %d, potential VPN owners = %d; want exactly one", len(vpnServices), potentialVPN)
+	}
+	if len(reissueServices) != 1 {
+		return fmt.Errorf("default-process authority reissue declarations = %d, want one", len(reissueServices))
+	}
+	vpn, reissue := vpnServices[0], reissueServices[0]
+	if vpn.Exported || !vpn.PermissionDeclared || vpn.Permission != "android.permission.BIND_VPN_SERVICE" || !vpn.ProcessDeclared || vpn.Process != ":vpn" || vpn.ForegroundServiceType != "specialUse" ||
+		!boolFalse(vpn.DirectBootAware) || boolFalse(vpn.Enabled) || boolTrue(vpn.IsolatedProcess) || boolTrue(vpn.ExternalService) || boolTrue(vpn.StopWithTask) ||
+		vpn.IntentFilterCount != 1 || len(vpn.IntentActions) != 1 || vpn.IntentActions[0] != phase17SystemVPNAction || len(vpn.IntentCategories) != 0 || vpn.IntentDataCount != 0 ||
+		strings.TrimSpace(vpn.SpecialUseSubtype) == "" || len(vpn.SpecialUseSubtype) > 1024 {
+		return fmt.Errorf("invalid Kurd VpnService declaration boundary")
 	}
 	if vpn.SupportsAlwaysOn == nil || !*vpn.SupportsAlwaysOn {
 		return fmt.Errorf("Kurd VpnService must explicitly support system-managed always-on VPN")
 	}
+	if reissue.Exported || !boolFalse(reissue.DirectBootAware) || boolFalse(reissue.Enabled) || boolTrue(reissue.IsolatedProcess) || boolTrue(reissue.ExternalService) ||
+		reissue.Permission != "" || (reissue.Process != "" && reissue.Process != phase17AppPackage) || reissue.ForegroundServiceType != "" || reissue.SpecialUseSubtype != "" ||
+		reissue.IntentFilterCount != 0 || len(reissue.IntentActions) != 0 || len(reissue.IntentCategories) != 0 || reissue.IntentDataCount != 0 {
+		return fmt.Errorf("invalid unexported default-process restore-only authority service boundary")
+	}
 	return nil
-}
-
-func phase17VPNService(manifest androidartifact.Manifest) (androidartifact.Service, error) {
-	var vpnServices []androidartifact.Service
-	for _, service := range manifest.Services {
-		if strings.HasSuffix(service.Name, ".KurdVpnService") {
-			vpnServices = append(vpnServices, service)
-		}
-	}
-	if len(vpnServices) != 1 {
-		return androidartifact.Service{}, fmt.Errorf("Kurd VpnService declarations = %d, want 1", len(vpnServices))
-	}
-	return vpnServices[0], nil
 }
 
 func verifyPhase17APKMarkers(artifact androidartifact.APK) error {
@@ -322,12 +397,22 @@ func requirePhase17JNISymbols(data []byte, expected []string) error {
 	if err != nil {
 		return err
 	}
+	return verifyPhase17JNIExports(symbols, expected)
+}
+
+func verifyPhase17JNIExports(symbols []elf.Symbol, expected []string) error {
 	var actual []string
 	for _, symbol := range symbols {
 		if symbol.Section == elf.SHN_UNDEF {
 			continue
 		}
-		if symbol.Name == "JNI_OnLoad" || strings.HasPrefix(symbol.Name, "Java_org_kurdistanvpn_core_nativejni_NativeBridge_") {
+		if strings.HasPrefix(symbol.Name, "kvpn_") {
+			return fmt.Errorf("internal native helper is exported: %q", symbol.Name)
+		}
+		if strings.HasPrefix(symbol.Name, "JNI_") || strings.HasPrefix(symbol.Name, "Java_") {
+			if elf.ST_TYPE(symbol.Info) != elf.STT_FUNC || elf.ST_BIND(symbol.Info) != elf.STB_GLOBAL || symbol.Other != byte(elf.STV_DEFAULT) {
+				return fmt.Errorf("JNI export is not a globally visible function: %q", symbol.Name)
+			}
 			actual = append(actual, symbol.Name)
 		}
 	}

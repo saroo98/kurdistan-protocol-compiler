@@ -83,8 +83,17 @@ func (selfHostedBridgeEnvironment) NewRecipientActivationSession(preview android
 }
 
 func (environment selfHostedBridgeEnvironment) VerifyBackupRecord(record backup.Record) error {
-	if record.Kind != backup.RecordNativeProfile || record.Generation == 0 || len(record.ExactBytes) == 0 {
-		return errors.New("self-hosted restore: only verified native-profile records are admitted")
+	switch record.Kind {
+	case backup.RecordLocalAlias:
+		return verifyVersionedRecipientKeyBackupRecord(record)
+	case backup.RecordNativeProfile:
+		// Continue below. A profile record must be freshly verified against
+		// the current self-hosted authority before restore can proceed.
+	default:
+		return errors.New("self-hosted restore: unsupported record kind")
+	}
+	if record.Generation == 0 || len(record.ExactBytes) == 0 {
+		return errors.New("self-hosted restore: malformed native-profile record")
 	}
 	request, err := androidbridge.DecodeVerifyRequest(record.ExactBytes)
 	if err != nil || request.Class != envelope.ArtifactSignedPublic {
@@ -97,6 +106,17 @@ func (environment selfHostedBridgeEnvironment) VerifyBackupRecord(record backup.
 	defer preview.Destroy()
 	if preview.Verified.Profile.Generation != record.Generation || !bytes.Equal(preview.Verified.ExactArtifact, request.Parts[0]) {
 		return errors.New("self-hosted restore: record identity mismatch")
+	}
+	return nil
+}
+
+// verifyVersionedRecipientKeyBackupRecord admits only the v2 backup's
+// canonical recipient-key envelope. backup.Restore has already validated its
+// full cross-record bindings before invoking this per-record environment hook.
+func verifyVersionedRecipientKeyBackupRecord(record backup.Record) error {
+	if record.Generation != 0 || record.LocalID != "recipient-keys-v3" || len(record.ExactBytes) < 6 ||
+		string(record.ExactBytes[:4]) != "KCK3" || record.ExactBytes[4] != 3 || record.ExactBytes[5] == 0 || record.ExactBytes[5] > 32 {
+		return errors.New("restore: malformed versioned recipient-key record")
 	}
 	return nil
 }

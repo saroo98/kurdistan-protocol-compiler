@@ -11,9 +11,19 @@ private const val ROUTING_RECORD_ID = "routing-policy-current"
 private const val MAX_PACKAGES = 64
 private const val MAX_PACKAGE_BYTES = 255
 
-class SecureRoutingPolicyStore(
-    private val blobs: SecureBlobAccess,
+class SecureRoutingPolicyStore private constructor(
+    private val blobs: SecureBlobReadAccess,
+    private val writer: SecureBlobAccess?,
 ) {
+    constructor(blobs: SecureBlobAccess) : this(blobs, blobs)
+
+    companion object {
+        /** Never obtains a writer, including when the supplied reader also implements one. */
+        fun readOnly(blobs: SecureBlobReadAccess): SecureRoutingPolicyStore = SecureRoutingPolicyStore(blobs, null)
+    }
+
+    private fun writes(): SecureBlobAccess = checkNotNull(writer) { "READ_ONLY_ROUTING_VIEW" }
+
     fun loadPackages(): Set<String> {
         if (!blobs.exists(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)) return emptySet()
         val encoded = blobs.reopen(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)
@@ -25,6 +35,7 @@ class SecureRoutingPolicyStore(
     }
 
     fun savePackages(packages: Set<String>) {
+        val writable = writes()
         require(packages.size <= MAX_PACKAGES) { "TOO_MANY_PACKAGES" }
         val normalized = packages.map { packageName ->
             require(packageName.matches(Regex("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+"))) {
@@ -45,14 +56,14 @@ class SecureRoutingPolicyStore(
             }
         }.array()
         try {
-            blobs.stage(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY, encoded)
+            writable.stage(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY, encoded)
         } finally {
             encoded.fill(0)
         }
     }
 
     fun clear() {
-        blobs.delete(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)
+        writes().delete(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)
     }
 
     private fun decode(encoded: ByteArray): Set<String> {

@@ -1,0 +1,178 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "50b2d99263ba4dd80463aea7965699bc",
+    "entities": [
+      {
+        "tableName": "profile_catalog",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`localRecordId` TEXT NOT NULL, `transactionState` TEXT NOT NULL, `envelopeVersion` INTEGER NOT NULL, `keyGeneration` INTEGER NOT NULL, `health` TEXT NOT NULL, `committedRevision` INTEGER NOT NULL DEFAULT 0, `operationId` TEXT NOT NULL DEFAULT '', `quarantineReason` TEXT NOT NULL DEFAULT 'LEGACY_UNVERIFIED', PRIMARY KEY(`localRecordId`))",
+        "fields": [
+          {
+            "fieldPath": "localRecordId",
+            "columnName": "localRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionState",
+            "columnName": "transactionState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "envelopeVersion",
+            "columnName": "envelopeVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyGeneration",
+            "columnName": "keyGeneration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "health",
+            "columnName": "health",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "committedRevision",
+            "columnName": "committedRevision",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "operationId",
+            "columnName": "operationId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "quarantineReason",
+            "columnName": "quarantineReason",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'LEGACY_UNVERIFIED'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "localRecordId"
+          ]
+        }
+      },
+      {
+        "tableName": "recipient_bindings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileRecordId` TEXT NOT NULL, `clientKeyRecordId` TEXT NOT NULL, `operationId` TEXT NOT NULL, `committedRevision` INTEGER NOT NULL, PRIMARY KEY(`profileRecordId`), FOREIGN KEY(`profileRecordId`) REFERENCES `profile_catalog`(`localRecordId`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "profileRecordId",
+            "columnName": "profileRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clientKeyRecordId",
+            "columnName": "clientKeyRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationId",
+            "columnName": "operationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "committedRevision",
+            "columnName": "committedRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileRecordId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recipient_bindings_clientKeyRecordId",
+            "unique": true,
+            "columnNames": [
+              "clientKeyRecordId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_recipient_bindings_clientKeyRecordId` ON `${TABLE_NAME}` (`clientKeyRecordId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "profile_catalog",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "profileRecordId"
+            ],
+            "referencedColumns": [
+              "localRecordId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "protected_projection",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singleton` INTEGER NOT NULL, `storeEpoch` TEXT NOT NULL, `operationId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `imageDigest` TEXT NOT NULL, PRIMARY KEY(`singleton`))",
+        "fields": [
+          {
+            "fieldPath": "singleton",
+            "columnName": "singleton",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "storeEpoch",
+            "columnName": "storeEpoch",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationId",
+            "columnName": "operationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageDigest",
+            "columnName": "imageDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singleton"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '50b2d99263ba4dd80463aea7965699bc')"
+    ]
+  }
+}

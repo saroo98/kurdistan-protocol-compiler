@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -174,7 +173,7 @@ func TestStatusRenderingIncludesCodegenGateDetails(t *testing.T) {
 }
 
 func TestCodegenAuthorizationCatalogCompiledFixtureAndDefaultSeedPins(t *testing.T) {
-	raw, err := os.ReadFile("../../testdata/codegen/profile-authorization-v1.json")
+	raw, err := evidenceoverlay.ReadSubjectFile(filepath.Join("..", ".."), "testdata/codegen/profile-authorization-v1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,11 +289,20 @@ func TestCodegenAuthorizationCatalogSixPathSHA256AndTestdataInventory(t *testing
 		{"cmd/kcheck/registry_test.go", "86772d52db8f6a8348c8e766e35063e2522bacb4ecea85a1ddea891c024a81bf"},
 		{"internal/runtime/policy_enforcement_test.go", "ABSENT"},
 	})
-	entries, err := os.ReadDir(filepath.Join(root, "testdata", "codegen"))
+	paths, err := evidenceoverlay.HistoricalPaths(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 || entries[0].IsDir() || entries[0].Name() != "profile-authorization-v1.json" {
+	var entries []string
+	for _, path := range paths {
+		if strings.HasPrefix(path, "testdata/codegen/") {
+			if _, err := evidenceoverlay.ReadHistoricalFile(root, path); err != nil {
+				t.Fatal(err)
+			}
+			entries = append(entries, path)
+		}
+	}
+	if len(entries) != 1 || entries[0] != "testdata/codegen/profile-authorization-v1.json" {
 		t.Fatalf("testdata/codegen inventory=%v", entries)
 	}
 }
@@ -400,7 +408,7 @@ type committedEvidenceExpectationV1 struct {
 
 func verifyCommittedEvidenceSetV1(t *testing.T, root, set string, want []committedEvidenceExpectationV1) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, committedEvidenceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1682,7 +1690,7 @@ func (s evidenceStateV1) resolve(path string) (string, error) {
 }
 
 func fileSHA256V1(root, path string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	content, err := evidenceoverlay.ReadSubjectFile(root, path)
 	if err != nil {
 		return "", err
 	}
@@ -1697,7 +1705,7 @@ func validHelperOwnerSHA256V1(value string) bool {
 
 func TestPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, committedEvidenceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1733,7 +1741,7 @@ func TestPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
 
 func TestPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, committedEvidenceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1765,7 +1773,7 @@ func TestPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
 
 func TestM2HelperOwnerOverlayCompositionMutationsV2(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, committedEvidenceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1961,7 +1969,7 @@ func stringContains(value, want string) bool {
 }
 func TestPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(committedEvidenceManifestPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, committedEvidenceManifestPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
