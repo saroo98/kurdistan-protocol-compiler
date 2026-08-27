@@ -92,3 +92,13 @@ jobs:
 
       - name: Run Android-only cache-proof gate
         run: go run ./cmd/gate -android-only
+
+      - name: Preserve bounded Windows settings failure details
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          go run ./cmd/phase9devicegate diagnose-junit `
+            -in android/data/settings/build/test-results/testDebugUnitTest/TEST-org.kurdistanvpn.data.settings.Phase13SettingsCodecTest.xml `
+            -out .tools/phase17/windows-settings-failure.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content -LiteralPath .tools/phase17/windows-settings-failure.txt

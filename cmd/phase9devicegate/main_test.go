@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestClearKnownEvidenceFilesRemovesOnlyGateEvidence(t *testing.T) {
@@ -291,6 +293,292 @@ func TestDiagnosticSummaryPreservesCrashClassWithoutRawLogData(t *testing.T) {
 	}
 	if len(summary) > maxDiagnosticBytes {
 		t.Fatalf("summary size = %d, limit = %d", len(summary), maxDiagnosticBytes)
+	}
+}
+
+func TestLaunchFailureRetainsSafeExceptionCauseWithoutTurningFailureIntoPass(t *testing.T) {
+	raw := "FATAL EXCEPTION: main\nProcess: " + defaultAppPackage + ", PID: 7781\n" +
+		"java.lang.RuntimeException: Unable to create application org.kurdistanvpn.app.KurdistanApplication\n" +
+		"Caused by: java.lang.IllegalArgumentException: Failed requirement.\n" +
+		"\tat org.kurdistanvpn.data.settings.Phase9SettingsStore.openOwnedProjection(Phase9SettingsStore.kt:271)\n"
+	summary := summarizeDiagnostics(raw, defaultAppPackage, false)
+	for _, want := range []string{"exception_class=java.lang.RuntimeException", "exception_class=java.lang.IllegalArgumentException", "exception_message=Failed requirement."} {
+		if !strings.Contains(summary, want) {
+			t.Errorf("missing launch failure detail %q", want)
+		}
+	}
+	if err := validateLaunchSmoke("Status: ok\n", "", defaultAppPackage, nil); err == nil {
+		t.Fatal("diagnostic collection changed a missing-process failure into success")
+	}
+	if err := evaluateInstrumentation("INSTRUMENTATION_STATUS_CODE: 0\nOK (1 test)", summary, defaultAppPackage, 1); err == nil {
+		t.Fatal("exception details changed a crash failure into success")
+	}
+}
+
+func TestLaunchWindowRejectsOldUnrelatedAndUnparseableRecords(t *testing.T) {
+	raw := strings.Join([]string{
+		"100.000001 777 777 E AndroidRuntime: Process: " + defaultAppPackage + ", PID: 777",
+		"100.000002 777 777 E AndroidRuntime: java.lang.IllegalStateException: old",
+		"102.000001 888 888 E AndroidRuntime: Process: example.unrelated, PID: 888",
+		"102.000002 888 888 E AndroidRuntime: java.lang.SecurityException: unrelated-secret",
+		"102.000003 999 999 E AndroidRuntime: FATAL EXCEPTION: main",
+		"102.000004 999 999 E AndroidRuntime: Process: " + defaultAppPackage + ", PID: 999",
+		"102.000005 999 999 E AndroidRuntime: java.lang.IllegalArgumentException: Failed requirement.",
+		"102.000006 999 999 E AndroidRuntime:     at org.kurdistanvpn.app.KurdistanApplication.onCreate(KurdistanApplication.kt:81)",
+	}, "\n")
+	events, complete := launchWindowEvents(raw, defaultAppPackage, 101_000_000_000, 103_000_000_000)
+	if !complete || len(events) != 4 {
+		t.Fatalf("window events=%+v complete=%t", events, complete)
+	}
+	for _, event := range events {
+		if event.PID != 999 || strings.Contains(event.Text, "secret") || strings.Contains(event.Text, "old") {
+			t.Fatalf("wrong invocation retained: %+v", event)
+		}
+	}
+	_, complete = launchWindowEvents(raw+"\nunparseable record", defaultAppPackage, 101_000_000_000, 103_000_000_000)
+	if complete {
+		t.Fatal("unparseable launch evidence was not INCOMPLETE")
+	}
+}
+
+func TestLaunchExceptionMessagesAndFramesCannotExportSecretsOrPaths(t *testing.T) {
+	raw := "java.lang.IllegalStateException: token=synthetic-secret https://192.0.2.9/profile\n" +
+		"\tat org.kurdistanvpn.app.MainActivity.onCreate(MainActivity.kt:42)\n" +
+		"Caused by: java.lang.IllegalArgumentException: Failed requirement.\n" +
+		"\tat example.untrusted.secretMethod(/private/profile.json:1)\n"
+	details, complete := javaFailureDetails(raw)
+	if complete || len(details) != 2 || len(details[0].Stack) != 1 || details[1].Message != "Failed requirement." {
+		t.Fatalf("details=%+v complete=%t", details, complete)
+	}
+	for _, forbidden := range []string{"synthetic-secret", "192.0.2.9", "https://", "private/profile", "secretMethod"} {
+		if strings.Contains(fmt.Sprint(details), forbidden) {
+			t.Fatalf("private detail survived: %s", forbidden)
+		}
+	}
+}
+
+func TestDiagnosticJava17ModuleFramesAndTargetProcessLifecycle(t *testing.T) {
+	details, complete := javaFailureDetails("java.lang.IllegalArgumentException: Failed requirement.\n at java.base@17.0.20/java.lang.reflect.Method.invoke(Method.java:569)\n")
+	if !complete || len(details) != 1 || !reflect.DeepEqual(details[0].Stack, []string{"at java.lang.reflect.Method.invoke(Method.java:569)"}) {
+		t.Fatalf("Java 17 module frame lost: %+v %t", details, complete)
+	}
+	raw := "102.000001 10 10 I ActivityManager: Start proc 99:" + defaultAppPackage + "/u0a123 for activity private-extra\n" +
+		"102.000002 10 10 I ActivityManager: Process " + defaultAppPackage + " (pid 99) has died: private-reason\n" +
+		"102.000003 10 10 I ActivityManager: Killing 88:example.other/u0a124 private-detail\n"
+	events, complete := launchWindowEvents(raw, defaultAppPackage, 101_000_000_000, 103_000_000_000)
+	if !complete || len(events) != 2 || !strings.Contains(events[0].Text, "event=Start_proc") || !strings.Contains(events[1].Text, "event=died") || strings.Contains(fmt.Sprint(events), "private") {
+		t.Fatalf("target lifecycle not safely preserved: %+v %t", events, complete)
+	}
+	state := sanitizeActivityProcessState("ProcessRecord{abc 99:"+defaultAppPackage+"/u0a123}\n curAdj=100 setAdj=100\n killed=true\n token=synthetic-secret\n ProcessRecord{def 88:example.other/u0a124}\n curAdj=999\n", defaultAppPackage)
+	if !strings.Contains(fmt.Sprint(state), "curAdj=100") || !strings.Contains(fmt.Sprint(state), "killed=true") || strings.Contains(fmt.Sprint(state), "999") || strings.Contains(fmt.Sprint(state), "synthetic-secret") {
+		t.Fatalf("activity state not scoped: %v", state)
+	}
+}
+
+func TestLaunchDiagnosticsNeverReplaceOriginalFailure(t *testing.T) {
+	want := errors.New("application process did not survive launch")
+	for _, diagnosticErr := range []error{nil, errors.New("missing diagnostics"), context.DeadlineExceeded} {
+		called := false
+		got := retainLaunchFailure(want, func() error { called = true; return diagnosticErr })
+		if got != want || !called {
+			t.Fatalf("diagnostic changed original failure: %v", got)
+		}
+	}
+}
+
+func TestLaunchOutputKeepsTimingButRedactsUnknownStderr(t *testing.T) {
+	lines, complete := sanitizeLaunchOutput("Status: ok\nActivity: "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity\nThisTime: 15\nTotalTime: 25\nWaitTime: 30\nComplete\n", defaultAppPackage)
+	if !complete || !strings.Contains(strings.Join(lines, "\n"), "WaitTime: 30") {
+		t.Fatalf("lost launch timing: %v %t", lines, complete)
+	}
+	lines, complete = sanitizeLaunchOutput("token=synthetic-secret endpoint=https://192.0.2.9\n", defaultAppPackage)
+	if complete || strings.Contains(fmt.Sprint(lines), "synthetic-secret") || strings.Contains(fmt.Sprint(lines), "192.0.2.9") {
+		t.Fatal("unsafe launch stderr was retained or called complete")
+	}
+}
+
+func TestExitReasonRequiresExactProcessAndWindow(t *testing.T) {
+	start := time.Date(2026, 1, 2, 3, 4, 0, 0, time.UTC)
+	raw := "ApplicationExitInfo #0:\n timestamp=2026-01-02 03:04:01.250 pid=999 realUid=10123 packageUid=10123 definingUid=10123 user=0\n" +
+		" process=" + defaultAppPackage + " reason=4 (CRASH) subreason=0 (UNKNOWN) status=0\n description=token=synthetic-secret\n" +
+		"ApplicationExitInfo #1:\n timestamp=2026-01-02 02:04:01.250 pid=777 realUid=10123\n process=" + defaultAppPackage + " reason=4 (CRASH) status=0\n" +
+		"ApplicationExitInfo #2:\n timestamp=2026-01-02 03:04:01.250 pid=888 realUid=10124\n process=" + defaultAppPackage + "ger reason=4 (CRASH) status=0\n"
+	records, complete := parseExitRecords(raw, defaultAppPackage, start, start.Add(5*time.Second), time.UTC)
+	if !complete || len(records) != 1 || records[0].PID != 999 || records[0].Reason != 4 || strings.Contains(fmt.Sprint(records), "secret") {
+		t.Fatalf("exit records=%+v complete=%t", records, complete)
+	}
+}
+
+func TestProcessIdentityRequiresExactNameAndStartTicks(t *testing.T) {
+	rows, complete := parseProcessRows("UID PID PPID NAME\n10123 999 111 "+defaultAppPackage+"\n10124 888 111 "+defaultAppPackage+"ger\n", defaultAppPackage)
+	if !complete || len(rows) != 1 || rows[0].PID != 999 || rows[0].UID != 10123 {
+		t.Fatalf("process identity=%+v complete=%t", rows, complete)
+	}
+	// Linux proc_pid_stat field 22 is starttime; fields 3..21 are explicit.
+	stat := "999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 12345"
+	if ticks, err := procStartTicks(stat, 999); err != nil || ticks != 12345 {
+		t.Fatalf("start ticks=%d err=%v", ticks, err)
+	}
+	if _, err := procStartTicks(stat, 888); err == nil {
+		t.Fatal("substituted PID accepted")
+	}
+}
+
+func TestLaunchMarkersRequireOneCurrentInvocationAndRetainWindowAfterStreamExit(t *testing.T) {
+	id := strings.Repeat("1", 32)
+	start := "101.000001 11 11 I KurdistanLaunchProbe: START:" + id + "\n"
+	end := "103.000001 12 12 I KurdistanLaunchProbe: END:" + id + "\n"
+	first, last, ok := launchMarkerWindow(start, start+end, id, 100_000_000_000, 104_000_000_000)
+	if !ok || first != 101_000_001_000 || last != 103_000_001_000 {
+		t.Fatalf("verified marker window lost after stream exit: %d %d %t", first, last, ok)
+	}
+	for _, input := range []struct{ stream, snapshot, invocation string }{
+		{start, "", id},
+		{start, end, strings.Repeat("2", 32)},
+		{start, end + "102.000001 13 13 I KurdistanLaunchProbe: START:" + id, id},
+		{start, "99.000001 12 12 I KurdistanLaunchProbe: END:" + id, id},
+	} {
+		if _, _, ok := launchMarkerWindow(input.stream, input.snapshot, input.invocation, 100_000_000_000, 104_000_000_000); ok {
+			t.Fatal("missing, duplicate, wrong-invocation or reversed markers accepted")
+		}
+	}
+	if events, ok := launchWindowEvents("unbound crash", defaultAppPackage, 0, 0); ok || len(events) != 0 {
+		t.Fatal("unbound logs attributed to current launch")
+	}
+}
+
+func TestDiagnosticSplitStreamsPreserveCombinedBoundAndReceivedOrder(t *testing.T) {
+	output := diagnosticOutput{combined: boundedBuffer{limit: 6}, stdout: boundedBuffer{limit: 6}, stderr: boundedBuffer{limit: 6}}
+	stdout, stderr := diagnosticSink{owner: &output}, diagnosticSink{owner: &output, stderr: true}
+	_, _ = stdout.Write([]byte("ab"))
+	_, _ = stderr.Write([]byte("cd"))
+	_, _ = stdout.Write([]byte("efg"))
+	if output.combined.String() != "abcdef" || output.stdout.String() != "abefg" || output.stderr.String() != "cd" || !output.combined.exceeded {
+		t.Fatal("diagnostics changed the existing combined-output limit or order")
+	}
+}
+
+func TestDiagnosticCommandFixtureProcess(t *testing.T) {
+	at := -1
+	for index, arg := range os.Args {
+		if arg == "--" {
+			at = index
+		}
+	}
+	if at < 0 || at+1 >= len(os.Args) {
+		return
+	}
+	switch os.Args[at+1] {
+	case "nonzero":
+		fmt.Fprintln(os.Stdout, "Status: error")
+		fmt.Fprintln(os.Stderr, "credential=synthetic-secret")
+		os.Exit(7)
+	case "wait":
+		time.Sleep(5 * time.Second)
+		os.Exit(0)
+	}
+	os.Exit(9)
+}
+
+func TestDiagnosticCommandsPreserveExitAndDeadlineAndDoNotPublishRawOutput(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := adbClient{path: executable, evidenceDir: t.TempDir(), timeline: &diagnosticTimeline{Started: time.Now()}}
+	args := []string{"-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "nonzero"}
+	stdout, stderr, record, commandErr := client.diagnosticCommand(context.Background(), "fixture", maxCommandEvidence, args...)
+	if commandErr == nil || record.ExitCode != 7 || record.Status != "ERROR" || !strings.Contains(stdout, "Status: error") || !strings.Contains(stderr, "synthetic-secret") {
+		t.Fatalf("lost original command failure: %+v %v", record, commandErr)
+	}
+	serialized, err := json.Marshal(record)
+	if err != nil || strings.Contains(string(serialized), "synthetic-secret") {
+		t.Fatal("raw captured bytes escaped into diagnostic JSON")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, _, record, commandErr = client.diagnosticCommand(ctx, "deadline", maxCommandEvidence, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "wait")
+	if !errors.Is(commandErr, context.DeadlineExceeded) || record.Status != "DEADLINE" || time.Since(start) > 3*time.Second {
+		t.Fatalf("diagnostic timeout not bounded: %v %+v", commandErr, record)
+	}
+	observation := &launchObservation{client: client, app: defaultAppPackage, Status: "CAPTURED"}
+	_, commandErr = observation.captureLaunch(context.Background(), "08-launch.txt", args...)
+	raw, readErr := os.ReadFile(filepath.Join(client.evidenceDir, "08-launch.txt"))
+	if commandErr == nil || readErr != nil || strings.Contains(string(raw), "synthetic-secret") || observation.Status != "INCOMPLETE" {
+		t.Fatalf("diagnostics changed failure or leaked stderr: %v %v", commandErr, readErr)
+	}
+}
+
+func TestDiagnosticMalformedAndBoundedInputsStayIncomplete(t *testing.T) {
+	if hasCapturedFailureCause(nil, nil) {
+		t.Fatal("absent failure details called complete")
+	}
+	classOnly := []diagnosticLogBuffer{{Events: []launchLogEvent{{Tag: "AndroidRuntime", Text: "java.lang.IllegalArgumentException: Failed requirement."}}}}
+	if hasCapturedFailureCause(classOnly, nil) {
+		t.Fatal("missing stack called complete")
+	}
+	for _, input := range []string{
+		"malformed\nUID PID PPID NAME\n",
+		"UID PID PPID NAME\nUID PID PPID NAME\n",
+		"10123 999 111 " + defaultAppPackage + "\n",
+		"UID PID PPID NAME\n-1 999 111 " + defaultAppPackage + "\n",
+	} {
+		if _, complete := parseProcessRows(input, defaultAppPackage); complete {
+			t.Fatal("ambiguous process inventory called complete")
+		}
+	}
+	for _, stamp := range []string{"1.%N", "-1.0", "9000000001.0", "1.1234567890", "1.0\ninjected"} {
+		if _, err := epochNanos(stamp); err == nil {
+			t.Fatal("invalid diagnostic time accepted")
+		}
+	}
+	if _, complete := launchWindowEvents(strings.Repeat("x", maxLogcatInput+1), defaultAppPackage, 1, 2); complete {
+		t.Fatal("oversized logs called complete")
+	}
+	if _, complete := javaFailureDetails(strings.Repeat("java.lang.IllegalArgumentException: Failed requirement.\n", 17)); complete {
+		t.Fatal("truncated cause chain called complete")
+	}
+}
+
+func TestMissingJUnitDiagnosticsCannotBecomeTestPass(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("JAVA_HOME", root)
+	output := filepath.Join(root, "failure.txt")
+	if code := runJUnitDiagnostics([]string{"-in", filepath.Join(root, "missing.xml"), "-out", output}); code != 0 {
+		t.Fatalf("cannot preserve missing-report state: %d", code)
+	}
+	raw, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report junitDiagnosticReport
+	if err := json.Unmarshal(raw, &report); err != nil || report.Status != "INCOMPLETE" || report.Tests != 0 || len(report.Cases) != 0 {
+		t.Fatalf("missing report misrepresented: %+v %v", report, err)
+	}
+	for _, forbidden := range []string{root, "PASS", "device_gate=passed", "synthetic-secret"} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatal("diagnostic missing-data output contains path, secret or success")
+		}
+	}
+}
+
+func TestDiagnosticOnlyJUnitKeepsCauseChainAndRejectsMalformedInput(t *testing.T) {
+	fixture := `<testsuite name="org.kurdistanvpn.data.settings.Phase13SettingsCodecTest" tests="1" failures="1" errors="0"><testcase name="explicitlyOwnedProjectionClosesBeforeIndependentDiskReadAndReopen" classname="org.kurdistanvpn.data.settings.Phase13SettingsCodecTest"><failure type="java.lang.IllegalArgumentException" message="java.lang.IllegalArgumentException: Failed requirement.">java.lang.IllegalArgumentException: Failed requirement.
+ at org.kurdistanvpn.data.settings.Phase9SettingsStore$Companion.openOwnedProjection(Phase9SettingsStore.kt:271)
+ at org.kurdistanvpn.data.settings.Phase13SettingsCodecTest.explicitlyOwnedProjectionClosesBeforeIndependentDiskReadAndReopen(Phase13SettingsCodecTest.kt:34)
+</failure></testcase><system-out>credential=synthetic-secret</system-out></testsuite>`
+	report, err := junitFailureReport([]byte(fixture))
+	if err != nil || report.Status != "CAPTURED" || report.Failures != 1 || len(report.Cases) != 1 || len(report.Cases[0].Exceptions[0].Stack) != 2 {
+		t.Fatalf("JUnit report=%+v err=%v", report, err)
+	}
+	if strings.Contains(fmt.Sprint(report), "synthetic-secret") {
+		t.Fatal("JUnit system output was exported")
+	}
+	for _, raw := range []string{"<bad>", fixture + fixture, strings.Repeat("x", maxLogcatInput+1)} {
+		if _, err := junitFailureReport([]byte(raw)); err == nil {
+			t.Fatal("malformed or oversized JUnit evidence accepted")
+		}
 	}
 }
 
