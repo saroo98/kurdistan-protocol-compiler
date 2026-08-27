@@ -155,24 +155,9 @@ val bridgeTasks = mapOf(
         .map { registerGoBridge("release", internalTrust = false, it) },
 )
 
-val requestedNativeBuildTypes = gradle.startParameter.taskNames.map(String::lowercase)
-val requestsInternalNative = requestedNativeBuildTypes.any { "internal" in it }
-val requestsReleaseNative = requestedNativeBuildTypes.any { "release" in it }
-
-tasks.configureEach {
-    val lowerName = name.lowercase(Locale.ROOT)
-    bridgeTasks.forEach { (buildType, buildTypeBridgeTasks) ->
-        val cmakeConfigurationMatches = lowerName.contains(buildType) ||
-            (lowerName.contains("relwithdebinfo") &&
-                ((buildType == "internal" && requestsInternalNative) ||
-                    (buildType == "release" && requestsReleaseNative)))
-        if (
-            cmakeConfigurationMatches &&
-            // Kotlin/manifest/host-unit compilation does not consume the Go shared library.
-            // Every native configure/build still requires the exact ABI bridge before CMake.
-            (lowerName.contains("configurecmake") || lowerName.contains("buildcmake"))
-        ) {
-            dependsOn(buildTypeBridgeTasks)
-        }
-    }
+androidComponents.onVariants { variant ->
+    // CMake consumes the generated bridge during configuration, before JNI compilation.
+    // Register the lazy producers at AGP's public variant lifecycle boundary so direct
+    // and aggregate invocations have the same prerequisites without private task names.
+    variant.lifecycleTasks.registerPreBuild(bridgeTasks.getValue(requireNotNull(variant.buildType)))
 }

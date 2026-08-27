@@ -1,4 +1,7 @@
-param([string]$RepositoryRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent))
+param(
+    [string]$RepositoryRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent),
+    [string]$NativeBridgeGradle = ''
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $guard = Join-Path $PSScriptRoot 'run-local-correction-checks.ps1'
@@ -76,3 +79,111 @@ Assert-Rejected { Assert-LocalCorrectionTaskGraph @([pscustomobject]@{Path=':app
 Assert-Rejected { Assert-LocalCorrectionTaskGraph @([pscustomobject]@{Path=':app:compileInternalKotlin';Type='KotlinCompile';Outputs=@();Command=@('curl','example.invalid');Finalizers=@()}) } 'BV-02'
 Assert-Rejected { Assert-LocalOfflineEnvironment -Values @{ GRADLE_USER_HOME='C:/outside' } } 'BV-03'
 Write-Output 'PASS: BV-01 whitelist and confinement; BV-02 prohibited task/output/command/finalizer rejection; BV-03 external writable environment rejection. No build task executed.'
+
+if ($NativeBridgeGradle) {
+    # Opt-in integration regression against the real project and pinned, already installed Gradle.
+    # These are dry runs only: no producer, APK, native compiler, or device task is executed.
+    if (-not (Test-Path -LiteralPath $NativeBridgeGradle -PathType Leaf)) {
+        throw 'An existing offline Gradle executable is required; acquisition is not permitted'
+    }
+    $arguments = @('-p', (Join-Path $RepositoryRoot 'android'), '--offline', '--no-daemon',
+        '--no-watch-fs', '--no-configuration-cache', '--no-build-cache', '--dependency-verification', 'strict',
+        '-Pandroid.builder.sdkDownload=false', '-Pkotlin.compiler.execution.strategy=in-process',
+        '-Dorg.gradle.java.installations.auto-download=false', '--console=plain', '--dry-run')
+    $failures = [Collections.Generic.List[string]]::new()
+    function Read-NativeTaskGraph([string]$Task) {
+        $output = @(& $NativeBridgeGradle @arguments $Task 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw ('Native task graph could not be evaluated for ' + $Task + "`n" + ($output -join "`n"))
+        }
+        $graph = @($output | ForEach-Object {
+            if ([string]$_ -cmatch '^(:\S+) SKIPPED$') { $Matches[1] }
+        })
+        if ($graph.Count -eq 0 -or $graph[-1] -cne (':' + $Task.TrimStart(':'))) {
+            throw ('Missing or incomplete dry-run graph: ' + $Task)
+        }
+        foreach ($node in $graph) {
+            if ($node -match '(?i):(install|uninstall|connected|.*DeviceGate|.*Campaign|.*Stress|.*Soak|publish|upload|deploy|.*EngineeringCandidate)') {
+                $failures.Add($Task + ': prohibited device, publication, or candidate task ' + $node)
+            }
+        }
+        return ,$graph
+    }
+    function Assert-NoAppPackaging([string]$Task, [string[]]$Graph) {
+        foreach ($node in $Graph) {
+            if ($node -cmatch '^:app:(assemble|package|bundle|sign|validateSigning)' -and
+                $node -cnotmatch '^:app:bundle\w+ClassesTo(Compile|Runtime)Jar$') {
+                $failures.Add($Task + ': unrelated application packaging task ' + $node)
+            }
+        }
+    }
+    function Assert-BridgeOrder([string]$Task, [string[]]$Graph, [string]$Producer, [string[]]$Consumers) {
+        $producerIndex = [Array]::IndexOf($Graph, $Producer)
+        if ($producerIndex -lt 0) { $failures.Add($Task + ': missing prerequisite ' + $Producer) }
+        foreach ($consumer in $Consumers) {
+            $consumerIndex = [Array]::IndexOf($Graph, $consumer)
+            if ($consumerIndex -lt 0) { $failures.Add($Task + ': missing native consumer ' + $consumer) }
+            elseif ($producerIndex -ge $consumerIndex) {
+                $failures.Add($Task + ': bridge does not precede ' + $consumer)
+            }
+        }
+    }
+    $variants = @(
+        @{ Name='Internal'; Producers=@{ 'arm64-v8a'='buildInternalArm64v8aGoBridge'; 'x86_64'='buildInternalX8664GoBridge' } },
+        @{ Name='Release'; Producers=@{ 'arm64-v8a'='buildReleaseArm64v8aGoBridge' } }
+    )
+    $consumers = @{}
+    foreach ($variant in $variants) {
+        $task = ':core:native-jni:externalNativeBuild' + $variant.Name
+        $graph = Read-NativeTaskGraph $task
+        Assert-NoAppPackaging $task $graph
+        $consumers[$variant.Name] = @{}
+        foreach ($abi in $variant.Producers.Keys) {
+            # Discover AGP's observable task identities from a direct variant graph, not from
+            # production task-name inference. The producer and ABI expectations are independent.
+            $suffix = '\[' + [regex]::Escape($abi) + '\](?:-\d+)?$'
+            $configure = @($graph | Where-Object { $_ -cmatch ('^:core:native-jni:configureCMake\w+' + $suffix) })
+            $build = @($graph | Where-Object { $_ -cmatch ('^:core:native-jni:buildCMake\w+' + $suffix) })
+            if ($configure.Count -ne 1 -or $build.Count -ne 1) {
+                throw ('Expected one configure/build pair for ' + $task + '/' + $abi)
+            }
+            $consumers[$variant.Name][$abi] = @($configure[0], $build[0])
+            $producer = ':core:native-jni:' + $variant.Producers[$abi]
+            Assert-BridgeOrder $task $graph $producer $consumers[$variant.Name][$abi]
+            if ([Array]::IndexOf($graph, $configure[0]) -ge [Array]::IndexOf($graph, $build[0])) {
+                $failures.Add($task + ': native build precedes configuration for ' + $abi)
+            }
+        }
+        foreach ($node in $graph | Where-Object { $_ -cmatch '^:core:native-jni:build.+GoBridge$' }) {
+            if ($node -cnotin @($variant.Producers.Values | ForEach-Object { ':core:native-jni:' + $_ })) {
+                $failures.Add($task + ': unrelated variant producer ' + $node)
+            }
+        }
+        Write-Output ('CHECKED: direct native graph ' + $task)
+    }
+    foreach ($task in @('ciDeviceArtifacts', 'ciPrHostGate', 'ciAssuranceHostGate')) {
+        $graph = Read-NativeTaskGraph $task
+        $required = if ($task -ceq 'ciDeviceArtifacts') { @('Internal') } else { @('Internal', 'Release') }
+        foreach ($variant in $variants | Where-Object { $_.Name -cin $required }) {
+            foreach ($abi in $variant.Producers.Keys) {
+                Assert-BridgeOrder $task $graph (':core:native-jni:' + $variant.Producers[$abi]) $consumers[$variant.Name][$abi]
+            }
+        }
+        if ($task -ceq 'ciDeviceArtifacts' -and @($graph | Where-Object { $_ -cmatch ':\w*Release\w*(?:\[.*\])?$' }).Count -ne 0) {
+            $failures.Add($task + ': unrelated release task')
+        }
+        if ($task -cne 'ciDeviceArtifacts' -and @($graph | Where-Object { $_ -cmatch '^:app:(assemble|package).*AndroidTest$' }).Count -ne 0) {
+            $failures.Add($task + ': unrequested test APK packaging')
+        }
+        Write-Output ('CHECKED: aggregate native graph ' + $task)
+    }
+    foreach ($task in @('help', ':core:model:testDebugUnitTest')) {
+        $graph = Read-NativeTaskGraph $task
+        Assert-NoAppPackaging $task $graph
+        if (@($graph | Where-Object { $_ -cmatch '^:core:native-jni:.*(GoBridge|CMake)' }).Count -ne 0) {
+            $failures.Add($task + ': unrelated native build was realized')
+        }
+    }
+    if ($failures.Count -ne 0) { throw ("Native bridge prerequisite regression:`n" + ($failures -join "`n")) }
+    Write-Output 'PASS: direct and all three CI aggregate graphs order every required bridge before CMake; unrelated packaging, device, release, and native tasks remain absent.'
+}
