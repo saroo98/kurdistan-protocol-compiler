@@ -139,19 +139,19 @@ internal class RuntimeSessionCoordinator(private val nativeCore: KurdNativeCore)
 }
 
 internal class RecoveryCoordinator(
-    private val storageFailure: () -> Phase9CompositionRoot.StorageFailure?,
-    private val presentationRecoveryRequired: () -> Boolean?,
-    private val recoverPresentation: suspend () -> ProtectedStateApplicationFacade.CommandResult<Unit>,
-    private val resetProfiles: suspend () -> Boolean,
-    private val resetRouting: suspend () -> Boolean,
-    private val resetDiagnostics: suspend () -> Boolean,
+    private val storageFailureCallback: () -> Phase9CompositionRoot.StorageFailure?,
+    private val presentationRecoveryRequiredCallback: () -> Boolean?,
+    private val recoverPresentationCallback: suspend () -> ProtectedStateApplicationFacade.CommandResult<Unit>,
+    private val resetProfilesCallback: suspend () -> Boolean,
+    private val resetRoutingCallback: suspend () -> Boolean,
+    private val resetDiagnosticsCallback: suspend () -> Boolean,
 ) {
-    fun storageFailure(): Phase9CompositionRoot.StorageFailure? = storageFailure()
-    fun presentationRecoveryRequired(): Boolean? = presentationRecoveryRequired()
-    suspend fun recoverPresentation(): ProtectedStateApplicationFacade.CommandResult<Unit> = recoverPresentation()
-    suspend fun resetProfiles(): Boolean = resetProfiles()
-    suspend fun resetRouting(): Boolean = resetRouting()
-    suspend fun resetDiagnostics(): Boolean = resetDiagnostics()
+    fun storageFailure(): Phase9CompositionRoot.StorageFailure? = storageFailureCallback.invoke()
+    fun presentationRecoveryRequired(): Boolean? = presentationRecoveryRequiredCallback.invoke()
+    suspend fun recoverPresentation(): ProtectedStateApplicationFacade.CommandResult<Unit> = recoverPresentationCallback.invoke()
+    suspend fun resetProfiles(): Boolean = resetProfilesCallback.invoke()
+    suspend fun resetRouting(): Boolean = resetRoutingCallback.invoke()
+    suspend fun resetDiagnostics(): Boolean = resetDiagnosticsCallback.invoke()
 }
 
 internal class ProviderProjectionRepository {
@@ -178,20 +178,20 @@ internal data class Phase13Coordinators(
                 diagnostics = DiagnosticsCoordinator(facade),
                 runtime = RuntimeSessionCoordinator(root.nativeCore),
                 recovery = RecoveryCoordinator(
-                    storageFailure = { root.storageFailure },
-                    presentationRecoveryRequired = {
+                    storageFailureCallback = { root.storageFailure },
+                    presentationRecoveryRequiredCallback = {
                         facade()?.presentationRecoveryRequired() ?: false
                     },
-                    recoverPresentation = {
+                    recoverPresentationCallback = {
                         facade()?.recoverPresentationConfirmed()
                             ?: ProtectedStateApplicationFacade.CommandResult.Busy
                     },
-                    resetProfiles = {
+                    resetProfilesCallback = {
                         val ids = facade()?.readProjection()?.profiles?.map { it.localRecordId }?.toSet().orEmpty()
                         facade()?.resetProfiles(ids) is ProtectedStateApplicationFacade.CommandResult.Committed
                     },
-                    resetRouting = { runCatching { routing.clear() }.isSuccess },
-                    resetDiagnostics = { runCatching { facade()?.replaceDiagnostics(emptyList()) is ProtectedStateApplicationFacade.CommandResult.Committed }.getOrDefault(false) },
+                    resetRoutingCallback = { runCatching { routing.clear() }.isSuccess },
+                    resetDiagnosticsCallback = { runCatching { facade()?.replaceDiagnostics(emptyList()) is ProtectedStateApplicationFacade.CommandResult.Committed }.getOrDefault(false) },
                 ),
                 providers = ProviderProjectionRepository(),
             )

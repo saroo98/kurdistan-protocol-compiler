@@ -173,7 +173,7 @@ func run(value options) error {
 	ctx, cancel := context.WithTimeout(context.Background(), deviceGateTimeout)
 	defer cancel()
 	timeline := &diagnosticTimeline{Started: time.Now()}
-	client := adbClient{path: adb, serial: value.serial, evidenceDir: value.evidenceDir, timeline: timeline}
+	client := newADBClient(adb, value.serial, value.evidenceDir, timeline)
 	defer func() {
 		if err := writeDiagnosticJSON(filepath.Join(value.evidenceDir, "01-command-timings.txt"), timeline); err != nil {
 			fmt.Fprintln(os.Stderr, "command timing diagnostics INCOMPLETE")
@@ -940,6 +940,60 @@ type adbClient struct {
 	serial      string
 	evidenceDir string
 	timeline    *diagnosticTimeline
+	transport   *commandTransport
+}
+
+// The transport owns only child execution. Callers retain command ordering,
+// bounded writers, deadlines, sanitization, correlation and gate derivation.
+// Production construction always installs the real transport; it is not
+// selectable through flags, environment variables or other external input.
+type commandTransport struct {
+	run   func(context.Context, string, []string, io.Writer, io.Writer, time.Duration) error
+	start func(context.Context, string, []string, io.Writer, io.Writer, time.Duration) (func() error, error)
+}
+
+func newADBClient(path, serial, evidenceDir string, timeline *diagnosticTimeline) adbClient {
+	return adbClient{
+		path: path, serial: serial, evidenceDir: evidenceDir, timeline: timeline,
+		transport: &commandTransport{run: runRealCommand, start: startRealCommand},
+	}
+}
+
+func realCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) *exec.Cmd {
+	command := exec.CommandContext(ctx, path, args...)
+	command.Stdout, command.Stderr = stdout, stderr
+	command.WaitDelay = waitDelay
+	return command
+}
+
+func runRealCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) error {
+	return realCommand(ctx, path, args, stdout, stderr, waitDelay).Run()
+}
+
+func startRealCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
+	command := realCommand(ctx, path, args, stdout, stderr, waitDelay)
+	if err := command.Start(); err != nil {
+		return nil, err
+	}
+	return command.Wait, nil
+}
+
+func (client adbClient) runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, waitDelay time.Duration) error {
+	if client.transport == nil || client.transport.run == nil {
+		return errors.New("command transport unavailable")
+	}
+	return client.transport.run(ctx, client.path, args, stdout, stderr, waitDelay)
+}
+
+func (client adbClient) startCommand(ctx context.Context, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
+	if client.transport == nil || client.transport.start == nil {
+		return nil, errors.New("command transport unavailable")
+	}
+	wait, err := client.transport.start(ctx, client.path, args, stdout, stderr, waitDelay)
+	if err == nil && wait == nil {
+		return nil, errors.New("command completion unavailable")
+	}
+	return wait, err
 }
 
 type boundedBuffer struct {
@@ -974,11 +1028,8 @@ func (client adbClient) capture(ctx context.Context, name string, args ...string
 		commandArgs = append(commandArgs, "-s", client.serial)
 	}
 	commandArgs = append(commandArgs, args...)
-	command := exec.CommandContext(ctx, client.path, commandArgs...)
 	combined := boundedBuffer{limit: maxCommandEvidence}
-	command.Stdout = &combined
-	command.Stderr = &combined
-	err := command.Run()
+	err := client.runCommand(ctx, commandArgs, &combined, &combined, 0)
 	if writeErr := os.WriteFile(filepath.Join(client.evidenceDir, name), combined.Bytes(), 0o644); writeErr != nil {
 		return combined.String(), fmt.Errorf("write %s: %w", name, writeErr)
 	}
@@ -996,11 +1047,8 @@ func (client adbClient) captureDiagnostic(ctx context.Context, name, appPackage 
 		commandArgs = append(commandArgs, "-s", client.serial)
 	}
 	commandArgs = append(commandArgs, args...)
-	command := exec.CommandContext(ctx, client.path, commandArgs...)
 	combined := boundedBuffer{limit: maxLogcatInput}
-	command.Stdout = &combined
-	command.Stderr = &combined
-	commandErr := command.Run()
+	commandErr := client.runCommand(ctx, commandArgs, &combined, &combined, 0)
 	summary := summarizeDiagnostics(combined.String(), appPackage, combined.exceeded)
 	if len(summary) > maxDiagnosticBytes {
 		return summary[:maxDiagnosticBytes], errors.New("sanitized diagnostic summary exceeded its byte limit")
@@ -1087,10 +1135,8 @@ func (client adbClient) captureOutput(ctx context.Context, args ...string) (outp
 		commandArgs = append(commandArgs, "-s", client.serial)
 	}
 	commandArgs = append(commandArgs, args...)
-	command := exec.CommandContext(ctx, client.path, commandArgs...)
 	combined := boundedBuffer{limit: maxCommandEvidence}
-	command.Stdout, command.Stderr = &combined, &combined
-	err := command.Run()
+	err := client.runCommand(ctx, commandArgs, &combined, &combined, 0)
 	if combined.exceeded {
 		return combined.String(), fmt.Errorf("adb identity output exceeded %d bytes", maxCommandEvidence)
 	}
@@ -2218,7 +2264,6 @@ type launchObservation struct {
 
 type launchLogStream struct {
 	name            string
-	command         *exec.Cmd
 	cancel          context.CancelFunc
 	done            chan error
 	output          boundedBuffer
@@ -2264,11 +2309,8 @@ func (client adbClient) diagnosticCommand(ctx context.Context, phase string, lim
 	if client.serial != "" {
 		commandArgs = append([]string{"-s", client.serial}, commandArgs...)
 	}
-	command := exec.CommandContext(ctx, client.path, commandArgs...)
-	command.WaitDelay = time.Second
 	output := diagnosticOutput{combined: boundedBuffer{limit: limit}, stdout: boundedBuffer{limit: limit}, stderr: boundedBuffer{limit: limit}}
-	command.Stdout, command.Stderr = diagnosticSink{owner: &output}, diagnosticSink{owner: &output, stderr: true}
-	err := command.Run()
+	err := client.runCommand(ctx, commandArgs, diagnosticSink{owner: &output}, diagnosticSink{owner: &output, stderr: true}, time.Second)
 	if ctx.Err() != nil {
 		err = ctx.Err()
 	}
@@ -2326,12 +2368,10 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 			args = append([]string{"-s", client.serial}, args...)
 		}
 		stream := &launchLogStream{name: buffer, cancel: cancel, done: make(chan error, 1), output: boundedBuffer{limit: 512 << 10}, stderr: boundedBuffer{limit: 8 << 10}}
-		stream.command = exec.CommandContext(logctx, client.path, args...)
-		stream.command.WaitDelay = time.Second
-		stream.command.Stdout, stream.command.Stderr = &stream.output, &stream.stderr
-		stream.startErr = stream.command.Start()
+		var wait func() error
+		wait, stream.startErr = client.startCommand(logctx, args, &stream.output, &stream.stderr, time.Second)
 		if stream.startErr == nil {
-			go func() { stream.done <- stream.command.Wait() }()
+			go func() { stream.done <- wait() }()
 		} else {
 			observation.incomplete("log stream unavailable")
 		}

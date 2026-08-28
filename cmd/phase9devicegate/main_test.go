@@ -4,27 +4,24 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
-
-// Only the test binary acts as an adb-shaped subprocess. No SDK, emulator,
-// application, or device is accessed by these orchestration regressions.
-func TestMain(m *testing.M) {
-	if root := os.Getenv("KURD_LAUNCH_TEST_ROOT"); root != "" {
-		os.Exit(launchTestCommand(root, os.Getenv("KURD_LAUNCH_TEST_CASE"), os.Args[1:]))
-	}
-	os.Exit(m.Run())
-}
 
 func TestLaunchGateRejectsRetainedCrashingProcess(t *testing.T) {
 	err, observation := runLaunchScenario(t, "crashing", 26)
@@ -105,6 +102,27 @@ func TestLaunchGateRejectsTargetApplicationErrorDialog(t *testing.T) {
 	}
 }
 
+func TestLaunchGateCompleteCurrentCrashProducesDefinitiveFailure(t *testing.T) {
+	err, observation := runLaunchScenario(t, "current-crash", 34)
+	if err == nil || errors.Is(err, errLaunchIncomplete) || observation.GateResult != "FAIL" || observation.Status != "CAPTURED" {
+		t.Fatalf("complete current crash must produce definitive FAIL: err=%v gate=%s evidence=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+	}
+}
+
+func TestCommandTransportAbsentFailsClosed(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := adbClient{path: executable, evidenceDir: t.TempDir(), timeline: &diagnosticTimeline{Started: time.Now()}}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stdout, stderr, record, err := client.diagnosticCommand(ctx, "absent-transport", 64, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "success")
+	if err == nil || record.Status == "CAPTURED" || stdout != "" || stderr != "" {
+		t.Fatalf("absent transport executed a child or supplied evidence: err=%v status=%s stdout_bytes=%d stderr_bytes=%d", err, record.Status, len(stdout), len(stderr))
+	}
+}
+
 func TestLaunchGateHealthyPlatformVariantsRemainUnqualified(t *testing.T) {
 	for _, api := range []int{26, 34, 36} {
 		t.Run(strconv.Itoa(api), func(t *testing.T) {
@@ -166,208 +184,749 @@ func TestLaunchGateTimedOutCommandCannotPassWithRetainedPID(t *testing.T) {
 
 func runLaunchScenario(t *testing.T, scenario string, api int) (error, launchObservation) {
 	t.Helper()
+	err, observation, _ := runLaunchFixture(t, scenario, api)
+	return err, observation
+}
+
+func runLaunchFixture(t *testing.T, scenario string, api int) (error, launchObservation, *launchFixtureTransport) {
+	t.Helper()
 	root := t.TempDir()
-	t.Setenv("KURD_LAUNCH_TEST_ROOT", root)
-	t.Setenv("KURD_LAUNCH_TEST_CASE", scenario)
-	// These synchronous synthetic commands must not inherit the race runtime's
-	// one-second exit sleep. Race detection and the gate's deadlines stay intact;
-	// this setting is inherited only by this fixture's child processes.
-	t.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=0"))
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixture := newLaunchFixtureTransport(scenario)
+	client := newADBClient("fixture-adb", "emulator-5554", root, &diagnosticTimeline{Started: time.Now()})
+	client.transport = &commandTransport{run: fixture.run, start: fixture.start}
 	budget := 12 * time.Second
 	if scenario == "timeout" {
 		budget = 3 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
-	client := adbClient{path: executable, serial: "emulator-5554", evidenceDir: root, timeline: &diagnosticTimeline{Started: time.Now()}}
-	err = launchSmokeWithDiagnostics(ctx, client, options{appPackage: defaultAppPackage, expectedAPI: api})
+	err := launchSmokeWithDiagnostics(ctx, client, options{appPackage: defaultAppPackage, expectedAPI: api})
 	var observation launchObservation
 	data, readErr := os.ReadFile(filepath.Join(root, "10-launch-details.txt"))
 	if readErr != nil || json.Unmarshal(data, &observation) != nil {
 		t.Fatal("launch observation was not preserved")
 	}
+	fixture.assertClosed(t)
 	logLaunchScenario(t, err, observation)
-	return err, observation
+	return err, observation, fixture
 }
 
-func launchTestCommand(root, scenario string, args []string) int {
-	if len(args) < 3 || args[0] != "-s" || args[1] != "emulator-5554" || args[2] != "shell" {
-		return 90
+type fixtureCommand struct {
+	kind      string
+	args      []string
+	waitDelay time.Duration
+	deadline  time.Time
+	remaining time.Duration
+}
+
+type fixtureOutputChunk struct {
+	raw       string
+	delivered chan error
+}
+
+type fixtureStream struct {
+	mu          sync.Mutex
+	chunks      chan fixtureOutputChunk
+	ready       chan struct{}
+	done        chan struct{}
+	writeErr    error
+	terminalErr error
+	waits       atomic.Int32
+	completed   atomic.Int32
+	cancelled   atomic.Int32
+	closes      atomic.Int32
+	eofs        atomic.Int32
+	admitted    atomic.Int64
+	delivered   atomic.Int64
+	rejected    atomic.Int64
+}
+
+func newFixtureStream(ctx context.Context, output io.Writer, terminate bool) *fixtureStream {
+	stream := &fixtureStream{
+		chunks: make(chan fixtureOutputChunk), ready: make(chan struct{}), done: make(chan struct{}),
 	}
+	// Start owns the output reader. Wait only observes its terminal state.
+	go func() {
+		close(stream.ready)
+		for chunk := range stream.chunks {
+			n, err := io.WriteString(output, chunk.raw)
+			stream.delivered.Add(int64(n))
+			if err == nil && n != len(chunk.raw) {
+				err = io.ErrShortWrite
+			}
+			stream.writeErr = errors.Join(stream.writeErr, err)
+			chunk.delivered <- err
+		}
+		stream.eofs.Add(1)
+		stream.completed.Add(1)
+		close(stream.done)
+	}()
+	<-stream.ready
+	go func() {
+		if !terminate {
+			<-ctx.Done()
+			stream.cancelled.Add(1)
+		}
+		// Do not close output until the current accepted chunk is fully copied.
+		// A later write returns an explicit error instead of losing bytes.
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		if !terminate {
+			stream.terminalErr = ctx.Err()
+		}
+		stream.closes.Add(1)
+		close(stream.chunks)
+	}()
+	return stream
+}
+
+func (stream *fixtureStream) write(raw string) error {
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	if stream.closes.Load() != 0 {
+		stream.rejected.Add(int64(len(raw)))
+		if stream.terminalErr != nil {
+			return stream.terminalErr
+		}
+		return io.ErrClosedPipe
+	}
+	stream.admitted.Add(int64(len(raw)))
+	chunk := fixtureOutputChunk{raw: raw, delivered: make(chan error, 1)}
+	stream.chunks <- chunk
+	return <-chunk.delivered
+}
+
+func (stream *fixtureStream) wait() error {
+	if stream.waits.Add(1) != 1 {
+		return errors.New("stream waited more than once")
+	}
+	<-stream.done
+	return errors.Join(stream.writeErr, stream.terminalErr)
+}
+
+// Only raw command bytes cross this seam. Production owns the parsers,
+// bounded writers, context budgets, identity correlation and gate result.
+type launchFixtureTransport struct {
+	mu        sync.Mutex
+	scenario  string
+	clock     time.Time
+	launched  time.Time
+	processes int
+	logs      map[string]string
+	streams   map[string]*fixtureStream
+	commands  []fixtureCommand
+	blocked   chan struct{}
+}
+
+func newLaunchFixtureTransport(scenario string) *launchFixtureTransport {
+	return &launchFixtureTransport{
+		scenario: scenario,
+		clock:    time.Unix(1_700_000_000, 0).UTC(),
+		logs:     make(map[string]string),
+		streams:  make(map[string]*fixtureStream),
+		blocked:  make(chan struct{}),
+	}
+}
+
+func (fixture *launchFixtureTransport) record(kind, path string, args []string, waitDelay time.Duration, ctx context.Context) error {
+	if path != "fixture-adb" || len(args) < 3 || args[0] != "-s" || args[1] != "emulator-5554" || args[2] != "shell" {
+		return errors.New("unexpected fixture command identity or argument order")
+	}
+	deadline, _ := ctx.Deadline()
+	fixture.commands = append(fixture.commands, fixtureCommand{
+		kind: kind, args: append([]string(nil), args...), waitDelay: waitDelay,
+		deadline: deadline, remaining: time.Until(deadline),
+	})
+	return nil
+}
+
+func fixtureStamp(at time.Time) string {
+	return fmt.Sprintf("%d.%09d", at.Unix(), at.Nanosecond())
+}
+
+// Called with fixture.mu held. Raw log creation, live delivery and fallback
+// snapshots share the same bytes, without parsed-result injection.
+func (fixture *launchFixtureTransport) appendLog(buffer, raw string) error {
+	fixture.logs[buffer] += raw
+	if stream := fixture.streams[buffer]; stream != nil {
+		return stream.write(raw)
+	}
+	return nil
+}
+
+func (fixture *launchFixtureTransport) run(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) error {
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if err := fixture.record("run", path, args, waitDelay, ctx); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Device timestamps follow command causality, not the host wall clock's
+	// resolution. Real context deadlines and the survival interval are untouched.
+	fixture.clock = fixture.clock.Add(time.Millisecond)
 	args = args[3:]
 	command := strings.Join(args, " ")
-	read := func(leaf string) string { value, _ := os.ReadFile(filepath.Join(root, leaf)); return string(value) }
-	write := func(leaf, value string) {
-		if err := os.WriteFile(filepath.Join(root, leaf), []byte(value), 0o600); err != nil {
-			panic(err)
-		}
-	}
-	stamp := func() string {
-		now := time.Now()
-		return strconv.FormatInt(now.Unix(), 10) + "." + fmt.Sprintf("%09d", now.Nanosecond())
-	}
-	launchTime, _ := epochNanos(read("launched"))
-	survived := launchTime > 0 && time.Since(time.Unix(0, launchTime)) >= 2*time.Second
+	scenario := fixture.scenario
+	afterSurvival := fixture.processes >= 3
 	switch {
+	case command == "fixture-block":
+		close(fixture.blocked)
+		<-ctx.Done()
+		return ctx.Err()
+	case command == "fixture-bounds":
+		fmt.Fprint(stdout, "ab")
+		fmt.Fprint(stderr, "cd")
+		fmt.Fprint(stdout, "efg")
 	case command == "date +%s.%N":
-		fmt.Println(stamp())
+		fmt.Fprintln(stdout, fixtureStamp(fixture.clock))
 	case command == "date +%z":
-		fmt.Println("+0000")
+		fmt.Fprintln(stdout, "+0000")
 	case strings.HasPrefix(command, "log -p i -t KurdistanLaunchProbe "):
 		if scenario == "missing-markers" {
-			return 0
+			return nil
 		}
-		write("markers", read("markers")+stamp()+" 11 11 I KurdistanLaunchProbe: "+args[len(args)-1]+"\n")
-	case strings.HasPrefix(command, "cmd package resolve-activity --brief -n "):
-		fmt.Println(defaultAppPackage + "/org.kurdistanvpn.app.MainActivity")
+		if scenario == "terminated-stream" && strings.HasPrefix(args[len(args)-1], "END:") {
+			for _, stream := range fixture.streams {
+				select {
+				case <-stream.done:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		}
+		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I KurdistanLaunchProbe: "+args[len(args)-1]+"\n")
+	case command == "cmd package resolve-activity --brief -n "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity":
+		fmt.Fprintln(stdout, defaultAppPackage+"/org.kurdistanvpn.app.MainActivity")
 	case command == "ps -A -o UID,PID,PPID,NAME":
+		fixture.processes++
+		afterSurvival = fixture.processes >= 3
 		if scenario == "missing-process-observation" {
-			return 1
+			return errors.New("fixture process query failed")
 		}
-		fmt.Println("UID PID PPID NAME")
-		if read("launched") != "" && !(scenario == "process-death" && survived) {
+		if scenario == "truncated-process-output" && fixture.processes == 4 {
+			fmt.Fprint(stdout, strings.Repeat("x", (256<<10)+1))
+			return nil
+		}
+		fmt.Fprintln(stdout, "UID PID PPID NAME")
+		if !fixture.launched.IsZero() && !(scenario == "process-death" && afterSurvival) {
 			uid := 10123
-			if scenario == "uid-change" && survived {
+			if scenario == "uid-change" && afterSurvival {
 				uid++
 			}
-			fmt.Printf("%d 999 111 %s\n", uid, defaultAppPackage)
+			fmt.Fprintf(stdout, "%d 999 111 %s\n", uid, defaultAppPackage)
+			if scenario == "extra-process-output" && fixture.processes == 4 {
+				fmt.Fprintf(stdout, "%d 999 111 %s\n", uid, defaultAppPackage)
+			}
 		}
 	case command == "cat /proc/999/stat":
+		if fixture.processes == 4 {
+			switch scenario {
+			case "missing-terminal-epoch":
+				return errors.New("fixture terminal epoch unavailable")
+			case "terminal-command-timeout":
+				<-ctx.Done()
+				return ctx.Err()
+			case "malformed-terminal-epoch":
+				fmt.Fprintln(stdout, "malformed stat")
+				return nil
+			}
+		}
 		ticks := 12345
-		if scenario == "epoch-change" && survived {
+		if (scenario == "epoch-change" && afterSurvival) || (scenario == "pid-reuse" && fixture.processes == 4) {
 			ticks++
 		}
-		fmt.Printf("999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 %d\n", ticks)
+		fmt.Fprintf(stdout, "999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 %d\n", ticks)
 	case command == "pidof "+defaultAppPackage:
-		if scenario == "process-death" && survived {
-			return 1
+		if scenario == "process-death" {
+			return errors.New("fixture target no longer exists")
 		}
-		fmt.Println("999")
-	case strings.HasPrefix(command, "am start -W -f 0x10008000 -n "):
-		write("launched", stamp())
-		write("lifecycle", stamp()+" 10 10 I ActivityManager: Start proc 999:"+defaultAppPackage+"/u0a123 for activity\n")
+		fmt.Fprintln(stdout, "999")
+	case command == "am start -W -f 0x10008000 -n "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity":
+		fixture.launched = fixture.clock
+		system := fixtureStamp(fixture.launched) + " 10 10 I ActivityManager: Start proc 999:" + defaultAppPackage + "/u0a123 for activity\n"
+		if scenario == "stale-dialog" {
+			system = fixtureStamp(fixture.launched.Add(-time.Hour)) +
+				" 10 10 I ActivityManager: AppErrorDialog for " + defaultAppPackage + "\n" + system
+		}
+		if err := fixture.appendLog("system", system); err != nil {
+			return err
+		}
 		if strings.HasSuffix(scenario, "crash") {
-			at, pid, app := time.Now(), 999, defaultAppPackage
+			at, pid, app := fixture.clock, 999, defaultAppPackage
 			if scenario == "stale-crash" {
 				at = at.Add(-time.Hour)
 			}
 			if scenario == "unrelated-crash" {
 				pid, app = 888, "example.unrelated"
 			}
-			prefix := fmt.Sprintf("%d.%09d %d %d E AndroidRuntime: ", at.Unix(), at.Nanosecond(), pid, pid)
-			write("crash", prefix+"FATAL EXCEPTION: main\n"+prefix+fmt.Sprintf("Process: %s, PID: %d\n", app, pid)+prefix+"java.lang.IllegalStateException: PROTECTED_STATE_UNAVAILABLE\n"+prefix+"at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)\n")
+			prefix := fmt.Sprintf("%s %d %d E AndroidRuntime: ", fixtureStamp(at), pid, pid)
+			// A complete, privacy-safe exception, not a message requiring redaction.
+			raw := prefix + "FATAL EXCEPTION: main\n" + prefix + fmt.Sprintf("Process: %s, PID: %d\n", app, pid) +
+				prefix + "java.lang.IllegalStateException: Check failed.\n" +
+				prefix + "at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)\n"
+			if err := fixture.appendLog("crash", raw); err != nil {
+				return err
+			}
 		}
 		if scenario == "malformed-log" {
-			write("crash", "unparseable evidence\n")
+			if err := fixture.appendLog("crash", "unparseable evidence\n"); err != nil {
+				return err
+			}
 		}
 		if scenario == "timeout" {
-			time.Sleep(10 * time.Second)
-			return 0
+			<-ctx.Done()
+			return ctx.Err()
 		}
 		switch scenario {
 		case "empty-launch":
-			return 0
+			return nil
 		case "status-only":
-			fmt.Println("Status: ok")
-			return 0
+			fmt.Fprintln(stdout, "Status: ok")
+			return nil
 		case "no-complete":
-			fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nWaitTime: 30")
-			return 0
+			fmt.Fprintln(stdout, "Status: ok\nActivity: "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity\nWaitTime: 30")
+			return nil
 		case "duplicate-status":
-			fmt.Println("Status: error")
+			fmt.Fprintln(stdout, "Status: error")
 		case "unknown-launch":
-			fmt.Println("UNKNOWN_RESULT")
+			fmt.Fprintln(stdout, "UNKNOWN_RESULT")
 		case "wrong-activity":
-			fmt.Println("Status: ok\nActivity: example.other/MainActivity\nWaitTime: 30\nComplete")
-			return 0
+			fmt.Fprintln(stdout, "Status: ok\nActivity: example.other/MainActivity\nWaitTime: 30\nComplete")
+			return nil
 		case "malformed-timing":
-			fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nTotalTime: UNKNOWN\nWaitTime: 30\nComplete")
-			return 0
+			fmt.Fprintln(stdout, "Status: ok\nActivity: "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity\nTotalTime: UNKNOWN\nWaitTime: 30\nComplete")
+			return nil
 		case "starting-intent":
-			fmt.Println("Starting: Intent { flg=0x10008000 cmp=" + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity }")
+			fmt.Fprintln(stdout, "Starting: Intent { flg=0x10008000 cmp="+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity }")
 		}
-		fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nThisTime: 15\nTotalTime: 25\nWaitTime: 30\nComplete")
+		fmt.Fprintln(stdout, "Status: ok\nActivity: "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity\nThisTime: 15\nTotalTime: 25\nWaitTime: 30\nComplete")
 	case command == "dumpsys activity processes "+defaultAppPackage:
 		if scenario == "missing-activity-observation" {
-			return 1
+			return errors.New("fixture activity query failed")
 		}
 		pidState := "pid=999 starting=false\n    curProcState=2 repProcState=2"
 		if strings.HasPrefix(scenario, "modern-") {
 			pidState = "pid=999\n    curProcState=TOP setProcState=TOP"
 		}
-		fmt.Println("ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)\n  All known processes:\n  *APP* UID 10123 ProcessRecord{abc 999:" + defaultAppPackage + "/u0a123}\n    user #0 uid=10123 gids={}\n    " + pidState + "\n    packageList={" + defaultAppPackage + "}")
-		if scenario == "crashing" {
-			fmt.Println("    debugging=false crashing=true null notResponding=false null bad=false")
+		fmt.Fprintln(stdout, "ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)\n  All known processes:\n  *APP* UID 10123 ProcessRecord{abc 999:"+defaultAppPackage+"/u0a123}\n    user #0 uid=10123 gids={}\n    "+pidState+"\n    packageList={"+defaultAppPackage+"}")
+		switch scenario {
+		case "crashing":
+			fmt.Fprintln(stdout, "    debugging=false crashing=true null notResponding=false null bad=false")
+		case "dialog":
+			fmt.Fprintln(stdout, "    debugging=false crashing=false com.android.server.am.AppErrorDialog@abc notResponding=false null bad=false")
+		case "not-responding":
+			fmt.Fprintln(stdout, "    crashing=false null notResponding=true null bad=false")
+		case "malformed-crash-flag":
+			fmt.Fprintln(stdout, "    crashing=unknown notResponding=false")
+		case "modern-crashing":
+			fmt.Fprintln(stdout, "    mCrashing=true null mNotResponding=false null bad=false")
+		case "modern-dialog":
+			fmt.Fprintln(stdout, "    mCrashing=false [com.android.server.am.AppErrorDialog@abc] mNotResponding=false null bad=false")
+		case "unterminated-process-record":
+			return nil
 		}
-		if scenario == "dialog" {
-			fmt.Println("    debugging=false crashing=false com.android.server.am.AppErrorDialog@abc notResponding=false null bad=false")
+		if scenario == "unrelated-dialog" {
+			fmt.Fprintln(stdout, "  *APP* UID 10124 ProcessRecord{def 888:example.unrelated/u0a124}\n    user #0 uid=10124\n    pid=888\n    curProcState=TOP setProcState=TOP\n    mCrashing=false [com.android.server.am.AppErrorDialog@def] mNotResponding=false")
 		}
-		if scenario == "not-responding" {
-			fmt.Println("    crashing=false null notResponding=true null bad=false")
-		}
-		if scenario == "malformed-crash-flag" {
-			fmt.Println("    crashing=unknown notResponding=false")
-		}
-		if scenario == "modern-crashing" {
-			fmt.Println("    mCrashing=true null mNotResponding=false null bad=false")
-		}
-		if scenario == "modern-dialog" {
-			fmt.Println("    mCrashing=false [com.android.server.am.AppErrorDialog@abc] mNotResponding=false null bad=false")
-		}
-		if scenario == "unterminated-process-record" {
-			return 0
-		}
-		fmt.Println("  Process LRU list (sorted by oom_adj, 1 total, non-act at 0, non-svc at 0):")
+		fmt.Fprintln(stdout, "  Process LRU list (sorted by oom_adj, 1 total, non-act at 0, non-svc at 0):")
 	case command == "dumpsys activity exit-info "+defaultAppPackage:
 		if scenario == "missing-exit-observation" {
-			return 0
+			return nil
 		}
-		fmt.Println("ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\nLast Timestamp of Persistence Into Persistent Storage: 1970-01-01 00:00:00.000")
+		fmt.Fprintln(stdout, "ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\nLast Timestamp of Persistence Into Persistent Storage: 1970-01-01 00:00:00.000")
 		if strings.HasSuffix(scenario, "exit") {
-			at, uid := time.Unix(0, launchTime).Add(time.Second).UTC(), 10123
+			at, uid := fixture.launched.Add(time.Millisecond), 10123
 			if scenario == "stale-exit" {
 				at = at.Add(-time.Hour)
 			}
 			if scenario == "unrelated-exit" {
 				uid++
 			}
-			fmt.Printf("ApplicationExitInfo #0:\n timestamp=%s pid=999 realUid=%d\n process=%s reason=4 (CRASH) status=0\n", at.Format("2006-01-02 15:04:05.000"), uid, defaultAppPackage)
+			fmt.Fprintf(stdout, "ApplicationExitInfo #0:\n timestamp=%s pid=999 realUid=%d\n process=%s reason=4 (CRASH) status=0\n", at.Format("2006-01-02 15:04:05.000"), uid, defaultAppPackage)
 		}
+	case command == "logcat -b all -t 4096 -v brief *:W":
+		fmt.Fprint(stdout, fixture.logs["crash"])
 	case len(args) > 3 && args[0] == "logcat" && args[1] == "-b":
-		// Match Android's one base format plus individual format modifiers.
-		// An unsupported option must not be mistaken for an empty healthy buffer.
-		if !strings.Contains(command, "-v threadtime -v epoch -v usec") {
-			return 93
+		if !strings.Contains(command, "-v threadtime -v epoch -v usec") || !strings.Contains(" "+command+" ", " -d ") {
+			return errors.New("unexpected fixture log snapshot options")
 		}
-		leaf := map[string]string{"main": "markers", "system": "lifecycle", "crash": "crash"}[args[2]]
-		if leaf == "" {
-			return 91
+		value, known := fixture.logs[args[2]]
+		if !known && args[2] != "crash" && args[2] != "main" && args[2] != "system" {
+			return errors.New("unexpected fixture log buffer")
 		}
-		if strings.Contains(" "+command+" ", " -d ") {
-			fmt.Print(read(leaf))
-			return 0
-		}
-		cursor := 0
-		if scenario == "terminated-stream" {
-			return 0
-		}
-		deadline := time.Now().Add(20 * time.Second)
-		for time.Now().Before(deadline) {
-			value := read(leaf)
-			if len(value) > cursor {
-				fmt.Print(value[cursor:])
-				cursor = len(value)
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
+		fmt.Fprint(stdout, value)
 	default:
-		return 92
+		return fmt.Errorf("unexpected fixture command: %q", args)
 	}
-	return 0
+	return nil
+}
+
+func (fixture *launchFixtureTransport) start(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if err := fixture.record("start", path, args, waitDelay, ctx); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if fixture.scenario == "unavailable-stream" {
+		return nil, errors.New("fixture stream unavailable")
+	}
+	if fixture.scenario == "stream-without-wait" {
+		return nil, nil
+	}
+	args = args[3:]
+	if len(args) < 3 {
+		return nil, errors.New("incomplete stream arguments")
+	}
+	buffer := args[2]
+	want := []string{"logcat", "-b", buffer, "-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+		"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+	if (buffer != "crash" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
+		return nil, errors.New("unexpected or duplicate fixture stream")
+	}
+	stream := newFixtureStream(ctx, stdout, fixture.scenario == "terminated-stream")
+	fixture.streams[buffer] = stream
+	return stream.wait, nil
+}
+
+func (fixture *launchFixtureTransport) assertClosed(t *testing.T) {
+	t.Helper()
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	want := 3
+	if fixture.scenario == "unavailable-stream" || fixture.scenario == "stream-without-wait" {
+		want = 0
+	}
+	if len(fixture.streams) != want {
+		t.Errorf("stream count=%d, want %d", len(fixture.streams), want)
+	}
+	for name, stream := range fixture.streams {
+		if stream.waits.Load() != 1 || stream.completed.Load() != 1 {
+			t.Errorf("%s stream wait=%d completion=%d, want exactly once", name, stream.waits.Load(), stream.completed.Load())
+		}
+		if stream.closes.Load() != 1 || stream.eofs.Load() != 1 || stream.admitted.Load() != stream.delivered.Load() {
+			t.Errorf("%s stream close=%d EOF=%d admitted_bytes=%d delivered_bytes=%d", name,
+				stream.closes.Load(), stream.eofs.Load(), stream.admitted.Load(), stream.delivered.Load())
+		}
+		if fixture.scenario != "terminated-stream" && stream.cancelled.Load() != 1 {
+			t.Errorf("%s stream was not cancelled exactly once", name)
+		}
+	}
+}
+
+func TestLaunchTransportIncompleteRawEvidenceRemainsBlocked(t *testing.T) {
+	for _, scenario := range []string{"missing-terminal-epoch", "terminal-command-timeout", "malformed-terminal-epoch", "truncated-process-output", "extra-process-output", "unavailable-stream", "stream-without-wait"} {
+		t.Run(scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, scenario, 26)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
+				t.Fatalf("incomplete raw evidence: err=%v gate=%s evidence=%s", err, observation.GateResult, observation.Status)
+			}
+			if scenario == "terminal-command-timeout" {
+				found := false
+				for _, command := range observation.Commands {
+					found = found || (command.Phase == "terminal-epoch" && command.Status == "DEADLINE" && command.ExitCode != 0)
+				}
+				if !found {
+					t.Fatal("fixture did not exercise the real shared command deadline")
+				}
+			}
+		})
+	}
+}
+
+func TestLaunchTransportPIDReuseDoesNotEstablishContinuity(t *testing.T) {
+	err, observation := runLaunchScenario(t, "pid-reuse", 34)
+	if err == nil || errors.Is(err, errLaunchIncomplete) || observation.GateResult != "FAIL" {
+		t.Fatalf("changed epoch for reused PID not rejected: err=%v gate=%s", err, observation.GateResult)
+	}
+}
+
+func TestLaunchTransportStaleAndUnrelatedDialogsDoNotRejectHealthyTarget(t *testing.T) {
+	for _, scenario := range []string{"stale-dialog", "unrelated-dialog"} {
+		t.Run(scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, scenario, 34)
+			if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" || observation.Status != "CAPTURED" {
+				t.Fatalf("uncorrelated dialog rejected current healthy target: err=%v gate=%s", err, observation.GateResult)
+			}
+		})
+	}
+}
+
+func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing.T) {
+	err, observation, fixture := runLaunchFixture(t, "healthy", 34)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	var snapshotDeadline time.Time
+	for _, call := range fixture.commands {
+		got = append(got, call.kind+" "+strings.Join(call.args, " "))
+		wantDelay := time.Second
+		if strings.Join(call.args, " ") == "-s emulator-5554 shell pidof "+defaultAppPackage {
+			wantDelay = 0
+		}
+		if call.waitDelay != wantDelay {
+			t.Errorf("changed wait delay for %v: %s", call.args, call.waitDelay)
+		}
+		if strings.Join(call.args[3:], " ") == "ps -A -o UID,PID,PPID,NAME" {
+			if call.remaining <= 0 || call.remaining > time.Second {
+				t.Errorf("snapshot budget=%s, must remain bounded by the existing second", call.remaining)
+			}
+			snapshotDeadline = call.deadline
+		}
+		if strings.Join(call.args[3:], " ") == "cat /proc/999/stat" && !call.deadline.Equal(snapshotDeadline) {
+			t.Error("epoch query did not retain its process-list query's shared deadline")
+		}
+	}
+	prefix := "run -s emulator-5554 shell "
+	streamPrefix := "start -s emulator-5554 shell logcat -b "
+	streamSuffix := " -v threadtime -v epoch -v usec -T 1 AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S"
+	want := []string{
+		prefix + "date +%s.%N", prefix + "date +%z",
+		streamPrefix + "crash" + streamSuffix, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
+		prefix + "log -p i -t KurdistanLaunchProbe START:" + observation.Invocation,
+		prefix + "ps -A -o UID,PID,PPID,NAME",
+		prefix + "cmd package resolve-activity --brief -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
+		prefix + "am start -W -f 0x10008000 -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
+		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage,
+		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "dumpsys activity processes " + defaultAppPackage,
+		prefix + "log -p i -t KurdistanLaunchProbe END:" + observation.Invocation,
+		prefix + "logcat -b main -d -t 128 -v threadtime -v epoch -v usec KurdistanLaunchProbe:I *:S",
+		prefix + "date +%s.%N", prefix + "dumpsys activity exit-info " + defaultAppPackage,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("launch command sequence changed:\ngot=%q\nwant=%q", got, want)
+	}
+}
+
+func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
+	fixture := newLaunchFixtureTransport("current-crash")
+	client := newADBClient("fixture-adb", "emulator-5554", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+	client.transport = &commandTransport{run: fixture.run, start: fixture.start}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	outputs := make(map[string]*readyChildWriter)
+	var waits []func() error
+	defer func() {
+		cancel()
+		for _, wait := range waits {
+			if err := wait(); !errors.Is(err, context.Canceled) {
+				t.Errorf("stream cleanup result=%v, want cancellation", err)
+			}
+		}
+		fixture.assertClosed(t)
+		for buffer, output := range outputs {
+			if output.String() != fixture.logs[buffer] {
+				t.Errorf("%s Wait changed or discarded already-delivered raw output", buffer)
+			}
+		}
+	}()
+	for _, buffer := range []string{"crash", "main", "system"} {
+		output := &readyChildWriter{ready: make(chan struct{})}
+		outputs[buffer] = output
+		args := []string{"-s", "emulator-5554", "shell", "logcat", "-b", buffer,
+			"-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+			"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		wait, err := client.startCommand(ctx, args, output, io.Discard, time.Second)
+		if err != nil || wait == nil {
+			t.Fatalf("%s Start did not provide a running command: %v", buffer, err)
+		}
+		waits = append(waits, wait)
+		select {
+		case <-fixture.streams[buffer].ready:
+		default:
+			t.Fatalf("%s output reader is unavailable after Start", buffer)
+		}
+		call := fixture.commands[len(fixture.commands)-1]
+		if call.kind != "start" || !reflect.DeepEqual(call.args, args) || call.waitDelay != time.Second {
+			t.Fatalf("%s Start changed command identity, argument order or wait bound", buffer)
+		}
+	}
+	invocation := strings.Repeat("1", 32)
+	for _, args := range [][]string{
+		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "START:" + invocation},
+		{"-s", "emulator-5554", "shell", "am", "start", "-W", "-f", "0x10008000", "-n", defaultAppPackage + "/org.kurdistanvpn.app.MainActivity"},
+		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "END:" + invocation},
+	} {
+		if err := client.runCommand(ctx, args, io.Discard, io.Discard, time.Second); err != nil {
+			t.Fatalf("raw fixture command failed: %v", err)
+		}
+	}
+	start, end, windowOK := launchMarkerWindow(fixture.logs["main"], fixture.logs["main"], invocation, 1, int64(9_000_000_000_000_000_000))
+	if !windowOK {
+		t.Error("raw fixture invocation window is invalid")
+	}
+	if start != 1_700_000_000_001_000_000 || end != 1_700_000_000_003_000_000 {
+		t.Errorf("synthetic command clock changed: start=%d end=%d", start, end)
+	}
+	for _, buffer := range []string{"main", "system", "crash"} {
+		raw := fixture.logs[buffer]
+		for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+			event, ok := parseEpochLog(line)
+			t.Logf("buffer=%s parsed=%t relative_start_ns=%d relative_end_ns=%d", buffer, ok, event.DeviceNanos-start, end-event.DeviceNanos)
+			if !ok {
+				t.Errorf("%s fixture emits a malformed raw log line", buffer)
+			}
+			if buffer != "main" && (event.DeviceNanos <= start || event.DeviceNanos > end) {
+				t.Errorf("%s raw event is outside the invocation window", buffer)
+			}
+		}
+		if outputs[buffer].String() != raw {
+			t.Errorf("%s output unavailable before Wait: emitted_bytes=%d readable_bytes=%d", buffer, len(raw), len(outputs[buffer].String()))
+		}
+		if fixture.streams[buffer].waits.Load() != 0 {
+			t.Errorf("%s Wait unexpectedly initiated output delivery", buffer)
+		}
+	}
+	wantEvents := map[string][]launchLogEvent{
+		"system": {
+			{DeviceNanos: 1_700_000_000_002_000_000, PID: 10, TID: 10, Tag: "ActivityManager", Text: "process_lifecycle event=Start_proc pid=999 process=" + defaultAppPackage + " uid=10123"},
+		},
+		"crash": {
+			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "FATAL EXCEPTION"},
+			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "Process: " + defaultAppPackage + ", PID: 999"},
+			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "java.lang.IllegalStateException: Check failed."},
+			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)"},
+		},
+	}
+	for _, buffer := range []string{"system", "crash"} {
+		events, complete := launchWindowEvents(outputs[buffer].String(), defaultAppPackage, start, end)
+		if !complete || !reflect.DeepEqual(events, wantEvents[buffer]) {
+			t.Errorf("%s real parser/sanitizer: complete=%t events=%+v, want fixed raw-record interpretation", buffer, complete, events)
+		}
+	}
+	cancel()
+	for buffer, stream := range fixture.streams {
+		select {
+		case <-stream.done:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("%s cancellation did not close its reader before Wait", buffer)
+		}
+		if stream.waits.Load() != 0 || stream.eofs.Load() != 1 || stream.closes.Load() != 1 || stream.completed.Load() != 1 {
+			t.Errorf("%s completion depends on Wait or is not exact-once", buffer)
+		}
+	}
+}
+
+type heldFixtureWriter struct {
+	output  readyChildWriter
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (writer *heldFixtureWriter) Write(value []byte) (int, error) {
+	close(writer.entered)
+	<-writer.release
+	return writer.output.Write(value)
+}
+
+func TestLaunchTransportCancellationDrainsAcceptedRawOutput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	fixture := newLaunchFixtureTransport("healthy")
+	client := newADBClient("fixture-adb", "emulator-5554", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+	client.transport = &commandTransport{run: fixture.run, start: fixture.start}
+	output := &heldFixtureWriter{
+		output: readyChildWriter{ready: make(chan struct{})}, entered: make(chan struct{}), release: make(chan struct{}),
+	}
+	release := sync.OnceFunc(func() { close(output.release) })
+	defer release()
+	args := []string{"-s", "emulator-5554", "shell", "logcat", "-b", "system",
+		"-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+		"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+	wait, err := client.startCommand(ctx, args, output, io.Discard, time.Second)
+	if err != nil || wait == nil {
+		t.Fatalf("start output-copy boundary: %v", err)
+	}
+	waited := false
+	defer func() {
+		release()
+		cancel()
+		if !waited {
+			if err := wait(); !errors.Is(err, context.Canceled) {
+				t.Errorf("cleanup wait: %v", err)
+			}
+		}
+	}()
+	stream := fixture.streams["system"]
+	raw := "1700000000.002000000 10 10 I ActivityManager: Start proc 999:" + defaultAppPackage + "/u0a123 for activity\n"
+	written := make(chan error, 1)
+	go func() { written <- stream.write(raw) }()
+	select {
+	case <-output.entered:
+	case <-ctx.Done():
+		t.Fatal("raw output did not enter the live reader")
+	}
+	cancel()
+	if stream.delivered.Load() != 0 || stream.completed.Load() != 0 || stream.admitted.Load() != int64(len(raw)) {
+		t.Error("output was declared delivered or complete before its writer returned")
+	}
+	release()
+	select {
+	case err := <-written:
+		if err != nil {
+			t.Errorf("accepted raw chunk was discarded during cancellation: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("accepted output did not finish after explicit release")
+	}
+	err = wait()
+	waited = true
+	if !errors.Is(err, context.Canceled) || output.output.String() != raw || stream.admitted.Load() != stream.delivered.Load() {
+		t.Fatalf("cancellation lost raw output or terminal state: err=%v admitted=%d delivered=%d", err, stream.admitted.Load(), stream.delivered.Load())
+	}
+	if stream.waits.Load() != 1 || stream.eofs.Load() != 1 || stream.closes.Load() != 1 || stream.completed.Load() != 1 || stream.cancelled.Load() != 1 {
+		t.Fatal("stream cancellation, EOF, close or wait was not exact-once")
+	}
+	if err := stream.write("late"); !errors.Is(err, context.Canceled) || stream.rejected.Load() != 4 || output.output.String() != raw {
+		t.Fatal("post-cancellation output was silently accepted or discarded")
+	}
+}
+
+func TestCommandTransportCancellationAndOutputBoundsRemainProductionOwned(t *testing.T) {
+	t.Run("cancellation", func(t *testing.T) {
+		fixture := newLaunchFixtureTransport("healthy")
+		client := newADBClient("fixture-adb", "emulator-5554", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+		client.transport = &commandTransport{run: fixture.run, start: fixture.start}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		done := make(chan struct{})
+		var record diagnosticCommand
+		var err error
+		go func() {
+			_, _, record, err = client.diagnosticCommand(ctx, "cancelled-query", 64, "shell", "fixture-block")
+			close(done)
+		}()
+		select {
+		case <-fixture.blocked:
+		case <-time.After(10 * time.Second):
+			t.Fatal("test transport never entered its cancellation boundary")
+		}
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("cancelled transport did not complete")
+		}
+		if !errors.Is(err, context.Canceled) || record.Status != "CANCELLED" || record.ExitCode == 0 {
+			t.Fatalf("cancellation lost: err=%v status=%s exit=%d", err, record.Status, record.ExitCode)
+		}
+	})
+	t.Run("bounded-output", func(t *testing.T) {
+		client := newADBClient("fixture-adb", "emulator-5554", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+		fixture := newLaunchFixtureTransport("healthy")
+		client.transport = &commandTransport{run: fixture.run, start: fixture.start}
+		stdout, stderr, record, err := client.diagnosticCommand(context.Background(), "bounded-query", 6, "shell", "fixture-bounds")
+		if err != nil || stdout != "abefg" || stderr != "cd" || record.combined != "abcdef" || !record.Truncated || record.Status != "INCOMPLETE" {
+			t.Fatalf("production output bounds changed: err=%v record=%+v", err, record)
+		}
+	})
 }
 
 func TestClearKnownEvidenceFilesRemovesOnlyGateEvidence(t *testing.T) {
@@ -823,15 +1382,153 @@ func TestDiagnosticCommandFixtureProcess(t *testing.T) {
 		return
 	}
 	switch os.Args[at+1] {
+	case "success":
+		fmt.Fprintf(os.Stdout, "child pid=%d\n", os.Getpid())
+		fmt.Fprintln(os.Stderr, "child stderr")
+		os.Exit(0)
 	case "nonzero":
 		fmt.Fprintln(os.Stdout, "Status: error")
 		fmt.Fprintln(os.Stderr, "credential=synthetic-secret")
 		os.Exit(7)
 	case "wait":
-		time.Sleep(5 * time.Second)
+		interrupt := make(chan os.Signal, 1)
+		signal.Notify(interrupt, os.Interrupt)
+		fmt.Fprintln(os.Stdout, "child ready")
+		<-interrupt
+		signal.Stop(interrupt)
 		os.Exit(0)
 	}
 	os.Exit(9)
+}
+
+func TestProductionCommandTransportInvokesRealChildAndKeepsExitState(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := newADBClient(executable, "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stdout, stderr, record, err := client.diagnosticCommand(ctx, "real-child", 128, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "success")
+	childPID, parseErr := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(stdout, "child pid=")))
+	if err != nil || record.Status != "CAPTURED" || record.ExitCode != 0 || parseErr != nil || childPID <= 0 || childPID == os.Getpid() || stderr != "child stderr\n" {
+		t.Fatalf("real child contract failed: err=%v status=%s exit=%d distinct_child=%t stderr_bytes=%d", err, record.Status, record.ExitCode, parseErr == nil && childPID > 0 && childPID != os.Getpid(), len(stderr))
+	}
+}
+
+type readyChildWriter struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+	ready  chan struct{}
+	once   sync.Once
+}
+
+func (writer *readyChildWriter) Write(value []byte) (int, error) {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	n, err := writer.buffer.Write(value)
+	if err == nil && n > 0 {
+		writer.once.Do(func() { close(writer.ready) })
+	}
+	return n, err
+}
+
+func (writer *readyChildWriter) String() string {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	return writer.buffer.String()
+}
+
+func TestReadyChildWriterDoesNotPromoteReaderFromAndSignalsOnce(t *testing.T) {
+	writer := &readyChildWriter{ready: make(chan struct{})}
+	if _, promoted := any(writer).(io.ReaderFrom); promoted {
+		t.Fatal("readiness writer promotes io.ReaderFrom and bypasses its Write method")
+	}
+	if n, err := writer.Write(nil); err != nil || n != 0 {
+		t.Fatalf("empty Write: n=%d err=%v", n, err)
+	}
+	select {
+	case <-writer.ready:
+		t.Fatal("empty output signalled readiness")
+	default:
+	}
+	if n, err := writer.Write([]byte("first")); err != nil || n != 5 {
+		t.Fatalf("first Write: n=%d err=%v", n, err)
+	}
+	select {
+	case <-writer.ready:
+	default:
+		t.Fatal("successful nonempty Write did not signal readiness")
+	}
+	snapshot := writer.String()
+	var pending sync.WaitGroup
+	for range 8 {
+		pending.Add(1)
+		go func() {
+			defer pending.Done()
+			if n, err := writer.Write([]byte("x")); err != nil || n != 1 {
+				t.Errorf("concurrent Write: n=%d err=%v", n, err)
+			}
+			_ = writer.String()
+		}()
+	}
+	pending.Wait()
+	if snapshot != "first" || writer.String() != "first"+strings.Repeat("x", 8) {
+		t.Fatal("snapshot changed or concurrent output was lost")
+	}
+}
+
+func TestProductionCommandTransportCancelsAnActuallyStartedStream(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := newADBClient(executable, "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stdout := &readyChildWriter{ready: make(chan struct{})}
+	if _, promoted := any(stdout).(io.ReaderFrom); promoted {
+		t.Fatal("real child output could bypass the readiness Write method")
+	}
+	var stderr bytes.Buffer
+	wait, err := client.startCommand(ctx, []string{"-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "wait"}, stdout, &stderr, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- wait() }()
+	select {
+	case <-stdout.ready:
+	case <-ctx.Done():
+		t.Fatal("real child did not report readiness within its boundary-test context")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		var exit *exec.ExitError
+		if !errors.Is(ctx.Err(), context.Canceled) || !errors.As(err, &exit) || exit.Success() || stderr.Len() != 0 {
+			t.Fatalf("real child cancellation lost: context=%v wait=%v stderr_bytes=%d", ctx.Err(), err, stderr.Len())
+		}
+		if stdout.String() != "child ready\n" {
+			t.Fatalf("real subprocess output-copy lost readiness bytes: length=%d", len(stdout.String()))
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("cancelled real child did not complete its wait")
+	}
+}
+
+func TestUnavailableCommandTransportOperationsFailClosed(t *testing.T) {
+	for _, transport := range []*commandTransport{nil, {}} {
+		client := adbClient{path: "must-not-execute", transport: transport}
+		ctx, cancel := context.WithCancel(context.Background())
+		var output bytes.Buffer
+		err := client.runCommand(ctx, []string{"argument"}, &output, &output, time.Second)
+		wait, startErr := client.startCommand(ctx, []string{"argument"}, &output, &output, time.Second)
+		cancel()
+		if err == nil || startErr == nil || wait != nil || output.Len() != 0 {
+			t.Fatal("unavailable transport supplied execution, stream ownership, or output")
+		}
+	}
 }
 
 func TestDiagnosticCommandsPreserveExitAndDeadlineAndDoNotPublishRawOutput(t *testing.T) {
@@ -839,7 +1536,7 @@ func TestDiagnosticCommandsPreserveExitAndDeadlineAndDoNotPublishRawOutput(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := adbClient{path: executable, evidenceDir: t.TempDir(), timeline: &diagnosticTimeline{Started: time.Now()}}
+	client := newADBClient(executable, "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
 	args := []string{"-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "nonzero"}
 	stdout, stderr, record, commandErr := client.diagnosticCommand(context.Background(), "fixture", maxCommandEvidence, args...)
 	if commandErr == nil || record.ExitCode != 7 || record.Status != "ERROR" || !strings.Contains(stdout, "Status: error") || !strings.Contains(stderr, "synthetic-secret") {
