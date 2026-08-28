@@ -357,7 +357,7 @@ func launchSmokeWithDiagnostics(ctx context.Context, client adbClient, value opt
 		component,
 	)
 	if err != nil {
-		return retainLaunchFailure(fmt.Errorf("launch smoke test: %w", err), func() error { return observation.finish(true) })
+		return retainLaunchFailure(fmt.Errorf("launch smoke test: %w", err), func() error { return observation.finish(context.Background(), true) })
 	}
 	// The observational query runs inside, not in addition to, the original
 	// two-second survival interval. The acceptance query below is unchanged.
@@ -370,10 +370,15 @@ func launchSmokeWithDiagnostics(ctx context.Context, client adbClient, value opt
 	observation.processSnapshot(ctx, "after-survival-interval", time.Second)
 	if err := validateLaunchSmoke(launchOutput, pidOutput, value.appPackage, pidErr); err != nil {
 		_, _ = client.captureDiagnostic(ctx, "10-launch-failure-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
-		return retainLaunchFailure(err, func() error { return observation.finish(true) })
+		return retainLaunchFailure(err, func() error { return observation.finish(context.Background(), true) })
 	}
-	_ = observation.finish(false)
-	return nil
+	// A PID and a successful am response are necessary, not sufficient. Required
+	// observations are collected inside the original gate deadline and consumed
+	// before the startup gate can pass. The failure-only grace never admits work.
+	if err := observation.finish(ctx, false); err != nil {
+		return fmt.Errorf("launch observations NOT_AVAILABLE: %w", err)
+	}
+	return ctx.Err()
 }
 
 func (client adbClient) captureProcessState(ctx context.Context, name, appPackage string) (string, error) {
@@ -820,14 +825,55 @@ func validateLaunchSmoke(launchOutput, pidOutput, appPackage string, pidErr erro
 	if pidErr != nil || strings.TrimSpace(pidOutput) == "" {
 		return errors.New("application process did not survive launch")
 	}
-	for _, line := range strings.Split(launchOutput, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "Activity:") {
-			continue
+	pid, err := strconv.ParseInt(strings.TrimSpace(pidOutput), 10, 32)
+	if err != nil || pid < 1 {
+		return errors.New("launch process identity NOT_AVAILABLE")
+	}
+	lines, complete := sanitizeLaunchOutput(launchOutput, appPackage)
+	return validateTerminalLaunch(lines, complete, appPackage)
+}
+
+func validateTerminalLaunch(lines []string, complete bool, appPackage string) error {
+	if !complete || len(lines) < 5 || lines[len(lines)-1] != "Complete" {
+		return errors.New("terminal launch evidence NOT_AVAILABLE")
+	}
+	seen := map[string]bool{}
+	for _, line := range lines {
+		key, _, _ := strings.Cut(line, ":")
+		if seen[key] {
+			return errors.New("ambiguous launch evidence NOT_AVAILABLE")
 		}
-		activity := strings.TrimSpace(strings.TrimPrefix(line, "Activity:"))
-		if !strings.HasPrefix(activity, appPackage+"/") {
-			return fmt.Errorf("launch resolved to another package: %s", activity)
+		seen[key] = true
+		switch key {
+		case "Starting":
+			if line != "Starting: "+appPackage+"/org.kurdistanvpn.app.MainActivity" {
+				return errLaunchIncomplete
+			}
+		case "LaunchState":
+			if line != "LaunchState: COLD" && line != "LaunchState: WARM" && line != "LaunchState: HOT" {
+				return errLaunchIncomplete
+			}
+		case "ThisTime", "TotalTime", "WaitTime":
+			value := strings.TrimPrefix(line, key+": ")
+			if _, err := strconv.ParseUint(value, 10, 31); err != nil {
+				return errLaunchIncomplete
+			}
+		case "Complete":
+		case "Status":
+			if line != "Status: ok" {
+				return errors.New("launch did not succeed")
+			}
+		case "Activity":
+			if line != "Activity: "+appPackage+"/org.kurdistanvpn.app.MainActivity" {
+				return errors.New("launch resolved to another activity")
+			}
+		default:
+			return errors.New("unknown launch evidence NOT_AVAILABLE")
+		}
+	}
+	for _, key := range []string{"Status", "Activity", "TotalTime", "WaitTime", "Complete"} {
+		if !seen[key] {
+			return errors.New("incomplete launch evidence NOT_AVAILABLE")
 		}
 	}
 	return nil
@@ -1614,7 +1660,7 @@ func launchWindowEvents(input, app string, start, end int64) ([]launchLogEvent, 
 		}
 	}
 	var events []launchLogEvent
-	lifecycle := regexp.MustCompile("(Start proc|Killing) ([0-9]+):(" + regexp.QuoteMeta(app) + "(?::[A-Za-z0-9_.]+)?)/")
+	lifecycle := regexp.MustCompile("(Start proc|Killing) ([0-9]+):(" + regexp.QuoteMeta(app) + "(?::[A-Za-z0-9_.]+)?)/([A-Za-z0-9]+)(?:\\s|$)")
 	death := regexp.MustCompile("Process (" + regexp.QuoteMeta(app) + "(?::[A-Za-z0-9_.]+)?) \\(pid ([0-9]+)\\) has died")
 	for _, event := range parsed {
 		if len(events) == 256 {
@@ -1663,7 +1709,12 @@ func launchWindowEvents(input, app string, start, end int64) ([]launchLogEvent, 
 			events = append(events, event)
 		} else if event.Tag == "ActivityManager" || event.Tag == "ActivityTaskManager" {
 			if match := lifecycle.FindStringSubmatch(event.Text); match != nil {
-				event.Text = "process_lifecycle event=" + strings.ReplaceAll(match[1], " ", "_") + " pid=" + match[2] + " process=" + match[3]
+				uid, valid := diagnosticUID(match[4])
+				if !valid {
+					complete = false
+					continue
+				}
+				event.Text = "process_lifecycle event=" + strings.ReplaceAll(match[1], " ", "_") + " pid=" + match[2] + " process=" + match[3] + " uid=" + strconv.Itoa(uid)
 				events = append(events, event)
 			} else if match := death.FindStringSubmatch(event.Text); match != nil {
 				event.Text = "process_lifecycle event=died pid=" + match[2] + " process=" + match[1]
@@ -1827,6 +1878,287 @@ func parseExitRecords(input, app string, start, end time.Time, zone *time.Locati
 	return records, complete
 }
 
+// Android UserHandle's ordinary application UID display, or a numeric UID.
+// Isolated/unknown identities cannot establish this application's main process.
+func diagnosticUID(label string) (int, bool) {
+	if value, err := strconv.ParseInt(label, 10, 32); err == nil && value >= 0 {
+		return int(value), true
+	}
+	match := regexp.MustCompile(`^u([0-9]{1,5})a([0-9]{1,5})$`).FindStringSubmatch(label)
+	if match == nil {
+		return 0, false
+	}
+	user, _ := strconv.ParseInt(match[1], 10, 64)
+	app, _ := strconv.ParseInt(match[2], 10, 64)
+	uid := user*100000 + app + 10000
+	return int(uid), app < 90000 && uid <= 2147483647
+}
+
+type diagnosticProcessHealth struct {
+	Process                                      string
+	PID, UID                                     int
+	Crashing, NotResponding, ErrorDialog, Killed bool
+}
+
+// AOSP API 26/34/36 dumps the error flags conditionally. Their absence is
+// meaningful only inside a complete, identity-checked ProcessRecord section,
+// never in an arbitrary fragment or a localized window title.
+func parseProcessHealth(input, app string) ([]diagnosticProcessHealth, bool) {
+	if len(input) > 256<<10 || !strings.HasPrefix(input, "ACTIVITY MANAGER RUNNING PROCESSES") ||
+		!strings.Contains(input, "All known processes:") || !strings.Contains(input, "Process LRU list") {
+		return nil, false
+	}
+	header := regexp.MustCompile(`^\s*\*APP\*.*ProcessRecord\{[0-9a-f]+ ([0-9]+):([A-Za-z0-9_.:]+)/([A-Za-z0-9]+)\}`)
+	flags := regexp.MustCompile(`(?:^|\s)(crashing|mCrashing|notResponding|mNotResponding|killed|killedByAm|bad)=([^\s]+)`)
+	var result []diagnosticProcessHealth
+	var current *diagnosticProcessHealth
+	var uidSeen, pidSeen, packagesSeen, stateSeen bool
+	complete := true
+	finish := func() {
+		if current != nil {
+			if !uidSeen || !pidSeen || !packagesSeen || !stateSeen || len(result) == 8 {
+				complete = false
+			} else {
+				result = append(result, *current)
+			}
+		}
+		current = nil
+		uidSeen, pidSeen, packagesSeen, stateSeen = false, false, false, false
+	}
+	for _, raw := range strings.Split(input, "\n") {
+		line := strings.TrimSpace(raw)
+		if strings.Contains(line, "Process LRU list") {
+			finish()
+			break
+		}
+		if strings.HasPrefix(line, "*APP*") {
+			finish()
+			match := header.FindStringSubmatch(raw)
+			if match == nil {
+				complete = false
+				continue
+			}
+			if !exactDiagnosticProcess(match[2], app) {
+				continue
+			}
+			pid, err := strconv.ParseInt(match[1], 10, 32)
+			uid, valid := diagnosticUID(match[3])
+			if err != nil || pid < 1 || !valid {
+				complete = false
+				continue
+			}
+			current = &diagnosticProcessHealth{Process: match[2], PID: int(pid), UID: uid}
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		if match := regexp.MustCompile(`^user #[0-9]+ uid=([0-9]+)(?:\s|$)`).FindStringSubmatch(line); match != nil {
+			uid, err := strconv.ParseInt(match[1], 10, 32)
+			if uidSeen || err != nil || int(uid) != current.UID {
+				complete = false
+			}
+			uidSeen = true
+		}
+		if match := regexp.MustCompile(`^pid=([0-9]+)(?: starting=(true|false))?$`).FindStringSubmatch(line); match != nil {
+			pid, err := strconv.ParseInt(match[1], 10, 32)
+			if pidSeen || err != nil || int(pid) != current.PID || match[2] == "true" {
+				complete = false
+			}
+			pidSeen = true
+		}
+		if strings.HasPrefix(line, "packageList={") && strings.HasSuffix(line, "}") {
+			if packagesSeen {
+				complete = false
+			}
+			for _, name := range strings.Split(strings.TrimSuffix(strings.TrimPrefix(line, "packageList={"), "}"), ",") {
+				if strings.TrimSpace(name) == app {
+					packagesSeen = true
+				}
+			}
+		}
+		if regexp.MustCompile(`(?:^|\s)curProcState=(?:[0-9]+|[A-Z]+)(?:\s|$)`).MatchString(line) {
+			stateSeen = true
+		}
+		for _, match := range flags.FindAllStringSubmatch(line, -1) {
+			if match[2] != "true" && match[2] != "false" {
+				complete = false
+				continue
+			}
+			value := match[2] == "true"
+			switch match[1] {
+			case "crashing", "mCrashing":
+				current.Crashing = current.Crashing || value
+			case "notResponding", "mNotResponding":
+				current.NotResponding = current.NotResponding || value
+			default:
+				current.Killed = current.Killed || value
+			}
+		}
+		if strings.Contains(line, "com.android.server.am.AppErrorDialog@") || strings.Contains(line, "com.android.server.am.AppNotRespondingDialog@") {
+			current.ErrorDialog = true
+		}
+	}
+	if current != nil {
+		complete = false
+	}
+	return result, complete && len(result) > 0
+}
+
+var errLaunchIncomplete = errors.New("required startup evidence NOT_AVAILABLE")
+
+func validateLaunchObservation(observation *launchObservation) error {
+	if observation == nil || observation.Status != "CAPTURED" || len(observation.Issues) != 0 ||
+		!regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(observation.Invocation) ||
+		observation.WindowStartNanos < observation.DeviceStartNanos || observation.WindowStartNanos <= 0 ||
+		observation.WindowEndNanos <= observation.WindowStartNanos || observation.WindowEndNanos > observation.DeviceEndNanos ||
+		!observation.FinishedUTC.After(observation.StartedUTC) || observation.ResolutionStatus != "CAPTURED" ||
+		observation.ResolvedActivity != observation.app+"/org.kurdistanvpn.app.MainActivity" ||
+		observation.ActivityProcessStatus != "CAPTURED" || len(observation.Processes) != 4 {
+		return errLaunchIncomplete
+	}
+	var launch *diagnosticCommand
+	for index := range observation.Commands {
+		command := &observation.Commands[index]
+		if command.Truncated || command.Status != "CAPTURED" || command.ExitCode != 0 || command.DurationMS < 0 ||
+			command.StartedUTC.Before(observation.StartedUTC) || command.FinishedUTC.Before(command.StartedUTC) || command.FinishedUTC.After(observation.FinishedUTC) {
+			return errLaunchIncomplete
+		}
+		if command.Phase == "am-start-W" {
+			if launch != nil {
+				return errLaunchIncomplete
+			}
+			launch = command
+		}
+	}
+	if launch == nil || len(launch.Stderr) != 0 {
+		return errLaunchIncomplete
+	}
+	phases := []string{"before-launch", "immediately-after-launch", "after-survival-interval", "terminal"}
+	var previous, current *diagnosticProcess
+	last := observation.StartedUTC
+	for index, snapshot := range observation.Processes {
+		if snapshot.Phase != phases[index] || snapshot.Status != "CAPTURED" || snapshot.ObservedUTC.Before(last) || snapshot.ObservedUTC.After(observation.FinishedUTC) {
+			return errLaunchIncomplete
+		}
+		last = snapshot.ObservedUTC
+		var found *diagnosticProcess
+		for row := range snapshot.Processes {
+			process := &snapshot.Processes[row]
+			if process.Name == observation.app {
+				if found != nil || process.PID <= 0 || process.UID < 10000 || process.StartTicks == 0 {
+					return errLaunchIncomplete
+				}
+				found = process
+			}
+		}
+		if index == 0 {
+			previous = found
+			continue
+		}
+		if found == nil {
+			return errors.New("target process did not survive launch")
+		}
+		if index == 1 {
+			current = found
+		} else if *found != *current {
+			return errors.New("target process identity changed during launch")
+		}
+		if snapshot.ObservedUTC.Before(launch.FinishedUTC) {
+			return errLaunchIncomplete
+		}
+		if index == 2 && snapshot.ObservedUTC.Sub(launch.FinishedUTC) < 2*time.Second {
+			return errLaunchIncomplete
+		}
+	}
+	if current == nil || validateTerminalLaunch(launch.Stdout, true, observation.app) != nil {
+		return errLaunchIncomplete
+	}
+	matched := 0
+	for _, health := range observation.ProcessHealth {
+		if health.Process != observation.app {
+			continue
+		}
+		if health.PID != current.PID || health.UID != current.UID {
+			return errLaunchIncomplete
+		}
+		matched++
+		if health.Crashing || health.NotResponding || health.ErrorDialog || health.Killed {
+			return errors.New("target process is crashing, unresponsive, or owns an error dialog")
+		}
+	}
+	if matched != 1 {
+		return errLaunchIncomplete
+	}
+	if (observation.api >= 30 && observation.ExitStatus != "CAPTURED") ||
+		(observation.api >= 26 && observation.api < 30 && observation.ExitStatus != "UNSUPPORTED_API_BELOW_30") || observation.api < 26 {
+		return errLaunchIncomplete
+	}
+	startPattern := regexp.MustCompile(`^process_lifecycle event=Start_proc pid=([0-9]+) process=([A-Za-z0-9_.:]+) uid=([0-9]+)$`)
+	starts := map[int64]bool{}
+	buffers := map[string]bool{}
+	for _, buffer := range observation.Logs {
+		if buffer.Source != "stream" || buffer.Status != "CAPTURED" || buffers[buffer.Buffer] ||
+			(buffer.Buffer != "main" && buffer.Buffer != "system" && buffer.Buffer != "crash") {
+			return errLaunchIncomplete
+		}
+		buffers[buffer.Buffer] = true
+		lastNanos := observation.WindowStartNanos
+		for _, event := range buffer.Events {
+			if event.DeviceNanos < lastNanos || event.DeviceNanos <= observation.WindowStartNanos || event.DeviceNanos > observation.WindowEndNanos {
+				return errLaunchIncomplete
+			}
+			lastNanos = event.DeviceNanos
+			if match := startPattern.FindStringSubmatch(event.Text); match != nil && match[2] == current.Name && match[1] == strconv.Itoa(current.PID) {
+				if match[3] != strconv.Itoa(current.UID) {
+					return errLaunchIncomplete
+				}
+				starts[event.DeviceNanos] = true
+			}
+		}
+	}
+	if len(buffers) != 3 || len(starts) > 1 {
+		return errLaunchIncomplete
+	}
+	epochStart := observation.WindowStartNanos
+	if previous == nil || *previous != *current {
+		if len(starts) != 1 {
+			return errLaunchIncomplete
+		}
+		for at := range starts {
+			epochStart = at
+		}
+	} else if len(starts) != 0 {
+		return errLaunchIncomplete
+	}
+	// PID correlation is bounded by the observed process epoch and its OS start
+	// event/UID. Reuse or missing continuity blocks admission; old or unrelated
+	// events do not become evidence about the current target.
+	for _, buffer := range observation.Logs {
+		for _, event := range buffer.Events {
+			if event.DeviceNanos < epochStart {
+				continue
+			}
+			if event.Tag == "AndroidRuntime" && event.PID == current.PID {
+				return errors.New("current target crash observed")
+			}
+			for _, kind := range []string{"died", "Killing"} {
+				prefix := "process_lifecycle event=" + kind + " pid=" + strconv.Itoa(current.PID) + " process=" + current.Name
+				if event.Text == prefix || strings.HasPrefix(event.Text, prefix+" uid=") {
+					return errors.New("current target termination observed")
+				}
+			}
+		}
+	}
+	for _, exit := range observation.ExitRecords {
+		if exit.Process == current.Name && exit.PID == current.PID && exit.UID == current.UID &&
+			exit.Timestamp.UnixNano()+int64(time.Millisecond) >= epochStart && exit.Timestamp.UnixNano() <= observation.WindowEndNanos {
+			return errors.New("current target exit observed")
+		}
+	}
+	return nil
+}
+
 type diagnosticCommand struct {
 	combined    string
 	Phase       string
@@ -1867,6 +2199,8 @@ type launchObservation struct {
 	FinishedUTC           time.Time
 	DeviceStartNanos      int64
 	DeviceEndNanos        int64
+	WindowStartNanos      int64
+	WindowEndNanos        int64
 	ClockZone             string
 	Commands              []diagnosticCommand
 	Processes             []diagnosticProcessSnapshot
@@ -1875,6 +2209,7 @@ type launchObservation struct {
 	ExitStatus            string
 	ActivityProcessState  []string
 	ActivityProcessStatus string
+	ProcessHealth         []diagnosticProcessHealth
 	ResolvedActivity      string
 	ResolutionStatus      string
 	LaunchCommand         []string
@@ -1986,7 +2321,7 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 	}
 	for _, buffer := range []string{"crash", "main", "system"} {
 		logctx, cancel := context.WithCancel(ctx)
-		args := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime,epoch,usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		args := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 		if client.serial != "" {
 			args = append([]string{"-s", client.serial}, args...)
 		}
@@ -2065,21 +2400,30 @@ func (observation *launchObservation) captureLaunch(ctx context.Context, name st
 	return record.combined, err
 }
 
-func (observation *launchObservation) finish(failed bool) error {
-	// The original launch result is already final. This bounded read-only grace
-	// collects evidence after a deadline; it cannot retry launch or extend its budget.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+func (observation *launchObservation) finish(parent context.Context, failed bool) error {
+	// Successful admission stays under the original deadline. Only a launch
+	// already rejected may use the existing diagnostic-only grace afterward.
+	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
 	defer cancel()
 	observation.GateResult = "LAUNCH_OBSERVED_NOT_QUALIFIED"
 	if failed {
 		observation.GateResult = "FAIL"
 	}
 	observation.processSnapshot(ctx, "terminal", time.Second)
+	rawState, readableState := observation.query(ctx, "activity-processes", "shell", "dumpsys", "activity", "processes", observation.app)
+	observation.ActivityProcessState = sanitizeActivityProcessState(rawState, observation.app)
+	var parsedState bool
+	observation.ProcessHealth, parsedState = parseProcessHealth(rawState, observation.app)
+	if readableState && parsedState {
+		observation.ActivityProcessStatus = "CAPTURED"
+	} else {
+		observation.incomplete("activity process state unavailable or incomplete")
+	}
 	_, _ = observation.query(ctx, "window-end", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "END:"+observation.Invocation)
 	// A separate marker-only snapshot confirms the end even if the launch
 	// deadline already terminated the streaming readers. It contains no crash
 	// body and cannot supply an old invocation's marker.
-	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime,epoch,usec", "KurdistanLaunchProbe:I", "*:S")
+	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "epoch", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
 	clock, ok := observation.query(ctx, "clock-after", "shell", "date", "+%s.%N")
 	nanos, err := epochNanos(clock)
 	if ok && err == nil {
@@ -2112,6 +2456,7 @@ func (observation *launchObservation) finish(failed bool) error {
 		// Do not attribute possibly old crashes when the invocation cannot be bound.
 		start, end = 0, 0
 	}
+	observation.WindowStartNanos, observation.WindowEndNanos = start, end
 	for _, stream := range observation.streams {
 		events, complete := launchWindowEvents(rawLogs[stream.name], observation.app, start, end)
 		status := "CAPTURED"
@@ -2121,37 +2466,35 @@ func (observation *launchObservation) finish(failed bool) error {
 		}
 		observation.Logs = append(observation.Logs, diagnosticLogBuffer{Buffer: stream.name, Source: "stream", Status: status, Events: events})
 	}
+	if observation.api >= 30 {
+		raw, readable := observation.query(ctx, "exit-info", "shell", "dumpsys", "activity", "exit-info", observation.app)
+		var zone *time.Location
+		if parsed, parseErr := time.Parse("-0700", observation.ClockZone); parseErr == nil {
+			_, offset := parsed.Zone()
+			zone = time.FixedZone("device", offset)
+		}
+		records, parsed := parseExitRecords(raw, observation.app, time.Unix(0, start), time.Unix(0, end), zone)
+		observation.ExitRecords = records
+		// A recognized, complete empty history is distinct from an empty or
+		// unsupported command response. The latter is never absence of crashes.
+		if readable && parsed && strings.HasPrefix(raw, "ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)") &&
+			strings.Contains(raw, "Last Timestamp of Persistence Into Persistent Storage:") {
+			observation.ExitStatus = "CAPTURED"
+		} else {
+			observation.incomplete("process exit reason unavailable")
+		}
+	} else if observation.api >= 26 {
+		observation.ExitStatus = "UNSUPPORTED_API_BELOW_30"
+	} else {
+		observation.incomplete("process exit observation capability unknown")
+	}
 	if failed {
-		raw, readable := observation.query(ctx, "activity-processes", "shell", "dumpsys", "activity", "processes", observation.app)
-		observation.ActivityProcessState = sanitizeActivityProcessState(raw, observation.app)
-		if readable {
-			observation.ActivityProcessStatus = "CAPTURED"
-		} else {
-			observation.incomplete("activity process state unavailable")
-		}
-		if observation.api >= 30 {
-			raw, readable = observation.query(ctx, "exit-info", "shell", "dumpsys", "activity", "exit-info", observation.app)
-			var zone *time.Location
-			if parsed, parseErr := time.Parse("-0700", observation.ClockZone); parseErr == nil {
-				_, offset := parsed.Zone()
-				zone = time.FixedZone("device", offset)
-			}
-			records, parsed := parseExitRecords(raw, observation.app, time.Unix(0, start), time.Unix(0, end), zone)
-			observation.ExitRecords = records
-			if readable && parsed && len(records) > 0 {
-				observation.ExitStatus = "CAPTURED"
-			} else {
-				observation.incomplete("process exit reason unavailable")
-			}
-		} else {
-			observation.ExitStatus = "UNSUPPORTED_API_BELOW_30"
-		}
 		// Read a bounded terminal snapshot as well as the streams. A stream may
 		// have ended at the launch deadline or not yet drained its final record.
 		// The two observation sources stay separate; no sorting or inferred event
 		// is used to fill a capture gap.
 		for _, buffer := range []string{"crash", "main", "system"} {
-			raw, readable := observation.query(ctx, "terminal-"+buffer, "shell", "logcat", "-b", buffer, "-d", "-t", "2048", "-v", "threadtime,epoch,usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "*:S")
+			raw, readable := observation.query(ctx, "terminal-"+buffer, "shell", "logcat", "-b", buffer, "-d", "-t", "2048", "-v", "threadtime", "-v", "epoch", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "*:S")
 			events, parsed := launchWindowEvents(raw, observation.app, start, end)
 			status := "CAPTURED"
 			if !readable || !parsed {
@@ -2165,7 +2508,21 @@ func (observation *launchObservation) finish(failed bool) error {
 		}
 	}
 	observation.FinishedUTC = time.Now().UTC()
-	return writeDiagnosticJSON(filepath.Join(observation.client.evidenceDir, "10-launch-details.txt"), observation)
+	var admission error
+	if !failed {
+		admission = validateLaunchObservation(observation)
+		if admission != nil {
+			observation.GateResult = "FAIL"
+			if errors.Is(admission, errLaunchIncomplete) {
+				observation.GateResult = "BLOCKED"
+				observation.incomplete("required startup evidence NOT_AVAILABLE")
+			}
+		}
+	}
+	if err := writeDiagnosticJSON(filepath.Join(observation.client.evidenceDir, "10-launch-details.txt"), observation); err != nil {
+		return err
+	}
+	return admission
 }
 
 func hasCapturedFailureCause(logs []diagnosticLogBuffer, exits []diagnosticExit) bool {

@@ -32,7 +32,7 @@ class Phase13SettingsCodecTest {
     }
 
     @Test fun explicitlyOwnedProjectionClosesBeforeIndependentDiskReadAndReopen() = kotlinx.coroutines.runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("settings-owner-").toFile()
+        val directory = java.nio.file.Files.createTempDirectory("settings-owner-").toFile().canonicalFile
         val file = java.io.File(directory, "synthetic.preferences_pb")
         val first = Phase9SettingsStore.openOwnedProjection(file)
         val image = SettingsProjectionCodec.fromModel(org.kurdistanvpn.core.model.Phase9Settings())
@@ -56,12 +56,40 @@ class Phase13SettingsCodecTest {
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
             Phase9SettingsStore.openOwnedProjection(java.io.File("relative.preferences_pb"))
         }
-        val directory = java.nio.file.Files.createTempDirectory("settings-parent-").toFile()
+        val directory = java.nio.file.Files.createTempDirectory("settings-parent-").toFile().canonicalFile
         val missing = java.io.File(directory, "absent")
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
             Phase9SettingsStore.openOwnedProjection(java.io.File(missing, "synthetic.preferences_pb"))
         }
         assertFalse(missing.exists())
+    }
+
+    @Test fun projectionOwnerRejectsAnExistingNoncanonicalParentWithoutCreatingAProjection() {
+        val directory = java.nio.file.Files.createTempDirectory("settings-alias-").toFile().canonicalFile
+        assertRejectedAlias(java.io.File(directory, "."))
+    }
+
+    @Test fun projectionOwnerRejectsActualNtfsShortNameTemporaryRootWhenSupplied() {
+        val supplied = java.io.File(checkNotNull(System.getProperty("java.io.tmpdir"))).absoluteFile
+        org.junit.Assume.assumeTrue("Requires a real NTFS short-name temp root",
+            checkNotNull(System.getProperty("os.name")).startsWith("Windows") &&
+                '~' in supplied.path && supplied != supplied.canonicalFile)
+        val directory = java.nio.file.Files.createTempDirectory(supplied.toPath(), "settings-short-").toFile()
+        assertRejectedAlias(directory)
+    }
+
+    private fun assertRejectedAlias(directory: java.io.File) {
+        assertTrue(directory.isDirectory)
+        assertFalse(directory.absoluteFile == directory.canonicalFile)
+        val file = java.io.File(directory, "rejected.preferences_pb")
+        var unexpectedOwner: Phase9SettingsStore? = null
+        try {
+            org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+                unexpectedOwner = Phase9SettingsStore.openOwnedProjection(file)
+            }
+        } finally { kotlinx.coroutines.runBlocking { unexpectedOwner?.closeOwned() } }
+        assertFalse(file.exists())
+        assertFalse(file.canonicalFile.exists())
     }
 
     @Test fun independentDiskParserReadsLiteralPreferencesWithoutOpeningADataStore() = kotlinx.coroutines.runBlocking {

@@ -7,9 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.kurdistanvpn.core.model.AppState
@@ -91,28 +95,9 @@ class ProductRootViewModel(
     private var pendingDiagnostic: DiagnosticPreviewHandle? = null
 
     init {
-        viewModelScope.launch {
-            coordinators.settings.settings.collect { persisted ->
-                val projection = runCatching {
-                    val securePackages = withContext(Dispatchers.IO) { coordinators.settings.routing.load() }
-                    ProtectedStatePreviewBackupPolicy.projectSettings(persisted, securePackages)
-                }.getOrElse {
-                    mutableState.value = AppState.DegradedStorage
-                    return@collect
-                }
-                mutableSettings.value = projection
-            }
-        }
+        // One startup coroutine owns presentation. A missing projection cannot
+        // race an independent collector or diagnostic job into a healthy state.
         viewModelScope.launch { initializeReadOnly() }
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { coordinators.diagnostics.load() }
-                .onSuccess { events ->
-                    val retained = retainDiagnosticEvents(events, mutableSettings.value.diagnostics.retention)
-                    mutableDiagnosticEvents.value = retained
-                    diagnosticSequence = retained.maxOfOrNull { it.sequence } ?: 0
-                }
-                .onFailure { mutableState.value = AppState.DegradedStorage }
-        }
     }
 
     fun preview(candidate: ImportCandidate, source: ImportSource) {
@@ -857,6 +842,38 @@ class ProductRootViewModel(
 
     private suspend fun initializeReadOnly() {
         mutableState.value = AppState.CompatibilityCheck
+        try {
+            initializeAvailableReadOnly()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Unexpected startup failure is explicitly fatal, not first-use,
+            // a healthy default, an automatic repair, or a persisted diagnostic.
+            mutableState.value = AppState.FatalRecovery
+            publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+        }
+    }
+
+    private suspend fun initializeAvailableReadOnly() {
+        val startup = withContext(Dispatchers.IO) {
+            coordinators.settings.startup { coordinators.recovery.storageFailure() }.first()
+        }
+        when (startup) {
+            is ProtectedStartupRead.Unavailable -> {
+                mutableState.value = startup.presentation
+                mutableProtectedRecovery.value = startup.recoveryReason?.let {
+                    ProtectedRecoveryPresentation.Required(it)
+                } ?: ProtectedRecoveryPresentation.NotRequired
+                return
+            }
+            ProtectedStartupRead.UnexpectedFailure -> {
+                mutableState.value = AppState.FatalRecovery
+                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+                return
+            }
+            is ProtectedStartupRead.Ready -> mutableSettings.value = startup.projection.settings
+        }
+        currentCoroutineContext().ensureActive()
         when (val compatibility = coordinators.profiles.nativeCore.compatibility()) {
             is NativeResult.Failure -> {
                 mutableState.value = AppState.MigrationRequired
@@ -881,36 +898,29 @@ class ProductRootViewModel(
                 )
             }
         }
-        when (coordinators.recovery.storageFailure()) {
-            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> {
-                mutableState.value = AppState.KeyInvalidated
-                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
-                return
-            }
-            Phase9CompositionRoot.StorageFailure.MIGRATION_REQUIRED -> {
-                mutableState.value = AppState.MigrationRequired
-                return
-            }
-            Phase9CompositionRoot.StorageFailure.DEGRADED -> {
-                mutableState.value = AppState.DegradedStorage
-                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
-                return
-            }
-            null -> Unit
-        }
         // Recovery is an explicit broker operation, never a consequence of opening a preview.
-        refreshEnrollmentState()
+        if (!refreshEnrollmentState()) {
+            mutableState.value = AppState.DegradedStorage
+            publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+            return
+        }
+        val events = withContext(Dispatchers.IO) { coordinators.diagnostics.load() }
+        currentCoroutineContext().ensureActive()
+        val retained = retainDiagnosticEvents(events, mutableSettings.value.diagnostics.retention)
+        mutableDiagnosticEvents.value = retained
+        diagnosticSequence = retained.maxOfOrNull { it.sequence } ?: 0
         refreshProfiles()
     }
 
-    private fun refreshEnrollmentState() {
+    private fun refreshEnrollmentState(): Boolean {
         val keys = runCatching { coordinators.profiles.enrollmentKeys() }.getOrElse {
+            if (it is CancellationException) throw it
             mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
-            return
+            return false
         }
         if (keys.isEmpty()) {
             mutableEnrollmentState.value = EnrollmentUiState.NoEnrollmentKey
-            return
+            return true
         }
         val summaries = keys.map { it.toUiSummary() }
         mutableEnrollmentState.value = when {
@@ -920,10 +930,12 @@ class ProductRootViewModel(
                 EnrollmentUiState.AwaitingProfile(summaries)
             else -> EnrollmentUiState.RequestReady(summaries)
         }
+        return true
     }
 
     private suspend fun refreshProfiles() {
         val projection = runCatching { coordinators.profiles.readProfileProjection() }.getOrElse {
+            if (it is CancellationException) throw it
             mutableState.value = AppState.DegradedStorage
             publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
             return
@@ -949,32 +961,46 @@ class ProductRootViewModel(
         }
         val preferences = runCatching {
             ProtectedStatePreviewBackupPolicy.projectProfiles(mutableSettings.value.profiles, profiles.map { it.localRecordId })
-        }.getOrElse { mutableState.value = AppState.DegradedStorage; return }
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            mutableState.value = AppState.DegradedStorage
+            return
+        }
+        val next = if (profiles.isEmpty()) AppState.NoProfiles else AppState.Ready(profiles)
+        val recovery = readProtectedRecovery(next)
+        currentCoroutineContext().ensureActive()
+        mutableProtectedRecovery.value = recovery
+        if (recovery is ProtectedRecoveryPresentation.Required &&
+            recovery.reason in setOf(ProtectedRecoveryReason.CLEANUP_UNPROVEN, ProtectedRecoveryReason.MUTATION_UNPROVEN)
+        ) {
+            mutableState.value = AppState.DegradedStorage
+            return
+        }
         mutableSettings.value = mutableSettings.value.copy(profiles = preferences)
-        mutableState.value = if (profiles.isEmpty()) AppState.NoProfiles else AppState.Ready(profiles)
-        refreshProtectedRecovery()
+        mutableState.value = next
     }
 
     private suspend fun refreshProtectedRecovery() {
+        mutableProtectedRecovery.value = readProtectedRecovery(mutableState.value)
+    }
+
+    private suspend fun readProtectedRecovery(state: AppState): ProtectedRecoveryPresentation {
         if (previewCleanupUnproven) {
-            publishRecoveryReason(ProtectedRecoveryReason.CLEANUP_UNPROVEN)
-            return
+            return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.CLEANUP_UNPROVEN)
         }
-        when (mutableState.value) {
+        when (state) {
             AppState.Quarantined -> {
-                publishRecoveryReason(ProtectedRecoveryReason.QUARANTINED)
-                return
+                return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.QUARANTINED)
             }
             AppState.DegradedStorage, AppState.KeyInvalidated, AppState.FatalRecovery -> {
-                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
-                return
+                return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.INCONSISTENT)
             }
             else -> Unit
         }
         val required = withContext(Dispatchers.IO) {
             coordinators.recovery.presentationRecoveryRequired()
         }
-        mutableProtectedRecovery.value = when (required) {
+        return when (required) {
             true -> ProtectedRecoveryPresentation.Required(
                 ProtectedRecoveryReason.RECOVERY_REQUIRED,
                 ProtectedRecoveryAction.RECOVER_PRESENTATION,

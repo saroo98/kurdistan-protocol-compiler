@@ -11,10 +11,364 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+// Only the test binary acts as an adb-shaped subprocess. No SDK, emulator,
+// application, or device is accessed by these orchestration regressions.
+func TestMain(m *testing.M) {
+	if root := os.Getenv("KURD_LAUNCH_TEST_ROOT"); root != "" {
+		os.Exit(launchTestCommand(root, os.Getenv("KURD_LAUNCH_TEST_CASE"), os.Args[1:]))
+	}
+	os.Exit(m.Run())
+}
+
+func TestLaunchGateRejectsRetainedCrashingProcess(t *testing.T) {
+	err, observation := runLaunchScenario(t, "crashing", 26)
+	if err == nil {
+		t.Error("retained crashing process returned no error")
+	}
+	if observation.GateResult != "FAIL" {
+		t.Errorf("complete retained-crash fixture gate_result=%s, want definitive FAIL", observation.GateResult)
+	}
+	if len(observation.ProcessHealth) != 1 {
+		t.Errorf("retained-crash fixture health_count=%d, want exactly one observation", len(observation.ProcessHealth))
+	} else if !observation.ProcessHealth[0].Crashing {
+		t.Error("retained-crash fixture observation is not marked crashing")
+	}
+}
+
+func logLaunchScenario(t *testing.T, err error, observation launchObservation) {
+	t.Helper()
+	errorCategory := "FAILURE"
+	switch {
+	case err == nil:
+		errorCategory = "NONE"
+	case errors.Is(err, context.DeadlineExceeded):
+		errorCategory = "DEADLINE"
+	case errors.Is(err, context.Canceled):
+		errorCategory = "CANCELED"
+	case errors.Is(err, errLaunchIncomplete):
+		errorCategory = "INCOMPLETE"
+	}
+	t.Logf("fixture_package=%s fixture_pid=999 fixture_uid=10123 fixture_epoch=12345", defaultAppPackage)
+	t.Logf("error_category=%s gate_result=%s evidence_status=%s incomplete=%t activity_status=%s health_count=%d issues=%q",
+		errorCategory, observation.GateResult, observation.Status, observation.Status == "INCOMPLETE",
+		observation.ActivityProcessStatus, len(observation.ProcessHealth), observation.Issues)
+	for _, command := range observation.Commands {
+		complete, statusOK := false, false
+		for _, line := range command.Stdout {
+			complete = complete || line == "Complete"
+			statusOK = statusOK || line == "Status: ok"
+		}
+		t.Logf("command_phase=%s status=%s exit=%d duration_ms=%d truncated=%t terminal_complete=%t status_ok=%t",
+			command.Phase, command.Status, command.ExitCode, command.DurationMS, command.Truncated, complete, statusOK)
+	}
+	for _, snapshot := range observation.Processes {
+		t.Logf("snapshot_phase=%s status=%s process_count=%d", snapshot.Phase, snapshot.Status, len(snapshot.Processes))
+		for _, process := range snapshot.Processes {
+			t.Logf("process_target_package=%t pid_matches_fixture=%t uid_matches_fixture=%t epoch_matches_fixture=%t",
+				process.Name == defaultAppPackage, process.PID == 999, process.UID == 10123, process.StartTicks == 12345)
+		}
+	}
+	for index, health := range observation.ProcessHealth {
+		t.Logf("health_index=%d target_package=%t pid_matches_fixture=%t uid_matches_fixture=%t crashing=%t not_responding=%t error_dialog=%t killed=%t",
+			index, health.Process == defaultAppPackage, health.PID == 999, health.UID == 10123,
+			health.Crashing, health.NotResponding, health.ErrorDialog, health.Killed)
+	}
+	for _, buffer := range observation.Logs {
+		t.Logf("log_buffer=%s source=%s status=%s event_count=%d", buffer.Buffer, buffer.Source, buffer.Status, len(buffer.Events))
+		for _, event := range buffer.Events {
+			inWindow := event.DeviceNanos > observation.WindowStartNanos && event.DeviceNanos <= observation.WindowEndNanos
+			t.Logf("event_in_window=%t target_crash=%t target_death=%t target_start=%t",
+				inWindow, event.Tag == "AndroidRuntime" && event.PID == 999,
+				event.Text == "process_lifecycle event=died pid=999 process="+defaultAppPackage,
+				event.Text == "process_lifecycle event=Start_proc pid=999 process="+defaultAppPackage+" uid=10123")
+		}
+	}
+	t.Logf("exit_status=%s exit_count=%d", observation.ExitStatus, len(observation.ExitRecords))
+	for _, exit := range observation.ExitRecords {
+		t.Logf("exit_target_package=%t pid_matches_fixture=%t uid_matches_fixture=%t in_window=%t reason=%d status=%d",
+			exit.Process == defaultAppPackage, exit.PID == 999, exit.UID == 10123,
+			exit.Timestamp.UnixNano() >= observation.WindowStartNanos && exit.Timestamp.UnixNano() <= observation.WindowEndNanos,
+			exit.Reason, exit.Status)
+	}
+}
+
+func TestLaunchGateRejectsTargetApplicationErrorDialog(t *testing.T) {
+	err, observation := runLaunchScenario(t, "dialog", 26)
+	if err == nil || observation.GateResult != "FAIL" || len(observation.ProcessHealth) != 1 || !observation.ProcessHealth[0].ErrorDialog {
+		t.Fatal("launch accepted nonempty PID 999 while its target ProcessRecord owns AppErrorDialog")
+	}
+}
+
+func TestLaunchGateHealthyPlatformVariantsRemainUnqualified(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		t.Run(strconv.Itoa(api), func(t *testing.T) {
+			scenario := "healthy"
+			if api >= 34 {
+				scenario = "modern-healthy"
+			}
+			err, observation := runLaunchScenario(t, scenario, api)
+			if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+				t.Fatalf("complete healthy platform fixture rejected: %v %s %v", err, observation.GateResult, observation.Issues)
+			}
+		})
+	}
+}
+
+func runLaunchTest(t *testing.T, scenario string, api int) error {
+	err, _ := runLaunchScenario(t, scenario, api)
+	return err
+}
+
+func TestLaunchGateFailsClosedWithoutCompleteHealthyObservations(t *testing.T) {
+	for _, scenario := range []string{
+		"not-responding", "modern-crashing", "modern-dialog", "process-death", "epoch-change", "uid-change",
+		"empty-launch", "status-only", "no-complete", "duplicate-status", "unknown-launch", "wrong-activity", "malformed-timing",
+		"missing-process-observation", "missing-activity-observation", "unterminated-process-record",
+		"missing-markers", "malformed-log", "terminated-stream", "missing-exit-observation", "current-crash", "current-exit", "malformed-crash-flag",
+	} {
+		t.Run(scenario, func(t *testing.T) {
+			if err := runLaunchTest(t, scenario, 34); err == nil {
+				t.Fatal("incomplete or unhealthy launch was accepted: " + scenario)
+			}
+		})
+	}
+}
+
+func TestLaunchGateHealthyCurrentAttemptIgnoresStaleOrUnrelatedCrashes(t *testing.T) {
+	for _, scenario := range []string{"healthy", "modern-healthy", "starting-intent", "stale-crash", "unrelated-crash", "stale-exit", "unrelated-exit"} {
+		t.Run(scenario, func(t *testing.T) {
+			if err, observation := runLaunchScenario(t, scenario, 34); err != nil {
+				t.Fatalf("healthy current attempt rejected: %v; status=%s issues=%v", err, observation.Status, observation.Issues)
+			}
+		})
+	}
+}
+
+func TestLaunchGateTimedOutCommandCannotPassWithRetainedPID(t *testing.T) {
+	started := time.Now()
+	err, observation := runLaunchScenario(t, "timeout", 26)
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > 8*time.Second {
+		t.Fatalf("launch timeout was accepted, replaced, or unbounded: %v", err)
+	}
+	for _, command := range observation.Commands {
+		if command.Phase == "am-start-W" && command.Status == "DEADLINE" && command.ExitCode != 0 {
+			return
+		}
+	}
+	t.Fatal("test did not exercise the launch command deadline")
+}
+
+func runLaunchScenario(t *testing.T, scenario string, api int) (error, launchObservation) {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("KURD_LAUNCH_TEST_ROOT", root)
+	t.Setenv("KURD_LAUNCH_TEST_CASE", scenario)
+	// These synchronous synthetic commands must not inherit the race runtime's
+	// one-second exit sleep. Race detection and the gate's deadlines stay intact;
+	// this setting is inherited only by this fixture's child processes.
+	t.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=0"))
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget := 12 * time.Second
+	if scenario == "timeout" {
+		budget = 3 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	defer cancel()
+	client := adbClient{path: executable, serial: "emulator-5554", evidenceDir: root, timeline: &diagnosticTimeline{Started: time.Now()}}
+	err = launchSmokeWithDiagnostics(ctx, client, options{appPackage: defaultAppPackage, expectedAPI: api})
+	var observation launchObservation
+	data, readErr := os.ReadFile(filepath.Join(root, "10-launch-details.txt"))
+	if readErr != nil || json.Unmarshal(data, &observation) != nil {
+		t.Fatal("launch observation was not preserved")
+	}
+	logLaunchScenario(t, err, observation)
+	return err, observation
+}
+
+func launchTestCommand(root, scenario string, args []string) int {
+	if len(args) < 3 || args[0] != "-s" || args[1] != "emulator-5554" || args[2] != "shell" {
+		return 90
+	}
+	args = args[3:]
+	command := strings.Join(args, " ")
+	read := func(leaf string) string { value, _ := os.ReadFile(filepath.Join(root, leaf)); return string(value) }
+	write := func(leaf, value string) {
+		if err := os.WriteFile(filepath.Join(root, leaf), []byte(value), 0o600); err != nil {
+			panic(err)
+		}
+	}
+	stamp := func() string {
+		now := time.Now()
+		return strconv.FormatInt(now.Unix(), 10) + "." + fmt.Sprintf("%09d", now.Nanosecond())
+	}
+	launchTime, _ := epochNanos(read("launched"))
+	survived := launchTime > 0 && time.Since(time.Unix(0, launchTime)) >= 2*time.Second
+	switch {
+	case command == "date +%s.%N":
+		fmt.Println(stamp())
+	case command == "date +%z":
+		fmt.Println("+0000")
+	case strings.HasPrefix(command, "log -p i -t KurdistanLaunchProbe "):
+		if scenario == "missing-markers" {
+			return 0
+		}
+		write("markers", read("markers")+stamp()+" 11 11 I KurdistanLaunchProbe: "+args[len(args)-1]+"\n")
+	case strings.HasPrefix(command, "cmd package resolve-activity --brief -n "):
+		fmt.Println(defaultAppPackage + "/org.kurdistanvpn.app.MainActivity")
+	case command == "ps -A -o UID,PID,PPID,NAME":
+		if scenario == "missing-process-observation" {
+			return 1
+		}
+		fmt.Println("UID PID PPID NAME")
+		if read("launched") != "" && !(scenario == "process-death" && survived) {
+			uid := 10123
+			if scenario == "uid-change" && survived {
+				uid++
+			}
+			fmt.Printf("%d 999 111 %s\n", uid, defaultAppPackage)
+		}
+	case command == "cat /proc/999/stat":
+		ticks := 12345
+		if scenario == "epoch-change" && survived {
+			ticks++
+		}
+		fmt.Printf("999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 %d\n", ticks)
+	case command == "pidof "+defaultAppPackage:
+		if scenario == "process-death" && survived {
+			return 1
+		}
+		fmt.Println("999")
+	case strings.HasPrefix(command, "am start -W -f 0x10008000 -n "):
+		write("launched", stamp())
+		write("lifecycle", stamp()+" 10 10 I ActivityManager: Start proc 999:"+defaultAppPackage+"/u0a123 for activity\n")
+		if strings.HasSuffix(scenario, "crash") {
+			at, pid, app := time.Now(), 999, defaultAppPackage
+			if scenario == "stale-crash" {
+				at = at.Add(-time.Hour)
+			}
+			if scenario == "unrelated-crash" {
+				pid, app = 888, "example.unrelated"
+			}
+			prefix := fmt.Sprintf("%d.%09d %d %d E AndroidRuntime: ", at.Unix(), at.Nanosecond(), pid, pid)
+			write("crash", prefix+"FATAL EXCEPTION: main\n"+prefix+fmt.Sprintf("Process: %s, PID: %d\n", app, pid)+prefix+"java.lang.IllegalStateException: PROTECTED_STATE_UNAVAILABLE\n"+prefix+"at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)\n")
+		}
+		if scenario == "malformed-log" {
+			write("crash", "unparseable evidence\n")
+		}
+		if scenario == "timeout" {
+			time.Sleep(10 * time.Second)
+			return 0
+		}
+		switch scenario {
+		case "empty-launch":
+			return 0
+		case "status-only":
+			fmt.Println("Status: ok")
+			return 0
+		case "no-complete":
+			fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nWaitTime: 30")
+			return 0
+		case "duplicate-status":
+			fmt.Println("Status: error")
+		case "unknown-launch":
+			fmt.Println("UNKNOWN_RESULT")
+		case "wrong-activity":
+			fmt.Println("Status: ok\nActivity: example.other/MainActivity\nWaitTime: 30\nComplete")
+			return 0
+		case "malformed-timing":
+			fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nTotalTime: UNKNOWN\nWaitTime: 30\nComplete")
+			return 0
+		case "starting-intent":
+			fmt.Println("Starting: Intent { flg=0x10008000 cmp=" + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity }")
+		}
+		fmt.Println("Status: ok\nActivity: " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity\nThisTime: 15\nTotalTime: 25\nWaitTime: 30\nComplete")
+	case command == "dumpsys activity processes "+defaultAppPackage:
+		if scenario == "missing-activity-observation" {
+			return 1
+		}
+		pidState := "pid=999 starting=false\n    curProcState=2 repProcState=2"
+		if strings.HasPrefix(scenario, "modern-") {
+			pidState = "pid=999\n    curProcState=TOP setProcState=TOP"
+		}
+		fmt.Println("ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)\n  All known processes:\n  *APP* UID 10123 ProcessRecord{abc 999:" + defaultAppPackage + "/u0a123}\n    user #0 uid=10123 gids={}\n    " + pidState + "\n    packageList={" + defaultAppPackage + "}")
+		if scenario == "crashing" {
+			fmt.Println("    debugging=false crashing=true null notResponding=false null bad=false")
+		}
+		if scenario == "dialog" {
+			fmt.Println("    debugging=false crashing=false com.android.server.am.AppErrorDialog@abc notResponding=false null bad=false")
+		}
+		if scenario == "not-responding" {
+			fmt.Println("    crashing=false null notResponding=true null bad=false")
+		}
+		if scenario == "malformed-crash-flag" {
+			fmt.Println("    crashing=unknown notResponding=false")
+		}
+		if scenario == "modern-crashing" {
+			fmt.Println("    mCrashing=true null mNotResponding=false null bad=false")
+		}
+		if scenario == "modern-dialog" {
+			fmt.Println("    mCrashing=false [com.android.server.am.AppErrorDialog@abc] mNotResponding=false null bad=false")
+		}
+		if scenario == "unterminated-process-record" {
+			return 0
+		}
+		fmt.Println("  Process LRU list (sorted by oom_adj, 1 total, non-act at 0, non-svc at 0):")
+	case command == "dumpsys activity exit-info "+defaultAppPackage:
+		if scenario == "missing-exit-observation" {
+			return 0
+		}
+		fmt.Println("ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\nLast Timestamp of Persistence Into Persistent Storage: 1970-01-01 00:00:00.000")
+		if strings.HasSuffix(scenario, "exit") {
+			at, uid := time.Unix(0, launchTime).Add(time.Second).UTC(), 10123
+			if scenario == "stale-exit" {
+				at = at.Add(-time.Hour)
+			}
+			if scenario == "unrelated-exit" {
+				uid++
+			}
+			fmt.Printf("ApplicationExitInfo #0:\n timestamp=%s pid=999 realUid=%d\n process=%s reason=4 (CRASH) status=0\n", at.Format("2006-01-02 15:04:05.000"), uid, defaultAppPackage)
+		}
+	case len(args) > 3 && args[0] == "logcat" && args[1] == "-b":
+		// Match Android's one base format plus individual format modifiers.
+		// An unsupported option must not be mistaken for an empty healthy buffer.
+		if !strings.Contains(command, "-v threadtime -v epoch -v usec") {
+			return 93
+		}
+		leaf := map[string]string{"main": "markers", "system": "lifecycle", "crash": "crash"}[args[2]]
+		if leaf == "" {
+			return 91
+		}
+		if strings.Contains(" "+command+" ", " -d ") {
+			fmt.Print(read(leaf))
+			return 0
+		}
+		cursor := 0
+		if scenario == "terminated-stream" {
+			return 0
+		}
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			value := read(leaf)
+			if len(value) > cursor {
+				fmt.Print(value[cursor:])
+				cursor = len(value)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	default:
+		return 92
+	}
+	return 0
+}
 
 func TestClearKnownEvidenceFilesRemovesOnlyGateEvidence(t *testing.T) {
 	directory := t.TempDir()
@@ -38,7 +392,7 @@ func TestClearKnownEvidenceFilesRemovesOnlyGateEvidence(t *testing.T) {
 }
 
 func TestValidateLaunchSmokeAcceptsExpectedActivityAndLiveProcess(t *testing.T) {
-	launch := "Activity: org.kurdistanvpn.app.debug/org.kurdistanvpn.app.MainActivity"
+	launch := "Status: ok\nActivity: org.kurdistanvpn.app.debug/org.kurdistanvpn.app.MainActivity\nTotalTime: 25\nWaitTime: 30\nComplete\n"
 	if err := validateLaunchSmoke(launch, "7781\n", defaultAppPackage, nil); err != nil {
 		t.Fatalf("validateLaunchSmoke() error = %v", err)
 	}

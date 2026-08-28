@@ -3,6 +3,9 @@ package org.kurdistanvpn.app
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.kurdistanvpn.core.model.*
 import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.data.metadata.CatalogHealth
@@ -10,6 +13,47 @@ import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
 import org.kurdistanvpn.data.secure.ClientKeySummary
 
 internal data class ProfileReadProjection(val profiles: List<ProfileSummary>, val health: CatalogHealth)
+
+/** Availability is presentation, never a default projection or permission to initialize storage. */
+internal sealed interface ProtectedStartupRead {
+    data class Ready(val projection: ProtectedStateApplicationFacade.ReadProjection) : ProtectedStartupRead
+    data class Unavailable(val failure: Phase9CompositionRoot.StorageFailure) : ProtectedStartupRead {
+        val presentation: AppState get() = when (failure) {
+            Phase9CompositionRoot.StorageFailure.FIRST_USE -> AppState.FirstLaunch
+            Phase9CompositionRoot.StorageFailure.LOCKED -> AppState.LockedStorage
+            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> AppState.KeyInvalidated
+            Phase9CompositionRoot.StorageFailure.MIGRATION_REQUIRED -> AppState.MigrationRequired
+            Phase9CompositionRoot.StorageFailure.DEGRADED,
+            Phase9CompositionRoot.StorageFailure.MUTATION_UNPROVEN -> AppState.DegradedStorage
+        }
+        val recoveryReason: ProtectedRecoveryReason? get() = when (failure) {
+            Phase9CompositionRoot.StorageFailure.MUTATION_UNPROVEN -> ProtectedRecoveryReason.MUTATION_UNPROVEN
+            Phase9CompositionRoot.StorageFailure.DEGRADED,
+            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> ProtectedRecoveryReason.INCONSISTENT
+            else -> null
+        }
+    }
+    data object UnexpectedFailure : ProtectedStartupRead
+}
+
+/** Read-only adapter. Cancellation propagates; unexpected exceptions have a distinct fatal result. */
+internal suspend fun readStartupProjection(
+    failure: Phase9CompositionRoot.StorageFailure?,
+    read: () -> ProtectedStateApplicationFacade.ReadProjection?,
+): ProtectedStartupRead {
+    currentCoroutineContext().ensureActive()
+    if (failure != null) return ProtectedStartupRead.Unavailable(failure)
+    return try {
+        val projection = read()
+        currentCoroutineContext().ensureActive()
+        if (projection == null) ProtectedStartupRead.Unavailable(Phase9CompositionRoot.StorageFailure.DEGRADED)
+        else ProtectedStartupRead.Ready(projection)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        ProtectedStartupRead.UnexpectedFailure
+    }
+}
 
 /** App adapter over the closed typed façade. No journal, key store, DAO, or writer escapes. */
 internal class ProfileAdmissionCoordinator(
@@ -50,8 +94,15 @@ internal class ProtectedRoutingPolicyRepository(private val facade: () -> Protec
 
 internal class SettingsCoordinator(private val facade: () -> ProtectedStateApplicationFacade?) {
     val routing: RoutingPolicyRepository = ProtectedRoutingPolicyRepository(facade)
+    fun startup(failure: () -> Phase9CompositionRoot.StorageFailure?): Flow<ProtectedStartupRead> = flow {
+        emit(readStartupProjection(failure()) { facade()?.readProjection() })
+    }
+    // Existing non-startup consumers receive only authenticated settings. Missing
+    // state emits nothing, rather than throwing or inventing a valid projection.
     val settings: Flow<Phase9Settings> = flow {
-        emit(checkNotNull(facade()?.readProjection()) { "PROTECTED_STATE_UNAVAILABLE" }.settings)
+        startup { null }.collect { result ->
+            if (result is ProtectedStartupRead.Ready) emit(result.projection.settings)
+        }
     }
     private suspend fun replace(transform: (Phase9Settings) -> Phase9Settings) {
         val current = checkNotNull(facade()?.readProjection()) { "PROTECTED_STATE_UNAVAILABLE" }

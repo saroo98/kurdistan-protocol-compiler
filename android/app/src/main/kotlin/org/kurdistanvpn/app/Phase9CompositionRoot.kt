@@ -34,10 +34,10 @@ class Phase9CompositionRoot private constructor(
     initialStorageFailure: StorageFailure?,
 ) : AutoCloseable {
     val runtime: UnavailableRuntime = UnavailableRuntime(RuntimeAvailability.PHASE_9_NO_RUNTIME)
-    var storageFailure: StorageFailure? = initialStorageFailure
+    @Volatile var storageFailure: StorageFailure? = initialStorageFailure
         private set
 
-    enum class StorageFailure { KEY_INVALIDATED, MIGRATION_REQUIRED, DEGRADED }
+    enum class StorageFailure { FIRST_USE, LOCKED, KEY_INVALIDATED, MIGRATION_REQUIRED, DEGRADED, MUTATION_UNPROVEN }
 
     /** The typed boundary only. It never returns a journal, KEK, DAO, writer, or authority. */
     @Synchronized fun protectedStateFacade(): ProtectedStateApplicationFacade? = facade
@@ -56,7 +56,7 @@ class Phase9CompositionRoot private constructor(
         synchronized(this@Phase9CompositionRoot) {
             if (result is ProtectedStateApplicationFacade.CommandResult.Committed && facade === current) {
                 facade = null
-                storageFailure = null
+                storageFailure = StorageFailure.FIRST_USE
             }
         }
         result
@@ -90,7 +90,10 @@ class Phase9CompositionRoot private constructor(
                     storageFailure = StorageFailure.KEY_INVALIDATED
                     false
                 }
-                else -> false
+                else -> {
+                    storageFailure = classifyStorageOpen(opened)
+                    false
+                }
             }
         }
     }
@@ -116,7 +119,7 @@ class Phase9CompositionRoot private constructor(
                     false
                 }
                 else -> {
-                    storageFailure = StorageFailure.DEGRADED
+                    storageFailure = classifyStorageOpen(opened)
                     false
                 }
             }
@@ -134,6 +137,15 @@ class Phase9CompositionRoot private constructor(
     }
 
     companion object {
+        internal fun classifyStorageOpen(opened: ProtectedStateApplicationFacade.OpenResult): StorageFailure? = when (opened) {
+            is ProtectedStateApplicationFacade.OpenResult.Ready -> null
+            ProtectedStateApplicationFacade.OpenResult.Missing -> StorageFailure.FIRST_USE
+            ProtectedStateApplicationFacade.OpenResult.Locked -> StorageFailure.LOCKED
+            ProtectedStateApplicationFacade.OpenResult.KeyInvalidated -> StorageFailure.KEY_INVALIDATED
+            ProtectedStateApplicationFacade.OpenResult.MigrationRequired -> StorageFailure.MIGRATION_REQUIRED
+            ProtectedStateApplicationFacade.OpenResult.Unproven -> StorageFailure.MUTATION_UNPROVEN
+        }
+
         fun create(context: Context, processOwner: ProtectedStateProcessOwner): Phase9CompositionRoot {
             check(context.applicationContext === context)
             val native = NativeBridge()
@@ -142,12 +154,7 @@ class Phase9CompositionRoot private constructor(
                 context, primitives, native, processOwner,
             )
             val facade = (opened as? ProtectedStateApplicationFacade.OpenResult.Ready)?.facade
-            val failure = when (opened) {
-                ProtectedStateApplicationFacade.OpenResult.KeyInvalidated -> StorageFailure.KEY_INVALIDATED
-                ProtectedStateApplicationFacade.OpenResult.MigrationRequired -> StorageFailure.MIGRATION_REQUIRED
-                ProtectedStateApplicationFacade.OpenResult.Unproven -> StorageFailure.DEGRADED
-                else -> null
-            }
+            val failure = classifyStorageOpen(opened)
             return Phase9CompositionRoot(context, native, primitives, processOwner, facade, failure)
         }
     }
