@@ -188,10 +188,27 @@ func runLaunchScenario(t *testing.T, scenario string, api int) (error, launchObs
 	return err, observation
 }
 
+func fixtureNonCancellationExitError(t *testing.T) error {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = exec.Command(executable, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "nonzero").Run()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 7 {
+		t.Fatalf("fixture did not produce the required non-cancellation exit failure: %v", err)
+	}
+	return err
+}
+
 func runLaunchFixture(t *testing.T, scenario string, api int) (error, launchObservation, *launchFixtureTransport) {
 	t.Helper()
 	root := t.TempDir()
 	fixture := newLaunchFixtureTransport(scenario)
+	if scenario == "post-cancellation-exit-failure" {
+		fixture.streamTerminalOverride = fixtureNonCancellationExitError(t)
+	}
 	client := newADBClient("fixture-adb", "emulator-5554", root, &diagnosticTimeline{Started: time.Now()})
 	client.transport = &commandTransport{run: fixture.run, start: fixture.start}
 	budget := 12 * time.Second
@@ -229,6 +246,8 @@ type fixtureStream struct {
 	chunks      chan fixtureOutputChunk
 	ready       chan struct{}
 	done        chan struct{}
+	stderr      io.Writer
+	stderrMode  string
 	writeErr    error
 	terminalErr error
 	waits       atomic.Int32
@@ -241,9 +260,10 @@ type fixtureStream struct {
 	rejected    atomic.Int64
 }
 
-func newFixtureStream(ctx context.Context, output io.Writer, terminate <-chan struct{}) *fixtureStream {
+func newFixtureStream(ctx context.Context, output, stderr io.Writer, terminate <-chan struct{}, stderrMode string, terminalOverride error) *fixtureStream {
 	stream := &fixtureStream{
 		chunks: make(chan fixtureOutputChunk), ready: make(chan struct{}), done: make(chan struct{}),
+		stderr: stderr, stderrMode: stderrMode,
 	}
 	// Start owns the output reader. Wait only observes its terminal state.
 	go func() {
@@ -262,6 +282,9 @@ func newFixtureStream(ctx context.Context, output io.Writer, terminate <-chan st
 		close(stream.done)
 	}()
 	<-stream.ready
+	if stderrMode == "before-owned-cancellation" {
+		_, stream.writeErr = io.WriteString(stderr, "logcat: invalid stream before owned cancellation credential=synthetic-secret\n")
+	}
 	go func() {
 		if terminate == nil {
 			<-ctx.Done()
@@ -273,11 +296,16 @@ func newFixtureStream(ctx context.Context, output io.Writer, terminate <-chan st
 				stream.cancelled.Add(1)
 			}
 		}
+		if stderrMode == "after-owned-cancellation" {
+			_, stream.writeErr = io.WriteString(stream.stderr, "logcat: stream terminated by owned cancellation credential=synthetic-secret\n")
+		}
 		// Do not close output until the current accepted chunk is fully copied.
 		// A later write returns an explicit error instead of losing bytes.
 		stream.mu.Lock()
 		defer stream.mu.Unlock()
-		if terminate == nil || ctx.Err() != nil {
+		if terminalOverride != nil {
+			stream.terminalErr = terminalOverride
+		} else if terminate == nil || ctx.Err() != nil {
 			stream.terminalErr = ctx.Err()
 		}
 		stream.closes.Add(1)
@@ -313,20 +341,21 @@ func (stream *fixtureStream) wait() error {
 // Only raw command bytes cross this seam. Production owns the parsers,
 // bounded writers, context budgets, identity correlation and gate result.
 type launchFixtureTransport struct {
-	mu         sync.Mutex
-	scenario   string
-	clock      time.Time
-	wallClock  time.Time
-	launched   time.Time
-	wallLaunch time.Time
-	processes  int
-	logs       map[string]string
-	markers    []fixtureMarker
-	streams    map[string]*fixtureStream
-	commands   []fixtureCommand
-	blocked    chan struct{}
-	terminate  chan struct{}
-	terminated bool
+	mu                     sync.Mutex
+	scenario               string
+	clock                  time.Time
+	wallClock              time.Time
+	launched               time.Time
+	wallLaunch             time.Time
+	processes              int
+	logs                   map[string]string
+	markers                []fixtureMarker
+	streams                map[string]*fixtureStream
+	commands               []fixtureCommand
+	blocked                chan struct{}
+	terminate              chan struct{}
+	terminated             bool
+	streamTerminalOverride error
 }
 
 type fixtureMarker struct {
@@ -657,11 +686,26 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	if (buffer != "crash" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
 		return nil, errors.New("unexpected or duplicate fixture stream")
 	}
+	if fixture.scenario == "invalid-stream-command" {
+		_, _ = io.WriteString(stderr, "logcat: invalid buffer configuration credential=synthetic-secret\n")
+		return nil, errors.New("fixture logcat command rejected")
+	}
 	var terminate <-chan struct{}
 	if fixture.scenario == "terminated-stream" {
 		terminate = fixture.terminate
 	}
-	stream := newFixtureStream(ctx, stdout, terminate)
+	stderrMode := ""
+	if buffer == "main" || buffer == "system" {
+		switch fixture.scenario {
+		case "owned-shutdown-stderr":
+			stderrMode = "after-owned-cancellation"
+		case "post-cancellation-exit-failure":
+			stderrMode = "after-owned-cancellation"
+		case "pre-cancellation-stderr":
+			stderrMode = "before-owned-cancellation"
+		}
+	}
+	stream := newFixtureStream(ctx, stdout, stderr, terminate, stderrMode, fixture.streamTerminalOverride)
 	fixture.streams[buffer] = stream
 	return stream.wait, nil
 }
@@ -671,7 +715,7 @@ func (fixture *launchFixtureTransport) assertClosed(t *testing.T) {
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
 	want := 3
-	if fixture.scenario == "unavailable-stream" || fixture.scenario == "stream-without-wait" {
+	if fixture.scenario == "unavailable-stream" || fixture.scenario == "stream-without-wait" || fixture.scenario == "invalid-stream-command" {
 		want = 0
 	}
 	if len(fixture.streams) != want {
@@ -1647,6 +1691,178 @@ func TestLaunchCollectorsExposeCausalLifecycleAndCategoricalCompletion(t *testin
 			for _, state := range states {
 				if state.TerminalReason != test.reason {
 					t.Fatalf("collector reason=%q, want %q: %+v", state.TerminalReason, test.reason, state)
+				}
+			}
+		})
+	}
+}
+
+type decodedLaunchStreamRecord struct {
+	DeviceNanos int64
+	PID         int
+	TID         int
+	Category    string
+}
+
+type decodedLaunchStreamLifecycle struct {
+	Buffer                     string
+	CommandCategory            string
+	Command                    []string
+	StartStatus                string
+	ReadinessStatus            string
+	TerminalStatus             string
+	TerminalReason             string
+	CommandStatus              string
+	ExitCode                   int
+	ExitSignal                 string
+	ContextCancellationState   string
+	CancellationRequestedUTC   time.Time
+	FirstStderrUTC             time.Time
+	LastStderrUTC              time.Time
+	CommandExitedUTC           time.Time
+	CancellationSequence       uint64
+	FirstStderrSequence        uint64
+	LastStderrSequence         uint64
+	CommandExitSequence        uint64
+	ExitRelativeToCancellation string
+	OutputTruncated            bool
+	StderrTruncated            bool
+	StderrObserved             bool
+	StdoutBytes                int64
+	StderrBytes                int64
+	StderrSHA256               string
+	StderrExcerpt              []string
+	LastParsedRecord           decodedLaunchStreamRecord
+	StartCapturedBeforeStop    bool
+	EndCapturedBeforeStop      bool
+	IntentionallyStopped       bool
+	ParserComplete             bool
+}
+
+func decodeLaunchStreamLifecycle(t *testing.T, observation launchObservation) []decodedLaunchStreamLifecycle {
+	t.Helper()
+	raw, err := json.Marshal(observation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		StreamLifecycle []decodedLaunchStreamLifecycle
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatal(err)
+	}
+	return report.StreamLifecycle
+}
+
+func TestLaunchStreamExpectedOwnedShutdownRetainsBoundedStderrWithoutInvalidatingEvidence(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		t.Run(strconv.Itoa(api), func(t *testing.T) {
+			err, observation := runLaunchScenario(t, "owned-shutdown-stderr", api)
+			if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+				t.Fatalf("complete evidence was invalidated by owned shutdown stderr: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+			}
+			states := decodeLaunchStreamLifecycle(t, observation)
+			if len(states) != 3 {
+				t.Fatalf("stream lifecycle count=%d, want 3", len(states))
+			}
+			for _, state := range states {
+				wantCommand := []string{"shell", "logcat", "-b", state.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+				if state.CommandCategory != "ADB_LOGCAT_STREAM" || !reflect.DeepEqual(state.Command, wantCommand) ||
+					!state.StartCapturedBeforeStop || !state.EndCapturedBeforeStop || !state.IntentionallyStopped || !state.ParserComplete {
+					t.Fatalf("owned collector identity or completion is incomplete: %+v", state)
+				}
+				if state.CancellationRequestedUTC.IsZero() || state.CommandExitedUTC.Before(state.CancellationRequestedUTC) ||
+					state.CancellationSequence == 0 || state.CommandExitSequence <= state.CancellationSequence ||
+					state.ExitRelativeToCancellation != "AFTER_OWNED_CANCELLATION" || state.ContextCancellationState != "CANCELED" {
+					t.Fatalf("owned cancellation ordering is not proven: %+v", state)
+				}
+				if state.Buffer == "crash" {
+					if state.StderrObserved || state.StderrBytes != 0 || state.TerminalStatus != "DRAINED" {
+						t.Fatalf("crash collector acquired unexpected stderr: %+v", state)
+					}
+					continue
+				}
+				if state.TerminalStatus != "DRAINED" || state.TerminalReason != "EXPECTED_OWNED_SHUTDOWN" ||
+					state.CommandStatus != "CANCELLED" || state.ExitCode != -1 || state.ExitSignal != "" ||
+					!state.StderrObserved || state.StderrBytes == 0 || state.StderrTruncated || len(state.StderrExcerpt) == 0 ||
+					state.FirstStderrUTC.Before(state.CancellationRequestedUTC) || state.LastStderrUTC.Before(state.FirstStderrUTC) ||
+					state.FirstStderrSequence <= state.CancellationSequence || state.LastStderrSequence < state.FirstStderrSequence ||
+					state.StdoutBytes == 0 || state.LastParsedRecord.DeviceNanos == 0 {
+					t.Fatalf("owned shutdown was not retained as complete bounded evidence: %+v", state)
+				}
+				evidence := strings.Join(state.StderrExcerpt, " ")
+				if !strings.Contains(evidence, "logcat") || !strings.Contains(evidence, "owned") ||
+					strings.Contains(evidence, "synthetic-secret") || state.StderrSHA256 == "" {
+					t.Fatalf("stderr evidence was not bounded and sanitized: %+v", state)
+				}
+			}
+		})
+	}
+}
+
+func TestLaunchStreamPreCancellationTransportFailureRemainsBlocked(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		t.Run(strconv.Itoa(api), func(t *testing.T) {
+			err, observation := runLaunchScenario(t, "pre-cancellation-stderr", api)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
+				t.Fatalf("pre-cancellation transport failure did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			}
+			for _, state := range decodeLaunchStreamLifecycle(t, observation) {
+				if state.Buffer == "crash" {
+					continue
+				}
+				if state.TerminalReason != "STDERR_BEFORE_OWNED_CANCELLATION" || state.TerminalStatus != "INCOMPLETE" ||
+					state.FirstStderrSequence == 0 || state.CancellationSequence == 0 || state.FirstStderrSequence >= state.CancellationSequence ||
+					!state.FirstStderrUTC.Before(state.CancellationRequestedUTC) || strings.Contains(strings.Join(state.StderrExcerpt, " "), "synthetic-secret") {
+					t.Fatalf("pre-cancellation failure ordering was not retained: %+v", state)
+				}
+			}
+		})
+	}
+}
+
+func TestLaunchStreamPostCancellationNonCancellationExitFailureRemainsBlocked(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		t.Run(strconv.Itoa(api), func(t *testing.T) {
+			err, observation := runLaunchScenario(t, "post-cancellation-exit-failure", api)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
+				t.Fatalf("ordinary exit failure after cancellation did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			}
+			for _, state := range decodeLaunchStreamLifecycle(t, observation) {
+				if state.Buffer == "crash" {
+					continue
+				}
+				if state.TerminalReason != "POST_CANCELLATION_TRANSPORT_UNPROVEN" || state.TerminalStatus != "INCOMPLETE" ||
+					state.CommandStatus != "ERROR" || state.ExitCode != 7 || state.ExitSignal != "" ||
+					state.ExitRelativeToCancellation != "AFTER_OWNED_CANCELLATION" || !state.IntentionallyStopped ||
+					state.FirstStderrSequence <= state.CancellationSequence {
+					t.Fatalf("non-cancellation exit failure was not retained as incomplete evidence: %+v", state)
+				}
+			}
+		})
+	}
+}
+
+func TestLaunchStreamInvalidCommandConfigurationRemainsBlockedWithSanitizedReason(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		t.Run(strconv.Itoa(api), func(t *testing.T) {
+			err, observation := runLaunchScenario(t, "invalid-stream-command", api)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
+				t.Fatalf("invalid stream command did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			}
+			states := decodeLaunchStreamLifecycle(t, observation)
+			if len(states) != 3 {
+				t.Fatalf("invalid command lifecycle count=%d, want 3", len(states))
+			}
+			for _, state := range states {
+				excerpt := strings.Join(state.StderrExcerpt, " ")
+				if state.StartStatus != "START_FAILED" || state.TerminalStatus != "INCOMPLETE" ||
+					state.TerminalReason != "COMMAND_OR_BUFFER_REJECTED" || state.CommandStatus == "CAPTURED" ||
+					state.StderrBytes == 0 || state.FirstStderrSequence == 0 || state.CancellationSequence == 0 ||
+					state.FirstStderrSequence >= state.CancellationSequence ||
+					!strings.Contains(excerpt, "logcat") || !strings.Contains(excerpt, "invalid") || !strings.Contains(excerpt, "buffer") ||
+					strings.Contains(excerpt, "synthetic-secret") {
+					t.Fatalf("invalid command reason was not preserved safely: %+v", state)
 				}
 			}
 		})

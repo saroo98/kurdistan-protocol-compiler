@@ -1494,6 +1494,71 @@ func (buffer *boundedBuffer) Write(input []byte) (int, error) {
 func (buffer *boundedBuffer) String() string { return buffer.buffer.String() }
 func (buffer *boundedBuffer) Bytes() []byte  { return buffer.buffer.Bytes() }
 
+type launchStreamSequence struct {
+	mu    sync.Mutex
+	value uint64
+}
+
+func (sequence *launchStreamSequence) mark() (uint64, time.Time) {
+	sequence.mu.Lock()
+	defer sequence.mu.Unlock()
+	sequence.value++
+	return sequence.value, time.Now().UTC()
+}
+
+type launchStreamCapture struct {
+	mu            sync.Mutex
+	sequence      *launchStreamSequence
+	buffer        boundedBuffer
+	bytes         int64
+	firstUTC      time.Time
+	lastUTC       time.Time
+	firstSequence uint64
+	lastSequence  uint64
+}
+
+type launchStreamCaptureSnapshot struct {
+	text          string
+	bytes         int64
+	truncated     bool
+	firstUTC      time.Time
+	lastUTC       time.Time
+	firstSequence uint64
+	lastSequence  uint64
+}
+
+func newLaunchStreamCapture(limit int, sequence *launchStreamSequence) *launchStreamCapture {
+	return &launchStreamCapture{sequence: sequence, buffer: boundedBuffer{limit: limit}}
+}
+
+func (capture *launchStreamCapture) Write(input []byte) (int, error) {
+	if len(input) == 0 {
+		return 0, nil
+	}
+	sequence, observed := capture.sequence.mark()
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	written, err := capture.buffer.Write(input)
+	capture.bytes += int64(written)
+	if capture.firstSequence == 0 {
+		capture.firstSequence = sequence
+		capture.firstUTC = observed
+	}
+	capture.lastSequence = sequence
+	capture.lastUTC = observed
+	return written, err
+}
+
+func (capture *launchStreamCapture) snapshot() launchStreamCaptureSnapshot {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	return launchStreamCaptureSnapshot{
+		text: capture.buffer.String(), bytes: capture.bytes, truncated: capture.buffer.exceeded,
+		firstUTC: capture.firstUTC, lastUTC: capture.lastUTC,
+		firstSequence: capture.firstSequence, lastSequence: capture.lastSequence,
+	}
+}
+
 func (client adbClient) capture(ctx context.Context, name string, args ...string) (output string, resultErr error) {
 	started := time.Now()
 	defer func() { client.timeline.record(name, started, resultErr) }()
@@ -2853,14 +2918,45 @@ type diagnosticLogBuffer struct {
 }
 
 type diagnosticStreamLifecycle struct {
-	Buffer          string
-	StartStatus     string
-	ReadinessStatus string
-	TerminalStatus  string
-	TerminalReason  string
-	CommandStatus   string
-	OutputTruncated bool
-	StderrObserved  bool
+	Buffer                     string
+	CommandCategory            string
+	Command                    []string
+	StartStatus                string
+	ReadinessStatus            string
+	TerminalStatus             string
+	TerminalReason             string
+	CommandStatus              string
+	ExitCode                   int
+	ExitSignal                 string
+	ContextCancellationState   string
+	CancellationRequestedUTC   time.Time
+	FirstStderrUTC             time.Time
+	LastStderrUTC              time.Time
+	CommandExitedUTC           time.Time
+	CancellationSequence       uint64
+	FirstStderrSequence        uint64
+	LastStderrSequence         uint64
+	CommandExitSequence        uint64
+	ExitRelativeToCancellation string
+	OutputTruncated            bool
+	StderrTruncated            bool
+	StderrObserved             bool
+	StdoutBytes                int64
+	StderrBytes                int64
+	StderrSHA256               string
+	StderrExcerpt              []string
+	LastParsedRecord           diagnosticLaunchStreamRecord
+	StartCapturedBeforeStop    bool
+	EndCapturedBeforeStop      bool
+	IntentionallyStopped       bool
+	ParserComplete             bool
+}
+
+type diagnosticLaunchStreamRecord struct {
+	DeviceNanos int64
+	PID         int
+	TID         int
+	Category    string
 }
 
 type diagnosticMarkerEvidence struct {
@@ -2937,14 +3033,221 @@ type launchObservation struct {
 }
 
 type launchLogStream struct {
-	name            string
-	cancel          context.CancelFunc
-	done            chan error
-	output          boundedBuffer
-	stderr          boundedBuffer
-	startErr        error
-	terminalErr     error
-	endedBeforeStop bool
+	name                 string
+	command              []string
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	sequence             *launchStreamSequence
+	done                 chan launchStreamTermination
+	output               *launchStreamCapture
+	stderr               *launchStreamCapture
+	startErr             error
+	terminalErr          error
+	terminalUTC          time.Time
+	terminalSequence     uint64
+	cancelUTC            time.Time
+	cancelSequence       uint64
+	intentionallyStopped bool
+	endedBeforeStop      bool
+}
+
+type launchStreamTermination struct {
+	err      error
+	observed time.Time
+	sequence uint64
+}
+
+func (stream *launchLogStream) requestCancellation(intentional bool) {
+	if stream.cancelSequence == 0 {
+		stream.cancelSequence, stream.cancelUTC = stream.sequence.mark()
+	}
+	stream.intentionallyStopped = intentional
+	stream.cancel()
+}
+
+func (stream *launchLogStream) acceptTermination(termination launchStreamTermination) {
+	stream.terminalErr = termination.err
+	stream.terminalUTC = termination.observed
+	stream.terminalSequence = termination.sequence
+}
+
+var launchStreamStderrSafeTokenPattern = regexp.MustCompile(`(?i)\b(?:logcat|error|failed|failure|invalid|unknown|unsupported|option|argument|buffer|configuration|permission|denied|closed|cancelled|canceled|cancellation|owned|killed|signal|eof|pipe|read|write|transport|device|offline|timeout|terminated|stream|usage)\b`)
+var launchStreamSignalPattern = regexp.MustCompile(`^signal: ([A-Za-z0-9]+)$`)
+
+func sanitizeLaunchStreamStderr(input string) []string {
+	const maxLines = 4
+	const maxBytes = 320
+	var result []string
+	remaining := maxBytes
+	for _, raw := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		if len(result) == maxLines || remaining == 0 {
+			break
+		}
+		matches := launchStreamStderrSafeTokenPattern.FindAllString(strings.TrimSpace(raw), -1)
+		if len(matches) == 0 {
+			if strings.TrimSpace(raw) == "" {
+				continue
+			}
+			matches = []string{"[REDACTED_DIAGNOSTIC]"}
+		}
+		line := strings.ToLower(strings.Join(matches, " "))
+		if len(line) > remaining {
+			line = line[:remaining]
+		}
+		result = append(result, line)
+		remaining -= len(line)
+	}
+	return result
+}
+
+func launchStreamContextState(ctx context.Context) string {
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		return "DEADLINE"
+	case errors.Is(ctx.Err(), context.Canceled):
+		return "CANCELED"
+	case ctx.Err() == nil:
+		return "ACTIVE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func launchStreamExitSignal(err error) string {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ProcessState == nil {
+		return ""
+	}
+	match := launchStreamSignalPattern.FindStringSubmatch(exit.ProcessState.String())
+	if match == nil {
+		return ""
+	}
+	return strings.ToUpper(match[1])
+}
+
+func launchStreamCancellationDriven(err error, ctx context.Context) bool {
+	if !errors.Is(ctx.Err(), context.Canceled) {
+		return false
+	}
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	// CommandContext reports an owned process kill as a signalled ExitError on
+	// Unix. An ordinary nonzero exit after cancellation is causally ambiguous
+	// and must remain incomplete rather than being attributed to the harness.
+	return launchStreamExitSignal(err) != ""
+}
+
+func lastLaunchStreamRecord(input string) diagnosticLaunchStreamRecord {
+	var result diagnosticLaunchStreamRecord
+	for _, line := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		event, ok := parseEpochLog(line)
+		if !ok {
+			continue
+		}
+		category := "OTHER_FILTERED_RECORD"
+		switch event.Tag {
+		case launchProbeTag:
+			if marker, valid := parseLaunchMarkerIdentity(event.Text); valid {
+				category = marker.Type + "_MARKER"
+			} else {
+				category = "MALFORMED_LAUNCH_MARKER"
+			}
+		case "AndroidRuntime":
+			category = "ANDROID_RUNTIME"
+		case "ActivityManager":
+			category = "ACTIVITY_MANAGER"
+		case "ActivityTaskManager":
+			category = "ACTIVITY_TASK_MANAGER"
+		}
+		result = diagnosticLaunchStreamRecord{DeviceNanos: event.DeviceNanos, PID: event.PID, TID: event.TID, Category: category}
+	}
+	return result
+}
+
+func markerCaptureStatus(window diagnosticMarkerWindow) (bool, bool) {
+	start, end := false, false
+	for _, marker := range window.Markers {
+		if !marker.InvocationMatch {
+			continue
+		}
+		start = start || marker.MarkerType == "START"
+		end = end || marker.MarkerType == "END"
+	}
+	return start, end
+}
+
+func diagnoseLaunchStreamLifecycle(stream *launchLogStream, stdout, stderr launchStreamCaptureSnapshot, parserComplete, startCaptured, endCaptured bool) diagnosticStreamLifecycle {
+	terminalErr := stream.terminalErr
+	if stream.startErr != nil {
+		terminalErr = stream.startErr
+	}
+	commandStatus, exitCode := diagnosticCommandStatus(terminalErr)
+	lifecycle := diagnosticStreamLifecycle{
+		Buffer: stream.name, CommandCategory: "ADB_LOGCAT_STREAM", Command: append([]string(nil), stream.command...),
+		StartStatus: "START_FAILED", ReadinessStatus: "NOT_AVAILABLE", TerminalStatus: "INCOMPLETE", TerminalReason: "START_FAILED",
+		CommandStatus: commandStatus, ExitCode: exitCode, ExitSignal: launchStreamExitSignal(terminalErr),
+		ContextCancellationState: launchStreamContextState(stream.ctx),
+		CancellationRequestedUTC: stream.cancelUTC, FirstStderrUTC: stderr.firstUTC, LastStderrUTC: stderr.lastUTC,
+		CommandExitedUTC: stream.terminalUTC, CancellationSequence: stream.cancelSequence,
+		FirstStderrSequence: stderr.firstSequence, LastStderrSequence: stderr.lastSequence,
+		CommandExitSequence: stream.terminalSequence, OutputTruncated: stdout.truncated, StderrTruncated: stderr.truncated,
+		StderrObserved: stderr.bytes != 0, StdoutBytes: stdout.bytes, StderrBytes: stderr.bytes,
+		StderrExcerpt: sanitizeLaunchStreamStderr(stderr.text), LastParsedRecord: lastLaunchStreamRecord(stdout.text),
+		StartCapturedBeforeStop: startCaptured, EndCapturedBeforeStop: endCaptured,
+		IntentionallyStopped: stream.intentionallyStopped, ParserComplete: parserComplete,
+	}
+	if stderr.bytes != 0 {
+		digest := sha256.Sum256([]byte(stderr.text))
+		lifecycle.StderrSHA256 = fmt.Sprintf("%x", digest)
+	}
+	switch {
+	case stream.cancelSequence == 0 || stream.terminalSequence == 0:
+		lifecycle.ExitRelativeToCancellation = "UNKNOWN"
+	case stream.terminalSequence < stream.cancelSequence:
+		lifecycle.ExitRelativeToCancellation = "BEFORE_OWNED_CANCELLATION"
+	case stream.terminalSequence > stream.cancelSequence:
+		lifecycle.ExitRelativeToCancellation = "AFTER_OWNED_CANCELLATION"
+	default:
+		lifecycle.ExitRelativeToCancellation = "AMBIGUOUS"
+	}
+	if stream.startErr == nil {
+		lifecycle.StartStatus = "STARTED"
+		lifecycle.ReadinessStatus = "OUTPUT_SINK_READY"
+	}
+	stderrBeforeCancellation := stderr.bytes != 0 && (stream.cancelSequence == 0 || stderr.firstSequence == 0 || stderr.firstSequence < stream.cancelSequence)
+	stderrAfterCancellation := stderr.bytes != 0 && stream.cancelSequence != 0 && stderr.firstSequence > stream.cancelSequence
+	transportComplete := stream.startErr == nil && !stream.endedBeforeStop && stdout.truncated == false && stderr.truncated == false &&
+		parserComplete && startCaptured && endCaptured && lifecycle.ExitRelativeToCancellation == "AFTER_OWNED_CANCELLATION" &&
+		stream.intentionallyStopped && launchStreamCancellationDriven(stream.terminalErr, stream.ctx)
+	switch {
+	case stream.startErr != nil && stderr.bytes != 0:
+		lifecycle.TerminalReason = "COMMAND_OR_BUFFER_REJECTED"
+	case stream.startErr != nil:
+	case stdout.truncated:
+		lifecycle.TerminalReason = "OUTPUT_TRUNCATED"
+	case stderr.truncated:
+		lifecycle.TerminalReason = "STDERR_TRUNCATED"
+	case stderrBeforeCancellation:
+		lifecycle.TerminalReason = "STDERR_BEFORE_OWNED_CANCELLATION"
+	case stream.endedBeforeStop || lifecycle.ExitRelativeToCancellation == "BEFORE_OWNED_CANCELLATION":
+		lifecycle.TerminalReason = "EOF_BEFORE_STOP"
+	case !parserComplete:
+		lifecycle.TerminalReason = "PARSER_INCOMPLETE"
+	case !startCaptured || !endCaptured:
+		lifecycle.TerminalReason = "MARKER_INCOMPLETE"
+	case stderrAfterCancellation && transportComplete:
+		lifecycle.TerminalStatus = "DRAINED"
+		lifecycle.TerminalReason = "EXPECTED_OWNED_SHUTDOWN"
+	case stderrAfterCancellation:
+		lifecycle.TerminalReason = "POST_CANCELLATION_TRANSPORT_UNPROVEN"
+	case transportComplete:
+		lifecycle.TerminalStatus = "DRAINED"
+		lifecycle.TerminalReason = "CANCELLED_AFTER_CAPTURE"
+	default:
+		lifecycle.TerminalReason = "TRANSPORT_COMPLETION_UNPROVEN"
+	}
+	return lifecycle
 }
 
 func (observation *launchObservation) incomplete(issue string) {
@@ -3064,16 +3367,27 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 	}
 	for _, buffer := range []string{"crash", "main", "system"} {
 		logctx, cancel := context.WithCancel(ctx)
-		args := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		command := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		args := append([]string(nil), command...)
 		if client.serial != "" {
 			args = append([]string{"-s", client.serial}, args...)
 		}
-		stream := &launchLogStream{name: buffer, cancel: cancel, done: make(chan error, 1), output: boundedBuffer{limit: 512 << 10}, stderr: boundedBuffer{limit: 8 << 10}}
+		sequence := &launchStreamSequence{}
+		stream := &launchLogStream{
+			name: buffer, command: command, ctx: logctx, cancel: cancel, sequence: sequence,
+			done:   make(chan launchStreamTermination, 1),
+			output: newLaunchStreamCapture(512<<10, sequence), stderr: newLaunchStreamCapture(8<<10, sequence),
+		}
 		var wait func() error
-		wait, stream.startErr = client.startCommand(logctx, args, &stream.output, &stream.stderr, time.Second)
+		wait, stream.startErr = client.startCommand(logctx, args, stream.output, stream.stderr, time.Second)
 		if stream.startErr == nil {
-			go func() { stream.done <- wait() }()
+			go func() {
+				err := wait()
+				terminalSequence, terminalUTC := stream.sequence.mark()
+				stream.done <- launchStreamTermination{err: err, observed: terminalUTC, sequence: terminalSequence}
+			}()
 		} else {
+			stream.terminalSequence, stream.terminalUTC = stream.sequence.mark()
 			observation.incomplete("log stream unavailable")
 		}
 		observation.streams = append(observation.streams, stream)
@@ -3185,46 +3499,25 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		observation.incomplete("monotonic-to-wall clock correlation unavailable")
 	}
 	rawLogs := map[string]string{}
+	stdoutSnapshots := map[string]launchStreamCaptureSnapshot{}
+	stderrSnapshots := map[string]launchStreamCaptureSnapshot{}
 	for _, stream := range observation.streams {
-		lifecycle := diagnosticStreamLifecycle{Buffer: stream.name, StartStatus: "START_FAILED", ReadinessStatus: "NOT_AVAILABLE", TerminalStatus: "INCOMPLETE", TerminalReason: "START_FAILED", CommandStatus: "INCOMPLETE"}
 		if stream.startErr == nil {
-			lifecycle.StartStatus = "STARTED"
-			lifecycle.ReadinessStatus = "OUTPUT_SINK_READY"
 			select {
-			case stream.terminalErr = <-stream.done:
+			case terminal := <-stream.done:
 				stream.endedBeforeStop = true
-				stream.cancel()
+				stream.acceptTermination(terminal)
+				stream.requestCancellation(false)
 			default:
-				stream.cancel()
-				stream.terminalErr = <-stream.done
+				stream.requestCancellation(true)
+				stream.acceptTermination(<-stream.done)
 			}
 		} else {
-			stream.cancel()
+			stream.requestCancellation(false)
 		}
-		rawLogs[stream.name] = stream.output.String()
-		lifecycle.OutputTruncated = stream.output.exceeded
-		lifecycle.StderrObserved = stream.stderr.buffer.Len() != 0
-		terminalCommandErr := stream.terminalErr
-		if stream.startErr != nil {
-			terminalCommandErr = stream.startErr
-		}
-		lifecycle.CommandStatus, _ = diagnosticCommandStatus(terminalCommandErr)
-		switch {
-		case stream.startErr != nil:
-		case stream.output.exceeded:
-			lifecycle.TerminalReason = "OUTPUT_TRUNCATED"
-		case stream.stderr.buffer.Len() != 0:
-			lifecycle.TerminalReason = "STDERR_OBSERVED"
-		case stream.endedBeforeStop:
-			lifecycle.TerminalReason = "EOF_BEFORE_STOP"
-		case stream.startErr == nil:
-			lifecycle.TerminalStatus = "DRAINED"
-			lifecycle.TerminalReason = "CANCELLED_AFTER_CAPTURE"
-		}
-		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
-		if lifecycle.TerminalStatus != "DRAINED" {
-			observation.incomplete(stream.name + " stream incomplete")
-		}
+		stdoutSnapshots[stream.name] = stream.output.snapshot()
+		stderrSnapshots[stream.name] = stream.stderr.snapshot()
+		rawLogs[stream.name] = stdoutSnapshots[stream.name].text
 	}
 	observation.MarkerWindow = diagnoseLaunchMarkerWindow(rawLogs["main"], markers, observation.Invocation, observation.DeviceStartNanos, observation.DeviceEndNanos)
 	start, end := observation.MarkerWindow.MatchingWindow()
@@ -3235,10 +3528,16 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		start, end = 0, 0
 	}
 	observation.WindowStartNanos, observation.WindowEndNanos = start, end
+	startCaptured, endCaptured := markerCaptureStatus(observation.MarkerWindow)
 	for _, stream := range observation.streams {
 		events, complete := launchWindowEvents(rawLogs[stream.name], observation.app, start, end)
+		lifecycle := diagnoseLaunchStreamLifecycle(stream, stdoutSnapshots[stream.name], stderrSnapshots[stream.name], complete, startCaptured, endCaptured)
+		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
+		if lifecycle.TerminalStatus != "DRAINED" {
+			observation.incomplete(stream.name + " stream incomplete")
+		}
 		status := "CAPTURED"
-		if !complete || stream.endedBeforeStop || stream.output.exceeded || stream.startErr != nil || stream.stderr.buffer.Len() != 0 {
+		if !complete || lifecycle.TerminalStatus != "DRAINED" {
 			status = "INCOMPLETE"
 			observation.incomplete(stream.name + " events incomplete")
 		}
