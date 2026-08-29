@@ -35,6 +35,9 @@ const (
 	defaultRunner                     = "androidx.test.runner.AndroidJUnitRunner"
 	monotonicClockDomain              = "CLOCK_MONOTONIC_LOGCAT"
 	clockProbeTag                     = "KurdistanClockProbe"
+	launchProbeTag                    = "KurdistanLaunchProbe"
+	launchMarkerVersion               = "KLG1"
+	launchMarkerEmitter               = "phase9devicegate"
 	nativeFilesystemAuthorizationV1   = "kurdistan-phase17-filesystem-authorization-v1\x00"
 	maxCommandEvidence                = 2 << 20
 	maxLogcatInput                    = 4 << 20
@@ -1972,6 +1975,7 @@ var diagnosticClassPattern = regexp.MustCompile("^[A-Za-z_$][A-Za-z0-9_$]*(?:\\.
 var diagnosticFramePattern = regexp.MustCompile("^\\s*at ([A-Za-z0-9_.$/@+-]+)\\(([A-Za-z0-9_.$-]+\\.(?:kt|java):[0-9]{1,7}|SourceFile:[0-9]{1,7}|Unknown Source|Native Method)\\)$")
 var elidedFramePattern = regexp.MustCompile("^\\.\\.\\. [0-9]{1,4} more$")
 var structuredTestSetupPattern = regexp.MustCompile(`^KURDISTAN_TEST_SETUP expected=([A-Z0-9_|-]{1,96}) actual=([A-Z0-9_|-]{1,96}) setup=([A-Z0-9_|,-]{1,256})$`)
+var structuredQuiescenceDiagnosticPattern = regexp.MustCompile(`^KURDISTAN_QUIESCENCE_DIAGNOSTIC poisoned=[0-9]{1,4} outcome=[A-Z_]{1,48} timeout=(?:true|false) interruption=(?:true|false) thread_interrupted=(?:true|false) elapsed_ms=[0-9]{1,12} future_began=(?:true|false) replied=(?:true|false) replied_late=(?:true|false) cleanup=[A-Z_]{1,32} late_authorization=(?:true|false)$`)
 
 func safeDiagnosticClass(value string) bool {
 	if len(value) > 240 || !diagnosticClassPattern.MatchString(value) {
@@ -1995,7 +1999,7 @@ func diagnosticMessage(message string) (string, bool) {
 		"SETTINGS_OWNER_CLOSED", "STALE_SETTINGS_PROJECTION", "SHARED_LEGACY_OWNER_CANNOT_BE_CLOSED":
 		return message, true
 	}
-	if structuredTestSetupPattern.MatchString(message) {
+	if structuredTestSetupPattern.MatchString(message) || structuredQuiescenceDiagnosticPattern.MatchString(message) {
 		return message, true
 	}
 	for _, prefix := range []string{"Unable to create application ", "Unable to instantiate application ", "Unable to start activity "} {
@@ -2469,17 +2473,19 @@ func procStartTicks(input string, pid int) (uint64, error) {
 }
 
 type diagnosticExit struct {
-	Process     string
-	PID         int
-	UID         int
-	Timestamp   time.Time
-	DeviceNanos int64
-	Reason      int
-	Status      int
+	Process        string
+	PID            int
+	UID            int
+	Timestamp      time.Time
+	DeviceNanos    int64
+	DeviceEndNanos int64
+	Reason         int
+	Status         int
 }
 
-func parseExitRecords(input, app string, startNanos, endNanos, wallMinusMonotonic int64, zone *time.Location) ([]diagnosticExit, bool) {
-	if zone == nil || startNanos <= 0 || endNanos <= startNanos || wallMinusMonotonic <= 0 || len(input) > maxLogcatInput {
+func parseExitRecords(input, app string, startNanos, endNanos int64, correlation diagnosticClockCorrelation, zone *time.Location) ([]diagnosticExit, bool) {
+	if zone == nil || startNanos <= 0 || endNanos <= startNanos || correlation.Status != "CAPTURED" ||
+		correlation.WallMinusMonotonicLowerNanos <= 0 || correlation.WallMinusMonotonicUpperNanos < correlation.WallMinusMonotonicLowerNanos || len(input) > maxLogcatInput {
 		return nil, false
 	}
 	var records []diagnosticExit
@@ -2508,10 +2514,11 @@ func parseExitRecords(input, app string, startNanos, endNanos, wallMinusMonotoni
 			complete = false
 			continue
 		}
-		deviceNanos := wallNanos - wallMinusMonotonic
+		deviceNanos := wallNanos - correlation.WallMinusMonotonicUpperNanos
+		deviceEndNanos := wallNanos - correlation.WallMinusMonotonicLowerNanos
 		// ApplicationExitInfo exposes milliseconds. Preserve the existing one-
 		// millisecond lower-bound tolerance without expanding the launch window.
-		if deviceNanos+int64(time.Millisecond) < startNanos || deviceNanos > endNanos {
+		if deviceEndNanos+int64(time.Millisecond) < startNanos || deviceNanos > endNanos {
 			continue
 		}
 		values := map[string]int{}
@@ -2532,7 +2539,7 @@ func parseExitRecords(input, app string, startNanos, endNanos, wallMinusMonotoni
 			complete = false
 			continue
 		}
-		records = append(records, diagnosticExit{Process: process[1], PID: values["pid"], UID: values["realUid"], Timestamp: at, DeviceNanos: deviceNanos, Reason: values["reason"], Status: values["status"]})
+		records = append(records, diagnosticExit{Process: process[1], PID: values["pid"], UID: values["realUid"], Timestamp: at, DeviceNanos: deviceNanos, DeviceEndNanos: deviceEndNanos, Reason: values["reason"], Status: values["status"]})
 	}
 	return records, complete
 }
@@ -2811,7 +2818,7 @@ func validateLaunchObservation(observation *launchObservation) error {
 	}
 	for _, exit := range observation.ExitRecords {
 		if exit.Process == current.Name && exit.PID == current.PID && exit.UID == current.UID &&
-			exit.DeviceNanos+int64(time.Millisecond) >= epochStart && exit.DeviceNanos <= observation.WindowEndNanos {
+			exit.DeviceEndNanos+int64(time.Millisecond) >= epochStart && exit.DeviceNanos <= observation.WindowEndNanos {
 			return errors.New("current target exit observed")
 		}
 	}
@@ -2845,11 +2852,26 @@ type diagnosticLogBuffer struct {
 	Events []launchLogEvent
 }
 
+type diagnosticStreamLifecycle struct {
+	Buffer          string
+	StartStatus     string
+	ReadinessStatus string
+	TerminalStatus  string
+	TerminalReason  string
+	CommandStatus   string
+	OutputTruncated bool
+	StderrObserved  bool
+}
+
 type diagnosticMarkerEvidence struct {
 	Source          string
 	Value           string
 	DeviceNanos     int64
 	InvocationMatch bool
+	MarkerType      string
+	EventNonce      string
+	Emitter         string
+	CommandEpoch    string
 }
 
 type diagnosticMarkerWindow struct {
@@ -2865,9 +2887,17 @@ type diagnosticMarkerWindow struct {
 }
 
 type diagnosticClockCorrelation struct {
-	Status                  string
-	Rejection               string
-	WallMinusMonotonicNanos int64
+	Status                       string
+	Rejection                    string
+	WallMinusMonotonicNanos      int64
+	WallMinusMonotonicLowerNanos int64
+	WallMinusMonotonicUpperNanos int64
+	StartOffsetNanos             int64
+	EndOffsetNanos               int64
+	StartOffsetLowerNanos        int64
+	StartOffsetUpperNanos        int64
+	EndOffsetLowerNanos          int64
+	EndOffsetUpperNanos          int64
 }
 
 type launchObservation struct {
@@ -2875,6 +2905,8 @@ type launchObservation struct {
 	api                   int
 	app                   string
 	streams               []*launchLogStream
+	startMarker           launchMarkerIdentity
+	endMarker             launchMarkerIdentity
 	Schema                string
 	Invocation            string
 	Status                string
@@ -2890,6 +2922,7 @@ type launchObservation struct {
 	Commands              []diagnosticCommand
 	Processes             []diagnosticProcessSnapshot
 	Logs                  []diagnosticLogBuffer
+	StreamLifecycle       []diagnosticStreamLifecycle
 	ExitRecords           []diagnosticExit
 	ExitStatus            string
 	ActivityProcessState  []string
@@ -2910,6 +2943,7 @@ type launchLogStream struct {
 	output          boundedBuffer
 	stderr          boundedBuffer
 	startErr        error
+	terminalErr     error
 	endedBeforeStop bool
 }
 
@@ -3004,6 +3038,15 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 		return observation
 	}
 	observation.Invocation = fmt.Sprintf("%x", nonce)
+	var markerErr error
+	observation.startMarker, markerErr = newLaunchMarkerIdentity("START", observation.Invocation)
+	if markerErr == nil {
+		observation.endMarker, markerErr = newLaunchMarkerIdentity("END", observation.Invocation)
+	}
+	if markerErr != nil {
+		observation.incomplete("launch marker identity unavailable")
+		return observation
+	}
 	if !safeDiagnosticClass(value.appPackage) {
 		observation.incomplete("unsupported diagnostic package identity")
 		return observation
@@ -3035,7 +3078,7 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 		}
 		observation.streams = append(observation.streams, stream)
 	}
-	_, _ = observation.query(ctx, "window-start", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "START:"+observation.Invocation)
+	_, _ = observation.query(ctx, "window-start", "shell", "log", "-p", "i", "-t", launchProbeTag, observation.startMarker.String())
 	observation.processSnapshot(ctx, "before-launch", time.Second)
 	resolved, ok := observation.query(ctx, "resolve-activity", "shell", "cmd", "package", "resolve-activity", "--brief", "-n", value.appPackage+"/org.kurdistanvpn.app.MainActivity")
 	for _, line := range strings.Split(resolved, "\n") {
@@ -3117,38 +3160,69 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	} else {
 		observation.incomplete("activity process state unavailable or incomplete")
 	}
-	_, _ = observation.query(ctx, "window-end", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "END:"+observation.Invocation)
+	_, _ = observation.query(ctx, "window-end", "shell", "log", "-p", "i", "-t", launchProbeTag, observation.endMarker.String())
 	// A separate marker-only snapshot confirms the end even if the launch
 	// deadline already terminated the streaming readers. It contains no crash
 	// body and cannot supply an old invocation's marker.
-	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
+	markerArgs, markerArgsErr := launchMarkerSnapshotArgs(observation.Invocation, observation.DeviceStartNanos, "monotonic")
+	if markerArgsErr != nil {
+		observation.incomplete("marker snapshot identity unavailable")
+	}
+	markers, markersOK := observation.query(ctx, "window-markers", markerArgs...)
 	nanos, ok := observation.queryClock(ctx, "clock-after")
 	if ok {
 		observation.DeviceEndNanos = nanos
 	} else {
 		observation.incomplete("terminal clock unavailable")
 	}
-	wallMarkers, wallMarkersOK := observation.query(ctx, "window-markers-wall", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "epoch", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
+	wallMarkerArgs, wallMarkerArgsErr := launchMarkerSnapshotArgs(observation.Invocation, observation.DeviceStartNanos, "epoch")
+	if wallMarkerArgsErr != nil {
+		observation.incomplete("wall marker snapshot identity unavailable")
+	}
+	wallMarkers, wallMarkersOK := observation.query(ctx, "window-markers-wall", wallMarkerArgs...)
 	observation.ClockCorrelation = correlateLaunchMarkerClocks(markers, wallMarkers, observation.Invocation)
 	if !wallMarkersOK || observation.ClockCorrelation.Status != "CAPTURED" {
 		observation.incomplete("monotonic-to-wall clock correlation unavailable")
 	}
 	rawLogs := map[string]string{}
 	for _, stream := range observation.streams {
+		lifecycle := diagnosticStreamLifecycle{Buffer: stream.name, StartStatus: "START_FAILED", ReadinessStatus: "NOT_AVAILABLE", TerminalStatus: "INCOMPLETE", TerminalReason: "START_FAILED", CommandStatus: "INCOMPLETE"}
 		if stream.startErr == nil {
+			lifecycle.StartStatus = "STARTED"
+			lifecycle.ReadinessStatus = "OUTPUT_SINK_READY"
 			select {
-			case <-stream.done:
+			case stream.terminalErr = <-stream.done:
 				stream.endedBeforeStop = true
 				stream.cancel()
 			default:
 				stream.cancel()
-				<-stream.done
+				stream.terminalErr = <-stream.done
 			}
 		} else {
 			stream.cancel()
 		}
 		rawLogs[stream.name] = stream.output.String()
-		if stream.startErr != nil || stream.endedBeforeStop || stream.output.exceeded || stream.stderr.buffer.Len() != 0 {
+		lifecycle.OutputTruncated = stream.output.exceeded
+		lifecycle.StderrObserved = stream.stderr.buffer.Len() != 0
+		terminalCommandErr := stream.terminalErr
+		if stream.startErr != nil {
+			terminalCommandErr = stream.startErr
+		}
+		lifecycle.CommandStatus, _ = diagnosticCommandStatus(terminalCommandErr)
+		switch {
+		case stream.startErr != nil:
+		case stream.output.exceeded:
+			lifecycle.TerminalReason = "OUTPUT_TRUNCATED"
+		case stream.stderr.buffer.Len() != 0:
+			lifecycle.TerminalReason = "STDERR_OBSERVED"
+		case stream.endedBeforeStop:
+			lifecycle.TerminalReason = "EOF_BEFORE_STOP"
+		case stream.startErr == nil:
+			lifecycle.TerminalStatus = "DRAINED"
+			lifecycle.TerminalReason = "CANCELLED_AFTER_CAPTURE"
+		}
+		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
+		if lifecycle.TerminalStatus != "DRAINED" {
 			observation.incomplete(stream.name + " stream incomplete")
 		}
 	}
@@ -3177,7 +3251,7 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 			_, offset := parsed.Zone()
 			zone = time.FixedZone("device", offset)
 		}
-		records, parsed := parseExitRecords(raw, observation.app, start, end, observation.ClockCorrelation.WallMinusMonotonicNanos, zone)
+		records, parsed := parseExitRecords(raw, observation.app, start, end, observation.ClockCorrelation, zone)
 		observation.ExitRecords = records
 		// A recognized, complete empty history is distinct from an empty or
 		// unsupported command response. The latter is never absence of crashes.
@@ -3277,52 +3351,93 @@ func sanitizeActivityProcessState(input, app string) []string {
 }
 
 func (window diagnosticMarkerWindow) MatchingWindow() (int64, int64) {
-	if len(window.MatchingStartTimestamps) != 1 || len(window.MatchingEndTimestamps) != 1 {
+	if len(window.MatchingStartTimestamps) == 0 || len(window.MatchingEndTimestamps) == 0 {
 		return 0, 0
 	}
-	return window.MatchingStartTimestamps[0], window.MatchingEndTimestamps[0]
+	// START uses the latest observation and END the earliest observation. This
+	// is the conservative intersection of one logical event observed through
+	// multiple collectors whose timestamp rendering can differ slightly.
+	start := window.MatchingStartTimestamps[0]
+	for _, observed := range window.MatchingStartTimestamps[1:] {
+		if observed > start {
+			start = observed
+		}
+	}
+	end := window.MatchingEndTimestamps[0]
+	for _, observed := range window.MatchingEndTimestamps[1:] {
+		if observed < end {
+			end = observed
+		}
+	}
+	return start, end
+}
+
+type launchMarkerIdentity struct {
+	Type         string
+	Invocation   string
+	EventNonce   string
+	Emitter      string
+	CommandEpoch string
+}
+
+var launchMarkerFieldPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+func (identity launchMarkerIdentity) String() string {
+	return strings.Join([]string{
+		launchMarkerVersion, identity.Type, identity.Invocation, identity.EventNonce, identity.Emitter, identity.CommandEpoch,
+	}, ":")
+}
+
+func parseLaunchMarkerIdentity(value string) (launchMarkerIdentity, bool) {
+	fields := strings.Split(value, ":")
+	if len(fields) != 6 || fields[0] != launchMarkerVersion ||
+		(fields[1] != "START" && fields[1] != "END") ||
+		!launchMarkerFieldPattern.MatchString(fields[2]) ||
+		!launchMarkerFieldPattern.MatchString(fields[3]) ||
+		fields[4] != launchMarkerEmitter ||
+		!launchMarkerFieldPattern.MatchString(fields[5]) {
+		return launchMarkerIdentity{}, false
+	}
+	return launchMarkerIdentity{
+		Type: fields[1], Invocation: fields[2], EventNonce: fields[3], Emitter: fields[4], CommandEpoch: fields[5],
+	}, true
+}
+
+func newLaunchMarkerIdentity(markerType, invocation string) (launchMarkerIdentity, error) {
+	if (markerType != "START" && markerType != "END") || !launchMarkerFieldPattern.MatchString(invocation) {
+		return launchMarkerIdentity{}, errors.New("invalid launch marker identity")
+	}
+	var eventNonce, commandEpoch [16]byte
+	if _, err := rand.Read(eventNonce[:]); err != nil {
+		return launchMarkerIdentity{}, err
+	}
+	if _, err := rand.Read(commandEpoch[:]); err != nil {
+		return launchMarkerIdentity{}, err
+	}
+	return launchMarkerIdentity{
+		Type: markerType, Invocation: invocation, EventNonce: fmt.Sprintf("%x", eventNonce),
+		Emitter: launchMarkerEmitter, CommandEpoch: fmt.Sprintf("%x", commandEpoch),
+	}, nil
+}
+
+func launchMarkerSnapshotArgs(invocation string, startNanos int64, domain string) ([]string, error) {
+	if !launchMarkerFieldPattern.MatchString(invocation) || startNanos <= 0 || (domain != "monotonic" && domain != "epoch") {
+		return nil, errors.New("invalid launch marker snapshot boundary")
+	}
+	start := strconv.FormatInt(startNanos/1_000_000_000, 10) + "." + fmt.Sprintf("%09d", startNanos%1_000_000_000)
+	return []string{
+		"shell", "logcat", "-b", "main", "-d", "-T", start, "-e", invocation,
+		"-v", "threadtime", "-v", domain, "-v", "usec", launchProbeTag + ":I", "*:S",
+	}, nil
 }
 
 func exactLaunchMarkerPair(input, invocation string) (int64, int64, string) {
-	if len(input) > maxLogcatInput || !regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(invocation) {
-		return 0, 0, "INPUT_INVALID"
+	window := diagnoseLaunchMarkerWindow(input, "", invocation, 1, 9_000_000_000_000_000_000)
+	if window.Status != "CAPTURED" {
+		return 0, 0, window.Rejection
 	}
-	var starts, ends []int64
-	pattern := regexp.MustCompile(`^(START|END):([0-9a-f]{32})$`)
-	for _, line := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "---------") {
-			continue
-		}
-		event, ok := parseEpochLog(line)
-		if !ok {
-			if strings.Contains(line, "KurdistanLaunchProbe") || strings.Contains(line, invocation) {
-				return 0, 0, "MARKER_MALFORMED"
-			}
-			continue
-		}
-		if event.Tag != "KurdistanLaunchProbe" {
-			continue
-		}
-		match := pattern.FindStringSubmatch(event.Text)
-		if match == nil {
-			return 0, 0, "MARKER_MALFORMED"
-		}
-		if match[2] != invocation {
-			continue
-		}
-		if match[1] == "START" {
-			starts = append(starts, event.DeviceNanos)
-		} else {
-			ends = append(ends, event.DeviceNanos)
-		}
-	}
-	if len(starts) != 1 || len(ends) != 1 {
-		return 0, 0, "MARKER_CARDINALITY_INVALID"
-	}
-	if starts[0] <= 0 || ends[0] <= starts[0] {
-		return 0, 0, "MARKER_ORDER_INVALID"
-	}
-	return starts[0], ends[0], ""
+	start, end := window.MatchingWindow()
+	return start, end, ""
 }
 
 func correlateLaunchMarkerClocks(monotonic, wall, invocation string) diagnosticClockCorrelation {
@@ -3343,12 +3458,40 @@ func correlateLaunchMarkerClocks(monotonic, wall, invocation string) diagnosticC
 	}
 	startOffset := wallStart - monotonicStart
 	endOffset := wallEnd - monotonicEnd
-	if startOffset != endOffset {
-		correlation.Rejection = "OFFSET_CHANGED"
+	// Logcat renders these snapshots at microsecond precision. Each paired
+	// marker therefore supplies an offset interval, not an exact offset. The
+	// controlling launch order remains monotonic; wall correlation is bounded
+	// by the two observed boundary samples and is used only for wall-timestamped
+	// exit metadata.
+	const renderUncertainty = int64(time.Microsecond - time.Nanosecond)
+	correlation.StartOffsetNanos = startOffset
+	correlation.EndOffsetNanos = endOffset
+	correlation.StartOffsetLowerNanos = startOffset - renderUncertainty
+	correlation.StartOffsetUpperNanos = startOffset + renderUncertainty
+	correlation.EndOffsetLowerNanos = endOffset - renderUncertainty
+	correlation.EndOffsetUpperNanos = endOffset + renderUncertainty
+	// Both observations describe one stable wall-minus-monotonic relationship.
+	// Retain only their mathematical intersection; a union would silently make
+	// incompatible clock samples appear coherent.
+	correlation.WallMinusMonotonicLowerNanos = correlation.StartOffsetLowerNanos
+	if correlation.EndOffsetLowerNanos > correlation.WallMinusMonotonicLowerNanos {
+		correlation.WallMinusMonotonicLowerNanos = correlation.EndOffsetLowerNanos
+	}
+	correlation.WallMinusMonotonicUpperNanos = correlation.StartOffsetUpperNanos
+	if correlation.EndOffsetUpperNanos < correlation.WallMinusMonotonicUpperNanos {
+		correlation.WallMinusMonotonicUpperNanos = correlation.EndOffsetUpperNanos
+	}
+	if correlation.WallMinusMonotonicLowerNanos <= 0 {
+		correlation.Rejection = "OFFSET_INTERVAL_INVALID"
+		return correlation
+	}
+	if correlation.WallMinusMonotonicUpperNanos < correlation.WallMinusMonotonicLowerNanos {
+		correlation.Rejection = "OFFSET_INTERVAL_INCOMPATIBLE"
 		return correlation
 	}
 	correlation.Status = "CAPTURED"
-	correlation.WallMinusMonotonicNanos = startOffset
+	correlation.WallMinusMonotonicNanos = correlation.WallMinusMonotonicLowerNanos +
+		(correlation.WallMinusMonotonicUpperNanos-correlation.WallMinusMonotonicLowerNanos)/2
 	return correlation
 }
 
@@ -3366,8 +3509,15 @@ func diagnoseLaunchMarkerWindow(stream, snapshot, invocation string, before, aft
 		window.Rejection = "DEVICE_END_CLOCK_INVALID"
 		return window
 	}
-	starts, ends := map[int64]bool{}, map[int64]bool{}
-	markerPattern := regexp.MustCompile("^(START|END):([0-9a-f]{32})$")
+	type markerState struct {
+		identity   string
+		timestamps []int64
+		bySource   map[string]int64
+	}
+	states := map[string]*markerState{
+		"START": {bySource: make(map[string]int64)},
+		"END":   {bySource: make(map[string]int64)},
+	}
 	for _, source := range []struct {
 		name  string
 		input string
@@ -3382,59 +3532,60 @@ func diagnoseLaunchMarkerWindow(stream, snapshot, invocation string, before, aft
 			}
 			event, ok := parseEpochLog(line)
 			if !ok {
-				if strings.Contains(line, "KurdistanLaunchProbe") {
+				if strings.Contains(line, launchProbeTag) {
 					window.MalformedMarkers++
+					window.Rejection = "MARKER_IDENTITY_MALFORMED"
+					return window
 				}
 				continue
 			}
-			if event.Tag != "KurdistanLaunchProbe" {
+			if event.Tag != launchProbeTag {
 				continue
 			}
-			match := markerPattern.FindStringSubmatch(event.Text)
-			if match == nil {
+			identity, valid := parseLaunchMarkerIdentity(event.Text)
+			if !valid {
 				window.MalformedMarkers++
-				continue
+				window.Rejection = "MARKER_IDENTITY_MALFORMED"
+				return window
 			}
-			matching := match[2] == invocation
+			matching := identity.Invocation == invocation
 			if len(window.Markers) < 64 {
 				window.Markers = append(window.Markers, diagnosticMarkerEvidence{
 					Source: source.name, Value: event.Text, DeviceNanos: event.DeviceNanos, InvocationMatch: matching,
+					MarkerType: identity.Type, EventNonce: identity.EventNonce, Emitter: identity.Emitter, CommandEpoch: identity.CommandEpoch,
 				})
 			} else {
 				window.MalformedMarkers++
+				window.Rejection = "MARKER_EVIDENCE_OVERSIZE"
+				return window
 			}
 			if !matching {
 				window.IgnoredMarkers++
-				continue
+				window.Rejection = "INVOCATION_MISMATCH"
+				return window
 			}
-			if match[1] == "START" {
-				starts[event.DeviceNanos] = true
-			} else {
-				ends[event.DeviceNanos] = true
+			state := states[identity.Type]
+			canonical := identity.String()
+			if state.identity != "" && state.identity != canonical {
+				window.Rejection = identity.Type + "_IDENTITY_AMBIGUOUS"
+				return window
 			}
+			state.identity = canonical
+			if prior, found := state.bySource[source.name]; found && prior != event.DeviceNanos {
+				window.Rejection = identity.Type + "_SOURCE_CONFLICT"
+				return window
+			}
+			state.bySource[source.name] = event.DeviceNanos
+			state.timestamps = append(state.timestamps, event.DeviceNanos)
 		}
 	}
-	for timestamp := range starts {
-		window.MatchingStartTimestamps = append(window.MatchingStartTimestamps, timestamp)
-	}
-	for timestamp := range ends {
-		window.MatchingEndTimestamps = append(window.MatchingEndTimestamps, timestamp)
-	}
-	sort.Slice(window.MatchingStartTimestamps, func(left, right int) bool {
-		return window.MatchingStartTimestamps[left] < window.MatchingStartTimestamps[right]
-	})
-	sort.Slice(window.MatchingEndTimestamps, func(left, right int) bool {
-		return window.MatchingEndTimestamps[left] < window.MatchingEndTimestamps[right]
-	})
+	window.MatchingStartTimestamps = append(window.MatchingStartTimestamps, states["START"].timestamps...)
+	window.MatchingEndTimestamps = append(window.MatchingEndTimestamps, states["END"].timestamps...)
 	switch {
-	case len(window.MatchingStartTimestamps) == 0:
+	case states["START"].identity == "":
 		window.Rejection = "START_MISSING"
-	case len(window.MatchingStartTimestamps) > 1:
-		window.Rejection = "START_AMBIGUOUS"
-	case len(window.MatchingEndTimestamps) == 0:
+	case states["END"].identity == "":
 		window.Rejection = "END_MISSING"
-	case len(window.MatchingEndTimestamps) > 1:
-		window.Rejection = "END_AMBIGUOUS"
 	default:
 		start, end := window.MatchingWindow()
 		switch {

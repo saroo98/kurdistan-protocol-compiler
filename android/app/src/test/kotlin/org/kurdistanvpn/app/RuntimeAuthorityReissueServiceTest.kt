@@ -6,8 +6,13 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.AbstractExecutorService
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import org.junit.Assert.*
 import org.junit.Test
 import org.kurdistanvpn.data.protectedstate.ProtectedStateProcessOwner
@@ -16,34 +21,159 @@ import org.kurdistanvpn.runtime.android.*
 
 /** Host execution covers the real provider state machine, not Android Binder or pipe syscalls. */
 class RuntimeAuthorityReissueServiceTest {
-    @Test fun boundedQuiescenceAdmissionRejectsPrebindAndCleansLateReplyBeforeItCanAuthorizeMutation() {
-        val executor = Executors.newSingleThreadExecutor()
-        try {
-            var poisoned = 0
-            val unavailable = BoundedMutationQuiescenceAdmission({ 100L }, executor, { poisoned++ }, 20L) {
-                "a".repeat(32)
-            }
-            assertNull(unavailable.acquire { _, _, _ -> false })
-            assertEquals(0, poisoned)
+    private data class QuiescenceTrace(
+        var poisoned: Int = 0,
+        var futureBegan: Boolean = false,
+        var replied: Boolean = false,
+        var repliedLate: Boolean = false,
+        var cleanup: String = "NOT_REQUIRED",
+        var lateAuthorization: Boolean = false,
+        var timedOut: Boolean = false,
+        var interrupted: Boolean = false,
+        var elapsedWaitMillis: Long = 0,
+    ) {
+        fun diagnostic(outcome: String): String =
+            "KURDISTAN_QUIESCENCE_DIAGNOSTIC poisoned=$poisoned outcome=$outcome timeout=$timedOut " +
+                "interruption=$interrupted thread_interrupted=${Thread.currentThread().isInterrupted} " +
+                "elapsed_ms=$elapsedWaitMillis future_began=$futureBegan replied=$replied " +
+                "replied_late=$repliedLate cleanup=$cleanup late_authorization=$lateAuthorization"
+    }
 
-            val released = CountDownLatch(1)
-            val delayed = BoundedMutationQuiescenceAdmission({ 100L }, executor, { poisoned++ }, 20L) {
-                "b".repeat(32)
+    private enum class ControlledGet { COMPLETE, TIMEOUT, INTERRUPT }
+
+    private class ControlledFuture<T>(
+        private val callable: Callable<T>,
+        private val getMode: ControlledGet,
+        private val onBegin: () -> Unit,
+        private val onReply: () -> Unit,
+    ) : Future<T> {
+        private var done = false
+        private var cancelled = false
+        private var value: T? = null
+        private var failure: Throwable? = null
+
+        fun runPending(): T? {
+            if (!done && !cancelled) {
+                onBegin()
+                try { value = callable.call() } catch (caught: Throwable) { failure = caught }
+                done = true
+                onReply()
             }
-            assertNull(delayed.acquire { code, _, _ ->
-                if (code == RuntimeMutationQuiescenceWire.ACQUIRE) {
-                    Thread.sleep(60)
-                    true
-                } else {
-                    released.countDown()
-                    true
-                }
-            })
-            assertTrue("late accepted admission was not released", released.await(1, TimeUnit.SECONDS))
-            assertEquals(1, poisoned)
-        } finally {
-            executor.shutdownNow()
+            failure?.let { throw ExecutionException(it) }
+            return value
         }
+
+        override fun cancel(mayInterruptIfRunning: Boolean): Boolean {
+            if (done) return false
+            cancelled = true
+            done = true
+            return true
+        }
+        override fun isCancelled(): Boolean = cancelled
+        override fun isDone(): Boolean = done
+        override fun get(): T = valueOrThrow(runPending())
+        override fun get(timeout: Long, unit: TimeUnit): T = when (getMode) {
+            ControlledGet.COMPLETE -> valueOrThrow(runPending())
+            ControlledGet.TIMEOUT -> throw TimeoutException("synthetic bounded timeout")
+            ControlledGet.INTERRUPT -> throw InterruptedException("synthetic bounded interruption")
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun valueOrThrow(result: T?): T {
+            failure?.let { throw ExecutionException(it) }
+            return result as T
+        }
+    }
+
+    private class ControlledExecutor : AbstractExecutorService() {
+        var nextGet = ControlledGet.COMPLETE
+        var onBegin: () -> Unit = {}
+        var onReply: () -> Unit = {}
+        var last: ControlledFuture<*>? = null
+        private var shutdown = false
+
+        override fun <T> submit(task: Callable<T>): Future<T> {
+            check(!shutdown)
+            return ControlledFuture(task, nextGet, onBegin, onReply).also { last = it }
+        }
+        override fun execute(command: Runnable) = error("test executor accepts Callable submissions only")
+        override fun shutdown() { shutdown = true }
+        override fun shutdownNow(): MutableList<Runnable> { shutdown = true; return mutableListOf() }
+        override fun isShutdown(): Boolean = shutdown
+        override fun isTerminated(): Boolean = shutdown
+        override fun awaitTermination(timeout: Long, unit: TimeUnit): Boolean = shutdown
+    }
+
+    private fun assertTrace(condition: Boolean, trace: QuiescenceTrace, outcome: String) {
+        assertTrue(trace.diagnostic(outcome), condition)
+    }
+
+    @Test fun boundedQuiescenceImmediatePrebindRejectionDoesNotPoison() {
+        val trace = QuiescenceTrace()
+        val executor = ControlledExecutor().also {
+            it.onBegin = { trace.futureBegan = true }
+            it.onReply = { trace.replied = true }
+        }
+        val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "a".repeat(32) }
+        val started = System.nanoTime()
+        val result = admission.acquire { _, _, _ -> false }
+        trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        assertTrace(result == null && trace.poisoned == 0 && trace.futureBegan && trace.replied, trace, "IMMEDIATE_REJECT")
+    }
+
+    @Test fun boundedQuiescenceActualTimeoutPoisonsAndLateReplyOnlyReleases() {
+        val trace = QuiescenceTrace(timedOut = true)
+        val executor = ControlledExecutor().also {
+            it.nextGet = ControlledGet.TIMEOUT
+            it.onBegin = { trace.futureBegan = true }
+            it.onReply = { trace.replied = true; trace.repliedLate = true }
+        }
+        val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "b".repeat(32) }
+        val started = System.nanoTime()
+        val result = admission.acquire { code, _, _ ->
+            if (code == RuntimeMutationQuiescenceWire.ACQUIRE) true else {
+                trace.cleanup = "RELEASED"
+                true
+            }
+        }
+        trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        assertTrace(result == null && trace.poisoned == 1 && !trace.futureBegan && !trace.replied, trace, "TIMEOUT")
+        val late = checkNotNull(executor.last).runPending()
+        trace.lateAuthorization = late != null
+        assertTrace(late == null && trace.cleanup == "RELEASED" && !trace.lateAuthorization && trace.futureBegan && trace.repliedLate, trace, "LATE_REPLY_RELEASED")
+    }
+
+    @Test fun boundedQuiescenceInterruptionPoisonsAndPreservesThreadInterruption() {
+        val trace = QuiescenceTrace(interrupted = true)
+        val executor = ControlledExecutor().also { it.nextGet = ControlledGet.INTERRUPT }
+        val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "c".repeat(32) }
+        val started = System.nanoTime()
+        try {
+            val result = admission.acquire { _, _, _ -> true }
+            trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            assertTrace(result == null && trace.poisoned == 1 && Thread.currentThread().isInterrupted, trace, "INTERRUPTED")
+        } finally {
+            Thread.interrupted()
+        }
+    }
+
+    @Test fun boundedQuiescenceLeaseCleanupIsExactAndPreventsLateAuthorization() {
+        val trace = QuiescenceTrace()
+        val executor = ControlledExecutor().also {
+            it.onBegin = { trace.futureBegan = true }
+            it.onReply = { trace.replied = true }
+        }
+        val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "d".repeat(32) }
+        var releases = 0
+        val lease = admission.acquire { code, _, _ ->
+            if (code == RuntimeMutationQuiescenceWire.RELEASE) releases++
+            true
+        }
+        assertTrace(lease != null && trace.poisoned == 0, trace, "LEASE_ACQUIRED")
+        checkNotNull(lease).close()
+        lease.close()
+        trace.cleanup = if (releases == 1) "RELEASED" else "UNPROVEN"
+        assertTrace(releases == 1 && trace.poisoned == 0, trace, "LEASE_RELEASED")
     }
 
     @Test fun quiescenceTransportOrReleaseFailurePoisonsTheDefaultProcessAdmission() {

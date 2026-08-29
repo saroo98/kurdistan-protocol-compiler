@@ -241,7 +241,7 @@ type fixtureStream struct {
 	rejected    atomic.Int64
 }
 
-func newFixtureStream(ctx context.Context, output io.Writer, terminate bool) *fixtureStream {
+func newFixtureStream(ctx context.Context, output io.Writer, terminate <-chan struct{}) *fixtureStream {
 	stream := &fixtureStream{
 		chunks: make(chan fixtureOutputChunk), ready: make(chan struct{}), done: make(chan struct{}),
 	}
@@ -263,15 +263,21 @@ func newFixtureStream(ctx context.Context, output io.Writer, terminate bool) *fi
 	}()
 	<-stream.ready
 	go func() {
-		if !terminate {
+		if terminate == nil {
 			<-ctx.Done()
 			stream.cancelled.Add(1)
+		} else {
+			select {
+			case <-terminate:
+			case <-ctx.Done():
+				stream.cancelled.Add(1)
+			}
 		}
 		// Do not close output until the current accepted chunk is fully copied.
 		// A later write returns an explicit error instead of losing bytes.
 		stream.mu.Lock()
 		defer stream.mu.Unlock()
-		if !terminate {
+		if terminate == nil || ctx.Err() != nil {
 			stream.terminalErr = ctx.Err()
 		}
 		stream.closes.Add(1)
@@ -319,6 +325,8 @@ type launchFixtureTransport struct {
 	streams    map[string]*fixtureStream
 	commands   []fixtureCommand
 	blocked    chan struct{}
+	terminate  chan struct{}
+	terminated bool
 }
 
 type fixtureMarker struct {
@@ -336,6 +344,7 @@ func newLaunchFixtureTransport(scenario string) *launchFixtureTransport {
 		logs:      make(map[string]string),
 		streams:   make(map[string]*fixtureStream),
 		blocked:   make(chan struct{}),
+		terminate: make(chan struct{}),
 	}
 }
 
@@ -403,7 +412,16 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		if scenario == "missing-markers" {
 			return nil
 		}
-		if scenario == "terminated-stream" && strings.HasPrefix(args[len(args)-1], "END:") {
+		marker := args[len(args)-1]
+		markerType := ""
+		if fields := strings.Split(marker, ":"); len(fields) >= 2 {
+			markerType = fields[1]
+		}
+		if scenario == "terminated-stream" && markerType == "END" {
+			if !fixture.terminated {
+				close(fixture.terminate)
+				fixture.terminated = true
+			}
 			for _, stream := range fixture.streams {
 				select {
 				case <-stream.done:
@@ -412,11 +430,19 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 				}
 			}
 		}
-		marker := args[len(args)-1]
 		fixture.markers = append(fixture.markers, fixtureMarker{
-			tag: "KurdistanLaunchProbe", text: marker, monotonic: fixture.clock, wall: fixture.wallClock,
+			tag: launchProbeTag, text: marker, monotonic: fixture.clock, wall: fixture.wallClock,
 		})
-		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I KurdistanLaunchProbe: "+marker+"\n")
+		raw := fixtureStamp(fixture.clock) + " 11 11 I " + launchProbeTag + ": " + marker + "\n"
+		if scenario == "terminated-stream" && markerType == "END" {
+			fixture.logs["main"] += raw
+			return nil
+		}
+		if scenario == "api34-start-stream-loss" && markerType == "START" {
+			fixture.logs["main"] += raw
+			return nil
+		}
+		return fixture.appendLog("main", raw)
 	case command == "cmd package resolve-activity --brief -n "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity":
 		fmt.Fprintln(stdout, defaultAppPackage+"/org.kurdistanvpn.app.MainActivity")
 	case command == "ps -A -o UID,PID,PPID,NAME":
@@ -588,6 +614,10 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 				if marker.tag != tag {
 					continue
 				}
+				if scenario == "api36-start-snapshot-loss" && strings.Contains(" "+command+" ", " -t ") &&
+					strings.Contains(marker.text, ":START:") {
+					continue
+				}
 				stamp := marker.monotonic
 				if epoch {
 					stamp = marker.wall
@@ -627,7 +657,11 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	if (buffer != "crash" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
 		return nil, errors.New("unexpected or duplicate fixture stream")
 	}
-	stream := newFixtureStream(ctx, stdout, fixture.scenario == "terminated-stream")
+	var terminate <-chan struct{}
+	if fixture.scenario == "terminated-stream" {
+		terminate = fixture.terminate
+	}
+	stream := newFixtureStream(ctx, stdout, terminate)
 	fixture.streams[buffer] = stream
 	return stream.wait, nil
 }
@@ -724,12 +758,31 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 	prefix := "run -s emulator-5554 shell "
 	streamPrefix := "start -s emulator-5554 shell logcat -b "
 	streamSuffix := " -v threadtime -v monotonic -v usec -T 1 AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S"
+	startMarker, endMarker := "", ""
+	for _, call := range fixture.commands {
+		if len(call.args) == 0 {
+			continue
+		}
+		identity, valid := parseLaunchMarkerIdentity(call.args[len(call.args)-1])
+		if !valid {
+			continue
+		}
+		if identity.Type == "START" {
+			startMarker = identity.String()
+		} else {
+			endMarker = identity.String()
+		}
+	}
+	if startMarker == "" || endMarker == "" {
+		t.Fatal("canonical launch markers unavailable from exact command sequence")
+	}
+	markerStart := strconv.FormatInt(observation.DeviceStartNanos/1_000_000_000, 10) + "." + fmt.Sprintf("%09d", observation.DeviceStartNanos%1_000_000_000)
 	want := []string{
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-before:" + observation.Invocation,
 		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
 		prefix + "date +%z",
 		streamPrefix + "crash" + streamSuffix, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
-		prefix + "log -p i -t KurdistanLaunchProbe START:" + observation.Invocation,
+		prefix + "log -p i -t KurdistanLaunchProbe " + startMarker,
 		prefix + "ps -A -o UID,PID,PPID,NAME",
 		prefix + "cmd package resolve-activity --brief -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "am start -W -f 0x10008000 -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
@@ -738,11 +791,11 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "dumpsys activity processes " + defaultAppPackage,
-		prefix + "log -p i -t KurdistanLaunchProbe END:" + observation.Invocation,
-		prefix + "logcat -b main -d -t 128 -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
+		prefix + "log -p i -t KurdistanLaunchProbe " + endMarker,
+		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,
 		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
-		prefix + "logcat -b main -d -t 128 -v threadtime -v epoch -v usec KurdistanLaunchProbe:I *:S",
+		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v epoch -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "dumpsys activity exit-info " + defaultAppPackage,
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -793,10 +846,12 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 		}
 	}
 	invocation := strings.Repeat("1", 32)
+	startMarker := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("2", 32), strings.Repeat("3", 32))
+	endMarker := fixtureCanonicalLaunchMarker("END", invocation, strings.Repeat("4", 32), strings.Repeat("5", 32))
 	for _, args := range [][]string{
-		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "START:" + invocation},
+		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", startMarker},
 		{"-s", "emulator-5554", "shell", "am", "start", "-W", "-f", "0x10008000", "-n", defaultAppPackage + "/org.kurdistanvpn.app.MainActivity"},
-		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", "END:" + invocation},
+		{"-s", "emulator-5554", "shell", "log", "-p", "i", "-t", "KurdistanLaunchProbe", endMarker},
 	} {
 		if err := client.runCommand(ctx, args, io.Discard, io.Discard, time.Second); err != nil {
 			t.Fatalf("raw fixture command failed: %v", err)
@@ -1362,9 +1417,14 @@ func TestExitReasonRequiresExactProcessAndWindow(t *testing.T) {
 		" process=" + defaultAppPackage + " reason=4 (CRASH) subreason=0 (UNKNOWN) status=0\n description=token=synthetic-secret\n" +
 		"ApplicationExitInfo #1:\n timestamp=2026-01-02 02:04:01.250 pid=777 realUid=10123\n process=" + defaultAppPackage + " reason=4 (CRASH) status=0\n" +
 		"ApplicationExitInfo #2:\n timestamp=2026-01-02 03:04:01.250 pid=888 realUid=10124\n process=" + defaultAppPackage + "ger reason=4 (CRASH) status=0\n"
-	records, complete := parseExitRecords(raw, defaultAppPackage, monotonicStart, monotonicStart+int64(5*time.Second), offset, time.UTC)
+	correlation := diagnosticClockCorrelation{
+		Status: "CAPTURED", WallMinusMonotonicNanos: offset,
+		WallMinusMonotonicLowerNanos: offset, WallMinusMonotonicUpperNanos: offset,
+	}
+	records, complete := parseExitRecords(raw, defaultAppPackage, monotonicStart, monotonicStart+int64(5*time.Second), correlation, time.UTC)
 	if !complete || len(records) != 1 || records[0].PID != 999 || records[0].Reason != 4 ||
-		records[0].DeviceNanos != monotonicStart+int64(1250*time.Millisecond) || strings.Contains(fmt.Sprint(records), "secret") {
+		records[0].DeviceNanos != monotonicStart+int64(1250*time.Millisecond) || records[0].DeviceEndNanos != records[0].DeviceNanos ||
+		strings.Contains(fmt.Sprint(records), "secret") {
 		t.Fatalf("exit records=%+v complete=%t", records, complete)
 	}
 }
@@ -1386,8 +1446,10 @@ func TestProcessIdentityRequiresExactNameAndStartTicks(t *testing.T) {
 
 func TestLaunchMarkersRequireOneCurrentInvocationAndRetainWindowAfterStreamExit(t *testing.T) {
 	id := strings.Repeat("1", 32)
-	start := "101.000001 11 11 I KurdistanLaunchProbe: START:" + id + "\n"
-	end := "103.000001 12 12 I KurdistanLaunchProbe: END:" + id + "\n"
+	startIdentity := fixtureCanonicalLaunchMarker("START", id, strings.Repeat("2", 32), strings.Repeat("3", 32))
+	endIdentity := fixtureCanonicalLaunchMarker("END", id, strings.Repeat("4", 32), strings.Repeat("5", 32))
+	start := "101.000001 11 11 I KurdistanLaunchProbe: " + startIdentity + "\n"
+	end := "103.000001 12 12 I KurdistanLaunchProbe: " + endIdentity + "\n"
 	first, last, ok := launchMarkerWindow(start, start+end, id, 100_000_000_000, 104_000_000_000)
 	if !ok || first != 101_000_001_000 || last != 103_000_001_000 {
 		t.Fatalf("verified marker window lost after stream exit: %d %d %t", first, last, ok)
@@ -1395,7 +1457,7 @@ func TestLaunchMarkersRequireOneCurrentInvocationAndRetainWindowAfterStreamExit(
 	for _, input := range []struct{ stream, snapshot, invocation string }{
 		{start, "", id},
 		{start, end, strings.Repeat("2", 32)},
-		{start, end + "102.000001 13 13 I KurdistanLaunchProbe: START:" + id, id},
+		{start, end + "102.000001 13 13 I KurdistanLaunchProbe: " + fixtureCanonicalLaunchMarker("START", id, strings.Repeat("6", 32), strings.Repeat("7", 32)), id},
 		{start, "99.000001 12 12 I KurdistanLaunchProbe: END:" + id, id},
 	} {
 		if _, _, ok := launchMarkerWindow(input.stream, input.snapshot, input.invocation, 100_000_000_000, 104_000_000_000); ok {
@@ -1404,6 +1466,190 @@ func TestLaunchMarkersRequireOneCurrentInvocationAndRetainWindowAfterStreamExit(
 	}
 	if events, ok := launchWindowEvents("unbound crash", defaultAppPackage, 0, 0); ok || len(events) != 0 {
 		t.Fatal("unbound logs attributed to current launch")
+	}
+}
+
+func fixtureCanonicalLaunchMarker(kind, invocation, nonce, epoch string) string {
+	return "KLG1:" + kind + ":" + invocation + ":" + nonce + ":phase9devicegate:" + epoch
+}
+
+func TestCanonicalLaunchMarkerIdentityMergesAPI26CollectorObservations(t *testing.T) {
+	invocation := strings.Repeat("1", 32)
+	start := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("2", 32), strings.Repeat("3", 32))
+	end := fixtureCanonicalLaunchMarker("END", invocation, strings.Repeat("4", 32), strings.Repeat("5", 32))
+	stream := "106.349197000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"110.394732000 11 11 I KurdistanLaunchProbe: " + end + "\n"
+	snapshot := "106.349200000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"110.394736000 11 11 I KurdistanLaunchProbe: " + end + "\n"
+
+	window := diagnoseLaunchMarkerWindow(stream, snapshot, invocation, 106_349_190_000, 110_394_740_000)
+	first, last := window.MatchingWindow()
+	if window.Status != "CAPTURED" || window.Rejection != "" || first != 106_349_200_000 || last != 110_394_732_000 {
+		t.Fatalf("same emitted markers were not merged by canonical identity: window=%+v first=%d last=%d", window, first, last)
+	}
+	if len(window.Markers) != 4 || window.Markers[0].Source != "stream" || window.Markers[2].Source != "snapshot" {
+		t.Fatalf("collector provenance was not retained: %+v", window.Markers)
+	}
+}
+
+func TestCanonicalLaunchMarkerIdentityRejectsAmbiguityConflictAndWrongInvocation(t *testing.T) {
+	invocation := strings.Repeat("6", 32)
+	otherInvocation := strings.Repeat("7", 32)
+	startOne := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("8", 32), strings.Repeat("9", 32))
+	startTwo := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("a", 32), strings.Repeat("b", 32))
+	end := fixtureCanonicalLaunchMarker("END", invocation, strings.Repeat("c", 32), strings.Repeat("d", 32))
+	wrong := fixtureCanonicalLaunchMarker("START", otherInvocation, strings.Repeat("e", 32), strings.Repeat("f", 32))
+	line := func(at, marker string) string { return at + " 11 11 I KurdistanLaunchProbe: " + marker + "\n" }
+
+	for name, input := range map[string]struct {
+		stream   string
+		snapshot string
+		want     string
+	}{
+		"distinct-start-identities": {
+			stream:   line("101.000001000", startOne) + line("103.000001000", end),
+			snapshot: line("101.000002000", startTwo) + line("103.000002000", end),
+			want:     "START_IDENTITY_AMBIGUOUS",
+		},
+		"same-source-conflicting-observation": {
+			stream: line("101.000001000", startOne) + line("101.000002000", startOne) + line("103.000001000", end),
+			want:   "START_SOURCE_CONFLICT",
+		},
+		"wrong-invocation": {
+			stream: line("101.000001000", wrong) + line("103.000001000", end),
+			want:   "INVOCATION_MISMATCH",
+		},
+		"malformed-identity": {
+			stream: line("101.000001000", "KLG1:START:"+invocation+":missing-fields") + line("103.000001000", end),
+			want:   "MARKER_IDENTITY_MALFORMED",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			window := diagnoseLaunchMarkerWindow(input.stream, input.snapshot, invocation, 100_000_000_000, 104_000_000_000)
+			if window.Status != "REJECTED" || window.Rejection != input.want {
+				t.Fatalf("invalid canonical marker evidence not rejected categorically: %+v", window)
+			}
+		})
+	}
+}
+
+func TestLaunchObservationUsesCanonicalMarkersAndInvocationBoundSnapshot(t *testing.T) {
+	err, observation, fixture := runLaunchFixture(t, "healthy", 34)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var emitted []string
+	var snapshot []string
+	for _, call := range fixture.commands {
+		command := strings.Join(call.args[3:], " ")
+		if strings.HasPrefix(command, "log -p i -t "+launchProbeTag+" ") {
+			emitted = append(emitted, call.args[len(call.args)-1])
+		}
+		if strings.HasPrefix(command, "logcat -b main -d ") && strings.Contains(command, launchProbeTag+":I") {
+			snapshot = append([]string(nil), call.args[3:]...)
+		}
+	}
+	if len(emitted) != 2 {
+		t.Fatalf("marker emission count=%d commands=%+v", len(emitted), fixture.commands)
+	}
+	startIdentity, startOK := parseLaunchMarkerIdentity(emitted[0])
+	endIdentity, endOK := parseLaunchMarkerIdentity(emitted[1])
+	if !startOK || !endOK || startIdentity.Type != "START" || endIdentity.Type != "END" ||
+		startIdentity.Invocation != observation.Invocation || endIdentity.Invocation != observation.Invocation ||
+		startIdentity.EventNonce == endIdentity.EventNonce || startIdentity.CommandEpoch == endIdentity.CommandEpoch {
+		t.Fatalf("START/END marker identities are not unique and invocation-bound: start=%q end=%q", emitted[0], emitted[1])
+	}
+	joined := strings.Join(snapshot, " ")
+	if len(snapshot) == 0 || strings.Contains(joined, " -t ") || !strings.Contains(joined, " -T ") ||
+		!strings.Contains(joined, launchProbeTag+":I") || !strings.Contains(joined, observation.Invocation) {
+		t.Fatalf("marker snapshot is not start-bounded, tag-filtered and invocation-bound: %q", snapshot)
+	}
+}
+
+func TestCollectorStartLossIsRecoveredOnlyByInvocationBoundSnapshot(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		scenario string
+		api      int
+		source   string
+	}{
+		{name: "api34-stream-loss", scenario: "api34-start-stream-loss", api: 34, source: "snapshot"},
+		{name: "api36-snapshot-loss", scenario: "api36-start-snapshot-loss", api: 36, source: "stream"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, test.scenario, test.api)
+			if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" || observation.MarkerWindow.Status != "CAPTURED" {
+				t.Fatalf("bounded collector loss did not retain one canonical event: err=%v observation=%+v", err, observation)
+			}
+			found := false
+			for _, marker := range observation.MarkerWindow.Markers {
+				found = found || (marker.MarkerType == "START" && marker.Source == test.source)
+			}
+			if !found {
+				t.Fatalf("START provenance did not identify surviving collector %q: %+v", test.source, observation.MarkerWindow.Markers)
+			}
+		})
+	}
+}
+
+func TestLaunchCollectorsExposeCausalLifecycleAndCategoricalCompletion(t *testing.T) {
+	type lifecycle struct {
+		Buffer          string
+		StartStatus     string
+		ReadinessStatus string
+		TerminalStatus  string
+		TerminalReason  string
+		OutputTruncated bool
+		StderrObserved  bool
+	}
+	decode := func(t *testing.T, observation launchObservation) []lifecycle {
+		t.Helper()
+		raw, err := json.Marshal(observation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var report struct{ StreamLifecycle []lifecycle }
+		if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatal(err)
+		}
+		return report.StreamLifecycle
+	}
+
+	err, healthy := runLaunchScenario(t, "healthy", 34)
+	if err != nil {
+		t.Fatal(err)
+	}
+	states := decode(t, healthy)
+	if len(states) != 3 {
+		t.Fatalf("collector lifecycle count=%d, want three causal records", len(states))
+	}
+	for _, state := range states {
+		if state.StartStatus != "STARTED" || state.ReadinessStatus != "OUTPUT_SINK_READY" ||
+			state.TerminalStatus != "DRAINED" || state.TerminalReason != "CANCELLED_AFTER_CAPTURE" ||
+			state.OutputTruncated || state.StderrObserved {
+			t.Fatalf("healthy collector lifecycle is ambiguous: %+v", state)
+		}
+	}
+
+	for _, test := range []struct{ scenario, reason string }{
+		{scenario: "terminated-stream", reason: "EOF_BEFORE_STOP"},
+		{scenario: "unavailable-stream", reason: "START_FAILED"},
+	} {
+		t.Run(test.scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, test.scenario, 34)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" {
+				t.Fatalf("incomplete collector changed gate semantics: err=%v gate=%s", err, observation.GateResult)
+			}
+			states := decode(t, observation)
+			if len(states) != 3 {
+				t.Fatalf("incomplete collector lifecycle count=%d", len(states))
+			}
+			for _, state := range states {
+				if state.TerminalReason != test.reason {
+					t.Fatalf("collector reason=%q, want %q: %+v", state.TerminalReason, test.reason, state)
+				}
+			}
+		})
 	}
 }
 
@@ -1679,6 +1925,22 @@ func TestDiagnosticOnlyJUnitKeepsCauseChainAndRejectsMalformedInput(t *testing.T
 	}
 }
 
+func TestDiagnosticOnlyJUnitPreservesBoundedQuiescenceStateWithoutHostDetails(t *testing.T) {
+	message := "KURDISTAN_QUIESCENCE_DIAGNOSTIC poisoned=1 outcome=TIMEOUT timeout=true interruption=false thread_interrupted=false elapsed_ms=0 future_began=false replied=false replied_late=false cleanup=NOT_REQUIRED late_authorization=false"
+	fixture := `<testsuite name="org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest" tests="1" failures="1" errors="0"><testcase name="boundedQuiescenceActualTimeoutPoisonsAndLateReplyOnlyReleases" classname="org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest"><failure type="java.lang.AssertionError">java.lang.AssertionError: ` + message + `
+	 at org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest.boundedQuiescenceActualTimeoutPoisonsAndLateReplyOnlyReleases(RuntimeAuthorityReissueServiceTest.kt:123)
+	</failure></testcase><system-out>C:\Users\someone\private credential=synthetic-secret</system-out></testsuite>`
+	report, err := junitFailureReport([]byte(fixture))
+	if err != nil || report.Status != "CAPTURED" || len(report.Cases) != 1 || len(report.Cases[0].Exceptions) != 1 ||
+		report.Cases[0].Exceptions[0].Message != message || report.Cases[0].Exceptions[0].MessageRedacted {
+		t.Fatalf("bounded quiescence diagnostic was not preserved exactly: report=%+v err=%v", report, err)
+	}
+	encoded, err := json.Marshal(report)
+	if err != nil || strings.Contains(string(encoded), "Users") || strings.Contains(string(encoded), "synthetic-secret") {
+		t.Fatalf("JUnit diagnostic retained host or private output: %s err=%v", encoded, err)
+	}
+}
+
 func TestEvaluateInstrumentationRejectsCategoricalCrashSummary(t *testing.T) {
 	output := "INSTRUMENTATION_STATUS_CODE: 0\nOK (1 test)"
 	summary := "schema=kurdistan-device-diagnostic-summary-v1\napp_crash=true\n"
@@ -1830,10 +2092,12 @@ func TestClockProbeUsesOneMonotonicLogdDomainOnAllSupportedAPIs(t *testing.T) {
 
 func TestLaunchMarkerClockCorrelationMapsWallRecordsIntoMonotonicDomain(t *testing.T) {
 	invocation := strings.Repeat("b", 32)
-	monotonic := "101.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
-		"105.001000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n"
-	wall := "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
-		"1700000005.001000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n"
+	start := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("c", 32), strings.Repeat("d", 32))
+	end := fixtureCanonicalLaunchMarker("END", invocation, strings.Repeat("e", 32), strings.Repeat("f", 32))
+	monotonic := "101.001000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"105.001000 11 11 I KurdistanLaunchProbe: " + end + "\n"
+	wall := "1700000001.001000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"1700000005.001000 11 11 I KurdistanLaunchProbe: " + end + "\n"
 	correlation := correlateLaunchMarkerClocks(monotonic, wall, invocation)
 	if correlation.Status != "CAPTURED" || correlation.Rejection != "" ||
 		correlation.WallMinusMonotonicNanos != 1_699_999_900_000_000_000 {
@@ -1841,9 +2105,7 @@ func TestLaunchMarkerClockCorrelationMapsWallRecordsIntoMonotonicDomain(t *testi
 	}
 	for name, changed := range map[string]string{
 		"missing":   "",
-		"duplicate": wall + "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n",
-		"offset-change": "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
-			"1700000005.002000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n",
+		"duplicate": wall + "1700000001.002000 11 11 I KurdistanLaunchProbe: " + start + "\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := correlateLaunchMarkerClocks(monotonic, changed, invocation)
@@ -1851,6 +2113,23 @@ func TestLaunchMarkerClockCorrelationMapsWallRecordsIntoMonotonicDomain(t *testi
 				t.Fatalf("ambiguous wall/monotonic mapping accepted: %+v", got)
 			}
 		})
+	}
+	compatible := "1700000001.001000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"1700000005.001001 11 11 I KurdistanLaunchProbe: " + end + "\n"
+	bounded := correlateLaunchMarkerClocks(monotonic, compatible, invocation)
+	if bounded.Status != "CAPTURED" || bounded.Rejection != "" ||
+		bounded.StartOffsetNanos != 1_699_999_900_000_000_000 || bounded.EndOffsetNanos != 1_699_999_900_000_001_000 ||
+		bounded.WallMinusMonotonicLowerNanos != bounded.EndOffsetNanos-999 ||
+		bounded.WallMinusMonotonicUpperNanos != bounded.StartOffsetNanos+999 {
+		t.Fatalf("mathematically compatible before/after clock intervals were rejected: %+v", bounded)
+	}
+
+	drifted := "1700000001.001000 11 11 I KurdistanLaunchProbe: " + start + "\n" +
+		"1700000005.002000 11 11 I KurdistanLaunchProbe: " + end + "\n"
+	incompatible := correlateLaunchMarkerClocks(monotonic, drifted, invocation)
+	if incompatible.Status != "REJECTED" || incompatible.Rejection != "OFFSET_INTERVAL_INCOMPATIBLE" ||
+		incompatible.WallMinusMonotonicNanos != 0 {
+		t.Fatalf("mathematically incompatible before/after clock intervals were accepted: %+v", incompatible)
 	}
 }
 
@@ -1922,16 +2201,18 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 
 func TestMarkerDiagnosticsPreserveExactFailedCorrelationWithoutUntrustedText(t *testing.T) {
 	invocation := strings.Repeat("a", 32)
-	stream := "101.000001 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
+	start := fixtureCanonicalLaunchMarker("START", invocation, strings.Repeat("b", 32), strings.Repeat("c", 32))
+	end := fixtureCanonicalLaunchMarker("END", invocation, strings.Repeat("d", 32), strings.Repeat("e", 32))
+	stream := "101.000001 11 11 I KurdistanLaunchProbe: " + start + "\n" +
 		"101.500001 11 11 I UntrustedTag: token=synthetic-secret endpoint=https://192.0.2.9\n"
-	snapshot := "105.000001 12 12 I KurdistanLaunchProbe: END:" + invocation + "\n"
+	snapshot := "105.000001 12 12 I KurdistanLaunchProbe: " + end + "\n"
 	window := diagnoseLaunchMarkerWindow(stream, snapshot, invocation, 100_000_000_000, 104_000_000_000)
 	if window.Status != "REJECTED" || window.Rejection != "END_AFTER_DEVICE_CLOCK" || len(window.Markers) != 2 {
 		t.Fatalf("marker correlation failure was not preserved: %+v", window)
 	}
-	if window.Markers[0].Source != "stream" || window.Markers[0].Value != "START:"+invocation ||
+	if window.Markers[0].Source != "stream" || window.Markers[0].Value != start ||
 		window.Markers[0].DeviceNanos != 101_000_001_000 || window.Markers[1].Source != "snapshot" ||
-		window.Markers[1].Value != "END:"+invocation || window.Markers[1].DeviceNanos != 105_000_001_000 {
+		window.Markers[1].Value != end || window.Markers[1].DeviceNanos != 105_000_001_000 {
 		t.Fatalf("marker values, sources, or timestamps changed: %+v", window.Markers)
 	}
 	encoded, err := json.Marshal(window)
