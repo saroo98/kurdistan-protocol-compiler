@@ -9,7 +9,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -37,6 +36,24 @@ class RuntimeAuthorityReissueServiceTest {
                 "interruption=$interrupted thread_interrupted=${Thread.currentThread().isInterrupted} " +
                 "elapsed_ms=$elapsedWaitMillis future_began=$futureBegan replied=$replied " +
                 "replied_late=$repliedLate cleanup=$cleanup late_authorization=$lateAuthorization"
+    }
+
+    private data class QuiescenceOutcome<T>(
+        val completedNormally: Boolean,
+        val value: T?,
+        val failure: Throwable?,
+    ) {
+        fun category(): String = when {
+            !completedNormally -> "THREW_${failure?.javaClass?.simpleName ?: "UNKNOWN"}"
+            value == null -> "NORMAL_NULL"
+            else -> "NORMAL_VALUE"
+        }
+    }
+
+    private fun <T> captureQuiescenceOutcome(block: () -> T): QuiescenceOutcome<T> = try {
+        QuiescenceOutcome(completedNormally = true, value = block(), failure = null)
+    } catch (failure: Throwable) {
+        QuiescenceOutcome(completedNormally = false, value = null, failure = failure)
     }
 
     private enum class ControlledGet { COMPLETE, TIMEOUT, INTERRUPT }
@@ -116,9 +133,14 @@ class RuntimeAuthorityReissueServiceTest {
         }
         val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "a".repeat(32) }
         val started = System.nanoTime()
-        val result = admission.acquire { _, _, _ -> false }
+        val outcome = captureQuiescenceOutcome { admission.acquire { _, _, _ -> false } }
         trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
-        assertTrace(result == null && trace.poisoned == 0 && trace.futureBegan && trace.replied, trace, "IMMEDIATE_REJECT")
+        assertTrace(
+            outcome.completedNormally && outcome.value == null && outcome.failure == null &&
+                trace.poisoned == 0 && trace.futureBegan && trace.replied,
+            trace,
+            outcome.category(),
+        )
     }
 
     @Test fun boundedQuiescenceActualTimeoutPoisonsAndLateReplyOnlyReleases() {
@@ -130,14 +152,21 @@ class RuntimeAuthorityReissueServiceTest {
         }
         val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "b".repeat(32) }
         val started = System.nanoTime()
-        val result = admission.acquire { code, _, _ ->
-            if (code == RuntimeMutationQuiescenceWire.ACQUIRE) true else {
-                trace.cleanup = "RELEASED"
-                true
+        val outcome = captureQuiescenceOutcome {
+            admission.acquire { code, _, _ ->
+                if (code == RuntimeMutationQuiescenceWire.ACQUIRE) true else {
+                    trace.cleanup = "RELEASED"
+                    true
+                }
             }
         }
         trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
-        assertTrace(result == null && trace.poisoned == 1 && !trace.futureBegan && !trace.replied, trace, "TIMEOUT")
+        assertTrace(
+            outcome.completedNormally && outcome.value == null && outcome.failure == null &&
+                trace.poisoned == 1 && !trace.futureBegan && !trace.replied,
+            trace,
+            outcome.category(),
+        )
         val late = checkNotNull(executor.last).runPending()
         trace.lateAuthorization = late != null
         assertTrace(late == null && trace.cleanup == "RELEASED" && !trace.lateAuthorization && trace.futureBegan && trace.repliedLate, trace, "LATE_REPLY_RELEASED")
@@ -149,9 +178,14 @@ class RuntimeAuthorityReissueServiceTest {
         val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { trace.poisoned++ }, 20L) { "c".repeat(32) }
         val started = System.nanoTime()
         try {
-            val result = admission.acquire { _, _, _ -> true }
+            val outcome = captureQuiescenceOutcome { admission.acquire { _, _, _ -> true } }
             trace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
-            assertTrace(result == null && trace.poisoned == 1 && Thread.currentThread().isInterrupted, trace, "INTERRUPTED")
+            assertTrace(
+                outcome.completedNormally && outcome.value == null && outcome.failure == null &&
+                    trace.poisoned == 1 && Thread.currentThread().isInterrupted,
+                trace,
+                outcome.category(),
+            )
         } finally {
             Thread.interrupted()
         }
@@ -177,26 +211,77 @@ class RuntimeAuthorityReissueServiceTest {
     }
 
     @Test fun quiescenceTransportOrReleaseFailurePoisonsTheDefaultProcessAdmission() {
-        val executor = Executors.newSingleThreadExecutor()
-        try {
-            var poisoned = 0
-            val admission = BoundedMutationQuiescenceAdmission({ 100L }, executor, { poisoned++ }, 100L) {
-                "c".repeat(32)
-            }
-            assertThrows(IllegalStateException::class.java) {
-                admission.acquire { _, _, _ -> throw java.io.IOException("peer died") }
-            }
-            assertEquals(1, poisoned)
-
-            val accepted = BoundedMutationQuiescenceAdmission({ 100L }, executor, { poisoned++ }, 100L) {
-                "d".repeat(32)
-            }.acquire { code, _, _ -> code == RuntimeMutationQuiescenceWire.ACQUIRE }
-            assertNotNull(accepted)
-            assertThrows(IllegalStateException::class.java) { checkNotNull(accepted).close() }
-            assertEquals(2, poisoned)
-        } finally {
-            executor.shutdownNow()
+        val transportTrace = QuiescenceTrace()
+        val transportExecutor = ControlledExecutor().also {
+            it.onBegin = { transportTrace.futureBegan = true }
+            it.onReply = { transportTrace.replied = true }
         }
+        val transportAdmission = BoundedMutationQuiescenceAdmission(
+            { 100L },
+            transportExecutor,
+            { transportTrace.poisoned++ },
+            20L,
+        ) { "c".repeat(32) }
+        val transportStarted = System.nanoTime()
+        val transportOutcome = captureQuiescenceOutcome {
+            transportAdmission.acquire { _, _, _ -> throw IOException("peer died") }
+        }
+        transportTrace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - transportStarted)
+        val transportFailure = transportOutcome.failure
+        assertTrace(
+            !transportOutcome.completedNormally && transportOutcome.value == null &&
+                transportFailure is IllegalStateException &&
+                transportFailure.message == "MUTATION_QUIESCENCE_TRANSPORT_UNPROVEN" &&
+                transportFailure.cause is IOException && transportFailure.cause?.message == "peer died" &&
+                transportTrace.poisoned == 1 && transportTrace.futureBegan && transportTrace.replied &&
+                !transportTrace.timedOut && !transportTrace.interrupted && !transportTrace.repliedLate &&
+                transportTrace.cleanup == "NOT_REQUIRED" && !transportTrace.lateAuthorization,
+            transportTrace,
+            transportOutcome.category(),
+        )
+
+        val releaseTrace = QuiescenceTrace()
+        val releaseExecutor = ControlledExecutor().also {
+            it.onBegin = { releaseTrace.futureBegan = true }
+            it.onReply = { releaseTrace.replied = true }
+        }
+        var releaseCalls = 0
+        val acceptedOutcome = captureQuiescenceOutcome {
+            BoundedMutationQuiescenceAdmission(
+                { 100L },
+                releaseExecutor,
+                { releaseTrace.poisoned++ },
+                20L,
+            ) { "d".repeat(32) }.acquire { code, _, _ ->
+                if (code == RuntimeMutationQuiescenceWire.RELEASE) {
+                    releaseCalls++
+                    releaseTrace.cleanup = "RELEASE_REJECTED"
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+        assertTrace(
+            acceptedOutcome.completedNormally && acceptedOutcome.value != null && acceptedOutcome.failure == null &&
+                releaseTrace.poisoned == 0,
+            releaseTrace,
+            acceptedOutcome.category(),
+        )
+        val releaseStarted = System.nanoTime()
+        val releaseOutcome = captureQuiescenceOutcome { checkNotNull(acceptedOutcome.value).close() }
+        releaseTrace.elapsedWaitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - releaseStarted)
+        val releaseFailure = releaseOutcome.failure
+        assertTrace(
+            !releaseOutcome.completedNormally && releaseOutcome.value == null &&
+                releaseFailure is IllegalStateException &&
+                releaseFailure.message == "MUTATION_QUIESCENCE_RELEASE_UNPROVEN" &&
+                releaseCalls == 1 && releaseTrace.poisoned == 1 && releaseTrace.futureBegan && releaseTrace.replied &&
+                !releaseTrace.timedOut && !releaseTrace.interrupted && !releaseTrace.repliedLate &&
+                releaseTrace.cleanup == "RELEASE_REJECTED" && !releaseTrace.lateAuthorization,
+            releaseTrace,
+            releaseOutcome.category(),
+        )
     }
 
     @Test fun defaultBackendChecksUnlockBeforeOpeningAndNeverCachesRuntimeAuthority() {

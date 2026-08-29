@@ -2921,6 +2921,11 @@ type diagnosticStreamLifecycle struct {
 	Buffer                     string
 	CommandCategory            string
 	Command                    []string
+	ExecutionBoundary          string
+	CommandIdentityStatus      string
+	CommandUID                 int
+	CommandGID                 int
+	CommandSELinuxContext      string
 	StartStatus                string
 	ReadinessStatus            string
 	TerminalStatus             string
@@ -2950,6 +2955,51 @@ type diagnosticStreamLifecycle struct {
 	EndCapturedBeforeStop      bool
 	IntentionallyStopped       bool
 	ParserComplete             bool
+}
+
+type diagnosticCollectorCommand struct {
+	Phase         string
+	Argv          []string
+	StartedUTC    time.Time
+	FinishedUTC   time.Time
+	DurationMS    int64
+	CommandStatus string
+	TerminalCause string
+	ExitCode      int
+	StdoutBytes   int64
+	StderrBytes   int64
+	StderrExcerpt []string
+	Truncated     bool
+}
+
+type diagnosticCollectorIdentity struct {
+	Status         string
+	Rejection      string
+	Execution      string
+	UID            int
+	User           string
+	GID            int
+	Group          string
+	SELinuxContext string
+	HelpStatus     string
+	Commands       []diagnosticCollectorCommand
+}
+
+type diagnosticCollectorProbe struct {
+	Buffer        string
+	Status        string
+	Rejection     string
+	Argv          []string
+	StartedUTC    time.Time
+	FinishedUTC   time.Time
+	DurationMS    int64
+	CommandStatus string
+	TerminalCause string
+	ExitCode      int
+	StdoutBytes   int64
+	StderrBytes   int64
+	StderrExcerpt []string
+	Truncated     bool
 }
 
 type diagnosticLaunchStreamRecord struct {
@@ -3019,6 +3069,8 @@ type launchObservation struct {
 	Processes             []diagnosticProcessSnapshot
 	Logs                  []diagnosticLogBuffer
 	StreamLifecycle       []diagnosticStreamLifecycle
+	CollectorIdentity     diagnosticCollectorIdentity
+	CollectorProbes       []diagnosticCollectorProbe
 	ExitRecords           []diagnosticExit
 	ExitStatus            string
 	ActivityProcessState  []string
@@ -3333,6 +3385,172 @@ func (observation *launchObservation) queryClock(parent context.Context, phase s
 	return evidence.ParsedNanos, emitOK && commandOK && evidence.ParseStatus == "CAPTURED"
 }
 
+var diagnosticADBSerialPattern = regexp.MustCompile(`^emulator-[0-9]{4,6}$`)
+var diagnosticShellIdentityPattern = regexp.MustCompile(`^uid=([0-9]{1,10})\(([A-Za-z0-9_.-]{1,64})\) gid=([0-9]{1,10})\(([A-Za-z0-9_.-]{1,64})\)(?: groups=[A-Za-z0-9_.,() -]{1,1000})?(?: context=[A-Za-z0-9_.:-]{1,128})?$`)
+var diagnosticSELinuxContextPattern = regexp.MustCompile(`^u:r:shell:s0$`)
+
+func diagnosticADBArgv(serial string, args ...string) []string {
+	result := []string{"adb"}
+	if serial != "" {
+		if diagnosticADBSerialPattern.MatchString(serial) {
+			result = append(result, "-s", serial)
+		} else {
+			result = append(result, "-s", "[REDACTED_SERIAL]")
+		}
+	}
+	return append(result, args...)
+}
+
+func diagnosticCollectorTerminalCause(record diagnosticCommand) string {
+	if record.Truncated {
+		return "OUTPUT_TRUNCATED"
+	}
+	switch record.Status {
+	case "CAPTURED":
+		return "EXITED_SUCCESSFULLY"
+	case "DEADLINE":
+		return "CONTEXT_DEADLINE"
+	case "CANCELLED":
+		return "CONTEXT_CANCELLED"
+	case "ERROR":
+		return "COMMAND_FAILED"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func parseDiagnosticShellIdentity(raw string) (int, string, int, string, bool) {
+	value := strings.TrimSpace(raw)
+	if strings.ContainsAny(value, "\r\n\x00") {
+		return 0, "", 0, "", false
+	}
+	match := diagnosticShellIdentityPattern.FindStringSubmatch(value)
+	if match == nil {
+		return 0, "", 0, "", false
+	}
+	uid, uidErr := strconv.Atoi(match[1])
+	gid, gidErr := strconv.Atoi(match[3])
+	if uidErr != nil || gidErr != nil {
+		return 0, "", 0, "", false
+	}
+	return uid, match[2], gid, match[4], true
+}
+
+func parseDiagnosticSELinuxContext(raw string) (string, bool) {
+	value := strings.Trim(raw, " \t\r\n\x00")
+	return value, diagnosticSELinuxContextPattern.MatchString(value)
+}
+
+func diagnosticLogcatHelpRecognized(stdout, stderr string) bool {
+	value := strings.ToLower(strings.ReplaceAll(stdout+"\n"+stderr, "\r\n", "\n"))
+	return strings.Contains(value, "usage:") && strings.Contains(value, "logcat") &&
+		regexp.MustCompile(`(?:^|\s)-b(?:\s|=|<)`).MatchString(value) && strings.Contains(value, "buffer")
+}
+
+func diagnosticPermissionDenied(raw string) bool {
+	value := strings.ToLower(raw)
+	return strings.Contains(value, "permission denied") || strings.Contains(value, "not permitted")
+}
+
+func (observation *launchObservation) collectorCommand(parent context.Context, phase string, args ...string) (string, string, diagnosticCollectorCommand, error) {
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+	stdout, stderr, record, err := observation.client.diagnosticCommand(ctx, phase, 32<<10, args...)
+	observation.Commands = append(observation.Commands, record)
+	evidence := diagnosticCollectorCommand{
+		Phase: phase, Argv: diagnosticADBArgv(observation.client.serial, args...),
+		StartedUTC: record.StartedUTC, FinishedUTC: record.FinishedUTC, DurationMS: record.DurationMS,
+		CommandStatus: record.Status, TerminalCause: diagnosticCollectorTerminalCause(record), ExitCode: record.ExitCode,
+		StdoutBytes: int64(len(stdout)), StderrBytes: int64(len(stderr)),
+		StderrExcerpt: sanitizeLaunchStreamStderr(stderr), Truncated: record.Truncated,
+	}
+	return stdout, stderr, evidence, err
+}
+
+func collectorProbeFromCommand(buffer string, command diagnosticCollectorCommand) diagnosticCollectorProbe {
+	return diagnosticCollectorProbe{
+		Buffer: buffer, Status: "INCOMPLETE", Rejection: "UNKNOWN",
+		Argv: append([]string(nil), command.Argv...), StartedUTC: command.StartedUTC, FinishedUTC: command.FinishedUTC,
+		DurationMS: command.DurationMS, CommandStatus: command.CommandStatus, TerminalCause: command.TerminalCause,
+		ExitCode: command.ExitCode, StdoutBytes: command.StdoutBytes, StderrBytes: command.StderrBytes,
+		StderrExcerpt: append([]string(nil), command.StderrExcerpt...), Truncated: command.Truncated,
+	}
+}
+
+func (observation *launchObservation) captureCollectorCapability(parent context.Context) bool {
+	identity := diagnosticCollectorIdentity{Status: "INCOMPLETE", Rejection: "UNKNOWN", Execution: "ADB_SHELL", HelpStatus: "INCOMPLETE"}
+	rawID, idStderr, idCommand, idErr := observation.collectorCommand(parent, "collector-shell-id", "shell", "id")
+	identity.Commands = append(identity.Commands, idCommand)
+	uid, user, gid, group, idParsed := parseDiagnosticShellIdentity(rawID)
+	identity.UID, identity.User, identity.GID, identity.Group = uid, user, gid, group
+	idOK := idErr == nil && !idCommand.Truncated && idStderr == "" && idParsed && uid == 2000 && user == "shell" && gid == 2000 && group == "shell"
+	switch {
+	case idErr != nil:
+		identity.Rejection = "IDENTITY_COMMAND_FAILED"
+	case idCommand.Truncated:
+		identity.Rejection = "IDENTITY_OUTPUT_TRUNCATED"
+	case idStderr != "":
+		identity.Rejection = "IDENTITY_STDERR_OBSERVED"
+	case !idParsed:
+		identity.Rejection = "IDENTITY_MALFORMED"
+	case !idOK:
+		identity.Rejection = "IDENTITY_NOT_SHELL"
+	}
+	rawContext, contextStderr, contextCommand, contextErr := observation.collectorCommand(parent, "collector-shell-selinux", "shell", "cat", "/proc/self/attr/current")
+	identity.Commands = append(identity.Commands, contextCommand)
+	contextValue, contextParsed := parseDiagnosticSELinuxContext(rawContext)
+	identity.SELinuxContext = contextValue
+	contextOK := contextErr == nil && !contextCommand.Truncated && contextStderr == "" && contextParsed
+	if idOK && !contextOK {
+		switch {
+		case contextErr != nil:
+			identity.Rejection = "SELINUX_COMMAND_FAILED"
+		case contextCommand.Truncated:
+			identity.Rejection = "SELINUX_OUTPUT_TRUNCATED"
+		case contextStderr != "":
+			identity.Rejection = "SELINUX_STDERR_OBSERVED"
+		default:
+			identity.Rejection = "SELINUX_CONTEXT_UNKNOWN"
+		}
+	}
+	helpOut, helpStderr, helpCommand, helpErr := observation.collectorCommand(parent, "collector-logcat-help", "shell", "logcat", "--help")
+	identity.Commands = append(identity.Commands, helpCommand)
+	helpOK := helpErr == nil && !helpCommand.Truncated && !diagnosticPermissionDenied(helpStderr) && diagnosticLogcatHelpRecognized(helpOut, helpStderr)
+	if helpOK {
+		identity.HelpStatus = "CAPTURED"
+	} else if idOK && contextOK {
+		identity.Rejection = "LOGCAT_HELP_UNAVAILABLE"
+	}
+	if idOK && contextOK && helpOK {
+		identity.Status = "CAPTURED"
+		identity.Rejection = ""
+	}
+	observation.CollectorIdentity = identity
+
+	probesOK := true
+	for _, buffer := range []string{"crash", "main", "system"} {
+		args := []string{"shell", "logcat", "-b", buffer, "-d", "-t", "1", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		_, stderr, command, err := observation.collectorCommand(parent, "collector-"+buffer+"-probe", args...)
+		probe := collectorProbeFromCommand(buffer, command)
+		switch {
+		case command.Truncated:
+			probe.Rejection = "OUTPUT_TRUNCATED"
+		case err != nil:
+			probe.Rejection = "COMMAND_FAILED"
+		case stderr != "":
+			probe.Rejection = "STDERR_OBSERVED"
+		default:
+			probe.Status = "CAPTURED"
+			probe.Rejection = ""
+		}
+		if probe.Status != "CAPTURED" {
+			probesOK = false
+		}
+		observation.CollectorProbes = append(observation.CollectorProbes, probe)
+	}
+	return identity.Status == "CAPTURED" && probesOK
+}
+
 func beginLaunchObservation(ctx context.Context, client adbClient, value options) *launchObservation {
 	observation := &launchObservation{client: client, api: value.expectedAPI, app: value.appPackage, Schema: "kurdistan-launch-observation-v1", Status: "CAPTURED", GateResult: "NOT_EVALUATED", StartedUTC: time.Now().UTC(), ExitStatus: "INCOMPLETE", ActivityProcessStatus: "INCOMPLETE", ResolutionStatus: "INCOMPLETE"}
 	var nonce [16]byte
@@ -3365,6 +3583,9 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 	} else {
 		observation.incomplete("device clock zone unavailable")
 	}
+	if !observation.captureCollectorCapability(ctx) {
+		observation.incomplete("collector shell capability unavailable")
+	}
 	for _, buffer := range []string{"crash", "main", "system"} {
 		logctx, cancel := context.WithCancel(ctx)
 		command := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
@@ -3374,7 +3595,7 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 		}
 		sequence := &launchStreamSequence{}
 		stream := &launchLogStream{
-			name: buffer, command: command, ctx: logctx, cancel: cancel, sequence: sequence,
+			name: buffer, command: diagnosticADBArgv(client.serial, command...), ctx: logctx, cancel: cancel, sequence: sequence,
 			done:   make(chan launchStreamTermination, 1),
 			output: newLaunchStreamCapture(512<<10, sequence), stderr: newLaunchStreamCapture(8<<10, sequence),
 		}
@@ -3532,6 +3753,11 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	for _, stream := range observation.streams {
 		events, complete := launchWindowEvents(rawLogs[stream.name], observation.app, start, end)
 		lifecycle := diagnoseLaunchStreamLifecycle(stream, stdoutSnapshots[stream.name], stderrSnapshots[stream.name], complete, startCaptured, endCaptured)
+		lifecycle.ExecutionBoundary = observation.CollectorIdentity.Execution
+		lifecycle.CommandIdentityStatus = observation.CollectorIdentity.Status
+		lifecycle.CommandUID = observation.CollectorIdentity.UID
+		lifecycle.CommandGID = observation.CollectorIdentity.GID
+		lifecycle.CommandSELinuxContext = observation.CollectorIdentity.SELinuxContext
 		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
 		if lifecycle.TerminalStatus != "DRAINED" {
 			observation.incomplete(stream.name + " stream incomplete")

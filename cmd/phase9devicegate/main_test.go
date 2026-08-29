@@ -429,6 +429,25 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		fmt.Fprint(stdout, "ab")
 		fmt.Fprint(stderr, "cd")
 		fmt.Fprint(stdout, "efg")
+	case command == "id":
+		if scenario == "unknown-shell-identity" {
+			fmt.Fprintln(stdout, "uid=1234(unknown) gid=1234(unknown) groups=1234(unknown)")
+		} else {
+			fmt.Fprintln(stdout, "uid=2000(shell) gid=2000(shell) groups=2000(shell)")
+		}
+	case command == "cat /proc/self/attr/current":
+		if scenario == "unknown-shell-context" {
+			fmt.Fprintln(stdout, "unconfined")
+		} else {
+			fmt.Fprintln(stdout, "u:r:shell:s0")
+		}
+	case command == "logcat --help":
+		fmt.Fprintln(stdout, "Usage: logcat [options] [filterspecs]\n  -b <buffer>  load an alternate log buffer")
+	case strings.HasPrefix(command, "logcat -b ") && strings.Contains(command, " -d -t 1 "):
+		if scenario == "permission-denied-preflight" && (args[2] == "main" || args[2] == "system") {
+			fmt.Fprintln(stderr, "logcat: permission denied credential=synthetic-secret")
+			return errors.New("exit status 1")
+		}
 	case command == "date +%z":
 		fmt.Fprintln(stdout, "+0000")
 	case strings.HasPrefix(command, "log -p i -t KurdistanClockProbe "):
@@ -825,6 +844,12 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-before:" + observation.Invocation,
 		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
 		prefix + "date +%z",
+		prefix + "id",
+		prefix + "cat /proc/self/attr/current",
+		prefix + "logcat --help",
+		prefix + "logcat -b crash -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
+		prefix + "logcat -b main -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
+		prefix + "logcat -b system -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
 		streamPrefix + "crash" + streamSuffix, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
 		prefix + "log -p i -t KurdistanLaunchProbe " + startMarker,
 		prefix + "ps -A -o UID,PID,PPID,NAME",
@@ -1708,6 +1733,11 @@ type decodedLaunchStreamLifecycle struct {
 	Buffer                     string
 	CommandCategory            string
 	Command                    []string
+	ExecutionBoundary          string
+	CommandIdentityStatus      string
+	CommandUID                 int
+	CommandGID                 int
+	CommandSELinuxContext      string
 	StartStatus                string
 	ReadinessStatus            string
 	TerminalStatus             string
@@ -1739,6 +1769,122 @@ type decodedLaunchStreamLifecycle struct {
 	ParserComplete             bool
 }
 
+type decodedCollectorIdentity struct {
+	Status         string
+	Rejection      string
+	Execution      string
+	UID            int
+	User           string
+	GID            int
+	Group          string
+	SELinuxContext string
+}
+
+type decodedCollectorProbe struct {
+	Buffer        string
+	Status        string
+	Rejection     string
+	Argv          []string
+	ExitCode      int
+	CommandStatus string
+	StdoutBytes   int64
+	StderrBytes   int64
+	StderrExcerpt []string
+	Truncated     bool
+}
+
+func decodeCollectorCapability(t *testing.T, observation launchObservation) (decodedCollectorIdentity, []decodedCollectorProbe) {
+	t.Helper()
+	raw, err := json.Marshal(observation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		CollectorIdentity decodedCollectorIdentity
+		CollectorProbes   []decodedCollectorProbe
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatal(err)
+	}
+	return report.CollectorIdentity, report.CollectorProbes
+}
+
+func TestLaunchCollectorsUseVerifiedOrdinaryADBShellIdentityAndExactBoundedFilters(t *testing.T) {
+	err, observation, fixture := runLaunchFixture(t, "healthy", 34)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, probes := decodeCollectorCapability(t, observation)
+	if identity.Status != "CAPTURED" || identity.Execution != "ADB_SHELL" || identity.UID != 2000 || identity.User != "shell" ||
+		identity.GID != 2000 || identity.Group != "shell" || identity.SELinuxContext != "u:r:shell:s0" || identity.Rejection != "" {
+		t.Fatalf("collector shell identity is not explicit and complete: %+v", identity)
+	}
+	wantProbe := func(buffer string) []string {
+		return []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", buffer, "-d", "-t", "1",
+			"-v", "threadtime", "-v", "monotonic", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I",
+			"ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+	}
+	if len(probes) != 3 {
+		t.Fatalf("collector probe count=%d, want one bounded probe per required buffer", len(probes))
+	}
+	for index, buffer := range []string{"crash", "main", "system"} {
+		probe := probes[index]
+		if probe.Buffer != buffer || probe.Status != "CAPTURED" || probe.Rejection != "" ||
+			!reflect.DeepEqual(probe.Argv, wantProbe(buffer)) || probe.ExitCode != 0 || probe.CommandStatus != "CAPTURED" ||
+			probe.StderrBytes != 0 || len(probe.StderrExcerpt) != 0 || probe.Truncated {
+			t.Fatalf("%s collector probe is not exact, bounded and complete: %+v", buffer, probe)
+		}
+	}
+	for _, call := range fixture.commands {
+		joined := " " + strings.Join(call.args, " ") + " "
+		for _, forbidden := range []string{" run-as ", " exec-out ", " su "} {
+			if strings.Contains(joined, forbidden) {
+				t.Fatalf("collector capability or stream crossed an app/root wrapper: %q", call.args)
+			}
+		}
+	}
+	for _, lifecycle := range decodeLaunchStreamLifecycle(t, observation) {
+		want := []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", lifecycle.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		if !reflect.DeepEqual(lifecycle.Command, want) || lifecycle.ExecutionBoundary != "ADB_SHELL" ||
+			lifecycle.CommandIdentityStatus != "CAPTURED" || lifecycle.CommandUID != 2000 || lifecycle.CommandGID != 2000 ||
+			lifecycle.CommandSELinuxContext != "u:r:shell:s0" {
+			t.Fatalf("%s stream identity is not bound to the verified ordinary shell: %+v", lifecycle.Buffer, lifecycle)
+		}
+	}
+}
+
+func TestLaunchCollectorCapabilityFailureRemainsBlockedAndSanitized(t *testing.T) {
+	for _, scenario := range []string{"unknown-shell-identity", "unknown-shell-context", "permission-denied-preflight"} {
+		t.Run(scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, scenario, 34)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
+				t.Fatalf("collector capability uncertainty did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			}
+			identity, probes := decodeCollectorCapability(t, observation)
+			if scenario != "permission-denied-preflight" && (identity.Status != "INCOMPLETE" || identity.Rejection == "") {
+				t.Fatalf("unknown shell identity lacks a categorical rejection: %+v", identity)
+			}
+			encoded, marshalErr := json.Marshal(observation)
+			if marshalErr != nil || strings.Contains(string(encoded), "synthetic-secret") {
+				t.Fatal("collector capability evidence retained an unsanitized diagnostic")
+			}
+			if scenario == "permission-denied-preflight" {
+				var rejected int
+				for _, probe := range probes {
+					if probe.Status == "INCOMPLETE" && probe.Rejection == "COMMAND_FAILED" &&
+						strings.Contains(strings.Join(probe.StderrExcerpt, " "), "permission") &&
+						strings.Contains(strings.Join(probe.StderrExcerpt, " "), "denied") {
+						rejected++
+					}
+				}
+				if rejected != 2 {
+					t.Fatalf("permission denial probe count=%d, want main and system only: %+v", rejected, probes)
+				}
+			}
+		})
+	}
+}
+
 func decodeLaunchStreamLifecycle(t *testing.T, observation launchObservation) []decodedLaunchStreamLifecycle {
 	t.Helper()
 	raw, err := json.Marshal(observation)
@@ -1766,7 +1912,7 @@ func TestLaunchStreamExpectedOwnedShutdownRetainsBoundedStderrWithoutInvalidatin
 				t.Fatalf("stream lifecycle count=%d, want 3", len(states))
 			}
 			for _, state := range states {
-				wantCommand := []string{"shell", "logcat", "-b", state.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+				wantCommand := []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", state.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 				if state.CommandCategory != "ADB_LOGCAT_STREAM" || !reflect.DeepEqual(state.Command, wantCommand) ||
 					!state.StartCapturedBeforeStop || !state.EndCapturedBeforeStop || !state.IntentionallyStopped || !state.ParserComplete {
 					t.Fatalf("owned collector identity or completion is incomplete: %+v", state)
