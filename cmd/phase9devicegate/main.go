@@ -33,12 +33,22 @@ const (
 	defaultAppPackage                 = "org.kurdistanvpn.app.debug"
 	defaultTestPackage                = "org.kurdistanvpn.app.debug.test"
 	defaultRunner                     = "androidx.test.runner.AndroidJUnitRunner"
+	monotonicClockDomain              = "CLOCK_MONOTONIC_LOGCAT"
+	clockProbeTag                     = "KurdistanClockProbe"
+	nativeFilesystemAuthorizationV1   = "kurdistan-phase17-filesystem-authorization-v1\x00"
 	maxCommandEvidence                = 2 << 20
 	maxLogcatInput                    = 4 << 20
 	maxDiagnosticBytes                = 16 << 10
 	maxInstrumentationDiagnosticBytes = 64 << 10
 	deviceGateTimeout                 = 35 * time.Minute
 )
+
+var nativeFilesystemChildren = []string{
+	"existing-directory",
+	"leaf-owner",
+	"read-link-identity",
+	"writer-replacement",
+}
 
 var deviceEvidenceProperties = []struct {
 	file string
@@ -285,15 +295,20 @@ func run(value options) error {
 	if err := prepareLogcatBaseline(ctx, client, "12-pre-test-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear pre-test logcat: %w", err)
 	}
+	instrumentationArgs, err := prepareNativeFilesystemInstrumentation(
+		ctx,
+		client,
+		value.appPackage,
+		value.testPackage,
+		value.testPackage+"/"+value.runner,
+	)
+	if err != nil {
+		return err
+	}
 	instrumentation, instrumentationErr := client.captureInstrumentation(
 		ctx,
 		"13-instrumentation-summary.txt",
-		"shell",
-		"am",
-		"instrument",
-		"-w",
-		"-r",
-		value.testPackage+"/"+value.runner,
+		instrumentationArgs...,
 	)
 	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
 	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("crash")...)
@@ -477,17 +492,22 @@ func (capture *instrumentationCaptureBuffer) snapshot() (string, []instrumentati
 }
 
 type instrumentationTestDiagnostic struct {
-	Class          string
-	Method         string
-	Status         string
-	ObservedUTC    time.Time
-	StartedUTC     time.Time
-	FinishedUTC    time.Time
-	DurationMS     int64
-	Category       string
-	ExceptionType  string
-	ExceptionTypes []string
-	Stack          []string
+	Class            string
+	Method           string
+	Status           string
+	ObservedUTC      time.Time
+	StartedUTC       time.Time
+	FinishedUTC      time.Time
+	DurationMS       int64
+	Category         string
+	ExceptionType    string
+	ExceptionTypes   []string
+	Message          string
+	Expected         string
+	Actual           string
+	SetupState       []string
+	Stack            []string
+	ApplicationStack []string
 }
 
 type instrumentationDiagnosticReport struct {
@@ -658,6 +678,12 @@ func buildInstrumentationDiagnostic(chunks []instrumentationDiagnosticChunk, com
 						incomplete("instrumentation failure exception unavailable")
 					} else {
 						detail.ExceptionType = exceptions[0].Class
+						detail.Message = exceptions[0].Message
+						if expected, actual, setup, ok := structuredTestSetup(detail.Message); ok {
+							detail.Expected = expected
+							detail.Actual = actual
+							detail.SetupState = append([]string(nil), setup...)
+						}
 						for _, exception := range exceptions {
 							detail.ExceptionTypes = append(detail.ExceptionTypes, exception.Class)
 							for _, frame := range exception.Stack {
@@ -666,6 +692,9 @@ func buildInstrumentationDiagnostic(chunks []instrumentationDiagnosticChunk, com
 									break
 								}
 								detail.Stack = append(detail.Stack, frame)
+								if strings.HasPrefix(frame, "at org.kurdistanvpn.") && len(detail.ApplicationStack) < 8 {
+									detail.ApplicationStack = append(detail.ApplicationStack, frame)
+								}
 							}
 						}
 					}
@@ -858,6 +887,118 @@ func instrumentationProgress(input string) (string, string) {
 type instrumentationPreparationCommand struct {
 	evidence string
 	args     []string
+}
+
+type nativeFilesystemInvocationPlan struct {
+	OwnerPackage  string
+	TestPackage   string
+	DataDir       string
+	Root          string
+	Authorization string
+	Children      []string
+}
+
+func nativeFilesystemInstrumentationPlan(ownerPackage, testPackage, dataDir, invocation string) (nativeFilesystemInvocationPlan, error) {
+	packagePattern := regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$`)
+	if !packagePattern.MatchString(ownerPackage) || !packagePattern.MatchString(testPackage) ||
+		!regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(invocation) {
+		return nativeFilesystemInvocationPlan{}, errors.New("invalid native-filesystem invocation identity")
+	}
+	wantDataDir := regexp.MustCompile(`^/data/(?:user/[0-9]+|data)/` + regexp.QuoteMeta(ownerPackage) + `$`)
+	if !wantDataDir.MatchString(dataDir) {
+		return nativeFilesystemInvocationPlan{}, errors.New("test-owned package directory unavailable")
+	}
+	children := append([]string(nil), nativeFilesystemChildren...)
+	root := dataDir + "/cache/phase17-disposable-" + invocation
+	preimage := nativeFilesystemAuthorizationV1 + root + "\x00" + strings.Join(children, "\x00")
+	digest := sha256.Sum256([]byte(preimage))
+	return nativeFilesystemInvocationPlan{
+		OwnerPackage: ownerPackage, TestPackage: testPackage, DataDir: dataDir,
+		Root: root, Authorization: fmt.Sprintf("%x", digest), Children: children,
+	}, nil
+}
+
+func nativeFilesystemPreparationArgs(plan nativeFilesystemInvocationPlan) [][]string {
+	prefix := strings.TrimPrefix(plan.Root, plan.DataDir+"/")
+	commands := [][]string{
+		{"shell", "run-as", plan.OwnerPackage, "mkdir", prefix},
+		{"shell", "run-as", plan.OwnerPackage, "chmod", "700", prefix},
+	}
+	for _, child := range plan.Children {
+		path := prefix + "/" + child
+		commands = append(commands,
+			[]string{"shell", "run-as", plan.OwnerPackage, "mkdir", path},
+			[]string{"shell", "run-as", plan.OwnerPackage, "chmod", "700", path},
+		)
+	}
+	return commands
+}
+
+func nativeFilesystemInstrumentationArgs(plan nativeFilesystemInvocationPlan, runner string) []string {
+	return []string{
+		"shell", "am", "instrument", "-w", "-r",
+		"-e", "phase17.disposableRoot", plan.Root,
+		"-e", "phase17.filesystemAuthorization", plan.Authorization,
+		runner,
+	}
+}
+
+func validateNativeFilesystemInstrumentationArgs(args []string, ownerPackage, testPackage string) error {
+	if len(args) != 12 || !reflectDeepEqualStrings(args[:5], []string{"shell", "am", "instrument", "-w", "-r"}) ||
+		args[5] != "-e" || args[6] != "phase17.disposableRoot" ||
+		args[8] != "-e" || args[9] != "phase17.filesystemAuthorization" ||
+		!strings.HasPrefix(args[11], testPackage+"/") {
+		return errors.New("native-filesystem instrumentation argument framing invalid")
+	}
+	rootPattern := regexp.MustCompile(`^(/data/(?:user/[0-9]+|data)/` + regexp.QuoteMeta(ownerPackage) + `)/cache/phase17-disposable-([0-9a-f]{32})$`)
+	match := rootPattern.FindStringSubmatch(args[7])
+	if match == nil || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(args[10]) {
+		return errors.New("native-filesystem instrumentation argument value invalid")
+	}
+	plan, err := nativeFilesystemInstrumentationPlan(ownerPackage, testPackage, match[1], match[2])
+	if err != nil || plan.Root != args[7] || plan.Authorization != args[10] {
+		return errors.New("native-filesystem instrumentation authorization mismatch")
+	}
+	return nil
+}
+
+func reflectDeepEqualStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func prepareNativeFilesystemInstrumentation(ctx context.Context, client adbClient, ownerPackage, testPackage, runner string) ([]string, error) {
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return nil, errors.New("native-filesystem invocation identity unavailable")
+	}
+	raw, err := client.capture(ctx, "12a-target-package-root.txt", "shell", "run-as", ownerPackage, "pwd")
+	if err != nil {
+		return nil, fmt.Errorf("read test-owned package root: %w", err)
+	}
+	dataDir := strings.TrimSpace(raw)
+	plan, err := nativeFilesystemInstrumentationPlan(ownerPackage, testPackage, dataDir, fmt.Sprintf("%x", nonce))
+	if err != nil {
+		return nil, err
+	}
+	for index, args := range nativeFilesystemPreparationArgs(plan) {
+		name := fmt.Sprintf("12b-native-root-%02d.txt", index+1)
+		if _, err := client.capture(ctx, name, args...); err != nil {
+			return nil, fmt.Errorf("prepare invocation-owned native-filesystem root step %d: %w", index+1, err)
+		}
+	}
+	args := nativeFilesystemInstrumentationArgs(plan, runner)
+	if err := validateNativeFilesystemInstrumentationArgs(args, ownerPackage, testPackage); err != nil {
+		return nil, err
+	}
+	return args, nil
 }
 
 func instrumentationPreparationCommands(appPackage, testPackage string) []instrumentationPreparationCommand {
@@ -1830,6 +1971,7 @@ type exceptionDetail struct {
 var diagnosticClassPattern = regexp.MustCompile("^[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)+$")
 var diagnosticFramePattern = regexp.MustCompile("^\\s*at ([A-Za-z0-9_.$/@+-]+)\\(([A-Za-z0-9_.$-]+\\.(?:kt|java):[0-9]{1,7}|SourceFile:[0-9]{1,7}|Unknown Source|Native Method)\\)$")
 var elidedFramePattern = regexp.MustCompile("^\\.\\.\\. [0-9]{1,4} more$")
+var structuredTestSetupPattern = regexp.MustCompile(`^KURDISTAN_TEST_SETUP expected=([A-Z0-9_|-]{1,96}) actual=([A-Z0-9_|-]{1,96}) setup=([A-Z0-9_|,-]{1,256})$`)
 
 func safeDiagnosticClass(value string) bool {
 	if len(value) > 240 || !diagnosticClassPattern.MatchString(value) {
@@ -1853,6 +1995,9 @@ func diagnosticMessage(message string) (string, bool) {
 		"SETTINGS_OWNER_CLOSED", "STALE_SETTINGS_PROJECTION", "SHARED_LEGACY_OWNER_CANNOT_BE_CLOSED":
 		return message, true
 	}
+	if structuredTestSetupPattern.MatchString(message) {
+		return message, true
+	}
 	for _, prefix := range []string{"Unable to create application ", "Unable to instantiate application ", "Unable to start activity "} {
 		if strings.HasPrefix(message, prefix) {
 			rest := strings.TrimPrefix(message, prefix)
@@ -1872,6 +2017,20 @@ func diagnosticMessage(message string) (string, bool) {
 		return name + ": " + value, complete
 	}
 	return "[REDACTED_MESSAGE]", false
+}
+
+func structuredTestSetup(message string) (string, string, []string, bool) {
+	match := structuredTestSetupPattern.FindStringSubmatch(message)
+	if match == nil {
+		return "", "", nil, false
+	}
+	setup := strings.Split(match[3], ",")
+	for _, value := range setup {
+		if value == "" {
+			return "", "", nil, false
+		}
+	}
+	return match[1], match[2], setup, true
 }
 
 func javaFailureDetails(input string) ([]exceptionDetail, bool) {
@@ -1963,6 +2122,7 @@ type launchLogEvent struct {
 
 type diagnosticClockEvidence struct {
 	Phase           string
+	Domain          string
 	ObservedUTC     time.Time
 	Raw             string
 	RawStatus       string
@@ -2037,6 +2197,62 @@ func clockDiagnostic(raw string, command diagnosticCommand) diagnosticClockEvide
 	}
 	evidence.ParsedNanos, evidence.Rejection = parseEpochNanos(raw)
 	if evidence.Rejection == "" {
+		evidence.ParseStatus = "CAPTURED"
+	}
+	return evidence
+}
+
+func monotonicClockProbePlan(phase, invocation string) (string, [][]string, error) {
+	if !regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`).MatchString(phase) ||
+		!regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(invocation) {
+		return "", nil, errors.New("invalid monotonic clock probe identity")
+	}
+	marker := "CLOCK:" + phase + ":" + invocation
+	return marker, [][]string{
+		{"shell", "log", "-p", "i", "-t", clockProbeTag, marker},
+		{"shell", "logcat", "-b", "main", "-d", "-t", "64", "-v", "threadtime", "-v", "monotonic", "-v", "usec", clockProbeTag + ":I", "*:S"},
+	}, nil
+}
+
+func monotonicClockDiagnostic(raw, marker string, command diagnosticCommand) diagnosticClockEvidence {
+	evidence := diagnosticClockEvidence{
+		Phase: command.Phase, Domain: monotonicClockDomain, ObservedUTC: command.FinishedUTC,
+		RawStatus: "REDACTED", ParseStatus: "REJECTED",
+		CommandStatus: command.Status, CommandExitCode: command.ExitCode,
+	}
+	if len(raw) > maxLogcatInput || !regexp.MustCompile(`^CLOCK:[a-z][a-z0-9-]{0,31}:[0-9a-f]{32}$`).MatchString(marker) {
+		evidence.Rejection = "INPUT_INVALID"
+		return evidence
+	}
+	var matches []launchLogEvent
+	malformed := false
+	for _, line := range strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "---------") {
+			continue
+		}
+		event, ok := parseEpochLog(line)
+		if !ok {
+			if strings.Contains(line, clockProbeTag) || strings.Contains(line, marker) {
+				malformed = true
+			}
+			continue
+		}
+		if event.Tag == clockProbeTag && event.Text == marker {
+			matches = append(matches, event)
+		}
+	}
+	switch {
+	case malformed:
+		evidence.Rejection = "MARKER_MALFORMED"
+	case len(matches) == 0:
+		evidence.Rejection = "MARKER_MISSING"
+	case len(matches) != 1:
+		evidence.Rejection = "MARKER_AMBIGUOUS"
+	default:
+		evidence.Raw = strconv.FormatInt(matches[0].DeviceNanos/1_000_000_000, 10) + "." +
+			fmt.Sprintf("%09d", matches[0].DeviceNanos%1_000_000_000)
+		evidence.RawStatus = "CAPTURED"
+		evidence.ParsedNanos = matches[0].DeviceNanos
 		evidence.ParseStatus = "CAPTURED"
 	}
 	return evidence
@@ -2253,16 +2469,17 @@ func procStartTicks(input string, pid int) (uint64, error) {
 }
 
 type diagnosticExit struct {
-	Process   string
-	PID       int
-	UID       int
-	Timestamp time.Time
-	Reason    int
-	Status    int
+	Process     string
+	PID         int
+	UID         int
+	Timestamp   time.Time
+	DeviceNanos int64
+	Reason      int
+	Status      int
 }
 
-func parseExitRecords(input, app string, start, end time.Time, zone *time.Location) ([]diagnosticExit, bool) {
-	if zone == nil || !end.After(start) || len(input) > maxLogcatInput {
+func parseExitRecords(input, app string, startNanos, endNanos, wallMinusMonotonic int64, zone *time.Location) ([]diagnosticExit, bool) {
+	if zone == nil || startNanos <= 0 || endNanos <= startNanos || wallMinusMonotonic <= 0 || len(input) > maxLogcatInput {
 		return nil, false
 	}
 	var records []diagnosticExit
@@ -2286,7 +2503,15 @@ func parseExitRecords(input, app string, start, end time.Time, zone *time.Locati
 			complete = false
 			continue
 		}
-		if at.Before(start) || at.After(end) {
+		wallNanos := at.UnixNano()
+		if wallNanos <= 0 {
+			complete = false
+			continue
+		}
+		deviceNanos := wallNanos - wallMinusMonotonic
+		// ApplicationExitInfo exposes milliseconds. Preserve the existing one-
+		// millisecond lower-bound tolerance without expanding the launch window.
+		if deviceNanos+int64(time.Millisecond) < startNanos || deviceNanos > endNanos {
 			continue
 		}
 		values := map[string]int{}
@@ -2307,7 +2532,7 @@ func parseExitRecords(input, app string, start, end time.Time, zone *time.Locati
 			complete = false
 			continue
 		}
-		records = append(records, diagnosticExit{Process: process[1], PID: values["pid"], UID: values["realUid"], Timestamp: at, Reason: values["reason"], Status: values["status"]})
+		records = append(records, diagnosticExit{Process: process[1], PID: values["pid"], UID: values["realUid"], Timestamp: at, DeviceNanos: deviceNanos, Reason: values["reason"], Status: values["status"]})
 	}
 	return records, complete
 }
@@ -2586,7 +2811,7 @@ func validateLaunchObservation(observation *launchObservation) error {
 	}
 	for _, exit := range observation.ExitRecords {
 		if exit.Process == current.Name && exit.PID == current.PID && exit.UID == current.UID &&
-			exit.Timestamp.UnixNano()+int64(time.Millisecond) >= epochStart && exit.Timestamp.UnixNano() <= observation.WindowEndNanos {
+			exit.DeviceNanos+int64(time.Millisecond) >= epochStart && exit.DeviceNanos <= observation.WindowEndNanos {
 			return errors.New("current target exit observed")
 		}
 	}
@@ -2639,6 +2864,12 @@ type diagnosticMarkerWindow struct {
 	MalformedMarkers        int
 }
 
+type diagnosticClockCorrelation struct {
+	Status                  string
+	Rejection               string
+	WallMinusMonotonicNanos int64
+}
+
 type launchObservation struct {
 	client                adbClient
 	api                   int
@@ -2668,6 +2899,7 @@ type launchObservation struct {
 	ResolutionStatus      string
 	LaunchCommand         []string
 	MarkerWindow          diagnosticMarkerWindow
+	ClockCorrelation      diagnosticClockCorrelation
 	Issues                []string
 }
 
@@ -2747,14 +2979,21 @@ func (observation *launchObservation) query(parent context.Context, phase string
 }
 
 func (observation *launchObservation) queryClock(parent context.Context, phase string) (int64, bool) {
-	raw, commandOK := observation.query(parent, phase, "shell", "date", "+%s.%N")
+	marker, commands, err := monotonicClockProbePlan(phase, observation.Invocation)
+	if err != nil {
+		observation.incomplete(phase + " identity unavailable")
+		return 0, false
+	}
+	_, emitOK := observation.query(parent, phase+"-emit", commands[0]...)
+	raw, commandOK := observation.query(parent, phase+"-snapshot", commands[1]...)
 	if len(observation.Commands) == 0 {
 		observation.incomplete(phase + " command record unavailable")
 		return 0, false
 	}
-	evidence := clockDiagnostic(raw, observation.Commands[len(observation.Commands)-1])
+	evidence := monotonicClockDiagnostic(raw, marker, observation.Commands[len(observation.Commands)-1])
+	evidence.Phase = phase
 	observation.Clocks = append(observation.Clocks, evidence)
-	return evidence.ParsedNanos, commandOK && evidence.ParseStatus == "CAPTURED"
+	return evidence.ParsedNanos, emitOK && commandOK && evidence.ParseStatus == "CAPTURED"
 }
 
 func beginLaunchObservation(ctx context.Context, client adbClient, value options) *launchObservation {
@@ -2782,7 +3021,7 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 	}
 	for _, buffer := range []string{"crash", "main", "system"} {
 		logctx, cancel := context.WithCancel(ctx)
-		args := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		args := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 		if client.serial != "" {
 			args = append([]string{"-s", client.serial}, args...)
 		}
@@ -2882,12 +3121,17 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	// A separate marker-only snapshot confirms the end even if the launch
 	// deadline already terminated the streaming readers. It contains no crash
 	// body and cannot supply an old invocation's marker.
-	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "epoch", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
+	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
 	nanos, ok := observation.queryClock(ctx, "clock-after")
 	if ok {
 		observation.DeviceEndNanos = nanos
 	} else {
 		observation.incomplete("terminal clock unavailable")
+	}
+	wallMarkers, wallMarkersOK := observation.query(ctx, "window-markers-wall", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "epoch", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
+	observation.ClockCorrelation = correlateLaunchMarkerClocks(markers, wallMarkers, observation.Invocation)
+	if !wallMarkersOK || observation.ClockCorrelation.Status != "CAPTURED" {
+		observation.incomplete("monotonic-to-wall clock correlation unavailable")
 	}
 	rawLogs := map[string]string{}
 	for _, stream := range observation.streams {
@@ -2933,7 +3177,7 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 			_, offset := parsed.Zone()
 			zone = time.FixedZone("device", offset)
 		}
-		records, parsed := parseExitRecords(raw, observation.app, time.Unix(0, start), time.Unix(0, end), zone)
+		records, parsed := parseExitRecords(raw, observation.app, start, end, observation.ClockCorrelation.WallMinusMonotonicNanos, zone)
 		observation.ExitRecords = records
 		// A recognized, complete empty history is distinct from an empty or
 		// unsupported command response. The latter is never absence of crashes.
@@ -2954,7 +3198,7 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		// The two observation sources stay separate; no sorting or inferred event
 		// is used to fill a capture gap.
 		for _, buffer := range []string{"crash", "main", "system"} {
-			raw, readable := observation.query(ctx, "terminal-"+buffer, "shell", "logcat", "-b", buffer, "-d", "-t", "2048", "-v", "threadtime", "-v", "epoch", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "*:S")
+			raw, readable := observation.query(ctx, "terminal-"+buffer, "shell", "logcat", "-b", buffer, "-d", "-t", "2048", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "*:S")
 			events, parsed := launchWindowEvents(raw, observation.app, start, end)
 			status := "CAPTURED"
 			if !readable || !parsed {
@@ -3037,6 +3281,75 @@ func (window diagnosticMarkerWindow) MatchingWindow() (int64, int64) {
 		return 0, 0
 	}
 	return window.MatchingStartTimestamps[0], window.MatchingEndTimestamps[0]
+}
+
+func exactLaunchMarkerPair(input, invocation string) (int64, int64, string) {
+	if len(input) > maxLogcatInput || !regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(invocation) {
+		return 0, 0, "INPUT_INVALID"
+	}
+	var starts, ends []int64
+	pattern := regexp.MustCompile(`^(START|END):([0-9a-f]{32})$`)
+	for _, line := range strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "---------") {
+			continue
+		}
+		event, ok := parseEpochLog(line)
+		if !ok {
+			if strings.Contains(line, "KurdistanLaunchProbe") || strings.Contains(line, invocation) {
+				return 0, 0, "MARKER_MALFORMED"
+			}
+			continue
+		}
+		if event.Tag != "KurdistanLaunchProbe" {
+			continue
+		}
+		match := pattern.FindStringSubmatch(event.Text)
+		if match == nil {
+			return 0, 0, "MARKER_MALFORMED"
+		}
+		if match[2] != invocation {
+			continue
+		}
+		if match[1] == "START" {
+			starts = append(starts, event.DeviceNanos)
+		} else {
+			ends = append(ends, event.DeviceNanos)
+		}
+	}
+	if len(starts) != 1 || len(ends) != 1 {
+		return 0, 0, "MARKER_CARDINALITY_INVALID"
+	}
+	if starts[0] <= 0 || ends[0] <= starts[0] {
+		return 0, 0, "MARKER_ORDER_INVALID"
+	}
+	return starts[0], ends[0], ""
+}
+
+func correlateLaunchMarkerClocks(monotonic, wall, invocation string) diagnosticClockCorrelation {
+	correlation := diagnosticClockCorrelation{Status: "REJECTED"}
+	monotonicStart, monotonicEnd, rejection := exactLaunchMarkerPair(monotonic, invocation)
+	if rejection != "" {
+		correlation.Rejection = "MONOTONIC_" + rejection
+		return correlation
+	}
+	wallStart, wallEnd, rejection := exactLaunchMarkerPair(wall, invocation)
+	if rejection != "" {
+		correlation.Rejection = "WALL_" + rejection
+		return correlation
+	}
+	if wallStart <= monotonicStart || wallEnd <= monotonicEnd {
+		correlation.Rejection = "OFFSET_INVALID"
+		return correlation
+	}
+	startOffset := wallStart - monotonicStart
+	endOffset := wallEnd - monotonicEnd
+	if startOffset != endOffset {
+		correlation.Rejection = "OFFSET_CHANGED"
+		return correlation
+	}
+	correlation.Status = "CAPTURED"
+	correlation.WallMinusMonotonicNanos = startOffset
+	return correlation
 }
 
 func diagnoseLaunchMarkerWindow(stream, snapshot, invocation string, before, after int64) diagnosticMarkerWindow {
@@ -3197,7 +3510,7 @@ func junitFailureReport(raw []byte) (junitDiagnosticReport, error) {
 			return report, errors.New("JUnit diagnostic trailing data")
 		}
 	}
-	const target = "org.kurdistanvpn.data.settings.Phase13SettingsCodecTest"
+	const target = "org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest"
 	if suite.Name != target || suite.Tests < 1 || suite.Tests > 64 || len(suite.Cases) != suite.Tests ||
 		suite.Failures < 0 || suite.Errors < 0 || suite.Failures+suite.Errors > 16 {
 		return report, errors.New("JUnit diagnostic subject or counts invalid")

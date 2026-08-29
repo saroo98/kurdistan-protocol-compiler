@@ -17,6 +17,7 @@ import android.content.ServiceConnection
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
+import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -30,8 +31,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.click
 import androidx.core.content.ContextCompat
 import androidx.test.espresso.IdlingPolicies
 import androidx.test.platform.app.InstrumentationRegistry
@@ -97,8 +96,9 @@ class Phase9FoundationUiTest {
         var recovered = 0
         var diagnostics = 0
         val activity = compose.activity
-        compose.setContent {
-            SettingsRecoveryScreen(
+        activity.runOnUiThread {
+            activity.setContent {
+                SettingsRecoveryScreen(
                 backupState = BackupWorkflowState.Idle,
                 settings = Phase9Settings(),
                 onTheme = {},
@@ -118,7 +118,8 @@ class Phase9FoundationUiTest {
                 recoveryDiagnosticsLabel = activity.getString(R.string.open_privacy_safe_diagnostics),
                 onConfirmPresentationRecovery = { recovered++ },
                 onOpenDiagnostics = { diagnostics++ },
-            )
+                )
+            }
         }
         compose.onNodeWithTag("protected_recovery_status").assertIsDisplayed()
         compose.onNodeWithContentDescription(
@@ -207,14 +208,14 @@ class Phase9FoundationUiTest {
         compose.onNodeWithContentDescription(highContrast)
             .performScrollTo()
             .assertIsOff()
-            .performTouchInput { click() }
+            .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
                 compose.onNodeWithContentDescription(highContrast).assertIsOn()
                 true
             }.getOrDefault(false)
         }
-        compose.onNodeWithContentDescription(highContrast).performTouchInput { click() }
+        compose.onNodeWithContentDescription(highContrast).performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
                 compose.onNodeWithContentDescription(highContrast).assertIsOff()
@@ -225,14 +226,14 @@ class Phase9FoundationUiTest {
         compose.onNodeWithContentDescription(reducedMotion)
             .performScrollTo()
             .assertIsOff()
-            .performTouchInput { click() }
+            .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
                 compose.onNodeWithContentDescription(reducedMotion).assertIsOn()
                 true
             }.getOrDefault(false)
         }
-        compose.onNodeWithContentDescription(reducedMotion).performTouchInput { click() }
+        compose.onNodeWithContentDescription(reducedMotion).performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
                 compose.onNodeWithContentDescription(reducedMotion).assertIsOff()
@@ -388,11 +389,7 @@ class Phase9FoundationUiTest {
                 else -> true
             }
         }
-        assertTrue(
-            "import test requires a usable initial state, got ${compose.activity.appStateSnapshotForTesting()}",
-            compose.activity.appStateSnapshotForTesting() is AppState.NoProfiles ||
-                compose.activity.appStateSnapshotForTesting() is AppState.Ready,
-        )
+        ensureProtectedStateInitializedForImport()
         val existing = compose.activity.appStateSnapshotForTesting()
         if (existing is AppState.Ready && existing.profiles.isNotEmpty()) {
             compose.onNodeWithTag("primary_profiles").performClick()
@@ -613,6 +610,7 @@ class Phase9FoundationUiTest {
             compose.activity.appStateSnapshotForTesting() !is AppState.Booting &&
                 compose.activity.appStateSnapshotForTesting() !is AppState.CompatibilityCheck
         }
+        ensureProtectedStateInitializedForImport()
         val current = compose.activity.appStateSnapshotForTesting()
         if (current !is AppState.Ready || current.profiles.isEmpty()) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(INTERNAL_SIGNED_PROFILE_LINK))
@@ -631,6 +629,15 @@ class Phase9FoundationUiTest {
                 state is AppState.Ready && state.profiles.isNotEmpty()
             }
         }
+    }
+
+    private fun ensureProtectedStateInitializedForImport() {
+        val root = (compose.activity.application as KurdistanApplication).compositionRoot
+        val initialized = runBlocking { root.initializeProtectedStateForExplicitUserAction() }
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} setup=EXPLICIT_IMPORT_INITIALIZATION",
+            initialized && root.protectedStateFacade() != null,
+        )
     }
 
     private fun prepareLegacyAuthorityExpectingRejection(routingPolicy: VpnRoutingPolicy): String {

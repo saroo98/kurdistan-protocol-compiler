@@ -8,6 +8,8 @@ import android.system.Os
 import android.system.OsConstants
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import org.junit.Assert.*
 import org.junit.Test
 import org.kurdistanvpn.core.nativeapi.*
@@ -20,7 +22,7 @@ import org.kurdistanvpn.core.nativejni.NativeBridge
  * durability; that requires the independent crash/observer journey and terminal verifier. */
 class Phase17ProtectedStateIntegrityDeviceTest {
     @Test
-    fun nativeLeafAndOwnerChecksCannotEscapeTheSuppliedDirectory() = withRoot { root, native ->
+    fun nativeLeafAndOwnerChecksCannotEscapeTheSuppliedDirectory() = withRoot("leaf-owner") { root, native ->
         val before = native.list(root.directory, DurableBounds.MAX_ENTRIES)
         assertEquals(DurableCode.OK, before.code)
         for (leaf in listOf("", ".", "..", "../escape", "child/escape", "bad\\leaf", "a\u0000b", "x".repeat(256))) {
@@ -32,7 +34,7 @@ class Phase17ProtectedStateIntegrityDeviceTest {
     }
 
     @Test
-    fun nativeWriterReplacementSyncAndDeletionRequireExactOldIdentity() = withRoot { root, native ->
+    fun nativeWriterReplacementSyncAndDeletionRequireExactOldIdentity() = withRoot("writer-replacement") { root, native ->
         val lock = native.bootstrapLock(root.directory, "writer.lock")
         assertEquals(DurableCode.OK, lock.code)
         val identity = checkNotNull(lock.identity)
@@ -66,7 +68,7 @@ class Phase17ProtectedStateIntegrityDeviceTest {
     }
 
     @Test
-    fun nativeReadsRejectSymlinkHardLinkAndChangedDirectoryIdentity() = withRoot { root, native ->
+    fun nativeReadsRejectSymlinkHardLinkAndChangedDirectoryIdentity() = withRoot("read-link-identity") { root, native ->
         val lock = checkNotNull(native.bootstrapLock(root.directory, "writer.lock").identity)
         val writer = checkNotNull(native.openWriter(root.directory, "writer.lock", lock).writer)
         try { assertEquals(DurableCode.OK, writer.replace("record", "temporary-one", null, byteArrayOf(7), 64).code) }
@@ -84,7 +86,7 @@ class Phase17ProtectedStateIntegrityDeviceTest {
     }
 
     @Test
-    fun existingDirectoryOpenNeverCreatesOrAdoptsAnUnprovenLeaf() = withRoot { root, native ->
+    fun existingDirectoryOpenNeverCreatesOrAdoptsAnUnprovenLeaf() = withRoot("existing-directory") { root, native ->
         val absent = native.openChildDirectory(root.directory, "absent-child")
         assertEquals(DurableCode.ABSENT, absent.code)
         val created = native.createChildDirectoryExclusive(root.directory, "child")
@@ -101,20 +103,31 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             DurableFileIdentity(identity.device, Math.addExact(identity.inode, 1))).code)
     }
 
-    private fun withRoot(block: (SuppliedRoot, DurableFilePrimitives) -> Unit) {
+    private fun withRoot(role: String, block: (SuppliedRoot, DurableFilePrimitives) -> Unit) {
         // Each invocation needs a fresh root supplied by its controller. There is no
         // fallback, mkdir, product-path discovery, automatic cleanup, or network access.
         val args = InstrumentationRegistry.getArguments()
         val supplied = checkNotNull(args.getString("phase17.disposableRoot")) { "EXPLICIT_DISPOSABLE_ROOT_REQUIRED" }
         val authorization = checkNotNull(args.getString("phase17.filesystemAuthorization"))
-        // This is only an invocation label, not cryptographic authorization or evidence.
-        // The external controller must separately authorize and preserve this journey.
-        require(authorization.matches(Regex("[0-9a-f]{64}")))
+        val children = listOf("existing-directory", "leaf-owner", "read-link-identity", "writer-replacement")
+        require(role in children)
+        // Instrumentation executes in the target application process. Keep the
+        // synthetic root under that process's cache UID, never under protected
+        // product storage or the separately installed test APK's data directory.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val parent = File(context.applicationInfo.dataDir, "cache")
-        val file = File(supplied)
-        require(file.isAbsolute && file.parentFile?.absolutePath == parent.absolutePath &&
-            file.name.matches(Regex("phase17-disposable-[0-9a-f]{32}")) && file.canonicalPath == file.absolutePath)
+        val base = File(supplied)
+        require(base.isAbsolute && base.parentFile?.absolutePath == parent.absolutePath &&
+            base.name.matches(Regex("phase17-disposable-[0-9a-f]{32}")) && base.canonicalPath == base.absolutePath)
+        val preimage = "kurdistan-phase17-filesystem-authorization-v1\u0000" + supplied + "\u0000" +
+            children.joinToString("\u0000")
+        val expectedAuthorization = MessageDigest.getInstance("SHA-256")
+            .digest(preimage.toByteArray(StandardCharsets.UTF_8)).joinToString("") {
+                "%02x".format(it.toInt() and 0xff)
+            }
+        require(authorization == expectedAuthorization)
+        val file = File(base, role)
+        require(file.parentFile?.absolutePath == base.absolutePath && file.canonicalPath == file.absolutePath)
         var raw: java.io.FileDescriptor? = null
         var descriptor: ParcelFileDescriptor? = null
         try {

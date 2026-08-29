@@ -605,6 +605,12 @@ class Phase17LiveDataPlaneDeviceTest {
                 ),
             ),
         )
+        assertTrue(
+            Phase17FieldHarness.isTerminalFieldConnectOutcome(
+                expectDnsAvailable = true,
+                snapshot = VpnRuntimeSnapshot(state = VpnRuntimeState.ACTIVE_KURD_LIVE),
+            ),
+        )
     }
 
     @Test
@@ -953,7 +959,10 @@ class Phase17LiveDataPlaneDeviceTest {
             assertNoAuthorityEvidence(controller.snapshot.value)
         }
 
-        assertTrue(root.initializeProtectedStateForExplicitUserAction())
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} setup=EXPLICIT_BACKUP_INITIALIZATION",
+            root.initializeProtectedStateForExplicitUserAction(),
+        )
         assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
         assertNull(root.protectedStateFacade())
         assertTrue(root.initializeProtectedStateForExplicitUserAction())

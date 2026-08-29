@@ -28,6 +28,20 @@ class ProtectedStateStartupDeviceTest {
     @Test fun firstUseViewModelIsDisconnectedAndDoesNotProvisionProtectedState() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val target = instrumentation.targetContext
+        val applicationRoot = (target.applicationContext as KurdistanApplication).compositionRoot
+        runBlocking {
+            if (applicationRoot.protectedStateFacade() != null) {
+                assertTrue(
+                    "KURDISTAN_TEST_SETUP expected=RESET_COMMITTED actual=RESET_REJECTED setup=FIRST_USE_ISOLATION",
+                    applicationRoot.resetProtectedStateConfirmed() is
+                        org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed,
+                )
+            }
+        }
+        assertNull(
+            "KURDISTAN_TEST_SETUP expected=NO_PROTECTED_FACADE actual=PROTECTED_FACADE_PRESENT setup=FIRST_USE_ISOLATION",
+            applicationRoot.protectedStateFacade(),
+        )
         val parent = Files.createTempDirectory(target.cacheDir.toPath(), "startup-isolated-").toFile().canonicalFile
         Os.chmod(parent.path, 448)
         val info = ApplicationInfo(target.applicationInfo).apply {
@@ -47,7 +61,11 @@ class ProtectedStateStartupDeviceTest {
         try {
             val opened = Phase9CompositionRoot.create(context, owner)
             root = opened
-            assertEquals(Phase9CompositionRoot.StorageFailure.FIRST_USE, opened.storageFailure)
+            assertEquals(
+                "KURDISTAN_TEST_SETUP expected=FIRST_USE actual=${opened.storageFailure?.name ?: "AVAILABLE"} setup=ISOLATED_EMPTY_DIRECTORY",
+                Phase9CompositionRoot.StorageFailure.FIRST_USE,
+                opened.storageFailure,
+            )
             assertNull(opened.protectedStateFacade())
             instrumentation.runOnMainSync {
                 model = ViewModelProvider(store, ProductRootViewModel.Factory(opened))[ProductRootViewModel::class.java]

@@ -90,7 +90,7 @@ func logLaunchScenario(t *testing.T, err error, observation launchObservation) {
 	for _, exit := range observation.ExitRecords {
 		t.Logf("exit_target_package=%t pid_matches_fixture=%t uid_matches_fixture=%t in_window=%t reason=%d status=%d",
 			exit.Process == defaultAppPackage, exit.PID == 999, exit.UID == 10123,
-			exit.Timestamp.UnixNano() >= observation.WindowStartNanos && exit.Timestamp.UnixNano() <= observation.WindowEndNanos,
+			exit.DeviceNanos >= observation.WindowStartNanos && exit.DeviceNanos <= observation.WindowEndNanos,
 			exit.Reason, exit.Status)
 	}
 }
@@ -307,24 +307,35 @@ func (stream *fixtureStream) wait() error {
 // Only raw command bytes cross this seam. Production owns the parsers,
 // bounded writers, context budgets, identity correlation and gate result.
 type launchFixtureTransport struct {
-	mu        sync.Mutex
-	scenario  string
-	clock     time.Time
-	launched  time.Time
-	processes int
-	logs      map[string]string
-	streams   map[string]*fixtureStream
-	commands  []fixtureCommand
-	blocked   chan struct{}
+	mu         sync.Mutex
+	scenario   string
+	clock      time.Time
+	wallClock  time.Time
+	launched   time.Time
+	wallLaunch time.Time
+	processes  int
+	logs       map[string]string
+	markers    []fixtureMarker
+	streams    map[string]*fixtureStream
+	commands   []fixtureCommand
+	blocked    chan struct{}
+}
+
+type fixtureMarker struct {
+	tag       string
+	text      string
+	monotonic time.Time
+	wall      time.Time
 }
 
 func newLaunchFixtureTransport(scenario string) *launchFixtureTransport {
 	return &launchFixtureTransport{
-		scenario: scenario,
-		clock:    time.Unix(1_700_000_000, 0).UTC(),
-		logs:     make(map[string]string),
-		streams:  make(map[string]*fixtureStream),
-		blocked:  make(chan struct{}),
+		scenario:  scenario,
+		clock:     time.Unix(101, 0).UTC(),
+		wallClock: time.Unix(1_700_000_000, 0).UTC(),
+		logs:      make(map[string]string),
+		streams:   make(map[string]*fixtureStream),
+		blocked:   make(chan struct{}),
 	}
 }
 
@@ -366,6 +377,7 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	// Device timestamps follow command causality, not the host wall clock's
 	// resolution. Real context deadlines and the survival interval are untouched.
 	fixture.clock = fixture.clock.Add(time.Millisecond)
+	fixture.wallClock = fixture.wallClock.Add(time.Millisecond)
 	args = args[3:]
 	command := strings.Join(args, " ")
 	scenario := fixture.scenario
@@ -379,10 +391,14 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		fmt.Fprint(stdout, "ab")
 		fmt.Fprint(stderr, "cd")
 		fmt.Fprint(stdout, "efg")
-	case command == "date +%s.%N":
-		fmt.Fprintln(stdout, fixtureStamp(fixture.clock))
 	case command == "date +%z":
 		fmt.Fprintln(stdout, "+0000")
+	case strings.HasPrefix(command, "log -p i -t KurdistanClockProbe "):
+		marker := args[len(args)-1]
+		fixture.markers = append(fixture.markers, fixtureMarker{
+			tag: clockProbeTag, text: marker, monotonic: fixture.clock, wall: fixture.wallClock,
+		})
+		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I "+clockProbeTag+": "+marker+"\n")
 	case strings.HasPrefix(command, "log -p i -t KurdistanLaunchProbe "):
 		if scenario == "missing-markers" {
 			return nil
@@ -396,7 +412,11 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 				}
 			}
 		}
-		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I KurdistanLaunchProbe: "+args[len(args)-1]+"\n")
+		marker := args[len(args)-1]
+		fixture.markers = append(fixture.markers, fixtureMarker{
+			tag: "KurdistanLaunchProbe", text: marker, monotonic: fixture.clock, wall: fixture.wallClock,
+		})
+		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I KurdistanLaunchProbe: "+marker+"\n")
 	case command == "cmd package resolve-activity --brief -n "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity":
 		fmt.Fprintln(stdout, defaultAppPackage+"/org.kurdistanvpn.app.MainActivity")
 	case command == "ps -A -o UID,PID,PPID,NAME":
@@ -445,9 +465,10 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		fmt.Fprintln(stdout, "999")
 	case command == "am start -W -f 0x10008000 -n "+defaultAppPackage+"/org.kurdistanvpn.app.MainActivity":
 		fixture.launched = fixture.clock
+		fixture.wallLaunch = fixture.wallClock
 		system := fixtureStamp(fixture.launched) + " 10 10 I ActivityManager: Start proc 999:" + defaultAppPackage + "/u0a123 for activity\n"
 		if scenario == "stale-dialog" {
-			system = fixtureStamp(fixture.launched.Add(-time.Hour)) +
+			system = fixtureStamp(fixture.launched.Add(-time.Second)) +
 				" 10 10 I ActivityManager: AppErrorDialog for " + defaultAppPackage + "\n" + system
 		}
 		if err := fixture.appendLog("system", system); err != nil {
@@ -456,7 +477,7 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		if strings.HasSuffix(scenario, "crash") {
 			at, pid, app := fixture.clock, 999, defaultAppPackage
 			if scenario == "stale-crash" {
-				at = at.Add(-time.Hour)
+				at = at.Add(-time.Second)
 			}
 			if scenario == "unrelated-crash" {
 				pid, app = 888, "example.unrelated"
@@ -537,7 +558,7 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		}
 		fmt.Fprintln(stdout, "ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)\nLast Timestamp of Persistence Into Persistent Storage: 1970-01-01 00:00:00.000")
 		if strings.HasSuffix(scenario, "exit") {
-			at, uid := fixture.launched.Add(time.Millisecond), 10123
+			at, uid := fixture.wallLaunch.Add(time.Millisecond), 10123
 			if scenario == "stale-exit" {
 				at = at.Add(-time.Hour)
 			}
@@ -549,12 +570,30 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	case command == "logcat -b all -t 4096 -v brief *:W":
 		fmt.Fprint(stdout, fixture.logs["crash"])
 	case len(args) > 3 && args[0] == "logcat" && args[1] == "-b":
-		if !strings.Contains(command, "-v threadtime -v epoch -v usec") || !strings.Contains(" "+command+" ", " -d ") {
+		monotonic := strings.Contains(command, "-v threadtime -v monotonic -v usec")
+		epoch := strings.Contains(command, "-v threadtime -v epoch -v usec")
+		if (!monotonic && !epoch) || !strings.Contains(" "+command+" ", " -d ") {
 			return errors.New("unexpected fixture log snapshot options")
 		}
 		value, known := fixture.logs[args[2]]
 		if !known && args[2] != "crash" && args[2] != "main" && args[2] != "system" {
 			return errors.New("unexpected fixture log buffer")
+		}
+		for _, tag := range []string{clockProbeTag, "KurdistanLaunchProbe"} {
+			if !strings.Contains(command, tag+":I") {
+				continue
+			}
+			value = ""
+			for _, marker := range fixture.markers {
+				if marker.tag != tag {
+					continue
+				}
+				stamp := marker.monotonic
+				if epoch {
+					stamp = marker.wall
+				}
+				value += fixtureStamp(stamp) + " 11 11 I " + marker.tag + ": " + marker.text + "\n"
+			}
 		}
 		fmt.Fprint(stdout, value)
 	default:
@@ -583,7 +622,7 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 		return nil, errors.New("incomplete stream arguments")
 	}
 	buffer := args[2]
-	want := []string{"logcat", "-b", buffer, "-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+	want := []string{"logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
 		"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 	if (buffer != "crash" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
 		return nil, errors.New("unexpected or duplicate fixture stream")
@@ -684,9 +723,11 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 	}
 	prefix := "run -s emulator-5554 shell "
 	streamPrefix := "start -s emulator-5554 shell logcat -b "
-	streamSuffix := " -v threadtime -v epoch -v usec -T 1 AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S"
+	streamSuffix := " -v threadtime -v monotonic -v usec -T 1 AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S"
 	want := []string{
-		prefix + "date +%s.%N", prefix + "date +%z",
+		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-before:" + observation.Invocation,
+		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
+		prefix + "date +%z",
 		streamPrefix + "crash" + streamSuffix, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
 		prefix + "log -p i -t KurdistanLaunchProbe START:" + observation.Invocation,
 		prefix + "ps -A -o UID,PID,PPID,NAME",
@@ -698,8 +739,11 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "dumpsys activity processes " + defaultAppPackage,
 		prefix + "log -p i -t KurdistanLaunchProbe END:" + observation.Invocation,
+		prefix + "logcat -b main -d -t 128 -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
+		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,
+		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
 		prefix + "logcat -b main -d -t 128 -v threadtime -v epoch -v usec KurdistanLaunchProbe:I *:S",
-		prefix + "date +%s.%N", prefix + "dumpsys activity exit-info " + defaultAppPackage,
+		prefix + "dumpsys activity exit-info " + defaultAppPackage,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("launch command sequence changed:\ngot=%q\nwant=%q", got, want)
@@ -731,7 +775,7 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 		output := &readyChildWriter{ready: make(chan struct{})}
 		outputs[buffer] = output
 		args := []string{"-s", "emulator-5554", "shell", "logcat", "-b", buffer,
-			"-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+			"-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
 			"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 		wait, err := client.startCommand(ctx, args, output, io.Discard, time.Second)
 		if err != nil || wait == nil {
@@ -762,7 +806,7 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 	if !windowOK {
 		t.Error("raw fixture invocation window is invalid")
 	}
-	if start != 1_700_000_000_001_000_000 || end != 1_700_000_000_003_000_000 {
+	if start != 101_001_000_000 || end != 101_003_000_000 {
 		t.Errorf("synthetic command clock changed: start=%d end=%d", start, end)
 	}
 	for _, buffer := range []string{"main", "system", "crash"} {
@@ -786,13 +830,13 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 	}
 	wantEvents := map[string][]launchLogEvent{
 		"system": {
-			{DeviceNanos: 1_700_000_000_002_000_000, PID: 10, TID: 10, Tag: "ActivityManager", Text: "process_lifecycle event=Start_proc pid=999 process=" + defaultAppPackage + " uid=10123"},
+			{DeviceNanos: 101_002_000_000, PID: 10, TID: 10, Tag: "ActivityManager", Text: "process_lifecycle event=Start_proc pid=999 process=" + defaultAppPackage + " uid=10123"},
 		},
 		"crash": {
-			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "FATAL EXCEPTION"},
-			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "Process: " + defaultAppPackage + ", PID: 999"},
-			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "java.lang.IllegalStateException: Check failed."},
-			{DeviceNanos: 1_700_000_000_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)"},
+			{DeviceNanos: 101_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "FATAL EXCEPTION"},
+			{DeviceNanos: 101_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "Process: " + defaultAppPackage + ", PID: 999"},
+			{DeviceNanos: 101_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "java.lang.IllegalStateException: Check failed."},
+			{DeviceNanos: 101_002_000_000, PID: 999, TID: 999, Tag: "AndroidRuntime", Text: "at org.kurdistanvpn.app.ProductRootViewModel.onCreate(Phase9ViewModel.kt:95)"},
 		},
 	}
 	for _, buffer := range []string{"system", "crash"} {
@@ -838,7 +882,7 @@ func TestLaunchTransportCancellationDrainsAcceptedRawOutput(t *testing.T) {
 	release := sync.OnceFunc(func() { close(output.release) })
 	defer release()
 	args := []string{"-s", "emulator-5554", "shell", "logcat", "-b", "system",
-		"-v", "threadtime", "-v", "epoch", "-v", "usec", "-T", "1",
+		"-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
 		"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 	wait, err := client.startCommand(ctx, args, output, io.Discard, time.Second)
 	if err != nil || wait == nil {
@@ -855,7 +899,7 @@ func TestLaunchTransportCancellationDrainsAcceptedRawOutput(t *testing.T) {
 		}
 	}()
 	stream := fixture.streams["system"]
-	raw := "1700000000.002000000 10 10 I ActivityManager: Start proc 999:" + defaultAppPackage + "/u0a123 for activity\n"
+	raw := "101.002000000 10 10 I ActivityManager: Start proc 999:" + defaultAppPackage + "/u0a123 for activity\n"
 	written := make(chan error, 1)
 	go func() { written <- stream.write(raw) }()
 	select {
@@ -1312,12 +1356,15 @@ func TestLaunchOutputKeepsTimingButRedactsUnknownStderr(t *testing.T) {
 
 func TestExitReasonRequiresExactProcessAndWindow(t *testing.T) {
 	start := time.Date(2026, 1, 2, 3, 4, 0, 0, time.UTC)
+	const monotonicStart = int64(101_000_000_000)
+	offset := start.UnixNano() - monotonicStart
 	raw := "ApplicationExitInfo #0:\n timestamp=2026-01-02 03:04:01.250 pid=999 realUid=10123 packageUid=10123 definingUid=10123 user=0\n" +
 		" process=" + defaultAppPackage + " reason=4 (CRASH) subreason=0 (UNKNOWN) status=0\n description=token=synthetic-secret\n" +
 		"ApplicationExitInfo #1:\n timestamp=2026-01-02 02:04:01.250 pid=777 realUid=10123\n process=" + defaultAppPackage + " reason=4 (CRASH) status=0\n" +
 		"ApplicationExitInfo #2:\n timestamp=2026-01-02 03:04:01.250 pid=888 realUid=10124\n process=" + defaultAppPackage + "ger reason=4 (CRASH) status=0\n"
-	records, complete := parseExitRecords(raw, defaultAppPackage, start, start.Add(5*time.Second), time.UTC)
-	if !complete || len(records) != 1 || records[0].PID != 999 || records[0].Reason != 4 || strings.Contains(fmt.Sprint(records), "secret") {
+	records, complete := parseExitRecords(raw, defaultAppPackage, monotonicStart, monotonicStart+int64(5*time.Second), offset, time.UTC)
+	if !complete || len(records) != 1 || records[0].PID != 999 || records[0].Reason != 4 ||
+		records[0].DeviceNanos != monotonicStart+int64(1250*time.Millisecond) || strings.Contains(fmt.Sprint(records), "secret") {
 		t.Fatalf("exit records=%+v complete=%t", records, complete)
 	}
 }
@@ -1615,12 +1662,11 @@ func TestMissingJUnitDiagnosticsCannotBecomeTestPass(t *testing.T) {
 }
 
 func TestDiagnosticOnlyJUnitKeepsCauseChainAndRejectsMalformedInput(t *testing.T) {
-	fixture := `<testsuite name="org.kurdistanvpn.data.settings.Phase13SettingsCodecTest" tests="1" failures="1" errors="0"><testcase name="explicitlyOwnedProjectionClosesBeforeIndependentDiskReadAndReopen" classname="org.kurdistanvpn.data.settings.Phase13SettingsCodecTest"><failure type="java.lang.IllegalArgumentException" message="java.lang.IllegalArgumentException: Failed requirement.">java.lang.IllegalArgumentException: Failed requirement.
- at org.kurdistanvpn.data.settings.Phase9SettingsStore$Companion.openOwnedProjection(Phase9SettingsStore.kt:271)
- at org.kurdistanvpn.data.settings.Phase13SettingsCodecTest.explicitlyOwnedProjectionClosesBeforeIndependentDiskReadAndReopen(Phase13SettingsCodecTest.kt:34)
-</failure></testcase><system-out>credential=synthetic-secret</system-out></testsuite>`
+	fixture := `<testsuite name="org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest" tests="1" failures="1" errors="0"><testcase name="timedOutMintPoisonsEpochEvenWhenProviderReturnsAfterCancellation" classname="org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest"><failure type="java.lang.AssertionError" message="java.lang.AssertionError: Failed requirement.">java.lang.AssertionError: Failed requirement.
+	 at org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest.timedOutMintPoisonsEpochEvenWhenProviderReturnsAfterCancellation(RuntimeAuthorityReissueServiceTest.kt:123)
+	</failure></testcase><system-out>credential=synthetic-secret</system-out></testsuite>`
 	report, err := junitFailureReport([]byte(fixture))
-	if err != nil || report.Status != "CAPTURED" || report.Failures != 1 || len(report.Cases) != 1 || len(report.Cases[0].Exceptions[0].Stack) != 2 {
+	if err != nil || report.Status != "CAPTURED" || report.Failures != 1 || len(report.Cases) != 1 || len(report.Cases[0].Exceptions[0].Stack) != 1 {
 		t.Fatalf("JUnit report=%+v err=%v", report, err)
 	}
 	if strings.Contains(fmt.Sprint(report), "synthetic-secret") {
@@ -1720,11 +1766,13 @@ func TestClockDiagnosticsPreserveSafeRawParserRejectionAndRedactUnsafeInput(t *t
 		ExitCode:    0,
 		Status:      "CAPTURED",
 	}
-	rejected := clockDiagnostic("1787946040.%N\n", record)
-	if rejected.Raw != "1787946040.%N" || rejected.RawStatus != "CAPTURED" ||
-		rejected.ParseStatus != "REJECTED" || rejected.Rejection != "FRACTION_NON_NUMERIC" ||
-		rejected.CommandStatus != "CAPTURED" || rejected.CommandExitCode != 0 {
-		t.Fatalf("clock rejection detail was not preserved exactly: %+v", rejected)
+	for _, observed := range []string{"1787966142.N", "1787966146.N"} {
+		rejected := clockDiagnostic(observed+"\n", record)
+		if rejected.Raw != observed || rejected.RawStatus != "CAPTURED" ||
+			rejected.ParseStatus != "REJECTED" || rejected.Rejection != "FRACTION_NON_NUMERIC" ||
+			rejected.CommandStatus != "CAPTURED" || rejected.CommandExitCode != 0 {
+			t.Fatalf("API 26 clock rejection detail was not preserved exactly for %q: %+v", observed, rejected)
+		}
 	}
 	valid := clockDiagnostic("1787946040.084506886\n", record)
 	if valid.ParseStatus != "CAPTURED" || valid.ParsedNanos != 1_787_946_040_084_506_886 || valid.Rejection != "" {
@@ -1735,6 +1783,140 @@ func TestClockDiagnosticsPreserveSafeRawParserRejectionAndRedactUnsafeInput(t *t
 	if err != nil || unsafe.RawStatus != "REDACTED" || unsafe.ParseStatus != "REJECTED" ||
 		strings.Contains(string(encoded), "synthetic-secret") || strings.Contains(string(encoded), "192.0.2.9") {
 		t.Fatalf("unsafe clock evidence escaped sanitization: %+v err=%v", unsafe, err)
+	}
+}
+
+func TestClockProbeUsesOneMonotonicLogdDomainOnAllSupportedAPIs(t *testing.T) {
+	invocation := strings.Repeat("a", 32)
+	marker, commands, err := monotonicClockProbePlan("clock-before", invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantMarker := "CLOCK:clock-before:" + invocation
+	want := [][]string{
+		{"shell", "log", "-p", "i", "-t", "KurdistanClockProbe", wantMarker},
+		{"shell", "logcat", "-b", "main", "-d", "-t", "64", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "KurdistanClockProbe:I", "*:S"},
+	}
+	if marker != wantMarker || !reflect.DeepEqual(commands, want) {
+		t.Fatalf("clock probe changed domain or command boundaries: marker=%q commands=%q", marker, commands)
+	}
+	for _, command := range commands {
+		joined := strings.Join(command, " ")
+		if strings.Contains(joined, "date ") || strings.Contains(joined, " epoch ") || strings.Contains(joined, "%N") {
+			t.Fatalf("clock probe retained wall-clock or unsupported fractional dependency: %q", command)
+		}
+	}
+	record := diagnosticCommand{Phase: "clock-before-snapshot", ExitCode: 0, Status: "CAPTURED"}
+	raw := "101.123456 11 11 I KurdistanClockProbe: " + marker + "\n"
+	evidence := monotonicClockDiagnostic(raw, marker, record)
+	if evidence.Domain != "CLOCK_MONOTONIC_LOGCAT" || evidence.ParseStatus != "CAPTURED" ||
+		evidence.ParsedNanos != 101_123_456_000 || evidence.Rejection != "" {
+		t.Fatalf("monotonic clock evidence changed: %+v", evidence)
+	}
+	for name, malformed := range map[string]string{
+		"missing":   "",
+		"duplicate": raw + raw,
+		"wrong":     "101.123456 11 11 I KurdistanClockProbe: CLOCK:clock-after:" + invocation + "\n",
+		"fraction":  "101.N 11 11 I KurdistanClockProbe: " + marker + "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := monotonicClockDiagnostic(malformed, marker, record)
+			if got.ParseStatus != "REJECTED" || got.Rejection == "" || got.ParsedNanos != 0 {
+				t.Fatalf("malformed monotonic clock evidence accepted: %+v", got)
+			}
+		})
+	}
+}
+
+func TestLaunchMarkerClockCorrelationMapsWallRecordsIntoMonotonicDomain(t *testing.T) {
+	invocation := strings.Repeat("b", 32)
+	monotonic := "101.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
+		"105.001000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n"
+	wall := "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
+		"1700000005.001000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n"
+	correlation := correlateLaunchMarkerClocks(monotonic, wall, invocation)
+	if correlation.Status != "CAPTURED" || correlation.Rejection != "" ||
+		correlation.WallMinusMonotonicNanos != 1_699_999_900_000_000_000 {
+		t.Fatalf("clock-domain correlation changed: %+v", correlation)
+	}
+	for name, changed := range map[string]string{
+		"missing":   "",
+		"duplicate": wall + "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n",
+		"offset-change": "1700000001.001000 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
+			"1700000005.002000 11 11 I KurdistanLaunchProbe: END:" + invocation + "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := correlateLaunchMarkerClocks(monotonic, changed, invocation)
+			if got.Status != "REJECTED" || got.Rejection == "" || got.WallMinusMonotonicNanos != 0 {
+				t.Fatalf("ambiguous wall/monotonic mapping accepted: %+v", got)
+			}
+		})
+	}
+}
+
+func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *testing.T) {
+	const targetPackage = "org.example.app"
+	const testPackage = "org.example.test"
+	const dataDir = "/data/user/0/org.example.app"
+	const invocation = "0123456789abcdef0123456789abcdef"
+	plan, err := nativeFilesystemInstrumentationPlan(targetPackage, testPackage, dataDir, invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRoot := dataDir + "/cache/phase17-disposable-" + invocation
+	if plan.OwnerPackage != targetPackage || plan.TestPackage != testPackage ||
+		plan.Root != wantRoot || plan.Authorization != "5c4c66627867800fad2b3f2d2f92d3f02346c727ce201281493a2cf954fdefbf" {
+		t.Fatalf("filesystem plan root or authorization changed: %+v", plan)
+	}
+	wantChildren := []string{"existing-directory", "leaf-owner", "read-link-identity", "writer-replacement"}
+	if !reflect.DeepEqual(plan.Children, wantChildren) {
+		t.Fatalf("filesystem child roots changed: %q", plan.Children)
+	}
+	wantPreparation := [][]string{
+		{"shell", "run-as", targetPackage, "mkdir", "cache/phase17-disposable-" + invocation},
+		{"shell", "run-as", targetPackage, "chmod", "700", "cache/phase17-disposable-" + invocation},
+	}
+	for _, child := range wantChildren {
+		wantPreparation = append(wantPreparation,
+			[]string{"shell", "run-as", targetPackage, "mkdir", "cache/phase17-disposable-" + invocation + "/" + child},
+			[]string{"shell", "run-as", targetPackage, "chmod", "700", "cache/phase17-disposable-" + invocation + "/" + child},
+		)
+	}
+	if got := nativeFilesystemPreparationArgs(plan); !reflect.DeepEqual(got, wantPreparation) {
+		t.Fatalf("filesystem preparation changed argument order or boundaries:\ngot=%q\nwant=%q", got, wantPreparation)
+	}
+	runner := testPackage + "/androidx.test.runner.AndroidJUnitRunner"
+	args := nativeFilesystemInstrumentationArgs(plan, runner)
+	wantArgs := []string{"shell", "am", "instrument", "-w", "-r",
+		"-e", "phase17.disposableRoot", wantRoot,
+		"-e", "phase17.filesystemAuthorization", plan.Authorization,
+		runner,
+	}
+	if !reflect.DeepEqual(args, wantArgs) || validateNativeFilesystemInstrumentationArgs(args, targetPackage, testPackage) != nil {
+		t.Fatalf("instrumentation arguments changed ordering, quoting, or binding: %q", args)
+	}
+	for _, value := range args {
+		if strings.ContainsAny(value, "\"'") {
+			t.Fatalf("instrumentation argument requires shell quoting instead of an exact argv boundary: %q", value)
+		}
+	}
+	mutations := map[string][]string{
+		"missing-root":       append([]string(nil), args[3:]...),
+		"duplicate-root":     append(append([]string(nil), args[:5]...), append([]string{"-e", "phase17.disposableRoot", wantRoot}, args[5:]...)...),
+		"malformed-root":     append([]string(nil), args...),
+		"substituted-root":   append([]string(nil), args...),
+		"unauthorized-token": append([]string(nil), args...),
+		"extra-argument":     append(append([]string(nil), args...), "unexpected"),
+	}
+	mutations["malformed-root"][7] = "../escape"
+	mutations["substituted-root"][7] = dataDir + "/cache/phase17-disposable-ffffffffffffffffffffffffffffffff"
+	mutations["unauthorized-token"][10] = strings.Repeat("0", 64)
+	for name, mutated := range mutations {
+		t.Run(name, func(t *testing.T) {
+			if err := validateNativeFilesystemInstrumentationArgs(mutated, targetPackage, testPackage); err == nil {
+				t.Fatalf("invalid instrumentation arguments accepted: %q", mutated)
+			}
+		})
 	}
 }
 
@@ -1769,8 +1951,9 @@ func TestInstrumentationDiagnosticsPreserveBoundedPerTestFailureTimeline(t *test
 		{ObservedUTC: started.Add(275 * time.Millisecond), Raw: strings.Join([]string{
 			"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest",
 			"INSTRUMENTATION_STATUS: test=dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected",
-			"INSTRUMENTATION_STATUS: stack=androidx.compose.ui.test.ComposeNotIdleException: Failed requirement.",
+			"INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=FAILED setup=DNS_EXPECTED_AVAILABLE",
 			" at org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest.dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected(Phase17LiveDataPlaneDeviceTest.kt:514)",
+			" at org.junit.Assert.fail(Assert.java:87)",
 			"INSTRUMENTATION_STATUS_CODE: -2",
 			"FAILURES!!!",
 		}, "\n") + "\n"},
@@ -1785,8 +1968,14 @@ func TestInstrumentationDiagnosticsPreserveBoundedPerTestFailureTimeline(t *test
 	failure := report.Failures[0]
 	if failure.Class != "org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest" ||
 		failure.Method != "dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected" ||
-		failure.Status != "FAIL" || failure.DurationMS != 275 || failure.Category != "test_timeout" ||
-		failure.ExceptionType != "androidx.compose.ui.test.ComposeNotIdleException" || len(failure.Stack) != 1 {
+		failure.Status != "FAIL" || failure.DurationMS != 275 || failure.Category != "assertion" ||
+		failure.ExceptionType != "java.lang.AssertionError" ||
+		failure.Message != "KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=FAILED setup=DNS_EXPECTED_AVAILABLE" ||
+		failure.Expected != "ACTIVE_KURD_LIVE" || failure.Actual != "FAILED" ||
+		!reflect.DeepEqual(failure.SetupState, []string{"DNS_EXPECTED_AVAILABLE"}) ||
+		!reflect.DeepEqual(failure.ApplicationStack, []string{
+			"at org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest.dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected(Phase17LiveDataPlaneDeviceTest.kt:514)",
+		}) {
 		t.Fatalf("per-test failure detail changed or was incomplete: %+v", failure)
 	}
 

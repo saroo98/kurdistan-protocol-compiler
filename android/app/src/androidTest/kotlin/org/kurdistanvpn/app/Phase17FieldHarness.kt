@@ -268,13 +268,21 @@ internal object Phase17FieldHarness {
     internal fun isTerminalFieldConnectOutcome(
         expectDnsAvailable: Boolean,
         snapshot: VpnRuntimeSnapshot,
-    ): Boolean =
-        isExpectedDnsStartupFailure(
+    ): Boolean = when (snapshot.state) {
+        VpnRuntimeState.ACTIVE_KURD_LIVE,
+        VpnRuntimeState.REVOKED,
+        VpnRuntimeState.IDLE,
+        VpnRuntimeState.STOPPING,
+        VpnRuntimeState.BLOCKED,
+        -> true
+        VpnRuntimeState.FAILED -> isExpectedDnsStartupFailure(
             expectAvailable = expectDnsAvailable,
             state = snapshot.state,
             failure = snapshot.failure,
             packetDisposition = snapshot.packetDisposition,
-        ) || isTerminalInitialRuntimeOutcome(snapshot)
+        )
+        else -> false
+    }
 
     internal suspend fun awaitNetworkScopedDnsReadiness(
         timeoutMillis: Long,

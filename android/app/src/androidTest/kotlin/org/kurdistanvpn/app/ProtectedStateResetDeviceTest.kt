@@ -22,7 +22,10 @@ class ProtectedStateResetDeviceTest {
                 .targetContext.applicationContext as KurdistanApplication
         val root = application.compositionRoot
 
-        assertTrue(root.initializeProtectedStateForExplicitUserAction())
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} setup=EXPLICIT_RESET_INITIALIZATION",
+            root.initializeProtectedStateForExplicitUserAction(),
+        )
         assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
         assertNull("reset must not recreate state", root.protectedStateFacade())
         assertTrue("replacement requires a distinct explicit action", root.initializeProtectedStateForExplicitUserAction())
