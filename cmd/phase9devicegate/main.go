@@ -30,13 +30,14 @@ import (
 )
 
 const (
-	defaultAppPackage  = "org.kurdistanvpn.app.debug"
-	defaultTestPackage = "org.kurdistanvpn.app.debug.test"
-	defaultRunner      = "androidx.test.runner.AndroidJUnitRunner"
-	maxCommandEvidence = 2 << 20
-	maxLogcatInput     = 4 << 20
-	maxDiagnosticBytes = 16 << 10
-	deviceGateTimeout  = 35 * time.Minute
+	defaultAppPackage                 = "org.kurdistanvpn.app.debug"
+	defaultTestPackage                = "org.kurdistanvpn.app.debug.test"
+	defaultRunner                     = "androidx.test.runner.AndroidJUnitRunner"
+	maxCommandEvidence                = 2 << 20
+	maxLogcatInput                    = 4 << 20
+	maxDiagnosticBytes                = 16 << 10
+	maxInstrumentationDiagnosticBytes = 64 << 10
+	deviceGateTimeout                 = 35 * time.Minute
 )
 
 var deviceEvidenceProperties = []struct {
@@ -392,7 +393,34 @@ func (client adbClient) captureProcessState(ctx context.Context, name, appPackag
 }
 
 func (client adbClient) captureInstrumentation(ctx context.Context, name string, args ...string) (string, error) {
-	output, err := client.captureOutput(ctx, args...)
+	started := time.Now()
+	commandArgs := make([]string, 0, len(args)+2)
+	if client.serial != "" {
+		commandArgs = append(commandArgs, "-s", client.serial)
+	}
+	commandArgs = append(commandArgs, args...)
+	capture := newInstrumentationCaptureBuffer(time.Now)
+	err := client.runCommand(ctx, commandArgs, capture, capture, 0)
+	finished := time.Now()
+	output, chunks, truncated := capture.snapshot()
+	status, exitCode := diagnosticCommandStatus(err)
+	command := diagnosticCommand{
+		Phase:       "instrumentation",
+		StartedUTC:  started.UTC(),
+		FinishedUTC: finished.UTC(),
+		DurationMS:  finished.Sub(started).Milliseconds(),
+		ExitCode:    exitCode,
+		Status:      status,
+		Truncated:   truncated,
+	}
+	client.timeline.record("instrumentation", started, err)
+	detailStem := strings.TrimSuffix(name, filepath.Ext(name))
+	detailStem = strings.TrimSuffix(detailStem, "-summary")
+	detailName := detailStem + "-details.json"
+	detail := buildInstrumentationDiagnostic(chunks, command, truncated)
+	if writeErr := writeInstrumentationDiagnostic(filepath.Join(client.evidenceDir, detailName), detail); writeErr != nil {
+		return output, fmt.Errorf("write %s: %w", detailName, writeErr)
+	}
 	summary := summarizeInstrumentation(output)
 	if len(summary) > maxDiagnosticBytes {
 		return output, errors.New("instrumentation summary exceeded its byte limit")
@@ -400,7 +428,309 @@ func (client adbClient) captureInstrumentation(ctx context.Context, name string,
 	if writeErr := os.WriteFile(filepath.Join(client.evidenceDir, name), []byte(summary), 0o644); writeErr != nil {
 		return output, fmt.Errorf("write %s: %w", name, writeErr)
 	}
+	if truncated {
+		return output, fmt.Errorf("adb instrumentation output exceeded %d bytes", maxCommandEvidence)
+	}
 	return output, err
+}
+
+type instrumentationDiagnosticChunk struct {
+	ObservedUTC time.Time
+	Raw         string
+}
+
+type instrumentationCaptureBuffer struct {
+	mu     sync.Mutex
+	output boundedBuffer
+	chunks []instrumentationDiagnosticChunk
+	now    func() time.Time
+}
+
+func newInstrumentationCaptureBuffer(now func() time.Time) *instrumentationCaptureBuffer {
+	if now == nil {
+		now = time.Now
+	}
+	return &instrumentationCaptureBuffer{output: boundedBuffer{limit: maxCommandEvidence}, now: now}
+}
+
+func (capture *instrumentationCaptureBuffer) Write(input []byte) (int, error) {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	before := capture.output.buffer.Len()
+	_, _ = capture.output.Write(input)
+	after := capture.output.buffer.Len()
+	if after > before {
+		capture.chunks = append(capture.chunks, instrumentationDiagnosticChunk{
+			ObservedUTC: capture.now().UTC(),
+			Raw:         string(append([]byte(nil), input[:after-before]...)),
+		})
+	}
+	return len(input), nil
+}
+
+func (capture *instrumentationCaptureBuffer) snapshot() (string, []instrumentationDiagnosticChunk, bool) {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	chunks := make([]instrumentationDiagnosticChunk, len(capture.chunks))
+	copy(chunks, capture.chunks)
+	return capture.output.String(), chunks, capture.output.exceeded
+}
+
+type instrumentationTestDiagnostic struct {
+	Class          string
+	Method         string
+	Status         string
+	ObservedUTC    time.Time
+	StartedUTC     time.Time
+	FinishedUTC    time.Time
+	DurationMS     int64
+	Category       string
+	ExceptionType  string
+	ExceptionTypes []string
+	Stack          []string
+}
+
+type instrumentationDiagnosticReport struct {
+	Schema                 string
+	Status                 string
+	Command                diagnosticCommand
+	InstrumentationStarted bool
+	TestsBegan             int
+	TestsCompleted         int
+	LastObserved           *instrumentationTestDiagnostic
+	Failures               []instrumentationTestDiagnostic
+	Issues                 []string
+}
+
+type timedInstrumentationLine struct {
+	ObservedUTC time.Time
+	Text        string
+}
+
+func instrumentationDiagnosticLines(chunks []instrumentationDiagnosticChunk) ([]timedInstrumentationLine, bool) {
+	lines := make([]timedInstrumentationLine, 0)
+	pending := ""
+	complete := true
+	lastObserved := time.Time{}
+	for _, chunk := range chunks {
+		if chunk.ObservedUTC.IsZero() || len(chunk.Raw) > maxCommandEvidence || len(pending)+len(chunk.Raw) > maxCommandEvidence {
+			return lines, false
+		}
+		lastObserved = chunk.ObservedUTC.UTC()
+		pending += chunk.Raw
+		for {
+			index := strings.IndexByte(pending, '\n')
+			if index < 0 {
+				break
+			}
+			line := strings.TrimSuffix(pending[:index], "\r")
+			lines = append(lines, timedInstrumentationLine{ObservedUTC: lastObserved, Text: line})
+			pending = pending[index+1:]
+		}
+	}
+	if pending != "" {
+		lines = append(lines, timedInstrumentationLine{ObservedUTC: lastObserved, Text: strings.TrimSuffix(pending, "\r")})
+		complete = false
+	}
+	return lines, complete
+}
+
+func splitTestIdentity(identity string) (string, string, bool) {
+	className, method, found := strings.Cut(identity, "#")
+	return className, method, found && safeTestIdentity(identity)
+}
+
+func buildInstrumentationDiagnostic(chunks []instrumentationDiagnosticChunk, command diagnosticCommand, truncated bool) instrumentationDiagnosticReport {
+	report := instrumentationDiagnosticReport{
+		Schema:  "kurdistan-instrumentation-diagnostic-v1",
+		Status:  "CAPTURED",
+		Command: command,
+	}
+	incomplete := func(issue string) {
+		report.Status = "INCOMPLETE"
+		if len(report.Issues) < 32 {
+			report.Issues = append(report.Issues, issue)
+		}
+	}
+	if truncated || command.Truncated {
+		incomplete("instrumentation output truncated")
+	}
+	lines, complete := instrumentationDiagnosticLines(chunks)
+	if !complete {
+		incomplete("instrumentation output framing incomplete")
+	}
+
+	type activeTest struct {
+		started time.Time
+	}
+	active := map[string][]activeTest{}
+	className, methodName := "", ""
+	stackLines := make([]string, 0)
+	stackActive := false
+	lastEventAt := command.FinishedUTC
+	setLast := func(detail instrumentationTestDiagnostic) {
+		copy := detail
+		report.LastObserved = &copy
+	}
+	addFailure := func(detail instrumentationTestDiagnostic) {
+		if len(report.Failures) == 16 {
+			incomplete("instrumentation failure detail limit exceeded")
+			return
+		}
+		report.Failures = append(report.Failures, detail)
+	}
+	for _, observed := range lines {
+		line := strings.TrimSpace(observed.Text)
+		if line == "" {
+			continue
+		}
+		lastEventAt = observed.ObservedUTC
+		switch {
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: class="):
+			className = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: class="))
+			stackActive = false
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: test="):
+			methodName = strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: test="))
+			stackActive = false
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS: stack="):
+			stackLines = []string{strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS: stack="))}
+			stackActive = true
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS:"):
+			stackActive = false
+		case strings.HasPrefix(line, "INSTRUMENTATION_STATUS_CODE:"):
+			code, codeErr := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "INSTRUMENTATION_STATUS_CODE:")))
+			identity := className + "#" + methodName
+			class, method, identityOK := splitTestIdentity(identity)
+			if codeErr != nil || !identityOK {
+				incomplete("instrumentation status identity or code invalid")
+				className, methodName, stackLines, stackActive = "", "", nil, false
+				continue
+			}
+			detail := instrumentationTestDiagnostic{Class: class, Method: method, ObservedUTC: observed.ObservedUTC}
+			switch {
+			case code == 1:
+				detail.Status = "STARTED"
+				detail.StartedUTC = observed.ObservedUTC
+				detail.DurationMS = 0
+				active[identity] = append(active[identity], activeTest{started: observed.ObservedUTC})
+				report.TestsBegan++
+				report.InstrumentationStarted = true
+				setLast(detail)
+			case code <= 0:
+				report.TestsCompleted++
+				switch code {
+				case 0:
+					detail.Status = "PASS"
+				case -1:
+					detail.Status = "ERROR"
+				case -2:
+					detail.Status = "FAIL"
+				case -3:
+					detail.Status = "IGNORED"
+				case -4:
+					detail.Status = "ASSUMPTION_FAILURE"
+				default:
+					detail.Status = "UNKNOWN"
+					incomplete("instrumentation terminal status unsupported")
+				}
+				queue := active[identity]
+				if len(queue) == 0 {
+					detail.DurationMS = -1
+					incomplete("instrumentation terminal event lacks matching start")
+				} else {
+					detail.StartedUTC = queue[0].started
+					detail.FinishedUTC = observed.ObservedUTC
+					detail.DurationMS = observed.ObservedUTC.Sub(queue[0].started).Milliseconds()
+					if detail.DurationMS < 0 {
+						incomplete("instrumentation event timestamps reversed")
+					}
+					if len(queue) == 1 {
+						delete(active, identity)
+					} else {
+						active[identity] = queue[1:]
+					}
+				}
+				if code == -1 || code == -2 || code == -4 {
+					stack := strings.Join(stackLines, "\n")
+					detail.Category, detail.ExceptionType = instrumentationFailureDetails(stack)
+					exceptions, stackComplete := javaFailureDetails(stack)
+					if len(exceptions) == 0 {
+						incomplete("instrumentation failure exception unavailable")
+					} else {
+						detail.ExceptionType = exceptions[0].Class
+						for _, exception := range exceptions {
+							detail.ExceptionTypes = append(detail.ExceptionTypes, exception.Class)
+							for _, frame := range exception.Stack {
+								if len(detail.Stack) == 16 {
+									stackComplete = false
+									break
+								}
+								detail.Stack = append(detail.Stack, frame)
+							}
+						}
+					}
+					if !stackComplete {
+						incomplete("instrumentation failure stack redacted or truncated")
+					}
+					addFailure(detail)
+				}
+				setLast(detail)
+			default:
+				incomplete("instrumentation status code unsupported")
+			}
+			className, methodName, stackLines, stackActive = "", "", nil, false
+		default:
+			if stackActive {
+				if len(stackLines) == 256 {
+					incomplete("instrumentation stack input limit exceeded")
+				} else {
+					stackLines = append(stackLines, line)
+				}
+			}
+		}
+	}
+	if command.Status == "DEADLINE" {
+		for identity, queue := range active {
+			class, method, ok := splitTestIdentity(identity)
+			if !ok {
+				incomplete("timed-out instrumentation identity invalid")
+				continue
+			}
+			for _, item := range queue {
+				detail := instrumentationTestDiagnostic{
+					Class: class, Method: method, Status: "TIMEOUT", Category: "test_timeout",
+					ObservedUTC: lastEventAt, StartedUTC: item.started, FinishedUTC: command.FinishedUTC,
+					DurationMS: command.FinishedUTC.Sub(item.started).Milliseconds(),
+				}
+				addFailure(detail)
+				setLast(detail)
+			}
+		}
+	} else if len(active) != 0 {
+		incomplete("instrumentation tests lack terminal status")
+	}
+	return report
+}
+
+func writeInstrumentationDiagnostic(path string, report instrumentationDiagnosticReport) error {
+	encoded, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	if len(encoded) > maxInstrumentationDiagnosticBytes {
+		fallback := instrumentationDiagnosticReport{
+			Schema: report.Schema, Status: "INCOMPLETE", Command: report.Command,
+			InstrumentationStarted: report.InstrumentationStarted,
+			TestsBegan:             report.TestsBegan, TestsCompleted: report.TestsCompleted,
+			LastObserved: report.LastObserved,
+			Issues:       append(append([]string(nil), report.Issues...), "instrumentation diagnostic output bound exceeded"),
+		}
+		encoded, err = json.MarshalIndent(fallback, "", "  ")
+		if err != nil || len(encoded) > maxInstrumentationDiagnosticBytes {
+			return errors.New("instrumentation diagnostics INCOMPLETE: output bound")
+		}
+	}
+	return os.WriteFile(path, append(encoded, '\n'), 0o600)
 }
 
 func diagnosticLogcatArgs(buffer string) []string {
@@ -1631,27 +1961,85 @@ type launchLogEvent struct {
 	Text        string
 }
 
+type diagnosticClockEvidence struct {
+	Phase           string
+	ObservedUTC     time.Time
+	Raw             string
+	RawStatus       string
+	ParseStatus     string
+	Rejection       string
+	ParsedNanos     int64
+	CommandStatus   string
+	CommandExitCode int
+}
+
 var epochLogPattern = regexp.MustCompile("^\\s*([0-9]{1,12}\\.[0-9]{1,9})\\s+([0-9]+)\\s+([0-9]+)\\s+([VDIWEF])\\s+([A-Za-z0-9_.-]+)\\s*:\\s?(.*)$")
 var processLogPattern = regexp.MustCompile("^Process: ([A-Za-z0-9_.:]+), PID: ([0-9]+)$")
 var processSuffixPattern = regexp.MustCompile("^[A-Za-z0-9_.]+$")
 
-func epochNanos(value string) (int64, error) {
-	parts := strings.Split(strings.TrimSpace(value), ".")
-	if len(parts) != 2 || len(parts[1]) > 9 || len(parts[1]) == 0 {
-		return 0, errors.New("invalid diagnostic clock")
+func parseEpochNanos(value string) (int64, string) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, "EMPTY"
 	}
-	if strings.Trim(parts[0]+parts[1], "0123456789") != "" {
-		return 0, errors.New("invalid diagnostic clock")
+	if strings.ContainsAny(trimmed, "\r\n") {
+		return 0, "MULTILINE"
+	}
+	parts := strings.Split(trimmed, ".")
+	if len(parts) != 2 {
+		return 0, "FORMAT"
+	}
+	if parts[0] == "" {
+		return 0, "SECONDS_EMPTY"
+	}
+	if parts[1] == "" {
+		return 0, "FRACTION_EMPTY"
+	}
+	if len(parts[1]) > 9 {
+		return 0, "FRACTION_PRECISION"
+	}
+	if strings.Trim(parts[0], "0123456789") != "" {
+		return 0, "SECONDS_NON_NUMERIC"
+	}
+	if strings.Trim(parts[1], "0123456789") != "" {
+		return 0, "FRACTION_NON_NUMERIC"
 	}
 	seconds, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil || seconds < 0 || seconds > 9_000_000_000 {
-		return 0, errors.New("invalid diagnostic clock")
+		return 0, "SECONDS_OUT_OF_RANGE"
 	}
 	fraction, err := strconv.ParseInt(parts[1]+strings.Repeat("0", 9-len(parts[1])), 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, "FRACTION_OUT_OF_RANGE"
 	}
-	return seconds*1_000_000_000 + fraction, nil
+	return seconds*1_000_000_000 + fraction, ""
+}
+
+func epochNanos(value string) (int64, error) {
+	nanos, rejection := parseEpochNanos(value)
+	if rejection != "" {
+		return 0, fmt.Errorf("invalid diagnostic clock: %s", rejection)
+	}
+	return nanos, nil
+}
+
+func clockDiagnostic(raw string, command diagnosticCommand) diagnosticClockEvidence {
+	trimmed := strings.TrimSpace(raw)
+	evidence := diagnosticClockEvidence{
+		Phase: command.Phase, ObservedUTC: command.FinishedUTC,
+		RawStatus: "REDACTED", ParseStatus: "REJECTED",
+		CommandStatus: command.Status, CommandExitCode: command.ExitCode,
+	}
+	safeRaw := regexp.MustCompile("^[+-]?[0-9%N]{1,16}(?:\\.[0-9%N]{0,16})?$")
+	if len(trimmed) <= 64 && safeRaw.MatchString(trimmed) {
+		evidence.Raw = trimmed
+		evidence.RawStatus = "CAPTURED"
+	}
+	evidence.ParsedNanos, evidence.Rejection = parseEpochNanos(raw)
+	if evidence.Rejection == "" {
+		evidence.ParseStatus = "CAPTURED"
+	}
+	return evidence
 }
 
 func parseEpochLog(line string) (launchLogEvent, bool) {
@@ -2232,6 +2620,25 @@ type diagnosticLogBuffer struct {
 	Events []launchLogEvent
 }
 
+type diagnosticMarkerEvidence struct {
+	Source          string
+	Value           string
+	DeviceNanos     int64
+	InvocationMatch bool
+}
+
+type diagnosticMarkerWindow struct {
+	Status                  string
+	Rejection               string
+	DeviceStartNanos        int64
+	DeviceEndNanos          int64
+	Markers                 []diagnosticMarkerEvidence
+	MatchingStartTimestamps []int64
+	MatchingEndTimestamps   []int64
+	IgnoredMarkers          int
+	MalformedMarkers        int
+}
+
 type launchObservation struct {
 	client                adbClient
 	api                   int
@@ -2248,6 +2655,7 @@ type launchObservation struct {
 	WindowStartNanos      int64
 	WindowEndNanos        int64
 	ClockZone             string
+	Clocks                []diagnosticClockEvidence
 	Commands              []diagnosticCommand
 	Processes             []diagnosticProcessSnapshot
 	Logs                  []diagnosticLogBuffer
@@ -2259,6 +2667,7 @@ type launchObservation struct {
 	ResolvedActivity      string
 	ResolutionStatus      string
 	LaunchCommand         []string
+	MarkerWindow          diagnosticMarkerWindow
 	Issues                []string
 }
 
@@ -2337,6 +2746,17 @@ func (observation *launchObservation) query(parent context.Context, phase string
 	return out, ok
 }
 
+func (observation *launchObservation) queryClock(parent context.Context, phase string) (int64, bool) {
+	raw, commandOK := observation.query(parent, phase, "shell", "date", "+%s.%N")
+	if len(observation.Commands) == 0 {
+		observation.incomplete(phase + " command record unavailable")
+		return 0, false
+	}
+	evidence := clockDiagnostic(raw, observation.Commands[len(observation.Commands)-1])
+	observation.Clocks = append(observation.Clocks, evidence)
+	return evidence.ParsedNanos, commandOK && evidence.ParseStatus == "CAPTURED"
+}
+
 func beginLaunchObservation(ctx context.Context, client adbClient, value options) *launchObservation {
 	observation := &launchObservation{client: client, api: value.expectedAPI, app: value.appPackage, Schema: "kurdistan-launch-observation-v1", Status: "CAPTURED", GateResult: "NOT_EVALUATED", StartedUTC: time.Now().UTC(), ExitStatus: "INCOMPLETE", ActivityProcessStatus: "INCOMPLETE", ResolutionStatus: "INCOMPLETE"}
 	var nonce [16]byte
@@ -2349,10 +2769,9 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 		observation.incomplete("unsupported diagnostic package identity")
 		return observation
 	}
-	clock, ok := observation.query(ctx, "clock-before", "shell", "date", "+%s.%N")
-	var err error
-	observation.DeviceStartNanos, err = epochNanos(clock)
-	if !ok || err != nil {
+	var ok bool
+	observation.DeviceStartNanos, ok = observation.queryClock(ctx, "clock-before")
+	if !ok {
 		observation.incomplete("device clock unavailable")
 	}
 	zone, ok := observation.query(ctx, "clock-zone", "shell", "date", "+%z")
@@ -2464,9 +2883,8 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	// deadline already terminated the streaming readers. It contains no crash
 	// body and cannot supply an old invocation's marker.
 	markers, markersOK := observation.query(ctx, "window-markers", "shell", "logcat", "-b", "main", "-d", "-t", "128", "-v", "threadtime", "-v", "epoch", "-v", "usec", "KurdistanLaunchProbe:I", "*:S")
-	clock, ok := observation.query(ctx, "clock-after", "shell", "date", "+%s.%N")
-	nanos, err := epochNanos(clock)
-	if ok && err == nil {
+	nanos, ok := observation.queryClock(ctx, "clock-after")
+	if ok {
 		observation.DeviceEndNanos = nanos
 	} else {
 		observation.incomplete("terminal clock unavailable")
@@ -2490,7 +2908,9 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 			observation.incomplete(stream.name + " stream incomplete")
 		}
 	}
-	start, end, windowOK := launchMarkerWindow(rawLogs["main"], markers, observation.Invocation, observation.DeviceStartNanos, observation.DeviceEndNanos)
+	observation.MarkerWindow = diagnoseLaunchMarkerWindow(rawLogs["main"], markers, observation.Invocation, observation.DeviceStartNanos, observation.DeviceEndNanos)
+	start, end := observation.MarkerWindow.MatchingWindow()
+	windowOK := observation.MarkerWindow.Status == "CAPTURED"
 	if !markersOK || !windowOK {
 		observation.incomplete("launch window markers missing or inconsistent")
 		// Do not attribute possibly old crashes when the invocation cannot be bound.
@@ -2612,39 +3032,116 @@ func sanitizeActivityProcessState(input, app string) []string {
 	return records
 }
 
-func launchMarkerWindow(stream, snapshot, invocation string, before, after int64) (int64, int64, bool) {
-	if !regexp.MustCompile("^[0-9a-f]{32}$").MatchString(invocation) || before <= 0 || after <= before {
-		return 0, 0, false
+func (window diagnosticMarkerWindow) MatchingWindow() (int64, int64) {
+	if len(window.MatchingStartTimestamps) != 1 || len(window.MatchingEndTimestamps) != 1 {
+		return 0, 0
+	}
+	return window.MatchingStartTimestamps[0], window.MatchingEndTimestamps[0]
+}
+
+func diagnoseLaunchMarkerWindow(stream, snapshot, invocation string, before, after int64) diagnosticMarkerWindow {
+	window := diagnosticMarkerWindow{Status: "REJECTED", DeviceStartNanos: before, DeviceEndNanos: after}
+	if !regexp.MustCompile("^[0-9a-f]{32}$").MatchString(invocation) {
+		window.Rejection = "INVOCATION_INVALID"
+		return window
+	}
+	if before <= 0 {
+		window.Rejection = "DEVICE_START_CLOCK_INVALID"
+		return window
+	}
+	if after <= before {
+		window.Rejection = "DEVICE_END_CLOCK_INVALID"
+		return window
 	}
 	starts, ends := map[int64]bool{}, map[int64]bool{}
-	for _, input := range []string{stream, snapshot} {
-		if len(input) > maxLogcatInput {
-			return 0, 0, false
+	markerPattern := regexp.MustCompile("^(START|END):([0-9a-f]{32})$")
+	for _, source := range []struct {
+		name  string
+		input string
+	}{{"stream", stream}, {"snapshot", snapshot}} {
+		if len(source.input) > maxLogcatInput {
+			window.Rejection = strings.ToUpper(source.name) + "_INPUT_OVERSIZE"
+			return window
 		}
-		for _, line := range strings.Split(input, "\n") {
-			event, ok := parseEpochLog(line)
-			if !ok || event.Tag != "KurdistanLaunchProbe" {
+		for _, line := range strings.Split(source.input, "\n") {
+			if strings.TrimSpace(line) == "" {
 				continue
 			}
-			switch event.Text {
-			case "START:" + invocation:
+			event, ok := parseEpochLog(line)
+			if !ok {
+				if strings.Contains(line, "KurdistanLaunchProbe") {
+					window.MalformedMarkers++
+				}
+				continue
+			}
+			if event.Tag != "KurdistanLaunchProbe" {
+				continue
+			}
+			match := markerPattern.FindStringSubmatch(event.Text)
+			if match == nil {
+				window.MalformedMarkers++
+				continue
+			}
+			matching := match[2] == invocation
+			if len(window.Markers) < 64 {
+				window.Markers = append(window.Markers, diagnosticMarkerEvidence{
+					Source: source.name, Value: event.Text, DeviceNanos: event.DeviceNanos, InvocationMatch: matching,
+				})
+			} else {
+				window.MalformedMarkers++
+			}
+			if !matching {
+				window.IgnoredMarkers++
+				continue
+			}
+			if match[1] == "START" {
 				starts[event.DeviceNanos] = true
-			case "END:" + invocation:
+			} else {
 				ends[event.DeviceNanos] = true
 			}
 		}
 	}
-	if len(starts) != 1 || len(ends) != 1 {
-		return 0, 0, false
+	for timestamp := range starts {
+		window.MatchingStartTimestamps = append(window.MatchingStartTimestamps, timestamp)
 	}
-	var start, end int64
-	for at := range starts {
-		start = at
+	for timestamp := range ends {
+		window.MatchingEndTimestamps = append(window.MatchingEndTimestamps, timestamp)
 	}
-	for at := range ends {
-		end = at
+	sort.Slice(window.MatchingStartTimestamps, func(left, right int) bool {
+		return window.MatchingStartTimestamps[left] < window.MatchingStartTimestamps[right]
+	})
+	sort.Slice(window.MatchingEndTimestamps, func(left, right int) bool {
+		return window.MatchingEndTimestamps[left] < window.MatchingEndTimestamps[right]
+	})
+	switch {
+	case len(window.MatchingStartTimestamps) == 0:
+		window.Rejection = "START_MISSING"
+	case len(window.MatchingStartTimestamps) > 1:
+		window.Rejection = "START_AMBIGUOUS"
+	case len(window.MatchingEndTimestamps) == 0:
+		window.Rejection = "END_MISSING"
+	case len(window.MatchingEndTimestamps) > 1:
+		window.Rejection = "END_AMBIGUOUS"
+	default:
+		start, end := window.MatchingWindow()
+		switch {
+		case start < before:
+			window.Rejection = "START_BEFORE_DEVICE_CLOCK"
+		case end <= start:
+			window.Rejection = "END_NOT_AFTER_START"
+		case end > after:
+			window.Rejection = "END_AFTER_DEVICE_CLOCK"
+		default:
+			window.Status = "CAPTURED"
+		}
 	}
-	return start, end, start >= before && end > start && end <= after
+	return window
+}
+
+func launchMarkerWindow(stream, snapshot, invocation string, before, after int64) (int64, int64, bool) {
+	window := diagnoseLaunchMarkerWindow(stream, snapshot, invocation, before, after)
+	start, end := window.MatchingWindow()
+	return start, end, window.Status == "CAPTURED"
 }
 
 type junitDiagnosticCase struct {

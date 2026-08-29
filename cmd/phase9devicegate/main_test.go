@@ -1711,6 +1711,222 @@ func TestInstrumentationSummaryRecordsOnlySafeProgressIdentities(t *testing.T) {
 	}
 }
 
+func TestClockDiagnosticsPreserveSafeRawParserRejectionAndRedactUnsafeInput(t *testing.T) {
+	record := diagnosticCommand{
+		Phase:       "clock-before",
+		StartedUTC:  time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC),
+		FinishedUTC: time.Date(2026, 8, 29, 10, 0, 0, int(time.Millisecond), time.UTC),
+		DurationMS:  1,
+		ExitCode:    0,
+		Status:      "CAPTURED",
+	}
+	rejected := clockDiagnostic("1787946040.%N\n", record)
+	if rejected.Raw != "1787946040.%N" || rejected.RawStatus != "CAPTURED" ||
+		rejected.ParseStatus != "REJECTED" || rejected.Rejection != "FRACTION_NON_NUMERIC" ||
+		rejected.CommandStatus != "CAPTURED" || rejected.CommandExitCode != 0 {
+		t.Fatalf("clock rejection detail was not preserved exactly: %+v", rejected)
+	}
+	valid := clockDiagnostic("1787946040.084506886\n", record)
+	if valid.ParseStatus != "CAPTURED" || valid.ParsedNanos != 1_787_946_040_084_506_886 || valid.Rejection != "" {
+		t.Fatalf("valid clock was not represented canonically: %+v", valid)
+	}
+	unsafe := clockDiagnostic("token=synthetic-secret endpoint=https://192.0.2.9\n", record)
+	encoded, err := json.Marshal(unsafe)
+	if err != nil || unsafe.RawStatus != "REDACTED" || unsafe.ParseStatus != "REJECTED" ||
+		strings.Contains(string(encoded), "synthetic-secret") || strings.Contains(string(encoded), "192.0.2.9") {
+		t.Fatalf("unsafe clock evidence escaped sanitization: %+v err=%v", unsafe, err)
+	}
+}
+
+func TestMarkerDiagnosticsPreserveExactFailedCorrelationWithoutUntrustedText(t *testing.T) {
+	invocation := strings.Repeat("a", 32)
+	stream := "101.000001 11 11 I KurdistanLaunchProbe: START:" + invocation + "\n" +
+		"101.500001 11 11 I UntrustedTag: token=synthetic-secret endpoint=https://192.0.2.9\n"
+	snapshot := "105.000001 12 12 I KurdistanLaunchProbe: END:" + invocation + "\n"
+	window := diagnoseLaunchMarkerWindow(stream, snapshot, invocation, 100_000_000_000, 104_000_000_000)
+	if window.Status != "REJECTED" || window.Rejection != "END_AFTER_DEVICE_CLOCK" || len(window.Markers) != 2 {
+		t.Fatalf("marker correlation failure was not preserved: %+v", window)
+	}
+	if window.Markers[0].Source != "stream" || window.Markers[0].Value != "START:"+invocation ||
+		window.Markers[0].DeviceNanos != 101_000_001_000 || window.Markers[1].Source != "snapshot" ||
+		window.Markers[1].Value != "END:"+invocation || window.Markers[1].DeviceNanos != 105_000_001_000 {
+		t.Fatalf("marker values, sources, or timestamps changed: %+v", window.Markers)
+	}
+	encoded, err := json.Marshal(window)
+	if err != nil || strings.Contains(string(encoded), "synthetic-secret") || strings.Contains(string(encoded), "192.0.2.9") {
+		t.Fatalf("untrusted marker-adjacent text escaped: %s err=%v", encoded, err)
+	}
+}
+
+func TestInstrumentationDiagnosticsPreserveBoundedPerTestFailureTimeline(t *testing.T) {
+	started := time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC)
+	chunks := []instrumentationDiagnosticChunk{
+		{ObservedUTC: started, Raw: strings.Join([]string{
+			"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest",
+			"INSTRUMENTATION_STATUS: test=dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected",
+			"INSTRUMENTATION_STATUS_CODE: 1",
+		}, "\n") + "\n"},
+		{ObservedUTC: started.Add(275 * time.Millisecond), Raw: strings.Join([]string{
+			"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest",
+			"INSTRUMENTATION_STATUS: test=dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected",
+			"INSTRUMENTATION_STATUS: stack=androidx.compose.ui.test.ComposeNotIdleException: Failed requirement.",
+			" at org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest.dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected(Phase17LiveDataPlaneDeviceTest.kt:514)",
+			"INSTRUMENTATION_STATUS_CODE: -2",
+			"FAILURES!!!",
+		}, "\n") + "\n"},
+	}
+	command := diagnosticCommand{Phase: "instrumentation", StartedUTC: started, FinishedUTC: started.Add(300 * time.Millisecond), DurationMS: 300, ExitCode: 1, Status: "ERROR"}
+	report := buildInstrumentationDiagnostic(chunks, command, false)
+	if report.Status != "CAPTURED" || !report.InstrumentationStarted || report.TestsBegan != 1 ||
+		report.TestsCompleted != 1 || report.LastObserved == nil || report.LastObserved.Status != "FAIL" ||
+		len(report.Failures) != 1 {
+		t.Fatalf("instrumentation progress or failure count was not preserved: %+v", report)
+	}
+	failure := report.Failures[0]
+	if failure.Class != "org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest" ||
+		failure.Method != "dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected" ||
+		failure.Status != "FAIL" || failure.DurationMS != 275 || failure.Category != "test_timeout" ||
+		failure.ExceptionType != "androidx.compose.ui.test.ComposeNotIdleException" || len(failure.Stack) != 1 {
+		t.Fatalf("per-test failure detail changed or was incomplete: %+v", failure)
+	}
+
+	unsafeChunks := append([]instrumentationDiagnosticChunk(nil), chunks[:1]...)
+	unsafeChunks = append(unsafeChunks, instrumentationDiagnosticChunk{ObservedUTC: started.Add(time.Second), Raw: strings.Join([]string{
+		"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.Phase17LiveDataPlaneDeviceTest",
+		"INSTRUMENTATION_STATUS: test=dnsFailClosedAcceptsBoundedNetworkFailuresOnlyWhenUnavailabilityIsExpected",
+		"INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: token=synthetic-secret endpoint=https://192.0.2.9",
+		" at example.untrusted.secretMethod(C:\\Users\\someone\\private.kt:4)",
+		"INSTRUMENTATION_STATUS_CODE: -2",
+	}, "\n") + "\n"})
+	unsafe := buildInstrumentationDiagnostic(unsafeChunks, command, false)
+	encoded, err := json.Marshal(unsafe)
+	if err != nil || unsafe.Status != "INCOMPLETE" || len(unsafe.Failures) != 1 ||
+		unsafe.Failures[0].ExceptionType != "java.lang.AssertionError" ||
+		strings.Contains(string(encoded), "synthetic-secret") || strings.Contains(string(encoded), "192.0.2.9") ||
+		strings.Contains(string(encoded), "Users") || strings.Contains(string(encoded), "secretMethod") {
+		t.Fatalf("unsafe instrumentation detail escaped or was treated as complete: %s err=%v", encoded, err)
+	}
+}
+
+func TestInstrumentationDiagnosticsPreserveKnownRunnerStatusCodes(t *testing.T) {
+	started := time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name         string
+		code         int
+		stack        string
+		wantStatus   string
+		wantFailures int
+	}{
+		{name: "ignored", code: -3, wantStatus: "IGNORED", wantFailures: 0},
+		{name: "assumption", code: -4, stack: "org.junit.AssumptionViolatedException: Failed requirement.", wantStatus: "ASSUMPTION_FAILURE", wantFailures: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lines := []string{
+				"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.DiagnosticStatusDeviceTest",
+				"INSTRUMENTATION_STATUS: test=" + test.name,
+				"INSTRUMENTATION_STATUS_CODE: 1",
+				"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.DiagnosticStatusDeviceTest",
+				"INSTRUMENTATION_STATUS: test=" + test.name,
+			}
+			if test.stack != "" {
+				lines = append(lines, "INSTRUMENTATION_STATUS: stack="+test.stack)
+			}
+			lines = append(lines, fmt.Sprintf("INSTRUMENTATION_STATUS_CODE: %d", test.code))
+			report := buildInstrumentationDiagnostic([]instrumentationDiagnosticChunk{
+				{ObservedUTC: started, Raw: strings.Join(lines[:3], "\n") + "\n"},
+				{ObservedUTC: started.Add(25 * time.Millisecond), Raw: strings.Join(lines[3:], "\n") + "\n"},
+			}, diagnosticCommand{Phase: "instrumentation", StartedUTC: started, FinishedUTC: started.Add(30 * time.Millisecond), DurationMS: 30, ExitCode: 0, Status: "CAPTURED"}, false)
+			if report.Status != "CAPTURED" || report.LastObserved == nil || report.LastObserved.Status != test.wantStatus ||
+				report.LastObserved.DurationMS != 25 || len(report.Failures) != test.wantFailures {
+				t.Fatalf("runner status %d was not represented exactly: %+v", test.code, report)
+			}
+		})
+	}
+}
+
+func TestInstrumentationDetailsSurviveLegacySummaryLimitFailure(t *testing.T) {
+	root := t.TempDir()
+	client := newADBClient("fixture-adb", "emulator-5554", root, &diagnosticTimeline{Started: time.Now()})
+	client.transport = &commandTransport{run: func(_ context.Context, _ string, _ []string, stdout, _ io.Writer, _ time.Duration) error {
+		className := "org.kurdistanvpn.app." + strings.Repeat("Diagnostic", 18)
+		for index := 0; index < 64; index++ {
+			method := fmt.Sprintf("failure%02d%s", index, strings.Repeat("Case", 10))
+			_, _ = fmt.Fprintf(stdout, "INSTRUMENTATION_STATUS: class=%s\nINSTRUMENTATION_STATUS: test=%s\nINSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed requirement.\nINSTRUMENTATION_STATUS_CODE: -2\n", className, method)
+		}
+		return errors.New("instrumentation failed")
+	}}
+	_, commandErr := client.captureInstrumentation(context.Background(), "13-instrumentation-summary.txt", "shell", "am", "instrument")
+	if commandErr == nil || !strings.Contains(commandErr.Error(), "summary exceeded") {
+		t.Fatalf("legacy summary limit did not remain fail-closed: %v", commandErr)
+	}
+	raw, readErr := os.ReadFile(filepath.Join(root, "13-instrumentation-details.json"))
+	if readErr != nil {
+		t.Fatalf("bounded diagnostic detail was lost when legacy summary overflowed: %v", readErr)
+	}
+	var report instrumentationDiagnosticReport
+	if json.Unmarshal(raw, &report) != nil || report.Status != "INCOMPLETE" || report.TestsCompleted != 64 {
+		t.Fatalf("retained diagnostic does not describe the bounded overflow: %s", raw)
+	}
+}
+
+func TestLaunchObservationSerializesClockAndMarkerRejectionEvidenceWithoutChangingGate(t *testing.T) {
+	err, observation := runLaunchScenario(t, "modern-healthy", 36)
+	if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+		t.Fatalf("diagnostic preservation changed a healthy launch result: err=%v gate=%s", err, observation.GateResult)
+	}
+	encoded, marshalErr := json.Marshal(observation)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	for _, required := range []string{"\"Clocks\"", "\"RawStatus\"", "\"ParseStatus\"", "\"MarkerWindow\"", "\"Markers\""} {
+		if !strings.Contains(string(encoded), required) {
+			t.Fatalf("launch evidence omitted diagnostic field %s: %s", required, encoded)
+		}
+	}
+}
+
+func TestCaptureInstrumentationAlwaysWritesBoundedSanitizedFailureDetails(t *testing.T) {
+	root := t.TempDir()
+	client := newADBClient("fixture-adb", "emulator-5554", root, &diagnosticTimeline{Started: time.Now()})
+	client.transport = &commandTransport{run: func(_ context.Context, _ string, _ []string, stdout, _ io.Writer, _ time.Duration) error {
+		_, _ = io.WriteString(stdout, strings.Join([]string{
+			"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.ProtectedStateStartupDeviceTest",
+			"INSTRUMENTATION_STATUS: test=firstUseViewModelIsDisconnectedAndDoesNotProvisionProtectedState",
+			"INSTRUMENTATION_STATUS_CODE: 1",
+		}, "\n")+"\n")
+		_, _ = io.WriteString(stdout, strings.Join([]string{
+			"INSTRUMENTATION_STATUS: class=org.kurdistanvpn.app.ProtectedStateStartupDeviceTest",
+			"INSTRUMENTATION_STATUS: test=firstUseViewModelIsDisconnectedAndDoesNotProvisionProtectedState",
+			"INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: token=synthetic-secret endpoint=https://192.0.2.9",
+			"INSTRUMENTATION_STATUS_CODE: -2",
+			"FAILURES!!!",
+		}, "\n")+"\n")
+		return errors.New("instrumentation failed")
+	}}
+	_, commandErr := client.captureInstrumentation(context.Background(), "13-instrumentation-summary.txt", "shell", "am", "instrument")
+	if commandErr == nil {
+		t.Fatal("fixture did not preserve the instrumentation command failure")
+	}
+	raw, readErr := os.ReadFile(filepath.Join(root, "13-instrumentation-details.json"))
+	if readErr != nil {
+		t.Fatalf("bounded failure detail was not written: %v", readErr)
+	}
+	var report instrumentationDiagnosticReport
+	if json.Unmarshal(raw, &report) != nil || !report.InstrumentationStarted || report.TestsBegan != 1 ||
+		report.TestsCompleted != 1 || len(report.Failures) != 1 {
+		t.Fatalf("failure detail does not represent the attempted instrumentation: %s", raw)
+	}
+	for _, forbidden := range []string{"synthetic-secret", "192.0.2.9", "https://", "device_gate=passed", "PASS"} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("failure detail leaked %q or fabricated success: %s", forbidden, raw)
+		}
+	}
+	if len(raw) > maxInstrumentationDiagnosticBytes {
+		t.Fatalf("failure detail size=%d exceeds bound=%d", len(raw), maxInstrumentationDiagnosticBytes)
+	}
+}
+
 func TestGeneralDiagnosticLogcatExcludesDebugNoise(t *testing.T) {
 	want := []string{"logcat", "-b", "all", "-t", "4096", "-v", "brief", "*:W"}
 	if got := diagnosticLogcatArgs("all"); !reflect.DeepEqual(got, want) {
