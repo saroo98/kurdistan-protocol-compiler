@@ -1,8 +1,8 @@
 {
   "schema": "kurdistan-phase17-acceptance-registry-v2",
   "registryVersion": 2,
-  "definitionSetSha256": "467f055345c12a225764937dd36a51f851958bdcfeb9f38afabf30aab6fba054",
-  "entryCount": 189,
+  "definitionSetSha256": "50efe6944293aec97728fca24ae45560458d3d951da39803b8ab3a6890e8398c",
+  "entryCount": 190,
   "groups": [
     {
       "source": "P1E",
@@ -18,7 +18,7 @@
     },
     {
       "source": "BOOT",
-      "count": 35
+      "count": 36
     },
     {
       "source": "JL_BV",
@@ -2156,6 +2156,30 @@
         ],
         "testPaths": [
           "internal/phase17qualification/device_verifier_test.go"
+        ],
+        "execution": "UNEXECUTED"
+      }
+    },
+    {
+      "id": "G05",
+      "source": "BOOT",
+      "definitionVersion": 1,
+      "criterion": "G05_PortableCompositeStartupAdmission_AllowsInstrumentationWithoutPrivilegedContinuousLogs",
+      "controlledInput": "API 26, 34, and 36 startup receipts with optional main/system log denial plus complete, missing, stale, malformed, truncated, conflicting, crash, ANR, dialog, death, replacement, and wrong-subject observations",
+      "requiredOracle": "Exact host launch receipt reconciled with package-scoped ActivityManager state, two-source PID/UID/process-epoch identity, survival, crash-buffer/failure state, invocation markers, subject identities, timestamps, and sanitized raw-evidence digests",
+      "requiredAssertion": "This successor replaces only the previous mandatory continuous main/system log-stream startup prerequisite: complete equivalent composite evidence yields LAUNCH_OBSERVED_NOT_QUALIFIED and may begin instrumentation; definitive unhealthy evidence yields FAIL; incomplete, unavailable, malformed, stale, or conflicting evidence yields BLOCKED; D01-D08 remain unexecuted installed requirements",
+      "evidenceRequirement": "Deterministic replay and CI emulator startup admission on API 26, 34, and 36; never installed qualification or operational acceptance",
+      "definitionSha256": "8911c04dc128292cac14f6774c22ba5c917eca973adc3940e5b3311b4d693316",
+      "implementation": {
+        "sourceStatus": "FULL",
+        "testStatus": "FULL",
+        "sourcePaths": [
+          "cmd/phase9devicegate/main.go",
+          "cmd/phase9devicegate/startup_observer.go"
+        ],
+        "testPaths": [
+          "cmd/phase9devicegate/main_test.go",
+          "cmd/phase9devicegate/startup_observer_test.go"
         ],
         "execution": "UNEXECUTED"
       }

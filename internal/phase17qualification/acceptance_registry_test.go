@@ -29,8 +29,8 @@ func TestAcceptanceRegistryRetainsAllApprovedDefinitions(t *testing.T) {
 	if err := json.Unmarshal(raw, &document); err != nil {
 		t.Fatal(err)
 	}
-	if len(document.Entries) != 189 {
-		t.Fatalf("definitions=%d, require exactly 189", len(document.Entries))
+	if len(document.Entries) != 190 {
+		t.Fatalf("definitions=%d, require exactly 190", len(document.Entries))
 	}
 	ids := make(map[string]bool)
 	for _, entry := range document.Entries {
@@ -39,7 +39,7 @@ func TestAcceptanceRegistryRetainsAllApprovedDefinitions(t *testing.T) {
 		}
 		ids[entry.ID] = true
 	}
-	for _, id := range []string{"S1-01", "RV-01", "PS-M-01", "MG-I-03", "RST-M-01", "BVM-M-01", "C01", "D08", "G04", "JL-12", "BV-03"} {
+	for _, id := range []string{"S1-01", "RV-01", "PS-M-01", "MG-I-03", "RST-M-01", "BVM-M-01", "C01", "D08", "G04", "G05", "JL-12", "BV-03"} {
 		if !ids[id] {
 			t.Fatalf("approved definition absent: %s", id)
 		}
@@ -48,7 +48,7 @@ func TestAcceptanceRegistryRetainsAllApprovedDefinitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if registry.DefinitionSetSHA256() != "467f055345c12a225764937dd36a51f851958bdcfeb9f38afabf30aab6fba054" {
+	if registry.DefinitionSetSHA256() != "50efe6944293aec97728fca24ae45560458d3d951da39803b8ab3a6890e8398c" {
 		t.Fatal("independent approved definition root not reproduced")
 	}
 	for _, entry := range registry.Entries() {
@@ -129,7 +129,7 @@ func TestAcceptanceRegistryRetainsCompleteMappingsWithoutExecutionClaims(t *test
 	d := acceptanceDocument(t)
 	expected := map[string]bool{
 		"A05": true, "BV-01": true, "C03": true, "EV-01": true, "FS-03": true,
-		"HR-04": true, "JL-03": true, "MB-03": true, "PS-U-03": true, "PV-I-01": true,
+		"G05": true, "HR-04": true, "JL-03": true, "MB-03": true, "PS-U-03": true, "PV-I-01": true,
 		"RST-I-02": true, "S1-02": true,
 	}
 	for _, entry := range d.Entries {
@@ -174,6 +174,7 @@ func TestAcceptanceRegistryIndependentDefinitionGoldenVectors(t *testing.T) {
 		"PS-M-01":  "07e22e9229fef487069177300b9ce7ebcfc501ae2160199004f5c1e4bf60cd9d",
 		"RST-M-01": "15437511231b7adfb8ddcf2d0e1c5f315678b03968fc1cbde3da0b2bc1e5dd02",
 		"D01":      "1497058e541b04d9b7ff99fcd1075edc131755651b7137526b8a0b8d8b429bfe",
+		"G05":      "8911c04dc128292cac14f6774c22ba5c917eca973adc3940e5b3311b4d693316",
 		"JL-01":    "82d5e4a4235dd65a54fc098631fbc2bbb983547ec907c6db918ba831063dd0c1",
 	}
 	for _, entry := range acceptanceDocument(t).Entries {
@@ -218,12 +219,12 @@ func acceptanceBytes(t *testing.T, value acceptanceRegistryDocument) []byte {
 
 func TestAcceptanceRegistryRejectsMissingDuplicateUnknownAndRepurposedIDs(t *testing.T) {
 	for name, mutate := range map[string]func(*acceptanceRegistryDocument){
-		"missing":                  func(d *acceptanceRegistryDocument) { d.Entries = d.Entries[:188] },
+		"missing":                  func(d *acceptanceRegistryDocument) { d.Entries = d.Entries[:189] },
 		"duplicate":                func(d *acceptanceRegistryDocument) { d.Entries[1] = d.Entries[0] },
 		"unknown":                  func(d *acceptanceRegistryDocument) { d.Entries[0].ID = "A11" },
 		"renamed":                  func(d *acceptanceRegistryDocument) { d.Entries[0].ID = "A-01" },
 		"wrong source":             func(d *acceptanceRegistryDocument) { d.Entries[0].Source = "P1J" },
-		"wrong count":              func(d *acceptanceRegistryDocument) { d.EntryCount = 188 },
+		"wrong count":              func(d *acceptanceRegistryDocument) { d.EntryCount = 189 },
 		"wrong group count":        func(d *acceptanceRegistryDocument) { d.Groups[0].Count = 71 },
 		"wrong version":            func(d *acceptanceRegistryDocument) { d.RegistryVersion = 1 },
 		"wrong schema":             func(d *acceptanceRegistryDocument) { d.Schema = "approval" },
@@ -402,7 +403,7 @@ func TestAcceptanceRegistrySchemaPinsEveryDefinitionAndClosedFieldShape(t *testi
 	if err := json.Unmarshal(document.Properties["entries"], &entryArray); err != nil {
 		t.Fatal(err)
 	}
-	if entryArray.MinItems != 189 || entryArray.MaxItems != 189 || entryArray.Items || len(entryArray.PrefixItems) != 189 {
+	if entryArray.MinItems != 190 || entryArray.MaxItems != 190 || entryArray.Items || len(entryArray.PrefixItems) != 190 {
 		t.Fatal("schema does not bind the complete ID sequence")
 	}
 	d := acceptanceDocument(t)

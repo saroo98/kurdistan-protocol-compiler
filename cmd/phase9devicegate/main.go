@@ -78,6 +78,7 @@ type options struct {
 	evidenceDir           string
 	conflictingAppPackage string
 	label                 string
+	startupSubject        startupSubjectBinding
 }
 
 type expectedTest struct {
@@ -169,6 +170,11 @@ func run(value options) error {
 	if value.minimumTests < 1 {
 		return errors.New("minimum-tests must be at least one")
 	}
+	startupSubject, err := resolveStartupSubjectBinding(value)
+	if err != nil {
+		return fmt.Errorf("bind immutable startup subject: %w", err)
+	}
+	value.startupSubject = startupSubject
 	expectedTestManifest, err := readExpectedTests(value.expectedTestsFile)
 	if err != nil {
 		return err
@@ -382,11 +388,13 @@ func launchSmokeWithDiagnostics(ctx context.Context, client adbClient, value opt
 	// two-second survival interval. The acceptance query below is unchanged.
 	survivalAt := time.Now().Add(2 * time.Second)
 	observation.processSnapshot(ctx, "immediately-after-launch", time.Second)
+	observation.captureStartupProcess(ctx, "immediately-after-launch")
 	if remaining := time.Until(survivalAt); remaining > 0 {
 		time.Sleep(remaining)
 	}
 	pidOutput, pidErr := client.captureProcessState(ctx, "09-launch-process.txt", value.appPackage)
 	observation.processSnapshot(ctx, "after-survival-interval", time.Second)
+	observation.captureStartupProcess(ctx, "after-survival-interval")
 	if err := validateLaunchSmoke(launchOutput, pidOutput, value.appPackage, pidErr); err != nil {
 		_, _ = client.captureDiagnostic(ctx, "10-launch-failure-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
 		return retainLaunchFailure(err, func() error { return observation.finish(context.Background(), true) })
@@ -2739,7 +2747,7 @@ func parseProcessHealth(input, app string) ([]diagnosticProcessHealth, bool) {
 var errLaunchIncomplete = errors.New("required startup evidence NOT_AVAILABLE")
 
 func validateLaunchObservation(observation *launchObservation) error {
-	if observation == nil || observation.Status != "CAPTURED" || len(observation.Issues) != 0 ||
+	if observation == nil || observation.Schema != startupObserverSchema ||
 		!regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(observation.Invocation) ||
 		observation.WindowStartNanos < observation.DeviceStartNanos || observation.WindowStartNanos <= 0 ||
 		observation.WindowEndNanos <= observation.WindowStartNanos || observation.WindowEndNanos > observation.DeviceEndNanos ||
@@ -2751,8 +2759,10 @@ func validateLaunchObservation(observation *launchObservation) error {
 	var launch *diagnosticCommand
 	for index := range observation.Commands {
 		command := &observation.Commands[index]
-		if command.Truncated || command.Status != "CAPTURED" || command.ExitCode != 0 || command.DurationMS < 0 ||
-			command.StartedUTC.Before(observation.StartedUTC) || command.FinishedUTC.Before(command.StartedUTC) || command.FinishedUTC.After(observation.FinishedUTC) {
+		optional := command.Phase == "collector-main-probe" || command.Phase == "collector-system-probe"
+		if command.DurationMS < 0 || command.StartedUTC.Before(observation.StartedUTC) ||
+			command.FinishedUTC.Before(command.StartedUTC) || command.FinishedUTC.After(observation.FinishedUTC) ||
+			(!optional && (command.Truncated || command.Status != "CAPTURED" || command.ExitCode != 0)) {
 			return errLaunchIncomplete
 		}
 		if command.Phase == "am-start-W" {
@@ -2821,46 +2831,60 @@ func validateLaunchObservation(observation *launchObservation) error {
 	if matched != 1 {
 		return errLaunchIncomplete
 	}
+	if err := validateCompositeStartup(observation, previous, current); err != nil {
+		return err
+	}
 	if (observation.api >= 30 && observation.ExitStatus != "CAPTURED") ||
 		(observation.api >= 26 && observation.api < 30 && observation.ExitStatus != "UNSUPPORTED_API_BELOW_30") || observation.api < 26 {
 		return errLaunchIncomplete
 	}
-	startPattern := regexp.MustCompile(`^process_lifecycle event=Start_proc pid=([0-9]+) process=([A-Za-z0-9_.:]+) uid=([0-9]+)$`)
-	starts := map[int64]bool{}
-	buffers := map[string]bool{}
-	for _, buffer := range observation.Logs {
-		if buffer.Source != "stream" || buffer.Status != "CAPTURED" || buffers[buffer.Buffer] ||
-			(buffer.Buffer != "main" && buffer.Buffer != "system" && buffer.Buffer != "crash") {
+	requiredStreams := map[string]bool{"crash": false, "events": false}
+	streamNames := map[string]bool{}
+	if len(observation.StreamLifecycle) != 4 {
+		return errLaunchIncomplete
+	}
+	for _, lifecycle := range observation.StreamLifecycle {
+		if streamNames[lifecycle.Buffer] || (lifecycle.Buffer != "crash" && lifecycle.Buffer != "events" && lifecycle.Buffer != "main" && lifecycle.Buffer != "system") {
 			return errLaunchIncomplete
 		}
-		buffers[buffer.Buffer] = true
+		streamNames[lifecycle.Buffer] = true
+		if _, required := requiredStreams[lifecycle.Buffer]; required {
+			if lifecycle.TerminalStatus != "DRAINED" || !lifecycle.ParserComplete || lifecycle.OutputTruncated || lifecycle.StderrTruncated {
+				return errLaunchIncomplete
+			}
+			requiredStreams[lifecycle.Buffer] = true
+		}
+	}
+	if !requiredStreams["crash"] || !requiredStreams["events"] {
+		return errLaunchIncomplete
+	}
+	logStreams := map[string]bool{}
+	for _, buffer := range observation.Logs {
+		if buffer.Source != "stream" || logStreams[buffer.Buffer] ||
+			(buffer.Buffer != "main" && buffer.Buffer != "system" && buffer.Buffer != "crash" && buffer.Buffer != "events") {
+			return errLaunchIncomplete
+		}
+		logStreams[buffer.Buffer] = true
+		if (buffer.Buffer == "crash" || buffer.Buffer == "events") && buffer.Status != "CAPTURED" {
+			return errLaunchIncomplete
+		}
 		lastNanos := observation.WindowStartNanos
 		for _, event := range buffer.Events {
 			if event.DeviceNanos < lastNanos || event.DeviceNanos <= observation.WindowStartNanos || event.DeviceNanos > observation.WindowEndNanos {
 				return errLaunchIncomplete
 			}
 			lastNanos = event.DeviceNanos
-			if match := startPattern.FindStringSubmatch(event.Text); match != nil && match[2] == current.Name && match[1] == strconv.Itoa(current.PID) {
-				if match[3] != strconv.Itoa(current.UID) {
-					return errLaunchIncomplete
-				}
-				starts[event.DeviceNanos] = true
-			}
 		}
 	}
-	if len(buffers) != 3 || len(starts) > 1 {
+	if len(logStreams) != 4 {
 		return errLaunchIncomplete
 	}
 	epochStart := observation.WindowStartNanos
-	if previous == nil || *previous != *current {
-		if len(starts) != 1 {
-			return errLaunchIncomplete
+	for _, event := range observation.SystemEvents.Events {
+		if event.Type == "PROCESS_START" && event.PID == current.PID && event.Process == current.Name {
+			epochStart = event.DeviceNanos
+			break
 		}
-		for at := range starts {
-			epochStart = at
-		}
-	} else if len(starts) != 0 {
-		return errLaunchIncomplete
 	}
 	// PID correlation is bounded by the observed process epoch and its OS start
 	// event/UID. Reuse or missing continuity blocks admission; old or unrelated
@@ -2886,6 +2910,9 @@ func validateLaunchObservation(observation *launchObservation) error {
 			exit.DeviceEndNanos+int64(time.Millisecond) >= epochStart && exit.DeviceNanos <= observation.WindowEndNanos {
 			return errors.New("current target exit observed")
 		}
+	}
+	if observation.Status != "CAPTURED" || len(observation.Issues) != 0 {
+		return errLaunchIncomplete
 	}
 	return nil
 }
@@ -3081,6 +3108,13 @@ type launchObservation struct {
 	LaunchCommand         []string
 	MarkerWindow          diagnosticMarkerWindow
 	ClockCorrelation      diagnosticClockCorrelation
+	Subject               startupSubjectBinding
+	BootSession           startupBootSession
+	CompositeSources      []startupCompositeSource
+	ActivityStates        []startupActivityState
+	ProcessCrossChecks    []startupProcessCrossCheck
+	PackageState          []startupPackageState
+	SystemEvents          startupSystemEventEvidence
 	Issues                []string
 }
 
@@ -3527,9 +3561,12 @@ func (observation *launchObservation) captureCollectorCapability(parent context.
 	}
 	observation.CollectorIdentity = identity
 
-	probesOK := true
-	for _, buffer := range []string{"crash", "main", "system"} {
+	requiredProbesOK := true
+	for _, buffer := range []string{"crash", "events", "main", "system"} {
 		args := []string{"shell", "logcat", "-b", buffer, "-d", "-t", "1", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		if buffer == "events" {
+			args = []string{"shell", "logcat", "-b", "events", "-d", "-t", "1", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+		}
 		_, stderr, command, err := observation.collectorCommand(parent, "collector-"+buffer+"-probe", args...)
 		probe := collectorProbeFromCommand(buffer, command)
 		switch {
@@ -3543,16 +3580,16 @@ func (observation *launchObservation) captureCollectorCapability(parent context.
 			probe.Status = "CAPTURED"
 			probe.Rejection = ""
 		}
-		if probe.Status != "CAPTURED" {
-			probesOK = false
+		if (buffer == "crash" || buffer == "events") && probe.Status != "CAPTURED" {
+			requiredProbesOK = false
 		}
 		observation.CollectorProbes = append(observation.CollectorProbes, probe)
 	}
-	return identity.Status == "CAPTURED" && probesOK
+	return identity.Status == "CAPTURED" && requiredProbesOK
 }
 
 func beginLaunchObservation(ctx context.Context, client adbClient, value options) *launchObservation {
-	observation := &launchObservation{client: client, api: value.expectedAPI, app: value.appPackage, Schema: "kurdistan-launch-observation-v1", Status: "CAPTURED", GateResult: "NOT_EVALUATED", StartedUTC: time.Now().UTC(), ExitStatus: "INCOMPLETE", ActivityProcessStatus: "INCOMPLETE", ResolutionStatus: "INCOMPLETE"}
+	observation := &launchObservation{client: client, api: value.expectedAPI, app: value.appPackage, Schema: startupObserverSchema, Status: "CAPTURED", GateResult: "NOT_EVALUATED", StartedUTC: time.Now().UTC(), ExitStatus: "INCOMPLETE", ActivityProcessStatus: "INCOMPLETE", ResolutionStatus: "INCOMPLETE", Subject: value.startupSubject}
 	var nonce [16]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		observation.incomplete("invocation identity unavailable")
@@ -3572,6 +3609,10 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 		observation.incomplete("unsupported diagnostic package identity")
 		return observation
 	}
+	if !validStartupSubject(observation.Subject, observation) {
+		observation.incomplete("immutable startup subject unavailable")
+		return observation
+	}
 	var ok bool
 	observation.DeviceStartNanos, ok = observation.queryClock(ctx, "clock-before")
 	if !ok {
@@ -3586,9 +3627,14 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 	if !observation.captureCollectorCapability(ctx) {
 		observation.incomplete("collector shell capability unavailable")
 	}
-	for _, buffer := range []string{"crash", "main", "system"} {
+	observation.captureStartupBoot(ctx, "before-launch")
+	observation.captureStartupPackage(ctx, "before-launch")
+	for _, buffer := range []string{"crash", "events", "main", "system"} {
 		logctx, cancel := context.WithCancel(ctx)
 		command := []string{"shell", "logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		if buffer == "events" {
+			command = []string{"shell", "logcat", "-b", "events", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+		}
 		args := append([]string(nil), command...)
 		if client.serial != "" {
 			args = append([]string{"-s", client.serial}, args...)
@@ -3609,7 +3655,9 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 			}()
 		} else {
 			stream.terminalSequence, stream.terminalUTC = stream.sequence.mark()
-			observation.incomplete("log stream unavailable")
+			if buffer == "crash" || buffer == "events" {
+				observation.incomplete(buffer + " log stream unavailable")
+			}
 		}
 		observation.streams = append(observation.streams, stream)
 	}
@@ -3686,6 +3734,7 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		observation.GateResult = "FAIL"
 	}
 	observation.processSnapshot(ctx, "terminal", time.Second)
+	observation.captureStartupProcess(ctx, "terminal")
 	rawState, readableState := observation.query(ctx, "activity-processes", "shell", "dumpsys", "activity", "processes", observation.app)
 	observation.ActivityProcessState = sanitizeActivityProcessState(rawState, observation.app)
 	var parsedState bool
@@ -3695,6 +3744,9 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	} else {
 		observation.incomplete("activity process state unavailable or incomplete")
 	}
+	observation.captureStartupActivity(ctx, "terminal")
+	observation.captureStartupPackage(ctx, "terminal")
+	observation.captureStartupBoot(ctx, "terminal")
 	_, _ = observation.query(ctx, "window-end", "shell", "log", "-p", "i", "-t", launchProbeTag, observation.endMarker.String())
 	// A separate marker-only snapshot confirms the end even if the launch
 	// deadline already terminated the streaming readers. It contains no crash
@@ -3752,6 +3804,11 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 	startCaptured, endCaptured := markerCaptureStatus(observation.MarkerWindow)
 	for _, stream := range observation.streams {
 		events, complete := launchWindowEvents(rawLogs[stream.name], observation.app, start, end)
+		if stream.name == "events" {
+			observation.SystemEvents = parseStartupSystemEvents(rawLogs[stream.name], observation.app, start, end)
+			complete = observation.SystemEvents.Status == "CAPTURED"
+			events = nil
+		}
 		lifecycle := diagnoseLaunchStreamLifecycle(stream, stdoutSnapshots[stream.name], stderrSnapshots[stream.name], complete, startCaptured, endCaptured)
 		lifecycle.ExecutionBoundary = observation.CollectorIdentity.Execution
 		lifecycle.CommandIdentityStatus = observation.CollectorIdentity.Status
@@ -3759,15 +3816,28 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		lifecycle.CommandGID = observation.CollectorIdentity.GID
 		lifecycle.CommandSELinuxContext = observation.CollectorIdentity.SELinuxContext
 		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
-		if lifecycle.TerminalStatus != "DRAINED" {
+		required := stream.name == "crash" || stream.name == "events"
+		if required && lifecycle.TerminalStatus != "DRAINED" {
 			observation.incomplete(stream.name + " stream incomplete")
 		}
 		status := "CAPTURED"
 		if !complete || lifecycle.TerminalStatus != "DRAINED" {
-			status = "INCOMPLETE"
-			observation.incomplete(stream.name + " events incomplete")
+			status = "OPTIONAL_SOURCE_UNAVAILABLE"
+			if required {
+				status = "INCOMPLETE"
+				observation.incomplete(stream.name + " events incomplete")
+			}
 		}
 		observation.Logs = append(observation.Logs, diagnosticLogBuffer{Buffer: stream.name, Source: "stream", Status: status, Events: events})
+		if stream.name == "events" {
+			parsed := observation.SystemEvents.Status == "CAPTURED"
+			canonicalEvents := canonicalStartupSystemEventEvidence(observation.SystemEvents.Events)
+			observation.recordCompositeSource("launch-window", "ACTIVITY_MANAGER_EVENTS", startupEventParserV2, canonicalEvents, lifecycle.TerminalStatus == "DRAINED", parsed, observation.SystemEvents.Rejection, len(observation.SystemEvents.Events))
+			if lifecycle.TerminalStatus != "DRAINED" {
+				observation.SystemEvents.Status = "INCOMPLETE"
+				observation.SystemEvents.Rejection = "EVENT_STREAM_NOT_DRAINED"
+			}
+		}
 	}
 	if observation.api >= 30 {
 		raw, readable := observation.query(ctx, "exit-info", "shell", "dumpsys", "activity", "exit-info", observation.app)

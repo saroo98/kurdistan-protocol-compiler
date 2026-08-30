@@ -206,6 +206,7 @@ func runLaunchFixture(t *testing.T, scenario string, api int) (error, launchObse
 	t.Helper()
 	root := t.TempDir()
 	fixture := newLaunchFixtureTransport(scenario)
+	fixture.api = api
 	if scenario == "post-cancellation-exit-failure" {
 		fixture.streamTerminalOverride = fixtureNonCancellationExitError(t)
 	}
@@ -217,7 +218,10 @@ func runLaunchFixture(t *testing.T, scenario string, api int) (error, launchObse
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
-	err := launchSmokeWithDiagnostics(ctx, client, options{appPackage: defaultAppPackage, expectedAPI: api})
+	err := launchSmokeWithDiagnostics(ctx, client, options{
+		appPackage: defaultAppPackage, testPackage: defaultTestPackage, expectedAPI: api, expectedABI: "x86_64",
+		startupSubject: fixtureStartupSubject(api),
+	})
 	var observation launchObservation
 	data, readErr := os.ReadFile(filepath.Join(root, "10-launch-details.txt"))
 	if readErr != nil || json.Unmarshal(data, &observation) != nil {
@@ -226,6 +230,16 @@ func runLaunchFixture(t *testing.T, scenario string, api int) (error, launchObse
 	fixture.assertClosed(t)
 	logLaunchScenario(t, err, observation)
 	return err, observation, fixture
+}
+
+func fixtureStartupSubject(api int) startupSubjectBinding {
+	return startupSubjectBinding{
+		Status: "CAPTURED", Repository: startupRepositoryIdentity,
+		Commit: strings.Repeat("1", 40), Tree: strings.Repeat("2", 40),
+		AppAPKDigest: strings.Repeat("3", 64), AppAPKBytes: 1024,
+		TestAPKDigest: strings.Repeat("4", 64), TestAPKBytes: 2048,
+		Package: defaultAppPackage, TestPackage: defaultTestPackage, API: api, ABI: "x86_64",
+	}
 }
 
 type fixtureCommand struct {
@@ -260,7 +274,7 @@ type fixtureStream struct {
 	rejected    atomic.Int64
 }
 
-func newFixtureStream(ctx context.Context, output, stderr io.Writer, terminate <-chan struct{}, stderrMode string, terminalOverride error) *fixtureStream {
+func newFixtureStream(ctx context.Context, output, stderr io.Writer, terminate <-chan struct{}, stderrMode, stderrBefore string, terminalOverride error) *fixtureStream {
 	stream := &fixtureStream{
 		chunks: make(chan fixtureOutputChunk), ready: make(chan struct{}), done: make(chan struct{}),
 		stderr: stderr, stderrMode: stderrMode,
@@ -283,7 +297,10 @@ func newFixtureStream(ctx context.Context, output, stderr io.Writer, terminate <
 	}()
 	<-stream.ready
 	if stderrMode == "before-owned-cancellation" {
-		_, stream.writeErr = io.WriteString(stderr, "logcat: invalid stream before owned cancellation credential=synthetic-secret\n")
+		if stderrBefore == "" {
+			stderrBefore = "logcat: invalid stream before owned cancellation credential=synthetic-secret\n"
+		}
+		_, stream.writeErr = io.WriteString(stderr, stderrBefore)
 	}
 	go func() {
 		if terminate == nil {
@@ -343,6 +360,7 @@ func (stream *fixtureStream) wait() error {
 type launchFixtureTransport struct {
 	mu                     sync.Mutex
 	scenario               string
+	api                    int
 	clock                  time.Time
 	wallClock              time.Time
 	launched               time.Time
@@ -391,6 +409,15 @@ func (fixture *launchFixtureTransport) record(kind, path string, args []string, 
 
 func fixtureStamp(at time.Time) string {
 	return fmt.Sprintf("%d.%09d", at.Unix(), at.Nanosecond())
+}
+
+func fixtureAPIForScenario(scenario string) int {
+	for _, api := range []int{26, 34, 36} {
+		if strings.Contains(scenario, "api"+strconv.Itoa(api)) {
+			return api
+		}
+	}
+	return 34
 }
 
 // Called with fixture.mu held. Raw log creation, live delivery and fallback
@@ -444,7 +471,10 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	case command == "logcat --help":
 		fmt.Fprintln(stdout, "Usage: logcat [options] [filterspecs]\n  -b <buffer>  load an alternate log buffer")
 	case strings.HasPrefix(command, "logcat -b ") && strings.Contains(command, " -d -t 1 "):
-		if scenario == "permission-denied-preflight" && (args[2] == "main" || args[2] == "system") {
+		if (scenario == "permission-denied-preflight" && (args[2] == "main" || args[2] == "system")) ||
+			(scenario == "ci-api36-permission-denied" && args[2] == "system") ||
+			(strings.HasSuffix(scenario, "missing-events") && args[2] == "events") ||
+			(strings.HasSuffix(scenario, "missing-crash") && args[2] == "crash") {
 			fmt.Fprintln(stderr, "logcat: permission denied credential=synthetic-secret")
 			return errors.New("exit status 1")
 		}
@@ -532,6 +562,42 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 			ticks++
 		}
 		fmt.Fprintf(stdout, "999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 %d\n", ticks)
+	case command == "cat /proc/999/status":
+		if scenario == "truncated-proc-status" {
+			fmt.Fprint(stdout, strings.Repeat("x", (256<<10)+1))
+			return nil
+		}
+		uid := 10123
+		if scenario == "conflicting-proc-uid" {
+			uid++
+		}
+		fmt.Fprintf(stdout, "Name:\tkurdistanvpn\nState:\tS (sleeping)\nTgid:\t999\nPid:\t999\nPPid:\t111\nUid:\t%d\t%d\t%d\t%d\n", uid, uid, uid, uid)
+	case command == "cat /proc/999/cmdline":
+		if scenario == "wrong-proc-command" {
+			fmt.Fprint(stdout, "example.unrelated\x00")
+		} else {
+			fmt.Fprint(stdout, defaultAppPackage+"\x00")
+		}
+	case command == "cat /proc/sys/kernel/random/boot_id":
+		if scenario == "app-authored-only" {
+			return errors.New("fixture boot identity unavailable")
+		}
+		fmt.Fprintln(stdout, "12345678-1234-4abc-8def-1234567890ab")
+	case command == "getprop ro.build.fingerprint":
+		api := fixture.api
+		if api == 0 {
+			api = fixtureAPIForScenario(scenario)
+		}
+		fmt.Fprintf(stdout, "google/sdk_gphone_x86_64/emu64xa:%d/TEST/123:userdebug/test-keys\n", api)
+	case command == "dumpsys package "+defaultAppPackage:
+		if scenario == "app-authored-only" {
+			return errors.New("fixture package state unavailable")
+		}
+		stopped := "false"
+		if scenario == "stopped-package" {
+			stopped = "true"
+		}
+		fmt.Fprintf(stdout, "Activity Resolver Table:\nPackages:\n  Package [%s] (abc):\n    userId=10123\n    versionCode=42 minSdk=26 targetSdk=36\n    versionName=0.9.0-internal\n    User 0: installed=true hidden=false suspended=false distractionFlags=0 stopped=%s notLaunched=false enabled=0\n", defaultAppPackage, stopped)
 	case command == "pidof "+defaultAppPackage:
 		if scenario == "process-death" {
 			return errors.New("fixture target no longer exists")
@@ -546,6 +612,25 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 				" 10 10 I ActivityManager: AppErrorDialog for " + defaultAppPackage + "\n" + system
 		}
 		if err := fixture.appendLog("system", system); err != nil {
+			return err
+		}
+		event := fixtureStamp(fixture.launched) + " 1000 1000 I am_proc_start: [0,999,10123," + defaultAppPackage + ",activity," + defaultAppPackage + "/.MainActivity]\n"
+		if scenario == "unrelated-events" {
+			event = fixtureStamp(fixture.launched) + " 1000 1000 I am_proc_start: [0,888,10124,example.unrelated,service,example.unrelated/.Worker]\n" + event
+		}
+		if scenario == "events-anr" {
+			event += fixtureStamp(fixture.launched.Add(time.Millisecond)) + " 1000 1000 I am_anr: [0,999," + defaultAppPackage + ",0,synthetic]\n"
+		}
+		if scenario == "events-crash" {
+			event += fixtureStamp(fixture.launched.Add(time.Millisecond)) + " 1000 1000 I am_crash: [0,999," + defaultAppPackage + ",0,java.lang.IllegalStateException,redacted,File.kt,1,0]\n"
+		}
+		if scenario == "events-process-death" {
+			event += fixtureStamp(fixture.launched.Add(time.Millisecond)) + " 1000 1000 I am_proc_died: [0,999," + defaultAppPackage + ",0,2]\n"
+		}
+		if scenario == "truncated-events" {
+			event += strings.Repeat("x", (512<<10)+1)
+		}
+		if err := fixture.appendLog("events", event); err != nil {
 			return err
 		}
 		if strings.HasSuffix(scenario, "crash") {
@@ -626,6 +711,23 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 			fmt.Fprintln(stdout, "  *APP* UID 10124 ProcessRecord{def 888:example.unrelated/u0a124}\n    user #0 uid=10124\n    pid=888\n    curProcState=TOP setProcState=TOP\n    mCrashing=false [com.android.server.am.AppErrorDialog@def] mNotResponding=false")
 		}
 		fmt.Fprintln(stdout, "  Process LRU list (sorted by oom_adj, 1 total, non-act at 0, non-svc at 0):")
+	case command == "dumpsys activity activities "+defaultAppPackage:
+		if scenario == "app-authored-only" {
+			return errors.New("fixture activity state unavailable")
+		}
+		if scenario == "unknown-activity-format" {
+			fmt.Fprintln(stdout, "ACTIVITY MANAGER ACTIVITIES (unknown future format)")
+			return nil
+		}
+		component := defaultAppPackage + "/.MainActivity"
+		if scenario == "conflicting-activity" {
+			component = "example.unrelated/.OtherActivity"
+		}
+		if fixture.api == 26 || strings.HasPrefix(scenario, "ci-api26-") {
+			fmt.Fprintf(stdout, "ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)\n  Stack #1:\n    mResumedActivity: ActivityRecord{abc u0 %s t42}\n", component)
+		} else {
+			fmt.Fprintf(stdout, "ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)\n  topResumedActivity=ActivityRecord{abc u0 %s t42}\n  * Hist #0: ActivityRecord{abc u0 %s t42}\n    state=RESUMED\n", component, component)
+		}
 	case command == "dumpsys activity exit-info "+defaultAppPackage:
 		if scenario == "missing-exit-observation" {
 			return nil
@@ -689,7 +791,9 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if fixture.scenario == "unavailable-stream" {
+	if fixture.scenario == "unavailable-stream" ||
+		(strings.HasSuffix(fixture.scenario, "missing-events") && strings.Contains(strings.Join(args, " "), "logcat -b events ")) ||
+		(strings.HasSuffix(fixture.scenario, "missing-crash") && strings.Contains(strings.Join(args, " "), "logcat -b crash ")) {
 		return nil, errors.New("fixture stream unavailable")
 	}
 	if fixture.scenario == "stream-without-wait" {
@@ -702,7 +806,11 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	buffer := args[2]
 	want := []string{"logcat", "-b", buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
 		"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
-	if (buffer != "crash" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
+	if buffer == "events" {
+		want = []string{"logcat", "-b", "events", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
+			"am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+	}
+	if (buffer != "crash" && buffer != "events" && buffer != "main" && buffer != "system") || !reflect.DeepEqual(args, want) || fixture.streams[buffer] != nil {
 		return nil, errors.New("unexpected or duplicate fixture stream")
 	}
 	if fixture.scenario == "invalid-stream-command" {
@@ -713,9 +821,12 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	if fixture.scenario == "terminated-stream" {
 		terminate = fixture.terminate
 	}
-	stderrMode := ""
+	stderrMode, stderrBefore := "", ""
 	if buffer == "main" || buffer == "system" {
 		switch fixture.scenario {
+		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events":
+			stderrMode = "before-owned-cancellation"
+			stderrBefore = "logcat: permission denied\n"
 		case "owned-shutdown-stderr":
 			stderrMode = "after-owned-cancellation"
 		case "post-cancellation-exit-failure":
@@ -724,7 +835,11 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 			stderrMode = "before-owned-cancellation"
 		}
 	}
-	stream := newFixtureStream(ctx, stdout, stderr, terminate, stderrMode, fixture.streamTerminalOverride)
+	terminalOverride := fixture.streamTerminalOverride
+	if fixture.scenario == "post-cancellation-exit-failure" && buffer != "main" && buffer != "system" {
+		terminalOverride = nil
+	}
+	stream := newFixtureStream(ctx, stdout, stderr, terminate, stderrMode, stderrBefore, terminalOverride)
 	fixture.streams[buffer] = stream
 	return stream.wait, nil
 }
@@ -733,9 +848,11 @@ func (fixture *launchFixtureTransport) assertClosed(t *testing.T) {
 	t.Helper()
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	want := 3
+	want := 4
 	if fixture.scenario == "unavailable-stream" || fixture.scenario == "stream-without-wait" || fixture.scenario == "invalid-stream-command" {
 		want = 0
+	} else if strings.HasSuffix(fixture.scenario, "missing-events") || strings.HasSuffix(fixture.scenario, "missing-crash") {
+		want = 3
 	}
 	if len(fixture.streams) != want {
 		t.Errorf("stream count=%d, want %d", len(fixture.streams), want)
@@ -799,11 +916,17 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 	}
 	var got []string
 	var snapshotDeadline time.Time
+	pidOfDirect, pidOfComposite := 0, 0
 	for _, call := range fixture.commands {
 		got = append(got, call.kind+" "+strings.Join(call.args, " "))
 		wantDelay := time.Second
 		if strings.Join(call.args, " ") == "-s emulator-5554 shell pidof "+defaultAppPackage {
-			wantDelay = 0
+			if call.waitDelay == 0 {
+				pidOfDirect++
+				wantDelay = 0
+			} else {
+				pidOfComposite++
+			}
 		}
 		if call.waitDelay != wantDelay {
 			t.Errorf("changed wait delay for %v: %s", call.args, call.waitDelay)
@@ -818,9 +941,14 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 			t.Error("epoch query did not retain its process-list query's shared deadline")
 		}
 	}
+	if pidOfDirect != 1 || pidOfComposite != 3 {
+		t.Fatalf("pidof command boundaries direct=%d composite=%d, want 1 and 3", pidOfDirect, pidOfComposite)
+	}
 	prefix := "run -s emulator-5554 shell "
 	streamPrefix := "start -s emulator-5554 shell logcat -b "
 	streamSuffix := " -v threadtime -v monotonic -v usec -T 1 AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S"
+	eventProbe := "logcat -b events -d -t 1 -v threadtime -v monotonic -v usec am_proc_start:I am_proc_died:I am_kill:I am_anr:I am_crash:I *:S"
+	eventStream := "start -s emulator-5554 shell logcat -b events -v threadtime -v monotonic -v usec -T 1 am_proc_start:I am_proc_died:I am_kill:I am_anr:I am_crash:I *:S"
 	startMarker, endMarker := "", ""
 	for _, call := range fixture.commands {
 		if len(call.args) == 0 {
@@ -848,18 +976,29 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "cat /proc/self/attr/current",
 		prefix + "logcat --help",
 		prefix + "logcat -b crash -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
+		prefix + eventProbe,
 		prefix + "logcat -b main -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
 		prefix + "logcat -b system -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
-		streamPrefix + "crash" + streamSuffix, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
+		prefix + "cat /proc/sys/kernel/random/boot_id",
+		prefix + "getprop ro.build.fingerprint",
+		prefix + "dumpsys package " + defaultAppPackage,
+		streamPrefix + "crash" + streamSuffix, eventStream, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
 		prefix + "log -p i -t KurdistanLaunchProbe " + startMarker,
 		prefix + "ps -A -o UID,PID,PPID,NAME",
 		prefix + "cmd package resolve-activity --brief -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "am start -W -f 0x10008000 -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
 		prefix + "pidof " + defaultAppPackage,
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
 		prefix + "dumpsys activity processes " + defaultAppPackage,
+		prefix + "dumpsys activity activities " + defaultAppPackage,
+		prefix + "dumpsys package " + defaultAppPackage,
+		prefix + "cat /proc/sys/kernel/random/boot_id",
+		prefix + "getprop ro.build.fingerprint",
 		prefix + "log -p i -t KurdistanLaunchProbe " + endMarker,
 		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,
@@ -893,12 +1032,17 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 			}
 		}
 	}()
-	for _, buffer := range []string{"crash", "main", "system"} {
+	for _, buffer := range []string{"crash", "events", "main", "system"} {
 		output := &readyChildWriter{ready: make(chan struct{})}
 		outputs[buffer] = output
 		args := []string{"-s", "emulator-5554", "shell", "logcat", "-b", buffer,
 			"-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
 			"AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		if buffer == "events" {
+			args = []string{"-s", "emulator-5554", "shell", "logcat", "-b", "events",
+				"-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1",
+				"am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+		}
 		wait, err := client.startCommand(ctx, args, output, io.Discard, time.Second)
 		if err != nil || wait == nil {
 			t.Fatalf("%s Start did not provide a running command: %v", buffer, err)
@@ -933,8 +1077,14 @@ func TestLaunchTransportStreamsRawEvidenceBeforeWait(t *testing.T) {
 	if start != 101_001_000_000 || end != 101_003_000_000 {
 		t.Errorf("synthetic command clock changed: start=%d end=%d", start, end)
 	}
-	for _, buffer := range []string{"main", "system", "crash"} {
+	for _, buffer := range []string{"main", "system", "crash", "events"} {
 		raw := fixture.logs[buffer]
+		if buffer == "events" {
+			if evidence := parseStartupSystemEvents(raw, defaultAppPackage, start, end); evidence.Status != "CAPTURED" || len(evidence.Events) != 1 || evidence.Events[0].Type != "PROCESS_START" {
+				t.Errorf("events fixture did not traverse the canonical system parser: %+v", evidence)
+			}
+			continue
+		}
 		for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
 			event, ok := parseEpochLog(line)
 			t.Logf("buffer=%s parsed=%t relative_start_ns=%d relative_end_ns=%d", buffer, ok, event.DeviceNanos-start, end-event.DeviceNanos)
@@ -1689,8 +1839,8 @@ func TestLaunchCollectorsExposeCausalLifecycleAndCategoricalCompletion(t *testin
 		t.Fatal(err)
 	}
 	states := decode(t, healthy)
-	if len(states) != 3 {
-		t.Fatalf("collector lifecycle count=%d, want three causal records", len(states))
+	if len(states) != 4 {
+		t.Fatalf("collector lifecycle count=%d, want four causal records", len(states))
 	}
 	for _, state := range states {
 		if state.StartStatus != "STARTED" || state.ReadinessStatus != "OUTPUT_SINK_READY" ||
@@ -1710,7 +1860,7 @@ func TestLaunchCollectorsExposeCausalLifecycleAndCategoricalCompletion(t *testin
 				t.Fatalf("incomplete collector changed gate semantics: err=%v gate=%s", err, observation.GateResult)
 			}
 			states := decode(t, observation)
-			if len(states) != 3 {
+			if len(states) != 4 {
 				t.Fatalf("incomplete collector lifecycle count=%d", len(states))
 			}
 			for _, state := range states {
@@ -1820,14 +1970,19 @@ func TestLaunchCollectorsUseVerifiedOrdinaryADBShellIdentityAndExactBoundedFilte
 		t.Fatalf("collector shell identity is not explicit and complete: %+v", identity)
 	}
 	wantProbe := func(buffer string) []string {
+		if buffer == "events" {
+			return []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", "events", "-d", "-t", "1",
+				"-v", "threadtime", "-v", "monotonic", "-v", "usec", "am_proc_start:I", "am_proc_died:I",
+				"am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+		}
 		return []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", buffer, "-d", "-t", "1",
 			"-v", "threadtime", "-v", "monotonic", "-v", "usec", "AndroidRuntime:E", "ActivityManager:I",
 			"ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
 	}
-	if len(probes) != 3 {
+	if len(probes) != 4 {
 		t.Fatalf("collector probe count=%d, want one bounded probe per required buffer", len(probes))
 	}
-	for index, buffer := range []string{"crash", "main", "system"} {
+	for index, buffer := range []string{"crash", "events", "main", "system"} {
 		probe := probes[index]
 		if probe.Buffer != buffer || probe.Status != "CAPTURED" || probe.Rejection != "" ||
 			!reflect.DeepEqual(probe.Argv, wantProbe(buffer)) || probe.ExitCode != 0 || probe.CommandStatus != "CAPTURED" ||
@@ -1845,6 +2000,9 @@ func TestLaunchCollectorsUseVerifiedOrdinaryADBShellIdentityAndExactBoundedFilte
 	}
 	for _, lifecycle := range decodeLaunchStreamLifecycle(t, observation) {
 		want := []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", lifecycle.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+		if lifecycle.Buffer == "events" {
+			want = []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", "events", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+		}
 		if !reflect.DeepEqual(lifecycle.Command, want) || lifecycle.ExecutionBoundary != "ADB_SHELL" ||
 			lifecycle.CommandIdentityStatus != "CAPTURED" || lifecycle.CommandUID != 2000 || lifecycle.CommandGID != 2000 ||
 			lifecycle.CommandSELinuxContext != "u:r:shell:s0" {
@@ -1854,34 +2012,43 @@ func TestLaunchCollectorsUseVerifiedOrdinaryADBShellIdentityAndExactBoundedFilte
 }
 
 func TestLaunchCollectorCapabilityFailureRemainsBlockedAndSanitized(t *testing.T) {
-	for _, scenario := range []string{"unknown-shell-identity", "unknown-shell-context", "permission-denied-preflight"} {
+	for _, scenario := range []string{"unknown-shell-identity", "unknown-shell-context"} {
 		t.Run(scenario, func(t *testing.T) {
 			err, observation := runLaunchScenario(t, scenario, 34)
 			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
 				t.Fatalf("collector capability uncertainty did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
 			}
-			identity, probes := decodeCollectorCapability(t, observation)
-			if scenario != "permission-denied-preflight" && (identity.Status != "INCOMPLETE" || identity.Rejection == "") {
+			identity, _ := decodeCollectorCapability(t, observation)
+			if identity.Status != "INCOMPLETE" || identity.Rejection == "" {
 				t.Fatalf("unknown shell identity lacks a categorical rejection: %+v", identity)
 			}
 			encoded, marshalErr := json.Marshal(observation)
 			if marshalErr != nil || strings.Contains(string(encoded), "synthetic-secret") {
 				t.Fatal("collector capability evidence retained an unsanitized diagnostic")
 			}
-			if scenario == "permission-denied-preflight" {
-				var rejected int
-				for _, probe := range probes {
-					if probe.Status == "INCOMPLETE" && probe.Rejection == "COMMAND_FAILED" &&
-						strings.Contains(strings.Join(probe.StderrExcerpt, " "), "permission") &&
-						strings.Contains(strings.Join(probe.StderrExcerpt, " "), "denied") {
-						rejected++
-					}
-				}
-				if rejected != 2 {
-					t.Fatalf("permission denial probe count=%d, want main and system only: %+v", rejected, probes)
-				}
-			}
 		})
+	}
+}
+
+func TestLaunchOptionalCollectorProbePermissionDenialIsRetainedWithoutBlockingCompleteComposite(t *testing.T) {
+	err, observation := runLaunchScenario(t, "permission-denied-preflight", 34)
+	if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" || observation.Status != "CAPTURED" {
+		t.Fatalf("optional probe denial blocked complete replacement evidence: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+	}
+	_, probes := decodeCollectorCapability(t, observation)
+	var rejected int
+	for _, probe := range probes {
+		if probe.Status == "INCOMPLETE" && probe.Rejection == "COMMAND_FAILED" &&
+			strings.Contains(strings.Join(probe.StderrExcerpt, " "), "permission") &&
+			strings.Contains(strings.Join(probe.StderrExcerpt, " "), "denied") {
+			rejected++
+			if probe.Buffer != "main" && probe.Buffer != "system" {
+				t.Fatalf("required collector was treated as optional: %+v", probe)
+			}
+		}
+	}
+	if rejected != 2 {
+		t.Fatalf("permission denial probe count=%d, want main and system only: %+v", rejected, probes)
 	}
 }
 
@@ -1908,11 +2075,14 @@ func TestLaunchStreamExpectedOwnedShutdownRetainsBoundedStderrWithoutInvalidatin
 				t.Fatalf("complete evidence was invalidated by owned shutdown stderr: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
 			}
 			states := decodeLaunchStreamLifecycle(t, observation)
-			if len(states) != 3 {
-				t.Fatalf("stream lifecycle count=%d, want 3", len(states))
+			if len(states) != 4 {
+				t.Fatalf("stream lifecycle count=%d, want 4", len(states))
 			}
 			for _, state := range states {
 				wantCommand := []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", state.Buffer, "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "AndroidRuntime:E", "ActivityManager:I", "ActivityTaskManager:I", "KurdistanLaunchProbe:I", "*:S"}
+				if state.Buffer == "events" {
+					wantCommand = []string{"adb", "-s", "emulator-5554", "shell", "logcat", "-b", "events", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "-T", "1", "am_proc_start:I", "am_proc_died:I", "am_kill:I", "am_anr:I", "am_crash:I", "*:S"}
+				}
 				if state.CommandCategory != "ADB_LOGCAT_STREAM" || !reflect.DeepEqual(state.Command, wantCommand) ||
 					!state.StartCapturedBeforeStop || !state.EndCapturedBeforeStop || !state.IntentionallyStopped || !state.ParserComplete {
 					t.Fatalf("owned collector identity or completion is incomplete: %+v", state)
@@ -1922,7 +2092,7 @@ func TestLaunchStreamExpectedOwnedShutdownRetainsBoundedStderrWithoutInvalidatin
 					state.ExitRelativeToCancellation != "AFTER_OWNED_CANCELLATION" || state.ContextCancellationState != "CANCELED" {
 					t.Fatalf("owned cancellation ordering is not proven: %+v", state)
 				}
-				if state.Buffer == "crash" {
+				if state.Buffer == "crash" || state.Buffer == "events" {
 					if state.StderrObserved || state.StderrBytes != 0 || state.TerminalStatus != "DRAINED" {
 						t.Fatalf("crash collector acquired unexpected stderr: %+v", state)
 					}
@@ -1946,15 +2116,15 @@ func TestLaunchStreamExpectedOwnedShutdownRetainsBoundedStderrWithoutInvalidatin
 	}
 }
 
-func TestLaunchStreamPreCancellationTransportFailureRemainsBlocked(t *testing.T) {
+func TestLaunchOptionalStreamPreCancellationTransportFailureRemainsVisibleWithoutBlockingCompleteComposite(t *testing.T) {
 	for _, api := range []int{26, 34, 36} {
 		t.Run(strconv.Itoa(api), func(t *testing.T) {
 			err, observation := runLaunchScenario(t, "pre-cancellation-stderr", api)
-			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
-				t.Fatalf("pre-cancellation transport failure did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" || observation.Status != "CAPTURED" {
+				t.Fatalf("optional pre-cancellation transport failure blocked complete replacement: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
 			}
 			for _, state := range decodeLaunchStreamLifecycle(t, observation) {
-				if state.Buffer == "crash" {
+				if state.Buffer == "crash" || state.Buffer == "events" {
 					continue
 				}
 				if state.TerminalReason != "STDERR_BEFORE_OWNED_CANCELLATION" || state.TerminalStatus != "INCOMPLETE" ||
@@ -1967,15 +2137,15 @@ func TestLaunchStreamPreCancellationTransportFailureRemainsBlocked(t *testing.T)
 	}
 }
 
-func TestLaunchStreamPostCancellationNonCancellationExitFailureRemainsBlocked(t *testing.T) {
+func TestLaunchOptionalStreamPostCancellationExitFailureRemainsVisibleWithoutBlockingCompleteComposite(t *testing.T) {
 	for _, api := range []int{26, 34, 36} {
 		t.Run(strconv.Itoa(api), func(t *testing.T) {
 			err, observation := runLaunchScenario(t, "post-cancellation-exit-failure", api)
-			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.Status != "INCOMPLETE" {
-				t.Fatalf("ordinary exit failure after cancellation did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
+			if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" || observation.Status != "CAPTURED" {
+				t.Fatalf("optional post-cancellation failure blocked complete replacement: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
 			}
 			for _, state := range decodeLaunchStreamLifecycle(t, observation) {
-				if state.Buffer == "crash" {
+				if state.Buffer == "crash" || state.Buffer == "events" {
 					continue
 				}
 				if state.TerminalReason != "POST_CANCELLATION_TRANSPORT_UNPROVEN" || state.TerminalStatus != "INCOMPLETE" ||
@@ -1997,8 +2167,8 @@ func TestLaunchStreamInvalidCommandConfigurationRemainsBlockedWithSanitizedReaso
 				t.Fatalf("invalid stream command did not fail closed: err=%v gate=%s status=%s", err, observation.GateResult, observation.Status)
 			}
 			states := decodeLaunchStreamLifecycle(t, observation)
-			if len(states) != 3 {
-				t.Fatalf("invalid command lifecycle count=%d, want 3", len(states))
+			if len(states) != 4 {
+				t.Fatalf("invalid command lifecycle count=%d, want 4", len(states))
 			}
 			for _, state := range states {
 				excerpt := strings.Join(state.StderrExcerpt, " ")

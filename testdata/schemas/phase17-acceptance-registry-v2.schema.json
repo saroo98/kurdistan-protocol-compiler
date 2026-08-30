@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kurdistanvpn.org/schemas/phase17-acceptance-registry-v2.schema.json",
   "title": "Fixed protected-state acceptance definitions, not execution evidence",
-  "description": "All 189 approved entries are required in unsigned ASCII ID order. Every definition field is fixed. FULL source or test status records audited mapping completeness only; it is not an execution receipt and does not establish installed qualification or operational acceptance. The Go consumer additionally recomputes the versioned definition digests against its fixed approved root.",
+  "description": "All 190 approved entries are required in unsigned ASCII ID order. Every definition field is fixed. FULL source or test status records audited mapping completeness only; it is not an execution receipt and does not establish installed qualification or operational acceptance. The Go consumer additionally recomputes the versioned definition digests against its fixed approved root.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,10 +22,10 @@
       "const": 2
     },
     "definitionSetSha256": {
-      "const": "467f055345c12a225764937dd36a51f851958bdcfeb9f38afabf30aab6fba054"
+      "const": "50efe6944293aec97728fca24ae45560458d3d951da39803b8ab3a6890e8398c"
     },
     "entryCount": {
-      "const": 189
+      "const": 190
     },
     "groups": {
       "type": "array",
@@ -94,7 +94,7 @@
                   "const": "BOOT"
                 },
                 "count": {
-                  "const": 35
+                  "const": 36
                 }
               }
             }
@@ -125,8 +125,8 @@
     },
     "entries": {
       "type": "array",
-      "minItems": 189,
-      "maxItems": 189,
+      "minItems": 190,
+      "maxItems": 190,
       "prefixItems": [
         {
           "allOf": [
@@ -3505,6 +3505,44 @@
                 },
                 "definitionSha256": {
                   "const": "56af68881237926e07af3d6a357205edb7133f64780f6286d95a574eceb1cc9e"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "G05"
+                },
+                "source": {
+                  "const": "BOOT"
+                },
+                "definitionVersion": {
+                  "const": 1
+                },
+                "criterion": {
+                  "const": "G05_PortableCompositeStartupAdmission_AllowsInstrumentationWithoutPrivilegedContinuousLogs"
+                },
+                "controlledInput": {
+                  "const": "API 26, 34, and 36 startup receipts with optional main/system log denial plus complete, missing, stale, malformed, truncated, conflicting, crash, ANR, dialog, death, replacement, and wrong-subject observations"
+                },
+                "requiredOracle": {
+                  "const": "Exact host launch receipt reconciled with package-scoped ActivityManager state, two-source PID/UID/process-epoch identity, survival, crash-buffer/failure state, invocation markers, subject identities, timestamps, and sanitized raw-evidence digests"
+                },
+                "requiredAssertion": {
+                  "const": "This successor replaces only the previous mandatory continuous main/system log-stream startup prerequisite: complete equivalent composite evidence yields LAUNCH_OBSERVED_NOT_QUALIFIED and may begin instrumentation; definitive unhealthy evidence yields FAIL; incomplete, unavailable, malformed, stale, or conflicting evidence yields BLOCKED; D01-D08 remain unexecuted installed requirements"
+                },
+                "evidenceRequirement": {
+                  "const": "Deterministic replay and CI emulator startup admission on API 26, 34, and 36; never installed qualification or operational acceptance"
+                },
+                "definitionSha256": {
+                  "const": "8911c04dc128292cac14f6774c22ba5c917eca973adc3940e5b3311b4d693316"
                 }
               }
             }
@@ -7341,7 +7379,7 @@
         "count": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 189
+          "maximum": 190
         }
       }
     },

@@ -124,7 +124,7 @@ func TestVerifyQualificationInfrastructureRejectsPolicySchemaAndBoundaryDrift(t 
 	}{
 		{
 			name: "acceptance accounting reduced", path: "config/phase17-acceptance-registry-v2.json",
-			old: `"entryCount": 189`, new: `"entryCount": 188`,
+			old: `"entryCount": 190`, new: `"entryCount": 189`,
 		},
 		{
 			name: "source mapping claims execution", path: "config/phase17-acceptance-registry-v2.json",

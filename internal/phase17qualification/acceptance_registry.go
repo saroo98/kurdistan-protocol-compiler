@@ -16,7 +16,7 @@ import (
 )
 
 const AcceptanceRegistrySchema = "kurdistan-phase17-acceptance-registry-v2"
-const AcceptanceDefinitionSetSHA256 = "467f055345c12a225764937dd36a51f851958bdcfeb9f38afabf30aab6fba054"
+const AcceptanceDefinitionSetSHA256 = "50efe6944293aec97728fca24ae45560458d3d951da39803b8ab3a6890e8398c"
 const MaxAcceptanceRegistryBytes = 256 << 10
 
 type AcceptanceImplementation struct {
@@ -130,7 +130,7 @@ func acceptanceIDGroups() []struct {
 		{"P1E", 72, "BL-01 EV-01 EV-02 EV-03 EV-04 EV-05 EV-06 EV-07 EV-08 EV-09 EV-10 EV-11 EV-12 EV-13 EV-14 FS-01 FS-02 FS-03 FS-04 FS-05 FS-06 FS-07 FS-08 FS-09 FS-10 FS-11 HR-01 HR-02 HR-03 HR-04 HR-05 HR-06 HR-07 HR-08 MB-01 MB-02 MB-03 MB-04 MB-05 MB-06 MB-07 MB-08 MB-09 MB-10 MB-11 OC-01 OC-02 OC-03 OC-04 OC-05 OC-06 RL-01 RL-02 RL-03 RL-04 RV-01 S1-01 S1-02 S1-03 S1-04 S1-05 S1-06 S1-07 S1-08 S1-09 S1-10 S1-11 S1-12 S1-13 S1-14 S1-15 TB-01"},
 		{"P1I", 41, "BK-I-01 BK-I-02 BK-I-03 BK-I-04 BK-O-01 BK-U-01 BT-D-01 BT-I-01 CN-I-01 CR-D-01 CR-I-01 CR-I-02 CR-I-03 CR-I-04 CR-I-05 CR-I-06 DL-I-01 DL-I-02 KI-I-01 MG-I-01 MG-I-02 MG-I-03 MG-M-01 PS-M-01 PS-U-01 PS-U-02 PS-U-03 PS-U-04 PV-I-01 PV-I-02 PV-I-03 RB-I-01 RB-I-02 RB-I-03 RC-I-01 RC-I-02 RD-I-01 RD-I-02 RT-D-01 RT-I-01 UB-I-01"},
 		{"P1J", 26, "BVM-I-01 BVM-M-01 BVM-U-01 FSD-D-01 FSD-I-01 FSD-I-02 FSD-I-03 FSD-I-04 FSD-I-05 FSD-M-01 KEY-I-01 MUT-U-01 MUT-U-02 RCV-I-01 RCV-I-02 RCV-I-03 RCV-I-04 RST-D-01 RST-I-01 RST-I-02 RST-I-03 RST-I-04 RST-I-05 RST-I-06 RST-M-01 RST-O-01"},
-		{"BOOT", 35, "A01 A02 A03 A04 A05 A06 A07 A08 A09 A10 C01 C02 C03 C04 C05 C06 C07 C08 C09 C10 D01 D02 D03 D04 D05 D06 D07 D08 G01 G02 G03 G04 I01 I02 I03"},
+		{"BOOT", 36, "A01 A02 A03 A04 A05 A06 A07 A08 A09 A10 C01 C02 C03 C04 C05 C06 C07 C08 C09 C10 D01 D02 D03 D04 D05 D06 D07 D08 G01 G02 G03 G04 G05 I01 I02 I03"},
 		{"JL_BV", 15, "BV-01 BV-02 BV-03 JL-01 JL-02 JL-03 JL-04 JL-05 JL-06 JL-07 JL-08 JL-09 JL-10 JL-11 JL-12"},
 	}
 }
@@ -139,7 +139,7 @@ func validateAcceptanceDocument(document acceptanceRegistryDocument) error {
 	reject := errors.New("acceptance registry definition or accounting rejected")
 	if document.Schema != AcceptanceRegistrySchema || document.RegistryVersion != 2 ||
 		document.DefinitionSetSHA256 != AcceptanceDefinitionSetSHA256 ||
-		document.EntryCount != 189 || len(document.Entries) != 189 ||
+		document.EntryCount != 190 || len(document.Entries) != 190 ||
 		document.ClaimPolicy != "DEFINITIONS_AND_SOURCE_MAPPING_ONLY" {
 		return reject
 	}
@@ -147,7 +147,7 @@ func validateAcceptanceDocument(document acceptanceRegistryDocument) error {
 	if len(document.Groups) != len(groups) {
 		return reject
 	}
-	expected := make(map[string]string, 189)
+	expected := make(map[string]string, 190)
 	counts := make(map[string]uint32, len(groups))
 	for i, group := range groups {
 		if document.Groups[i] != (AcceptanceGroup{group.source, group.count}) {
@@ -258,11 +258,11 @@ func validAcceptanceSourcePath(path string) bool {
 // are unsigned u32 big-endian. Each definition frame is domain || version ||
 // length-prefixed id, source, criterion, controlledInput, requiredOracle,
 // requiredAssertion, evidenceRequirement. The set frame is its separate domain ||
-// registry version (2) || count (189) || repeated (length-prefixed ID || raw
+// registry version (2) || count (190) || repeated (length-prefixed ID || raw
 // 32-byte definition digest), in strict unsigned byte order of ASCII IDs.
 // Mapping metadata is deliberately outside this definition digest: it is not
 // evidence and must never be used as a gate. The approved set digest was computed
-// independently with .NET SHA256 over a 7,888-byte set frame.
+// independently with .NET SHA256 and Python hashlib over a 7,927-byte set frame.
 func acceptanceDefinitionDigest(entry AcceptanceEntry) string {
 	var frame bytes.Buffer
 	frame.WriteString("kurdistan-phase17-acceptance-definition-v2\x00")
