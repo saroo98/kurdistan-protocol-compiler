@@ -13,12 +13,38 @@ function Assert-Rejected([scriptblock]$Action, [string]$Id) {
     if (-not $rejected) { throw ($Id + ': unsafe input was admitted') }
 }
 $paths = @(Get-LocalCorrectionWhitelist)
-if ($paths.Count -ne 194 -or @($paths.Path | Sort-Object -Unique).Count -ne 194) {
+if ($paths.Count -ne 208 -or @($paths.Path | Sort-Object -Unique).Count -ne 208) {
     throw 'BV-01: whitelist accounting mismatch'
 }
-if (@($paths | Where-Object Kind -eq 'M').Count -ne 112 -or
-    @($paths | Where-Object Kind -eq 'N').Count -ne 76 -or
+if (@($paths | Where-Object Kind -eq 'M').Count -ne 121 -or
+    @($paths | Where-Object Kind -eq 'N').Count -ne 81 -or
     @($paths | Where-Object Kind -eq 'D').Count -ne 6) { throw 'BV-01: whitelist disposition mismatch' }
+foreach ($aclPath in @('internal/selfhost/backup.go','internal/selfhost/private_path_windows.go',
+    'internal/selfhost/restore_acl_windows_test.go','cmd/kurdctl/localpath_windows.go',
+    'cmd/kurdctl/main_test.go','cmd/kurdctl/localpath_windows_test.go')) {
+    Assert-LocalCorrectionPath $aclPath
+}
+foreach ($followupPath in @('.github/workflows/ci.yml',
+    'android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt',
+    'android/app/src/androidTest/kotlin/org/kurdistanvpn/app/ProtectedStateStartupDeviceTest.kt',
+    'android/app/src/test/kotlin/org/kurdistanvpn/app/FirstUseStartupTest.kt',
+    'cmd/phase9devicegate/main.go','cmd/phase9devicegate/main_test.go',
+    'cmd/phase9devicegate/startup_observer.go','cmd/phase9devicegate/startup_observer_test.go')) {
+    Assert-LocalCorrectionPath $followupPath
+}
+Assert-LocalCorrectionWorkspace
+$savedBaseline = $script:CorrectionBaseline
+$savedTree = $script:CorrectionTree
+try {
+    $script:CorrectionBaseline = '0000000000000000000000000000000000000000'
+    Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
+    $script:CorrectionBaseline = $savedBaseline
+    $script:CorrectionTree = '0000000000000000000000000000000000000000'
+    Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
+} finally {
+    $script:CorrectionBaseline = $savedBaseline
+    $script:CorrectionTree = $savedTree
+}
 Assert-LocalCorrectionPath 'android/settings-gradle.lockfile'
 foreach ($historicalVerifier in @('internal/testkit/evidenceoverlay/successor.go',
     'internal/testkit/evidenceoverlay/successor_test.go','internal/audit/security.go',
