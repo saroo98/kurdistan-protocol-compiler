@@ -858,16 +858,23 @@ private class FdSnapshotLegacyMigrationAccess(
     }
 }
 
+internal fun projectionRootIdentityMatches(isAbsolute: Boolean, isDirectory: Boolean,
+    device: Long, inode: Long, uid: Long, mode: Int, expected: DurableDirectory): Boolean =
+    isAbsolute && isDirectory && device == expected.identity.device && inode == expected.identity.inode &&
+        uid == expected.expectedUid && mode == 448
+
 /** Android owners are confined to an already verified broker root. No parent is created. */
 internal class AndroidProjectionStoreOwnerFactory(private val context: android.content.Context,
     private val root: java.io.File, private val directory: DurableDirectory,
     private val layout: ProjectionLeafLayout) : ProjectionStoreOwnerFactory {
     override fun requireRootIdentity() {
-        check(root.isAbsolute && root.canonicalFile == root.absoluteFile && root.isDirectory) { "PROJECTION_ROOT_UNSAFE" }
         val stat = android.system.Os.lstat(root.absolutePath)
-        check(android.system.OsConstants.S_ISDIR(stat.st_mode) && stat.st_dev == directory.identity.device &&
-            stat.st_ino == directory.identity.inode && stat.st_uid.toLong() == directory.expectedUid &&
-            stat.st_mode and 511 == 448) { "PROJECTION_ROOT_IDENTITY_MISMATCH" }
+        // Android may expose the credential root through an installation-local alias. The
+        // fixed final leaf is trusted only when lstat binds it to the already verified FD.
+        check(projectionRootIdentityMatches(root.isAbsolute, android.system.OsConstants.S_ISDIR(stat.st_mode),
+            stat.st_dev, stat.st_ino, stat.st_uid.toLong(), stat.st_mode and 511, directory)) {
+            "PROJECTION_ROOT_IDENTITY_MISMATCH"
+        }
     }
     override fun open(ownership: ProjectionOwnership, withSettings: Boolean): ProjectionStoreSession {
         requireRootIdentity()

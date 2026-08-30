@@ -2,6 +2,8 @@
 package org.kurdistanvpn.data.protectedstate
 
 import java.lang.reflect.Modifier
+import org.kurdistanvpn.core.nativeapi.DurableDirectory
+import org.kurdistanvpn.core.nativeapi.DurableFileIdentity
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -53,5 +55,16 @@ class ProtectedStateStructuralBoundaryTest {
         assertEquals("O_CLOEXEC", 0x00080000, flags and 0x00080000)
         assertEquals("no write access", 0, flags and 0x00000003)
         assertEquals("no creation", 0, flags and 0x00000040)
+    }
+
+    @Test fun projectionRootTrustComesFromBoundIdentityNotCanonicalPathSpelling() {
+        val expected = DurableDirectory(7, 1_234, DurableFileIdentity(55, 66))
+        assertTrue(projectionRootIdentityMatches(true, true, 55, 66, 1_234, 448, expected))
+        assertFalse(projectionRootIdentityMatches(false, true, 55, 66, 1_234, 448, expected))
+        assertFalse(projectionRootIdentityMatches(true, false, 55, 66, 1_234, 448, expected))
+        assertFalse(projectionRootIdentityMatches(true, true, 56, 66, 1_234, 448, expected))
+        assertFalse(projectionRootIdentityMatches(true, true, 55, 67, 1_234, 448, expected))
+        assertFalse(projectionRootIdentityMatches(true, true, 55, 66, 1_235, 448, expected))
+        assertFalse(projectionRootIdentityMatches(true, true, 55, 66, 1_234, 493, expected))
     }
 }
