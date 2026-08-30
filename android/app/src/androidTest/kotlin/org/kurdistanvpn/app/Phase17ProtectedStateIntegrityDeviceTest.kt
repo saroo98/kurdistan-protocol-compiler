@@ -160,12 +160,17 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             }
             val descriptorsBefore = descriptorsForPath(file.absolutePath)
             raw = Os.open(file.absolutePath, flags, 0)
-            val openedDescriptor = (descriptorsForPath(file.absolutePath) - descriptorsBefore).single()
-            val descriptorFlags = File("/proc/self/fdinfo/$openedDescriptor").useLines { lines ->
-                checkNotNull(lines.firstOrNull { it.startsWith("flags:") }) { "FDINFO_FLAGS_UNAVAILABLE" }
-                    .substringAfter(':').trim().toLong(8)
+            if (Build.VERSION.SDK_INT >= 30) {
+                val descriptorFlags = Os.fcntlInt(checkNotNull(raw), OsConstants.F_GETFD, 0)
+                assertEquals(OsConstants.FD_CLOEXEC, descriptorFlags and OsConstants.FD_CLOEXEC)
+            } else {
+                val openedDescriptor = (descriptorsForPath(file.absolutePath) - descriptorsBefore).single()
+                val descriptorFlags = File("/proc/self/fdinfo/$openedDescriptor").useLines { lines ->
+                    checkNotNull(lines.firstOrNull { it.startsWith("flags:") }) { "FDINFO_FLAGS_UNAVAILABLE" }
+                        .substringAfter(':').trim().toLong(8)
+                }
+                assertEquals(linuxOCloexec.toLong(), descriptorFlags and linuxOCloexec.toLong())
             }
-            assertEquals(linuxOCloexec.toLong(), descriptorFlags and linuxOCloexec.toLong())
             val observed = Os.fstat(checkNotNull(raw))
             require(observed.st_dev == before.st_dev && observed.st_ino == before.st_ino && observed.st_uid == before.st_uid && observed.st_mode == before.st_mode)
             descriptor = ParcelFileDescriptor.dup(checkNotNull(raw))
