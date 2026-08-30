@@ -383,27 +383,6 @@ int kvpn_fs_open_writer(const struct kvpn_fs_directory *d, const uint8_t *leaf, 
     return a == KVPN_FS_OK && b == KVPN_FS_OK ? code : KVPN_FS_CLOSE_UNPROVEN;
 }
 
-/* Bootstrap must prove regular-file fsync support before creating a named lock.
- * O_TMPFILE has no persistent directory entry; unsupported filesystems fail closed. */
-static int bootstrap_preflight(int dir, int64_t uid) {
-#ifdef O_TMPFILE
-    int fd;
-    do { fd = openat(dir, ".", O_TMPFILE | O_RDWR | O_CLOEXEC, 0600); } while (fd < 0 && errno == EINTR);
-    if (fd < 0) return (errno == EINVAL || errno == EISDIR || errno == ENOENT) ? KVPN_FS_UNSUPPORTED : io_code();
-    struct stat st;
-    int code = stat_fd(fd, &st) == 0 ? KVPN_FS_OK : io_code();
-    if (code == KVPN_FS_OK && (!S_ISREG(st.st_mode) || st.st_nlink != 0 ||
-        (st.st_mode & 07777) != 0600 || (uint64_t)st.st_uid != (uint64_t)uid)) code = KVPN_FS_UNSAFE;
-    if (code == KVPN_FS_OK) code = sync_fd(fd);
-    if (close_once(&fd) != KVPN_FS_OK) code = KVPN_FS_CLOSE_UNPROVEN;
-    return code;
-#else
-    (void)dir;
-    (void)uid;
-    return KVPN_FS_UNSUPPORTED;
-#endif
-}
-
 static int child_directory_stat(const struct stat *st, const struct kvpn_fs_directory *parent) {
     return S_ISDIR(st->st_mode) && (st->st_mode & 07777) == 0700 &&
         (uint64_t)st->st_uid == (uint64_t)parent->uid && st->st_nlink >= 1 &&
@@ -474,10 +453,9 @@ int kvpn_fs_create_child_directory_exclusive(const struct kvpn_fs_directory *par
     name_copy(name, leaf, leaf_length);
     int code = duplicate_directory(parent, &dir);
     if (code != KVPN_FS_OK) return code;
-    /* Same-filesystem parent and regular-file fsync capability are required
-     * before a named change. Child fsync is independently checked after mkdir. */
+    /* Verify and synchronize the supplied parent before the exclusive namespace
+     * change. Durability is proven on the actual child and parent afterward. */
     code = sync_fd(dir);
-    if (code == KVPN_FS_OK) code = bootstrap_preflight(dir, parent->uid);
     if (code == KVPN_FS_OK) code = verify_directory(dir, parent);
     if (code == KVPN_FS_OK) {
         /* mkdirat is exclusive. Never retry a possibly completed namespace call. */
@@ -525,7 +503,6 @@ int kvpn_fs_bootstrap_lock(const struct kvpn_fs_directory *d, const uint8_t *lea
     int code = duplicate_directory(d, &dir);
     if (code != KVPN_FS_OK) return code;
     code = sync_fd(dir);
-    if (code == KVPN_FS_OK) code = bootstrap_preflight(dir, d->uid);
     if (code == KVPN_FS_OK) {
         fd = create_leaf(dir, name);
         if (fd < 0 && errno == EEXIST) code = KVPN_FS_CONFLICT;

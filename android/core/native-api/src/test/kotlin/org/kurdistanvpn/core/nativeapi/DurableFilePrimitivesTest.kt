@@ -757,6 +757,29 @@ class DurableFilePrimitivesTest {
             assertThrows(IllegalArgumentException::class.java) { DurablePipeResult(code) }
     }
 
+    /** Source-boundary check only; installed API-26 coverage proves the platform behavior. */
+    @Test fun nativeCreationDurabilityIsProvenByCreatedObjectsNotOptionalUnnamedTemporarySupport() {
+        val source = nativeSource("kvpn_durable_fs.c")
+        val child = source.substringAfter("int kvpn_fs_create_child_directory_exclusive(")
+            .substringBefore("int kvpn_fs_close_directory(")
+        val lock = source.substringAfter("int kvpn_fs_bootstrap_lock(")
+            .substringBefore("static int expected_old(")
+        for (body in listOf(child, lock)) {
+            assertFalse(body.contains("bootstrap_preflight"))
+            assertFalse(body.contains("O_TMPFILE"))
+            assertTrue(body.contains("if (changed) code = KVPN_FS_MUTATION_UNPROVEN"))
+        }
+        assertTrue(child.indexOf("mkdirat(") < child.indexOf("sync_fd(child)"))
+        assertTrue(child.indexOf("sync_fd(child)") < child.indexOf("verify_child_name("))
+        assertTrue(child.indexOf("verify_child_name(") < child.lastIndexOf("sync_fd(dir)"))
+        assertTrue(lock.indexOf("create_leaf(") < lock.indexOf("sync_fd(fd)"))
+        assertTrue(lock.indexOf("sync_fd(fd)") < lock.indexOf("verify_name("))
+        val publishedDirectorySync = lock.lastIndexOf("sync_fd(dir)")
+        assertTrue(lock.indexOf("verify_name(") < publishedDirectorySync)
+        assertTrue(publishedDirectorySync < lock.indexOf("read_leaf("))
+        assertTrue(lock.indexOf("read_leaf(") < lock.indexOf("verify_directory("))
+    }
+
     /** Source-boundary check only; this does not execute Android libc or establish installed behavior. */
     @Test fun nativePipeSourceHasBoundedInterruptedCallsAndNeverClosesBorrowedFd() {
         val source = nativeSource("kvpn_durable_fs.c")
