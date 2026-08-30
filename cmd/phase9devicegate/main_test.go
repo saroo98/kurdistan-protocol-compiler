@@ -598,7 +598,7 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 			return errors.New("fixture package state unavailable")
 		}
 		stopped := "false"
-		if scenario == "stopped-package" {
+		if scenario == "stopped-package" || (strings.HasPrefix(scenario, "ci-api") && fixture.launched.IsZero()) {
 			stopped = "true"
 		}
 		identityName := "userId"

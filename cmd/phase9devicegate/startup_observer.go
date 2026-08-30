@@ -660,13 +660,16 @@ func validateCompositeStartup(observation *launchObservation, previous, current 
 	if len(observation.PackageState) != 2 {
 		return errLaunchIncomplete
 	}
+	wantPackagePhases := []string{"before-launch", "terminal"}
 	var first *startupPackageState
 	for index := range observation.PackageState {
 		state := &observation.PackageState[index]
-		if state.Status != "CAPTURED" || state.Package != observation.app || state.UserID != current.UID || state.VersionCode == 0 || state.VersionName == "" {
+		if state.Phase != wantPackagePhases[index] || state.Status != "CAPTURED" || state.Package != observation.app ||
+			state.UserID != current.UID || state.VersionCode == 0 || state.VersionName == "" {
 			return errLaunchIncomplete
 		}
-		if !state.Installed || state.Suspended || state.Stopped || (state.Enabled != 0 && state.Enabled != 1) {
+		if !state.Installed || state.Suspended || (state.Enabled != 0 && state.Enabled != 1) ||
+			(state.Phase == "terminal" && state.Stopped) {
 			return errors.New("target package is stopped, suspended, disabled, or unavailable")
 		}
 		if first == nil {

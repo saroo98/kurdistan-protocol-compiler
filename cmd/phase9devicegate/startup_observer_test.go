@@ -69,6 +69,22 @@ func TestCompositeStartupObserverAllowsOptionalMainSystemDenialOnlyWithCompleteR
 	}
 }
 
+func TestCompositeStartupObserverAllowsHostLaunchToClearForceStoppedPackageState(t *testing.T) {
+	err, observation := runLaunchScenario(t, "ci-api34-permission-denied", 34)
+	if len(observation.PackageState) != 2 {
+		t.Fatalf("package-state observation count=%d, want before-launch and terminal", len(observation.PackageState))
+	}
+	if observation.PackageState[0].Phase != "before-launch" || !observation.PackageState[0].Stopped {
+		t.Fatalf("pre-launch force-stopped state was not reproduced: %+v", observation.PackageState[0])
+	}
+	if observation.PackageState[1].Phase != "terminal" || observation.PackageState[1].Stopped {
+		t.Fatalf("terminal package state did not prove launch cleared force-stop: %+v", observation.PackageState[1])
+	}
+	if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+		t.Fatalf("healthy host launch from force-stopped state was rejected: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+	}
+}
+
 func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycle(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0).UTC()
 	valid := diagnosticStreamLifecycle{
