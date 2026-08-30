@@ -26,19 +26,56 @@ func localPathRoot(path string) (string, error) {
 	return volume + string(os.PathSeparator), nil
 }
 
+type privatePathProtectionOperations struct {
+	verifyOwner func(windows.Handle, *windows.SID) error
+	setDACL     func(windows.Handle, *windows.ACL) error
+	verify      func(windows.Handle, bool, *windows.SID) error
+	close       func(windows.Handle) error
+}
+
+func defaultPrivatePathProtectionOperations() privatePathProtectionOperations {
+	return privatePathProtectionOperations{
+		verifyOwner: verifyPrivateHandleOwner,
+		setDACL: func(handle windows.Handle, dacl *windows.ACL) error {
+			return windows.SetSecurityInfo(
+				handle,
+				windows.SE_FILE_OBJECT,
+				windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
+				nil,
+				nil,
+				dacl,
+				nil,
+			)
+		},
+		verify: verifyPrivateHandle,
+		close:  windows.CloseHandle,
+	}
+}
+
 func protectPrivatePath(path string, directory bool) error {
+	return protectPrivatePathWithOperations(path, directory, defaultPrivatePathProtectionOperations())
+}
+
+func protectPrivatePathWithOperations(path string, directory bool, operations privatePathProtectionOperations) (result error) {
 	info, err := os.Lstat(path)
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || directory != info.IsDir() || !directory && !info.Mode().IsRegular() {
 		return fmt.Errorf("%w: unsafe path type", errUnsupportedFilesystem)
 	}
+	if operations.verifyOwner == nil || operations.setDACL == nil || operations.verify == nil || operations.close == nil {
+		return fmt.Errorf("%w: incomplete private-path operations", errUnsupportedFilesystem)
+	}
 	token, err := windows.OpenCurrentProcessToken()
 	if err != nil {
-		return fmt.Errorf("%w: token", errUnsupportedFilesystem)
+		return privatePathFailure("open current process token", err)
 	}
-	defer token.Close()
+	defer func() {
+		if closeErr := token.Close(); closeErr != nil {
+			result = errors.Join(result, privatePathFailure("close current process token", closeErr))
+		}
+	}()
 	user, err := token.GetTokenUser()
 	if err != nil || user == nil || user.User.Sid == nil {
-		return fmt.Errorf("%w: user sid", errUnsupportedFilesystem)
+		return privatePathFailure("read current process owner", err)
 	}
 	var pinner runtime.Pinner
 	pinner.Pin(user.User.Sid)
@@ -57,12 +94,90 @@ func protectPrivatePath(path string, directory bool) error {
 		},
 	}}, nil)
 	if err != nil {
-		return fmt.Errorf("%w: acl", errUnsupportedFilesystem)
+		return privatePathFailure("construct private DACL", err)
 	}
-	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, user.User.Sid, nil, acl, nil); err != nil {
-		return fmt.Errorf("%w: set dacl", errUnsupportedFilesystem)
+	pointer, err := windows.UTF16PtrFromString(filepath.Clean(path))
+	if err != nil {
+		return privatePathFailure("encode private path", err)
 	}
-	return verifyWindowsPrivatePath(path, directory)
+	attributes := uint32(windows.FILE_FLAG_OPEN_REPARSE_POINT)
+	if directory {
+		attributes |= windows.FILE_FLAG_BACKUP_SEMANTICS
+	}
+	handle, err := windows.CreateFile(
+		pointer,
+		windows.FILE_READ_ATTRIBUTES|windows.READ_CONTROL|windows.WRITE_DAC,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		attributes,
+		0,
+	)
+	if err != nil {
+		return privatePathFailure("open private path", err)
+	}
+	defer func() {
+		if closeErr := operations.close(handle); closeErr != nil {
+			result = errors.Join(result, privatePathFailure("close private path handle", closeErr))
+		}
+	}()
+	if err := verifyPrivateHandleType(handle, directory); err != nil {
+		return privatePathFailure("verify private path type", err)
+	}
+	if err := operations.verifyOwner(handle, user.User.Sid); err != nil {
+		return privatePathFailure("verify private path owner", err)
+	}
+	if err := operations.setDACL(handle, acl); err != nil {
+		return privatePathFailure("set private DACL", err)
+	}
+	if err := operations.verify(handle, directory, user.User.Sid); err != nil {
+		return privatePathFailure("verify private DACL", err)
+	}
+	return nil
+}
+
+func privatePathFailure(operation string, err error) error {
+	if err == nil {
+		return fmt.Errorf("%w: %s", errUnsupportedFilesystem, operation)
+	}
+	return fmt.Errorf("kurdctl private path: %s: %w", operation, err)
+}
+
+func verifyPrivateHandleType(handle windows.Handle, directory bool) error {
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return err
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || directory != (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) {
+		return errUnsupportedFilesystem
+	}
+	return nil
+}
+
+func verifyPrivateHandleOwner(handle windows.Handle, currentUser *windows.SID) error {
+	if currentUser == nil || !currentUser.IsValid() {
+		return errUnsupportedFilesystem
+	}
+	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil || descriptor == nil {
+		return privatePathFailure("read private path owner", err)
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil || owner == nil || !owner.Equals(currentUser) {
+		return privatePathFailure("compare private path owner", err)
+	}
+	return nil
+}
+
+func verifyPrivateHandle(handle windows.Handle, directory bool, currentUser *windows.SID) error {
+	if err := verifyPrivateHandleType(handle, directory); err != nil {
+		return err
+	}
+	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.OWNER_SECURITY_INFORMATION)
+	if err != nil || descriptor == nil {
+		return privatePathFailure("read private security descriptor", err)
+	}
+	return verifyPrivateSecurityDescriptor(descriptor, currentUser)
 }
 
 func verifyWindowsPrivatePath(path string, directory bool) error {
@@ -76,7 +191,14 @@ func verifyWindowsPrivatePath(path string, directory bool) error {
 	}
 	descriptor, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.OWNER_SECURITY_INFORMATION)
 	if err != nil || descriptor == nil {
-		return fmt.Errorf("%w: read dacl", errUnsupportedFilesystem)
+		return privatePathFailure("read private security descriptor", err)
+	}
+	return verifyPrivateSecurityDescriptor(descriptor, currentUser)
+}
+
+func verifyPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, currentUser *windows.SID) error {
+	if descriptor == nil || currentUser == nil || !currentUser.IsValid() {
+		return errUnsupportedFilesystem
 	}
 	owner, _, err := descriptor.Owner()
 	if err != nil || owner == nil || !owner.Equals(currentUser) {
