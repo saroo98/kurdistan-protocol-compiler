@@ -40,6 +40,30 @@ func TestProtectSelfhostPrivatePathCanReplaceInheritedDACLWithoutOwnerRewrite(t 
 	}
 }
 
+func TestSelfhostPrivatePathOwnerAdmissionAllowsOnlyTokenUserOrDefaultOwner(t *testing.T) {
+	user, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultOwner, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrelated, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !selfhostPrivatePathOwnerAllowed(user, user, defaultOwner) {
+		t.Fatal("token user owner was rejected")
+	}
+	if !selfhostPrivatePathOwnerAllowed(defaultOwner, user, defaultOwner) {
+		t.Fatal("token default owner was rejected")
+	}
+	if selfhostPrivatePathOwnerAllowed(unrelated, user, defaultOwner) {
+		t.Fatal("unrelated owner was accepted")
+	}
+}
+
 func TestApplyRestorePublishesPrivateWindowsTreeBeforeRecovery(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source")
@@ -100,7 +124,7 @@ func TestProtectSelfhostPrivatePathFailureRetainsWindowsErrorAndClosesHandleOnce
 			}
 			setCalls, verifyCalls, closeCalls := 0, 0, 0
 			operations := selfhostPrivatePathProtectionOperations{
-				verifyOwner: func(windows.Handle, *windows.SID) error { return nil },
+				verifyOwner: func(windows.Handle, *windows.SID, *windows.SID) error { return nil },
 				setDACL: func(handle windows.Handle, dacl *windows.ACL) error {
 					setCalls++
 					if test.setError != nil {
@@ -108,7 +132,7 @@ func TestProtectSelfhostPrivatePathFailureRetainsWindowsErrorAndClosesHandleOnce
 					}
 					return windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
 				},
-				verify: func(windows.Handle, bool, *windows.SID) error {
+				verify: func(windows.Handle, bool, *windows.SID, *windows.SID) error {
 					verifyCalls++
 					return test.verificationError
 				},
@@ -163,12 +187,12 @@ func TestProtectSelfhostPrivatePathRejectsInvalidSubjectsBeforeDACLMutation(t *t
 
 	setCalls, closeCalls := 0, 0
 	err := protectSelfhostPrivatePathWithOperations(file, false, selfhostPrivatePathProtectionOperations{
-		verifyOwner: func(windows.Handle, *windows.SID) error { return ErrRecipientRegistry },
+		verifyOwner: func(windows.Handle, *windows.SID, *windows.SID) error { return ErrRecipientRegistry },
 		setDACL: func(windows.Handle, *windows.ACL) error {
 			setCalls++
 			return nil
 		},
-		verify: func(windows.Handle, bool, *windows.SID) error { return nil },
+		verify: func(windows.Handle, bool, *windows.SID, *windows.SID) error { return nil },
 		close: func(handle windows.Handle) error {
 			closeCalls++
 			return windows.CloseHandle(handle)

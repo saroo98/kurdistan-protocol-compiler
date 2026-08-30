@@ -68,7 +68,7 @@ func TestProtectPrivatePathOwnerValidationRejectsUnexpectedOwner(t *testing.T) {
 	}
 	operations := defaultPrivatePathProtectionOperations()
 	setCalls, closeCalls := 0, 0
-	operations.verifyOwner = func(windows.Handle, *windows.SID) error {
+	operations.verifyOwner = func(windows.Handle, *windows.SID, *windows.SID) error {
 		return windows.ERROR_INVALID_OWNER
 	}
 	operations.setDACL = func(windows.Handle, *windows.ACL) error {
@@ -90,6 +90,30 @@ func TestProtectPrivatePathOwnerValidationRejectsUnexpectedOwner(t *testing.T) {
 		t.Fatalf("setCalls=%d closeCalls=%d, want 0/1", setCalls, closeCalls)
 	}
 	assertKurdctlPrivateFileContent(t, path, []byte("previous"))
+}
+
+func TestPrivatePathOwnerAdmissionAllowsOnlyTokenUserOrDefaultOwner(t *testing.T) {
+	user, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultOwner, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrelated, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !privatePathOwnerAllowed(user, user, defaultOwner) {
+		t.Fatal("token user owner was rejected")
+	}
+	if !privatePathOwnerAllowed(defaultOwner, user, defaultOwner) {
+		t.Fatal("token default owner was rejected")
+	}
+	if privatePathOwnerAllowed(unrelated, user, defaultOwner) {
+		t.Fatal("unrelated owner was accepted")
+	}
 }
 
 func TestProtectPrivatePathDACLFailuresRemainFailClosed(t *testing.T) {
@@ -120,7 +144,7 @@ func TestProtectPrivatePathDACLFailuresRemainFailClosed(t *testing.T) {
 				}
 				return windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
 			}
-			operations.verify = func(windows.Handle, bool, *windows.SID) error {
+			operations.verify = func(windows.Handle, bool, *windows.SID, *windows.SID) error {
 				verifyCalls++
 				return test.verifyError
 			}
@@ -162,7 +186,7 @@ func TestProtectPrivateHandleOwnerRejectsDifferentSID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyPrivateHandleOwner(handle, localSystem); err == nil {
+	if err := verifyPrivateHandleOwner(handle, localSystem, localSystem); err == nil {
 		t.Fatal("unexpected owner was accepted")
 	}
 }

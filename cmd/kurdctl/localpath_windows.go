@@ -27,9 +27,9 @@ func localPathRoot(path string) (string, error) {
 }
 
 type privatePathProtectionOperations struct {
-	verifyOwner func(windows.Handle, *windows.SID) error
+	verifyOwner func(windows.Handle, *windows.SID, *windows.SID) error
 	setDACL     func(windows.Handle, *windows.ACL) error
-	verify      func(windows.Handle, bool, *windows.SID) error
+	verify      func(windows.Handle, bool, *windows.SID, *windows.SID) error
 	close       func(windows.Handle) error
 }
 
@@ -77,8 +77,17 @@ func protectPrivatePathWithOperations(path string, directory bool, operations pr
 	if err != nil || user == nil || user.User.Sid == nil {
 		return privatePathFailure("read current process owner", err)
 	}
+	userSID, err := user.User.Sid.Copy()
+	if err != nil {
+		return privatePathFailure("copy current process owner", err)
+	}
+	defaultOwner, err := windowsTokenOwnerSID(token)
+	if err != nil {
+		return privatePathFailure("read current process default owner", err)
+	}
 	var pinner runtime.Pinner
-	pinner.Pin(user.User.Sid)
+	pinner.Pin(userSID)
+	pinner.Pin(defaultOwner)
 	defer pinner.Unpin()
 	inheritance := uint32(windows.NO_INHERITANCE)
 	if directory {
@@ -90,7 +99,7 @@ func protectPrivatePathWithOperations(path string, directory bool, operations pr
 		Inheritance:       inheritance,
 		Trustee: windows.TRUSTEE{
 			TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeType: windows.TRUSTEE_IS_USER,
-			TrusteeValue: windows.TrusteeValueFromSID(user.User.Sid),
+			TrusteeValue: windows.TrusteeValueFromSID(userSID),
 		},
 	}}, nil)
 	if err != nil {
@@ -124,13 +133,13 @@ func protectPrivatePathWithOperations(path string, directory bool, operations pr
 	if err := verifyPrivateHandleType(handle, directory); err != nil {
 		return privatePathFailure("verify private path type", err)
 	}
-	if err := operations.verifyOwner(handle, user.User.Sid); err != nil {
+	if err := operations.verifyOwner(handle, userSID, defaultOwner); err != nil {
 		return privatePathFailure("verify private path owner", err)
 	}
 	if err := operations.setDACL(handle, acl); err != nil {
 		return privatePathFailure("set private DACL", err)
 	}
-	if err := operations.verify(handle, directory, user.User.Sid); err != nil {
+	if err := operations.verify(handle, directory, userSID, defaultOwner); err != nil {
 		return privatePathFailure("verify private DACL", err)
 	}
 	return nil
@@ -154,8 +163,8 @@ func verifyPrivateHandleType(handle windows.Handle, directory bool) error {
 	return nil
 }
 
-func verifyPrivateHandleOwner(handle windows.Handle, currentUser *windows.SID) error {
-	if currentUser == nil || !currentUser.IsValid() {
+func verifyPrivateHandleOwner(handle windows.Handle, currentUser, defaultOwner *windows.SID) error {
+	if currentUser == nil || !currentUser.IsValid() || defaultOwner == nil || !defaultOwner.IsValid() {
 		return errUnsupportedFilesystem
 	}
 	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
@@ -163,13 +172,13 @@ func verifyPrivateHandleOwner(handle windows.Handle, currentUser *windows.SID) e
 		return privatePathFailure("read private path owner", err)
 	}
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(currentUser) {
+	if err != nil || !privatePathOwnerAllowed(owner, currentUser, defaultOwner) {
 		return privatePathFailure("compare private path owner", err)
 	}
 	return nil
 }
 
-func verifyPrivateHandle(handle windows.Handle, directory bool, currentUser *windows.SID) error {
+func verifyPrivateHandle(handle windows.Handle, directory bool, currentUser, defaultOwner *windows.SID) error {
 	if err := verifyPrivateHandleType(handle, directory); err != nil {
 		return err
 	}
@@ -177,7 +186,7 @@ func verifyPrivateHandle(handle windows.Handle, directory bool, currentUser *win
 	if err != nil || descriptor == nil {
 		return privatePathFailure("read private security descriptor", err)
 	}
-	return verifyPrivateSecurityDescriptor(descriptor, currentUser)
+	return verifyPrivateSecurityDescriptor(descriptor, currentUser, defaultOwner)
 }
 
 func verifyWindowsPrivatePath(path string, directory bool) error {
@@ -185,7 +194,7 @@ func verifyWindowsPrivatePath(path string, directory bool) error {
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || directory != info.IsDir() || !directory && !info.Mode().IsRegular() {
 		return fmt.Errorf("%w: unsafe path type", errUnsupportedFilesystem)
 	}
-	currentUser, err := currentWindowsUserSID()
+	currentUser, defaultOwner, err := currentWindowsSecuritySIDs()
 	if err != nil {
 		return err
 	}
@@ -193,15 +202,15 @@ func verifyWindowsPrivatePath(path string, directory bool) error {
 	if err != nil || descriptor == nil {
 		return privatePathFailure("read private security descriptor", err)
 	}
-	return verifyPrivateSecurityDescriptor(descriptor, currentUser)
+	return verifyPrivateSecurityDescriptor(descriptor, currentUser, defaultOwner)
 }
 
-func verifyPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, currentUser *windows.SID) error {
-	if descriptor == nil || currentUser == nil || !currentUser.IsValid() {
+func verifyPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, currentUser, defaultOwner *windows.SID) error {
+	if descriptor == nil || currentUser == nil || !currentUser.IsValid() || defaultOwner == nil || !defaultOwner.IsValid() {
 		return errUnsupportedFilesystem
 	}
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(currentUser) {
+	if err != nil || !privatePathOwnerAllowed(owner, currentUser, defaultOwner) {
 		return fmt.Errorf("%w: unexpected owner", errUnsupportedFilesystem)
 	}
 	control, _, err := descriptor.Control()
@@ -231,16 +240,57 @@ func verifyPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, cu
 func syncLocalDirectory(string) error { return nil }
 
 func currentWindowsUserSID() (*windows.SID, error) {
+	user, _, err := currentWindowsSecuritySIDs()
+	return user, err
+}
+
+func currentWindowsSecuritySIDs() (*windows.SID, *windows.SID, error) {
 	token, err := windows.OpenCurrentProcessToken()
 	if err != nil {
-		return nil, fmt.Errorf("%w: token", errUnsupportedFilesystem)
+		return nil, nil, fmt.Errorf("%w: token", errUnsupportedFilesystem)
 	}
 	defer token.Close()
 	user, err := token.GetTokenUser()
 	if err != nil || user == nil || user.User.Sid == nil || !user.User.Sid.IsValid() {
-		return nil, fmt.Errorf("%w: user sid", errUnsupportedFilesystem)
+		return nil, nil, fmt.Errorf("%w: user sid", errUnsupportedFilesystem)
 	}
-	return user.User.Sid, nil
+	userSID, err := user.User.Sid.Copy()
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: copy user sid", errUnsupportedFilesystem)
+	}
+	defaultOwner, err := windowsTokenOwnerSID(token)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: token owner", errUnsupportedFilesystem)
+	}
+	return userSID, defaultOwner, nil
+}
+
+type windowsTokenOwner struct {
+	owner *windows.SID
+}
+
+func windowsTokenOwnerSID(token windows.Token) (*windows.SID, error) {
+	var size uint32
+	err := windows.GetTokenInformation(token, windows.TokenOwner, nil, 0, &size)
+	if !errors.Is(err, windows.ERROR_INSUFFICIENT_BUFFER) || size < uint32(unsafe.Sizeof(windowsTokenOwner{})) {
+		return nil, errUnsupportedFilesystem
+	}
+	buffer := make([]byte, size)
+	if err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size); err != nil {
+		return nil, err
+	}
+	owner := (*windowsTokenOwner)(unsafe.Pointer(&buffer[0])).owner
+	if owner == nil || !owner.IsValid() {
+		return nil, errUnsupportedFilesystem
+	}
+	copy, err := owner.Copy()
+	runtime.KeepAlive(buffer)
+	return copy, err
+}
+
+func privatePathOwnerAllowed(owner, currentUser, defaultOwner *windows.SID) bool {
+	return owner != nil && owner.IsValid() && currentUser != nil && currentUser.IsValid() &&
+		defaultOwner != nil && defaultOwner.IsValid() && (owner.Equals(currentUser) || owner.Equals(defaultOwner))
 }
 
 func windowsPrivateSecurityAttributes(directory bool) (*windows.SecurityAttributes, error) {

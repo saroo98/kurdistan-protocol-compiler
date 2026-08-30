@@ -18,9 +18,9 @@ import (
 )
 
 type selfhostPrivatePathProtectionOperations struct {
-	verifyOwner func(windows.Handle, *windows.SID) error
+	verifyOwner func(windows.Handle, *windows.SID, *windows.SID) error
 	setDACL     func(windows.Handle, *windows.ACL) error
-	verify      func(windows.Handle, bool, *windows.SID) error
+	verify      func(windows.Handle, bool, *windows.SID, *windows.SID) error
 	close       func(windows.Handle) error
 }
 
@@ -68,8 +68,17 @@ func protectSelfhostPrivatePathWithOperations(path string, directory bool, opera
 	if err != nil || user == nil || user.User.Sid == nil {
 		return selfhostPrivatePathFailure("read current process owner", err)
 	}
+	userSID, err := user.User.Sid.Copy()
+	if err != nil {
+		return selfhostPrivatePathFailure("copy current process owner", err)
+	}
+	defaultOwner, err := selfhostWindowsTokenOwnerSID(token)
+	if err != nil {
+		return selfhostPrivatePathFailure("read current process default owner", err)
+	}
 	var pinner runtime.Pinner
-	pinner.Pin(user.User.Sid)
+	pinner.Pin(userSID)
+	pinner.Pin(defaultOwner)
 	defer pinner.Unpin()
 	inheritance := uint32(windows.NO_INHERITANCE)
 	if directory {
@@ -81,7 +90,7 @@ func protectSelfhostPrivatePathWithOperations(path string, directory bool, opera
 		Inheritance:       inheritance,
 		Trustee: windows.TRUSTEE{
 			TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeType: windows.TRUSTEE_IS_USER,
-			TrusteeValue: windows.TrusteeValueFromSID(user.User.Sid),
+			TrusteeValue: windows.TrusteeValueFromSID(userSID),
 		},
 	}}, nil)
 	if err != nil {
@@ -115,13 +124,13 @@ func protectSelfhostPrivatePathWithOperations(path string, directory bool, opera
 	if err := verifySelfhostPrivateHandleType(handle, directory); err != nil {
 		return selfhostPrivatePathFailure("verify private path type", err)
 	}
-	if err := operations.verifyOwner(handle, user.User.Sid); err != nil {
+	if err := operations.verifyOwner(handle, userSID, defaultOwner); err != nil {
 		return selfhostPrivatePathFailure("verify private path owner", err)
 	}
 	if err := operations.setDACL(handle, acl); err != nil {
 		return selfhostPrivatePathFailure("set private DACL", err)
 	}
-	if err := operations.verify(handle, directory, user.User.Sid); err != nil {
+	if err := operations.verify(handle, directory, userSID, defaultOwner); err != nil {
 		return selfhostPrivatePathFailure("verify private DACL", err)
 	}
 	return nil
@@ -145,8 +154,8 @@ func verifySelfhostPrivateHandleType(handle windows.Handle, directory bool) erro
 	return nil
 }
 
-func verifySelfhostPrivateHandleOwner(handle windows.Handle, currentUser *windows.SID) error {
-	if currentUser == nil || !currentUser.IsValid() {
+func verifySelfhostPrivateHandleOwner(handle windows.Handle, currentUser, defaultOwner *windows.SID) error {
+	if currentUser == nil || !currentUser.IsValid() || defaultOwner == nil || !defaultOwner.IsValid() {
 		return ErrRecipientRegistry
 	}
 	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
@@ -154,13 +163,13 @@ func verifySelfhostPrivateHandleOwner(handle windows.Handle, currentUser *window
 		return selfhostPrivatePathFailure("read private path owner", err)
 	}
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(currentUser) {
+	if err != nil || !selfhostPrivatePathOwnerAllowed(owner, currentUser, defaultOwner) {
 		return selfhostPrivatePathFailure("compare private path owner", err)
 	}
 	return nil
 }
 
-func verifySelfhostPrivateHandle(handle windows.Handle, directory bool, currentUser *windows.SID) error {
+func verifySelfhostPrivateHandle(handle windows.Handle, directory bool, currentUser, defaultOwner *windows.SID) error {
 	if err := verifySelfhostPrivateHandleType(handle, directory); err != nil {
 		return err
 	}
@@ -168,15 +177,15 @@ func verifySelfhostPrivateHandle(handle windows.Handle, directory bool, currentU
 	if err != nil || descriptor == nil {
 		return selfhostPrivatePathFailure("read private security descriptor", err)
 	}
-	return verifySelfhostPrivateSecurityDescriptor(descriptor, currentUser)
+	return verifySelfhostPrivateSecurityDescriptor(descriptor, currentUser, defaultOwner)
 }
 
-func verifySelfhostPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, currentUser *windows.SID) error {
-	if descriptor == nil || currentUser == nil || !currentUser.IsValid() {
+func verifySelfhostPrivateSecurityDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, currentUser, defaultOwner *windows.SID) error {
+	if descriptor == nil || currentUser == nil || !currentUser.IsValid() || defaultOwner == nil || !defaultOwner.IsValid() {
 		return ErrRecipientRegistry
 	}
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(currentUser) {
+	if err != nil || !selfhostPrivatePathOwnerAllowed(owner, currentUser, defaultOwner) {
 		return ErrRecipientRegistry
 	}
 	control, _, err := descriptor.Control()
@@ -205,7 +214,7 @@ func verifySelfhostPrivatePath(path string, directory bool) error {
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || directory != info.IsDir() || !directory && !info.Mode().IsRegular() {
 		return ErrRecipientRegistry
 	}
-	currentUser, err := selfhostWindowsUserSID()
+	currentUser, defaultOwner, err := selfhostWindowsSecuritySIDs()
 	if err != nil {
 		return ErrRecipientRegistry
 	}
@@ -213,20 +222,61 @@ func verifySelfhostPrivatePath(path string, directory bool) error {
 	if err != nil || descriptor == nil {
 		return ErrRecipientRegistry
 	}
-	return verifySelfhostPrivateSecurityDescriptor(descriptor, currentUser)
+	return verifySelfhostPrivateSecurityDescriptor(descriptor, currentUser, defaultOwner)
 }
 
 func selfhostWindowsUserSID() (*windows.SID, error) {
+	user, _, err := selfhostWindowsSecuritySIDs()
+	return user, err
+}
+
+func selfhostWindowsSecuritySIDs() (*windows.SID, *windows.SID, error) {
 	token, err := windows.OpenCurrentProcessToken()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer token.Close()
 	user, err := token.GetTokenUser()
 	if err != nil || user == nil || user.User.Sid == nil || !user.User.Sid.IsValid() {
+		return nil, nil, ErrRecipientRegistry
+	}
+	userSID, err := user.User.Sid.Copy()
+	if err != nil {
+		return nil, nil, err
+	}
+	defaultOwner, err := selfhostWindowsTokenOwnerSID(token)
+	if err != nil {
+		return nil, nil, err
+	}
+	return userSID, defaultOwner, nil
+}
+
+type selfhostWindowsTokenOwner struct {
+	owner *windows.SID
+}
+
+func selfhostWindowsTokenOwnerSID(token windows.Token) (*windows.SID, error) {
+	var size uint32
+	err := windows.GetTokenInformation(token, windows.TokenOwner, nil, 0, &size)
+	if !errors.Is(err, windows.ERROR_INSUFFICIENT_BUFFER) || size < uint32(unsafe.Sizeof(selfhostWindowsTokenOwner{})) {
 		return nil, ErrRecipientRegistry
 	}
-	return user.User.Sid, nil
+	buffer := make([]byte, size)
+	if err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size); err != nil {
+		return nil, err
+	}
+	owner := (*selfhostWindowsTokenOwner)(unsafe.Pointer(&buffer[0])).owner
+	if owner == nil || !owner.IsValid() {
+		return nil, ErrRecipientRegistry
+	}
+	copy, err := owner.Copy()
+	runtime.KeepAlive(buffer)
+	return copy, err
+}
+
+func selfhostPrivatePathOwnerAllowed(owner, currentUser, defaultOwner *windows.SID) bool {
+	return owner != nil && owner.IsValid() && currentUser != nil && currentUser.IsValid() &&
+		defaultOwner != nil && defaultOwner.IsValid() && (owner.Equals(currentUser) || owner.Equals(defaultOwner))
 }
 
 func selfhostWindowsSecurityAttributes(directory bool) (*windows.SecurityAttributes, error) {
