@@ -1375,6 +1375,10 @@ class ProtectedStateApplicationFacade private constructor(
         // the public Java OsConstants field was added only in API 27. Supplying it to
         // Os.open keeps close-on-exec atomic with descriptor creation.
         private const val LINUX_O_CLOEXEC = 0x00080000
+        // Bionic also exposes O_DIRECTORY on every supported API, while the public
+        // Android SDK does not expose a Java field for it. Supply the native value
+        // directly so directory-only opening never depends on hidden-API reflection.
+        private const val LINUX_O_DIRECTORY = 0x00010000
         private val layout = ProjectionLeafLayout("protected-metadata.db", "protected-settings.preferences_pb")
         private class OpenFailure(val result: OpenResult) : IllegalStateException()
 
@@ -1732,8 +1736,7 @@ class ProtectedStateApplicationFacade private constructor(
             return try {
                 val before = Os.lstat(path)
                 if (!OsConstants.S_ISDIR(before.st_mode) || before.st_uid != context.applicationInfo.uid || before.st_mode and 511 != 448) return null
-                val directoryFlag = OsConstants::class.java.getField("O_DIRECTORY").getInt(null)
-                fd = Os.open(path, credentialParentOpenFlags(directoryFlag), 0)
+                fd = Os.open(path, credentialParentOpenFlags(), 0)
                 val actual = Os.fstat(checkNotNull(fd))
                 if (!OsConstants.S_ISDIR(actual.st_mode) || actual.st_uid != before.st_uid || actual.st_dev != before.st_dev || actual.st_ino != before.st_ino || actual.st_mode and 511 != 448) return null
                 owned = ParcelFileDescriptor.dup(checkNotNull(fd))
@@ -1744,8 +1747,8 @@ class ProtectedStateApplicationFacade private constructor(
             finally { try { if (fd != null) Os.close(fd) } catch (_: Throwable) { }; try { owned?.close() } catch (_: Throwable) { } }
         }
 
-        private fun credentialParentOpenFlags(directoryFlag: Int): Int =
-            OsConstants.O_RDONLY or directoryFlag or LINUX_O_CLOEXEC or OsConstants.O_NOFOLLOW
+        private fun credentialParentOpenFlags(): Int =
+            OsConstants.O_RDONLY or LINUX_O_DIRECTORY or LINUX_O_CLOEXEC or OsConstants.O_NOFOLLOW
 
         private fun credentialProtectedDataDir(context: Context): String =
             checkNotNull(context.applicationInfo::class.java.getField("credentialProtectedDataDir")

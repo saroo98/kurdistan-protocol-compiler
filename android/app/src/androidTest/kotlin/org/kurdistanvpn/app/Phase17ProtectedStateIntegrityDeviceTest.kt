@@ -147,13 +147,13 @@ class Phase17ProtectedStateIntegrityDeviceTest {
         try {
             val before = Os.lstat(file.absolutePath)
             require(OsConstants.S_ISDIR(before.st_mode) && before.st_uid == Process.myUid() && before.st_mode and 511 == 448)
-            val directoryFlag = OsConstants::class.java.getField("O_DIRECTORY").getInt(null)
             val flagsMethod = ProtectedStateApplicationFacade.Companion::class.java
-                .getDeclaredMethod("credentialParentOpenFlags", Int::class.javaPrimitiveType).apply { isAccessible = true }
-            val flags = flagsMethod.invoke(ProtectedStateApplicationFacade.Companion, directoryFlag) as Int
+                .getDeclaredMethod("credentialParentOpenFlags").apply { isAccessible = true }
+            val flags = flagsMethod.invoke(ProtectedStateApplicationFacade.Companion) as Int
+            val linuxODirectory = 0x00010000
             val linuxOCloexec = 0x00080000
             assertEquals(linuxOCloexec, flags and linuxOCloexec)
-            assertEquals(directoryFlag, flags and directoryFlag)
+            assertEquals(linuxODirectory, flags and linuxODirectory)
             assertEquals(OsConstants.O_NOFOLLOW, flags and OsConstants.O_NOFOLLOW)
             if (Build.VERSION.SDK_INT >= 27) {
                 assertEquals(OsConstants::class.java.getField("O_CLOEXEC").getInt(null), linuxOCloexec)

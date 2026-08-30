@@ -42,4 +42,16 @@ class ProtectedStateStructuralBoundaryTest {
                 it.type == type("ImmutableProtectedObjectWriter")
         })
     }
+
+    @Test fun credentialParentOpenFlagsDoNotDependOnHiddenFrameworkFields() {
+        val companion = type("ProtectedStateApplicationFacade").getField("Companion").get(null)
+        val method = companion.javaClass.declaredMethods.single { it.name == "credentialParentOpenFlags" }
+        assertEquals("credential-parent flags must not require a reflected framework constant", 0, method.parameterCount)
+        method.isAccessible = true
+        val flags = method.invoke(companion) as Int
+        assertEquals("O_DIRECTORY", 0x00010000, flags and 0x00010000)
+        assertEquals("O_CLOEXEC", 0x00080000, flags and 0x00080000)
+        assertEquals("no write access", 0, flags and 0x00000003)
+        assertEquals("no creation", 0, flags and 0x00000040)
+    }
 }
