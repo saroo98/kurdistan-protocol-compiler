@@ -2,6 +2,7 @@
 // Copyright 2026 Saro
 package org.kurdistanvpn.app
 
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.system.Os
@@ -14,6 +15,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.kurdistanvpn.core.nativeapi.*
 import org.kurdistanvpn.core.nativejni.NativeBridge
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
 
 /** Installed native-filesystem tests, never host-only evidence. The separately authorized
  * runner must create and supply an empty invocation-owned disposable cache root. These tests do not
@@ -134,7 +136,24 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             val before = Os.lstat(file.absolutePath)
             require(OsConstants.S_ISDIR(before.st_mode) && before.st_uid == Process.myUid() && before.st_mode and 511 == 448)
             val directoryFlag = OsConstants::class.java.getField("O_DIRECTORY").getInt(null)
-            raw = Os.open(file.absolutePath, OsConstants.O_RDONLY or directoryFlag or OsConstants.O_NOFOLLOW or OsConstants.O_CLOEXEC, 0)
+            val flagsMethod = ProtectedStateApplicationFacade.Companion::class.java
+                .getDeclaredMethod("credentialParentOpenFlags", Int::class.javaPrimitiveType).apply { isAccessible = true }
+            val flags = flagsMethod.invoke(ProtectedStateApplicationFacade.Companion, directoryFlag) as Int
+            val linuxOCloexec = 0x00080000
+            assertEquals(linuxOCloexec, flags and linuxOCloexec)
+            assertEquals(directoryFlag, flags and directoryFlag)
+            assertEquals(OsConstants.O_NOFOLLOW, flags and OsConstants.O_NOFOLLOW)
+            if (Build.VERSION.SDK_INT >= 27) {
+                assertEquals(OsConstants::class.java.getField("O_CLOEXEC").getInt(null), linuxOCloexec)
+            }
+            val descriptorsBefore = descriptorsForPath(file.absolutePath)
+            raw = Os.open(file.absolutePath, flags, 0)
+            val openedDescriptor = (descriptorsForPath(file.absolutePath) - descriptorsBefore).single()
+            val descriptorFlags = File("/proc/self/fdinfo/$openedDescriptor").useLines { lines ->
+                checkNotNull(lines.firstOrNull { it.startsWith("flags:") }) { "FDINFO_FLAGS_UNAVAILABLE" }
+                    .substringAfter(':').trim().toLong(8)
+            }
+            assertEquals(linuxOCloexec.toLong(), descriptorFlags and linuxOCloexec.toLong())
             val observed = Os.fstat(checkNotNull(raw))
             require(observed.st_dev == before.st_dev && observed.st_ino == before.st_ino && observed.st_uid == before.st_uid && observed.st_mode == before.st_mode)
             descriptor = ParcelFileDescriptor.dup(checkNotNull(raw))
@@ -151,6 +170,11 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             if (failure != null) throw IllegalStateException("TEST_DIRECTORY_CLEANUP_UNPROVEN", failure)
         }
     }
+    private fun descriptorsForPath(path: String): Set<Int> = checkNotNull(File("/proc/self/fd").list()).mapNotNull { leaf ->
+        val descriptor = leaf.toIntOrNull() ?: return@mapNotNull null
+        val target = try { Os.readlink("/proc/self/fd/$leaf") } catch (_: Throwable) { return@mapNotNull null }
+        descriptor.takeIf { target == path }
+    }.toSet()
     private class SuppliedRoot(private val file: File, val descriptor: ParcelFileDescriptor, val directory: DurableDirectory) {
         fun child(leaf: String): String { require(DurableBounds.leaf(leaf) != null); return File(file, leaf).absolutePath }
     }
