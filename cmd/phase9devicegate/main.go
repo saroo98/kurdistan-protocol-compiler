@@ -2287,7 +2287,7 @@ func monotonicClockProbePlan(phase, invocation string) (string, [][]string, erro
 	marker := "CLOCK:" + phase + ":" + invocation
 	return marker, [][]string{
 		{"shell", "log", "-p", "i", "-t", clockProbeTag, marker},
-		{"shell", "logcat", "-b", "main", "-d", "-t", "64", "-v", "threadtime", "-v", "monotonic", "-v", "usec", clockProbeTag + ":I", "*:S"},
+		{"shell", "logcat", "-b", "main", "-d", "-e", "^" + regexp.QuoteMeta(marker) + "$", "-v", "threadtime", "-v", "monotonic", "-v", "usec", clockProbeTag + ":I", "*:S"},
 	}, nil
 }
 

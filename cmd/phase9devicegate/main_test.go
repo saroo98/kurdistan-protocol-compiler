@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -485,7 +486,15 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		fixture.markers = append(fixture.markers, fixtureMarker{
 			tag: clockProbeTag, text: marker, monotonic: fixture.clock, wall: fixture.wallClock,
 		})
-		return fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I "+clockProbeTag+": "+marker+"\n")
+		if err := fixture.appendLog("main", fixtureStamp(fixture.clock)+" 11 11 I "+clockProbeTag+": "+marker+"\n"); err != nil {
+			return err
+		}
+		if scenario == "api34-clock-tail-eviction" {
+			for sequence := 0; sequence < 65; sequence++ {
+				fixture.logs["main"] += fmt.Sprintf("%s 22 22 I UnrelatedTag: noise-%02d\n", fixtureStamp(fixture.clock), sequence)
+			}
+		}
+		return nil
 	case strings.HasPrefix(command, "log -p i -t KurdistanLaunchProbe "):
 		if scenario == "missing-markers" {
 			return nil
@@ -770,6 +779,10 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 			if !strings.Contains(command, tag+":I") {
 				continue
 			}
+			if tag == clockProbeTag && scenario == "api34-clock-tail-eviction" {
+				value = fixtureClockSnapshot(value, args)
+				continue
+			}
 			value = ""
 			for _, marker := range fixture.markers {
 				if marker.tag != tag {
@@ -791,6 +804,43 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		return fmt.Errorf("unexpected fixture command: %q", args)
 	}
 	return nil
+}
+
+func fixtureClockSnapshot(raw string, args []string) string {
+	lines := strings.Split(strings.TrimSuffix(strings.ReplaceAll(raw, "\r\n", "\n"), "\n"), "\n")
+	for index := 0; index+1 < len(args); index++ {
+		if args[index] != "-t" {
+			continue
+		}
+		count, err := strconv.Atoi(args[index+1])
+		if err == nil && count >= 0 && len(lines) > count {
+			lines = lines[len(lines)-count:]
+		}
+		break
+	}
+	var filter *regexp.Regexp
+	for index := 0; index+1 < len(args); index++ {
+		if args[index] == "-e" {
+			filter = regexp.MustCompile(args[index+1])
+			break
+		}
+	}
+	var selected []string
+	for _, line := range lines {
+		const prefix = " I KurdistanClockProbe: "
+		position := strings.Index(line, prefix)
+		if position < 0 {
+			continue
+		}
+		message := line[position+len(prefix):]
+		if filter == nil || filter.MatchString(message) {
+			selected = append(selected, line)
+		}
+	}
+	if len(selected) == 0 {
+		return ""
+	}
+	return strings.Join(selected, "\n") + "\n"
 }
 
 func (fixture *launchFixtureTransport) start(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
@@ -981,7 +1031,7 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 	markerStart := strconv.FormatInt(observation.DeviceStartNanos/1_000_000_000, 10) + "." + fmt.Sprintf("%09d", observation.DeviceStartNanos%1_000_000_000)
 	want := []string{
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-before:" + observation.Invocation,
-		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
+		prefix + "logcat -b main -d -e ^CLOCK:clock-before:" + observation.Invocation + "$ -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
 		prefix + "date +%z",
 		prefix + "id",
 		prefix + "cat /proc/self/attr/current",
@@ -1013,7 +1063,7 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "log -p i -t KurdistanLaunchProbe " + endMarker,
 		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,
-		prefix + "logcat -b main -d -t 64 -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
+		prefix + "logcat -b main -d -e ^CLOCK:clock-after:" + observation.Invocation + "$ -v threadtime -v monotonic -v usec KurdistanClockProbe:I *:S",
 		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v epoch -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "dumpsys activity exit-info " + defaultAppPackage,
 	}
@@ -2600,7 +2650,7 @@ func TestClockProbeUsesOneMonotonicLogdDomainOnAllSupportedAPIs(t *testing.T) {
 	wantMarker := "CLOCK:clock-before:" + invocation
 	want := [][]string{
 		{"shell", "log", "-p", "i", "-t", "KurdistanClockProbe", wantMarker},
-		{"shell", "logcat", "-b", "main", "-d", "-t", "64", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "KurdistanClockProbe:I", "*:S"},
+		{"shell", "logcat", "-b", "main", "-d", "-e", "^" + wantMarker + "$", "-v", "threadtime", "-v", "monotonic", "-v", "usec", "KurdistanClockProbe:I", "*:S"},
 	}
 	if marker != wantMarker || !reflect.DeepEqual(commands, want) {
 		t.Fatalf("clock probe changed domain or command boundaries: marker=%q commands=%q", marker, commands)
@@ -2630,6 +2680,19 @@ func TestClockProbeUsesOneMonotonicLogdDomainOnAllSupportedAPIs(t *testing.T) {
 				t.Fatalf("malformed monotonic clock evidence accepted: %+v", got)
 			}
 		})
+	}
+}
+
+func TestClockProbeSurvivesRawTailEvictionWithExactInvocationFilter(t *testing.T) {
+	err, observation := runLaunchScenario(t, "api34-clock-tail-eviction", 34)
+	clockStatus := make(map[string]string, len(observation.Clocks))
+	for _, clock := range observation.Clocks {
+		clockStatus[clock.Phase] = clock.ParseStatus
+	}
+	if err != nil || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" ||
+		clockStatus["clock-before"] != "CAPTURED" || clockStatus["clock-after"] != "CAPTURED" {
+		t.Fatalf("raw pre-filter tail evicted exact clock evidence: err=%v gate=%s start=%+v end=%+v",
+			err, observation.GateResult, clockStatus["clock-before"], clockStatus["clock-after"])
 	}
 }
 
