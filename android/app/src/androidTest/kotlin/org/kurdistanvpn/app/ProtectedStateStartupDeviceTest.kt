@@ -21,6 +21,10 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.ProtectedRecoveryPresentation
+import org.kurdistanvpn.core.nativeapi.DurableCode
+import org.kurdistanvpn.core.nativeapi.DurableOwnedDirectory
+import org.kurdistanvpn.core.nativejni.NativeBridge
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
 import org.kurdistanvpn.data.protectedstate.ProtectedStateProcessOwner
 
 /** Real Android construction and scheduling; compile-only during local non-device validation. */
@@ -59,6 +63,27 @@ class ProtectedStateStartupDeviceTest {
         var root: Phase9CompositionRoot? = null
         lateinit var model: ProductRootViewModel
         try {
+            val openCredentialParent = ProtectedStateApplicationFacade.Companion::class.java
+                .getDeclaredMethod("openCredentialParent", Context::class.java).apply { isAccessible = true }
+            val parentOwner = openCredentialParent.invoke(ProtectedStateApplicationFacade.Companion, context)
+                as? DurableOwnedDirectory
+            assertNotNull(
+                "KURDISTAN_TEST_SETUP expected=CREDENTIAL_PARENT_AVAILABLE actual=CREDENTIAL_PARENT_UNAVAILABLE setup=ISOLATED_EMPTY_DIRECTORY",
+                parentOwner,
+            )
+            val existingNoBackup = NativeBridge().durableFiles()
+                .openChildDirectory(checkNotNull(checkNotNull(parentOwner).borrow()), "no_backup")
+            assertEquals(
+                "KURDISTAN_TEST_SETUP expected=NO_BACKUP_ABSENT actual=${existingNoBackup.code.name} setup=ISOLATED_EMPTY_DIRECTORY",
+                DurableCode.ABSENT,
+                existingNoBackup.code,
+            )
+            assertNull(existingNoBackup.owner)
+            assertEquals(
+                "KURDISTAN_TEST_SETUP expected=CREDENTIAL_PARENT_CLOSE_OK actual=CREDENTIAL_PARENT_CLOSE_UNPROVEN setup=ISOLATED_EMPTY_DIRECTORY",
+                DurableCode.OK,
+                parentOwner.closeResult(),
+            )
             val opened = Phase9CompositionRoot.create(context, owner)
             root = opened
             assertEquals(
