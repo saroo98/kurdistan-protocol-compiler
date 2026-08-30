@@ -98,7 +98,7 @@ internal object Phase17FieldHarness {
                 .get(context.applicationInfo) as? String
         }.getOrNull()
         if (credentialRoot == null) return (evidence + "CREDENTIAL_ROOT_UNAVAILABLE").joinToString(",")
-        val root = File(credentialRoot, "no_backup/protected-state")
+        val root = protectedStateDiagnosticRoot(File(credentialRoot))
         val stat = runCatching { android.system.Os.lstat(root.absolutePath) }.getOrNull()
         if (stat == null) return (evidence + "PROTECTED_ROOT_ABSENT").joinToString(",")
         val canonical = runCatching { root.canonicalFile == root.absoluteFile }.getOrDefault(false)
@@ -140,6 +140,9 @@ internal object Phase17FieldHarness {
         if (!known) evidence += "UNKNOWN_LEAF"
         return evidence.joinToString(",").also { check(it.length <= 256) }
     }
+
+    internal fun protectedStateDiagnosticRoot(credentialRoot: File): File =
+        File(File(credentialRoot, "no_backup"), "protected-state-v1")
 
     internal data class BoundarySnapshot(
         val vpnActive: Boolean,

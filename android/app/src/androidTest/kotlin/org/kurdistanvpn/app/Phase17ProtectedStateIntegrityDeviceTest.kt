@@ -24,6 +24,16 @@ import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
  * durability; that requires the independent crash/observer journey and terminal verifier. */
 class Phase17ProtectedStateIntegrityDeviceTest {
     @Test
+    fun protectedStateFailureDiagnosticsUseTheProductionRootLeaf() {
+        val productionRoot = ProtectedStateApplicationFacade::class.java.getDeclaredField("ROOT").apply {
+            isAccessible = true
+        }.get(null) as String
+        val observed = Phase17FieldHarness.protectedStateDiagnosticRoot(File("/synthetic-credential-root"))
+        assertEquals("no_backup", observed.parentFile?.name)
+        assertEquals(productionRoot, observed.name)
+    }
+
+    @Test
     fun nativeLeafAndOwnerChecksCannotEscapeTheSuppliedDirectory() = withRoot("leaf-owner") { root, native ->
         val before = native.list(root.directory, DurableBounds.MAX_ENTRIES)
         assertEquals(DurableCode.OK, before.code)
