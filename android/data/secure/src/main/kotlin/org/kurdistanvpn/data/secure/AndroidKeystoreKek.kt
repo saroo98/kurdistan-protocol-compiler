@@ -86,8 +86,15 @@ class AndroidKeystoreKek private constructor(
         ): AndroidKeystoreKek {
             require(alias.isNotBlank() && generation > 0)
             val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-            val key = FirstUseKeyCreation.create(preferStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
-                { store.containsAlias(alias) }, { generate(alias, it) })
+            val key = FirstUseKeyCreation.create(
+                preferStrongBox = preferStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
+                exists = { store.containsAlias(alias) },
+                generate = { generate(alias, it) },
+                isStrongBoxUnavailable = { failure ->
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                        failure is StrongBoxUnavailableException
+                },
+            )
             return AndroidKeystoreKek(
                 alias = alias,
                 generation = generation,
@@ -145,13 +152,18 @@ class AndroidKeystoreKek private constructor(
 
 /** Testable first-use admission. The broker must also hold the cross-process writer lease. */
 internal object FirstUseKeyCreation {
-    fun <T> create(preferStrongBox: Boolean, exists: () -> Boolean, generate: (Boolean) -> T): T {
+    fun <T> create(
+        preferStrongBox: Boolean,
+        exists: () -> Boolean,
+        generate: (Boolean) -> T,
+        isStrongBoxUnavailable: (Exception) -> Boolean,
+    ): T {
         check(!exists()) { "refusing to replace an existing Keystore key" }
         return try { generate(preferStrongBox) }
         catch (failure: Exception) {
             // A generic failure can follow partial publication. Never replace that key,
             // and never silently change hardware policy after an unrelated provider error.
-            if (!preferStrongBox || failure !is StrongBoxUnavailableException || exists()) throw failure
+            if (!preferStrongBox || !isStrongBoxUnavailable(failure) || exists()) throw failure
             generate(false)
         }
     }
