@@ -12,6 +12,13 @@ function Assert-Rejected([scriptblock]$Action, [string]$Id) {
     try { & $Action | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { throw ($Id + ': unsafe input was admitted') }
 }
+$global:LASTEXITCODE = 23
+Assert-ExpectedCompilerDenial 1 @("Cannot access 'JournalStorage': it is internal") 'expected-denial'
+if ($global:LASTEXITCODE -ne 0) {
+    throw 'BV-04: an accepted negative compiler fixture leaked its native exit status'
+}
+Assert-Rejected { Assert-ExpectedCompilerDenial 0 @() 'unexpected-success' } 'BV-04'
+Assert-Rejected { Assert-ExpectedCompilerDenial 1 @('unresolved reference: missing') 'wrong-failure' } 'BV-04'
 $paths = @(Get-LocalCorrectionWhitelist)
 if ($paths.Count -ne 208 -or @($paths.Path | Sort-Object -Unique).Count -ne 208) {
     throw 'BV-01: whitelist accounting mismatch'

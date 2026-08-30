@@ -336,6 +336,17 @@ function Assert-LocalOfflineEnvironment([hashtable]$Values) {
     }
     if ($Values['GOPROXY'] -cne 'off' -or $Values['GOTOOLCHAIN'] -cne 'local') { throw 'Go network/toolchain resolution is not disabled' }
 }
+function Assert-ExpectedCompilerDenial([int]$ExitCode, [object[]]$Diagnostics, [string]$Name) {
+    $text = $Diagnostics -join "`n"
+    if ($ExitCode -eq 0 -or
+        $text -notmatch 'Cannot access|cannot access|invisible|private|internal' -or
+        $text -match 'Unresolved reference|unresolved reference|ClassNotFoundException|NoClassDefFoundError') {
+        throw ('External-module denial was not proven: ' + $Name)
+    }
+    # The nonzero compiler result is the expected assertion for this negative fixture. Do not
+    # leak it as the terminal status of a completely successful validation script.
+    $global:LASTEXITCODE = 0
+}
 function Assert-LocalCorrectionWorkspace {
     $env:GIT_OPTIONAL_LOCKS = '0'
     $head = & git -C $script:CorrectionRoot rev-parse HEAD
@@ -578,11 +589,7 @@ function Invoke-LocalKotlinTests {
                 $compilerExit = $LASTEXITCODE
                 if ($case.Accept) {
                     if ($compilerExit -ne 0) { throw 'External-module positive control did not compile' }
-                } elseif ($compilerExit -eq 0 -or
-                    -not ($diagnostics -match 'Cannot access|cannot access|invisible|private|internal') -or
-                    ($diagnostics -match 'Unresolved reference|unresolved reference|ClassNotFoundException|NoClassDefFoundError')) {
-                    throw ('External-module denial was not proven: ' + $case.Name)
-                }
+                } else { Assert-ExpectedCompilerDenial $compilerExit $diagnostics $case.Name }
                 Write-Output ('PASS: external-module boundary ' + $case.Name)
             }
         }
