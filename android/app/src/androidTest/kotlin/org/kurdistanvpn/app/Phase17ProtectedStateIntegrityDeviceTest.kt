@@ -117,10 +117,22 @@ class Phase17ProtectedStateIntegrityDeviceTest {
         // synthetic root under that process's cache UID, never under protected
         // product storage or the separately installed test APK's data directory.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val parent = File(context.applicationInfo.dataDir, "cache")
+        val parent = context.cacheDir
         val base = File(supplied)
-        require(base.isAbsolute && base.parentFile?.absolutePath == parent.absolutePath &&
-            base.name.matches(Regex("phase17-disposable-[0-9a-f]{32}")) && base.canonicalPath == base.absolutePath)
+        require(base.isAbsolute) { "EXPLICIT_DISPOSABLE_ROOT_NOT_ABSOLUTE" }
+        require(base.name.matches(Regex("phase17-disposable-[0-9a-f]{32}"))) {
+            "EXPLICIT_DISPOSABLE_ROOT_LEAF_INVALID"
+        }
+        // Android may expose the same package data directory through /data/data or
+        // /data/user/0. Bind the supplied root to the target cache by canonical parent,
+        // then reject a substituted root entry independently with lstat below.
+        require(base.parentFile?.canonicalFile == parent.canonicalFile) {
+            "EXPLICIT_DISPOSABLE_ROOT_PARENT_MISMATCH"
+        }
+        val baseBefore = Os.lstat(base.absolutePath)
+        require(OsConstants.S_ISDIR(baseBefore.st_mode) && baseBefore.st_uid == Process.myUid() &&
+            baseBefore.st_mode and 511 == 448
+        ) { "EXPLICIT_DISPOSABLE_ROOT_ENTRY_UNSAFE" }
         val preimage = "kurdistan-phase17-filesystem-authorization-v1\u0000" + supplied + "\u0000" +
             children.joinToString("\u0000")
         val expectedAuthorization = MessageDigest.getInstance("SHA-256")
@@ -129,7 +141,7 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             }
         require(authorization == expectedAuthorization)
         val file = File(base, role)
-        require(file.parentFile?.absolutePath == base.absolutePath && file.canonicalPath == file.absolutePath)
+        require(file.parentFile?.absolutePath == base.absolutePath) { "EXPLICIT_DISPOSABLE_CHILD_ESCAPED" }
         var raw: java.io.FileDescriptor? = null
         var descriptor: ParcelFileDescriptor? = null
         try {
