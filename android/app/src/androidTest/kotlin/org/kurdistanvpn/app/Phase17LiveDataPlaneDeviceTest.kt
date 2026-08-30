@@ -959,9 +959,11 @@ class Phase17LiveDataPlaneDeviceTest {
             assertNoAuthorityEvidence(controller.snapshot.value)
         }
 
+        val initialized = root.initializeProtectedStateForExplicitUserAction()
         assertTrue(
-            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} setup=EXPLICIT_BACKUP_INITIALIZATION",
-            root.initializeProtectedStateForExplicitUserAction(),
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} " +
+                "setup=${Phase17FieldHarness.protectedStateSetupState(application, "EXPLICIT_BACKUP_INITIALIZATION")}",
+            initialized,
         )
         assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
         assertNull(root.protectedStateFacade())

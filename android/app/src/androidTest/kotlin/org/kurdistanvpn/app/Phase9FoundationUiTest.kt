@@ -635,7 +635,8 @@ class Phase9FoundationUiTest {
         val root = (compose.activity.application as KurdistanApplication).compositionRoot
         val initialized = runBlocking { root.initializeProtectedStateForExplicitUserAction() }
         assertTrue(
-            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} setup=EXPLICIT_IMPORT_INITIALIZATION",
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} " +
+                "setup=${Phase17FieldHarness.protectedStateSetupState(compose.activity, "EXPLICIT_IMPORT_INITIALIZATION")}",
             initialized && root.protectedStateFacade() != null,
         )
     }

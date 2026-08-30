@@ -89,6 +89,58 @@ internal object Phase17FieldHarness {
     private const val OWNER_SOCKET_PROTECTION_TIMEOUT_MILLIS = 2_000L
     private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
 
+    /** Fixed-category failure evidence only. No path, inode, payload, key, or authority byte leaves the test process. */
+    fun protectedStateSetupState(context: Context, setup: String): String {
+        require(setup.matches(Regex("[A-Z0-9_]{1,64}")))
+        val evidence = arrayListOf(setup)
+        val credentialRoot = runCatching {
+            context.applicationInfo::class.java.getField("credentialProtectedDataDir")
+                .get(context.applicationInfo) as? String
+        }.getOrNull()
+        if (credentialRoot == null) return (evidence + "CREDENTIAL_ROOT_UNAVAILABLE").joinToString(",")
+        val root = File(credentialRoot, "no_backup/protected-state")
+        val stat = runCatching { android.system.Os.lstat(root.absolutePath) }.getOrNull()
+        if (stat == null) return (evidence + "PROTECTED_ROOT_ABSENT").joinToString(",")
+        val canonical = runCatching { root.canonicalFile == root.absoluteFile }.getOrDefault(false)
+        val directory = android.system.OsConstants.S_ISDIR(stat.st_mode)
+        val owned = stat.st_uid == context.applicationInfo.uid
+        val privateMode = stat.st_mode and 511 == 448
+        evidence += if (canonical) "ROOT_CANONICAL" else "ROOT_ALIAS_OR_SUBSTITUTION"
+        evidence += if (directory) "ROOT_DIRECTORY" else "ROOT_NOT_DIRECTORY"
+        evidence += if (owned) "ROOT_OWNER_MATCH" else "ROOT_OWNER_MISMATCH"
+        evidence += if (privateMode) "ROOT_MODE_0700" else "ROOT_MODE_MISMATCH"
+        if (!canonical || !directory || !owned || !privateMode) return evidence.joinToString(",")
+        val leaves = root.list()?.toSet()
+            ?: return (evidence + "ROOT_LIST_UNAVAILABLE").joinToString(",")
+        if (leaves.isEmpty()) evidence += "ROOT_EMPTY"
+        fun present(token: String, predicate: (String) -> Boolean) {
+            if (leaves.any(predicate)) evidence += token
+        }
+        present("LOCK") { it == "protected-state.lock" }
+        present("STORE_IDENTITY") { it == "journal-store.blob" }
+        present("CONTROL") { it == "journal-control.blob" }
+        present("INTENT") { it.startsWith("journal-intent-") && it.endsWith(".blob") }
+        present("CHECKPOINT") { it.startsWith("journal-checkpoint-") && it.endsWith(".blob") }
+        present("PROJECTION_WITNESS") { it.startsWith("journal-projection-") && it.endsWith(".blob") }
+        present("PENDING") { it.startsWith("pending-") }
+        present("ROOM_MAIN") { it == "protected-metadata.db" }
+        present("ROOM_JOURNAL") { it == "protected-metadata.db-journal" }
+        present("ROOM_WAL") { it == "protected-metadata.db-wal" }
+        present("ROOM_SHM") { it == "protected-metadata.db-shm" }
+        present("SETTINGS") { it == "protected-settings.preferences_pb" }
+        val known = leaves.all { leaf ->
+            leaf == "protected-state.lock" || leaf == "journal-store.blob" || leaf == "journal-control.blob" ||
+                (leaf.startsWith("journal-intent-") && leaf.endsWith(".blob")) ||
+                (leaf.startsWith("journal-checkpoint-") && leaf.endsWith(".blob")) ||
+                (leaf.startsWith("journal-projection-") && leaf.endsWith(".blob")) || leaf.startsWith("pending-") ||
+                leaf == "protected-metadata.db" || leaf == "protected-metadata.db-journal" ||
+                leaf == "protected-metadata.db-wal" || leaf == "protected-metadata.db-shm" ||
+                leaf == "protected-settings.preferences_pb"
+        }
+        if (!known) evidence += "UNKNOWN_LEAF"
+        return evidence.joinToString(",").also { check(it.length <= 256) }
+    }
+
     internal data class BoundarySnapshot(
         val vpnActive: Boolean,
         val ipv4Default: Boolean,
