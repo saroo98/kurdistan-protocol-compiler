@@ -97,7 +97,6 @@ type startupProcessCrossCheck struct {
 	StartTicks  uint64
 	PIDOf       int
 	ProcName    string
-	ProcCommand string
 	ObservedUTC time.Time
 	Rejection   string
 }
@@ -303,7 +302,7 @@ func parseStartupPackageState(raw, app, phase string) startupPackageState {
 			}
 			userID, _ = strconv.Atoi(match[1])
 		}
-		if match := regexp.MustCompile(`^versionCode=([0-9]{1,20}) minSdk=[0-9]{1,3} targetSdk=[0-9]{1,3}$`).FindStringSubmatch(line); match != nil {
+		if match := regexp.MustCompile(`^versionCode=([0-9]{1,20}) minSdk=[0-9]{1,3} targetSdk=[0-9]{1,3}(?: minExtensionVersions=\[(?:[0-9]{1,3}=[0-9]{1,10}(?:, [0-9]{1,3}=[0-9]{1,10})*)?\])?$`).FindStringSubmatch(line); match != nil {
 			if version != 0 {
 				return state
 			}
@@ -450,15 +449,18 @@ func parseProcStatus(raw string) (name string, pid, parent, uid int, ok bool) {
 	return name, pid, parent, uid, name != "" && pid > 0 && tgid == pid && parent >= 0 && uid >= 10000
 }
 
-func parseProcCommand(raw, app string) (string, bool) {
-	if len(raw) == 0 || len(raw) > 4096 {
+func androidKernelTaskName(process string) (string, bool) {
+	if !diagnosticClassPattern.MatchString(process) {
 		return "", false
 	}
-	value := strings.TrimSuffix(raw, "\x00")
-	if strings.ContainsRune(value, '\x00') || value != app {
-		return "", false
+	// Android's set_process_name keeps the final 15 bytes for PR_SET_NAME.
+	// The full process name is independently bound by ps, ActivityManager, and
+	// pidof; this is only the kernel task-name corroboration from /proc/status.
+	const maxTaskNameBytes = 15
+	if len(process) <= maxTaskNameBytes {
+		return process, true
 	}
-	return value, true
+	return process[len(process)-maxTaskNameBytes:], true
 }
 
 func (observation *launchObservation) captureStartupProcess(parent context.Context, phase string) {
@@ -502,11 +504,8 @@ func (observation *launchObservation) captureStartupProcess(parent context.Conte
 	name, pid, parentPID, uid, statusParsed := parseProcStatus(statusRaw)
 	check.ProcName = name
 	observation.recordCompositeSource(phase, "PROC_STATUS", startupProcessParserV1, statusRaw, statusOK, statusParsed, "PROC_STATUS_INVALID", 1)
-	commandRaw, commandOK := observation.query(parent, phase+"-proc-command", "shell", "cat", "/proc/"+strconv.Itoa(process.PID)+"/cmdline")
-	command, commandParsed := parseProcCommand(commandRaw, observation.app)
-	check.ProcCommand = command
-	observation.recordCompositeSource(phase, "PROC_CMDLINE", startupProcessParserV1, commandRaw, commandOK, commandParsed, "PROC_COMMAND_INVALID", 1)
-	if pidOK && pidParsed && statusOK && statusParsed && commandOK && commandParsed &&
+	expectedTaskName, taskNameOK := androidKernelTaskName(process.Name)
+	if pidOK && pidParsed && statusOK && statusParsed && taskNameOK && name == expectedTaskName &&
 		check.PIDOf == process.PID && pid == process.PID && parentPID == process.ParentPID && uid == process.UID {
 		check.Status, check.Rejection = "CAPTURED", ""
 	} else {
@@ -618,8 +617,11 @@ func validateCompositeStartup(observation *launchObservation, previous, current 
 		return errLaunchIncomplete
 	}
 	for index, source := range observation.CompositeSources {
+		optionalEventsUnavailable := source.Source == "ACTIVITY_MANAGER_EVENTS" && source.Parser == startupEventParserV2 &&
+			source.Status == "OPTIONAL_SOURCE_UNAVAILABLE" && source.Rejection == "NONPRIVILEGED_EVENT_BUFFER_PERMISSION_DENIED" &&
+			observation.SystemEvents.Status == "OPTIONAL_SOURCE_UNAVAILABLE"
 		if source.ReceivedOrder != index+1 || source.Phase == "" || source.Source == "" || source.Parser == "" ||
-			source.Status != "CAPTURED" || source.RecordCount < 0 || source.RawBytes < 0 ||
+			(source.Status != "CAPTURED" && !optionalEventsUnavailable) || source.RecordCount < 0 || source.RawBytes < 0 ||
 			!startupDigestPattern.MatchString(source.RawDigest) || source.ObservedUTC.Before(observation.StartedUTC) || source.ObservedUTC.After(observation.FinishedUTC) {
 			return errLaunchIncomplete
 		}
@@ -657,13 +659,15 @@ func validateCompositeStartup(observation *launchObservation, previous, current 
 		return errLaunchIncomplete
 	}
 	for index, check := range observation.ProcessCrossChecks {
+		expectedTaskName, taskNameOK := androidKernelTaskName(current.Name)
 		if check.Phase != wantPhases[index] || check.Status != "CAPTURED" || check.Process != current.Name ||
 			check.PID != current.PID || check.PIDOf != current.PID || check.UID != current.UID || check.ParentPID != current.ParentPID ||
-			check.StartTicks != current.StartTicks || check.ProcCommand != current.Name || check.ObservedUTC.Before(observation.StartedUTC) || check.ObservedUTC.After(observation.FinishedUTC) {
+			check.StartTicks != current.StartTicks || !taskNameOK || check.ProcName != expectedTaskName ||
+			check.ObservedUTC.Before(observation.StartedUTC) || check.ObservedUTC.After(observation.FinishedUTC) {
 			return errLaunchIncomplete
 		}
 	}
-	if observation.SystemEvents.Status != "CAPTURED" {
+	if observation.SystemEvents.Status != "CAPTURED" && observation.SystemEvents.Status != "OPTIONAL_SOURCE_UNAVAILABLE" {
 		return errLaunchIncomplete
 	}
 	startCount := 0
@@ -692,11 +696,11 @@ func validateCompositeStartup(observation *launchObservation, previous, current 
 			return errLaunchIncomplete
 		}
 	}
-	if previous == nil {
+	if observation.SystemEvents.Status == "CAPTURED" && previous == nil {
 		if startCount != 1 {
 			return errLaunchIncomplete
 		}
-	} else if *previous != *current || startCount != 0 {
+	} else if previous != nil && (*previous != *current || (observation.SystemEvents.Status == "CAPTURED" && startCount != 0)) {
 		return errLaunchIncomplete
 	}
 	return nil

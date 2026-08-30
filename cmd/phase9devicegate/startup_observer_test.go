@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 // This replays the observed API 26/34/36 boundary: the ordinary ADB shell is
@@ -28,7 +29,7 @@ func TestCompositeStartupObserverAllowsOptionalMainSystemDenialOnlyWithCompleteR
 		t.Run(fmt.Sprintf("api%d", test.api), func(t *testing.T) {
 			err, observation := runLaunchScenario(t, test.scenario, test.api)
 			if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
-				t.Fatalf("complete composite with optional main/system denial rejected: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+				t.Fatalf("complete composite with optional main/system denial rejected: err=%v gate=%s status=%s issues=%q streams=%+v events=%+v", err, observation.GateResult, observation.Status, observation.Issues, observation.StreamLifecycle, observation.SystemEvents)
 			}
 			denied := map[string]bool{"main": false, "system": false}
 			for _, stream := range observation.StreamLifecycle {
@@ -39,13 +40,126 @@ func TestCompositeStartupObserverAllowsOptionalMainSystemDenialOnlyWithCompleteR
 			if !denied["main"] || !denied["system"] {
 				t.Fatalf("permission-denied optional sources were not retained: %+v", observation.StreamLifecycle)
 			}
+			var eventLifecycle *diagnosticStreamLifecycle
+			for index := range observation.StreamLifecycle {
+				if observation.StreamLifecycle[index].Buffer == "events" {
+					eventLifecycle = &observation.StreamLifecycle[index]
+					break
+				}
+			}
+			if eventLifecycle == nil || !knownNonPrivilegedSystemEventDenial(*eventLifecycle) ||
+				observation.SystemEvents.Status != "OPTIONAL_SOURCE_UNAVAILABLE" {
+				t.Fatalf("events permission denial was not retained as the exact optional source state: lifecycle=%+v events=%+v", eventLifecycle, observation.SystemEvents)
+			}
+			optionalSources := 0
+			for _, source := range observation.CompositeSources {
+				if source.Status == "OPTIONAL_SOURCE_UNAVAILABLE" {
+					optionalSources++
+					if source.Source != "ACTIVITY_MANAGER_EVENTS" || source.Parser != startupEventParserV2 ||
+						source.Rejection != "NONPRIVILEGED_EVENT_BUFFER_PERMISSION_DENIED" || !startupDigestPattern.MatchString(source.RawDigest) {
+						t.Fatalf("optional composite source was not narrowly bound: %+v", source)
+					}
+				}
+			}
+			if optionalSources != 1 {
+				t.Fatalf("optional composite source count=%d, want the denied events source only", optionalSources)
+			}
 			assertVersionedCompositeBinding(t, observation)
 		})
 	}
 }
 
+func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycle(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	valid := diagnosticStreamLifecycle{
+		Buffer: "events", ExecutionBoundary: "ADB_SHELL", CommandIdentityStatus: "CAPTURED",
+		CommandUID: 2000, CommandGID: 2000, CommandSELinuxContext: "u:r:shell:s0",
+		StartStatus: "STARTED", ReadinessStatus: "OUTPUT_SINK_READY", TerminalStatus: "INCOMPLETE",
+		TerminalReason: "STDERR_BEFORE_OWNED_CANCELLATION", CommandStatus: "CANCELLED", ExitCode: -1,
+		ContextCancellationState: "CANCELED", CancellationRequestedUTC: now.Add(time.Second),
+		FirstStderrUTC: now, LastStderrUTC: now.Add(time.Millisecond), CommandExitedUTC: now.Add(2 * time.Second),
+		CancellationSequence: 2, FirstStderrSequence: 1, LastStderrSequence: 1, CommandExitSequence: 3,
+		ExitRelativeToCancellation: "AFTER_OWNED_CANCELLATION", StderrObserved: true, StderrBytes: 27,
+		StderrSHA256: strings.Repeat("a", 64), StderrExcerpt: []string{"logcat permission denied"},
+		StartCapturedBeforeStop: true, EndCapturedBeforeStop: true, IntentionallyStopped: true,
+	}
+	if !knownNonPrivilegedSystemEventDenial(valid) {
+		t.Fatal("exact ordinary-shell permission denial was not recognized")
+	}
+	partialBeforeDenial := valid
+	partialBeforeDenial.ParserComplete = true
+	partialBeforeDenial.StdoutBytes = 128
+	partialBeforeDenial.LastParsedRecord = diagnosticLaunchStreamRecord{DeviceNanos: 1, PID: 999, TID: 999, Category: "ACTIVITY_MANAGER"}
+	if !knownNonPrivilegedSystemEventDenial(partialBeforeDenial) {
+		t.Fatal("bounded partial output was incorrectly treated as proof that a denied stream was complete")
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*diagnosticStreamLifecycle)
+	}{
+		{"wrong-buffer", func(value *diagnosticStreamLifecycle) { value.Buffer = "main" }},
+		{"unknown-identity", func(value *diagnosticStreamLifecycle) { value.CommandIdentityStatus = "INCOMPLETE" }},
+		{"wrong-uid", func(value *diagnosticStreamLifecycle) { value.CommandUID = 10123 }},
+		{"wrong-selinux-domain", func(value *diagnosticStreamLifecycle) { value.CommandSELinuxContext = "u:r:untrusted_app:s0" }},
+		{"missing-readiness", func(value *diagnosticStreamLifecycle) { value.ReadinessStatus = "NOT_AVAILABLE" }},
+		{"unknown-order", func(value *diagnosticStreamLifecycle) { value.ExitRelativeToCancellation = "UNKNOWN" }},
+		{"stderr-after-cancel", func(value *diagnosticStreamLifecycle) { value.FirstStderrSequence = 3 }},
+		{"truncated-stderr", func(value *diagnosticStreamLifecycle) { value.StderrTruncated = true }},
+		{"not-intentional", func(value *diagnosticStreamLifecycle) { value.IntentionallyStopped = false }},
+		{"missing-marker", func(value *diagnosticStreamLifecycle) { value.EndCapturedBeforeStop = false }},
+		{"wrong-reason", func(value *diagnosticStreamLifecycle) { value.TerminalReason = "PARSER_INCOMPLETE" }},
+		{"ambiguous-diagnostic", func(value *diagnosticStreamLifecycle) { value.StderrExcerpt = []string{"permission denied"} }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := valid
+			test.mutate(&candidate)
+			if knownNonPrivilegedSystemEventDenial(candidate) {
+				t.Fatalf("ambiguous lifecycle was accepted: %+v", candidate)
+			}
+		})
+	}
+}
+
+func TestStartupPackageStateParsesSupportedAPI26AndExtensionAwareOutput(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		versionLine string
+	}{
+		{"api26", "versionCode=42 minSdk=26 targetSdk=36"},
+		{"api34-empty-extensions", "versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[]"},
+		{"api36-bound-extensions", "versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[30=7, 31=9]"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw := "Packages:\n  Package [" + defaultAppPackage + "] (abc):\n" +
+				"    userId=10123\n    " + test.versionLine + "\n" +
+				"    versionName=0.9.0-internal\n" +
+				"    User 0: ceDataInode=123 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false\n"
+			state := parseStartupPackageState(raw, defaultAppPackage, "terminal")
+			if state.Status != "CAPTURED" || state.UserID != 10123 || state.VersionCode != 42 || state.VersionName != "0.9.0-internal" ||
+				!state.Installed || state.Suspended || state.Stopped || state.Enabled != 0 {
+				t.Fatalf("supported package output was not captured: %+v", state)
+			}
+		})
+	}
+}
+
+func TestStartupPackageStateRejectsMalformedOrAmbiguousExtensionMetadata(t *testing.T) {
+	for _, versionLine := range []string{
+		"versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[broken]",
+		"versionCode=42 minSdk=26 targetSdk=36 unexpected=true",
+	} {
+		raw := "Packages:\n  Package [" + defaultAppPackage + "] (abc):\n" +
+			"    userId=10123\n    " + versionLine + "\n" +
+			"    versionName=0.9.0-internal\n" +
+			"    User 0: installed=true suspended=false stopped=false enabled=0\n"
+		if state := parseStartupPackageState(raw, defaultAppPackage, "terminal"); state.Status != "INCOMPLETE" {
+			t.Fatalf("malformed extension metadata was accepted: %q -> %+v", versionLine, state)
+		}
+	}
+}
+
 func TestCompositeStartupObserverDoesNotTurnIncompleteReplacementIntoAdmission(t *testing.T) {
-	for _, scenario := range []string{"ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-crash"} {
+	for _, scenario := range []string{"ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-crash", "ci-api34-permission-denied-missing-proc-status"} {
 		t.Run(scenario, func(t *testing.T) {
 			err, observation := runLaunchScenario(t, scenario, 34)
 			if err == nil || !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" {
@@ -67,7 +181,7 @@ func TestCompositeStartupObserverDefinitiveUnhealthyEvidenceFails(t *testing.T) 
 }
 
 func TestCompositeStartupObserverIncompleteOrContradictoryEvidenceStaysClosed(t *testing.T) {
-	blocked := []string{"conflicting-proc-uid", "wrong-proc-command", "truncated-proc-status", "truncated-events", "unknown-activity-format", "app-authored-only"}
+	blocked := []string{"conflicting-proc-uid", "wrong-proc-task-name", "truncated-proc-status", "truncated-events", "unknown-activity-format", "app-authored-only"}
 	for _, scenario := range blocked {
 		t.Run(scenario, func(t *testing.T) {
 			err, observation := runLaunchScenario(t, scenario, 34)

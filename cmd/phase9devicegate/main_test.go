@@ -563,6 +563,9 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		}
 		fmt.Fprintf(stdout, "999 (synthetic process) S 111 111 111 0 -1 0 0 0 0 0 1 2 3 4 5 6 1 0 %d\n", ticks)
 	case command == "cat /proc/999/status":
+		if scenario == "ci-api34-permission-denied-missing-proc-status" {
+			return errors.New("fixture proc status unavailable")
+		}
 		if scenario == "truncated-proc-status" {
 			fmt.Fprint(stdout, strings.Repeat("x", (256<<10)+1))
 			return nil
@@ -571,13 +574,14 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		if scenario == "conflicting-proc-uid" {
 			uid++
 		}
-		fmt.Fprintf(stdout, "Name:\tkurdistanvpn\nState:\tS (sleeping)\nTgid:\t999\nPid:\t999\nPPid:\t111\nUid:\t%d\t%d\t%d\t%d\n", uid, uid, uid, uid)
-	case command == "cat /proc/999/cmdline":
-		if scenario == "wrong-proc-command" {
-			fmt.Fprint(stdout, "example.unrelated\x00")
-		} else {
-			fmt.Fprint(stdout, defaultAppPackage+"\x00")
+		name, ok := androidKernelTaskName(defaultAppPackage)
+		if !ok {
+			return errors.New("fixture package does not have a valid Android kernel task name")
 		}
+		if scenario == "wrong-proc-task-name" {
+			name = "unrelated"
+		}
+		fmt.Fprintf(stdout, "Name:\t%s\nState:\tS (sleeping)\nTgid:\t999\nPid:\t999\nPPid:\t111\nUid:\t%d\t%d\t%d\t%d\n", name, uid, uid, uid, uid)
 	case command == "cat /proc/sys/kernel/random/boot_id":
 		if scenario == "app-authored-only" {
 			return errors.New("fixture boot identity unavailable")
@@ -597,7 +601,11 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		if scenario == "stopped-package" {
 			stopped = "true"
 		}
-		fmt.Fprintf(stdout, "Activity Resolver Table:\nPackages:\n  Package [%s] (abc):\n    userId=10123\n    versionCode=42 minSdk=26 targetSdk=36\n    versionName=0.9.0-internal\n    User 0: installed=true hidden=false suspended=false distractionFlags=0 stopped=%s notLaunched=false enabled=0\n", defaultAppPackage, stopped)
+		versionSuffix := ""
+		if fixture.api >= 34 || strings.Contains(scenario, "api34") || strings.Contains(scenario, "api36") {
+			versionSuffix = " minExtensionVersions=[]"
+		}
+		fmt.Fprintf(stdout, "Activity Resolver Table:\nPackages:\n  Package [%s] (abc):\n    userId=10123\n    versionCode=42 minSdk=26 targetSdk=36%s\n    versionName=0.9.0-internal\n    User 0: ceDataInode=123 installed=true hidden=false suspended=false distractionFlags=0 stopped=%s notLaunched=false enabled=0 instant=false virtual=false\n", defaultAppPackage, versionSuffix, stopped)
 	case command == "pidof "+defaultAppPackage:
 		if scenario == "process-death" {
 			return errors.New("fixture target no longer exists")
@@ -822,9 +830,9 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 		terminate = fixture.terminate
 	}
 	stderrMode, stderrBefore := "", ""
-	if buffer == "main" || buffer == "system" {
+	if buffer == "main" || buffer == "system" || (buffer == "events" && strings.HasPrefix(fixture.scenario, "ci-api")) {
 		switch fixture.scenario {
-		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events":
+		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-proc-status":
 			stderrMode = "before-owned-cancellation"
 			stderrBefore = "logcat: permission denied\n"
 		case "owned-shutdown-stderr":
@@ -988,12 +996,12 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "cmd package resolve-activity --brief -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "am start -W -f 0x10008000 -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
-		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
 		prefix + "pidof " + defaultAppPackage,
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
-		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
 		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
-		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status", prefix + "cat /proc/999/cmdline",
+		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
 		prefix + "dumpsys activity processes " + defaultAppPackage,
 		prefix + "dumpsys activity activities " + defaultAppPackage,
 		prefix + "dumpsys package " + defaultAppPackage,

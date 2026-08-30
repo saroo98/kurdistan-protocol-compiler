@@ -2838,7 +2838,8 @@ func validateLaunchObservation(observation *launchObservation) error {
 		(observation.api >= 26 && observation.api < 30 && observation.ExitStatus != "UNSUPPORTED_API_BELOW_30") || observation.api < 26 {
 		return errLaunchIncomplete
 	}
-	requiredStreams := map[string]bool{"crash": false, "events": false}
+	requiredStreams := map[string]bool{"crash": false}
+	eventsSatisfied := false
 	streamNames := map[string]bool{}
 	if len(observation.StreamLifecycle) != 4 {
 		return errLaunchIncomplete
@@ -2853,9 +2854,15 @@ func validateLaunchObservation(observation *launchObservation) error {
 				return errLaunchIncomplete
 			}
 			requiredStreams[lifecycle.Buffer] = true
+		} else if lifecycle.Buffer == "events" {
+			eventsSatisfied = (lifecycle.TerminalStatus == "DRAINED" && lifecycle.ParserComplete &&
+				!lifecycle.OutputTruncated && !lifecycle.StderrTruncated) || knownNonPrivilegedSystemEventDenial(lifecycle)
+			if !eventsSatisfied {
+				return errLaunchIncomplete
+			}
 		}
 	}
-	if !requiredStreams["crash"] || !requiredStreams["events"] {
+	if !requiredStreams["crash"] || !eventsSatisfied {
 		return errLaunchIncomplete
 	}
 	logStreams := map[string]bool{}
@@ -2865,7 +2872,10 @@ func validateLaunchObservation(observation *launchObservation) error {
 			return errLaunchIncomplete
 		}
 		logStreams[buffer.Buffer] = true
-		if (buffer.Buffer == "crash" || buffer.Buffer == "events") && buffer.Status != "CAPTURED" {
+		if buffer.Buffer == "crash" && buffer.Status != "CAPTURED" {
+			return errLaunchIncomplete
+		}
+		if buffer.Buffer == "events" && buffer.Status != "CAPTURED" && buffer.Status != "OPTIONAL_SOURCE_UNAVAILABLE" {
 			return errLaunchIncomplete
 		}
 		lastNanos := observation.WindowStartNanos
@@ -3184,6 +3194,26 @@ func sanitizeLaunchStreamStderr(input string) []string {
 		remaining -= len(line)
 	}
 	return result
+}
+
+func knownNonPrivilegedSystemEventDenial(lifecycle diagnosticStreamLifecycle) bool {
+	if lifecycle.Buffer != "events" || lifecycle.ExecutionBoundary != "ADB_SHELL" ||
+		lifecycle.CommandIdentityStatus != "CAPTURED" || lifecycle.CommandUID != 2000 || lifecycle.CommandGID != 2000 ||
+		lifecycle.CommandSELinuxContext != "u:r:shell:s0" || lifecycle.StartStatus != "STARTED" ||
+		lifecycle.ReadinessStatus != "OUTPUT_SINK_READY" || lifecycle.TerminalStatus != "INCOMPLETE" ||
+		lifecycle.TerminalReason != "STDERR_BEFORE_OWNED_CANCELLATION" || lifecycle.ContextCancellationState != "CANCELED" ||
+		lifecycle.ExitRelativeToCancellation != "AFTER_OWNED_CANCELLATION" || !lifecycle.IntentionallyStopped ||
+		lifecycle.OutputTruncated || lifecycle.StderrTruncated || !lifecycle.StderrObserved || lifecycle.StderrBytes == 0 ||
+		lifecycle.StderrSHA256 == "" || !lifecycle.StartCapturedBeforeStop || !lifecycle.EndCapturedBeforeStop ||
+		lifecycle.CancellationSequence == 0 || lifecycle.FirstStderrSequence == 0 || lifecycle.CommandExitSequence <= lifecycle.CancellationSequence ||
+		lifecycle.FirstStderrSequence >= lifecycle.CancellationSequence || lifecycle.CancellationRequestedUTC.IsZero() ||
+		lifecycle.FirstStderrUTC.IsZero() || !lifecycle.FirstStderrUTC.Before(lifecycle.CancellationRequestedUTC) ||
+		lifecycle.CommandExitedUTC.Before(lifecycle.CancellationRequestedUTC) ||
+		strings.Join(lifecycle.StderrExcerpt, " ") != "logcat permission denied" {
+		return false
+	}
+	return (lifecycle.CommandStatus == "CANCELLED" && lifecycle.ExitCode == -1) ||
+		(lifecycle.CommandStatus == "ERROR" && lifecycle.ExitSignal != "")
 }
 
 func launchStreamContextState(ctx context.Context) string {
@@ -3816,24 +3846,34 @@ func (observation *launchObservation) finish(parent context.Context, failed bool
 		lifecycle.CommandGID = observation.CollectorIdentity.GID
 		lifecycle.CommandSELinuxContext = observation.CollectorIdentity.SELinuxContext
 		observation.StreamLifecycle = append(observation.StreamLifecycle, lifecycle)
-		required := stream.name == "crash" || stream.name == "events"
+		required := stream.name == "crash"
 		if required && lifecycle.TerminalStatus != "DRAINED" {
 			observation.incomplete(stream.name + " stream incomplete")
 		}
 		status := "CAPTURED"
-		if !complete || lifecycle.TerminalStatus != "DRAINED" {
+		eventsUnavailable := stream.name == "events" && knownNonPrivilegedSystemEventDenial(lifecycle)
+		if eventsUnavailable {
 			status = "OPTIONAL_SOURCE_UNAVAILABLE"
-			if required {
+		} else if !complete || lifecycle.TerminalStatus != "DRAINED" {
+			status = "OPTIONAL_SOURCE_UNAVAILABLE"
+			if required || stream.name == "events" {
 				status = "INCOMPLETE"
 				observation.incomplete(stream.name + " events incomplete")
 			}
 		}
 		observation.Logs = append(observation.Logs, diagnosticLogBuffer{Buffer: stream.name, Source: "stream", Status: status, Events: events})
 		if stream.name == "events" {
-			parsed := observation.SystemEvents.Status == "CAPTURED"
+			parsed := status == "CAPTURED" && observation.SystemEvents.Status == "CAPTURED"
+			if eventsUnavailable {
+				observation.SystemEvents.Status = "OPTIONAL_SOURCE_UNAVAILABLE"
+				observation.SystemEvents.Rejection = "NONPRIVILEGED_EVENT_BUFFER_PERMISSION_DENIED"
+			}
 			canonicalEvents := canonicalStartupSystemEventEvidence(observation.SystemEvents.Events)
-			observation.recordCompositeSource("launch-window", "ACTIVITY_MANAGER_EVENTS", startupEventParserV2, canonicalEvents, lifecycle.TerminalStatus == "DRAINED", parsed, observation.SystemEvents.Rejection, len(observation.SystemEvents.Events))
-			if lifecycle.TerminalStatus != "DRAINED" {
+			observation.recordCompositeSource("launch-window", "ACTIVITY_MANAGER_EVENTS", startupEventParserV2, canonicalEvents, status == "CAPTURED", parsed, observation.SystemEvents.Rejection, len(observation.SystemEvents.Events))
+			if eventsUnavailable {
+				observation.CompositeSources[len(observation.CompositeSources)-1].Status = "OPTIONAL_SOURCE_UNAVAILABLE"
+			}
+			if !eventsUnavailable && lifecycle.TerminalStatus != "DRAINED" {
 				observation.SystemEvents.Status = "INCOMPLETE"
 				observation.SystemEvents.Rejection = "EVENT_STREAM_NOT_DRAINED"
 			}
