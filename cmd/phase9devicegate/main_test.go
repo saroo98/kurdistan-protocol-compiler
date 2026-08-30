@@ -601,11 +601,14 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		if scenario == "stopped-package" {
 			stopped = "true"
 		}
+		identityName := "userId"
 		versionSuffix := ""
+		versionMetadata := ""
 		if fixture.api >= 34 || strings.Contains(scenario, "api34") || strings.Contains(scenario, "api36") {
-			versionSuffix = " minExtensionVersions=[]"
+			identityName = "appId"
+			versionMetadata = "\n    minExtensionVersions=[]"
 		}
-		fmt.Fprintf(stdout, "Activity Resolver Table:\nPackages:\n  Package [%s] (abc):\n    userId=10123\n    versionCode=42 minSdk=26 targetSdk=36%s\n    versionName=0.9.0-internal\n    User 0: ceDataInode=123 installed=true hidden=false suspended=false distractionFlags=0 stopped=%s notLaunched=false enabled=0 instant=false virtual=false\n", defaultAppPackage, versionSuffix, stopped)
+		fmt.Fprintf(stdout, "Activity Resolver Table:\nPackages:\n  Package [%s] (abc):\n    %s=10123\n    versionCode=42 minSdk=26 targetSdk=36%s%s\n    versionName=0.9.0-internal\n    User 0: ceDataInode=123 installed=true hidden=false suspended=false distractionFlags=0 stopped=%s notLaunched=false enabled=0 instant=false virtual=false\n", defaultAppPackage, identityName, versionSuffix, versionMetadata, stopped)
 	case command == "pidof "+defaultAppPackage:
 		if scenario == "process-death" {
 			return errors.New("fixture target no longer exists")
@@ -834,7 +837,7 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 		switch fixture.scenario {
 		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-proc-status":
 			stderrMode = "before-owned-cancellation"
-			stderrBefore = "logcat: permission denied\n"
+			stderrBefore = "Permission denied\n"
 		case "owned-shutdown-stderr":
 			stderrMode = "after-owned-cancellation"
 		case "post-cancellation-exit-failure":

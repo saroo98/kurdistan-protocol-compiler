@@ -3197,6 +3197,7 @@ func sanitizeLaunchStreamStderr(input string) []string {
 }
 
 func knownNonPrivilegedSystemEventDenial(lifecycle diagnosticStreamLifecycle) bool {
+	stderrExcerpt := strings.Join(lifecycle.StderrExcerpt, " ")
 	if lifecycle.Buffer != "events" || lifecycle.ExecutionBoundary != "ADB_SHELL" ||
 		lifecycle.CommandIdentityStatus != "CAPTURED" || lifecycle.CommandUID != 2000 || lifecycle.CommandGID != 2000 ||
 		lifecycle.CommandSELinuxContext != "u:r:shell:s0" || lifecycle.StartStatus != "STARTED" ||
@@ -3209,7 +3210,7 @@ func knownNonPrivilegedSystemEventDenial(lifecycle diagnosticStreamLifecycle) bo
 		lifecycle.FirstStderrSequence >= lifecycle.CancellationSequence || lifecycle.CancellationRequestedUTC.IsZero() ||
 		lifecycle.FirstStderrUTC.IsZero() || !lifecycle.FirstStderrUTC.Before(lifecycle.CancellationRequestedUTC) ||
 		lifecycle.CommandExitedUTC.Before(lifecycle.CancellationRequestedUTC) ||
-		strings.Join(lifecycle.StderrExcerpt, " ") != "logcat permission denied" {
+		(stderrExcerpt != "permission denied" && stderrExcerpt != "logcat permission denied") {
 		return false
 	}
 	return (lifecycle.CommandStatus == "CANCELLED" && lifecycle.ExitCode == -1) ||

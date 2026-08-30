@@ -26,7 +26,7 @@ const (
 	startupActivityParserAPI26 = "ACTIVITY_STATE_API26_V1"
 	startupActivityParserAPI30 = "ACTIVITY_STATE_API30_PLUS_V1"
 	startupEventParserV2       = "ACTIVITY_MANAGER_EVENTS_V2"
-	startupPackageParserV1     = "PACKAGE_STATE_V1"
+	startupPackageParserV2     = "PACKAGE_STATE_V2"
 	startupProcessParserV1     = "PROC_PROCESS_CROSSCHECK_V1"
 )
 
@@ -294,22 +294,43 @@ func parseStartupPackageState(raw, app, phase string) startupPackageState {
 		return state
 	}
 	userID, version, versionName, userState := -1, uint64(0), "", ""
+	extensionMetadataSeen := false
 	for _, rawLine := range strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n") {
 		line := strings.TrimSpace(rawLine)
-		if match := regexp.MustCompile(`^userId=([0-9]{1,10})$`).FindStringSubmatch(line); match != nil {
-			if userID != -1 {
+		if strings.HasPrefix(line, "userId=") || strings.HasPrefix(line, "appId=") {
+			match := regexp.MustCompile(`^(?:userId|appId)=([0-9]{1,10})$`).FindStringSubmatch(line)
+			if match == nil || userID != -1 {
 				return state
 			}
-			userID, _ = strconv.Atoi(match[1])
-		}
-		if match := regexp.MustCompile(`^versionCode=([0-9]{1,20}) minSdk=[0-9]{1,3} targetSdk=[0-9]{1,3}(?: minExtensionVersions=\[(?:[0-9]{1,3}=[0-9]{1,10}(?:, [0-9]{1,3}=[0-9]{1,10})*)?\])?$`).FindStringSubmatch(line); match != nil {
-			if version != 0 {
+			var err error
+			userID, err = strconv.Atoi(match[1])
+			if err != nil {
 				return state
 			}
-			version, _ = strconv.ParseUint(match[1], 10, 64)
 		}
-		if match := regexp.MustCompile(`^versionName=([A-Za-z0-9_.+-]{1,128})$`).FindStringSubmatch(line); match != nil {
-			if versionName != "" {
+		if strings.HasPrefix(line, "versionCode=") {
+			match := regexp.MustCompile(`^versionCode=([0-9]{1,20}) minSdk=[0-9]{1,3} targetSdk=[0-9]{1,3}(?: minExtensionVersions=\[(?:[0-9]{1,3}=[0-9]{1,10}(?:, [0-9]{1,3}=[0-9]{1,10})*)?\])?$`).FindStringSubmatch(line)
+			if match == nil || version != 0 {
+				return state
+			}
+			var err error
+			version, err = strconv.ParseUint(match[1], 10, 64)
+			if err != nil || version == 0 {
+				return state
+			}
+			if strings.Contains(line, " minExtensionVersions=") {
+				extensionMetadataSeen = true
+			}
+		}
+		if strings.HasPrefix(line, "minExtensionVersions=") {
+			if extensionMetadataSeen || !regexp.MustCompile(`^minExtensionVersions=\[(?:[0-9]{1,3}=[0-9]{1,10}(?:, [0-9]{1,3}=[0-9]{1,10})*)?\]$`).MatchString(line) {
+				return state
+			}
+			extensionMetadataSeen = true
+		}
+		if strings.HasPrefix(line, "versionName=") {
+			match := regexp.MustCompile(`^versionName=([A-Za-z0-9_.+-]{1,128})$`).FindStringSubmatch(line)
+			if match == nil || versionName != "" {
 				return state
 			}
 			versionName = match[1]
@@ -346,7 +367,7 @@ func (observation *launchObservation) captureStartupPackage(parent context.Conte
 	raw, ok := observation.query(parent, phase+"-package-state", "shell", "dumpsys", "package", observation.app)
 	state := parseStartupPackageState(raw, observation.app, phase)
 	parsed := state.Status == "CAPTURED"
-	observation.recordCompositeSource(phase, "PACKAGE_MANAGER", startupPackageParserV1, raw, ok, parsed, state.Rejection, 1)
+	observation.recordCompositeSource(phase, "PACKAGE_MANAGER", startupPackageParserV2, raw, ok, parsed, state.Rejection, 1)
 	observation.PackageState = append(observation.PackageState, state)
 	if !ok || !parsed {
 		observation.incomplete(phase + " package state unavailable")

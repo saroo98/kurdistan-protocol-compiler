@@ -80,11 +80,16 @@ func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycl
 		FirstStderrUTC: now, LastStderrUTC: now.Add(time.Millisecond), CommandExitedUTC: now.Add(2 * time.Second),
 		CancellationSequence: 2, FirstStderrSequence: 1, LastStderrSequence: 1, CommandExitSequence: 3,
 		ExitRelativeToCancellation: "AFTER_OWNED_CANCELLATION", StderrObserved: true, StderrBytes: 27,
-		StderrSHA256: strings.Repeat("a", 64), StderrExcerpt: []string{"logcat permission denied"},
+		StderrSHA256: strings.Repeat("a", 64), StderrExcerpt: []string{"permission denied"},
 		StartCapturedBeforeStop: true, EndCapturedBeforeStop: true, IntentionallyStopped: true,
 	}
 	if !knownNonPrivilegedSystemEventDenial(valid) {
-		t.Fatal("exact ordinary-shell permission denial was not recognized")
+		t.Fatal("exact CI ordinary-shell permission denial was not recognized")
+	}
+	logcatPrefixed := valid
+	logcatPrefixed.StderrExcerpt = []string{"logcat permission denied"}
+	if !knownNonPrivilegedSystemEventDenial(logcatPrefixed) {
+		t.Fatal("exact logcat-prefixed ordinary-shell permission denial was not recognized")
 	}
 	partialBeforeDenial := valid
 	partialBeforeDenial.ParserComplete = true
@@ -108,7 +113,7 @@ func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycl
 		{"not-intentional", func(value *diagnosticStreamLifecycle) { value.IntentionallyStopped = false }},
 		{"missing-marker", func(value *diagnosticStreamLifecycle) { value.EndCapturedBeforeStop = false }},
 		{"wrong-reason", func(value *diagnosticStreamLifecycle) { value.TerminalReason = "PARSER_INCOMPLETE" }},
-		{"ambiguous-diagnostic", func(value *diagnosticStreamLifecycle) { value.StderrExcerpt = []string{"permission denied"} }},
+		{"ambiguous-diagnostic", func(value *diagnosticStreamLifecycle) { value.StderrExcerpt = []string{"error permission denied"} }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			candidate := valid
@@ -122,16 +127,18 @@ func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycl
 
 func TestStartupPackageStateParsesSupportedAPI26AndExtensionAwareOutput(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		versionLine string
+		name         string
+		identityLine string
+		versionLines string
 	}{
-		{"api26", "versionCode=42 minSdk=26 targetSdk=36"},
-		{"api34-empty-extensions", "versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[]"},
-		{"api36-bound-extensions", "versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[30=7, 31=9]"},
+		{"api26-user-id", "userId=10123", "versionCode=42 minSdk=26 targetSdk=36"},
+		{"api34-app-id-empty-extensions", "appId=10123", "versionCode=42 minSdk=26 targetSdk=36\n    minExtensionVersions=[]"},
+		{"api36-app-id-bound-extensions", "appId=10123", "versionCode=42 minSdk=26 targetSdk=36\n    minExtensionVersions=[30=7, 31=9]"},
+		{"legacy-same-line-extensions", "userId=10123", "versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[]"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			raw := "Packages:\n  Package [" + defaultAppPackage + "] (abc):\n" +
-				"    userId=10123\n    " + test.versionLine + "\n" +
+				"    " + test.identityLine + "\n    " + test.versionLines + "\n" +
 				"    versionName=0.9.0-internal\n" +
 				"    User 0: ceDataInode=123 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false\n"
 			state := parseStartupPackageState(raw, defaultAppPackage, "terminal")
@@ -144,17 +151,30 @@ func TestStartupPackageStateParsesSupportedAPI26AndExtensionAwareOutput(t *testi
 }
 
 func TestStartupPackageStateRejectsMalformedOrAmbiguousExtensionMetadata(t *testing.T) {
-	for _, versionLine := range []string{
+	for _, versionLines := range []string{
 		"versionCode=42 minSdk=26 targetSdk=36 minExtensionVersions=[broken]",
+		"versionCode=42 minSdk=26 targetSdk=36\n    minExtensionVersions=[broken]",
+		"versionCode=42 minSdk=26 targetSdk=36\n    minExtensionVersions=[]\n    minExtensionVersions=[]",
 		"versionCode=42 minSdk=26 targetSdk=36 unexpected=true",
 	} {
 		raw := "Packages:\n  Package [" + defaultAppPackage + "] (abc):\n" +
-			"    userId=10123\n    " + versionLine + "\n" +
+			"    appId=10123\n    " + versionLines + "\n" +
 			"    versionName=0.9.0-internal\n" +
 			"    User 0: installed=true suspended=false stopped=false enabled=0\n"
 		if state := parseStartupPackageState(raw, defaultAppPackage, "terminal"); state.Status != "INCOMPLETE" {
-			t.Fatalf("malformed extension metadata was accepted: %q -> %+v", versionLine, state)
+			t.Fatalf("malformed extension metadata was accepted: %q -> %+v", versionLines, state)
 		}
+	}
+}
+
+func TestStartupPackageStateRejectsAmbiguousLegacyAndCurrentIdentityFields(t *testing.T) {
+	raw := "Packages:\n  Package [" + defaultAppPackage + "] (abc):\n" +
+		"    userId=10123\n    appId=10123\n" +
+		"    versionCode=42 minSdk=26 targetSdk=36\n    minExtensionVersions=[]\n" +
+		"    versionName=0.9.0-internal\n" +
+		"    User 0: installed=true suspended=false stopped=false enabled=0\n"
+	if state := parseStartupPackageState(raw, defaultAppPackage, "terminal"); state.Status != "INCOMPLETE" {
+		t.Fatalf("ambiguous package identity fields were accepted: %+v", state)
 	}
 }
 
@@ -276,5 +296,18 @@ func assertVersionedCompositeBinding(t *testing.T, observation launchObservation
 		if value[field] == nil {
 			t.Fatalf("versioned launch observation omitted %s", field)
 		}
+	}
+	packageSources := 0
+	for _, source := range observation.CompositeSources {
+		if source.Source != "PACKAGE_MANAGER" {
+			continue
+		}
+		packageSources++
+		if source.Parser != startupPackageParserV2 || source.Status != "CAPTURED" {
+			t.Fatalf("package-state source was not bound to the current strict parser: %+v", source)
+		}
+	}
+	if packageSources != 2 {
+		t.Fatalf("package-state source count=%d, want before-launch and terminal", packageSources)
 	}
 }
