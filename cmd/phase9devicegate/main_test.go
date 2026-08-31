@@ -627,7 +627,7 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 			api = fixtureAPIForScenario(scenario)
 		}
 		fmt.Fprintf(stdout, "google/sdk_gphone_x86_64/emu64xa:%d/TEST/123:userdebug/test-keys\n", api)
-	case command == "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint":
+	case command == "cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint":
 		api := fixture.api
 		if api == 0 {
 			api = fixtureAPIForScenario(scenario)
@@ -1073,7 +1073,7 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + eventProbe,
 		prefix + "logcat -b main -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
 		prefix + "logcat -b system -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
-		prefix + "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
+		prefix + "cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
 		prefix + "dumpsys package " + defaultAppPackage,
 		streamPrefix + "crash" + streamSuffix, eventStream, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
 		prefix + "log -p i -t KurdistanLaunchProbe " + startMarker,
@@ -1090,7 +1090,7 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + "dumpsys activity processes " + defaultAppPackage,
 		prefix + "dumpsys activity activities " + defaultAppPackage,
 		prefix + "dumpsys package " + defaultAppPackage,
-		prefix + "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
+		prefix + "cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
 		prefix + "log -p i -t KurdistanLaunchProbe " + endMarker,
 		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,

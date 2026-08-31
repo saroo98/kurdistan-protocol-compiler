@@ -274,7 +274,7 @@ func parseStartupBootBuildIdentity(raw string) (boot string, build string, ok bo
 }
 
 func (observation *launchObservation) captureStartupBoot(parent context.Context, phase string) {
-	raw, queryOK := observation.query(parent, phase+"-boot-build-identity", "shell", "sh", "-c",
+	raw, queryOK := observation.query(parent, phase+"-boot-build-identity", "shell",
 		"cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint")
 	bootRaw, buildRaw, framed := parseStartupBootBuildIdentity(raw)
 	bootIdentity, bootParsed := parseStartupIdentity(bootRaw)

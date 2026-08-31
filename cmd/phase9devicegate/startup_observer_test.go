@@ -90,12 +90,16 @@ func TestStartupBootAndBuildIdentityUseOneBoundedADBObservation(t *testing.T) {
 	if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
 		t.Fatalf("one bounded boot/build observation did not survive the reproduced inter-command drop: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
 	}
+	remoteCommand := "cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint"
 	combined, standalone := 0, 0
 	for _, call := range fixture.commands {
 		command := strings.Join(call.args[3:], " ")
 		switch command {
-		case "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint":
+		case remoteCommand, "sh -c " + remoteCommand:
 			combined++
+			if len(call.args) != 4 || call.args[3] != remoteCommand {
+				t.Errorf("composite boot/build command argv=%q, want one remote shell argument after the serial prefix", call.args)
+			}
 		case "cat /proc/sys/kernel/random/boot_id", "getprop ro.build.fingerprint":
 			standalone++
 		}
