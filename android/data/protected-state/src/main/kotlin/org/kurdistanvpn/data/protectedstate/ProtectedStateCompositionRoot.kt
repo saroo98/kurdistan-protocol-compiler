@@ -863,25 +863,45 @@ internal fun projectionRootIdentityMatches(isAbsolute: Boolean, isDirectory: Boo
     isAbsolute && isDirectory && device == expected.identity.device && inode == expected.identity.inode &&
         uid == expected.expectedUid && mode == 448
 
+internal data class ProjectionRootObservation(val isAbsolute: Boolean, val isDirectory: Boolean,
+    val device: Long, val inode: Long, val uid: Long, val mode: Int)
+
+internal fun canonicalProjectionRootForBoundIdentity(root: java.io.File, expected: DurableDirectory,
+    observe: (java.io.File) -> ProjectionRootObservation): java.io.File {
+    check(root.isAbsolute)
+    val absolute = root.absoluteFile
+    val canonical = root.canonicalFile
+    val candidates = if (absolute == canonical) listOf(absolute) else listOf(absolute, canonical)
+    check(candidates.all { candidate ->
+        val observed = observe(candidate)
+        projectionRootIdentityMatches(observed.isAbsolute, observed.isDirectory, observed.device,
+            observed.inode, observed.uid, observed.mode, expected)
+    }) { "PROJECTION_ROOT_IDENTITY_MISMATCH" }
+    return canonical
+}
+
 /** Android owners are confined to an already verified broker root. No parent is created. */
 internal class AndroidProjectionStoreOwnerFactory(private val context: android.content.Context,
     private val root: java.io.File, private val directory: DurableDirectory,
     private val layout: ProjectionLeafLayout) : ProjectionStoreOwnerFactory {
-    override fun requireRootIdentity() {
-        val stat = android.system.Os.lstat(root.absolutePath)
-        // Android may expose the credential root through an installation-local alias. The
-        // fixed final leaf is trusted only when lstat binds it to the already verified FD.
-        check(projectionRootIdentityMatches(root.isAbsolute, android.system.OsConstants.S_ISDIR(stat.st_mode),
-            stat.st_dev, stat.st_ino, stat.st_uid.toLong(), stat.st_mode and 511, directory)) {
-            "PROJECTION_ROOT_IDENTITY_MISMATCH"
-        }
+    private fun observe(candidate: java.io.File): ProjectionRootObservation {
+        val stat = android.system.Os.lstat(candidate.absolutePath)
+        return ProjectionRootObservation(candidate.isAbsolute,
+            android.system.OsConstants.S_ISDIR(stat.st_mode), stat.st_dev, stat.st_ino,
+            stat.st_uid.toLong(), stat.st_mode and 511)
     }
+    private fun verifiedCanonicalRoot(): java.io.File =
+        canonicalProjectionRootForBoundIdentity(root, directory, ::observe)
+    override fun requireRootIdentity() { verifiedCanonicalRoot() }
     override fun open(ownership: ProjectionOwnership, withSettings: Boolean): ProjectionStoreSession {
-        requireRootIdentity()
-        val room = ownership.own(AndroidRoomOwner(context, java.io.File(root, layout.room)))
+        // Room and DataStore accept path names rather than directory descriptors. Bind both the
+        // Android alias and its canonical spelling to the already verified directory capability
+        // before either path-based owner receives the canonical spelling.
+        val verifiedRoot = verifiedCanonicalRoot()
+        val room = ownership.own(AndroidRoomOwner(context, java.io.File(verifiedRoot, layout.room)))
         room.open()
-        val settings = if (withSettings) ownership.own(AndroidSettingsOwner(java.io.File(root, layout.settings))).also { it.open() } else null
-        requireRootIdentity()
+        val settings = if (withSettings) ownership.own(AndroidSettingsOwner(java.io.File(verifiedRoot, layout.settings))).also { it.open() } else null
+        verifiedCanonicalRoot()
         return object : ProjectionStoreSession {
             override fun readCatalog(): CatalogProjection = room.read()
             override fun publishCatalog(expected: CatalogProjection, next: ProtectedProjectionEntity,

@@ -67,4 +67,30 @@ class ProtectedStateStructuralBoundaryTest {
         assertFalse(projectionRootIdentityMatches(true, true, 55, 66, 1_235, 448, expected))
         assertFalse(projectionRootIdentityMatches(true, true, 55, 66, 1_234, 493, expected))
     }
+
+    @Test fun pathBasedProjectionOwnersUseCanonicalSpellingOnlyAfterBothNamesMatchTheBoundDirectory() {
+        val directory = java.nio.file.Files.createTempDirectory("projection-alias-").toFile().canonicalFile
+        try {
+            val alias = java.io.File(directory, ".").absoluteFile
+            assertNotEquals(alias, alias.canonicalFile)
+            val expected = DurableDirectory(7, 1_234, DurableFileIdentity(55, 66))
+            val matching = ProjectionRootObservation(true, true, 55, 66, 1_234, 448)
+            val observed = arrayListOf<java.io.File>()
+
+            val selected = canonicalProjectionRootForBoundIdentity(alias, expected) { candidate ->
+                observed += candidate
+                matching.copy(isAbsolute = candidate.isAbsolute)
+            }
+
+            assertEquals(alias.canonicalFile, selected)
+            assertEquals(listOf(alias, alias.canonicalFile), observed)
+            assertThrows(IllegalStateException::class.java) {
+                canonicalProjectionRootForBoundIdentity(alias, expected) { candidate ->
+                    if (candidate == alias.canonicalFile) matching.copy(inode = 67) else matching
+                }
+            }
+        } finally {
+            assertTrue(directory.delete())
+        }
+    }
 }
