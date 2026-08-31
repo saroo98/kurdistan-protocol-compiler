@@ -185,6 +185,35 @@ class RuntimeStartCoordinatorTest {
         assertTrue(uncertain.begin(RuntimeAuthorityTrigger.MANUAL, true, true) is RuntimeStartDecision.CleanupPending)
     }
 
+    @Test fun terminalFailureSurvivesRequiredCleanupDrain() {
+        val coordinator = coordinator()
+        val pending = coordinator.begin(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        val entered = CountDownLatch(1)
+        val finish = CountDownLatch(1)
+        val acquisition = Thread {
+            pending.guard.acquire { owner ->
+                entered.countDown()
+                check(finish.await(5, TimeUnit.SECONDS))
+                owner.own(RuntimeResourceKind.SOCKET, Closeable {})
+            }
+        }.apply { isDaemon = true; start() }
+        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        try {
+            assertTrue(
+                coordinator.failed(pending.token, RuntimeStartFailure.AUTHORITY_REJECTED) is
+                    RuntimeStartDecision.CleanupPending,
+            )
+        } finally {
+            finish.countDown()
+            acquisition.join(5_000)
+        }
+        assertFalse(acquisition.isAlive)
+        assertEquals(
+            RuntimeStartDecision.Rejected(RuntimeStartFailure.AUTHORITY_REJECTED),
+            coordinator.cleanupCompleted(pending.token),
+        )
+    }
+
     @Test fun stopWinsWhileSupersededAcquisitionStillOwnsLocalResources() {
         val coordinator = coordinator()
         val old = coordinator.begin(RuntimeAuthorityTrigger.AUTOMATIC, true, true) as RuntimeStartDecision.RequestAuthority

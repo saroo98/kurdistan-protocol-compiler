@@ -31,7 +31,8 @@ sealed interface RuntimeStartDecision {
 class RuntimeStartCoordinator internal constructor(val epoch: String, private val requestIds: () -> String = { UUID.randomUUID().toString().replace("-", "") }) {
     private enum class Phase { AUTHORITY, ACQUIRING, ACTIVE, STOPPING }
     private data class Current(val token: RuntimeStartToken, val guard: RuntimeActivationGuard,
-        var phase: Phase, var budget: Int?, val origin: RuntimeAuthorityTrigger)
+        var phase: Phase, var budget: Int?, val origin: RuntimeAuthorityTrigger,
+        var terminalFailure: RuntimeStartFailure? = null)
     private data class Next(val trigger: RuntimeAuthorityTrigger, val requestId: String?, val attempt: Int,
         val budget: Int?, val origin: RuntimeAuthorityTrigger, val delay: Long)
     private var generation = 0L
@@ -138,14 +139,17 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
                 val attempt = token.retryAttempt + 1
                 queued = Next(RuntimeAuthorityTrigger.NETWORK_RETRY, null, attempt, budget, value.origin,
                     1000L shl (attempt - 1))
-            } else { queued = null; suppressAutomatic = true }
+                value.terminalFailure = null
+            } else {
+                queued = null
+                suppressAutomatic = true
+                value.terminalFailure = if (failure.retryable) RuntimeStartFailure.RETRY_EXHAUSTED else failure
+            }
             value.phase = Phase.STOPPING
             value.guard.markCancellation()
             value
         }
-        val retired = retire(active)
-        return if (retired == RuntimeStartDecision.Idle)
-            RuntimeStartDecision.Rejected(if (failure.retryable) RuntimeStartFailure.RETRY_EXHAUSTED else failure) else retired
+        return retire(active)
     }
 
     fun stop(reason: RuntimeStopReason): RuntimeStartDecision {
@@ -154,6 +158,7 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
             suppressAutomatic = true
             queued = null
             (current ?: return RuntimeStartDecision.Idle).also {
+                it.terminalFailure = null
                 it.phase = Phase.STOPPING
                 it.guard.markCancellation()
             }
@@ -187,7 +192,11 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
         current = null
         val next = queued
         queued = null
-        return if (next == null) RuntimeStartDecision.Idle else start(next)
+        return when {
+            next != null -> start(next)
+            active.terminalFailure != null -> RuntimeStartDecision.Rejected(active.terminalFailure!!)
+            else -> RuntimeStartDecision.Idle
+        }
     }
     private fun start(next: Next): RuntimeStartDecision {
         if (generation == Long.MAX_VALUE || usedIds.size >= 4096) return RuntimeStartDecision.Rejected(RuntimeStartFailure.INTERNAL_FAILURE)
