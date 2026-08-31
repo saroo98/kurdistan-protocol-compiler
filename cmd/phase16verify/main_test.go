@@ -90,19 +90,19 @@ func TestVerifyDecentralizedAuthorityRejectsMandatoryCloud(t *testing.T) {
 	}
 }
 
-func TestVerifyPrivatePlanningAbsentRejectsPublicRoadmap(t *testing.T) {
+func TestVerifyPublicationBoundaryRejectsUnexpectedArtifact(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "ROADMAP.md"), []byte("private roadmap\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "RZ-evidence-ref-069"), []byte("retired publication artifact\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyPrivatePlanningAbsent(root); err == nil {
-		t.Fatal("public roadmap accepted")
+	if err := verifyPublicationBoundary(root); err == nil {
+		t.Fatal("retired publication artifact accepted")
 	}
 }
 
 func TestVerifyDecentralizedAuthorityRejectsGlobalRoot(t *testing.T) {
 	root := copyDecentralizedAuthority(t)
-	path := filepath.Join(root, filepath.FromSlash("docs/KIP-0093-decentralized-self-hosted-kurd-network.md"))
+	path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/SECURITY.md"))
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

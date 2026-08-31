@@ -42,16 +42,6 @@
       "post_sha256": "9c5eae87c6617387ef7749955d8035aa21dfbcb29267c8819e0a1395400d71a7"
     },
     {
-      "path": "docs/PHASE16_API.md",
-      "pre_sha256": "5307090396eb65486d3d26f47fe8355fbd6b131e0d80c37f7fd7725c483c3a32",
-      "post_sha256": "c7012500054fae1797a4e684725da9c706eb5a2eda4166f52a993e4603cf0565"
-    },
-    {
-      "path": "docs/PHASE16_EVIDENCE_INDEX.md",
-      "pre_sha256": "137f81d9723c493e2420e53566ade3b68896251bb4b308127890d969f750ec28",
-      "post_sha256": "95bde2bf99efb470e31176c559a6222ad3644ddef626f54066e1488824845460"
-    },
-    {
       "path": "infra/terraform/environments/production/main.tf",
       "pre_sha256": "f6c42bc9cac6eb1e8345005db0750fe0529277b9deaf87a56d8e4e6f5632ad4e",
       "post_sha256": "2f9c3548bf165c6d6b71bf687d925f5e6ac90910408a773da57ac99fe022df5e"

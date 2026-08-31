@@ -510,9 +510,9 @@
     "public_claims": {
       "documents_scanned": [
         "README.md",
-        "docs/index.html",
-        "docs/KIP-0048-https-like-carrier-lab-prototype.md",
-        "docs/KIP-0049-https-like-carrier-adversarial-hardening.md"
+        "docs/iz-evidence-ref-002",
+        "docs/KZ-evidence-ref-018",
+        "docs/KZ-evidence-ref-019"
       ],
       "claim_safety_passed": true,
       "conclusion": "passed"
@@ -540,7 +540,7 @@
     "payload_logged": false,
     "secret_logged": false,
     "recommended_next_milestone": "M44: DNS-survival / constrained-carrier design lock",
-    "report_hash": "sha256:c469871ac3d99eff0d134d84b0555d14106f7459ce1e6ac9f46bf5b60c7d7848",
+    "report_hash": "sha256:4f0d435cb612f012615ad71a0b4a9cb9c8f80c26865a723df320531c42dc0af8",
     "conclusion": "passed"
   },
   "misuse": {
@@ -972,12 +972,12 @@
       "kind": "claim_safety",
       "scenario": "https_adversary_public_claim_safety",
       "expected": "passed",
-      "summary_hash": "sha256:705a01520af65fb3afba1f2ce34e8edb68b90e741835a72d2d44b0bdc907ff1d",
+      "summary_hash": "sha256:45afa25b0fe2253f1cf360c6c6577659dff4f4bb881a5aa378e9da9beeca627b",
       "payload_logged": false,
       "secret_logged": false
     }
   ],
-  "fixture_hash": "sha256:6bda68faa3ca656bbee5dede8461a55ff90f57966306467f846332d83cc9ee65",
+  "fixture_hash": "sha256:10772c587b26f111fea881cdcf75f98e3d83fefc79852fac5b7cb29ea334616d",
   "payload_logged": false,
   "secret_logged": false,
   "conclusion": "passed"

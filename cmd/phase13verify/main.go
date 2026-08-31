@@ -17,9 +17,9 @@ import (
 )
 
 var requiredFiles = []string{
-	"docs/KIP-0088-phase13-android-product-completion.md",
-	"docs/PHASE13_EVIDENCE_INDEX.md",
-	"docs/PHASE13_FEATURE_COVERAGE.md",
+	"docs/KZ-evidence-ref-042",
+	"docs/PZ-evidence-ref-050",
+	"docs/PZ-evidence-ref-051",
 	"testdata/evidence/phase13/acceptance-status.json",
 	"android/config/phase13-required-device-tests.txt",
 }

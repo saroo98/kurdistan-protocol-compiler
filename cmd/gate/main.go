@@ -2,7 +2,7 @@
 // Copyright 2026 Saro
 
 // Command gate runs the repository's full validation bar in one step: the same
-// gates documented in docs/GOVERNANCE.md. It exists to give a single
+// gates documented in docs/GZ-evidence-ref-001. It exists to give a single
 // reproducible pre-merge check locally and in the repository CI workflow.
 //
 // Usage:

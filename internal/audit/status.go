@@ -20,7 +20,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "> Staged product-development program. Phases 8-11 add bounded profile cryptography, protected Android state, a reserved-range `VpnService`/TUN runtime, and authenticated Kurd-over-TLS/TCP owned-loopback conformance. Owned-network, public-relay, field-resilience, production-safety, deployment, and release evidence remains **[UNVERIFIED]**.")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "> Legend: `[live]` executes real behavior locally (current network I/O remains owned-loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The audit table includes many historical `[model]`/`[plan]` gates; the separate Phase 9-11 Android and transport boundary is enforced by `go run ./cmd/gate -android` and `docs/PHASE11_EVIDENCE_INDEX.md`. The security and runtime mutant gates report real lab fault-injection detector sensitivity with paired controls. A pass does not prove defect absence, production security, field resilience, release readiness, or authorization to merge or deploy.")
+	fmt.Fprintln(&b, "> Legend: `[live]` executes real behavior locally (current network I/O remains owned-loopback-only) · `[model]` deterministic in-memory contract, not live · `[plan]` design spec only. The audit table includes many historical `[model]`/`[plan]` gates; the separate Phase 9-11 Android and transport boundary is enforced by `go run ./cmd/gate -android` and `docs/PZ-evidence-ref-048`. The security and runtime mutant gates report real lab fault-injection detector sensitivity with paired controls. A pass does not prove defect absence, production security, field resilience, release readiness, or authorization to merge or deploy.")
 	fmt.Fprintln(&b)
 	fmt.Fprintf(&b, "- Latest audit mode: `%s`\n", report.Mode)
 	fmt.Fprintf(&b, "- Profile count: `%d`\n", report.ProfileCount)
@@ -82,7 +82,7 @@ func RenderStatus(report AuditReport) string {
 	fmt.Fprintln(&b)
 	if report.BaselineComparison == nil {
 		fmt.Fprintln(&b, "- No baseline comparison was run.")
-		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck --quick --status STATUS.md --baseline testdata/audit/baseline-small.json` to include longitudinal deltas.")
+		fmt.Fprintln(&b, "- Run `go run ./cmd/kcheck --quick --status SZ-evidence-ref-070 --baseline testdata/audit/baseline-small.json` to include longitudinal deltas.")
 	} else {
 		comparison := report.BaselineComparison
 		fmt.Fprintf(&b, "- Conclusion: `%s`\n", comparison.Conclusion)
@@ -491,7 +491,7 @@ func RenderStatus(report AuditReport) string {
 		renderNamedGateResult(&b, report.Gates, "adaptivepath_generated_backend_parity")
 		renderNamedGateResult(&b, report.Gates, "adaptivepath_trace_hygiene")
 		renderNamedGateResult(&b, report.Gates, "adaptivepath_mutant_detection")
-		renderNamedGateResult(&b, report.Gates, "adaptivepath_roadmap_public_docs")
+		renderNamedGateResult(&b, report.Gates, "adaptivepath_public_docs")
 		if strings.HasPrefix(report.Mode, "adaptivepath-") {
 			summary := toJSONMap(report.TraceScanSummary)
 			renderSummaryMap(&b, summary, []string{
@@ -678,7 +678,7 @@ func RenderStatus(report AuditReport) string {
 // milestoneFrontierNote derives an honest current-frontier line from the gates
 // actually present in this report, instead of a hardcoded (and lagging) future
 // milestone claim. It names the latest modelled surface that was evaluated and
-// points at the KIP docs and the safety boundary.
+// points at the safety boundary.
 func milestoneFrontierNote(report AuditReport) string {
 	if _, ok := gateByName(report.Gates, "androidcarrier_report"); ok {
 		return "The latest modelled surface in this audit table is the Android carrier integration path (`androidcarrier_*`). Separately, Phases 8-11 implement and gate profile cryptography, protected Android state, reserved-range TUN behavior, and authenticated owned-loopback Kurd transport. Owned-LAN, owned-relay, physical-device matrix, capacity, handover, field-resilience, deployment, and release evidence remains **[UNVERIFIED]**."
@@ -686,7 +686,7 @@ func milestoneFrontierNote(report AuditReport) string {
 	if _, ok := gateByName(report.Gates, "androidvpnservice_report"); ok {
 		return "The latest modelled surface in this audit table is the Android VpnService prototype (`androidvpnservice_*`). Separately gated Phase 10/11 code implements reserved-range TUN behavior and authenticated owned-loopback Kurd transport. Non-loopback and production evidence remains **[UNVERIFIED]**."
 	}
-	return "Per-milestone tracking lives in the `docs/KIP-*.md` documents and the gate table above. Only the specifically authorized owned-loopback transport is live locally; non-loopback and production operation remains closed."
+	return "Implementation evidence is summarized by the gate table above. Only the specifically authorized owned-loopback transport is live locally; non-loopback and production operation remains closed."
 }
 
 func WriteStatus(path string, report AuditReport) error {

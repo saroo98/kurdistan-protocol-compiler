@@ -5,12 +5,13 @@ on:
     paths:
       - 'cmd/kurd-node/**'
       - 'cmd/kurdctl/**'
+      - 'config/selfhost/**'
       - 'deploy/selfhost/**'
-      - 'docs/KIP-0093-decentralized-self-hosted-kurd-network.md'
-      - 'docs/PHASE16_*'
       - 'docs/self-hosting/**'
       - 'internal/selfhost/**'
       - 'cmd/phase16verify/**'
+      - 'testdata/evidence/phase16/**'
+      - 'testdata/schemas/phase16-*'
       - '.github/workflows/phase16-*.yml'
   workflow_dispatch:
 

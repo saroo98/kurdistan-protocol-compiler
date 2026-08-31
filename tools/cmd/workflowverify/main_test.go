@@ -101,6 +101,35 @@ jobs:
 	}
 }
 
+func TestVerifyWorkflowAllowsPagesWriteOnlyForWebsiteDeployment(t *testing.T) {
+	workflow := `name: pages
+on: [workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  deploy:
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+`
+	for name, wantPass := range map[string]bool{
+		"website-pages.yml": true,
+		"ordinary.yml":      false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeWorkflow(t, root, name, workflow)
+			err := verifyRoot(root)
+			if (err == nil) != wantPass {
+				t.Fatalf("pass=%v error=%v", wantPass, err)
+			}
+		})
+	}
+}
+
 func TestVerifyKnownWorkflowContractRejectsAttemptAmbiguityAndUnboundDeviceBytes(t *testing.T) {
 	for name, content := range map[string]string{
 		"assurance.yml": "name: incomplete assurance",

@@ -67,7 +67,7 @@ func TestAdaptivePathAuditQuickIncludesRequiredGates(t *testing.T) {
 		"adaptivepath_generated_backend_parity",
 		"adaptivepath_trace_hygiene",
 		"adaptivepath_mutant_detection",
-		"adaptivepath_roadmap_public_docs",
+		"adaptivepath_public_docs",
 	}
 	for _, name := range required {
 		if _, ok := gateByName(report.Gates, name); !ok {
@@ -76,8 +76,8 @@ func TestAdaptivePathAuditQuickIncludesRequiredGates(t *testing.T) {
 	}
 }
 
-func TestAdaptivePathRoadmapPublicDocsGatePasses(t *testing.T) {
-	gate := AdaptivePathRoadmapPublicDocsGate()
+func TestAdaptivePathPublicDocsGatePasses(t *testing.T) {
+	gate := AdaptivePathPublicDocsGate()
 	if !gate.Passed {
 		t.Fatalf("public docs gate failed: %v", gate.Details["failures"])
 	}

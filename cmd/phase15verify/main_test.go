@@ -52,8 +52,8 @@ func TestDecodeContractRejectsTrailingJSON(t *testing.T) {
 func TestVerifyHumanParityRejectsMismatchedBaseline(t *testing.T) {
 	value := validContractForTest()
 	root := t.TempDir()
-	writeTestFile(t, root, "docs/PHASE15_PRODUCTION_CONTRACT.md", "baseline deadbeef release `NO_GO` API 26 API 36 arm64-v8a x86_64")
-	writeTestFile(t, root, "docs/KIP-0090-phase15-production-contract-freeze.md", value.Baseline.SourceCommit+" `NO_GO`")
+	writeTestFile(t, root, "docs/PZ-evidence-ref-059", "baseline deadbeef release `NO_GO` API 26 API 36 arm64-v8a x86_64")
+	writeTestFile(t, root, "docs/KZ-evidence-ref-044", value.Baseline.SourceCommit+" `NO_GO`")
 	if err := verifyHumanParity(root, value); err == nil {
 		t.Fatal("expected human/machine baseline mismatch to fail")
 	}
@@ -61,9 +61,9 @@ func TestVerifyHumanParityRejectsMismatchedBaseline(t *testing.T) {
 
 func TestVerifyPhase14ReconciliationRejectsIntegrationPending(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "docs/KIP-0089-phase14-assurance-field-release.md", "candidate integration pending")
-	writeTestFile(t, root, "docs/PHASE14_EVIDENCE_INDEX.md", "integrated on main")
-	writeTestFile(t, root, "docs/PHASE14_READINESS_MATRIX.md", "integrated on main")
+	writeTestFile(t, root, "docs/KZ-evidence-ref-043", "candidate integration pending")
+	writeTestFile(t, root, "docs/PZ-evidence-ref-052", "integrated on main")
+	writeTestFile(t, root, "docs/PZ-evidence-ref-056", "integrated on main")
 	writeTestFile(t, root, "testdata/evidence/phase14/acceptance-status.json", `{"priorPhaseBaseline":{"integrationState":"INTEGRATED_ON_MAIN"}}`)
 	if err := verifyPhase14Reconciliation(root); err == nil {
 		t.Fatal("expected stale Phase 14 integration language to fail")
@@ -93,10 +93,10 @@ func TestVerifyBaselineWorkflowReadsFrozenCommit(t *testing.T) {
 	}
 }
 
-func TestVerifyRoadmapAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
+func TestVerifyReleaseBoundaryAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
 	value := validContractForTest()
 	root := t.TempDir()
-	writeTestFile(t, root, "ROADMAP.md", strings.Join([]string{
+	writeTestFile(t, root, "RZ-evidence-ref-069", strings.Join([]string{
 		"Phases 1-15 are integrated on `main` at `83e262921d3ae8ecd8c04a2a440699b6cccace7b`.",
 		"Phase 16 is active. Its evidence-preserving CI foundation is integrated.",
 		value.Baseline.SourceCommit,
@@ -106,8 +106,8 @@ func TestVerifyRoadmapAcceptsIntegratedPhase15AndActivePhase16(t *testing.T) {
 		"| 16 | Active |",
 		"The current release decision is `NO_GO`.",
 	}, "\n"))
-	if err := verifyRoadmap(root, value); err != nil {
-		t.Fatalf("verify roadmap: %v", err)
+	if err := verifyReleaseBoundary(root, value); err != nil {
+		t.Fatalf("verify release boundary: %v", err)
 	}
 }
 

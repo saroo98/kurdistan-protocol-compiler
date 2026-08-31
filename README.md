@@ -232,8 +232,8 @@ testing. Release variants must not contain those fixtures.
   a public issue containing exploit details or secrets.
 
 See [self-hosting security](docs/self-hosting/SECURITY.md),
-[project safety boundaries](docs/safety.md), and
-[governance](docs/GOVERNANCE.md).
+[project safety boundaries](docs/sb-evidence-ref-068), and
+[governance](docs/GZ-evidence-ref-001).
 
 ## Current boundary
 

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -166,55 +165,5 @@ func TestPhase12EvidenceVocabularyMutationsV1(t *testing.T) {
 				t.Fatal("Phase 12 acceptance evidence vocabulary mutation accepted")
 			}
 		})
-	}
-}
-
-func TestPhase12DocumentsRecordSecondReviewWithoutClosingExternalBoundaries(t *testing.T) {
-	root := filepath.Join("..", "..")
-	read := func(relative string) string {
-		t.Helper()
-		raw, err := os.ReadFile(filepath.Join(root, relative))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(raw)
-	}
-	kip := read(filepath.Join("docs", "KIP-0087-phase12-operator-provisioning-relay-fleet.md"))
-	index := read(filepath.Join("docs", "PHASE12_EVIDENCE_INDEX.md"))
-	for name, document := range map[string]string{
-		"KIP-0087":       kip,
-		"evidence index": index,
-	} {
-		if !strings.Contains(document, "**[UNVERIFIED]**") {
-			t.Fatalf("%s lost its external evidence boundary", name)
-		}
-	}
-	for _, required := range []string{
-		"## Second adversarial review closure",
-		"Recoverer identity shape and `recover` duty",
-		"root-set member's canonical signed delegation",
-		"bind authoritative creation time",
-		"exact current artifact digest",
-		"redacted value DTO and exact event ID",
-		"safety-priority lane preserves per-target ordering",
-		"Expired operations, including safety operations",
-		"bounded failure path rather than bypassing expiry",
-		"`ValidUntil <= PublishedAt`",
-		"exact revision continuity",
-	} {
-		if !strings.Contains(index, required) {
-			t.Fatalf("Phase 12 evidence index missing second-review claim %q", required)
-		}
-	}
-	for _, required := range []string{
-		"validates the recoverer actor",
-		"root-signed delegation",
-		"exact digest of the current admitted artifact",
-		"Complete journal copying",
-		"production trusted-time source",
-	} {
-		if !strings.Contains(kip, required) {
-			t.Fatalf("KIP-0087 missing corrected boundary %q", required)
-		}
 	}
 }

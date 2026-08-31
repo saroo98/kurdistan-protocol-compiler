@@ -28,8 +28,8 @@ import (
 const contractPath = "testdata/evidence/phase15/production-contract.json"
 
 var requiredFiles = []string{
-	"docs/KIP-0090-phase15-production-contract-freeze.md",
-	"docs/PHASE15_PRODUCTION_CONTRACT.md",
+	"docs/KZ-evidence-ref-044",
+	"docs/PZ-evidence-ref-059",
 	contractPath,
 	evidenceoverlay.SuccessorPath,
 }
@@ -151,7 +151,7 @@ func verify(root string) error {
 	if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
 		return err
 	}
-	if err := verifyRoadmap(root, value); err != nil {
+	if err := verifyReleaseBoundary(root, value); err != nil {
 		return err
 	}
 	if err := verifyHumanParity(root, value); err != nil {
@@ -165,10 +165,10 @@ func verify(root string) error {
 		return fmt.Errorf("verify Phase 15 successor overlay: %w", err)
 	}
 	for _, required := range []string{
-		"ROADMAP.md",
-		"docs/KIP-0089-phase14-assurance-field-release.md",
-		"docs/PHASE14_EVIDENCE_INDEX.md",
-		"docs/PHASE14_READINESS_MATRIX.md",
+		"RZ-evidence-ref-069",
+		"docs/KZ-evidence-ref-043",
+		"docs/PZ-evidence-ref-052",
+		"docs/PZ-evidence-ref-056",
 		"testdata/evidence/phase14/acceptance-status.json",
 	} {
 		if predecessors[required] == "" {
@@ -225,15 +225,15 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 	return nil
 }
 
-func verifyRoadmap(root string, value contract) error {
-	raw, err := os.ReadFile(filepath.Join(root, "ROADMAP.md"))
+func verifyReleaseBoundary(root string, value contract) error {
+	raw, err := os.ReadFile(filepath.Join(root, "RZ-evidence-ref-069"))
 	if errors.Is(err, os.ErrNotExist) {
 		predecessors, overlayErr := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
 		if overlayErr != nil {
 			return overlayErr
 		}
-		if predecessors["ROADMAP.md"] == "" {
-			return errors.New("retired public ROADMAP.md lacks authenticated predecessor evidence")
+		if predecessors["RZ-evidence-ref-069"] == "" {
+			return errors.New("retired public RZ-evidence-ref-069 lacks authenticated predecessor evidence")
 		}
 		return nil
 	}
@@ -252,7 +252,7 @@ func verifyRoadmap(root string, value contract) error {
 		"The current release decision is `NO_GO`",
 	} {
 		if !strings.Contains(text, required) {
-			return fmt.Errorf("ROADMAP.md is missing Phase 15 authority %q", required)
+			return fmt.Errorf("RZ-evidence-ref-069 is missing Phase 15 authority %q", required)
 		}
 	}
 	return nil
@@ -260,7 +260,7 @@ func verifyRoadmap(root string, value contract) error {
 
 func verifyHumanParity(root string, value contract) error {
 	requirements := map[string][]string{
-		"docs/PHASE15_PRODUCTION_CONTRACT.md": {
+		"docs/PZ-evidence-ref-059": {
 			value.Baseline.SourceCommit,
 			"`NO_GO`",
 			fmt.Sprintf("API %d", value.Android.MinAPI),
@@ -270,7 +270,7 @@ func verifyHumanParity(root string, value contract) error {
 			value.Baseline.WorkflowPath,
 			value.Baseline.WorkflowSHA256,
 		},
-		"docs/KIP-0090-phase15-production-contract-freeze.md": {
+		"docs/KZ-evidence-ref-044": {
 			value.Baseline.SourceCommit,
 			"`NO_GO`",
 			value.Baseline.CandidateCIRun,
@@ -294,9 +294,9 @@ func verifyHumanParity(root string, value contract) error {
 
 func verifyPhase14Reconciliation(root string) error {
 	for _, relative := range []string{
-		"docs/KIP-0089-phase14-assurance-field-release.md",
-		"docs/PHASE14_EVIDENCE_INDEX.md",
-		"docs/PHASE14_READINESS_MATRIX.md",
+		"docs/KZ-evidence-ref-043",
+		"docs/PZ-evidence-ref-052",
+		"docs/PZ-evidence-ref-056",
 	} {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {

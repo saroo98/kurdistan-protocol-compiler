@@ -87,46 +87,6 @@
       "post_sha256": "365e5728823b6fe3ccee4bffb94665d52d2a83ef3625fa8ca911d6b5ed3e59d9"
     },
     {
-      "path": "docs/KIP-0092-phase16-production-trust.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "f7bf0e27e8b6692b05edd573ae5c16eaf156a80fb609e6c8963d394d9c72622f"
-    },
-    {
-      "path": "docs/PHASE16_API.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "5307090396eb65486d3d26f47fe8355fbd6b131e0d80c37f7fd7725c483c3a32"
-    },
-    {
-      "path": "docs/PHASE16_CEREMONIES.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "bcaa6efec6ad848bac6261f1ca6facaa141413e588252a4c48db1a977907d0c5"
-    },
-    {
-      "path": "docs/PHASE16_DISASTER_RECOVERY.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "89c509431dcd3560b0c826b4fe8eb3073136022f0f5154ecffb299d2f226b62e"
-    },
-    {
-      "path": "docs/PHASE16_EVIDENCE_INDEX.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "137f81d9723c493e2420e53566ade3b68896251bb4b308127890d969f750ec28"
-    },
-    {
-      "path": "docs/PHASE16_OPERATIONS.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "c85f7bad1dd4b16d5451f96fd4f14623a73adc5ac1c1f08fef7139e7778def43"
-    },
-    {
-      "path": "docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "6dd90bd9acca28588f66971e5d25af5411d9985f9e99a789762f69b2a269b75d"
-    },
-    {
-      "path": "docs/PHASE16_THREAT_MODEL.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "0ed962b48a296b9a484d4f8b90c4aedca00a481a2912d9f0f36c438145450b9d"
-    },
-    {
       "path": "infra/terraform/environments/production/.terraform.lock.hcl",
       "pre_evidence": "ABSENT",
       "post_sha256": "0eed622c36b78a92df96f7b3964670b7dbddeccbf26eab6532451a88fa6da419"

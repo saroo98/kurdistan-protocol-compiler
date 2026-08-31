@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
+  <title id="title">Kurdistan VPN mark</title>
+  <desc id="desc">A minimal letter K formed by connected network routes</desc>
+  <rect x="14" y="14" width="132" height="132" rx="30" fill="#11132b" stroke="#55c9bf" stroke-width="4"/>
+  <path d="M52 43v74M54 80l54-37M54 80l54 37" fill="none" stroke="#55c9bf" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="54" cy="80" r="6" fill="#11132b"/>
+</svg>

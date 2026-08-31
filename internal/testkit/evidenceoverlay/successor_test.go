@@ -58,13 +58,13 @@ func TestPhase17SuccessorOverlayUsesBoundedExpandedCardinality(t *testing.T) {
 
 func TestLoadSuccessorVerifiesPostStateAndReturnsPredecessors(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
+	path := "RZ-evidence-ref-069"
 	post := []byte("phase 15\n")
 	if err := os.WriteFile(filepath.Join(root, path), post, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	postDigest := sha256.Sum256(post)
-	overlay := `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"` +
+	overlay := `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"` +
 		"2667320dee8453456f13e3c69928310fe5eab32f3bd95c58cdbb7b8699ad7a4e" +
 		`","post_sha256":"` + hex.EncodeToString(postDigest[:]) + `"}]}`
 	if err := os.MkdirAll(filepath.Join(root, "testdata", "evidence", "phase15"), 0o755); err != nil {
@@ -87,11 +87,11 @@ func TestLoadSuccessorRejectsPostMutation(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "testdata", "evidence", "phase15"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	overlay := `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"2667320dee8453456f13e3c69928310fe5eab32f3bd95c58cdbb7b8699ad7a4e","post_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}`
+	overlay := `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"2667320dee8453456f13e3c69928310fe5eab32f3bd95c58cdbb7b8699ad7a4e","post_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}`
 	if err := os.WriteFile(filepath.Join(root, SuccessorPath), []byte(overlay), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "ROADMAP.md"), []byte("mutated"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "RZ-evidence-ref-069"), []byte("mutated"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadSuccessor(root, "phase15-production-contract-v1"); err == nil {
@@ -102,23 +102,23 @@ func TestLoadSuccessorRejectsPostMutation(t *testing.T) {
 func TestLoadSuccessorAcceptsAuthenticatedDeletion(t *testing.T) {
 	root := t.TempDir()
 	predecessor := strings.Repeat("a", 64)
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+predecessor+`","post_evidence":"ABSENT"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+predecessor+`","post_evidence":"ABSENT"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := pre["ROADMAP.md"]; got != predecessor {
+	if got := pre["RZ-evidence-ref-069"]; got != predecessor {
 		t.Fatalf("predecessor = %q, want %q", got, predecessor)
 	}
 }
 
 func TestLoadSuccessorRejectsDeletionWhenPathStillExists(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "ROADMAP.md"), []byte("still public"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "RZ-evidence-ref-069"), []byte("still public"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+strings.Repeat("a", 64)+`","post_evidence":"ABSENT"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+strings.Repeat("a", 64)+`","post_evidence":"ABSENT"}]}`)
 
 	if _, err := LoadSuccessor(root, "phase15-production-contract-v1"); err == nil {
 		t.Fatal("expected deletion evidence to reject an existing path")
@@ -128,20 +128,20 @@ func TestLoadSuccessorRejectsDeletionWhenPathStillExists(t *testing.T) {
 func TestLoadSuccessorReturnsOptionalPredecessorsWithoutLegacyBase(t *testing.T) {
 	root := t.TempDir()
 	predecessor := strings.Repeat("b", 64)
-	writeOverlayForTest(t, root, PublicDocumentationSuccessorPath, `{"version":"public-documentation-sanitization-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+predecessor+`","post_evidence":"ABSENT"}]}`)
+	writeOverlayForTest(t, root, PublicDocumentationSuccessorPath, `{"version":"public-documentation-sanitization-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+predecessor+`","post_evidence":"ABSENT"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := pre["ROADMAP.md"]; got != predecessor {
+	if got := pre["RZ-evidence-ref-069"]; got != predecessor {
 		t.Fatalf("predecessor = %q, want %q", got, predecessor)
 	}
 }
 
 func TestLoadSuccessorChainsPhase16IntoPhase15(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
+	path := "RZ-evidence-ref-069"
 	phase14 := strings.Repeat("1", 64)
 	phase15Bytes := []byte("phase 15\n")
 	phase16Bytes := []byte("phase 16\n")
@@ -150,8 +150,8 @@ func TestLoadSuccessorChainsPhase16IntoPhase15(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, path), phase16Bytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16Digest[:])+`"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -164,7 +164,7 @@ func TestLoadSuccessorChainsPhase16IntoPhase15(t *testing.T) {
 
 func TestLoadSuccessorChainsProductionTrustIntoCIAndPhase15(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
+	path := "RZ-evidence-ref-069"
 	phase14 := strings.Repeat("1", 64)
 	phase15Bytes := []byte("phase 15\n")
 	phase16CIBytes := []byte("phase 16 CI\n")
@@ -175,9 +175,9 @@ func TestLoadSuccessorChainsProductionTrustIntoCIAndPhase15(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, path), phase16TrustBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -190,7 +190,7 @@ func TestLoadSuccessorChainsProductionTrustIntoCIAndPhase15(t *testing.T) {
 
 func TestLoadSuccessorChainsProductionRuntimeIntoTrustCIAndPhase15(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
+	path := "RZ-evidence-ref-069"
 	phase14 := strings.Repeat("1", 64)
 	phase15Bytes := []byte("phase 15\n")
 	phase16CIBytes := []byte("phase 16 CI\n")
@@ -203,10 +203,10 @@ func TestLoadSuccessorChainsProductionRuntimeIntoTrustCIAndPhase15(t *testing.T)
 	if err := os.WriteFile(filepath.Join(root, path), phase16RuntimeBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16RuntimeSuccessorPath, `{"version":"phase16-production-runtime-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16RuntimeSuccessorPath, `{"version":"phase16-production-runtime-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -219,7 +219,7 @@ func TestLoadSuccessorChainsProductionRuntimeIntoTrustCIAndPhase15(t *testing.T)
 
 func TestLoadSuccessorChainsDecentralizedAuthorityThroughEarlierLayers(t *testing.T) {
 	root := t.TempDir()
-	path := "ROADMAP.md"
+	path := "RZ-evidence-ref-069"
 	phase14 := strings.Repeat("1", 64)
 	phase15Bytes := []byte("phase 15\n")
 	phase16CIBytes := []byte("phase 16 CI\n")
@@ -234,11 +234,11 @@ func TestLoadSuccessorChainsDecentralizedAuthorityThroughEarlierLayers(t *testin
 	if err := os.WriteFile(filepath.Join(root, path), decentralizedBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16RuntimeSuccessorPath, `{"version":"phase16-production-runtime-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`"}]}`)
-	writeOverlayForTest(t, root, Phase16DecentralizedSuccessorPath, `{"version":"phase16-decentralized-self-hosted-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`","post_sha256":"`+hex.EncodeToString(decentralizedDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+phase14+`","post_sha256":"`+hex.EncodeToString(phase15Digest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16SuccessorPath, `{"version":"phase16-ci-release-acceleration-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase15Digest[:])+`","post_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16ProductionTrustSuccessorPath, `{"version":"phase16-production-trust-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16CIDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16RuntimeSuccessorPath, `{"version":"phase16-production-runtime-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16TrustDigest[:])+`","post_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, Phase16DecentralizedSuccessorPath, `{"version":"phase16-decentralized-self-hosted-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+hex.EncodeToString(phase16RuntimeDigest[:])+`","post_sha256":"`+hex.EncodeToString(decentralizedDigest[:])+`"}]}`)
 
 	pre, err := LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -291,8 +291,8 @@ func TestRepositoryDocumentationProfileUsesCanonicalLFSuccessorV1(t *testing.T) 
 
 func TestResolveCurrentSHA256UsesValidatedPredecessorOrWorkingTree(t *testing.T) {
 	root := t.TempDir()
-	overlaidPath := "ROADMAP.md"
-	currentPath := "docs/GOVERNANCE.md"
+	overlaidPath := "RZ-evidence-ref-069"
+	currentPath := "docs/GZ-evidence-ref-001"
 	predecessor := strings.Repeat("2", 64)
 	post := []byte("phase 15\n")
 	current := []byte("current\n")
@@ -307,7 +307,7 @@ func TestResolveCurrentSHA256UsesValidatedPredecessorOrWorkingTree(t *testing.T)
 	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(currentPath)), current, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"`+predecessor+`","post_sha256":"`+hex.EncodeToString(postDigest[:])+`"}]}`)
+	writeOverlayForTest(t, root, SuccessorPath, `{"version":"phase15-production-contract-v1","entries":[{"path":"RZ-evidence-ref-069","pre_sha256":"`+predecessor+`","post_sha256":"`+hex.EncodeToString(postDigest[:])+`"}]}`)
 
 	got, err := ResolveCurrentSHA256(root, overlaidPath)
 	if err != nil {

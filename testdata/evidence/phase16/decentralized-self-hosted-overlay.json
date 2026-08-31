@@ -22,11 +22,6 @@
       "post_sha256": "30d1b4cbe176c90e5824afc8c3a144b11d170c1ed19deeb5c8b96dc747d68120"
     },
     {
-      "path": "ROADMAP.md",
-      "pre_sha256": "f148c0a7314116b7cb69945f7ffc8f6d872e241de109d34ef282dbb824960f1c",
-      "post_sha256": "b1bc37aa40b84b8e765f5d2413998ab2e51e5b10211e47dd03bd23d9f7900dcc"
-    },
-    {
       "path": "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase11ControlSurfaceDeviceTest.kt",
       "pre_sha256": "8e33622eaaaa20c58b5b8233ca4246cb271141857ab853b98a74ff55974f03d5",
       "post_sha256": "4774aa58da7c8c9740c2e8c676dc89813f54d4169fcd026d3dd96b008df7b78f"
@@ -215,76 +210,6 @@
       "path": "deploy/selfhost/native/upgrade.sh",
       "pre_evidence": "ABSENT",
       "post_sha256": "eb9aeb852449c5de285ff92cedd1639834c3b5eed9576432b51daef9fb079d91"
-    },
-    {
-      "path": "docs/KIP-0090-phase15-production-contract-freeze.md",
-      "pre_sha256": "c7d92dad24c95bc9c9ab8aa6e7335ea5936216f6e512dc8ef310abd0bef79b9e",
-      "post_sha256": "b6225c263807a3dc23aa5487466494269a0576f6332e87feafd4e572a5374bd5"
-    },
-    {
-      "path": "docs/KIP-0091-assurance-release-acceleration.md",
-      "pre_sha256": "0eefd4ffb99f69b099d5450e9fea4b51c9d811eca334c33a1e41780d40ae3852",
-      "post_sha256": "a2ceacbd580df8ce3ad9ab58c0878b3e8d94fdb684c0b41311ce95ac872f31cc"
-    },
-    {
-      "path": "docs/KIP-0092-phase16-production-trust.md",
-      "pre_sha256": "f7bf0e27e8b6692b05edd573ae5c16eaf156a80fb609e6c8963d394d9c72622f",
-      "post_sha256": "3fe605c0b28566205b1387b17704332cd37be3ce970f588259254e55a2ce1715"
-    },
-    {
-      "path": "docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "9bfee97ff1bd47daab7bca029b13cbe5b3c41ee1f96077ba461cf1d88208d285"
-    },
-    {
-      "path": "docs/PHASE15_PRODUCTION_CONTRACT.md",
-      "pre_sha256": "c3563b819420af38aac5e91b108d5d841438f8e7c8a94fbba4d17cd2f92b2d59",
-      "post_sha256": "60e65b7e283eb8c74e3bf16b367391857521ff60d07ca9b5a9400083e7c687ce"
-    },
-    {
-      "path": "docs/PHASE16_API.md",
-      "pre_sha256": "c7012500054fae1797a4e684725da9c706eb5a2eda4166f52a993e4603cf0565",
-      "post_sha256": "059f4af49612ea0dc8b215bd85a0ef5692cb7b1191455c10bf6b4552de9c484b"
-    },
-    {
-      "path": "docs/PHASE16_CEREMONIES.md",
-      "pre_sha256": "bcaa6efec6ad848bac6261f1ca6facaa141413e588252a4c48db1a977907d0c5",
-      "post_sha256": "38b678085e4fba792f2bbf671694c4b3ccb11d68cb9892f5921ec17b04a40316"
-    },
-    {
-      "path": "docs/PHASE16_DIRTY_WORKTREE_DISPOSITION.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "34e742efa00f5130b090b7bc0c86651d1d49872aa2b601880629af1449eef1e7"
-    },
-    {
-      "path": "docs/PHASE16_DISASTER_RECOVERY.md",
-      "pre_sha256": "89c509431dcd3560b0c826b4fe8eb3073136022f0f5154ecffb299d2f226b62e",
-      "post_sha256": "18710feb09fc3e671ab845cb453bc37bbd33eb2c510c87b30499cba5b68e14df"
-    },
-    {
-      "path": "docs/PHASE16_EVIDENCE_INDEX.md",
-      "pre_sha256": "95bde2bf99efb470e31176c559a6222ad3644ddef626f54066e1488824845460",
-      "post_sha256": "d4a27a8928b0a8abb9923dc4ce9d287acf9d277f9c0b6664c42958db6d8f937c"
-    },
-    {
-      "path": "docs/PHASE16_OPERATIONS.md",
-      "pre_sha256": "c85f7bad1dd4b16d5451f96fd4f14623a73adc5ac1c1f08fef7139e7778def43",
-      "post_sha256": "aeb178f52b0f0ea0fdf0e25190f4de1db5bcae0de99fe1743ca3c5d2c10d5b0d"
-    },
-    {
-      "path": "docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
-      "pre_sha256": "6dd90bd9acca28588f66971e5d25af5411d9985f9e99a789762f69b2a269b75d",
-      "post_sha256": "c01140e3bb0ea030eb6d02c9934683f0b8632e540d87c30d2422084578255018"
-    },
-    {
-      "path": "docs/PHASE16_SELF_HOSTED_VPS_COMPLETION_PLAN.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "985d3d2db70744c7b91621d3644d24bc3dde26e5ede111f2a6e7a3a2683e9ac5"
-    },
-    {
-      "path": "docs/PHASE16_THREAT_MODEL.md",
-      "pre_sha256": "0ed962b48a296b9a484d4f8b90c4aedca00a481a2912d9f0f36c438145450b9d",
-      "post_sha256": "c5e2c5fa4053b5dd31ddac08736edf2dce4e25bb9deef22cace8d36b35a59b03"
     },
     {
       "path": "docs/self-hosting/BACKUP-RESTORE.md",

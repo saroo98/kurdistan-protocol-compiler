@@ -154,7 +154,7 @@ func runAudit(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local audit")
 	full := flags.Bool("full", false, "run full local audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	baseline := flags.String("baseline", "", "optional baseline audit JSON for longitudinal comparison")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
@@ -330,7 +330,7 @@ func runCodegen(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local generated-backend audit")
 	full := flags.Bool("full", false, "run full local generated-backend audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional generated profile count override")
 	authorizationPath := flags.String("authorization-catalog", "", "explicit authorization catalog absolute path")
@@ -457,7 +457,7 @@ func runStreamAdversary(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local multi-stream adversary audit")
 	full := flags.Bool("full", false, "run full local multi-stream adversary audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -512,7 +512,7 @@ func runProxySemantics(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local proxy-semantics audit")
 	full := flags.Bool("full", false, "run full local proxy-semantics audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -567,7 +567,7 @@ func runCarrier(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local carrier audit")
 	full := flags.Bool("full", false, "run full local carrier audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -622,7 +622,7 @@ func runSecurity(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local security audit")
 	full := flags.Bool("full", false, "run full local security audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -677,7 +677,7 @@ func runRuntime(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local runtime audit")
 	full := flags.Bool("full", false, "run full local runtime audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -732,7 +732,7 @@ func runHardening(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local hardening audit")
 	full := flags.Bool("full", false, "run full local hardening audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	raceAdvice := flags.Bool("race-advice", false, "print deterministic race-test advice")
@@ -793,7 +793,7 @@ func runAdapter(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local adapter audit")
 	full := flags.Bool("full", false, "run full local adapter audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -848,7 +848,7 @@ func runLocalAdapter(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local adapter prototype audit")
 	full := flags.Bool("full", false, "run full local adapter prototype audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -903,7 +903,7 @@ func runByteTransport(args []string) int {
 	quick := flags.Bool("quick", false, "run quick byte transport audit")
 	full := flags.Bool("full", false, "run full byte transport audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -958,7 +958,7 @@ func runBytePath(args []string) int {
 	quick := flags.Bool("quick", false, "run quick bytepath fixture audit")
 	full := flags.Bool("full", false, "run full bytepath fixture audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	startSeed := flags.Int64("start-seed", 0, "optional start seed override")
 	profiles := flags.Int("profiles", 0, "optional profile count override")
 	if err := flags.Parse(args); err != nil {
@@ -1013,7 +1013,7 @@ func runProtocolCorpus(args []string) int {
 	quick := flags.Bool("quick", false, "run quick protocol corpus audit")
 	full := flags.Bool("full", false, "run full protocol corpus audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -1063,7 +1063,7 @@ func runWireFeatures(args []string) int {
 	quick := flags.Bool("quick", false, "run quick wire feature audit")
 	full := flags.Bool("full", false, "run full wire feature audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -1231,7 +1231,7 @@ func runWireGen(args []string) int {
 	quick := flags.Bool("quick", false, "run quick wire-shape generation audit")
 	full := flags.Bool("full", false, "run full wire-shape generation audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -1406,7 +1406,7 @@ func runWireEval(args []string) int {
 	quick := flags.Bool("quick", false, "run quick wire evaluation audit")
 	full := flags.Bool("full", false, "run full wire evaluation audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -1637,7 +1637,7 @@ func runHostDetect(args []string) int {
 	quick := flags.Bool("quick", false, "run quick host detection audit")
 	full := flags.Bool("full", false, "run full host detection audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -1801,7 +1801,7 @@ func runRelayFleet(args []string) int {
 	quick := flags.Bool("quick", false, "run quick relay fleet audit")
 	full := flags.Bool("full", false, "run full relay fleet audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -2465,7 +2465,7 @@ func runAdaptivePath(args []string) int {
 	quick := flags.Bool("quick", false, "run quick adaptive path audit")
 	full := flags.Bool("full", false, "run full adaptive path audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -2635,7 +2635,7 @@ func runTransportBundle(args []string) int {
 	quick := flags.Bool("quick", false, "run quick transport bundle audit")
 	full := flags.Bool("full", false, "run full transport bundle audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -2806,7 +2806,7 @@ func runPathRace(args []string) int {
 	quick := flags.Bool("quick", false, "run quick pathrace audit")
 	full := flags.Bool("full", false, "run full pathrace audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -2977,7 +2977,7 @@ func runPathHealth(args []string) int {
 	quick := flags.Bool("quick", false, "run quick pathhealth audit")
 	full := flags.Bool("full", false, "run full pathhealth audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -3147,7 +3147,7 @@ func runCarrierReview(args []string) int {
 	quick := flags.Bool("quick", false, "run quick carrier review audit")
 	full := flags.Bool("full", false, "run full carrier review audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -3314,7 +3314,7 @@ func runMeasurementReview(args []string) int {
 	quick := flags.Bool("quick", false, "run quick measurement review audit")
 	full := flags.Bool("full", false, "run full measurement review audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -3482,7 +3482,7 @@ func runProxyEgress(args []string) int {
 	quick := flags.Bool("quick", false, "run quick proxy egress audit")
 	full := flags.Bool("full", false, "run full proxy egress audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -3653,7 +3653,7 @@ func runRelayBridge(args []string) int {
 	quick := flags.Bool("quick", false, "run quick relay bridge audit")
 	full := flags.Bool("full", false, "run full relay bridge audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -3822,7 +3822,7 @@ func runLocalPipeline(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local pipeline audit")
 	full := flags.Bool("full", false, "run full local pipeline audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -4117,7 +4117,7 @@ func runProductionReadiness(args []string) int {
 	quick := flags.Bool("quick", false, "run quick production readiness audit")
 	full := flags.Bool("full", false, "run full production readiness audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -4286,7 +4286,7 @@ func runConcreteLocalAdapter(args []string) int {
 	quick := flags.Bool("quick", false, "run quick concrete local adapter audit")
 	full := flags.Bool("full", false, "run full concrete local adapter audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -4453,7 +4453,7 @@ func runLocalProtocolAdapter(args []string) int {
 	quick := flags.Bool("quick", false, "run quick local protocol adapter audit")
 	full := flags.Bool("full", false, "run full local protocol adapter audit")
 	out := flags.String("out", "", "optional audit JSON output path")
-	status := flags.String("status", "", "optional STATUS.md output path")
+	status := flags.String("status", "", "optional SZ-evidence-ref-070 output path")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}

@@ -37,11 +37,6 @@
       "post_sha256": "7d03339bed65003b59b6088809cc48d6763df3e0b97bb60f5b86d8bbd38f7ff9"
     },
     {
-      "path": "ROADMAP.md",
-      "pre_sha256": "da9e73bcd41c5045e38b17e06b23db853ea0a15fb7fa46b91b7db9813ec3274f",
-      "post_sha256": "f148c0a7314116b7cb69945f7ffc8f6d872e241de109d34ef282dbb824960f1c"
-    },
-    {
       "path": "android/app/build.gradle.kts",
       "pre_sha256": "7d511221248e0882b93fd2f6f19f53c16cfcd682fc94d804bfc22d1df5834d84",
       "post_sha256": "fec17876c926008ab346c6000cad9a87cde1b85ddd36c648de150b5959a49f45"
@@ -325,41 +320,6 @@
       "path": "config/release/version.properties",
       "pre_evidence": "ABSENT",
       "post_sha256": "446e6fb3d2ccf7d6b197f5d4175c816f1bcb617db39ed765618f9f7c779b415e"
-    },
-    {
-      "path": "docs/GOVERNANCE.md",
-      "pre_sha256": "49ef557f6fbb8b9d6fc6e0a06e83141370d84d6e16b1aae9d054558854a4d776",
-      "post_sha256": "702f0946377cfc032e7cef5c639422d904c566e9383558de038ae817f38805c6"
-    },
-    {
-      "path": "docs/KIP-0089-phase14-assurance-field-release.md",
-      "pre_sha256": "a1a370944ce85b47c139d9019e2d99b4b88cede6ac1f5ea6a612c95f3375de4f",
-      "post_sha256": "c62946e88e0799e563a3304331ae50d48398bea6358e8ba649923e608f9b6959"
-    },
-    {
-      "path": "docs/KIP-0090-phase15-production-contract-freeze.md",
-      "pre_sha256": "c5fa9c14a693349014728ab9ddfc2ed0e885db3d0dbadfef4b18b14f7a6befa8",
-      "post_sha256": "c7d92dad24c95bc9c9ab8aa6e7335ea5936216f6e512dc8ef310abd0bef79b9e"
-    },
-    {
-      "path": "docs/KIP-0091-assurance-release-acceleration.md",
-      "pre_evidence": "ABSENT",
-      "post_sha256": "0eefd4ffb99f69b099d5450e9fea4b51c9d811eca334c33a1e41780d40ae3852"
-    },
-    {
-      "path": "docs/PHASE14_EVIDENCE_INDEX.md",
-      "pre_sha256": "58d7fc2d70ee244c77083b6ed68beb323e56c084fe34b52d51f3a45f8d59bdc3",
-      "post_sha256": "6780473c03095287feff59e639168d023bfcbe89c9ab5751b979e567c7f3114e"
-    },
-    {
-      "path": "docs/PHASE14_READINESS_MATRIX.md",
-      "pre_sha256": "72c2731c2602969ce8e81d3ec47487405ce599a7435bc9d3206933d8054f19ac",
-      "post_sha256": "50d988e8e8602872ea51ef793ce77ae1fd2b4b2d78d4ec29ec974d236b6b8869"
-    },
-    {
-      "path": "docs/PHASE15_PRODUCTION_CONTRACT.md",
-      "pre_sha256": "fdf8282cc8d540ab1f4c52515e84aa85fc46b3626fb5c4e342dd6f6cb5f555d3",
-      "post_sha256": "c3563b819420af38aac5e91b108d5d841438f8e7c8a94fbba4d17cd2f92b2d59"
     },
     {
       "path": "internal/assurance/certificate.go",

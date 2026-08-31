@@ -102,7 +102,7 @@ func Generate(repoRoot string) ([]byte, error) {
 			decision = "reject"
 		}
 		path := "internal/product/profile/testdata/phase8-issuance/" + name
-		entries = append(entries, newEntry(repoRoot, "issuance-"+name, "local-issuance-fixture", path, "internal/testkit/phase8issuancefixture/generate.go", "deterministic test-only Go generator with independent standard-library consumers", "docs/KIP-0081-phase8-offline-issuance-tooling.md", decision, issuance.Fixtures[name]))
+		entries = append(entries, newEntry(repoRoot, "issuance-"+name, "local-issuance-fixture", path, "internal/testkit/phase8issuancefixture/generate.go", "deterministic test-only Go generator with independent standard-library consumers", "docs/KZ-evidence-ref-035", decision, issuance.Fixtures[name]))
 	}
 	for _, path := range []string{"testdata/evidence/phase8-fuzz-campaign-report.json", "testdata/evidence/phase8-suite-decision-matrix.json", "testdata/evidence/phase8-toolchain-randomness-report.json", "docs/third-party/phase8-profile-cryptography.md"} {
 		entries = append(entries, newEntry(repoRoot, filepath.Base(path), "release-source", path, path, "repository-controlled standards and dependency evidence", "docs/third-party/phase8-profile-cryptography.md", "informational", fileHash(repoRoot, path)))

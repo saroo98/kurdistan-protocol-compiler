@@ -7,14 +7,14 @@
   "predecessor_manifest_sha256": "989df23699da6edfb8e5279752dbe66863a854b530a532119a2689320049c56f",
   "kip_0075_sha256": "59ca1cc0df03c0fa3b7beb8fa5bcf6982851cb8ca94b3d6a65931f4e71bdfa60",
   "adopted_artifacts": [
-    {"path":"docs/KIP-0076-phase8-profile-threat-model.md","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
+    {"path":"docs/KZ-evidence-ref-030","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
     {"path":"internal/product/envelope/phase8_trust.go","sha256":"9c272ecb1a6770ecaf61d2d91ba2689cc3650e7544496a9c879cfee9883f5229"},
     {"path":"internal/product/envelope/phase8_trust_test.go","sha256":"cc33ddbccf7e177d275ce7ff5d33597419e8adf1b2d80f7fc8e38c121884536e"},
     {"path":"internal/product/profile/phase8_trust.go","sha256":"d379eee32c69d9117442496ca8f200db1b9dfaec7dc95a70583585dddc6d7c1f"},
     {"path":"internal/product/profile/phase8_trust_test.go","sha256":"9818c24e1bbafe12a9471206524994ec8ceec0958b29fb8b95d3617a5728d1f1"}
   ],
   "wo801_post_hashes": [
-    {"path":"docs/KIP-0076-phase8-profile-threat-model.md","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
+    {"path":"docs/KZ-evidence-ref-030","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
     {"path":"internal/product/envelope/phase8_trust.go","sha256":"9c272ecb1a6770ecaf61d2d91ba2689cc3650e7544496a9c879cfee9883f5229"},
     {"path":"internal/product/envelope/phase8_trust_test.go","sha256":"cc33ddbccf7e177d275ce7ff5d33597419e8adf1b2d80f7fc8e38c121884536e"},
     {"path":"internal/product/profile/phase8_trust.go","sha256":"d379eee32c69d9117442496ca8f200db1b9dfaec7dc95a70583585dddc6d7c1f"},
@@ -32,7 +32,7 @@
     "scope": "Scoped non-self implementation-state digest for the five adopted WO-801 artifacts and seven post-WO-812 guard consumers; this is not a Loom whole-repository state hash.",
     "canonicalization": "ordered path<TAB>lowercase_sha256<LF>",
     "ordered_records": [
-      {"path":"docs/KIP-0076-phase8-profile-threat-model.md","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
+      {"path":"docs/KZ-evidence-ref-030","sha256":"ec4ffbf31846c6f4aa96e0ddfb13ff1f4817ff58e35d91ded570d680025d6a19"},
       {"path":"internal/product/envelope/phase8_trust.go","sha256":"9c272ecb1a6770ecaf61d2d91ba2689cc3650e7544496a9c879cfee9883f5229"},
       {"path":"internal/product/envelope/phase8_trust_test.go","sha256":"cc33ddbccf7e177d275ce7ff5d33597419e8adf1b2d80f7fc8e38c121884536e"},
       {"path":"internal/product/profile/phase8_trust.go","sha256":"d379eee32c69d9117442496ca8f200db1b9dfaec7dc95a70583585dddc6d7c1f"},

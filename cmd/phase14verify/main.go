@@ -21,14 +21,14 @@ import (
 const acceptancePath = "testdata/evidence/phase14/acceptance-status.json"
 
 var requiredFiles = []string{
-	"docs/KIP-0089-phase14-assurance-field-release.md",
-	"docs/PHASE14_READINESS_MATRIX.md",
-	"docs/PHASE14_EVIDENCE_INDEX.md",
-	"docs/PHASE14_FEATURE_COVERAGE.md",
-	"docs/PHASE14_FIELD_VALIDATION_PROTOCOL.md",
-	"docs/PHASE14_RELEASE_RUNBOOK.md",
-	"docs/PHASE14_ROLLBACK_RUNBOOK.md",
-	"docs/PHASE14_INCIDENT_RESPONSE.md",
+	"docs/KZ-evidence-ref-043",
+	"docs/PZ-evidence-ref-056",
+	"docs/PZ-evidence-ref-052",
+	"docs/PZ-evidence-ref-053",
+	"docs/PZ-evidence-ref-054",
+	"docs/PZ-evidence-ref-057",
+	"docs/PZ-evidence-ref-058",
+	"docs/PZ-evidence-ref-055",
 	"testdata/evidence/phase14/reproducibility.json",
 	"testdata/evidence/phase14/recovery-drills.json",
 	"testdata/evidence/phase14/longevity.json",

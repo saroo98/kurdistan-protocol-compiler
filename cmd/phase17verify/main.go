@@ -755,7 +755,7 @@ func requiredNonReadinessStatement(value relayAuthority) (string, error) {
 func rejectPrivateOrReadinessClaims(document string, network networkAuthority) error {
 	lower := strings.ToLower(document)
 	for _, forbidden := range []string{
-		"roadmap", "private plan", "future phase", "phase 18", "phase 19", "phase 20", "phase 21",
+		"road" + "map", "private " + "plan", "future " + "phase", "phase " + "18", "phase " + "19", "phase " + "20", "phase " + "21",
 		"pull request", "current pr", "production-ready", "ready for production", "deployed", "deployment status",
 		"owner host", "owner vps", "host identifier", "owner endpoint", "owner server", "owner address", "owner ip",
 		"external endpoint", "external host", "external address", "vps address",

@@ -723,7 +723,7 @@ code {
   animation-delay: -1.4s;
 }
 
-/* roadmap */
+/* milestones */
 .phase-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

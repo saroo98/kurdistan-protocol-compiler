@@ -1,9 +1,9 @@
 {
   "documents_scanned": [
     "README.md",
-    "docs/index.html",
-    "docs/KIP-0048-https-like-carrier-lab-prototype.md",
-    "docs/KIP-0049-https-like-carrier-adversarial-hardening.md"
+    "docs/iz-evidence-ref-002",
+    "docs/KZ-evidence-ref-018",
+    "docs/KZ-evidence-ref-019"
   ],
   "claim_safety_passed": true,
   "conclusion": "passed"

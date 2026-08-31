@@ -348,7 +348,7 @@ func RunWithExecutor(ctx context.Context, cfg AuditConfig, executor ExecutorOpti
 	}
 	if adaptivePathErr == nil {
 		gates = append(gates, AdaptivePathGates(adaptivePathSet, adaptivePathComparison)...)
-		gates = append(gates, AdaptivePathRoadmapPublicDocsGate())
+		gates = append(gates, AdaptivePathPublicDocsGate())
 	} else {
 		gates = append(gates, gate("adaptivepath_candidate_taxonomy", false, "required", adaptivePathErr.Error(), nil, []string{adaptivePathErr.Error()}))
 	}

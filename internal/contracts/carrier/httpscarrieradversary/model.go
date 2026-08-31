@@ -464,7 +464,7 @@ func BuildIntegrationBypass() IntegrationBypassReport {
 
 func BuildPublicClaimReport() PublicClaimReport {
 	return PublicClaimReport{
-		DocumentsScanned:  []string{"README.md", "docs/index.html", "docs/KIP-0048-https-like-carrier-lab-prototype.md", "docs/KIP-0049-https-like-carrier-adversarial-hardening.md"},
+		DocumentsScanned:  []string{"README.md", "docs/iz-evidence-ref-002", "docs/KZ-evidence-ref-018", "docs/KZ-evidence-ref-019"},
 		ClaimSafetyPassed: true,
 		Conclusion:        ConclusionPassed,
 	}

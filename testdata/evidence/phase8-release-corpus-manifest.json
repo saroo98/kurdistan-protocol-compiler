@@ -201,7 +201,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "accept",
       "expected_bytes_sha256": "399f8c65e3d080e2215e7e8e0f2a6f6a06a4016c2a5ca3a7fa8c732f9f72b4b7"
     },
@@ -213,7 +213,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "accept",
       "expected_bytes_sha256": "8bd8d6fbb51cb95218ce17893b7911dae0351ecb8bd3ac9d988c07b3c6c362e4"
     },
@@ -225,7 +225,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "393952fcb3013b6cb5a7843833d44bfbc51e9ecb7f8e3e9f919419c93b763cbf"
     },
@@ -237,7 +237,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "66b3ba3b0805f602b8100fc1407bf57cad53cebb45d5f5a9919c7d1c75f680e1"
     },
@@ -249,7 +249,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "a21253fd340c7ad6094f9c11a84eb8dcf7c2bfe6ec0cab52ed77e266dcc90d57"
     },
@@ -261,7 +261,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "1e79bc476783b5fdaf44e52f07f14cf862bf66d18d05efd921bf26331ee9ba9b"
     },
@@ -273,7 +273,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "35e85518a180af1448d04da6d530d7b42efd32f2d81b6636d9daeae29a46343f"
     },
@@ -285,7 +285,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "reject",
       "expected_bytes_sha256": "eb04dd301d966c0d5eacc3b98e77ed7fb11125406848eba9cff9093dc28afb73"
     },
@@ -297,7 +297,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "accept",
       "expected_bytes_sha256": "28b2b508d93bf5b61cf6cd2f0bc858413d90fb433f2b54861678bcbe257c8961"
     },
@@ -309,7 +309,7 @@
       "generator_path": "internal/testkit/phase8issuancefixture/generate.go",
       "generator_sha256": "7d586c99f2c1a7aa3904468d40aac96d5386eb860cfe2561487030f6f0e49717",
       "provenance": "deterministic test-only Go generator with independent standard-library consumers",
-      "license_path": "docs/KIP-0081-phase8-offline-issuance-tooling.md",
+      "license_path": "docs/KZ-evidence-ref-035",
       "expected_decision": "accept",
       "expected_bytes_sha256": "6e9f0808271cf7297d6b39ee32b46e52b8de0f5a1c0b262e0b1c4fbc1850e0e3"
     },

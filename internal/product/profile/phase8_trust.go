@@ -18,8 +18,8 @@ const (
 	UpdateMigrate = "provider-migration"
 )
 
-// ArtifactTrust is authenticated metadata required of a future Phase 8
-// artifact. This package validates its contract and binding, not proof.
+// ArtifactTrust is authenticated metadata required by profile artifacts.
+// This package validates its contract and binding, not proof.
 type ArtifactTrust struct {
 	Artifact                 envelope.ArtifactMetadata
 	ContentID, LineageID     string

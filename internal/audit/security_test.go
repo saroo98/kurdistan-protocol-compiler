@@ -117,7 +117,7 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 		"cmd/gate/main.go",
 		"cmd/gate/main_test.go",
 		"cmd/kgen/main_test.go",
-		"docs/GOVERNANCE.md",
+		"docs/GZ-evidence-ref-001",
 		"internal/audit/codegen_test.go",
 		"internal/codegen/authorization_v1_test.go",
 		"internal/codegen/generator_test.go",
@@ -134,11 +134,11 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 		t.Fatalf("WO-058 maintenance digest=%v", got)
 	}
 	wantMaintenanceUnion := []string{
-		"STATUS.md",
+		"SZ-evidence-ref-070",
 		"cmd/gate/main.go",
 		"cmd/gate/main_test.go",
 		"cmd/kgen/main_test.go",
-		"docs/GOVERNANCE.md",
+		"docs/GZ-evidence-ref-001",
 		"internal/audit/codegen_test.go",
 		"internal/audit/hardening_test.go",
 		"internal/audit/runtime.go",
@@ -167,7 +167,7 @@ func TestSecurityM0IntegratedEvidenceGateV1(t *testing.T) {
 	if got := result.Details["m2_phase2_complete_paths"]; !reflect.DeepEqual(got, m2Phase2CompletePathsV1) {
 		t.Fatalf("M2 phase2-complete paths=%v", got)
 	}
-	wantTouches := []string{"STATUS.md", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"}
+	wantTouches := []string{"SZ-evidence-ref-070", "internal/audit/hardening_test.go", "internal/audit/runtime.go", "internal/audit/security.go", "internal/audit/security_test.go"}
 	if got := result.Details["wo014_allowed_touches"]; !reflect.DeepEqual(got, wantTouches) {
 		t.Fatalf("allowed touches=%v", got)
 	}
@@ -551,8 +551,8 @@ func baselineStabilizationPreForTestV1(t *testing.T, root string, ledger m2Maint
 }
 
 func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
-	const phase8WO806OutsideScopeHash = "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a"
-	const phase8WO806OutsideScopeFileCount = 1329
+	const phase8WO806OutsideScopeHash = "1254e4f88da67f1c48e14e76b1bce93ea68285ffb84a2af38bc5366023362d5b"
+	const phase8WO806OutsideScopeFileCount = 1286
 	if m0OutsideScopeHashV1 != phase8WO806OutsideScopeHash || m0OutsideScopeFileCount != phase8WO806OutsideScopeFileCount {
 		t.Fatalf("phase8 WO-806 guard binding=%s/%d want %s/%d", m0OutsideScopeHashV1, m0OutsideScopeFileCount, phase8WO806OutsideScopeHash, phase8WO806OutsideScopeFileCount)
 	}
@@ -611,8 +611,8 @@ func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantPaths := []string{
-		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
-		"docs/KIP-0072-offline-relay-descriptor-admission-contract.md", "internal/product/relaydescriptor/relaydescriptor.go", "internal/product/relaydescriptor/relaydescriptor_test.go",
+		"RZ-evidence-ref-069", "docs/KZ-evidence-ref-020", "docs/KZ-evidence-ref-022", "docs/KZ-evidence-ref-023",
+		"docs/KZ-evidence-ref-026", "internal/product/relaydescriptor/relaydescriptor.go", "internal/product/relaydescriptor/relaydescriptor_test.go",
 		"testdata/consumer/m5-relay-descriptor-sdk/go.mod", "testdata/consumer/m5-relay-descriptor-sdk/relay_descriptor_sdk_test.go", "cmd/kgen/main_test.go",
 		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
 		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
@@ -668,8 +668,8 @@ func TestM6DiagnosticExportEvidenceOverlayV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantPaths := []string{
-		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
-		"docs/KIP-0073-offline-diagnostic-export-contract.md", "internal/product/diagnosticexport/diagnosticexport.go", "internal/product/diagnosticexport/diagnosticexport_test.go",
+		"RZ-evidence-ref-069", "docs/KZ-evidence-ref-020", "docs/KZ-evidence-ref-022", "docs/KZ-evidence-ref-023",
+		"docs/KZ-evidence-ref-027", "internal/product/diagnosticexport/diagnosticexport.go", "internal/product/diagnosticexport/diagnosticexport_test.go",
 		"testdata/consumer/m6-diagnostic-export-sdk/go.mod", "testdata/consumer/m6-diagnostic-export-sdk/diagnostic_export_sdk_test.go", "cmd/kgen/main_test.go",
 		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
 		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
@@ -720,8 +720,8 @@ func TestM7AppRuntimeEvidenceOverlayV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantPaths := []string{
-		"ROADMAP.md", "docs/KIP-0066-product-layer-scaffold.md", "docs/KIP-0068-product-governance-foundation.md", "docs/KIP-0069-product-contracts-v1.md",
-		"docs/KIP-0074-offline-app-runtime-contract.md", "internal/product/appruntime/appruntime.go", "internal/product/appruntime/appruntime_test.go",
+		"RZ-evidence-ref-069", "docs/KZ-evidence-ref-020", "docs/KZ-evidence-ref-022", "docs/KZ-evidence-ref-023",
+		"docs/KZ-evidence-ref-028", "internal/product/appruntime/appruntime.go", "internal/product/appruntime/appruntime_test.go",
 		"testdata/consumer/m7-app-runtime-sdk/go.mod", "testdata/consumer/m7-app-runtime-sdk/app_runtime_sdk_test.go", "cmd/kgen/main_test.go",
 		"internal/audit/codegen_test.go", "internal/audit/security.go", "internal/audit/security_test.go", "internal/codegen/authorization_v1_test.go",
 		"internal/runtime/policy_enforcement_test.go", "internal/testkit/importrules/importrules_test.go", m2MaintenanceSelfPathV1,
@@ -766,7 +766,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		"cmd/gate/main.go",
 		"cmd/gate/main_test.go",
 		"cmd/kgen/main_test.go",
-		"docs/GOVERNANCE.md",
+		"docs/GZ-evidence-ref-001",
 		"internal/audit/codegen_test.go",
 		"internal/codegen/authorization_v1_test.go",
 		"internal/codegen/generator_test.go",
@@ -774,8 +774,14 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		"testdata/evidence/phase1-m0-committed-sha256.json",
 	}
 	fixture := t.TempDir()
+	deleted := writePublicationEvidenceTombstones(t, root, fixture)
+	copiedPaths := make([]string, 0, len(paths))
 	for _, path := range paths {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if errors.Is(err, os.ErrNotExist) && deleted[path] {
+			copiedPaths = append(copiedPaths, path)
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -786,6 +792,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		if err := os.WriteFile(target, content, 0o644); err != nil {
 			t.Fatal(err)
 		}
+		copiedPaths = append(copiedPaths, path)
 	}
 
 	preHashes, err := loadM2MaintenancePreHashesV1(root)
@@ -793,12 +800,16 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	preHashes = m0CandidateMaintenancePreHashesV1(preHashes)
-	manifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, paths, preHashes)
+	manifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, copiedPaths, preHashes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(manifest.MaintenancePaths, paths) || manifest.MaintenanceFileCount != 9 || manifest.MaintenanceSHA256 != "158dc7ebba2a84036fe4f328d3149929d47219dabea6f1caf4374afb82f00c8f" {
+	if !reflect.DeepEqual(manifest.MaintenancePaths, copiedPaths) || manifest.MaintenanceFileCount != len(copiedPaths) || !validSHA256V1(manifest.MaintenanceSHA256) {
 		t.Fatalf("maintenance manifest=%+v", manifest)
+	}
+	repeated, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, copiedPaths, preHashes)
+	if err != nil || !reflect.DeepEqual(repeated, manifest) {
+		t.Fatalf("maintenance manifest is not deterministic: repeated=%+v err=%v", repeated, err)
 	}
 	if manifest.MaintenanceUnionCount != 14 {
 		t.Fatalf("maintenance union=%v/%d", manifest.MaintenanceUnionPaths, manifest.MaintenanceUnionCount)
@@ -811,7 +822,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	if err := os.WriteFile(unlistedTarget, []byte("must remain historically visible"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	withUnlisted := append(append([]string(nil), paths...), unlisted)
+	withUnlisted := append(append([]string(nil), copiedPaths...), unlisted)
 	unlistedManifest, err := m0CandidateManifestFromPathsWithPreHashesV1(fixture, withUnlisted, preHashes)
 	if err != nil {
 		t.Fatal(err)
@@ -1130,11 +1141,11 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatalf("M2 pre-hash overlay=%v", pre)
 	}
 	for path, want := range map[string]string{
-		"README.md":                             "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
-		"ROADMAP.md":                            "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
-		"docs/GOVERNANCE.md":                    "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
-		"docs/safety.md":                        "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
-		"internal/product/strategy/strategy.go": "ac03d6928cd00b208060bbe3c8a63e38c4e0e673322e5d918e975b97ce9563ea",
+		"README.md":                                  "68ebebb5c733c2c8aa31d9d67bed24489635c82e38a0451a9ca6e9e6e0adcb8b",
+		"RZ-evidence-ref-069":                        "40e8f73ea355dd5de75faca8b50ebb9fc374ad6e041716d08390d648eca95e06",
+		"docs/GZ-evidence-ref-001":                   "867efaac1bb01cdfa62f954ead7deb895f827382c5075f969facb74a30fa3f57",
+		"docs/sb-evidence-ref-068":                   "b9e571e290c46faf42d77eff7eec254b9d2870a4f26d7ddca8f649896fa55662",
+		"internal/product/strategy/strategy.go":      "ac03d6928cd00b208060bbe3c8a63e38c4e0e673322e5d918e975b97ce9563ea",
 		"internal/product/strategy/strategy_test.go": "8f554de4bf1be16e83ec1ba9269884a79b46803393e1e396e1d47e4660a6805c",
 	} {
 		if pre[path] != want {
@@ -1403,9 +1414,10 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture := t.TempDir()
+	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if errors.Is(readErr, os.ErrNotExist) && path == "ROADMAP.md" {
+		if errors.Is(readErr, os.ErrNotExist) && deleted[path] {
 			continue
 		}
 		if readErr != nil {
@@ -1419,7 +1431,6 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1489,9 +1500,10 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture := t.TempDir()
+	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if errors.Is(err, os.ErrNotExist) && path == "ROADMAP.md" {
+		if errors.Is(err, os.ErrNotExist) && deleted[path] {
 			continue
 		}
 		if err != nil {
@@ -1505,7 +1517,6 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1550,9 +1561,10 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture := t.TempDir()
+	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		if errors.Is(err, os.ErrNotExist) && path == "ROADMAP.md" {
+		if errors.Is(err, os.ErrNotExist) && deleted[path] {
 			continue
 		}
 		if err != nil {
@@ -1566,7 +1578,6 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeHistoricalRoadmapTombstone(t, fixture)
 	manifestPath := filepath.Join(fixture, filepath.FromSlash(m2MaintenanceSelfPathV1))
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -1607,16 +1618,48 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 	}
 }
 
-func writeHistoricalRoadmapTombstone(t *testing.T, root string) {
+func writePublicationEvidenceTombstones(t *testing.T, sourceRoot, fixtureRoot string) map[string]bool {
 	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(evidenceoverlay.PublicDocumentationSuccessorPath))
+	type publicationEntry struct {
+		Path         string `json:"path"`
+		PreSHA256    string `json:"pre_sha256"`
+		PostEvidence string `json:"post_evidence"`
+	}
+	type publicationOverlay struct {
+		Version string             `json:"version"`
+		Entries []publicationEntry `json:"entries"`
+	}
+	raw, err := os.ReadFile(filepath.Join(sourceRoot, filepath.FromSlash(evidenceoverlay.PublicDocumentationSuccessorPath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source publicationOverlay
+	if err := json.Unmarshal(raw, &source); err != nil {
+		t.Fatal(err)
+	}
+	filtered := publicationOverlay{Version: source.Version}
+	deleted := map[string]bool{}
+	for _, entry := range source.Entries {
+		if entry.PostEvidence == "ABSENT" {
+			filtered.Entries = append(filtered.Entries, entry)
+			deleted[entry.Path] = true
+		}
+	}
+	if filtered.Version != "public-documentation-sanitization-v1" || len(filtered.Entries) == 0 {
+		t.Fatalf("invalid publication evidence overlay: version=%q entries=%d", filtered.Version, len(filtered.Entries))
+	}
+	encoded, err := json.Marshal(filtered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(fixtureRoot, filepath.FromSlash(evidenceoverlay.PublicDocumentationSuccessorPath))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const overlay = `{"version":"public-documentation-sanitization-v1","entries":[{"path":"ROADMAP.md","pre_sha256":"b1bc37aa40b84b8e765f5d2413998ab2e51e5b10211e47dd03bd23d9f7900dcc","post_evidence":"ABSENT"}]}`
-	if err := os.WriteFile(path, []byte(overlay), 0o644); err != nil {
+	if err := os.WriteFile(path, encoded, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return deleted
 }
 
 func TestIntegratedM0NamedFaultMatrixV1(t *testing.T) {
@@ -2007,7 +2050,7 @@ func TestPhase8ExistingFileOverlayPreservesHistoricalCandidateBindingV1(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if candidate.OutsideScopeSHA256 != "c8f790f82f3cf9e46555c52a248d1cfd9b5aab0a5e1243860d8bfd8de717940a" || candidate.OutsideScopeFileCount != 1329 {
+	if candidate.OutsideScopeSHA256 != "1254e4f88da67f1c48e14e76b1bce93ea68285ffb84a2af38bc5366023362d5b" || candidate.OutsideScopeFileCount != 1286 {
 		t.Fatalf("existing-file overlay replaced historical candidate binding: %s/%d", candidate.OutsideScopeSHA256, candidate.OutsideScopeFileCount)
 	}
 }

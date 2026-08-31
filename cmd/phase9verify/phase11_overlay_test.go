@@ -124,10 +124,10 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		pre[path] = predecessor
 		last = path
 	}
-	if name == "phase13-android-product-v1" && hex.EncodeToString(phase13Binding.Sum(nil)) != "53dde098ac5c6f2febee7f5069d8b11f5809f58ef94a5ada55835c2467ebd58f" {
+	if name == "phase13-android-product-v1" && hex.EncodeToString(phase13Binding.Sum(nil)) != "93020d6f615b9706dda3bf719ddbffeafa838837f0ec15d3e89ad395d1950c6c" {
 		t.Fatal("invalid phase13 predecessor binding")
 	}
-	if name == "phase14-assurance-v1" && hex.EncodeToString(phase14Binding.Sum(nil)) != "eefcbeb7a93a4472fa7563a3b0fb8d7399001da4fe309ae735861369ed57a0fa" {
+	if name == "phase14-assurance-v1" && hex.EncodeToString(phase14Binding.Sum(nil)) != "9a06e73ef9659dd10dd1c58c53955029b0116d7bd8c0ffa0856b0fa7c3ab230a" {
 		t.Fatal("invalid phase14 predecessor binding")
 	}
 	return pre
@@ -137,7 +137,7 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 	t.Helper()
 	const name = "phase12-operator-control-plane-v1"
 	paths := []string{
-		"ROADMAP.md",
+		"RZ-evidence-ref-069",
 		"cmd/gate/main.go",
 		"cmd/gate/main_test.go",
 		"cmd/kgen/main_test.go",
@@ -145,9 +145,9 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 		"cmd/koperator/main.go",
 		"cmd/koperator/main_test.go",
 		"cmd/phase9verify/phase11_overlay_test.go",
-		"docs/KIP-0087-phase12-operator-provisioning-relay-fleet.md",
-		"docs/PHASE12_EVIDENCE_INDEX.md",
-		"docs/safety.md",
+		"docs/KZ-evidence-ref-041",
+		"docs/PZ-evidence-ref-049",
+		"docs/sb-evidence-ref-068",
 		"internal/audit/codegen_test.go",
 		"internal/audit/security.go",
 		"internal/audit/security_test.go",
@@ -186,12 +186,12 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 		"testdata/evidence/phase8-wo807-recovery-report.json",
 	}
 	preHashes := map[string]string{
-		"ROADMAP.md":                                         "586a5e7f377c1809eb67cfe932d996ae81703bb562f52b539935e26ccdc93e8b",
+		"RZ-evidence-ref-069":                                         "586a5e7f377c1809eb67cfe932d996ae81703bb562f52b539935e26ccdc93e8b",
 		"cmd/gate/main.go":                                   "8f0e4e86384ea012ac54f1c9f795c3a4f760b5ab6c7f4b24f3ab553cad3c96c1",
 		"cmd/gate/main_test.go":                              "c2b868ec7b155ed5ae95f667181284af9672722ceea8b3c018f4dd32df2d4fdd",
 		"cmd/kgen/main_test.go":                              "2fabad2630c546749cde3c0c67dd9885ffa855230c298dacb741c65ef497c846",
 		"cmd/phase9verify/phase11_overlay_test.go":           "95c7e090b93beab82e673513735e6725e1f636f10244a6b37b504adc91cb3a67",
-		"docs/safety.md":                                     "2846c0453c9a20d8fee0a355d339ba70f658d3f064e2dcd6ddef693d7bbb50b0",
+		"docs/sb-evidence-ref-068":                                     "2846c0453c9a20d8fee0a355d339ba70f658d3f064e2dcd6ddef693d7bbb50b0",
 		"internal/audit/codegen_test.go":                     "c1896696926104de33e540f207c4cc3e7f477edfddc006cfc9f279dd34e5df94",
 		"internal/audit/security.go":                         "a180d1b42b37ac390a1bdf718a4c8172cafc8f14b8afd9c46c24831fe461cbe9",
 		"internal/audit/security_test.go":                    "b4674dd844d0f006fe83ced7fbd6855a309e1bbd76ac1cd2fb6c8a73711a5519",

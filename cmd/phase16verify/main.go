@@ -34,12 +34,10 @@ const (
 
 var requiredFiles = []string{
 	"README.md",
-	"docs/KIP-0090-phase15-production-contract-freeze.md",
-	"docs/KIP-0091-assurance-release-acceleration.md",
-	"docs/KIP-0092-phase16-production-trust.md",
-	"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
-	"docs/PHASE15_PRODUCTION_CONTRACT.md",
-	"docs/PHASE16_EVIDENCE_INDEX.md",
+	"docs/self-hosting/INSTALL.md",
+	"docs/self-hosting/LIVE-DATA-PLANE.md",
+	"docs/self-hosting/QUICKSTART.md",
+	"docs/self-hosting/SECURITY.md",
 	"testdata/schemas/phase16-production-trust-status-v1.schema.json",
 	"testdata/schemas/phase16-self-hosted-vps-qualification-v1.schema.json",
 	statusPath,
@@ -56,16 +54,16 @@ var requiredFiles = []string{
 
 var decentralizedAuthorityFiles = []string{
 	"README.md",
-	"docs/KIP-0092-phase16-production-trust.md",
-	"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+	"docs/self-hosting/INSTALL.md",
+	"docs/self-hosting/SECURITY.md",
 }
 
-var privatePlanningFiles = []string{
-	"ROADMAP.md",
-	"STATUS.md",
-	"docs/PHASE16_DIRTY_WORKTREE_DISPOSITION.md",
-	"docs/PHASE16_PRODUCTION_TRUST_COMPLETION_PLAN.md",
-	"docs/PHASE16_SELF_HOSTED_VPS_COMPLETION_PLAN.md",
+var excludedPublicationFiles = []string{
+	"RZ-evidence-ref-069",
+	"SZ-evidence-ref-070",
+	"docs/PZ-evidence-ref-060",
+	"docs/PZ-evidence-ref-062",
+	"docs/PZ-evidence-ref-063",
 }
 
 var expectedRoles = []string{"approver", "auditor", "deployer", "emergency", "executor", "publisher", "recovery", "requester", "viewer"}
@@ -324,7 +322,7 @@ func verify(root, mode, ownerPath string) error {
 			return fmt.Errorf("required file unavailable: %s", rel)
 		}
 	}
-	if err := verifyPrivatePlanningAbsent(root); err != nil {
+	if err := verifyPublicationBoundary(root); err != nil {
 		return err
 	}
 	var value status
@@ -598,10 +596,10 @@ func validateOwner(value ownerInputs) error {
 
 func verifyDocuments(root string) error {
 	required := map[string][]string{
-		"README.md": {"profile-driven, self-hosted relay transport system", "Each operator controls", "no telemetry", "pre-release software"},
-		"docs/KIP-0092-phase16-production-trust.md":               {"superseded", "Historical record only", "NO_GO"},
-		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md": {"accepted for implementation", "There is no global root", "kurd-node", "kurdctl", "NO_GO"},
-		"docs/PHASE16_EVIDENCE_INDEX.md":                          {"Self-hosted qualification", "No known critical or high Phase 16 finding remains", "NO_GO"},
+		"README.md":                            {"profile-driven, self-hosted relay transport system", "Each operator controls", "no telemetry", "pre-release software"},
+		"docs/self-hosting/INSTALL.md":         {"The installer verifies the manifest and every checksum", "The relay process runs as `kurd-node`", "contacts an update service"},
+		"docs/self-hosting/LIVE-DATA-PLANE.md": {"PRIVACY_PAYLOAD_LOGGING=PROHIBITED", "`kurd-node` runs unprivileged", "query logging disabled"},
+		"docs/self-hosting/SECURITY.md":        {"There is no Kurdistan account", "global root", "It cannot control another deployment"},
 	}
 	for path, needles := range required {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
@@ -626,16 +624,15 @@ func verifyDecentralizedAuthority(root string) error {
 			"does not require a Kurdistan account",
 			"one deployment cannot revoke or disable another independent deployment",
 		},
-		"docs/KIP-0092-phase16-production-trust.md": {
-			"superseded by",
-			"Historical record only",
+		"docs/self-hosting/INSTALL.md": {
+			"owner-controlled qualification host",
+			"The relay process runs as `kurd-node`",
+			"owns no capability",
 		},
-		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md": {
-			"decentralized, self-hosted VPN product",
-			"no vendor account",
-			"There is no global root",
-			"kurd-node",
-			"kurdctl",
+		"docs/self-hosting/SECURITY.md": {
+			"There is no Kurdistan account",
+			"global root",
+			"It cannot control another deployment",
 		},
 	}
 	for path, needles := range required {
@@ -653,7 +650,7 @@ func verifyDecentralizedAuthority(root string) error {
 
 	for _, path := range []string{
 		"README.md",
-		"docs/KIP-0093-decentralized-self-hosted-kurd-network.md",
+		"docs/self-hosting/SECURITY.md",
 	} {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
@@ -678,14 +675,14 @@ func verifyDecentralizedAuthority(root string) error {
 	return nil
 }
 
-func verifyPrivatePlanningAbsent(root string) error {
-	for _, path := range privatePlanningFiles {
+func verifyPublicationBoundary(root string) error {
+	for _, path := range excludedPublicationFiles {
 		_, err := os.Lstat(filepath.Join(root, filepath.FromSlash(path)))
 		if err == nil {
-			return fmt.Errorf("private planning file is present in the public repository tree: %s", path)
+			return fmt.Errorf("excluded file is present in the public repository tree: %s", path)
 		}
 		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("inspect private planning path %s: %w", path, err)
+			return fmt.Errorf("inspect excluded publication path %s: %w", path, err)
 		}
 	}
 	return nil
