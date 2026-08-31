@@ -965,13 +965,21 @@ class Phase17LiveDataPlaneDeviceTest {
                 "setup=${Phase17FieldHarness.protectedStateSetupState(application, "EXPLICIT_BACKUP_INITIALIZATION")}",
             initialized,
         )
-        assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
+        val reset = root.resetProtectedStateConfirmed()
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=RESET_COMMITTED actual=$reset " +
+                "storage=${root.storageFailure?.name ?: "AVAILABLE"}",
+            reset is ProtectedStateApplicationFacade.CommandResult.Committed,
+        )
         assertNull(root.protectedStateFacade())
         assertTrue(root.initializeProtectedStateForExplicitUserAction())
         val facade = requireNotNull(root.protectedStateFacade())
         val plan = when (val enumeration = facade.enumerateBackup(null, { false }, android.os.SystemClock::elapsedRealtime)) {
             is ProtectedBackupEnumeration.Ready -> enumeration.plan
-            is ProtectedBackupEnumeration.Rejected -> error("BACKUP_ENUMERATION_UNPROVEN")
+            is ProtectedBackupEnumeration.Rejected -> error(
+                "BACKUP_ENUMERATION_${enumeration.category.name} " +
+                    "snapshot=${facade.snapshot() != null} projection=${facade.readProjection() != null}",
+            )
         }
         assertEquals(0, plan.profileCount)
         assertEquals(0, plan.keyCount)

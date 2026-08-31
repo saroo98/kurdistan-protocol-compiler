@@ -106,6 +106,30 @@ class ProtectedStatePreviewBackupPolicyTest {
         fixture.assertReadOnly()
     }
 
+    @Test fun emptyFullBackupIsCanonicalWhileMissingExplicitSelectionFailsClosed() {
+        val fixture = PreviewFixture()
+        val result = fixture.reader().enumerateOrdinaryBackup() as ProtectedBackupEnumeration.Ready
+        assertEquals(0, result.plan.profileCount)
+        assertEquals(0, result.plan.keyCount)
+        assertEquals(0, fixture.backupCalls)
+
+        val passphrase = "synthetic-passphrase".encodeToByteArray()
+        assertTrue(result.plan.confirmEncryptedExport(passphrase) is NativeResult.Failure)
+        assertEquals(1, fixture.backupCalls)
+        assertTrue(fixture.wrappedProfiles.isEmpty())
+        assertTrue(fixture.wrappedKeyStatuses.isEmpty())
+        assertTrue(fixture.wrappedBindings.isEmpty())
+        assertEquals(2, fixture.wrappedVersion)
+        assertArrayEquals("synthetic-passphrase".encodeToByteArray(), passphrase)
+        fixture.assertReadOnly()
+
+        val missing = PreviewFixture()
+        assertEquals(ProtectedReadFailure.STATE_UNPROVEN,
+            (missing.reader().enumerateOrdinaryBackup("profile-missing") as ProtectedBackupEnumeration.Rejected).category)
+        assertEquals(0, missing.backupCalls)
+        missing.assertReadOnly()
+    }
+
     @Test fun explicitBackupRevalidatesSelectionUsesV2AndWipesPassphraseOnNativeFailure() {
         val fixture = PreviewFixture(keyCount = 3, withProfiles = true)
         val result = fixture.reader().enumerateOrdinaryBackup("profile-sealed") as ProtectedBackupEnumeration.Ready

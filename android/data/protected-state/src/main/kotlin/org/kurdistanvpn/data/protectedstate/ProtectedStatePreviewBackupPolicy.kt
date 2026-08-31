@@ -309,7 +309,7 @@ internal class ProtectedStatePreviewBackupReader(
         val catalog = try { ProfileCatalogProjectionCodec.decode(catalogBytes) } finally { catalogBytes.fill(0) }
         val included = catalog.filter { it.transactionState == TransactionState.FINALIZED.name &&
             it.health == CatalogHealth.AVAILABLE.name && (selected == null || selected == it.localRecordId) }
-        require(included.isNotEmpty() && included.size <= 128 && (selected == null || included.size == 1))
+        require(included.size <= 128 && (selected == null || included.size == 1))
         val profiles = mutableListOf<BackupProfileRecord>()
         val keys = linkedMapOf<String, ClientKeyBackupRecord>()
         var requestBytes = 0L
