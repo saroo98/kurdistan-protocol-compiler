@@ -4,7 +4,6 @@
 package org.kurdistanvpn.app
 
 import android.Manifest
-import android.app.ActivityManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -37,7 +36,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -288,6 +286,7 @@ class Phase9FoundationUiTest {
     fun clipboardAndOfflineQrControlsFailClosedAndReturnCleanly() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val activity = compose.activity
+        waitForSettledProfileState()
         compose.onNodeWithTag("primary_profiles")
             .performClick()
 
@@ -316,6 +315,7 @@ class Phase9FoundationUiTest {
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
+        waitForSettledProfileState()
 
         compose.onNodeWithTag("primary_profiles")
             .performClick()
@@ -342,6 +342,7 @@ class Phase9FoundationUiTest {
         compose.onNodeWithText(activity.getString(UiR.string.dismiss))
             .performScrollTo()
             .performClick()
+        waitForSettledProfileState()
 
         instrumentation.uiAutomation.executeShellCommand(
             "pm grant ${activity.packageName} ${Manifest.permission.CAMERA}",
@@ -586,6 +587,7 @@ class Phase9FoundationUiTest {
                     state = VpnRuntimeState.BLOCKED,
                     failure = "AUTHORITY_REJECTED",
                     timeoutMillis = runtimeTimeout(40_000),
+                    stage = "duplicate authority first rejection",
                 )
             }
             context.startForegroundService(Intent(start))
@@ -594,6 +596,7 @@ class Phase9FoundationUiTest {
                     state = VpnRuntimeState.BLOCKED,
                     failure = "AUTHORITY_REJECTED",
                     timeoutMillis = runtimeTimeout(5_000),
+                    stage = "duplicate authority replay rejection",
                 )
             }
             assertEquals(0L, terminal.packetsRead)
@@ -662,6 +665,16 @@ class Phase9FoundationUiTest {
         }
     }
 
+    private fun waitForSettledProfileState() {
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            when (compose.activity.appStateSnapshotForTesting()) {
+                AppState.FirstLaunch, AppState.NoProfiles -> true
+                is AppState.Ready -> true
+                else -> false
+            }
+        }
+    }
+
     private fun resetRuntime(controller: VpnRuntimeController) {
         controller.stop()
         runBlocking {
@@ -673,13 +686,19 @@ class Phase9FoundationUiTest {
     }
 
     private fun resetRuntimeService(context: Context) {
-        context.stopService(Intent(context, KurdVpnService::class.java))
-        runBlocking {
-            withTimeout(runtimeTimeout(10_000)) {
-                while (isKurdVpnServiceRunning(context)) {
-                    delay(25)
-                }
+        val probe = DirectRuntimeStatusProbe(context, requestId = null)
+        try {
+            KurdVpnService.stop(context)
+            runBlocking {
+                probe.await(
+                    state = VpnRuntimeState.IDLE,
+                    failure = null,
+                    timeoutMillis = runtimeTimeout(10_000),
+                    stage = "runtime reset",
+                )
             }
+        } finally {
+            probe.close()
         }
     }
 
@@ -734,26 +753,28 @@ private class DirectRuntimeStatusProbe(
         state: VpnRuntimeState,
         failure: String?,
         timeoutMillis: Long,
-    ): VpnRuntimeSnapshot = withTimeout(timeoutMillis) {
-        while (true) {
-            val snapshot = snapshots.receive()
-            if (snapshot.state == state && snapshot.failure == failure) return@withTimeout snapshot
+        stage: String = "runtime status",
+    ): VpnRuntimeSnapshot {
+        val observed = ArrayDeque<String>()
+        val matched = withTimeoutOrNull(timeoutMillis) {
+            while (true) {
+                val snapshot = snapshots.receive()
+                if (observed.size == 8) observed.removeFirst()
+                observed.addLast("${snapshot.state}/${snapshot.failure ?: "NONE"}")
+                if (snapshot.state == state && snapshot.failure == failure) return@withTimeoutOrNull snapshot
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
         }
-        @Suppress("UNREACHABLE_CODE")
-        error("unreachable")
+        return matched ?: throw AssertionError(
+            "$stage expected=$state/${failure ?: "NONE"} observed=${observed.joinToString()}",
+        )
     }
 
     override fun close() {
         runCatching { context.unregisterReceiver(receiver) }
         snapshots.close()
     }
-}
-
-@Suppress("DEPRECATION")
-private fun isKurdVpnServiceRunning(context: Context): Boolean {
-    val activityManager = context.getSystemService(ActivityManager::class.java)
-    val component = ComponentName(context, KurdVpnService::class.java)
-    return activityManager.getRunningServices(Int.MAX_VALUE).any { it.service == component }
 }
 
 private const val INTERNAL_SIGNED_PROFILE_LINK =
