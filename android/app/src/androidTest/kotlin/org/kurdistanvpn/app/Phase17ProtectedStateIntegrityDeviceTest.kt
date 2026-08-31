@@ -69,6 +69,38 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             val synchronized = writer.syncAndObserveExisting("record", second, 64)
             assertEquals(DurableCode.OK, synchronized.code)
             assertEquals(second.identity, synchronized.snapshot?.identity)
+
+            val frameworkPath = root.child("framework-projection")
+            val frameworkBytes = byteArrayOf(9, 8, 7, 6)
+            var frameworkDescriptor: java.io.FileDescriptor? = null
+            try {
+                frameworkDescriptor = Os.open(frameworkPath,
+                    OsConstants.O_RDWR or OsConstants.O_CREAT or OsConstants.O_EXCL or 0x00080000 or OsConstants.O_NOFOLLOW,
+                    432)
+                assertEquals(frameworkBytes.size, Os.write(checkNotNull(frameworkDescriptor), frameworkBytes, 0, frameworkBytes.size))
+                Os.fchmod(checkNotNull(frameworkDescriptor), 432)
+            } finally {
+                val retiring = frameworkDescriptor
+                frameworkDescriptor = null
+                if (retiring != null) Os.close(retiring)
+            }
+            val frameworkBefore = Os.lstat(frameworkPath)
+            assertEquals(432, frameworkBefore.st_mode and 511)
+            assertEquals(DurableCode.UNSAFE, writer.read("framework-projection", 64).code)
+            val restricted = writer.restrictAndObserveExisting("framework-projection", 64)
+            assertEquals(DurableCode.OK, restricted.code)
+            assertEquals(DurableFileIdentity(frameworkBefore.st_dev, frameworkBefore.st_ino), restricted.snapshot?.identity)
+            assertArrayEquals(frameworkBytes, restricted.snapshot?.bytes)
+            val frameworkAfter = Os.lstat(frameworkPath)
+            assertEquals(384, frameworkAfter.st_mode and 511)
+            assertEquals(frameworkBefore.st_dev, frameworkAfter.st_dev)
+            assertEquals(frameworkBefore.st_ino, frameworkAfter.st_ino)
+            assertEquals(frameworkBefore.st_uid, frameworkAfter.st_uid)
+            assertEquals(frameworkBefore.st_size, frameworkAfter.st_size)
+            val repeated = writer.restrictAndObserveExisting("framework-projection", 64)
+            assertEquals(DurableCode.OK, repeated.code)
+            assertEquals(restricted.snapshot?.identity, repeated.snapshot?.identity)
+            assertArrayEquals(frameworkBytes, repeated.snapshot?.bytes)
             assertEquals(DurableCode.CONFLICT, writer.delete("record", first, 64).code)
             // This is the explicitly exercised deletion primitive, not fixture cleanup.
             assertEquals(DurableCode.OK, writer.delete("record", second, 64).code)

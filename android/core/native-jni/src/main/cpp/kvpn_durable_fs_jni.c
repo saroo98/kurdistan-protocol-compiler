@@ -55,7 +55,7 @@ static int leaf_arg(JNIEnv *env, jbyteArray input, uint8_t **bytes, size_t *leng
 static int wipe_result_inputs(JNIEnv *env, jlongArray info, size_t count, jbyteArray data, size_t length) {
     jthrowable pending = (*env)->ExceptionOccurred(env);
     if (pending != NULL) (*env)->ExceptionClear(env);
-    const jlong empty_info[6] = {0};
+    const jlong empty_info[7] = {0};
     const jbyte empty_data[1024] = {0};
     if (info != NULL && count != 0) (*env)->SetLongArrayRegion(env, info, 0, (jsize)count, empty_info);
     size_t offset = 0;
@@ -79,7 +79,7 @@ static int wipe_result_inputs(JNIEnv *env, jlongArray info, size_t count, jbyteA
 static jobject result(JNIEnv *env, int code, const int64_t *metadata, size_t count, const uint8_t *bytes, size_t length) {
     if ((*env)->ExceptionCheck(env)) return NULL;
     if (code != KVPN_FS_OK) { count = 0; bytes = NULL; length = 0; }
-    if (count > 6 || length > KVPN_FS_MAX_BYTES) return NULL;
+    if (count > 7 || length > KVPN_FS_MAX_BYTES) return NULL;
     jclass type = (*env)->FindClass(env, "org/kurdistanvpn/core/nativeapi/DurableRawResult");
     if (type == NULL) return NULL;
     jmethodID ctor = (*env)->GetMethodID(env, type, "<init>", "(I[J[B)V");
@@ -87,7 +87,7 @@ static jobject result(JNIEnv *env, int code, const int64_t *metadata, size_t cou
     jlongArray info = (*env)->NewLongArray(env, (jsize)count);
     if (info == NULL) { (*env)->DeleteLocalRef(env, type); return NULL; }
     if (count != 0) {
-        jlong values[6];
+        jlong values[7];
         for (size_t i = 0; i < count; ++i) values[i] = metadata[i];
         (*env)->SetLongArrayRegion(env, info, 0, (jsize)count, values);
     }
@@ -289,6 +289,34 @@ JNIEXPORT jobject JNICALL Java_org_kurdistanvpn_core_nativejni_NativeBridge_nati
     wipe_free(lock_leaf, lock_length);
     wipe_free(leaf, leaf_length);
     wipe_free(expected, expected_length);
+    wipe_free(output, capacity);
+    return value;
+}
+
+JNIEXPORT jobject JNICALL Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableRestrictExisting(
+    JNIEnv *env, jobject receiver, jlongArray handles, jlongArray input, jbyteArray lock_name,
+    jlongArray lock, jbyteArray name, jlong maximum) {
+    (void)receiver;
+    struct kvpn_fs_directory d;
+    int64_t session[2] = {-1, -1}, lock_id[2] = {0}, metadata[7] = {0};
+    uint8_t *lock_leaf = NULL, *leaf = NULL, *before = NULL, *output = NULL;
+    size_t lock_length = 0, leaf_length = 0, length = 0, capacity = 0;
+    int code = KVPN_FS_INVALID;
+    int owned = longs(env, handles, 2, session) && session[0] >= 0 && session[0] <= INT_MAX &&
+        session[1] >= 0 && session[1] <= INT_MAX && session[0] != session[1];
+    if (owned && maximum > 0 && maximum <= KVPN_FS_MAX_BYTES && directory_arg(env, input, &d) &&
+        longs(env, lock, 2, lock_id) && leaf_arg(env, lock_name, &lock_leaf, &lock_length) &&
+        leaf_arg(env, name, &leaf, &leaf_length)) {
+        capacity = (size_t)maximum;
+        before = malloc(capacity);
+        output = malloc(capacity);
+        code = before == NULL || output == NULL ? KVPN_FS_IO : kvpn_fs_restrict_existing(session, &d,
+            lock_leaf, lock_length, lock_id, leaf, leaf_length, capacity, before, output, &length, metadata);
+    }
+    jobject value = result(env, code, metadata, 7, code == KVPN_FS_OK ? output : NULL, length);
+    wipe_free(lock_leaf, lock_length);
+    wipe_free(leaf, leaf_length);
+    wipe_free(before, capacity);
     wipe_free(output, capacity);
     return value;
 }

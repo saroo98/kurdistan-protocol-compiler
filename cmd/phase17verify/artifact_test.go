@@ -189,7 +189,7 @@ func TestPhase17NativeJNIExportPolicyRejectsMissingExtraAndVisibleInternalHelper
 	if err := verifyPhase17JNIExports(symbols, phase17JNISymbols); err != nil {
 		t.Fatal(err)
 	}
-	for _, suffix := range []string{"nativeDurableRead", "nativePrepareBorrowedPipe", "nativeDurableOpenChild", "nativeDurableCreateChild", "nativeDurableCloseDirectory", "nativeDurableBootstrap", "nativeDurableList", "nativeDurableOpen", "nativeDurableClose", "nativeDurableMutate", "nativeDurableSyncExisting"} {
+	for _, suffix := range []string{"nativeDurableRead", "nativePrepareBorrowedPipe", "nativeDurableOpenChild", "nativeDurableCreateChild", "nativeDurableCloseDirectory", "nativeDurableBootstrap", "nativeDurableList", "nativeDurableOpen", "nativeDurableClose", "nativeDurableMutate", "nativeDurableRestrictExisting", "nativeDurableSyncExisting"} {
 		name := "Java_org_kurdistanvpn_core_nativejni_NativeBridge_" + suffix
 		var missing []elf.Symbol
 		for _, symbol := range symbols {

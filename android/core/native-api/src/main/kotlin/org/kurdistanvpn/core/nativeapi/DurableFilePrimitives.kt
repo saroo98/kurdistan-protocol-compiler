@@ -89,6 +89,14 @@ data class DurableSyncResult(val code: DurableCode, val snapshot: DurableSnapsho
         require(code != DurableCode.ABSENT && code != DurableCode.CLOSE_UNPROVEN)
     }
 }
+data class DurableRestrictionResult(val code: DurableCode, val snapshot: DurableSnapshot? = null,
+    val modeChanged: Boolean = false) {
+    init {
+        require((code == DurableCode.OK) == (snapshot != null))
+        require(!modeChanged || code == DurableCode.OK)
+        require(code != DurableCode.CLOSE_UNPROVEN)
+    }
+}
 
 /** Immutable observation only: no descriptor ownership, authority, or byte payload is transferred. */
 class DurablePipeObservation internal constructor(
@@ -153,6 +161,12 @@ interface DurableWriter : Closeable {
     /** Only for already quiesced and closed store files; never for live SQLite or DataStore files. */
     fun syncAndObserveExisting(leaf: String, expected: DurableSnapshot, maxBytes: Int): DurableSyncResult =
         DurableSyncResult(DurableCode.UNSUPPORTED)
+    /**
+     * Closed framework-owned projection files only. Restricts an exact 0660 file to 0600 through
+     * the held directory capability, or observes an already-0600 file without changing it.
+     */
+    fun restrictAndObserveExisting(leaf: String, maxBytes: Int): DurableRestrictionResult =
+        DurableRestrictionResult(DurableCode.UNSUPPORTED)
     fun closeResult(): DurableCode
 }
 
@@ -194,6 +208,9 @@ interface DurableNativeTransport {
     fun close(session: LongArray): DurableRawResult
     fun syncExisting(session: LongArray, directory: DurableDirectory, lockLeaf: ByteArray,
         lock: DurableFileIdentity, leaf: ByteArray, expected: DurableSnapshot, maxBytes: Int): DurableRawResult =
+        DurableRawResult(DurableCode.UNSUPPORTED.wire, longArrayOf(), null)
+    fun restrictExisting(session: LongArray, directory: DurableDirectory, lockLeaf: ByteArray,
+        lock: DurableFileIdentity, leaf: ByteArray, maxBytes: Int): DurableRawResult =
         DurableRawResult(DurableCode.UNSUPPORTED.wire, longArrayOf(), null)
 }
 
@@ -527,6 +544,35 @@ class CheckedDurableFilePrimitives internal constructor(
             // A successful fsync may publish preceding projection writes. It is
             // provisional until this writer's terminal close also succeeds.
             if (result.code == DurableCode.OK) changed = true
+            if (result.code == DurableCode.MUTATION_UNPROVEN) { changed = true; poisoned = true }
+            return result
+        }
+
+        @Synchronized override fun restrictAndObserveExisting(leaf: String, maxBytes: Int): DurableRestrictionResult {
+            val owned = handles ?: return DurableRestrictionResult(DurableCode.CLOSED)
+            if (poisoned) return DurableRestrictionResult(DurableCode.CLOSED)
+            val name = DurableBounds.leaf(leaf)
+            if (name == null || name.contentEquals(lockLeaf) || !DurableBounds.validLimit(maxBytes)) {
+                return DurableRestrictionResult(DurableCode.INVALID)
+            }
+            val result = try {
+                decode(native.restrictExisting(owned.copyOf(), directory.copy(directoryFd = owned[0]),
+                    lockLeaf.copyOf(), lock, name, maxBytes)) { wire, metadata, observed ->
+                    val code = checkedCode(wire, metadata, observed, DurableCode.MUTATION_UNPROVEN)
+                    if (code != DurableCode.OK) {
+                        DurableRestrictionResult(if (code == DurableCode.CLOSE_UNPROVEN || code == DurableCode.CLOSED)
+                            DurableCode.MUTATION_UNPROVEN else code)
+                    } else if (metadata.size != 7 || observed == null || observed.size > maxBytes || metadata[6] !in 0L..1L) {
+                        DurableRestrictionResult(DurableCode.MUTATION_UNPROVEN)
+                    } else {
+                        val id = fileIdentity(metadata.copyOfRange(0, 6), directory.expectedUid, maxBytes)
+                        if (id == null || metadata[5] != observed.size.toLong()) {
+                            DurableRestrictionResult(DurableCode.MUTATION_UNPROVEN)
+                        } else DurableRestrictionResult(DurableCode.OK, DurableSnapshot(id, observed), metadata[6] == 1L)
+                    }
+                }
+            } catch (_: Throwable) { DurableRestrictionResult(DurableCode.MUTATION_UNPROVEN) }
+            if (result.code == DurableCode.OK && result.modeChanged) changed = true
             if (result.code == DurableCode.MUTATION_UNPROVEN) { changed = true; poisoned = true }
             return result
         }

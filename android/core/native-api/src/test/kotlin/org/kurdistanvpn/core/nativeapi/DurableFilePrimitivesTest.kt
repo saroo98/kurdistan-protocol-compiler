@@ -95,6 +95,9 @@ class DurableFilePrimitivesTest {
         assertTrue(wiping.contains("SetLongArrayRegion"))
         assertTrue(wiping.contains("ExceptionClear"))
         assertTrue(wiping.contains("Throw(env, pending)"))
+        assertTrue(wiping.contains("const jlong empty_info[7]"))
+        assertTrue(resultBody.contains("count > 7"))
+        assertTrue(resultBody.contains("jlong values[7]"))
     }
 
     @Test fun acquiredChildIsClosedOnceWhenEveryCopyOrConstructionBoundaryThrows() {
@@ -642,6 +645,57 @@ class DurableFilePrimitivesTest {
         }
     }
 
+    @Test fun restrictExistingReturnsOnlyAValidatedRestrictedSnapshotAndChangeFlag() {
+        val bytes = byteArrayOf(4, 8)
+        val backend = Backend().apply {
+            restrictResult = DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 2, 1), bytes)
+        }
+        val writer = CheckedDurableFilePrimitives(backend).openWriter(directory, "lock", identity).writer!!
+        val result = writer.restrictAndObserveExisting("projection", 10)
+        assertEquals(DurableCode.OK, result.code)
+        assertTrue(result.modeChanged)
+        assertEquals(identity, result.snapshot!!.identity)
+        assertArrayEquals(byteArrayOf(4, 8), result.snapshot.bytes)
+        assertArrayEquals(byteArrayOf(4, 8), bytes)
+        assertArrayEquals(byteArrayOf(0, 0), backend.restrictResult.bytes)
+        assertTrue(backend.restrictResult.metadata.all { it == 0L })
+        assertEquals(1, backend.restrictCalls)
+        assertEquals(DurableCode.OK, writer.closeResult())
+    }
+
+    @Test fun restrictExistingPreservesAbsenceAndRejectsInvalidInputBeforeNativeEntry() {
+        val backend = Backend().apply { restrictResult = DurableRawResult(DurableCode.ABSENT.wire, longArrayOf(), null) }
+        val writer = CheckedDurableFilePrimitives(backend).openWriter(directory, "lock", identity).writer!!
+        assertEquals(DurableCode.ABSENT, writer.restrictAndObserveExisting("projection", 10).code)
+        listOf("", ".", "..", "a/b", "a\\b", "a\u0000b", "lock", "x".repeat(256)).forEach {
+            assertEquals(DurableCode.INVALID, writer.restrictAndObserveExisting(it, 10).code)
+        }
+        listOf(0, DurableBounds.MAX_BYTES + 1).forEach {
+            assertEquals(DurableCode.INVALID, writer.restrictAndObserveExisting("projection", it).code)
+        }
+        assertEquals(1, backend.restrictCalls)
+        assertEquals(DurableCode.OK, writer.closeResult())
+    }
+
+    @Test fun restrictExistingImpossibleResultsPoisonTheLease() {
+        val malformed = listOf(
+            DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 2), byteArrayOf(4, 8)),
+            DurableRawResult(0, longArrayOf(1, 2, 1000, 420, 1, 2, 1), byteArrayOf(4, 8)),
+            DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 2, 2), byteArrayOf(4, 8)),
+            DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 3, 0), byteArrayOf(4, 8)),
+            DurableRawResult(DurableCode.CLOSE_UNPROVEN.wire, longArrayOf(), null),
+            DurableRawResult(987, longArrayOf(), null),
+        )
+        malformed.forEach { raw ->
+            val backend = Backend().apply { restrictResult = raw }
+            val writer = CheckedDurableFilePrimitives(backend).openWriter(directory, "lock", identity).writer!!
+            assertEquals(DurableCode.MUTATION_UNPROVEN, writer.restrictAndObserveExisting("projection", 10).code)
+            assertEquals(DurableCode.CLOSED, writer.read("projection", 10).code)
+            assertEquals(DurableCode.MUTATION_UNPROVEN, writer.closeResult())
+            assertEquals(1, backend.restrictCalls)
+        }
+    }
+
     @Test fun syncExistingOwnsTheWriterUntilTheResultIsValidatedBeforeConcurrentClose() {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -780,6 +834,23 @@ class DurableFilePrimitivesTest {
         assertTrue(lock.indexOf("read_leaf(") < lock.indexOf("verify_directory("))
     }
 
+    /** Source-boundary check only; installed Android execution is covered by the device test. */
+    @Test fun nativeFrameworkProjectionRestrictionIsDescriptorRelativeAndPreflightsBeforeModeMutation() {
+        val source = nativeSource("kvpn_durable_fs.c")
+        val helper = source.substringAfter("int kvpn_fs_restrict_existing(")
+            .substringBefore("int kvpn_fs_mutate(")
+        assertTrue(source.contains("mode == 0600 || mode == 0660"))
+        assertTrue(helper.contains("open_leaf(dir, name, O_RDWR)"))
+        assertTrue(helper.indexOf("sync_fd(lock)") < helper.indexOf("sync_fd(dir)"))
+        assertTrue(helper.indexOf("sync_fd(dir)") < helper.indexOf("sync_fd(file)"))
+        assertTrue(helper.indexOf("sync_fd(file)") < helper.indexOf("fchmod(file, 0600)"))
+        assertTrue(helper.contains("read_restrictable_open_file"))
+        assertTrue(helper.contains("read_leaf(dir, d->uid, name"))
+        assertTrue(helper.contains("same_identity(&before, &reopened)"))
+        assertTrue(helper.contains("KVPN_FS_MUTATION_UNPROVEN"))
+        assertFalse(Regex("\\bchmod\\s*\\(").containsMatchIn(helper))
+    }
+
     /** Source-boundary check only; this does not execute Android libc or establish installed behavior. */
     @Test fun nativePipeSourceHasBoundedInterruptedCallsAndNeverClosesBorrowedFd() {
         val source = nativeSource("kvpn_durable_fs.c")
@@ -827,12 +898,15 @@ class DurableFilePrimitivesTest {
         var closeCalls = 0
         var mutationCalls = 0
         var syncCalls = 0
+        var restrictCalls = 0
         var pipeCalls = 0
         var pipeArguments: List<Long>? = null
         var pipeResult = DurableRawResult(0, longArrayOf(1, 2, 1000, 4480, 0, 1), null)
         var pipeFailure: Throwable? = null
         var syncResult = DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 2), byteArrayOf(4, 8))
         var syncFailure: Throwable? = null
+        var restrictResult = DurableRawResult(0, longArrayOf(1, 2, 1000, 384, 1, 2, 0), byteArrayOf(4, 8))
+        var restrictFailure: Throwable? = null
         var beforeSyncReturn: (() -> Unit)? = null
         var readResult = DurableRawResult(1, longArrayOf(), null)
         var listResult = DurableRawResult(0, longArrayOf(0), byteArrayOf())
@@ -899,6 +973,12 @@ class DurableFilePrimitivesTest {
             syncFailure?.let { throw it }
             beforeSyncReturn?.invoke()
             return syncResult
+        }
+        override fun restrictExisting(session: LongArray, directory: DurableDirectory, lockLeaf: ByteArray,
+            lock: DurableFileIdentity, leaf: ByteArray, maxBytes: Int): DurableRawResult {
+            restrictCalls++
+            restrictFailure?.let { throw it }
+            return restrictResult
         }
     }
 }

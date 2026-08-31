@@ -613,6 +613,10 @@ class NativeBridge : KurdNativeCore {
                         identity(expected.identity), previous, maxBytes.toLong())
                 } finally { previous.fill(0) }
             }
+            override fun restrictExisting(session: LongArray, directory: org.kurdistanvpn.core.nativeapi.DurableDirectory,
+                lockLeaf: ByteArray, lock: org.kurdistanvpn.core.nativeapi.DurableFileIdentity, leaf: ByteArray,
+                maxBytes: Int) = nativeDurableRestrictExisting(session, directory(directory), lockLeaf,
+                    identity(lock), leaf, maxBytes.toLong())
         })
 
     private external fun nativePrepareBorrowedPipe(fd: Long, expectedUid: Long, expectedAccess: Int): org.kurdistanvpn.core.nativeapi.DurableRawResult
@@ -629,6 +633,8 @@ class NativeBridge : KurdNativeCore {
     private external fun nativeDurableClose(session: LongArray): org.kurdistanvpn.core.nativeapi.DurableRawResult
     private external fun nativeDurableSyncExisting(session: LongArray, directory: LongArray, lockLeaf: ByteArray, lock: LongArray,
         leaf: ByteArray, expectedIdentity: LongArray, expected: ByteArray, maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableRestrictExisting(session: LongArray, directory: LongArray, lockLeaf: ByteArray,
+        lock: LongArray, leaf: ByteArray, maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
 
     private external fun nativeAbiInfo(output: ByteBuffer, outputLength: IntArray): Int
     private external fun nativeRecipientCreate(validitySeconds: Int, outputHandle: LongArray): Int

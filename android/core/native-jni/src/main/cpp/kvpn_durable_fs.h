@@ -59,6 +59,14 @@ int kvpn_fs_sync_existing(int64_t session[2], const struct kvpn_fs_directory *di
     const uint8_t *leaf, size_t leaf_length, const int64_t expected_identity[2],
     const uint8_t *expected, size_t expected_length, size_t limit,
     uint8_t *output, size_t *length, int64_t metadata[6]);
+/* Closed framework projection only. Source mode must be exactly 0600 or 0660.
+ * A 0660 source is restricted through the held directory FD to 0600 after
+ * synchronization preflight. Exact identity and content are reobserved after
+ * reopen. metadata[6] reports whether the mode changed. */
+int kvpn_fs_restrict_existing(int64_t session[2], const struct kvpn_fs_directory *directory,
+    const uint8_t *lock_leaf, size_t lock_length, const int64_t lock_identity[2],
+    const uint8_t *leaf, size_t leaf_length, size_t limit,
+    uint8_t *before_output, uint8_t *output, size_t *length, int64_t metadata[7]);
 int kvpn_fs_close(int64_t session[2]);
 
 #endif

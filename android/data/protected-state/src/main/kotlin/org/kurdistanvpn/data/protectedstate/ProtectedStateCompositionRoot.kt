@@ -392,6 +392,15 @@ internal class ClosedProjectionFiles(private val directory: DurableDirectory,
     fun observe(writer: DurableWriter? = null, synchronize: Boolean = false,
         allowAbsent: Boolean = false): List<ProjectionFileObservation> {
         check(!synchronize || writer != null) { "BROKER_WRITER_REQUIRED" }
+        if (synchronize) {
+            val acquired = checkNotNull(writer)
+            for (role in ProjectionFileRole.entries) {
+                val restricted = acquired.restrictAndObserveExisting(layout.leaf(role), limit(role))
+                check(restricted.code == DurableCode.OK || restricted.code == DurableCode.ABSENT) {
+                    "PROJECTION_MODE_RESTRICTION_UNPROVEN"
+                }
+            }
+        }
         val inventory = if (writer == null) primitives.list(directory, JournalLimits.OBJECTS) else writer.list(JournalLimits.OBJECTS)
         check(inventory.code == DurableCode.OK) { "PROJECTION_INVENTORY_UNPROVEN" }
         layout.requireNoUnboundSidecars(checkNotNull(inventory.entries).map { it.leaf })

@@ -103,6 +103,7 @@ class ProtectedStateProjectionWitnessTest {
         io.files["projection.db-journal"] = DurableSnapshot(DurableFileIdentity(1, 12), byteArrayOf())
         val files = ClosedProjectionFiles(io.directory, io, ProjectionLeafLayout("projection.db", "settings.preferences_pb"))
         assertEquals(5, files.observe(io, synchronize = true).size)
+        assertEquals(5, io.restrictions)
         assertEquals(3, io.syncs)
         for (code in listOf(DurableCode.UNSUPPORTED, DurableCode.IO_FAILURE, DurableCode.MUTATION_UNPROVEN)) {
             io.syncCode = code
@@ -300,6 +301,8 @@ private class ProjectionFileFixture : DurableFilePrimitives, DurableWriter {
         "settings.preferences_pb" to DurableSnapshot(DurableFileIdentity(1, 11), byteArrayOf(4, 5, 6)),
     )
     var syncs = 0
+    var restrictions = 0
+    var restrictionCode = DurableCode.OK
     var syncCode = DurableCode.OK
     var substitute = false
     var requireQuiescent: () -> Unit = {}
@@ -315,6 +318,13 @@ private class ProjectionFileFixture : DurableFilePrimitives, DurableWriter {
         files.map { DurableDirectoryEntry(it.key, it.value.identity, it.value.size.toLong()) })
     override fun replace(leaf: String, tempLeaf: String, expectedOld: DurableSnapshot?, bytes: ByteArray, maxBytes: Int) = error("not permitted")
     override fun delete(leaf: String, expectedOld: DurableSnapshot, maxBytes: Int) = error("not permitted")
+    override fun restrictAndObserveExisting(leaf: String, maxBytes: Int): DurableRestrictionResult {
+        requireQuiescent()
+        restrictions++
+        if (restrictionCode != DurableCode.OK) return DurableRestrictionResult(restrictionCode)
+        return files[leaf]?.let { DurableRestrictionResult(DurableCode.OK, it) }
+            ?: DurableRestrictionResult(DurableCode.ABSENT)
+    }
     override fun syncAndObserveExisting(leaf: String, expected: DurableSnapshot, maxBytes: Int): DurableSyncResult {
         requireQuiescent()
         syncs++

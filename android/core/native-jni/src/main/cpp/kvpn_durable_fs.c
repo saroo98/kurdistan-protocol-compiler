@@ -166,6 +166,14 @@ static int regular(const struct stat *st, int64_t uid, size_t limit) {
         st->st_size >= 0 && (uint64_t)st->st_size <= limit;
 }
 
+static int restrictable_regular(const struct stat *st, int64_t uid, size_t limit) {
+    mode_t mode = st->st_mode & 07777;
+    return S_ISREG(st->st_mode) && (mode == 0600 || mode == 0660) &&
+        (uint64_t)st->st_uid == (uint64_t)uid && st->st_nlink == 1 &&
+        (uint64_t)st->st_dev <= INT64_MAX && st->st_ino != 0 && (uint64_t)st->st_ino <= INT64_MAX &&
+        st->st_size >= 0 && (uint64_t)st->st_size <= limit;
+}
+
 static int verify_directory(int fd, const struct kvpn_fs_directory *d) {
     struct stat st;
     if (stat_fd(fd, &st) != 0) return io_code();
@@ -195,6 +203,12 @@ static int verify_name(int dir, const char *name, const struct stat *opened, int
     struct stat named;
     if (stat_name(dir, name, &named) != 0) return errno == ENOENT ? KVPN_FS_CONFLICT : io_code();
     return regular(&named, uid, limit) && same_identity(&named, opened) ? KVPN_FS_OK : KVPN_FS_UNSAFE;
+}
+
+static int verify_restrictable_name(int dir, const char *name, const struct stat *opened, int64_t uid, size_t limit) {
+    struct stat named;
+    if (stat_name(dir, name, &named) != 0) return errno == ENOENT ? KVPN_FS_CONFLICT : io_code();
+    return restrictable_regular(&named, uid, limit) && same_identity(&named, opened) ? KVPN_FS_OK : KVPN_FS_UNSAFE;
 }
 
 static void metadata_from(const struct stat *st, int64_t metadata[6]) {
@@ -227,6 +241,33 @@ static int read_open_file(int fd, int64_t uid, size_t limit, uint8_t *out, size_
     struct stat after;
     if (stat_fd(fd, &after) != 0) return io_code();
     if (!regular(&after, uid, limit) || !same_identity(before, &after) || before->st_size != after.st_size ||
+        before->st_mtim.tv_sec != after.st_mtim.tv_sec || before->st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
+        before->st_ctim.tv_sec != after.st_ctim.tv_sec || before->st_ctim.tv_nsec != after.st_ctim.tv_nsec) return KVPN_FS_CONFLICT;
+    *length = size;
+    return KVPN_FS_OK;
+}
+
+static int read_restrictable_open_file(int fd, int64_t uid, size_t limit, uint8_t *out,
+    size_t *length, struct stat *before) {
+    if (stat_fd(fd, before) != 0) return io_code();
+    if (!restrictable_regular(before, uid, limit)) return KVPN_FS_UNSAFE;
+    size_t size = (size_t)before->st_size;
+    size_t used = 0;
+    while (used < size) {
+        ssize_t n = read(fd, out + used, size - used);
+        if (n < 0 && errno == EINTR) continue;
+        if (n < 0) return io_code();
+        if (n == 0) return KVPN_FS_CONFLICT;
+        used += (size_t)n;
+    }
+    uint8_t trailing;
+    ssize_t n;
+    do { n = read(fd, &trailing, 1); } while (n < 0 && errno == EINTR);
+    if (n < 0) return io_code();
+    if (n != 0) return KVPN_FS_CONFLICT;
+    struct stat after;
+    if (stat_fd(fd, &after) != 0) return io_code();
+    if (!restrictable_regular(&after, uid, limit) || !same_identity(before, &after) || before->st_size != after.st_size ||
         before->st_mtim.tv_sec != after.st_mtim.tv_sec || before->st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
         before->st_ctim.tv_sec != after.st_ctim.tv_sec || before->st_ctim.tv_nsec != after.st_ctim.tv_nsec) return KVPN_FS_CONFLICT;
     *length = size;
@@ -621,6 +662,88 @@ done:
         erase(output, limit);
         *length = 0;
         if (synchronization_started || code == KVPN_FS_CLOSE_UNPROVEN) code = KVPN_FS_MUTATION_UNPROVEN;
+    }
+    return code;
+}
+
+int kvpn_fs_restrict_existing(int64_t session[2], const struct kvpn_fs_directory *d,
+    const uint8_t *lock_leaf, size_t lock_length, const int64_t lock_id[2],
+    const uint8_t *leaf, size_t leaf_length, size_t limit,
+    uint8_t *before_output, uint8_t *output, size_t *length, int64_t metadata[7]) {
+    if (length != NULL) *length = 0;
+    if (metadata != NULL) memset(metadata, 0, 7 * sizeof(int64_t));
+    if (session == NULL || !fd_valid(session[0]) || !fd_valid(session[1]) || session[0] == session[1] ||
+        !kvpn_fs_valid_directory(d) || !identity_valid(lock_id) ||
+        !kvpn_fs_valid_leaf(lock_leaf, lock_length) || !kvpn_fs_valid_leaf(leaf, leaf_length) ||
+        limit == 0 || limit > KVPN_FS_MAX_BYTES || before_output == NULL || output == NULL ||
+        before_output == output || length == NULL || metadata == NULL) return KVPN_FS_INVALID;
+    uintptr_t before_start = (uintptr_t)before_output, output_start = (uintptr_t)output;
+    if (before_start > UINTPTR_MAX - limit || output_start > UINTPTR_MAX - limit ||
+        (before_start < output_start + limit && output_start < before_start + limit)) return KVPN_FS_INVALID;
+    int dir = (int)session[0], lock = (int)session[1], file = -1;
+    int synchronization_started = 0, mutation_started = 0, mode_changed = 0;
+    char name[KVPN_FS_MAX_LEAF + 1], lock_name[KVPN_FS_MAX_LEAF + 1];
+    struct stat before, restricted, reopened;
+    size_t before_length = 0, observed_length = 0;
+    name_copy(name, leaf, leaf_length);
+    name_copy(lock_name, lock_leaf, lock_length);
+    if (strcmp(name, lock_name) == 0) return KVPN_FS_INVALID;
+    int code = verify_lock(dir, lock, d, lock_name, lock_id);
+    if (code != KVPN_FS_OK) goto done;
+    file = open_leaf(dir, name, O_RDWR);
+    if (file < 0) {
+        code = errno == ENOENT ? KVPN_FS_ABSENT : io_code();
+        if (code == KVPN_FS_ABSENT) {
+            int checked = verify_lock(dir, lock, d, lock_name, lock_id);
+            if (checked != KVPN_FS_OK) code = checked;
+        }
+        goto done;
+    }
+    code = read_restrictable_open_file(file, d->uid, limit, before_output, &before_length, &before);
+    if (code == KVPN_FS_OK) code = verify_restrictable_name(dir, name, &before, d->uid, limit);
+    if (code == KVPN_FS_OK) code = verify_lock(dir, lock, d, lock_name, lock_id);
+    if (code != KVPN_FS_OK) goto done;
+    if ((before.st_mode & 07777) == 0660) {
+        code = sync_fd(lock);
+        if (code == KVPN_FS_OK) code = sync_fd(dir);
+        if (code != KVPN_FS_OK) goto done;
+        synchronization_started = 1;
+        code = sync_fd(file);
+        if (code != KVPN_FS_OK) goto done;
+        mutation_started = 1;
+        if (fchmod(file, 0600) != 0) { code = io_code(); goto done; }
+        mode_changed = 1;
+        if (stat_fd(file, &restricted) != 0) { code = io_code(); goto done; }
+        if (!regular(&restricted, d->uid, limit) || !same_identity(&before, &restricted) ||
+            before.st_size != restricted.st_size || before.st_mtim.tv_sec != restricted.st_mtim.tv_sec ||
+            before.st_mtim.tv_nsec != restricted.st_mtim.tv_nsec) { code = KVPN_FS_CONFLICT; goto done; }
+        code = verify_name(dir, name, &restricted, d->uid, limit);
+        if (code == KVPN_FS_OK) code = verify_lock(dir, lock, d, lock_name, lock_id);
+        if (code == KVPN_FS_OK) code = sync_fd(file);
+        if (code != KVPN_FS_OK) goto done;
+    }
+    if (close_once(&file) != KVPN_FS_OK) { code = KVPN_FS_CLOSE_UNPROVEN; goto done; }
+    if (mode_changed) {
+        code = sync_fd(dir);
+        if (code != KVPN_FS_OK) goto done;
+    }
+    code = read_leaf(dir, d->uid, name, limit, output, &observed_length, &reopened);
+    if (code == KVPN_FS_OK && (!same_identity(&before, &reopened) || observed_length != before_length ||
+        (observed_length != 0 && memcmp(before_output, output, observed_length) != 0))) code = KVPN_FS_CONFLICT;
+    if (code == KVPN_FS_OK) code = verify_name(dir, name, &reopened, d->uid, limit);
+    if (code == KVPN_FS_OK) code = verify_lock(dir, lock, d, lock_name, lock_id);
+done:
+    if (close_once(&file) != KVPN_FS_OK) code = KVPN_FS_CLOSE_UNPROVEN;
+    if (code == KVPN_FS_OK) {
+        metadata_from(&reopened, metadata);
+        metadata[6] = mode_changed;
+        *length = observed_length;
+    } else {
+        erase(before_output, limit);
+        erase(output, limit);
+        *length = 0;
+        if (synchronization_started || mutation_started || code == KVPN_FS_CLOSE_UNPROVEN)
+            code = KVPN_FS_MUTATION_UNPROVEN;
     }
     return code;
 }

@@ -108,6 +108,7 @@ var phase17JNISymbols = []string{
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableOpen",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableOpenChild",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableRead",
+	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableRestrictExisting",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeDurableSyncExisting",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativeFree",
 	"Java_org_kurdistanvpn_core_nativejni_NativeBridge_nativePhase11RoundTrip",
