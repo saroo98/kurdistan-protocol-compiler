@@ -23,6 +23,7 @@ import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -262,6 +263,7 @@ internal class DefaultProcessAuthorityBackend(
  * A missing, dead, malformed, or indeterminate peer is never treated as clean. */
 private class VpnMutationQuiescenceClient(private val context: Context) {
     private val monitor = Any()
+    private val connectionReady = CountDownLatch(1)
     private val lifetime = Binder()
     private val ipc = Executors.newSingleThreadExecutor { task ->
         Thread(task, "kurd-vpn-quiescence").apply { isDaemon = true }
@@ -289,6 +291,7 @@ private class VpnMutationQuiescenceClient(private val context: Context) {
                         false
                     }
                 }
+                connectionReady.countDown()
                 if (!retained) try { service.unlinkToDeath(remoteDeath, 0) } catch (_: Throwable) { }
             } catch (_: Throwable) { poison() }
         }
@@ -302,13 +305,24 @@ private class VpnMutationQuiescenceClient(private val context: Context) {
 
     fun acquire(): AutoCloseable? {
         check(Looper.myLooper() != Looper.getMainLooper()) { "MUTATION_QUIESCENCE_MAIN_THREAD" }
-        val service = synchronized(monitor) { if (poisoned) null else remote }
-        if (service == null || !service.isBinderAlive) {
-            if (service != null) poison()
-            bindIfNeeded()
+        val deadline = Math.addExact(SystemClock.elapsedRealtime(), RuntimeMutationQuiescenceWire.MAX_ADMISSION_MILLIS)
+        bindIfNeeded()
+        val initial = synchronized(monitor) { if (poisoned) null else remote }
+        val service = initial ?: try {
+            val remaining = deadline - SystemClock.elapsedRealtime()
+            if (remaining <= 0 || !connectionReady.await(remaining, TimeUnit.MILLISECONDS)) return null
+            synchronized(monitor) { if (poisoned) null else remote }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
             return null
         }
-        return admission.acquire { code, id, deadline -> transact(service, code, id, deadline) }
+        if (service == null || !service.isBinderAlive) {
+            if (service != null) poison()
+            return null
+        }
+        return admission.acquireBefore(deadline) { code, id, leaseDeadline ->
+            transact(service, code, id, leaseDeadline)
+        }
     }
 
     private fun bindIfNeeded() {
@@ -344,6 +358,7 @@ private class VpnMutationQuiescenceClient(private val context: Context) {
             remote = null
             binding = false
             poisoned = true
+            connectionReady.countDown()
             current
         }
         try { prior?.unlinkToDeath(remoteDeath, 0) } catch (_: Throwable) { }
@@ -365,8 +380,15 @@ internal class BoundedMutationQuiescenceAdmission(
     init { require(timeoutMillis in 1..RuntimeMutationQuiescenceWire.MAX_ADMISSION_MILLIS) }
 
     fun acquire(call: (code: Int, id: String, deadline: Long) -> Boolean): AutoCloseable? {
-        val id = newId().also { require(RuntimeAuthorityLimits.validId(it)) }
         val deadline = Math.addExact(now(), timeoutMillis)
+        return acquireBefore(deadline, call)
+    }
+
+    internal fun acquireBefore(deadline: Long,
+        call: (code: Int, id: String, deadline: Long) -> Boolean): AutoCloseable? {
+        val remaining = deadline - now()
+        if (remaining !in 1..timeoutMillis) return null
+        val id = newId().also { require(RuntimeAuthorityLimits.validId(it)) }
         val cancelled = AtomicBoolean(false)
         val future = executor.submit<AutoCloseable?> {
             val accepted = call(RuntimeMutationQuiescenceWire.ACQUIRE, id, deadline)
@@ -378,7 +400,7 @@ internal class BoundedMutationQuiescenceAdmission(
             lease(call, id, deadline)
         }
         return try {
-            future.get(timeoutMillis, TimeUnit.MILLISECONDS)
+            future.get(remaining, TimeUnit.MILLISECONDS)
         } catch (_: TimeoutException) {
             cancelled.set(true)
             poison()
