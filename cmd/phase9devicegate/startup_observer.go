@@ -28,6 +28,7 @@ const (
 	startupEventParserV2       = "ACTIVITY_MANAGER_EVENTS_V2"
 	startupPackageParserV2     = "PACKAGE_STATE_V2"
 	startupProcessParserV1     = "PROC_PROCESS_CROSSCHECK_V1"
+	startupBootBuildParserV2   = "BOOT_BUILD_IDENTITY_V2"
 )
 
 var (
@@ -256,14 +257,32 @@ func parseStartupBuildIdentity(raw string) (string, bool) {
 	return startupFramedDigest(startupIdentityDigestV2, []byte(value)), true
 }
 
+func parseStartupBootBuildIdentity(raw string) (boot string, build string, ok bool) {
+	if len(raw) > 1024 || strings.Contains(raw, "\x00") {
+		return "", "", false
+	}
+	normalized := strings.ReplaceAll(raw, "\r\n", "\n")
+	if strings.Contains(normalized, "\r") {
+		return "", "", false
+	}
+	normalized = strings.TrimSuffix(normalized, "\n")
+	lines := strings.Split(normalized, "\n")
+	if len(lines) != 2 || lines[0] == "" || lines[1] == "" {
+		return "", "", false
+	}
+	return lines[0], lines[1], true
+}
+
 func (observation *launchObservation) captureStartupBoot(parent context.Context, phase string) {
-	bootRaw, bootOK := observation.query(parent, phase+"-boot-session", "shell", "cat", "/proc/sys/kernel/random/boot_id")
+	raw, queryOK := observation.query(parent, phase+"-boot-build-identity", "shell", "sh", "-c",
+		"cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint")
+	bootRaw, buildRaw, framed := parseStartupBootBuildIdentity(raw)
 	bootIdentity, bootParsed := parseStartupIdentity(bootRaw)
-	observation.recordCompositeSource(phase, "PROC_BOOT_ID", "BOOT_ID_V1", bootRaw, bootOK, bootParsed, "BOOT_ID_INVALID", 1)
-	buildRaw, buildOK := observation.query(parent, phase+"-build-identity", "shell", "getprop", "ro.build.fingerprint")
 	buildIdentity, buildParsed := parseStartupBuildIdentity(buildRaw)
-	observation.recordCompositeSource(phase, "BUILD_FINGERPRINT", "BUILD_FINGERPRINT_V1", buildRaw, buildOK, buildParsed, "BUILD_IDENTITY_INVALID", 1)
-	if !bootOK || !bootParsed || !buildOK || !buildParsed {
+	parsed := framed && bootParsed && buildParsed
+	observation.recordCompositeSource(phase, "PROC_BOOT_ID_AND_BUILD_FINGERPRINT", startupBootBuildParserV2,
+		raw, queryOK, parsed, "BOOT_OR_BUILD_IDENTITY_INVALID", 2)
+	if !queryOK || !parsed {
 		observation.BootSession.Status = "INCOMPLETE"
 		observation.BootSession.Rejection = "BOOT_OR_BUILD_IDENTITY_UNAVAILABLE"
 		observation.incomplete("boot session identity unavailable")

@@ -535,6 +535,10 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	case command == "ps -A -o UID,PID,PPID,NAME":
 		fixture.processes++
 		afterSurvival = fixture.processes >= 3
+		if scenario == "ci-api36-full-ps-contention" && !fixture.launched.IsZero() {
+			<-ctx.Done()
+			return ctx.Err()
+		}
 		if scenario == "missing-process-observation" {
 			return errors.New("fixture process query failed")
 		}
@@ -544,6 +548,24 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		}
 		fmt.Fprintln(stdout, "UID PID PPID NAME")
 		if !fixture.launched.IsZero() && !(scenario == "process-death" && afterSurvival) {
+			uid := 10123
+			if scenario == "uid-change" && afterSurvival {
+				uid++
+			}
+			fmt.Fprintf(stdout, "%d 999 111 %s\n", uid, defaultAppPackage)
+			if scenario == "extra-process-output" && fixture.processes == 4 {
+				fmt.Fprintf(stdout, "%d 999 111 %s\n", uid, defaultAppPackage)
+			}
+		}
+	case command == "ps -p 999 -o UID,PID,PPID,NAME":
+		fixture.processes++
+		afterSurvival = fixture.processes >= 3
+		if scenario == "truncated-process-output" && fixture.processes == 4 {
+			fmt.Fprint(stdout, strings.Repeat("x", (256<<10)+1))
+			return nil
+		}
+		fmt.Fprintln(stdout, "UID PID PPID NAME")
+		if !(scenario == "process-death" && afterSurvival) {
 			uid := 10123
 			if scenario == "uid-change" && afterSurvival {
 				uid++
@@ -597,10 +619,20 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 		}
 		fmt.Fprintln(stdout, "12345678-1234-4abc-8def-1234567890ab")
 	case command == "getprop ro.build.fingerprint":
+		if scenario == "ci-api26-inter-command-drop" {
+			return errors.New("fixture reproduced transient split-command transport loss")
+		}
 		api := fixture.api
 		if api == 0 {
 			api = fixtureAPIForScenario(scenario)
 		}
+		fmt.Fprintf(stdout, "google/sdk_gphone_x86_64/emu64xa:%d/TEST/123:userdebug/test-keys\n", api)
+	case command == "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint":
+		api := fixture.api
+		if api == 0 {
+			api = fixtureAPIForScenario(scenario)
+		}
+		fmt.Fprintln(stdout, "12345678-1234-4abc-8def-1234567890ab")
 		fmt.Fprintf(stdout, "google/sdk_gphone_x86_64/emu64xa:%d/TEST/123:userdebug/test-keys\n", api)
 	case command == "dumpsys package "+defaultAppPackage:
 		if scenario == "app-authored-only" {
@@ -992,7 +1024,8 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		if call.waitDelay != wantDelay {
 			t.Errorf("changed wait delay for %v: %s", call.args, call.waitDelay)
 		}
-		if strings.Join(call.args[3:], " ") == "ps -A -o UID,PID,PPID,NAME" {
+		processCommand := strings.Join(call.args[3:], " ")
+		if processCommand == "ps -A -o UID,PID,PPID,NAME" || processCommand == "ps -p 999 -o UID,PID,PPID,NAME" {
 			if call.remaining <= 0 || call.remaining > time.Second {
 				t.Errorf("snapshot budget=%s, must remain bounded by the existing second", call.remaining)
 			}
@@ -1002,8 +1035,8 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 			t.Error("epoch query did not retain its process-list query's shared deadline")
 		}
 	}
-	if pidOfDirect != 1 || pidOfComposite != 3 {
-		t.Fatalf("pidof command boundaries direct=%d composite=%d, want 1 and 3", pidOfDirect, pidOfComposite)
+	if pidOfDirect != 1 || pidOfComposite != 6 {
+		t.Fatalf("pidof command boundaries direct=%d composite=%d, want 1 and 6", pidOfDirect, pidOfComposite)
 	}
 	prefix := "run -s emulator-5554 shell "
 	streamPrefix := "start -s emulator-5554 shell logcat -b "
@@ -1040,26 +1073,24 @@ func TestLaunchTransportPreservesArgumentOrderAndSharedSnapshotBudget(t *testing
 		prefix + eventProbe,
 		prefix + "logcat -b main -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
 		prefix + "logcat -b system -d -t 1 -v threadtime -v monotonic -v usec AndroidRuntime:E ActivityManager:I ActivityTaskManager:I KurdistanLaunchProbe:I *:S",
-		prefix + "cat /proc/sys/kernel/random/boot_id",
-		prefix + "getprop ro.build.fingerprint",
+		prefix + "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
 		prefix + "dumpsys package " + defaultAppPackage,
 		streamPrefix + "crash" + streamSuffix, eventStream, streamPrefix + "main" + streamSuffix, streamPrefix + "system" + streamSuffix,
 		prefix + "log -p i -t KurdistanLaunchProbe " + startMarker,
 		prefix + "ps -A -o UID,PID,PPID,NAME",
 		prefix + "cmd package resolve-activity --brief -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
 		prefix + "am start -W -f 0x10008000 -n " + defaultAppPackage + "/org.kurdistanvpn.app.MainActivity",
-		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "ps -p 999 -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
 		prefix + "pidof " + defaultAppPackage,
-		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "ps -p 999 -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
-		prefix + "ps -A -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
+		prefix + "pidof " + defaultAppPackage, prefix + "ps -p 999 -o UID,PID,PPID,NAME", prefix + "cat /proc/999/stat",
 		prefix + "pidof " + defaultAppPackage, prefix + "cat /proc/999/status",
 		prefix + "dumpsys activity processes " + defaultAppPackage,
 		prefix + "dumpsys activity activities " + defaultAppPackage,
 		prefix + "dumpsys package " + defaultAppPackage,
-		prefix + "cat /proc/sys/kernel/random/boot_id",
-		prefix + "getprop ro.build.fingerprint",
+		prefix + "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint",
 		prefix + "log -p i -t KurdistanLaunchProbe " + endMarker,
 		prefix + "logcat -b main -d -T " + markerStart + " -e " + observation.Invocation + " -v threadtime -v monotonic -v usec KurdistanLaunchProbe:I *:S",
 		prefix + "log -p i -t KurdistanClockProbe CLOCK:clock-after:" + observation.Invocation,

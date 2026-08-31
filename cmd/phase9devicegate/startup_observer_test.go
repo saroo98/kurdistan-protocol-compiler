@@ -85,6 +85,46 @@ func TestCompositeStartupObserverAllowsHostLaunchToClearForceStoppedPackageState
 	}
 }
 
+func TestStartupBootAndBuildIdentityUseOneBoundedADBObservation(t *testing.T) {
+	err, observation, fixture := runLaunchFixture(t, "ci-api26-inter-command-drop", 26)
+	if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+		t.Fatalf("one bounded boot/build observation did not survive the reproduced inter-command drop: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+	}
+	combined, standalone := 0, 0
+	for _, call := range fixture.commands {
+		command := strings.Join(call.args[3:], " ")
+		switch command {
+		case "sh -c cat /proc/sys/kernel/random/boot_id && getprop ro.build.fingerprint":
+			combined++
+		case "cat /proc/sys/kernel/random/boot_id", "getprop ro.build.fingerprint":
+			standalone++
+		}
+	}
+	if combined != 2 || standalone != 0 {
+		t.Fatalf("boot/build identity commands combined=%d standalone=%d, want two combined observations and no split commands", combined, standalone)
+	}
+}
+
+func TestPostLaunchProcessSnapshotsUseExactTargetInsteadOfWholeDeviceEnumeration(t *testing.T) {
+	err, observation, fixture := runLaunchFixture(t, "ci-api36-full-ps-contention", 36)
+	if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+		t.Fatalf("exact-target process observation did not survive reproduced whole-device contention: err=%v gate=%s status=%s issues=%q", err, observation.GateResult, observation.Status, observation.Issues)
+	}
+	full, targeted := 0, 0
+	for _, call := range fixture.commands {
+		command := strings.Join(call.args[3:], " ")
+		if command == "ps -A -o UID,PID,PPID,NAME" {
+			full++
+		}
+		if command == "ps -p 999 -o UID,PID,PPID,NAME" {
+			targeted++
+		}
+	}
+	if full != 1 || targeted != 3 {
+		t.Fatalf("process observations full=%d targeted=%d, want one pre-launch full snapshot and three exact-target snapshots", full, targeted)
+	}
+}
+
 func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycle(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0).UTC()
 	valid := diagnosticStreamLifecycle{

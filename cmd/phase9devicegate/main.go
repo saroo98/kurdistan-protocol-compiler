@@ -3712,7 +3712,20 @@ func beginLaunchObservation(ctx context.Context, client adbClient, value options
 func (observation *launchObservation) processSnapshot(parent context.Context, phase string, budget time.Duration) {
 	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
-	raw, ok := observation.query(ctx, phase, "shell", "ps", "-A", "-o", "UID,PID,PPID,NAME")
+	command := []string{"shell", "ps", "-A", "-o", "UID,PID,PPID,NAME"}
+	if phase != "before-launch" {
+		pidRaw, pidOK := observation.query(ctx, phase+"-snapshot-pidof", "shell", "pidof", observation.app)
+		fields := strings.Fields(pidRaw)
+		pid, err := strconv.Atoi(strings.Join(fields, ""))
+		if !pidOK || len(fields) != 1 || err != nil || pid <= 0 {
+			snapshot := diagnosticProcessSnapshot{Phase: phase, ObservedUTC: time.Now().UTC(), Status: "INCOMPLETE"}
+			observation.incomplete(phase + " process identity unavailable")
+			observation.Processes = append(observation.Processes, snapshot)
+			return
+		}
+		command = []string{"shell", "ps", "-p", strconv.Itoa(pid), "-o", "UID,PID,PPID,NAME"}
+	}
+	raw, ok := observation.query(ctx, phase, command...)
 	rows, parsed := parseProcessRows(raw, observation.app)
 	snapshot := diagnosticProcessSnapshot{Phase: phase, ObservedUTC: time.Now().UTC(), Status: "CAPTURED", Processes: rows}
 	if !ok || !parsed {
