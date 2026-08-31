@@ -17,12 +17,12 @@ import (
 	"strings"
 )
 
-const phase17InventorySHA256 = "3662a1b6a912089a402fcafa04144810ee08f85d44ef845bf5b50521a6a7379c"
+const phase17InventorySHA256 = "ae6107c91182b4c74e4263bc64af1859c6963ed6a9a89495e34454a9e9e84e3c"
 
 var (
 	packageDeclaration = regexp.MustCompile(`(?m)^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*$`)
 	classDeclaration   = regexp.MustCompile(`(?m)^\s*(?:internal\s+|public\s+|private\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
-	testDeclaration    = regexp.MustCompile(`(?m)^\s*@Test\s*\r?\n\s*fun\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+	testDeclaration    = regexp.MustCompile(`(?m)^[ \t]*@Test(?:[ \t]*\r?\n[ \t]*|[ \t]+)fun[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\(`)
 )
 
 func verifyDeviceTestInventory(root string) error {
