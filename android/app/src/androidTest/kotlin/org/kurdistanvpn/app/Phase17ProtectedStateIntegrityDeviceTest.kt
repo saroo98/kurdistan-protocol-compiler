@@ -5,6 +5,7 @@ package org.kurdistanvpn.app
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import androidx.test.platform.app.InstrumentationRegistry
@@ -89,9 +90,27 @@ class Phase17ProtectedStateIntegrityDeviceTest {
         // No fallback or deletion is attempted if the platform denies these operations.
         Os.symlink("record", root.child("symbolic-record"))
         assertEquals(DurableCode.UNSAFE, native.read(root.directory, "symbolic-record", 64).code)
-        Os.link(root.child("record"), root.child("hard-record"))
-        assertEquals(DurableCode.UNSAFE, native.read(root.directory, "record", 64).code)
-        assertEquals(DurableCode.UNSAFE, native.read(root.directory, "hard-record", 64).code)
+        val recordPath = root.child("record")
+        val hardRecordPath = root.child("hard-record")
+        val recordBefore = Os.lstat(recordPath)
+        val denied = assertThrows(ErrnoException::class.java) { Os.link(recordPath, hardRecordPath) }
+        // AOSP SELinux policy denies the link permission to every untrusted-app
+        // domain. The native nlink rejection is executed separately on a host
+        // where creating the adversarial fixture is permitted.
+        assertEquals(OsConstants.EACCES, denied.errno)
+        val recordAfter = Os.lstat(recordPath)
+        assertEquals(recordBefore.st_dev, recordAfter.st_dev)
+        assertEquals(recordBefore.st_ino, recordAfter.st_ino)
+        assertEquals(recordBefore.st_uid, recordAfter.st_uid)
+        assertEquals(recordBefore.st_mode, recordAfter.st_mode)
+        assertEquals(recordBefore.st_size, recordAfter.st_size)
+        assertEquals(1L, recordAfter.st_nlink)
+        val absent = assertThrows(ErrnoException::class.java) { Os.lstat(hardRecordPath) }
+        assertEquals(OsConstants.ENOENT, absent.errno)
+        val unchanged = native.read(root.directory, "record", 64)
+        assertEquals(DurableCode.OK, unchanged.code)
+        assertArrayEquals(byteArrayOf(7), unchanged.snapshot?.bytes)
+        assertEquals(DurableCode.ABSENT, native.read(root.directory, "hard-record", 64).code)
         val substituted = root.directory.copy(identity = DurableFileIdentity(root.directory.identity.device,
             Math.addExact(root.directory.identity.inode, 1)))
         assertNotEquals(DurableCode.OK, native.list(substituted, 64).code)

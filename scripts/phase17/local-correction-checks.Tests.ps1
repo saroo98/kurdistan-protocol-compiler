@@ -20,11 +20,11 @@ if ($global:LASTEXITCODE -ne 0) {
 Assert-Rejected { Assert-ExpectedCompilerDenial 0 @() 'unexpected-success' } 'BV-04'
 Assert-Rejected { Assert-ExpectedCompilerDenial 1 @('unresolved reference: missing') 'wrong-failure' } 'BV-04'
 $paths = @(Get-LocalCorrectionWhitelist)
-if ($paths.Count -ne 208 -or @($paths.Path | Sort-Object -Unique).Count -ne 208) {
+if ($paths.Count -ne 209 -or @($paths.Path | Sort-Object -Unique).Count -ne 209) {
     throw 'BV-01: whitelist accounting mismatch'
 }
 if (@($paths | Where-Object Kind -eq 'M').Count -ne 121 -or
-    @($paths | Where-Object Kind -eq 'N').Count -ne 81 -or
+    @($paths | Where-Object Kind -eq 'N').Count -ne 82 -or
     @($paths | Where-Object Kind -eq 'D').Count -ne 6) { throw 'BV-01: whitelist disposition mismatch' }
 foreach ($aclPath in @('internal/selfhost/backup.go','internal/selfhost/private_path_windows.go',
     'internal/selfhost/restore_acl_windows_test.go','cmd/kurdctl/localpath_windows.go',

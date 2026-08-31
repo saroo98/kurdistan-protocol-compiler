@@ -1807,7 +1807,8 @@
         ],
         "testPaths": [
           "android/core/native-api/src/test/kotlin/org/kurdistanvpn/core/nativeapi/DurableFilePrimitivesTest.kt",
-          "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17ProtectedStateIntegrityDeviceTest.kt"
+          "android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17ProtectedStateIntegrityDeviceTest.kt",
+          "cmd/phase17verify/native_durable_fs_linux_test.go"
         ],
         "execution": "UNEXECUTED"
       }

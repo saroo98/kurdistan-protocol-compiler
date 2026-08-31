@@ -160,6 +160,7 @@ M|cmd/phase17verify/inventory.go
 M|cmd/phase17verify/inventory_test.go
 M|cmd/phase17verify/qualification.go
 M|cmd/phase17verify/qualification_test.go
+N|cmd/phase17verify/native_durable_fs_linux_test.go
 M|scripts/phase17/build-qualification-candidate.ps1
 M|scripts/phase17/run-qualified-campaign.ps1
 M|scripts/phase17/sanitize-field-evidence.ps1
@@ -396,7 +397,7 @@ function Assert-LocalCorrectionWorkspace {
     $trackedLocalGradle = @(& git -C $script:CorrectionRoot ls-files -- '.gradle-user-home/*')
     if ($LASTEXITCODE -ne 0 -or $trackedLocalGradle.Count -ne 0) { throw 'Local Gradle user home must remain untracked' }
     if ($changedPaths.Count -ne @($changedPaths | Sort-Object -Unique).Count) { throw 'Duplicate correction path accounting' }
-    Write-Output ('PASS: immutable baseline/tree ancestor, linear correction history, 208-path whitelist, zero staged paths; changed paths=' + $changedPaths.Count)
+    Write-Output ('PASS: immutable baseline/tree ancestor, linear correction history, 209-path whitelist, zero staged paths; changed paths=' + $changedPaths.Count)
 }
 function Resolve-VerifiedLocalJar([string]$Group, [string]$Artifact, [string]$Version) {
     $cache = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.gradle/caches/modules-2/files-2.1'

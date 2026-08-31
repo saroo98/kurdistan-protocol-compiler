@@ -88,6 +88,7 @@ var qualificationFiles = []string{
 	"cmd/phase17verify/inventory_test.go",
 	"cmd/phase17verify/main.go",
 	"cmd/phase17verify/main_test.go",
+	"cmd/phase17verify/native_durable_fs_linux_test.go",
 	"cmd/phase17verify/qualification.go",
 	"cmd/phase17verify/qualification_test.go",
 	"config/phase17-acceptance-registry-v2.json",
