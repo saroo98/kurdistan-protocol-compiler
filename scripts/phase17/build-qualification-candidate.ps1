@@ -26,6 +26,9 @@ param(
     [string]$EngineeringProvenance,
     [Parameter(Mandatory = $true)]
     [string]$EngineeringComparison,
+    [string]$EngineeringManifest = '',
+    [string]$EngineeringDeviceRoster = '',
+    [string]$TrustedObserverPublicKey = '',
     [ValidatePattern('^[A-Za-z0-9_./-]{1,200}$')]
     [string]$ExpectedMainRef = 'origin/main'
 )
@@ -234,6 +237,7 @@ function Build-CandidateRoot {
     $commands = [ordered]@{
         'phase17field.exe' = './cmd/phase17field'
         'phase17qual.exe' = './cmd/phase17qual'
+        'phase17devicegate.exe' = './cmd/phase17devicegate'
         'phase17scan.exe' = './cmd/phase17scan'
         'phase17boundary.exe' = './cmd/phase17boundary'
         'kurdpackage.exe' = './cmd/kurdpackage'
@@ -349,7 +353,12 @@ function Build-CandidateRoot {
     }
 }
 
-foreach ($relative in @($EngineeringCandidateRoot, $EngineeringAssuranceRoot, $EngineeringProvenance, $EngineeringComparison)) {
+if ([string]::IsNullOrWhiteSpace($EngineeringManifest) -or [string]::IsNullOrWhiteSpace($EngineeringDeviceRoster) -or
+    [string]::IsNullOrWhiteSpace($TrustedObserverPublicKey)) {
+    throw 'PHASE17_BUILD_CANONICAL_ENGINEERING_REHEARSAL_REQUIRED'
+}
+foreach ($relative in @($EngineeringCandidateRoot, $EngineeringAssuranceRoot, $EngineeringProvenance, $EngineeringComparison,
+    $EngineeringManifest, $EngineeringDeviceRoster, $TrustedObserverPublicKey)) {
     Assert-SafeRelativePath -Path $relative
 }
 Assert-ChildPath -Parent $repoRoot -Child $qualificationRoot
@@ -372,6 +381,25 @@ Invoke-Checked -FilePath 'git' -Arguments @('-C', $repoRoot, 'merge-base', '--is
 $sourceStatus = Get-GitText -Root $repoRoot -Arguments @('status', '--porcelain=v1', '--untracked-files=all') -Failure 'PHASE17_BUILD_SOURCE_STATUS_FAILED'
 if (-not [string]::IsNullOrEmpty($sourceStatus)) {
     throw 'PHASE17_BUILD_SOURCE_NOT_CLEAN'
+}
+
+# G03: fail before candidate directories, worktrees, APK assembly, or signing.
+# This read-only verifier accepts exact raw observer records, never a caller PASS.
+# The existing owner key authenticates the roster; no observer/key is provisioned here.
+$priorProxy = $env:GOPROXY
+$priorToolchain = $env:GOTOOLCHAIN
+$priorSumDB = $env:GOSUMDB
+Push-Location $repoRoot
+try {
+    $env:GOPROXY = 'off'; $env:GOSUMDB = 'off'; $env:GOTOOLCHAIN = 'local'
+    Invoke-Checked -FilePath 'go' -Arguments @('run', '-mod=readonly', './cmd/phase17devicegate', 'verify-canonical',
+        '-purpose', 'ENGINEERING_REHEARSAL', '-manifest', $EngineeringManifest,
+        '-roster', $EngineeringDeviceRoster, '-trusted-public-key', $TrustedObserverPublicKey,
+        '-expected-commit', $Commit, '-expected-tree', $tree
+    ) -Failure 'PHASE17_BUILD_CANONICAL_ENGINEERING_REHEARSAL_REQUIRED'
+} finally {
+    $env:GOPROXY = $priorProxy; $env:GOTOOLCHAIN = $priorToolchain; $env:GOSUMDB = $priorSumDB
+    Pop-Location
 }
 
 $worktreeAAdded = $false

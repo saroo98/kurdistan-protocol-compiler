@@ -24,8 +24,11 @@ import (
 const qualificationMaximumSourceBytes = 16 << 20
 
 var qualificationSchemaFiles = []string{
+	"testdata/schemas/phase17-acceptance-registry-v2.schema.json",
 	"testdata/schemas/phase17-candidate-comparison-v1.schema.json",
 	"testdata/schemas/phase17-candidate-manifest-v1.schema.json",
+	"testdata/schemas/phase17-device-evidence-v1.schema.json",
+	"testdata/schemas/phase17-device-verifier-result-v1.schema.json",
 	"testdata/schemas/phase17-environment-context-v1.schema.json",
 	"testdata/schemas/phase17-historical-gate-supersession-v1.schema.json",
 	"testdata/schemas/phase17-owned-vps-evidence-v3.schema.json",
@@ -37,9 +40,12 @@ var qualificationSchemaFiles = []string{
 }
 
 var qualificationFiles = []string{
+	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17BootQualificationDeviceTest.kt",
+	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17CanonicalDeviceEvidenceHarness.kt",
 	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldActionDeviceTest.kt",
 	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17FieldHarness.kt",
 	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17LiveDataPlaneDeviceTest.kt",
+	"android/app/src/androidTest/kotlin/org/kurdistanvpn/app/Phase17ProtectedStateIntegrityDeviceTest.kt",
 	"android/app/src/internal/AndroidManifest.xml",
 	"android/app/src/internal/kotlin/org/kurdistanvpn/app/InternalVpnSocketProtectionService.kt",
 	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/ActiveVpnUnderlyingNetwork.kt",
@@ -82,8 +88,10 @@ var qualificationFiles = []string{
 	"cmd/phase17verify/inventory_test.go",
 	"cmd/phase17verify/main.go",
 	"cmd/phase17verify/main_test.go",
+	"cmd/phase17verify/native_durable_fs_linux_test.go",
 	"cmd/phase17verify/qualification.go",
 	"cmd/phase17verify/qualification_test.go",
+	"config/phase17-acceptance-registry-v2.json",
 	"config/phase17/qualification-policy-v1.json",
 	"internal/phase17boundary/monitor.go",
 	"internal/phase17boundary/monitor_test.go",
@@ -99,12 +107,18 @@ var qualificationFiles = []string{
 	"internal/phase17privacy/scannera/scanner.go",
 	"internal/phase17privacy/scannera/scanner_b_test.go",
 	"internal/phase17privacy/scannera/scanner_test.go",
+	"internal/phase17qualification/acceptance_registry.go",
+	"internal/phase17qualification/acceptance_registry_test.go",
 	"internal/phase17qualification/atomic.go",
 	"internal/phase17qualification/atomic_test.go",
 	"internal/phase17qualification/canonical.go",
 	"internal/phase17qualification/canonical_test.go",
 	"internal/phase17qualification/comparison.go",
 	"internal/phase17qualification/comparison_test.go",
+	"internal/phase17qualification/device_evidence.go",
+	"internal/phase17qualification/device_evidence_test.go",
+	"internal/phase17qualification/device_verifier.go",
+	"internal/phase17qualification/device_verifier_test.go",
 	"internal/phase17qualification/environment_private.go",
 	"internal/phase17qualification/environment_private_test.go",
 	"internal/phase17qualification/fuzz_test.go",
@@ -134,6 +148,7 @@ var qualificationFiles = []string{
 	"internal/phase17qualification/subject_test.go",
 	"internal/testkit/importrules/importrules_test.go",
 	"scripts/phase17/build-qualification-candidate.ps1",
+	"scripts/phase17/local-correction-checks.Tests.ps1",
 	"scripts/phase17/netns-e2e.sh",
 	"scripts/phase17/netns_probe.py",
 	"scripts/phase17/netns_witness.py",
@@ -142,6 +157,7 @@ var qualificationFiles = []string{
 	"scripts/phase17/owned-vps-scripts.Tests.ps1",
 	"scripts/phase17/privacy_scan_b_test.py",
 	"scripts/phase17/privacy_scanner_b.py",
+	"scripts/phase17/run-local-correction-checks.ps1",
 	"scripts/phase17/run-qualified-campaign.ps1",
 	"scripts/phase17/sanitize-field-evidence.ps1",
 	"testdata/fixtures/phase17/privacy-scanner/corpus-v1.json",
@@ -182,10 +198,88 @@ var qualificationPatternScopes = []qualificationPatternScope{
 	},
 }
 
+// Explicit product inputs for G02. They remain ordinary source inputs, not
+// execution evidence or permission to construct a qualification candidate.
+var correctionQualificationFiles = []string{
+	"android/app/build.gradle.kts",
+	"android/app/gradle.lockfile",
+	"android/app/src/main/AndroidManifest.xml",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/KurdistanApplication.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase13Coordinators.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase9CompositionRoot.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase9ExportWire.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase9ViewModel.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/RuntimeAuthorityReissueAdmission.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/RuntimeAuthorityReissueIpcAdapter.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/RuntimeAuthorityReissueService.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/SensitiveActionAuthorizer.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/VpnNetworkTeardownBarrier.kt",
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/VpnRuntimeController.kt",
+	"android/app/src/main/res/values/strings.xml",
+	"android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/AppState.kt",
+	"android/core/model/src/main/kotlin/org/kurdistanvpn/core/model/ProductSettings.kt",
+	"android/core/native-api/build.gradle.kts",
+	"android/core/native-api/gradle.lockfile",
+	"android/core/native-api/src/main/kotlin/org/kurdistanvpn/core/nativeapi/DurableFilePrimitives.kt",
+	"android/core/native-jni/build.gradle.kts",
+	"android/core/native-jni/src/main/cpp/CMakeLists.txt",
+	"android/core/native-jni/src/main/cpp/kvpn_durable_fs.c",
+	"android/core/native-jni/src/main/cpp/kvpn_durable_fs.h",
+	"android/core/native-jni/src/main/cpp/kvpn_durable_fs_jni.c",
+	"android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
+	"android/data/metadata/schemas/org.kurdistanvpn.data.metadata.KurdistanMetadataDatabase/2.json",
+	"android/data/metadata/src/main/kotlin/org/kurdistanvpn/data/metadata/ProfileCatalog.kt",
+	"android/data/protected-state/build.gradle.kts",
+	"android/data/protected-state/gradle.lockfile",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ActiveSessionMutationPolicy.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateAuthorityFactory.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateCompositionRoot.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateContracts.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateJournalLifecycle.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateMigrationCoordinator.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateMutationBroker.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateOperationJournal.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStatePreviewBackupPolicy.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateProjectionWitness.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateResetRecoveryCoordinator.kt",
+	"android/data/protected-state/src/main/kotlin/org/kurdistanvpn/data/protectedstate/ProtectedStateSnapshotReader.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/AndroidKeystoreKek.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/BackupPayloadCodec.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/ClientKeyBundleStore.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/EncryptedDiagnosticEventStore.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/ProfileAdmissionJournal.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/SecureBlobStore.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/SecureEnvelope.kt",
+	"android/data/secure/src/main/kotlin/org/kurdistanvpn/data/secure/SecureRoutingPolicyStore.kt",
+	"android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/Phase9SettingsStore.kt",
+	"android/feature/settings-recovery/src/main/kotlin/org/kurdistanvpn/feature/settingsrecovery/ProductSettingsScreens.kt",
+	"android/feature/settings-recovery/src/main/kotlin/org/kurdistanvpn/feature/settingsrecovery/SettingsRecoveryScreen.kt",
+	"android/runtime/android/src/main/AndroidManifest.xml",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/NativeTunnelController.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/PendingRuntimeTermination.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeActivationGuard.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityFrameCodec.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityReissueClient.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeAuthorityTimeoutPolicy.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeRevisionLeaseClient.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeServiceCommand.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/RuntimeStartCoordinator.kt",
+	"android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/UnderlyingNetworkMonitor.kt",
+	"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/LiveRuntimeModels.kt",
+	"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeAuthorityPurpose.kt",
+	"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeAuthorityReissueContract.kt",
+	"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStartWire.kt",
+	"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",
+	"android/settings-gradle.lockfile",
+	"android/settings.gradle.kts",
+}
+
 func qualificationRequiredFiles() []string {
 	result := make([]string, 0, len(qualificationFiles)+len(qualificationSchemaFiles))
 	result = append(result, qualificationFiles...)
 	result = append(result, qualificationSchemaFiles...)
+	result = append(result, correctionQualificationFiles...)
 	return result
 }
 
@@ -222,6 +316,13 @@ func verifyQualificationInfrastructure(root string) error {
 }
 
 func verifyQualificationSemanticContracts(files map[string][]byte) error {
+	// Definitions are an immutable source contract, not test results. This decoder
+	// deliberately refuses PASS/executed claims and cannot open an operational gate.
+	if _, err := phase17qualification.DecodeAcceptanceRegistry(bytes.NewReader(
+		files["config/phase17-acceptance-registry-v2.json"],
+	)); err != nil {
+		return errors.New("qualification acceptance definitions or source-only accounting rejected")
+	}
 	if value, err := qualificationSchemaStringConst(
 		files["testdata/schemas/phase17-owned-vps-evidence-v3.schema.json"], "environment", "vpsArch",
 	); err != nil || value != "amd64" {
@@ -684,6 +785,29 @@ func verifyQualificationGoBoundaries(root string) error {
 
 func verifyQualificationScripts(files map[string][]byte) error {
 	builder := string(files["scripts/phase17/build-qualification-candidate.ps1"])
+	// G03 is a pre-construction source gate. Runtime evidence is independently
+	// recomputed by verify-canonical; this check prevents deleting or weakening
+	// the exact invocation while retaining unrelated historical builder tokens.
+	gateStart := strings.Index(builder, "$priorProxy = $env:GOPROXY")
+	gateEnd := strings.Index(builder, "$worktreeAAdded = $false")
+	creation := "New-Item -ItemType Directory -Path $temporaryRoot, $candidateA, $candidateB"
+	if gateStart < 0 || gateEnd <= gateStart || strings.Count(builder, creation) != 1 ||
+		strings.Index(builder, creation) <= gateEnd {
+		return errors.New("canonical engineering admission must precede candidate mutation")
+	}
+	gate := strings.Join(strings.Fields(builder[gateStart:gateEnd]), " ")
+	for _, required := range []string{
+		"$env:GOPROXY = 'off'; $env:GOSUMDB = 'off'; $env:GOTOOLCHAIN = 'local'",
+		"Invoke-Checked -FilePath 'go' -Arguments @('run', '-mod=readonly', './cmd/phase17devicegate', 'verify-canonical',",
+		"'-purpose', 'ENGINEERING_REHEARSAL', '-manifest', $EngineeringManifest,",
+		"'-roster', $EngineeringDeviceRoster, '-trusted-public-key', $TrustedObserverPublicKey,",
+		"'-expected-commit', $Commit, '-expected-tree', $tree",
+		") -Failure 'PHASE17_BUILD_CANONICAL_ENGINEERING_REHEARSAL_REQUIRED'",
+	} {
+		if strings.Count(gate, required) != 1 {
+			return errors.New("canonical engineering admission identity or verifier changed")
+		}
+	}
 	for _, required := range []string{
 		"candidate-A", "candidate-B", "candidate-manifest.json", "candidate-comparison.json", "Build-CandidateRoot",
 		"'-trimpath'", "'candidate', 'create'", "android\\config\\phase17-required-device-tests.txt",
