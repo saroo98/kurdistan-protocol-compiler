@@ -9,6 +9,12 @@ import (
 	"testing"
 )
 
+func TestRepositoryDeviceInventoryIsExact(t *testing.T) {
+	if err := verifyDeviceTestInventory(filepath.Join("..", "..")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDeviceInventoryRequiresExactSourceTests(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "android", "app", "src", "androidTest", "kotlin", "org", "example")
@@ -66,5 +72,30 @@ class ExactTest {
 	}
 	if err := verifyDeviceTestInventory(root); err == nil {
 		t.Fatal("unexpected device test was accepted")
+	}
+}
+
+func TestDiscoverAndroidDeviceTestsIncludesSameLineAnnotations(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "androidTest", "kotlin")
+	if err := os.MkdirAll(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "ExactTest.kt"), []byte(`package org.example
+import org.junit.Test
+class ExactTest {
+    @Test fun works() {}
+    @Test fun hidden() {}
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests, err := discoverAndroidDeviceTests(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"org.example.ExactTest#works", "org.example.ExactTest#hidden"} {
+		if _, ok := tests[name]; !ok {
+			t.Fatalf("same-line annotated device test %q was not discovered", name)
+		}
 	}
 }

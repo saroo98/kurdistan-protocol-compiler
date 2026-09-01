@@ -92,3 +92,13 @@ jobs:
 
       - name: Run Android-only cache-proof gate
         run: go run ./cmd/gate -android-only
+
+      - name: Preserve bounded Windows authority-reissue failure details
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          go run ./cmd/phase9devicegate diagnose-junit `
+            -in android/app/build/test-results/testInternalUnitTest/TEST-org.kurdistanvpn.app.RuntimeAuthorityReissueServiceTest.xml `
+            -out .tools/phase17/windows-authority-reissue-failure.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content -LiteralPath .tools/phase17/windows-authority-reissue-failure.txt

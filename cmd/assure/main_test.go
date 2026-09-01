@@ -477,6 +477,7 @@ func writeTestReceipt(t *testing.T, root string, policy assurance.ProofPolicy, p
 		t.Fatal(err)
 	}
 	gitTest(t, root, "init")
+	gitTest(t, root, "config", "core.longpaths", "true")
 	gitTest(t, root, "config", "user.email", "test@example.invalid")
 	gitTest(t, root, "config", "user.name", "Assure Test")
 	gitTest(t, root, "add", ".")

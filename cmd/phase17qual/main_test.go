@@ -1215,6 +1215,7 @@ func writeEvidenceOnlyRepositoryFixture(t *testing.T) (root, candidatePath, cand
 		t.Fatal(err)
 	}
 	runGitTest(t, root, "init", "--quiet")
+	runGitTest(t, root, "config", "core.longpaths", "true")
 	runGitTest(t, root, "config", "user.name", "Phase 17 Test")
 	runGitTest(t, root, "config", "user.email", "phase17-test@example.invalid")
 	writeTestFile(t, root, "README.md", []byte("baseline\n"))
