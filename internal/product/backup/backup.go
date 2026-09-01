@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-// Package backup implements the bounded, passphrase-encrypted kurd-backup-v1
-// container. It performs no filesystem, UI, network, or persistence work.
+// Package backup implements bounded, passphrase-encrypted kurd-backup-v2 with
+// explicit source-format v1 compatibility. KDF and AEAD parameters are unchanged.
+// It performs no filesystem, UI, network, or persistence work.
 package backup
 
 import (
@@ -10,9 +11,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
@@ -20,7 +23,8 @@ import (
 )
 
 const (
-	Version = "kurd-backup-v1"
+	Version       = "kurd-backup-v2"
+	LegacyVersion = "kurd-backup-v1"
 
 	ArgonMemoryKiB  uint32 = 64 * 1024
 	ArgonIterations uint32 = 3
@@ -121,7 +125,7 @@ func CreateWithRandom(random io.Reader, passphrase string, payload Payload) ([]b
 		return nil, ErrResourceLimit
 	}
 	ciphertextLength := len(plaintext) + 16
-	header := encodeHeader(ArgonMemoryKiB, ArgonIterations, ArgonThreads, salt, nonce, ciphertextLength)
+	header := encodeHeader(payload.Version, ArgonMemoryKiB, ArgonIterations, ArgonThreads, salt, nonce, ciphertextLength)
 	key := argon2.IDKey(pass, salt, ArgonIterations, ArgonMemoryKiB, ArgonThreads, KeyBytes)
 	defer clear(key)
 	block, err := aes.NewCipher(key)
@@ -172,8 +176,11 @@ func OpenPreview(passphrase string, encoded []byte) (Opened, Preview, error) {
 		return Opened{}, Preview{}, err
 	}
 	defer destroyPayload(&payload)
+	if payload.Version != uint64(binary.BigEndian.Uint16(header[8:10])) {
+		return Opened{}, Preview{}, ErrInvalidPayload
+	}
 	preview := Preview{
-		Version:     Version,
+		Version:     payloadVersionName(payload.Version),
 		RecordCount: len(payload.Records),
 		KindCounts:  make(map[RecordKind]int),
 	}
@@ -197,7 +204,8 @@ func (opened *Opened) Destroy() {
 // and monotonic lifecycle verifier accepts every member. It never persists.
 func Restore(opened Opened, expected Preview, verifier RestoreVerifier) (Payload, error) {
 	if verifier == nil || !previewEqual(opened.preview, expected) ||
-		opened.preview.Version != Version ||
+		opened.preview.Version != payloadVersionName(opened.payload.Version) ||
+		(opened.payload.Version != 1 && opened.payload.Version != 2) ||
 		opened.preview.RecordCount != len(opened.payload.Records) {
 		return Payload{}, ErrRestoreRejected
 	}
@@ -212,10 +220,14 @@ func Restore(opened Opened, expected Preview, verifier RestoreVerifier) (Payload
 	return clonePayload(opened.payload), nil
 }
 
-func encodeHeader(memory, iterations uint32, threads uint8, salt, nonce []byte, ciphertextLength int) []byte {
+func encodeHeader(version uint64, memory, iterations uint32, threads uint8, salt, nonce []byte, ciphertextLength int) []byte {
 	out := make([]byte, fixedHeaderBytes+len(salt)+len(nonce))
 	copy(out[:8], headerMagic)
 	binary.BigEndian.PutUint16(out[8:10], headerVersion)
+	if version == 2 {
+		copy(out[:8], "KURDBK2\x00")
+		binary.BigEndian.PutUint16(out[8:10], 2)
+	}
 	out[10], out[11] = kdfArgon2id, cipherAES256GCM
 	binary.BigEndian.PutUint32(out[12:16], memory)
 	binary.BigEndian.PutUint32(out[16:20], iterations)
@@ -233,8 +245,8 @@ func parseHeader(encoded []byte) (header, salt, nonce, ciphertext []byte, err er
 		return nil, nil, nil, nil, ErrInvalidHeader
 	}
 	fixed := encoded[:fixedHeaderBytes]
-	if string(fixed[:8]) != headerMagic ||
-		binary.BigEndian.Uint16(fixed[8:10]) != headerVersion ||
+	version := binary.BigEndian.Uint16(fixed[8:10])
+	if !((string(fixed[:8]) == headerMagic && version == headerVersion) || (string(fixed[:8]) == "KURDBK2\x00" && version == 2)) ||
 		fixed[10] != kdfArgon2id || fixed[11] != cipherAES256GCM ||
 		fixed[21] != SaltBytes || fixed[22] != NonceBytes || fixed[23] != 0 {
 		return nil, nil, nil, nil, ErrInvalidHeader
@@ -248,9 +260,9 @@ func parseHeader(encoded []byte) (header, salt, nonce, ciphertext []byte, err er
 		return nil, nil, nil, nil, ErrResourceLimit
 	}
 	headerLength := fixedHeaderBytes + SaltBytes + NonceBytes
-	ciphertextLength := int(binary.BigEndian.Uint32(fixed[24:28]))
+	ciphertextLength := uint64(binary.BigEndian.Uint32(fixed[24:28]))
 	if ciphertextLength < 16 || ciphertextLength > MaxPayloadBytes+16 ||
-		len(encoded) != headerLength+ciphertextLength {
+		uint64(len(encoded)) != uint64(headerLength)+ciphertextLength {
 		return nil, nil, nil, nil, ErrInvalidHeader
 	}
 	header = bytes.Clone(encoded[:headerLength])
@@ -261,28 +273,16 @@ func parseHeader(encoded []byte) (header, salt, nonce, ciphertext []byte, err er
 }
 
 func validatePassphrase(passphrase string) ([]byte, error) {
-	raw := []byte(passphrase)
-	if !utf8.ValidString(passphrase) || len(raw) > MaximumPassBytes ||
+	if len(passphrase) > MaximumPassBytes || !utf8.ValidString(passphrase) ||
 		utf8.RuneCountInString(passphrase) < MinimumRunes {
 		return nil, ErrInvalidPassphrase
 	}
-	return raw, nil
+	return []byte(passphrase), nil
 }
 
 func encodePayload(payload Payload) ([]byte, error) {
-	if payload.Version != 1 || len(payload.Records) > MaxRecords {
-		return nil, ErrInvalidPayload
-	}
-	seen := make(map[string]struct{}, len(payload.Records))
-	for _, record := range payload.Records {
-		if !validRecord(record) {
-			return nil, ErrInvalidPayload
-		}
-		key := string(rune(record.Kind)) + "\x00" + record.LocalID
-		if _, exists := seen[key]; exists {
-			return nil, ErrInvalidPayload
-		}
-		seen[key] = struct{}{}
+	if err := ValidatePayload(payload); err != nil {
+		return nil, err
 	}
 	mode, err := cbor.CoreDetEncOptions().EncMode()
 	if err != nil {
@@ -290,9 +290,240 @@ func encodePayload(payload Payload) ([]byte, error) {
 	}
 	encoded, err := mode.Marshal(payload)
 	if err != nil || len(encoded) == 0 || len(encoded) > MaxPayloadBytes {
+		clear(encoded)
 		return nil, ErrInvalidPayload
 	}
 	return encoded, nil
+}
+
+// ValidatePayload applies versioned semantic and aggregate bounds before codecs allocate.
+func ValidatePayload(payload Payload) error {
+	if (payload.Version != 1 && payload.Version != 2) || len(payload.Records) > MaxRecords {
+		return ErrInvalidPayload
+	}
+	seen := make(map[string]struct{}, len(payload.Records))
+	size := 4 + cborHeadSize(uint64(len(payload.Records)))
+	for _, record := range payload.Records {
+		if !validRecord(record) {
+			return ErrInvalidPayload
+		}
+		key := string(rune(record.Kind)) + "\x00" + record.LocalID
+		if _, exists := seen[key]; exists {
+			return ErrInvalidPayload
+		}
+		seen[key] = struct{}{}
+		size += 5 + cborHeadSize(uint64(len(record.LocalID))) + len(record.LocalID) + cborHeadSize(uint64(len(record.ExactBytes))) + len(record.ExactBytes)
+		if record.Generation != 0 {
+			size += 1 + cborHeadSize(record.Generation)
+		}
+		if size > MaxPayloadBytes {
+			return ErrResourceLimit
+		}
+	}
+	_, err := decodeRecipientKeys(payload, false)
+	return err
+}
+func cborHeadSize(value uint64) int {
+	switch {
+	case value < 24:
+		return 1
+	case value <= 0xff:
+		return 2
+	case value <= 0xffff:
+		return 3
+	case value <= 0xffffffff:
+		return 5
+	default:
+		return 9
+	}
+}
+func payloadVersionName(version uint64) string {
+	if version == 1 {
+		return LegacyVersion
+	}
+	if version == 2 {
+		return Version
+	}
+	return ""
+}
+
+// RecipientKeyRecord contains source metadata, not current admission authority.
+// Legacy SourceVersion=1 has SourceStatus=0 and no SourceProfiles. A caller must
+// validate the recipient pair and current profile before creating any binding.
+type RecipientKeyRecord struct {
+	SourceRecordID        string
+	SourceVersion         uint64
+	SourceStatus          uint8
+	CreatedAtEpochSeconds int64
+	ExpiresAtEpochSeconds int64
+	SourceProfiles        []string
+	PublicRequest         []byte
+	PrivateBundle         []byte
+}
+
+func (r *RecipientKeyRecord) Destroy() {
+	if r == nil {
+		return
+	}
+	clear(r.PublicRequest)
+	clear(r.PrivateBundle)
+	clear(r.SourceProfiles)
+	*r = RecipientKeyRecord{}
+}
+
+// DecodeRecipientKeyRecords owns defensive copies that the caller must Destroy.
+func DecodeRecipientKeyRecords(payload Payload) ([]RecipientKeyRecord, error) {
+	if err := ValidatePayload(payload); err != nil {
+		return nil, err
+	}
+	return decodeRecipientKeys(payload, true)
+}
+
+type keyCursor struct {
+	raw    []byte
+	offset int
+}
+
+func (c *keyCursor) take(size int) ([]byte, bool) {
+	if size < 0 || size > len(c.raw)-c.offset {
+		return nil, false
+	}
+	out := c.raw[c.offset : c.offset+size]
+	c.offset += size
+	return out, true
+}
+func (c *keyCursor) octet() (byte, bool) {
+	raw, ok := c.take(1)
+	if !ok {
+		return 0, false
+	}
+	return raw[0], true
+}
+func (c *keyCursor) localID() (string, bool) {
+	size, ok := c.octet()
+	if !ok || size == 0 || size > 64 {
+		return "", false
+	}
+	raw, ok := c.take(int(size))
+	if !ok {
+		return "", false
+	}
+	id := string(raw)
+	return id, validLocalID(id)
+}
+func (c *keyCursor) material(maximum uint16) ([]byte, bool) {
+	raw, ok := c.take(2)
+	if !ok {
+		return nil, false
+	}
+	size := binary.BigEndian.Uint16(raw)
+	if size == 0 || size > maximum {
+		return nil, false
+	}
+	return c.take(int(size))
+}
+
+func decodeRecipientKeys(payload Payload, copyMaterial bool) (records []RecipientKeyRecord, err error) {
+	records = []RecipientKeyRecord{}
+	defer func() {
+		if err != nil && copyMaterial {
+			for i := range records {
+				records[i].Destroy()
+			}
+			records = nil
+		}
+	}()
+	profiles := map[string]bool{}
+	for _, r := range payload.Records {
+		if r.Kind == RecordNativeProfile {
+			profiles[r.LocalID] = true
+		}
+	}
+	found := false
+	ids := map[string]bool{}
+	assigned := map[string]bool{}
+	requests := map[[32]byte]bool{}
+	privateKeys := map[[32]byte]bool{}
+	for _, outer := range payload.Records {
+		if outer.Kind != RecordLocalAlias || !strings.HasPrefix(outer.LocalID, "recipient-keys-") {
+			continue
+		}
+		expectedID, magic, version := "recipient-keys-v2", "KCK2", byte(2)
+		if payload.Version == 2 {
+			expectedID, magic, version = "recipient-keys-v3", "KCK3", 3
+		}
+		if found || outer.LocalID != expectedID || len(outer.ExactBytes) < 6 || len(outer.ExactBytes) > 192*1024 {
+			return records, ErrInvalidPayload
+		}
+		found = true
+		c := keyCursor{raw: outer.ExactBytes}
+		header, _ := c.take(6)
+		if string(header[:4]) != magic || header[4] != version || header[5] == 0 || header[5] > 32 {
+			return records, ErrInvalidPayload
+		}
+		for index := 0; index < int(header[5]); index++ {
+			id, ok := c.localID()
+			if !ok || ids[id] {
+				return records, ErrInvalidPayload
+			}
+			ids[id] = true
+			status := byte(0)
+			if payload.Version == 2 {
+				status, ok = c.octet()
+				if !ok || status != 4 {
+					return records, ErrInvalidPayload
+				}
+			}
+			times, ok := c.take(16)
+			if !ok {
+				return records, ErrInvalidPayload
+			}
+			created, expires := binary.BigEndian.Uint64(times[:8]), binary.BigEndian.Uint64(times[8:])
+			if created == 0 || created > 0x7fffffffffffffff || expires <= created || expires > 0x7fffffffffffffff {
+				return records, ErrInvalidPayload
+			}
+			bindings := []string{}
+			if payload.Version == 2 {
+				count, ok := c.octet()
+				if !ok || count == 0 || count > 64 {
+					return records, ErrInvalidPayload
+				}
+				previous := ""
+				for i := 0; i < int(count); i++ {
+					profile, ok := c.localID()
+					if !ok || profile <= previous || !profiles[profile] || assigned[profile] {
+						return records, ErrInvalidPayload
+					}
+					bindings = append(bindings, profile)
+					assigned[profile] = true
+					previous = profile
+				}
+			}
+			request, ok := c.material(512)
+			if !ok {
+				return records, ErrInvalidPayload
+			}
+			private, ok := c.material(128)
+			if !ok {
+				return records, ErrInvalidPayload
+			}
+			requestID, privateID := sha256.Sum256(request), sha256.Sum256(private)
+			if requests[requestID] || privateKeys[privateID] {
+				return records, ErrInvalidPayload
+			}
+			requests[requestID] = true
+			privateKeys[privateID] = true
+			if copyMaterial {
+				request = bytes.Clone(request)
+				private = bytes.Clone(private)
+			}
+			records = append(records, RecipientKeyRecord{id, payload.Version, status, int64(created), int64(expires), bindings, request, private})
+		}
+		if c.offset != len(c.raw) {
+			return records, ErrInvalidPayload
+		}
+	}
+	return records, nil
 }
 
 func decodePayload(encoded []byte) (Payload, error) {
@@ -315,10 +546,13 @@ func decodePayload(encoded []byte) (Payload, error) {
 	}
 	var payload Payload
 	if err := mode.Unmarshal(encoded, &payload); err != nil {
+		destroyPayload(&payload)
 		return Payload{}, ErrInvalidPayload
 	}
 	canonical, err := encodePayload(payload)
+	defer clear(canonical)
 	if err != nil || !bytes.Equal(canonical, encoded) {
+		destroyPayload(&payload)
 		return Payload{}, ErrInvalidPayload
 	}
 	return payload, nil
@@ -326,14 +560,9 @@ func decodePayload(encoded []byte) (Payload, error) {
 
 func validRecord(record Record) bool {
 	if record.Kind < RecordNativeProfile || record.Kind > RecordRoutingPreferences ||
-		len(record.LocalID) == 0 || len(record.LocalID) > 64 ||
+		!validLocalID(record.LocalID) ||
 		len(record.ExactBytes) == 0 || len(record.ExactBytes) > MaxPayloadBytes {
 		return false
-	}
-	for _, value := range record.LocalID {
-		if (value < 'a' || value > 'z') && (value < '0' || value > '9') && value != '-' {
-			return false
-		}
 	}
 	if (record.Kind == RecordNativeProfile || record.Kind == RecordVerifiedReceipt) &&
 		record.Generation == 0 {
@@ -342,6 +571,17 @@ func validRecord(record Record) bool {
 	if record.Kind != RecordNativeProfile && record.Kind != RecordVerifiedReceipt &&
 		record.Generation != 0 {
 		return false
+	}
+	return true
+}
+func validLocalID(id string) bool {
+	if len(id) == 0 || len(id) > 64 {
+		return false
+	}
+	for _, value := range id {
+		if (value < 'a' || value > 'z') && (value < '0' || value > '9') && value != '-' {
+			return false
+		}
 	}
 	return true
 }

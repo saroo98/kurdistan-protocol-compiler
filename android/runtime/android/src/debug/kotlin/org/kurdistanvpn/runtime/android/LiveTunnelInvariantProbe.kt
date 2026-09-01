@@ -17,7 +17,8 @@ import org.kurdistanvpn.runtime.api.LiveTunnelFailure
 import org.kurdistanvpn.runtime.api.LiveTunnelStage
 import org.kurdistanvpn.runtime.api.LiveTunnelStartResult
 
-/** Internal-build device probe. This source set is absent from release APKs. */
+/** Internal-build controller model. No real TUN, socket, authority, or ACTIVE publication
+ * occurs here. This source set is absent from release APKs. */
 object LiveTunnelInvariantProbe {
     data class Result(
         val events: List<String>,
@@ -44,8 +45,17 @@ object LiveTunnelInvariantProbe {
             },
             detachedCloser = DetachedFileDescriptorCloser { events += "close-detached:$it" },
             onStage = { events += "stage:${it.name}" },
+            preTunValidation = { events += "model:PRE_TUN"; true },
+            prepareRequiredActivationResources = { registrar ->
+                registrar.notification(AutoCloseable { events += "model:NOTIFICATION_CLOSED" })
+                events += "model:NOTIFICATION_READY"
+                registrar.healthMonitor(AutoCloseable { events += "model:HEALTH_CLOSED" })
+                events += "model:HEALTH_READY"
+            },
+            finalPublicationCheck = { events += "model:PRE_ACTIVE"; true },
         )
         val start = controller.start(session)
+        if (start is LiveTunnelStartResult.Running) events += "model:NATIVE_READY"
         val before = controller.isRunning()
         controller.stop()
         val after = controller.isRunning()

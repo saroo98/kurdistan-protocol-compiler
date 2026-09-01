@@ -34,7 +34,7 @@ func (state *backupHandle) Destroy() {
 }
 
 func EncodeBackupPayload(payload backup.Payload) ([]byte, error) {
-	if payload.Version != 1 || len(payload.Records) > backup.MaxRecords {
+	if err := backup.ValidatePayload(payload); err != nil {
 		return nil, backup.ErrInvalidPayload
 	}
 	size := 4 + 2
@@ -50,6 +50,9 @@ func EncodeBackupPayload(payload backup.Payload) ([]byte, error) {
 	}
 	out := make([]byte, size)
 	copy(out[:4], backupPayloadMagic)
+	if payload.Version == 2 {
+		copy(out[:4], "KBP2")
+	}
 	binary.BigEndian.PutUint16(out[4:6], uint16(len(payload.Records)))
 	offset := 6
 	for _, record := range payload.Records {
@@ -71,7 +74,7 @@ func EncodeBackupPayload(payload backup.Payload) ([]byte, error) {
 
 func DecodeBackupPayload(encoded []byte) (backup.Payload, error) {
 	if len(encoded) < 6 || len(encoded) > backup.MaxPayloadBytes ||
-		string(encoded[:4]) != backupPayloadMagic {
+		(string(encoded[:4]) != backupPayloadMagic && string(encoded[:4]) != "KBP2") {
 		return backup.Payload{}, backup.ErrInvalidPayload
 	}
 	count := int(binary.BigEndian.Uint16(encoded[4:6]))
@@ -79,6 +82,15 @@ func DecodeBackupPayload(encoded []byte) (backup.Payload, error) {
 		return backup.Payload{}, backup.ErrInvalidPayload
 	}
 	payload := backup.Payload{Version: 1, Records: make([]backup.Record, count)}
+	if string(encoded[:4]) == "KBP2" {
+		payload.Version = 2
+	}
+	valid := false
+	defer func() {
+		if !valid {
+			destroyBackupPayload(&payload)
+		}
+	}()
 	offset := 6
 	for index := range payload.Records {
 		if offset+14 > len(encoded) {
@@ -95,26 +107,28 @@ func DecodeBackupPayload(encoded []byte) (backup.Payload, error) {
 		}
 		localID := string(encoded[offset : offset+idLength])
 		offset += idLength
-		byteLength := int(binary.BigEndian.Uint32(encoded[offset : offset+4]))
+		byteLength := uint64(binary.BigEndian.Uint32(encoded[offset : offset+4]))
 		offset += 4
-		if byteLength == 0 || byteLength > backup.MaxPayloadBytes || offset+byteLength > len(encoded) {
+		if byteLength == 0 || byteLength > backup.MaxPayloadBytes || byteLength > uint64(len(encoded)-offset) {
 			return backup.Payload{}, backup.ErrInvalidPayload
 		}
 		payload.Records[index] = backup.Record{
 			Kind:       kind,
 			LocalID:    localID,
 			Generation: generation,
-			ExactBytes: append([]byte(nil), encoded[offset:offset+byteLength]...),
+			ExactBytes: append([]byte(nil), encoded[offset:offset+int(byteLength)]...),
 		}
-		offset += byteLength
+		offset += int(byteLength)
 	}
 	if offset != len(encoded) {
 		return backup.Payload{}, backup.ErrInvalidPayload
 	}
 	canonical, err := EncodeBackupPayload(payload)
+	defer clear(canonical)
 	if err != nil || !bytes.Equal(canonical, encoded) {
 		return backup.Payload{}, backup.ErrInvalidPayload
 	}
+	valid = true
 	return payload, nil
 }
 
@@ -144,9 +158,16 @@ func BackupOpenPreview(registry *HandleRegistry, encodedBackup, passphrase []byt
 	}
 	encodedPreview, err := encodeBackupPreview(preview)
 	if err != nil {
+		opened.Destroy()
 		return 0, nil, CodeInternalFailure
 	}
-	handle, code := registry.Open(HandleBackup, &backupHandle{opened: opened, preview: preview})
+	state := &backupHandle{opened: opened, preview: preview}
+	handle, code := registry.Open(HandleBackup, state)
+	if code != CodeOK {
+		state.Destroy()
+		clear(encodedPreview)
+		return 0, nil, code
+	}
 	return handle, encodedPreview, code
 }
 
@@ -192,11 +213,24 @@ func destroyBackupPayload(payload *backup.Payload) {
 }
 
 func encodeBackupPreview(preview backup.Preview) ([]byte, error) {
-	if preview.Version != backup.Version || preview.RecordCount < 0 || preview.RecordCount > backup.MaxRecords {
+	if (preview.Version != backup.Version && preview.Version != backup.LegacyVersion) || preview.RecordCount < 0 || preview.RecordCount > backup.MaxRecords {
+		return nil, backup.ErrInvalidPayload
+	}
+	total := 0
+	for kind, count := range preview.KindCounts {
+		if kind < backup.RecordNativeProfile || kind > backup.RecordRoutingPreferences || count < 0 || count > backup.MaxRecords {
+			return nil, backup.ErrInvalidPayload
+		}
+		total += count
+	}
+	if total != preview.RecordCount {
 		return nil, backup.ErrInvalidPayload
 	}
 	out := make([]byte, 4+2+5*2)
 	copy(out[:4], backupPreviewMagic)
+	if preview.Version == backup.Version {
+		copy(out[:4], "KBV2")
+	}
 	binary.BigEndian.PutUint16(out[4:6], uint16(preview.RecordCount))
 	for index := 0; index < 5; index++ {
 		count := preview.KindCounts[backup.RecordKind(index+1)]
@@ -209,13 +243,16 @@ func encodeBackupPreview(preview backup.Preview) ([]byte, error) {
 }
 
 func decodeBackupPreview(encoded []byte) (backup.Preview, error) {
-	if len(encoded) != 16 || string(encoded[:4]) != backupPreviewMagic {
+	if len(encoded) != 16 || (string(encoded[:4]) != backupPreviewMagic && string(encoded[:4]) != "KBV2") {
 		return backup.Preview{}, backup.ErrInvalidPayload
 	}
 	preview := backup.Preview{
-		Version:     backup.Version,
+		Version:     backup.LegacyVersion,
 		RecordCount: int(binary.BigEndian.Uint16(encoded[4:6])),
 		KindCounts:  make(map[backup.RecordKind]int),
+	}
+	if string(encoded[:4]) == "KBV2" {
+		preview.Version = backup.Version
 	}
 	total := 0
 	for index := 0; index < 5; index++ {

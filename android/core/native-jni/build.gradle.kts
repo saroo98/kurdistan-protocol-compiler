@@ -32,9 +32,14 @@ android {
             }
         }
         create("internal") {
-            initWith(getByName("debug"))
+            // Do not initWith(debug): AGP shares the external-native argument
+            // collection and the internal bridge root then contaminates Debug.
+            ndk {
+                abiFilters += setOf("arm64-v8a", "x86_64")
+            }
             matchingFallbacks += listOf("debug")
             externalNativeBuild.cmake {
+                abiFilters += setOf("arm64-v8a", "x86_64")
                 arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("internal")}"
             }
         }
@@ -109,7 +114,8 @@ fun registerGoBridge(buildType: String, internalTrust: Boolean, abi: AndroidGoAb
         group = "build"
         description = "Builds the bounded Go c-shared bridge for $buildType/${abi.androidAbi}."
         val outputDirectory = generatedGoRoot.get().asFile.resolve("$buildType/${abi.androidAbi}")
-        check(outputDirectory.exists() || outputDirectory.mkdirs())
+        // Configuration and task-graph inspection must never create build output.
+        doFirst { check(outputDirectory.exists() || outputDirectory.mkdirs()) }
         val output = outputDirectory.resolve("libkurdistan_bridge.so")
         val header = outputDirectory.resolve("libkurdistan_bridge.h")
         inputs.files(
@@ -149,14 +155,9 @@ val bridgeTasks = mapOf(
         .map { registerGoBridge("release", internalTrust = false, it) },
 )
 
-tasks.configureEach {
-    val lowerName = name.lowercase(Locale.ROOT)
-    bridgeTasks.forEach { (buildType, buildTypeBridgeTasks) ->
-        if (
-            lowerName.contains(buildType) &&
-            (lowerName.contains("configurecmake") || lowerName.contains("buildcmake") || lowerName.contains("pre${buildType}build"))
-        ) {
-            dependsOn(buildTypeBridgeTasks)
-        }
-    }
+androidComponents.onVariants { variant ->
+    // CMake consumes the generated bridge during configuration, before JNI compilation.
+    // Register the lazy producers at AGP's public variant lifecycle boundary so direct
+    // and aggregate invocations have the same prerequisites without private task names.
+    variant.lifecycleTasks.registerPreBuild(bridgeTasks.getValue(requireNotNull(variant.buildType)))
 }

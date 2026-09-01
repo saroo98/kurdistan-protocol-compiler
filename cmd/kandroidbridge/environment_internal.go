@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"time"
@@ -192,17 +193,29 @@ func (internalBridgeEnvironment) NewRecipientActivationSession(preview androidbr
 }
 
 func (environment internalBridgeEnvironment) VerifyBackupRecord(record backup.Record) error {
-	if record.Kind != backup.RecordNativeProfile || record.Generation == 0 || len(record.ExactBytes) == 0 {
-		return errors.New("phase9 internal restore: only verified native-profile records are admitted")
+	switch record.Kind {
+	case backup.RecordLocalAlias:
+		return verifyVersionedRecipientKeyBackupRecord(record)
+	case backup.RecordNativeProfile:
+		// Continue below. Profile admission remains independently verified.
+	default:
+		return errors.New("phase9 internal restore: unsupported record kind")
+	}
+	if record.Generation == 0 || len(record.ExactBytes) == 0 {
+		return errors.New("phase9 internal restore: malformed native-profile record")
 	}
 	request, err := androidbridge.DecodeVerifyRequest(record.ExactBytes)
 	if err != nil {
 		return errors.New("phase9 internal restore: malformed verify request")
 	}
 	preview, code := androidbridge.VerifyAndPreview(record.ExactBytes, environment)
+	if code == androidbridge.CodeOK {
+		defer preview.Destroy()
+	}
 	if code == androidbridge.CodeOK &&
 		preview.Verified.Metadata.Class == request.Class &&
-		preview.Verified.Profile.Generation == record.Generation {
+		preview.Verified.Profile.Generation == record.Generation &&
+		len(request.Parts) == 1 && bytes.Equal(preview.Verified.ExactArtifact, request.Parts[0]) {
 		return nil
 	}
 	return errors.New("phase9 internal restore: profile verification rejected")

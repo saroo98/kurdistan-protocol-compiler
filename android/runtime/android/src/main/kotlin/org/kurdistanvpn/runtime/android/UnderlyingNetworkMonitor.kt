@@ -49,17 +49,39 @@ internal class CurrentNetworkTracker<T>(
     private val available = linkedSetOf<T>()
     private var current: T? = null
 
-    fun available(value: T) {
+    @Synchronized fun available(value: T) {
         if (!available.add(value) || current != null) return
         current = value
         onTransition(NetworkTransition(null, value))
     }
 
-    fun lost(value: T) {
+    @Synchronized fun lost(value: T) {
         if (!available.remove(value) || current != value) return
         val previous = current
         current = available.firstOrNull()
         onTransition(NetworkTransition(previous, current))
+    }
+}
+
+/** Owns possible platform registration before the fallible registration call. A failed
+ * close is sticky; an ambiguous callback handle is never unregistered twice. */
+internal class NetworkCallbackOwnership(private val register: () -> Unit,
+    private val unregister: () -> Unit) : AutoCloseable {
+    private enum class State { NEW, ACQUIRING, REGISTERED, CLEAN, UNPROVEN }
+    private var state = State.NEW
+    @Synchronized fun start() {
+        check(state == State.NEW)
+        state = State.ACQUIRING
+        try { register(); state = State.REGISTERED }
+        catch (failure: Throwable) { try { close() } catch (_: Throwable) { }; throw failure }
+    }
+    @Synchronized fun acceptsCallbacks(): Boolean = state == State.ACQUIRING || state == State.REGISTERED
+    @Synchronized override fun close() {
+        if (state == State.NEW || state == State.CLEAN) { state = State.CLEAN; return }
+        check(state != State.UNPROVEN) { "NETWORK_CALLBACK_CLEANUP_UNPROVEN" }
+        state = State.UNPROVEN
+        unregister()
+        state = State.CLEAN
     }
 }
 
@@ -72,16 +94,16 @@ internal class UnderlyingNetworkMonitor(
         .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
         .build()
-    private val callback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) = tracker.available(network)
-        override fun onLost(network: Network) = tracker.lost(network)
+    private val callback: ConnectivityManager.NetworkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) { if (ownership.acceptsCallbacks()) tracker.available(network) }
+        override fun onLost(network: Network) { if (ownership.acceptsCallbacks()) tracker.lost(network) }
     }
-    private var registered = false
+    private val ownership: NetworkCallbackOwnership = NetworkCallbackOwnership(
+        { connectivity.registerNetworkCallback(request, callback) },
+        { connectivity.unregisterNetworkCallback(callback) })
 
     fun start() {
-        if (registered) return
-        connectivity.registerNetworkCallback(request, callback)
-        registered = true
+        ownership.start()
         connectivity.activeNetwork?.takeIf { network ->
             connectivity.getNetworkCapabilities(network)?.hasCapability(
                 NetworkCapabilities.NET_CAPABILITY_NOT_VPN,
@@ -90,8 +112,6 @@ internal class UnderlyingNetworkMonitor(
     }
 
     override fun close() {
-        if (!registered) return
-        registered = false
-        runCatching { connectivity.unregisterNetworkCallback(callback) }
+        ownership.close()
     }
 }

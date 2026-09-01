@@ -49,6 +49,7 @@ include(
     ":data:metadata",
     ":data:secure",
     ":data:settings",
+    ":data:protected-state",
     ":platform:import",
     ":runtime:api",
     ":runtime:android",

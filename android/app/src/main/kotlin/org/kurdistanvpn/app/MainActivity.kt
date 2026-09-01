@@ -63,6 +63,8 @@ import org.kurdistanvpn.core.model.ResetScope
 import org.kurdistanvpn.core.model.ProjectionStatus
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.model.QrDisplayMatrix
+import org.kurdistanvpn.core.model.ProtectedRecoveryPresentation
+import org.kurdistanvpn.core.model.ProtectedRecoveryReason
 import org.kurdistanvpn.core.ui.KurdistanTheme
 import org.kurdistanvpn.core.ui.KurdistanIcons
 import org.kurdistanvpn.core.ui.R as UiR
@@ -85,8 +87,6 @@ import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.MultipartQrAccumulator
 import org.kurdistanvpn.platform.importing.OfflineQrScanner
 import org.kurdistanvpn.platform.importing.OfflineQrEncoder
-import org.kurdistanvpn.data.secure.SensitiveAction
-import org.kurdistanvpn.data.secure.SensitiveActionAuthorizer
 import org.kurdistanvpn.runtime.api.PerAppRoutingMode
 import org.kurdistanvpn.runtime.api.VpnRoutingPolicy
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
@@ -98,17 +98,18 @@ class MainActivity : FragmentActivity() {
         ProductRootViewModel.Factory((application as KurdistanApplication).compositionRoot)
     }
     private val vpnController by lazy { VpnRuntimeController(applicationContext) }
+    private val manualConsentAdmission = ManualStartAdmission()
 
     internal fun appStateSnapshotForTesting(): AppState = viewModel.state.value
     internal fun diagnosticStateSnapshotForTesting(): DiagnosticWorkflowState =
         viewModel.diagnosticState.value
 
-    internal fun prepareRuntimeAuthorityForTesting(
+    internal fun prepareManualStartForTesting(
         config: VpnRuntimeConfig,
-        onReady: (ByteArray) -> Unit,
+        onReady: () -> Unit,
         onFailure: (OperationError) -> Unit,
     ) {
-        viewModel.prepareRuntimeStart(config, onReady, onFailure)
+        viewModel.prepareManualStartForTesting(config, onReady, onFailure)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,6 +119,7 @@ class MainActivity : FragmentActivity() {
             val backupState = viewModel.backupState.collectAsStateWithLifecycle().value
             val diagnosticState = viewModel.diagnosticState.collectAsStateWithLifecycle().value
             val diagnosticEvents = viewModel.diagnosticEvents.collectAsStateWithLifecycle().value
+            val protectedRecovery = viewModel.protectedRecovery.collectAsStateWithLifecycle().value
             val settings = viewModel.settings.collectAsStateWithLifecycle().value
             val compatibility = viewModel.compatibility.collectAsStateWithLifecycle().value
             val probeState = viewModel.probeState.collectAsStateWithLifecycle().value
@@ -127,12 +129,28 @@ class MainActivity : FragmentActivity() {
                 value = withContext(Dispatchers.IO) { discoverLaunchableApplications() }
             }
             val capabilities = remember { phase13Capabilities() }
+            val startAfterConsent: () -> Unit = start@{
+                val ticket = manualConsentAdmission.consume() ?: return@start
+                viewModel.prepareManualStart(
+                    config = runtimeConfig(settings),
+                    onReady = {
+                        if (manualConsentAdmission.isCurrent(ticket)) {
+                            vpnController.stageManualStart()
+                            vpnController.startStaged()
+                        }
+                    },
+                    onFailure = { error ->
+                        if (manualConsentAdmission.isCurrent(ticket)) vpnController.authorityRejected(error.name)
+                    },
+                )
+            }
             val vpnPermission = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { result ->
                 if (result.resultCode == RESULT_OK) {
-                    vpnController.startStaged()
+                    startAfterConsent()
                 } else {
+                    manualConsentAdmission.cancel()
                     vpnController.permissionRejected()
                 }
             }
@@ -142,11 +160,12 @@ class MainActivity : FragmentActivity() {
                 if (granted) {
                     val permission = vpnController.prepareIntent()
                     if (permission == null) {
-                        vpnController.startStaged()
+                        startAfterConsent()
                     } else {
                         vpnPermission.launch(permission)
                     }
                 } else {
+                    manualConsentAdmission.cancel()
                     vpnController.notificationPermissionRejected()
                 }
             }
@@ -227,6 +246,7 @@ class MainActivity : FragmentActivity() {
                     backupState = backupState,
                     diagnosticState = diagnosticState,
                     diagnosticEvents = diagnosticEvents,
+                    protectedRecovery = protectedRecovery,
                     settings = settings,
                     compatibility = compatibility,
                     probeState = probeState,
@@ -308,6 +328,8 @@ class MainActivity : FragmentActivity() {
                     },
                     onConfirmRestore = viewModel::confirmRestore,
                     onCancelRestore = viewModel::cancelRestore,
+                    onConfirmMigration = viewModel::confirmLegacyMigration,
+                    onConfirmPresentationRecovery = viewModel::confirmPresentationRecovery,
                     onResetAll = {
                         vpnController.stop()
                         viewModel.resetAll()
@@ -336,6 +358,7 @@ class MainActivity : FragmentActivity() {
                     onDiagnosticsSettings = viewModel::setDiagnostics,
                     onExpert = viewModel::setExpert,
                     onSelectProfile = { localRecordId ->
+                        manualConsentAdmission.cancel()
                         if (localRecordId != settings.profiles.activeLocalRecordId && vpnRuntime.state.hasRuntimeSession()) {
                             vpnController.stop()
                         }
@@ -353,45 +376,19 @@ class MainActivity : FragmentActivity() {
                     onCancelDiagnostic = viewModel::cancelDiagnostic,
                     onClearDiagnosticEvents = viewModel::clearDiagnosticEvents,
                     onStartVpn = startVpn@{
-                        val config = runtimeConfig(settings)
-                        val reconnectAuthorityProvider =
-                            viewModel.freshRuntimeAuthorityProvider(config)
-                        if (reconnectAuthorityProvider == null) {
-                            vpnController.authorityRejected(OperationError.POLICY_REJECTED.name)
-                            return@startVpn
+                        manualConsentAdmission.stage()
+                        // No protected authority is reconstructed until the real Android
+                        // prepared state exists. Consent never substitutes for validation.
+                        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                            this@MainActivity, Manifest.permission.POST_NOTIFICATIONS,
+                        ) != PackageManager.PERMISSION_GRANTED) {
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            val permission = vpnController.prepareIntent()
+                            if (permission == null) startAfterConsent() else vpnPermission.launch(permission)
                         }
-                        viewModel.prepareRuntimeStart(
-                            config = config,
-                            onReady = { authority ->
-                                vpnController.stageAuthority(
-                                    authority,
-                                    reconnectAuthorityProvider,
-                                )
-                                if (
-                                    Build.VERSION.SDK_INT >= 33 &&
-                                    ContextCompat.checkSelfPermission(
-                                        this@MainActivity,
-                                        Manifest.permission.POST_NOTIFICATIONS,
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notificationPermission.launch(
-                                        Manifest.permission.POST_NOTIFICATIONS,
-                                    )
-                                } else {
-                                    val permission = vpnController.prepareIntent()
-                                    if (permission == null) {
-                                        vpnController.startStaged()
-                                    } else {
-                                        vpnPermission.launch(permission)
-                                    }
-                                }
-                            },
-                            onFailure = { error ->
-                                vpnController.authorityRejected(error.name)
-                            },
-                        )
                     },
-                    onStopVpn = vpnController::stop,
+                    onStopVpn = { manualConsentAdmission.cancel(); vpnController.stop() },
                 )
             }
         }
@@ -407,6 +404,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        manualConsentAdmission.close()
         vpnController.close()
         super.onDestroy()
     }
@@ -623,6 +621,7 @@ private fun KurdistanApp(
     backupState: BackupWorkflowState,
     diagnosticState: DiagnosticWorkflowState,
     diagnosticEvents: List<org.kurdistanvpn.core.model.DiagnosticEvent>,
+    protectedRecovery: ProtectedRecoveryPresentation,
     settings: Phase9Settings,
     compatibility: CompatibilitySummary?,
     probeState: ProbeExecutionState,
@@ -650,6 +649,8 @@ private fun KurdistanApp(
     onOpenBackup: (String) -> Unit,
     onConfirmRestore: () -> Unit,
     onCancelRestore: () -> Unit,
+    onConfirmMigration: () -> Unit,
+    onConfirmPresentationRecovery: () -> Unit,
     onResetAll: () -> Unit,
     onResetScope: (ResetScope) -> Unit,
     onTheme: (ThemePreference) -> Unit,
@@ -677,6 +678,7 @@ private fun KurdistanApp(
     val currentBackupState by rememberUpdatedState(backupState)
     val currentDiagnosticState by rememberUpdatedState(diagnosticState)
     val currentDiagnosticEvents by rememberUpdatedState(diagnosticEvents)
+    val currentProtectedRecovery by rememberUpdatedState(protectedRecovery)
     val currentSettings by rememberUpdatedState(settings)
     val currentCompatibility by rememberUpdatedState(compatibility)
     val currentProbeState by rememberUpdatedState(probeState)
@@ -891,6 +893,8 @@ private fun KurdistanApp(
                     )
                 }
                 AppDestination.PRIVACY_RECOVERY -> NavEntry(key) {
+                    val recoveryReason =
+                        (currentProtectedRecovery as? ProtectedRecoveryPresentation.Required)?.reason
                     SettingsRecoveryScreen(
                         backupState = currentBackupState,
                         settings = currentSettings,
@@ -904,6 +908,38 @@ private fun KurdistanApp(
                         onResetAll = onResetAll,
                         onBack = navigateBack,
                         onResetScope = onResetScope,
+                        pendingCredentialResetLabel = stringResource(R.string.reset_scope_pending_credentials),
+                        pendingCredentialResetHelp = stringResource(R.string.reset_pending_credentials_help),
+                        migrationRequired = currentState is AppState.MigrationRequired,
+                        migrationLabel = stringResource(R.string.prepare_protected_state_migration),
+                        migrationHelp = stringResource(R.string.protected_state_migration_help),
+                        migrationConfirmLabel = stringResource(R.string.confirm_protected_state_migration),
+                        onConfirmMigration = onConfirmMigration,
+                        protectedRecovery = currentProtectedRecovery,
+                        recoveryTitle = recoveryReason?.let {
+                            stringResource(R.string.protected_recovery_title)
+                        },
+                        recoveryMessage = recoveryReason?.let {
+                            stringResource(
+                                when (it) {
+                                    ProtectedRecoveryReason.RECOVERY_REQUIRED ->
+                                        R.string.protected_recovery_required
+                                    ProtectedRecoveryReason.QUARANTINED ->
+                                        R.string.protected_recovery_quarantined
+                                    ProtectedRecoveryReason.INCONSISTENT ->
+                                        R.string.protected_recovery_inconsistent
+                                    ProtectedRecoveryReason.CLEANUP_UNPROVEN ->
+                                        R.string.protected_recovery_cleanup_unproven
+                                    ProtectedRecoveryReason.MUTATION_UNPROVEN ->
+                                        R.string.protected_recovery_mutation_unproven
+                                },
+                            )
+                        },
+                        recoveryPrepareLabel = stringResource(R.string.prepare_presentation_recovery),
+                        recoveryConfirmLabel = stringResource(R.string.confirm_presentation_recovery),
+                        recoveryDiagnosticsLabel = stringResource(R.string.open_privacy_safe_diagnostics),
+                        onConfirmPresentationRecovery = onConfirmPresentationRecovery,
+                        onOpenDiagnostics = { backStack.add(AppDestination.DIAGNOSTICS_ABOUT) },
                     )
                 }
                 AppDestination.DIAGNOSTICS_ABOUT -> NavEntry(key) {

@@ -57,6 +57,9 @@ data class LiveTunConfiguration(
 )
 
 sealed interface LiveTunnelStartResult {
+    /** Native data plane ready only. External ACTIVE still requires coordinator atomic commit. */
     data class Running(val stage: LiveTunnelStage = LiveTunnelStage.RUNNING) : LiveTunnelStartResult
-    data class Failure(val category: LiveTunnelFailure) : LiveTunnelStartResult
+    data class Failure(val category: LiveTunnelFailure, val cleanup: LiveTunnelCleanupState = LiveTunnelCleanupState.CLEAN) : LiveTunnelStartResult
 }
+
+enum class LiveTunnelCleanupState { CLEANUP_REQUIRED, UNPROVEN, CLEAN }

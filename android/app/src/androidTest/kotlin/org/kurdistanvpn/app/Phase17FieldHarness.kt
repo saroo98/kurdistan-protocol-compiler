@@ -44,8 +44,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertTrue
 import org.kurdistanvpn.core.model.ProfilePreferences
 import org.kurdistanvpn.core.nativeapi.NativeResult
-import org.kurdistanvpn.data.secure.AdmissionResult
-import org.kurdistanvpn.data.secure.ClientKeyResult
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
+import org.kurdistanvpn.data.protectedstate.ProtectedExternalPreviewResult
 import org.kurdistanvpn.platform.importing.ArtifactClass
 import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.IngressKind
@@ -88,6 +88,61 @@ internal object Phase17FieldHarness {
     private const val UNDERLAY_PROBE_CONNECT_TIMEOUT_MILLIS = 2_000
     private const val OWNER_SOCKET_PROTECTION_TIMEOUT_MILLIS = 2_000L
     private const val BOUNDARY_ANDROID_SCHEMA = "kurdistan-phase17-boundary-android-v1"
+
+    /** Fixed-category failure evidence only. No path, inode, payload, key, or authority byte leaves the test process. */
+    fun protectedStateSetupState(context: Context, setup: String): String {
+        require(setup.matches(Regex("[A-Z0-9_]{1,64}")))
+        val evidence = arrayListOf(setup)
+        val credentialRoot = runCatching {
+            context.applicationInfo::class.java.getField("credentialProtectedDataDir")
+                .get(context.applicationInfo) as? String
+        }.getOrNull()
+        if (credentialRoot == null) return (evidence + "CREDENTIAL_ROOT_UNAVAILABLE").joinToString(",")
+        val root = protectedStateDiagnosticRoot(File(credentialRoot))
+        val stat = runCatching { android.system.Os.lstat(root.absolutePath) }.getOrNull()
+        if (stat == null) return (evidence + "PROTECTED_ROOT_ABSENT").joinToString(",")
+        val canonical = runCatching { root.canonicalFile == root.absoluteFile }.getOrDefault(false)
+        val directory = android.system.OsConstants.S_ISDIR(stat.st_mode)
+        val owned = stat.st_uid == context.applicationInfo.uid
+        val privateMode = stat.st_mode and 511 == 448
+        evidence += if (canonical) "ROOT_CANONICAL" else "ROOT_ALIAS_OR_SUBSTITUTION"
+        evidence += if (directory) "ROOT_DIRECTORY" else "ROOT_NOT_DIRECTORY"
+        evidence += if (owned) "ROOT_OWNER_MATCH" else "ROOT_OWNER_MISMATCH"
+        evidence += if (privateMode) "ROOT_MODE_0700" else "ROOT_MODE_MISMATCH"
+        if (!canonical || !directory || !owned || !privateMode) return evidence.joinToString(",")
+        val leaves = root.list()?.toSet()
+            ?: return (evidence + "ROOT_LIST_UNAVAILABLE").joinToString(",")
+        if (leaves.isEmpty()) evidence += "ROOT_EMPTY"
+        fun present(token: String, predicate: (String) -> Boolean) {
+            if (leaves.any(predicate)) evidence += token
+        }
+        present("LOCK") { it == "protected-state.lock" }
+        present("STORE_IDENTITY") { it == "journal-store.blob" }
+        present("CONTROL") { it == "journal-control.blob" }
+        present("INTENT") { it.startsWith("journal-intent-") && it.endsWith(".blob") }
+        present("CHECKPOINT") { it.startsWith("journal-checkpoint-") && it.endsWith(".blob") }
+        present("PROJECTION_WITNESS") { it.startsWith("journal-projection-") && it.endsWith(".blob") }
+        present("PENDING") { it.startsWith("pending-") }
+        present("ROOM_MAIN") { it == "protected-metadata.db" }
+        present("ROOM_JOURNAL") { it == "protected-metadata.db-journal" }
+        present("ROOM_WAL") { it == "protected-metadata.db-wal" }
+        present("ROOM_SHM") { it == "protected-metadata.db-shm" }
+        present("SETTINGS") { it == "protected-settings.preferences_pb" }
+        val known = leaves.all { leaf ->
+            leaf == "protected-state.lock" || leaf == "journal-store.blob" || leaf == "journal-control.blob" ||
+                (leaf.startsWith("journal-intent-") && leaf.endsWith(".blob")) ||
+                (leaf.startsWith("journal-checkpoint-") && leaf.endsWith(".blob")) ||
+                (leaf.startsWith("journal-projection-") && leaf.endsWith(".blob")) || leaf.startsWith("pending-") ||
+                leaf == "protected-metadata.db" || leaf == "protected-metadata.db-journal" ||
+                leaf == "protected-metadata.db-wal" || leaf == "protected-metadata.db-shm" ||
+                leaf == "protected-settings.preferences_pb"
+        }
+        if (!known) evidence += "UNKNOWN_LEAF"
+        return evidence.joinToString(",").also { check(it.length <= 256) }
+    }
+
+    internal fun protectedStateDiagnosticRoot(credentialRoot: File): File =
+        File(File(credentialRoot, "no_backup"), "protected-state-v1")
 
     internal data class BoundarySnapshot(
         val vpnActive: Boolean,
@@ -268,13 +323,21 @@ internal object Phase17FieldHarness {
     internal fun isTerminalFieldConnectOutcome(
         expectDnsAvailable: Boolean,
         snapshot: VpnRuntimeSnapshot,
-    ): Boolean =
-        isExpectedDnsStartupFailure(
+    ): Boolean = when (snapshot.state) {
+        VpnRuntimeState.ACTIVE_KURD_LIVE,
+        VpnRuntimeState.REVOKED,
+        VpnRuntimeState.IDLE,
+        VpnRuntimeState.STOPPING,
+        VpnRuntimeState.BLOCKED,
+        -> true
+        VpnRuntimeState.FAILED -> isExpectedDnsStartupFailure(
             expectAvailable = expectDnsAvailable,
             state = snapshot.state,
             failure = snapshot.failure,
             packetDisposition = snapshot.packetDisposition,
-        ) || isTerminalInitialRuntimeOutcome(snapshot)
+        )
+        else -> false
+    }
 
     internal suspend fun awaitNetworkScopedDnsReadiness(
         timeoutMillis: Long,
@@ -373,7 +436,7 @@ internal object Phase17FieldHarness {
         candidate.state == VpnRuntimeState.REVOKED -> true
         candidate.state == VpnRuntimeState.IDLE || candidate.state == VpnRuntimeState.STOPPING -> true
         candidate.state == VpnRuntimeState.FAILED || candidate.state == VpnRuntimeState.BLOCKED ->
-            !isRetryableRuntimeFailure(candidate.failure)
+            true // The service retries internally; these states are terminal after its budget.
         else -> false
     }
 
@@ -490,16 +553,19 @@ internal object Phase17FieldHarness {
     }
 
     private suspend fun exportRecipient(root: Phase9CompositionRoot, fieldRoot: File) {
-        assertTrue("protected state reset failed", root.resetProtectedState())
+        assertTrue("protected state initialization failed", root.initializeProtectedStateForExplicitUserAction())
+        assertTrue("protected state reset failed", root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
+        check(root.protectedStateFacade() == null) { "RESET_RECREATED_STATE" }
+        assertTrue("explicit replacement initialization failed", root.initializeProtectedStateForExplicitUserAction())
         val coordinators = Phase13Coordinators.create(root)
         val now = System.currentTimeMillis() / 1000
         val created = coordinators.profiles.createEnrollment(
             validitySeconds = 24 * 60 * 60,
-            nowEpochSeconds = now,
+            now = now,
         )
         val summary = when (created) {
-            is ClientKeyResult.Success -> created.summary
-            is ClientKeyResult.Failure -> error("RECIPIENT_CREATE_FAILED:${created.error}")
+            is ProtectedStateApplicationFacade.CommandResult.Committed -> created.value
+            else -> error("RECIPIENT_CREATE_FAILED")
         }
         val request = requireNotNull(
             coordinators.profiles.enrollmentRequest(summary.localRecordId),
@@ -509,7 +575,8 @@ internal object Phase17FieldHarness {
                 "RECIPIENT_REQUEST_SIZE_REJECTED"
             }
             writeAtomic(File(fieldRoot, RECIPIENT_REQUEST), request)
-            coordinators.profiles.markEnrollmentRequestExported(summary.localRecordId)
+            check(coordinators.profiles.markEnrollmentRequestExported(summary.localRecordId) is
+                ProtectedStateApplicationFacade.CommandResult.Committed) { "RECIPIENT_EXPORT_STATE_UNPROVEN" }
             writeAtomic(File(fieldRoot, RESULT), "RECIPIENT_READY\n".encodeToByteArray())
         } finally {
             request.fill(0)
@@ -531,23 +598,22 @@ internal object Phase17FieldHarness {
         )
         try {
             val coordinators = Phase13Coordinators.create(root)
-            val resolved = when (val result = coordinators.profiles.resolvePreview(request)) {
-                is NativeResult.Success -> result.value
-                is NativeResult.Failure -> error("PROFILE_PREVIEW_FAILED:${result.error}")
+            val facade = requireNotNull(root.protectedStateFacade())
+            val resolved = when (val result = facade.previewExternalImport(request, { false }, android.os.SystemClock::elapsedRealtime)) {
+                is ProtectedExternalPreviewResult.Ready -> result.preview
+                is ProtectedExternalPreviewResult.Rejected -> error("PROFILE_PREVIEW_FAILED")
             }
-            val expected = resolved.verified.preview
-            root.nativeCore.releaseVerified(resolved.verified)
-            val admission = requireNotNull(root.admissionJournal).admit(
-                verifyRequest = request,
-                expectedPreview = expected,
-                recipientKeyLocalId = resolved.recipientKeyLocalId,
-            )
-            val outcome = when (admission) {
-                is AdmissionResult.Success -> admission.outcome
-                is AdmissionResult.Failure -> error("PROFILE_ADMISSION_FAILED:${admission.error}")
+            val outcome = resolved.use { pending ->
+                // This field action is a separately authorized import, not an external preview.
+                pending.confirm().use { confirmed ->
+                    when (val admission = facade.confirmImport(confirmed)) {
+                        is ProtectedStateApplicationFacade.CommandResult.Committed -> admission.value
+                        else -> error("PROFILE_ADMISSION_FAILED")
+                    }
+                }
             }
             coordinators.settings.setProfiles(
-                ProfilePreferences(activeLocalRecordId = outcome.localRecordId),
+                ProfilePreferences(activeLocalRecordId = outcome),
             )
             writeAtomic(File(fieldRoot, RESULT), "PROFILE_ACTIVE\n".encodeToByteArray())
         } finally {
@@ -569,42 +635,14 @@ internal object Phase17FieldHarness {
         attemptId: String = "",
     ) {
         val coordinators = Phase13Coordinators.create(root)
-        val localRecordId = root.settingsStore.settings.first().profiles.activeLocalRecordId
-            ?: error("ACTIVE_PROFILE_UNAVAILABLE")
-        val config = VpnRuntimeConfig(
-            routingPolicy = VpnRoutingPolicy(),
-            mtu = 1280,
-        )
-        val authorityPreparations = AtomicInteger()
-        val authorityProvider = FreshRuntimeAuthorityProvider {
-            authorityPreparations.incrementAndGet()
-            when (val result = coordinators.runtime.openLiveAuthority(localRecordId)) {
-                is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Success ->
-                    result.material.use { material ->
-                        FreshRuntimeAuthority.Ready(
-                            RuntimeStartWire.encode(
-                                verifyRequest = material.verifyRequest,
-                                activationRecord = material.activationRecord,
-                                recipientRequest = material.recipientRequest,
-                                recipientPrivate = material.recipientPrivate,
-                                config = config,
-                            ),
-                        )
-                    }
-                is org.kurdistanvpn.data.secure.RuntimeAuthorityResult.Failure ->
-                    FreshRuntimeAuthority.Rejected(result.error.name)
-                null -> FreshRuntimeAuthority.Rejected("STORAGE_FAILURE")
-            }
-        }
-        val encoded = when (val prepared = authorityProvider.prepare()) {
-            is FreshRuntimeAuthority.Ready -> prepared.encoded
-            is FreshRuntimeAuthority.Rejected ->
-                error("RUNTIME_AUTHORITY_FAILED:${prepared.failure}")
-        }
+        val settings = coordinators.settings.settings.first()
+        check(settings.profiles.activeLocalRecordId != null) { "ACTIVE_PROFILE_UNAVAILABLE" }
+        coordinators.settings.setTunnel(settings.tunnel.copy(mtu = 1280))
+        val reissue = (application as RuntimeAuthorityReissueOwner).runtimeAuthorityReissue
         val controller = VpnRuntimeController(application)
         try {
             check(controller.prepareIntent() == null) { "VPN_CONSENT_REQUIRED" }
-            controller.stageAuthority(encoded, authorityProvider)
+            controller.stageManualStart()
             controller.startStaged()
             val snapshot = withTimeoutOrNull(120_000) {
                 controller.snapshot.first { candidate ->
@@ -661,7 +699,7 @@ internal object Phase17FieldHarness {
                     runVerifiedProbeWithReconnect(
                         initialSnapshot = stable,
                         runtimeSnapshots = controller.snapshot,
-                        authorityPreparationCount = authorityPreparations::get,
+                        authorityPreparationCount = reissue::completedFullAuthorityCount,
                         reconnectTimeoutMillis = LIVE_RECONNECT_READY_TIMEOUT_MILLIS,
                         acquireNetwork = {
                             if (verifyBoundary) {
@@ -779,7 +817,6 @@ internal object Phase17FieldHarness {
                 writeAtomic(File(fieldRoot, RESULT), "CONNECTED\n".encodeToByteArray())
             }
         } finally {
-            encoded.fill(0)
             try {
                 controller.stop()
                 check(

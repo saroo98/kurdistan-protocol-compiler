@@ -89,7 +89,7 @@ type RuntimeNetworkSession interface {
 	AttachTUN(context.Context, int) ErrorCode
 	Start(context.Context) ErrorCode
 	Status() ErrorCode
-	Close()
+	Close() ErrorCode
 }
 
 // RuntimeNetworkDiagnosticsV1 contains only bounded aggregate packet-pump
@@ -129,6 +129,9 @@ type runtimeSessionV2Handle struct {
 	nextEndpoint        uint8
 	attemptCount        uint8
 	maxFallbackAttempts uint8
+	stopOnce            sync.Once
+	destroyOnce         sync.Once
+	cleanupCode         ErrorCode
 }
 
 func EncodeRuntimeSessionSnapshotV2(snapshot RuntimeSessionSnapshotV2) ([]byte, error) {
@@ -430,20 +433,34 @@ func RuntimeSocketPrepare(registry *HandleRegistry, handle Handle) (int, ErrorCo
 	plan.Destroy()
 	if code != CodeOK || network == nil {
 		if network != nil {
-			network.Close()
+			if cleanupCode := runtimeCloseNetwork(network); cleanupCode != CodeOK {
+				state.recordCleanupFailure(cleanupCode)
+				state.Cancel()
+				return -1, cleanupCode
+			}
 		}
 		return -1, normalizeRuntimeNetworkCode(code)
 	}
 	fd, fdCode := network.SocketFD()
 	if fdCode != CodeOK || fd < 0 {
-		network.Close()
+		if cleanupCode := runtimeCloseNetwork(network); cleanupCode != CodeOK {
+			state.recordCleanupFailure(cleanupCode)
+			state.Cancel()
+			return -1, cleanupCode
+		}
 		return -1, normalizeRuntimeNetworkCode(fdCode)
 	}
 	state.mu.Lock()
 	if state.state != RuntimeStateVerified || state.ctx.Err() != nil {
 		state.mu.Unlock()
-		network.Close()
+		cleanupCode := runtimeCloseNetwork(network)
+		if cleanupCode != CodeOK {
+			state.recordCleanupFailure(cleanupCode)
+		}
 		state.Cancel()
+		if cleanupCode != CodeOK {
+			return -1, cleanupCode
+		}
 		return -1, CodeCancelled
 	}
 	state.network = network
@@ -494,7 +511,12 @@ func RuntimeSocketCommitProtected(registry *HandleRegistry, handle Handle, prote
 					state.state = RuntimeStateVerified
 				}
 				state.mu.Unlock()
-				network.Close()
+				cleanupCode := runtimeCloseNetwork(network)
+				if cleanupCode != CodeOK {
+					state.recordCleanupFailure(cleanupCode)
+					state.Cancel()
+					return cleanupCode
+				}
 				if canRetry {
 					return CodeEndpointUnavailable
 				}
@@ -569,7 +591,9 @@ func RuntimeTUNAttach(registry *HandleRegistry, handle Handle, fd int) ErrorCode
 	state.state = RuntimeStateTUNAttached
 	state.mu.Unlock()
 	if code := network.Start(ctx); code != CodeOK {
-		state.Cancel()
+		if cleanupCode := state.Cancel(); cleanupCode != CodeOK {
+			return cleanupCode
+		}
 		return normalizeRuntimeNetworkCode(code)
 	}
 	state.mu.Lock()
@@ -620,51 +644,80 @@ func RuntimeNetworkDiagnostics(registry *HandleRegistry, handle Handle) (Runtime
 }
 
 func RuntimeStop(registry *HandleRegistry, handle Handle) ErrorCode {
-	state, code := runtimeV2State(registry, handle)
-	if code != CodeOK {
-		return code
+	_, _, kind, ok := decodeHandle(handle)
+	if !ok {
+		return CodeInvalidHandle
 	}
-	state.Cancel()
-	return CodeOK
+	if kind != HandleRuntimeSession {
+		return CodeWrongHandleType
+	}
+	return registry.Free(handle)
 }
 
-func (state *runtimeSessionV2Handle) Cancel() {
+func (state *runtimeSessionV2Handle) Cancel() ErrorCode {
 	if state == nil {
-		return
+		return CodeOK
 	}
-	state.mu.Lock()
-	if state.state == RuntimeStateClosed {
+	state.stopOnce.Do(func() {
+		state.mu.Lock()
+		state.state = RuntimeStateStopping
+		cancel, network := state.cancel, state.network
 		state.mu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		cleanupCode := runtimeCloseNetwork(network)
+		state.mu.Lock()
+		if state.cleanupCode == CodeOK {
+			state.cleanupCode = cleanupCode
+		}
+		state.network = nil
+		state.state = RuntimeStateClosed
+		state.mu.Unlock()
+	})
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return state.cleanupCode
+}
+
+func (state *runtimeSessionV2Handle) recordCleanupFailure(code ErrorCode) {
+	if state == nil || code == CodeOK {
 		return
 	}
-	state.state = RuntimeStateStopping
-	cancel, network := state.cancel, state.network
-	state.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
-	if network != nil {
-		network.Close()
-	}
 	state.mu.Lock()
-	state.network = nil
-	state.state = RuntimeStateClosed
+	if state.cleanupCode == CodeOK {
+		state.cleanupCode = code
+	}
 	state.mu.Unlock()
 }
 
 func (state *runtimeSessionV2Handle) Destroy() {
+	_ = state.DestroyResult()
+}
+
+func (state *runtimeSessionV2Handle) DestroyResult() ErrorCode {
 	if state == nil {
-		return
+		return CodeOK
 	}
-	state.Cancel()
-	state.mu.Lock()
-	state.credentials.Destroy()
-	state.plan.Destroy()
-	clearRuntimeSnapshotV2(&state.snapshot)
-	state.factory = nil
-	state.ctx = nil
-	state.cancel = nil
-	state.mu.Unlock()
+	cleanupCode := state.Cancel()
+	state.destroyOnce.Do(func() {
+		state.mu.Lock()
+		state.credentials.Destroy()
+		state.plan.Destroy()
+		clearRuntimeSnapshotV2(&state.snapshot)
+		state.factory = nil
+		state.ctx = nil
+		state.cancel = nil
+		state.mu.Unlock()
+	})
+	return cleanupCode
+}
+
+func runtimeCloseNetwork(network RuntimeNetworkSession) ErrorCode {
+	if network == nil {
+		return CodeOK
+	}
+	return normalizeRuntimeNetworkCode(network.Close())
 }
 
 func runtimeV2State(registry *HandleRegistry, handle Handle) (*runtimeSessionV2Handle, ErrorCode) {

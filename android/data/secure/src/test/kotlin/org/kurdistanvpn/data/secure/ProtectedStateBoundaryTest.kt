@@ -35,6 +35,155 @@ import org.kurdistanvpn.data.metadata.TransactionState
 
 class ProtectedStateBoundaryTest {
     @Test
+    fun failedUnbindBeforeDuringAndAfterIndexReplacementNeverLeavesProfileAdmissible() = runBlocking {
+        for (point in listOf("before", "during", "after")) {
+            val sealed = preview().copy(sealed = true, artifactClass = "sealed-device", audienceClass = "device-recipient")
+            val material = BoundaryRecipientNative()
+            val blobs = FakeBlobs()
+            val keys = ClientKeyBundleStore(blobs, material) { "recipient-one" }
+            val key = (keys.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+            val catalog = FakeCatalog()
+            val native = FakeNativeCore(sealed, material.publicRequest, material.privateBundle)
+            val journal = ProfileAdmissionJournal(native, catalog, blobs, false, keys)
+            val record = (journal.admit(byteArrayOf(1), sealed, key.localRecordId) as AdmissionResult.Success).outcome.localRecordId
+            var injected = 0
+            val fail: (String, SecureDataClass) -> Unit = { id, role ->
+                if (id == "recipient-index" && role == SecureDataClass.RECIPIENT_KEY_INDEX) {
+                    assertEquals(CatalogHealth.QUARANTINED.name, catalog.rows.getValue(record).health)
+                    injected++
+                    error("synthetic interrupted unbind")
+                }
+            }
+            when (point) {
+                "before" -> blobs.beforeStage = fail
+                "during" -> blobs.beforeStageCommit = fail
+                "after" -> blobs.afterStage = fail
+            }
+            assertFalse(point, journal.delete(record))
+            assertEquals(point, 1, injected)
+            assertEquals(point, CatalogHealth.QUARANTINED.name, catalog.rows.getValue(record).health)
+            assertTrue(point, journal.openRuntimeAuthority(record) is RuntimeAuthorityResult.Failure)
+            val independent = ClientKeyBundleStore.readOnly(blobs, material)
+            val observed = independent.credentialsForProfile(record)
+            try { assertEquals(point, point != "after", observed != null) } finally { observed?.close() }
+            assertTrue(point, blobs.exists(key.localRecordId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL))
+            blobs.beforeStage = null; blobs.beforeStageCommit = null; blobs.afterStage = null
+            assertTrue(point, ProfileAdmissionJournal(native, catalog, blobs, false, keys).delete(record))
+            assertEquals(point, null, ClientKeyBundleStore.readOnly(blobs, material).credentialsForProfile(record))
+            assertFalse(point, catalog.rows.containsKey(record))
+        }
+    }
+
+    @Test
+    fun duplicateRestoredProfileCannotTurnMissingBindingIntoSuccessfulRetry() = runBlocking {
+        val sealed = preview().copy(sealed = true, artifactClass = "sealed-device", audienceClass = "device-recipient")
+        val material = BoundaryRecipientNative()
+        val blobs = FakeBlobs()
+        val keys = ClientKeyBundleStore(blobs, material) { "recipient-one" }
+        val key = (keys.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+        val catalog = FakeCatalog()
+        val native = FakeNativeCore(sealed, material.publicRequest, material.privateBundle)
+        val journal = ProfileAdmissionJournal(native, catalog, blobs, false, keys)
+        val request = byteArrayOf(1, 2)
+        val record = (journal.admit(request, sealed, key.localRecordId) as AdmissionResult.Success).outcome.localRecordId
+        val records = listOf(BackupProfileRecord("synthetic-source", sealed.generation, request))
+        assertEquals(0, (journal.restore(records) as RestoreResult.Success).restoredProfiles)
+        assertEquals(setOf(record), catalog.rows.keys)
+        keys.unbindProfile(record) // Synthetic legacy crash-before-bind combination, not automatic recovery.
+        val beforeRows = catalog.rows.toMap()
+        val beforeObjects = blobs.snapshot()
+        repeat(2) {
+            val reopened = ProfileAdmissionJournal(native, catalog, blobs, false, keys)
+            val result = reopened.restore(records)
+            assertEquals(OperationError.RECOVERY_REQUIRED, (result as RestoreResult.Failure).error)
+            assertEquals(beforeRows, catalog.rows)
+            assertEquals(beforeObjects.keys, blobs.snapshot().keys)
+            beforeObjects.forEach { (id, bytes) -> assertArrayEquals(bytes, blobs.snapshot()[id]) }
+            assertEquals(null, ClientKeyBundleStore.readOnly(blobs, material).credentialsForProfile(record))
+            assertTrue(reopened.openRuntimeAuthority(record) is RuntimeAuthorityResult.Failure)
+        }
+    }
+
+    @Test
+    fun incompleteCatalogStateCannotBeReportedHealthyAndReadDoesNotRepairIt() = runBlocking {
+        for (state in TransactionState.entries.filter { it != TransactionState.FINALIZED }) {
+            val catalog = FakeCatalog()
+            val row = ProfileCatalogEntity("incomplete-profile", state.name, 1, 1, CatalogHealth.AVAILABLE.name)
+            catalog.upsert(row)
+            val blobs = FakeBlobs()
+            val journal = ProfileAdmissionJournal.readOnly(FakeNativeCore(preview()), catalog, blobs, false)
+            assertFalse(journal.storageHealth() == CatalogHealth.AVAILABLE)
+            assertTrue(journal.listProfiles().isEmpty())
+            assertEquals(listOf(row), catalog.listAll())
+        }
+    }
+
+    @Test
+    fun readOnlyAdmissionCannotRecoverOrMutateEvenAfterInteractiveInitialization() = runBlocking {
+        val catalog = FakeCatalog()
+        val blobs = FakeBlobs()
+        val native = FakeNativeCore(preview())
+        val readOnly = ProfileAdmissionJournal.readOnly(native, catalog, blobs, false)
+        val interactive = ProfileAdmissionJournal(native, catalog, blobs, false)
+        val admitted = interactive.admit(byteArrayOf(1), preview()) as AdmissionResult.Success
+        val state = catalog.listAll()
+        val authority = readOnly.openRuntimeAuthority(admitted.outcome.localRecordId)
+        assertTrue(authority is RuntimeAuthorityResult.Success)
+        (authority as RuntimeAuthorityResult.Success).material.close()
+        for (write in listOf<suspend () -> Unit>(
+            { readOnly.admit(byteArrayOf(2), preview()); Unit },
+            { readOnly.recoverIncomplete(); Unit },
+            { readOnly.recoverPendingRestore(); Unit },
+            { readOnly.delete(admitted.outcome.localRecordId); Unit },
+            { readOnly.resetAll(); Unit },
+        )) {
+            var denied = false
+            try { write() } catch (_: IllegalStateException) { denied = true }
+            assertTrue(denied)
+        }
+        assertEquals(state, catalog.listAll())
+    }
+
+    @Test
+    fun sealedFinalizationNeverPrecedesItsRecipientBindingAndDeletionUnbinds() = runBlocking {
+        val sealed = preview().copy(sealed = true, artifactClass = "sealed-device", audienceClass = "device-recipient")
+        val material = BoundaryRecipientNative()
+        val blobs = FakeBlobs()
+        val keys = ClientKeyBundleStore(blobs, material) { "recipient-one" }
+        val key = (keys.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+        val catalog = FakeCatalog()
+        var finalizedWithoutBinding = false
+        catalog.beforeUpsert = { row ->
+            if (row.transactionState == TransactionState.FINALIZED.name) {
+                val lease = keys.credentialsForProfile(row.localRecordId)
+                if (lease == null) finalizedWithoutBinding = true
+                lease?.close()
+            }
+        }
+        val journal = ProfileAdmissionJournal(FakeNativeCore(sealed, material.publicRequest, material.privateBundle),
+            catalog, blobs, false, keys)
+        val result = journal.admit(byteArrayOf(1), sealed, key.localRecordId) as AdmissionResult.Success
+        assertFalse(finalizedWithoutBinding)
+        assertTrue(journal.delete(result.outcome.localRecordId))
+        assertEquals(0, keys.list().single().boundProfileCount)
+        assertEquals(null, keys.credentialsForProfile(result.outcome.localRecordId))
+    }
+
+    @Test
+    fun scopedProfileResetPreservesRoutingDiagnosticsAndPendingKeys() = runBlocking {
+        val blobs = FakeBlobs()
+        val keys = ClientKeyBundleStore(blobs, BoundaryRecipientNative()) { "recipient-pending" }
+        val pending = (keys.create(600, 1_800_000_000) as ClientKeyResult.Success).summary
+        keys.markRequestExported(pending.localRecordId)
+        blobs.stage("routing-canary", SecureDataClass.ROUTING_POLICY, byteArrayOf(7))
+        val journal = ProfileAdmissionJournal(FakeNativeCore(preview()), FakeCatalog(), blobs, false, keys)
+        journal.admit(byteArrayOf(1), preview())
+        assertTrue(journal.resetAll())
+        assertEquals(pending.localRecordId, keys.list().single().localRecordId)
+        assertArrayEquals(byteArrayOf(7), blobs.reopen("routing-canary", SecureDataClass.ROUTING_POLICY))
+    }
+
+    @Test
     fun runtimeAuthorityReopensOnlyFinalizedEncryptedActivationAndWipesOnClose() = runBlocking {
         val native = FakeNativeCore(preview())
         val journal = ProfileAdmissionJournal(
@@ -332,8 +481,10 @@ class ProtectedStateBoundaryTest {
             byteArrayOf(0),
         )
 
+        val before = catalog.rows.toMap()
         assertTrue(journal.listProfiles().isEmpty())
         assertEquals(CatalogHealth.QUARANTINED, journal.storageHealth())
+        assertEquals(before, catalog.rows)
     }
 
     @Test
@@ -440,9 +591,21 @@ private class FakeBlobs : SecureBlobAccess {
     val reopenedValues = mutableListOf<ByteArray>()
     var failDelete: Pair<String, SecureDataClass>? = null
     var failDeleteAll = false
+    var beforeStage: ((String, SecureDataClass) -> Unit)? = null
+    var beforeStageCommit: ((String, SecureDataClass) -> Unit)? = null
+    var afterStage: ((String, SecureDataClass) -> Unit)? = null
+    fun snapshot(): Map<Pair<String, SecureDataClass>, ByteArray> = values.mapValues { it.value.clone() }
 
     override fun stage(localRecordId: String, dataClass: SecureDataClass, exactBytes: ByteArray) {
-        values[localRecordId to dataClass] = exactBytes.clone()
+        beforeStage?.invoke(localRecordId, dataClass)
+        val owned = exactBytes.clone()
+        var transferred = false
+        try {
+            beforeStageCommit?.invoke(localRecordId, dataClass)
+            values.put(localRecordId to dataClass, owned)?.fill(0)
+            transferred = true
+            afterStage?.invoke(localRecordId, dataClass)
+        } finally { if (!transferred) owned.fill(0) }
     }
 
     override fun reopen(localRecordId: String, dataClass: SecureDataClass): ByteArray {
@@ -467,10 +630,12 @@ private class FakeBlobs : SecureBlobAccess {
 
 private class FakeCatalog : ProfileCatalogDao {
     val rows = linkedMapOf<String, ProfileCatalogEntity>()
+    var beforeUpsert: ((ProfileCatalogEntity) -> Unit)? = null
     override fun observeAll(): Flow<List<ProfileCatalogEntity>> = flowOf(rows.values.toList())
     override suspend fun get(localRecordId: String): ProfileCatalogEntity? = rows[localRecordId]
     override suspend fun listAll(): List<ProfileCatalogEntity> = rows.values.toList()
     override suspend fun upsert(entity: ProfileCatalogEntity) {
+        beforeUpsert?.invoke(entity)
         rows[entity.localRecordId] = entity
     }
 
