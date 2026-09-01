@@ -120,15 +120,16 @@ func ApplyRestore(options RestoreOptions) error {
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return err
 	}
-	staging, err := os.MkdirTemp(parent, ".kurd-restore-*")
+	staging, err := prepareRestoreStaging(parent)
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(staging)
-	if err := os.Chmod(staging, 0o700); err != nil {
+	masterPath := filepath.Join(staging, masterKeyFileName)
+	if err := os.WriteFile(masterPath, payload.MasterKey, 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(staging, masterKeyFileName), payload.MasterKey, 0o600); err != nil {
+	if err := protectSelfhostPrivatePath(masterPath, false); err != nil {
 		return err
 	}
 	if backupState.v2 != nil {
@@ -151,6 +152,9 @@ func ApplyRestore(options RestoreOptions) error {
 		state.Drained = true
 		return nil
 	}); err != nil {
+		return err
+	}
+	if err := protectSelfhostPrivatePath(filepath.Join(staging, stateFileName), false); err != nil {
 		return err
 	}
 	if _, err := loadStateWithKey(staging, payload.MasterKey); err != nil {
@@ -177,6 +181,27 @@ func ApplyRestore(options RestoreOptions) error {
 		return err
 	}
 	return syncDirectory(parent)
+}
+
+func prepareRestoreStaging(parent string) (string, error) {
+	return prepareRestoreStagingWithOperations(parent, protectSelfhostPrivatePath, os.RemoveAll)
+}
+
+func prepareRestoreStagingWithOperations(parent string, protect func(string, bool) error, remove func(string) error) (string, error) {
+	if parent == "" || protect == nil || remove == nil {
+		return "", ErrRecoveryRejected
+	}
+	staging, err := os.MkdirTemp(parent, ".kurd-restore-*")
+	if err != nil {
+		return "", err
+	}
+	if err := protect(staging, true); err != nil {
+		if removeErr := remove(staging); removeErr != nil {
+			return "", errors.Join(err, fmt.Errorf("selfhost: remove rejected restore staging: %w", removeErr))
+		}
+		return "", err
+	}
+	return staging, nil
 }
 
 type decodedBackupState struct {

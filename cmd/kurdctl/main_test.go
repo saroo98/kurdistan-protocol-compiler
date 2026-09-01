@@ -730,12 +730,30 @@ func TestPrivateOutputProtectionIsEnforced(t *testing.T) {
 	if err := protectPrivatePath(directory, true); err != nil {
 		t.Fatal(err)
 	}
+	if err := protectPrivatePath(directory, true); err != nil {
+		t.Fatalf("repeated directory protection: %v", err)
+	}
 	file := filepath.Join(directory, "artifact")
-	if err := os.WriteFile(file, []byte("artifact"), 0o600); err != nil {
+	want := []byte("artifact")
+	if err := os.WriteFile(file, want, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := protectPrivatePath(file, false); err != nil {
 		t.Fatal(err)
+	}
+	if err := protectPrivatePath(file, false); err != nil {
+		t.Fatalf("repeated file protection: %v", err)
+	}
+	got, err := os.ReadFile(file)
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("protected file content changed: got=%q err=%v", got, err)
+	}
+	renamed := file + ".renamed"
+	if err := os.Rename(file, renamed); err != nil {
+		t.Fatalf("private-path handle remained open: %v", err)
+	}
+	if err := os.Rename(renamed, file); err != nil {
+		t.Fatalf("restore protected filename: %v", err)
 	}
 }
 
