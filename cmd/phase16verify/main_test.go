@@ -4,7 +4,10 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,14 +16,107 @@ import (
 )
 
 func TestVerifyRepositoryOffline(t *testing.T) {
-	if err := verify(repositoryRoot(t), "offline", ownerInputDefault); err != nil {
+	if err := verify(repositoryRoot(t), "offline", ownerInputDefault); err != nil && !errors.Is(err, errHistoricalEvidenceNotAvailable) {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifySelfHostedQualification(t *testing.T) {
-	if err := verifySelfHostedQualification(repositoryRoot(t)); err != nil {
+	if err := verifySelfHostedQualification(repositoryRoot(t)); err != nil && !errors.Is(err, errHistoricalEvidenceNotAvailable) {
 		t.Fatal(err)
+	}
+}
+
+func TestUnavailableHistoricalCommitIsExplicitAndKeepsOfflineGateBlocked(t *testing.T) {
+	root := copyRepositoryAuthority(t)
+	initEmptyGitRepository(t, root)
+	copyPhase16PolicyFiles(t, root)
+	var value status
+	if err := decodeFile(repositoryRoot(t), statusPath, &value); err != nil {
+		t.Fatal(err)
+	}
+	value.BaselineCommit = strings.Repeat("f", 40)
+	err := validateStatus(root, value, "offline")
+	if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("missing immutable baseline classification = %v", err)
+	}
+	if !strings.Contains(err.Error(), value.BaselineCommit) || strings.Contains(err.Error(), root) {
+		t.Fatalf("unavailable evidence error is not bounded and identity-specific: %v", err)
+	}
+}
+
+func TestUnavailableHistoricalCommitDoesNotHideInvalidReleaseBoundary(t *testing.T) {
+	root := copyRepositoryAuthority(t)
+	initEmptyGitRepository(t, root)
+	copyPhase16PolicyFiles(t, root)
+	var value status
+	if err := decodeFile(repositoryRoot(t), statusPath, &value); err != nil {
+		t.Fatal(err)
+	}
+	value.BaselineCommit = strings.Repeat("f", 40)
+	value.ReleaseDecision = "GO"
+	err := validateStatus(root, value, "offline")
+	if err == nil || errors.Is(err, errHistoricalEvidenceNotAvailable) || !strings.Contains(err.Error(), "cannot widen") {
+		t.Fatalf("invalid release boundary was hidden by unavailable history: %v", err)
+	}
+}
+
+func TestUnavailableClassificationDoesNotMaskAnUnboundRepository(t *testing.T) {
+	root := t.TempDir()
+	command := exec.Command("git", "init", "--quiet")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("initialize unbound Git fixture: %v: %s", err, output)
+	}
+	err := historicalCommitAvailability(root, strings.Repeat("f", 40), "synthetic baseline")
+	if err == nil || errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("unbound repository was misclassified as absent historical evidence: %v", err)
+	}
+}
+
+func TestUnavailableSelfHostedBaselineStillValidatesTheStaticRecord(t *testing.T) {
+	root := copyRepositoryAuthority(t)
+	initEmptyGitRepository(t, root)
+	err := verifySelfHostedQualification(root)
+	if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("missing self-hosted historical subject classification = %v", err)
+	}
+
+	path := filepath.Join(root, filepath.FromSlash(selfHostedQualificationPath))
+	raw, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	raw = []byte(strings.Replace(string(raw), `"releaseDecision": "NO_GO"`, `"releaseDecision": "GO"`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = verifySelfHostedQualification(root)
+	if err == nil || errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("invalid static record was hidden by unavailable history: %v", err)
+	}
+}
+
+func TestRunReportsNotAvailableWithoutOpeningQualification(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", ".", "-mode", "offline"}, &stdout, &stderr, func(string, string, string) error {
+		return errHistoricalEvidenceNotAvailable
+	})
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("NOT_AVAILABLE run = code %d stderr %q", code, stderr.String())
+	}
+	if output := stdout.String(); !strings.Contains(output, "NOT_AVAILABLE") || !strings.Contains(output, "BLOCKED") || strings.Contains(output, "PASSED") {
+		t.Fatalf("NOT_AVAILABLE output opened or obscured the gate: %q", output)
+	}
+}
+
+func TestRunKeepsOrdinaryVerificationFailureRed(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", ".", "-mode", "offline"}, &stdout, &stderr, func(string, string, string) error {
+		return errors.New("synthetic verifier failure")
+	})
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "VERIFICATION FAILED") {
+		t.Fatalf("ordinary failure = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
 	}
 }
 
@@ -346,6 +442,47 @@ func copyRepositoryAuthority(t *testing.T) string {
 	// check through a worktree file would weaken production behavior, so this
 	// helper is used only to exercise strict decode before that point.
 	return root
+}
+
+func initEmptyGitRepository(t *testing.T, root string) {
+	t.Helper()
+	command := exec.Command("git", "init", "--quiet")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("initialize isolated Git subject: %v: %s", err, output)
+	}
+	command = exec.Command("git", "-c", "user.name=phase16-test", "-c", "user.email=phase16-test.invalid", "commit", "--quiet", "--allow-empty", "-m", "fixture subject")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("commit isolated Git subject: %v: %s", err, output)
+	}
+}
+
+func copyPhase16PolicyFiles(t *testing.T, root string) {
+	t.Helper()
+	source := repositoryRoot(t)
+	for _, path := range []string{
+		"config/production/actions.json",
+		"config/production/key-policy.json",
+		"config/production/regions.json",
+		"config/production/retention.json",
+		"config/production/roles.json",
+		"config/production/services.json",
+		"config/production/tools.json",
+	} {
+		from := filepath.Join(source, filepath.FromSlash(path))
+		to := filepath.Join(root, filepath.FromSlash(path))
+		raw, err := os.ReadFile(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(to, raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func copyDecentralizedAuthority(t *testing.T) string {
