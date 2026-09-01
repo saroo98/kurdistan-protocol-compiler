@@ -32,7 +32,7 @@ type phase11OverlayV1 struct {
 
 func TestPhase11LocalTransportEvidenceOverlayV1(t *testing.T) {
 	root := phase11RepoRootV1(t)
-	raw, err := os.ReadFile(filepath.Join(root, "testdata", "evidence", "phase1-m0-committed-sha256.json"))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, "testdata/evidence/phase1-m0-committed-sha256.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func validateOverlayAtPostV1(t *testing.T, root, name string, overlays map[strin
 		}
 		actual, present := currentAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -186,23 +186,23 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 		"testdata/evidence/phase8-wo807-recovery-report.json",
 	}
 	preHashes := map[string]string{
-		"RZ-evidence-ref-069":                                         "586a5e7f377c1809eb67cfe932d996ae81703bb562f52b539935e26ccdc93e8b",
-		"cmd/gate/main.go":                                   "8f0e4e86384ea012ac54f1c9f795c3a4f760b5ab6c7f4b24f3ab553cad3c96c1",
-		"cmd/gate/main_test.go":                              "c2b868ec7b155ed5ae95f667181284af9672722ceea8b3c018f4dd32df2d4fdd",
-		"cmd/kgen/main_test.go":                              "2fabad2630c546749cde3c0c67dd9885ffa855230c298dacb741c65ef497c846",
-		"cmd/phase9verify/phase11_overlay_test.go":           "95c7e090b93beab82e673513735e6725e1f636f10244a6b37b504adc91cb3a67",
-		"docs/sb-evidence-ref-068":                                     "2846c0453c9a20d8fee0a355d339ba70f658d3f064e2dcd6ddef693d7bbb50b0",
-		"internal/audit/codegen_test.go":                     "c1896696926104de33e540f207c4cc3e7f477edfddc006cfc9f279dd34e5df94",
-		"internal/audit/security.go":                         "a180d1b42b37ac390a1bdf718a4c8172cafc8f14b8afd9c46c24831fe461cbe9",
-		"internal/audit/security_test.go":                    "b4674dd844d0f006fe83ced7fbd6855a309e1bbd76ac1cd2fb6c8a73711a5519",
-		"internal/codegen/authorization_v1_test.go":          "e2d8caf8757c35bc9e1aea7ba6c5a129d328f507d9aa54889223b83e536e4c51",
-		"internal/codegen/generator_templates.go":            "53651959c9fbc7a936c23d4ae6cf5e4821e2322befc38596cbf215f3f24ff643",
-		"internal/codegen/generator_test.go":                 "2a519ad4aaf1d0ba4e4f9cf6294dc0772059f677e82a113b81c3712ac2832f31",
-		"internal/product/lifecycle/phase8_verified.go":      "e9fd50ec54dca326be6580815153a3983555f1b31ea028e4a3c052257e7e17c6",
-		"internal/product/lifecycle/phase8_verified_test.go": "7e3aad03d9af6dcec588c37225c4791cce3d38c7d0b3dfb7c69218b3ae5e5769",
-		"internal/product/profile/phase8_activation.go":      "3de078f241b4bd4da039891cf19db34f30eae083363cd23ea21b393d88a3a080",
-		"internal/product/profile/phase8_providers.go":       "9bf824c879fc0186de623f4c6a589a0ef2dce0cefb33b6168397363cd0a5f33c",
-		"internal/product/profile/testdata/phase8-activation/activation-crash-report.json":            "4e710e1683d0e68274d1403443c342dacbbb1e67033ced503bc0d389165609f0",
+		"RZ-evidence-ref-069":                                                              "586a5e7f377c1809eb67cfe932d996ae81703bb562f52b539935e26ccdc93e8b",
+		"cmd/gate/main.go":                                                                 "8f0e4e86384ea012ac54f1c9f795c3a4f760b5ab6c7f4b24f3ab553cad3c96c1",
+		"cmd/gate/main_test.go":                                                            "c2b868ec7b155ed5ae95f667181284af9672722ceea8b3c018f4dd32df2d4fdd",
+		"cmd/kgen/main_test.go":                                                            "2fabad2630c546749cde3c0c67dd9885ffa855230c298dacb741c65ef497c846",
+		"cmd/phase9verify/phase11_overlay_test.go":                                         "95c7e090b93beab82e673513735e6725e1f636f10244a6b37b504adc91cb3a67",
+		"docs/sb-evidence-ref-068":                                                         "2846c0453c9a20d8fee0a355d339ba70f658d3f064e2dcd6ddef693d7bbb50b0",
+		"internal/audit/codegen_test.go":                                                   "c1896696926104de33e540f207c4cc3e7f477edfddc006cfc9f279dd34e5df94",
+		"internal/audit/security.go":                                                       "a180d1b42b37ac390a1bdf718a4c8172cafc8f14b8afd9c46c24831fe461cbe9",
+		"internal/audit/security_test.go":                                                  "b4674dd844d0f006fe83ced7fbd6855a309e1bbd76ac1cd2fb6c8a73711a5519",
+		"internal/codegen/authorization_v1_test.go":                                        "e2d8caf8757c35bc9e1aea7ba6c5a129d328f507d9aa54889223b83e536e4c51",
+		"internal/codegen/generator_templates.go":                                          "53651959c9fbc7a936c23d4ae6cf5e4821e2322befc38596cbf215f3f24ff643",
+		"internal/codegen/generator_test.go":                                               "2a519ad4aaf1d0ba4e4f9cf6294dc0772059f677e82a113b81c3712ac2832f31",
+		"internal/product/lifecycle/phase8_verified.go":                                    "e9fd50ec54dca326be6580815153a3983555f1b31ea028e4a3c052257e7e17c6",
+		"internal/product/lifecycle/phase8_verified_test.go":                               "7e3aad03d9af6dcec588c37225c4791cce3d38c7d0b3dfb7c69218b3ae5e5769",
+		"internal/product/profile/phase8_activation.go":                                    "3de078f241b4bd4da039891cf19db34f30eae083363cd23ea21b393d88a3a080",
+		"internal/product/profile/phase8_providers.go":                                     "9bf824c879fc0186de623f4c6a589a0ef2dce0cefb33b6168397363cd0a5f33c",
+		"internal/product/profile/testdata/phase8-activation/activation-crash-report.json": "4e710e1683d0e68274d1403443c342dacbbb1e67033ced503bc0d389165609f0",
 		"internal/product/profile/testdata/phase8-activation/authenticated-hint-mismatch-report.json": "20b5867ab1fd0ff1aff509702021c2ccc0d529f5cd4434ad48cf74864d8b185b",
 		"internal/product/profile/testdata/phase8-activation/last-known-good-negative-report.json":    "4e710e1683d0e68274d1403443c342dacbbb1e67033ced503bc0d389165609f0",
 		"internal/product/profile/testdata/phase8-activation/policy-bypass-report.json":               "d4987c0461d703870dcfc2a53d107537fc529cacfff0cb7ceef55343cb3722fa",
@@ -241,7 +241,7 @@ func validatePhase12OverlayAtPostV1(t *testing.T, root string, currentAtPost map
 		}
 		actual, present := currentAtPost[path]
 		if !present {
-			content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+			content, err := evidenceoverlay.ReadSubjectFile(root, path)
 			if err != nil {
 				t.Fatal(err)
 			}

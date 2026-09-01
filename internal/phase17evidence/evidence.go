@@ -8,17 +8,16 @@ package phase17evidence
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 const (
@@ -201,20 +200,48 @@ func ValidateAcceptance(value Acceptance) error {
 	return nil
 }
 
-// Verify validates the evidence schema marker, supersession record, acceptance
-// status, and the digest binding to the current Phase 17 artifact policy.
+// DevelopmentAvailability is an observation, not a receipt or an authorization.
+// This historical verifier has no qualified successor-evidence input. A valid
+// historical subject therefore never opens a current-development consumer.
+type DevelopmentAvailability struct {
+	HistoricalCommit                                      string
+	HistoricalTree                                        string
+	HistoricalVerification                                string
+	SuccessorEvidence                                     string
+	Candidate, Readiness, Stress, Campaign, Soak, Release string
+}
+
+func VerifyDevelopmentAvailability(root string) (DevelopmentAvailability, error) {
+	result := DevelopmentAvailability{
+		HistoricalCommit: evidenceoverlay.HistoricalCommit, HistoricalTree: evidenceoverlay.HistoricalTree,
+		HistoricalVerification: "NOT_AVAILABLE", SuccessorEvidence: "NOT_AVAILABLE",
+		Candidate: "BLOCKED", Readiness: "BLOCKED", Stress: "BLOCKED", Campaign: "BLOCKED", Soak: "BLOCKED", Release: "BLOCKED",
+	}
+	if _, err := evidenceoverlay.ReadHistoricalFile(root, AcceptancePath); err != nil {
+		return result, err
+	}
+	if err := Verify(root); err != nil {
+		return result, err
+	}
+	result.HistoricalVerification = "VERIFIED"
+	return result, nil
+}
+
+// Verify validates only the frozen historical evidence schema, supersession,
+// acceptance status and artifact-policy binding. A nil error is not current
+// source qualification. Standalone fixture inputs retain strict mutation checks.
 func Verify(root string) error {
-	if err := verifySchema(filepath.Join(root, filepath.FromSlash(SchemaPath))); err != nil {
+	if err := verifySchema(root, SchemaPath); err != nil {
 		return err
 	}
 	var record Supersession
-	if err := readStrict(filepath.Join(root, filepath.FromSlash(SupersessionPath)), &record); err != nil {
+	if err := readStrict(root, SupersessionPath, &record); err != nil {
 		return fmt.Errorf("historical supersession: %w", err)
 	}
 	if err := ValidateSupersession(record); err != nil {
 		return fmt.Errorf("historical supersession: %w", err)
 	}
-	digest, err := fileSHA256(filepath.Join(root, filepath.FromSlash(SuccessorPolicy)))
+	digest, err := evidenceoverlay.SubjectState(root, SuccessorPolicy)
 	if err != nil {
 		return fmt.Errorf("successor policy: %w", err)
 	}
@@ -222,7 +249,7 @@ func Verify(root string) error {
 		return errors.New("historical supersession successor policy digest is stale")
 	}
 	var status Acceptance
-	if err := readStrict(filepath.Join(root, filepath.FromSlash(AcceptancePath)), &status); err != nil {
+	if err := readStrict(root, AcceptancePath, &status); err != nil {
 		return fmt.Errorf("acceptance status: %w", err)
 	}
 	if err := ValidateAcceptance(status); err != nil {
@@ -231,8 +258,8 @@ func Verify(root string) error {
 	return nil
 }
 
-func verifySchema(path string) error {
-	raw, err := os.ReadFile(path)
+func verifySchema(root, path string) error {
+	raw, err := evidenceoverlay.ReadSubjectFile(root, path)
 	if err != nil {
 		return fmt.Errorf("read supersession schema: %w", err)
 	}
@@ -295,21 +322,12 @@ func requireAllPass(scope string, values map[string]string) error {
 	return nil
 }
 
-func readStrict(path string, target any) error {
-	raw, err := os.ReadFile(path)
+func readStrict(root, path string, target any) error {
+	raw, err := evidenceoverlay.ReadSubjectFile(root, path)
 	if err != nil {
 		return err
 	}
 	return DecodeStrict(raw, target)
-}
-
-func fileSHA256(path string) (string, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(raw)
-	return hex.EncodeToString(digest[:]), nil
 }
 
 func validDigest(value string) bool {
