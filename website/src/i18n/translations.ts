@@ -146,9 +146,13 @@ export type SiteCopy = {
   footer: {
     title: string
     intro: string
-    dedicationBefore: string
+    dedicationProduct: string
+    dedicationBeforeCreator: string
+    dedicationCreator: string
+    dedicationBeforePlace: string
     dedicationPlace: string
-    dedicationAfter: string
+    dedicationPlaceHref: string
+    dedicationAfterPlace: string
     noAccount: string
     backToTop: string
   }
@@ -429,10 +433,15 @@ const english: SiteCopy = {
     title: 'Follow the build.',
     intro:
       'The Android app is still in development. Until release, explore the source and implementation status on GitHub.',
-    dedicationBefore:
-      'Made with immense ❤️ by Saro Xizirnijad for the Kurdish people, with love and solidarity for all who have endured oppression, loss, and suffering under the Iranian government’s repression in ',
+    dedicationProduct: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن)',
+    dedicationBeforeCreator: ' is created by ',
+    dedicationCreator: 'Saro Xizirnijad',
+    dedicationBeforePlace:
+      ' with boundless love for all Kurdish people, and for everyone in ',
     dedicationPlace: 'Rojhelat',
-    dedicationAfter: '. May their stories and courage never be forgotten.',
+    dedicationPlaceHref: 'https://en.wikipedia.org/wiki/Iranian_Kurdistan',
+    dedicationAfterPlace:
+      ' who has endured oppression, loss, and suffering under the repression of the Islamic Republic of Iran, the regime of the gallows. May their stories and courage never be forgotten.',
     noAccount: 'No mandatory account. No required analytics.',
     backToTop: 'Back to top',
   },
@@ -701,11 +710,16 @@ const sorani: SiteCopy = {
   footer: {
     title: 'گەشەپێدانەکە بەدواداچوون بکە.',
     intro: 'ئەپی ئەندرۆید هێشتا لە ژێر گەشەپێدانە. تا بڵاوکردنەوە، سەرچاوە و دۆخی جێبەجێکردن لە GitHub ببینە.',
-    dedicationBefore:
-      'سارۆ خزرنژاد بە خۆشەویستییەکی بێ‌سنوورەوە ❤️ بۆ گەلی کورد دروستی کردووە، بە خۆشەویستی و هاوپشتی بۆ هەموو ئەوانەی لە ',
+    dedicationProduct: 'کوردستان ڤی‌پی‌ئێن (KurdistanVPN)',
+    dedicationBeforeCreator: ' لەلایەن ',
+    dedicationCreator: 'سارۆ خزرنژاد',
+    dedicationBeforePlace:
+      'ەوە دروست کراوە بۆ هەموو گەلی کورد بە خۆشەویستییەکی بێ‌سنوورە بۆ هەموو ئەوانەی کە لە ',
     dedicationPlace: 'ڕۆژهەڵات',
-    dedicationAfter:
-      ' لە ژێر سەرکوتکاریی حکومەتی ئێران، ستەم و لەدەستدان و ئازاریان چەشتووە. چیرۆک و بوێرییان هەرگیز لەبیر نەچێتەوە.',
+    dedicationPlaceHref:
+      'https://ckb.wikipedia.org/wiki/%DA%95%DB%86%DA%98%DA%BE%DB%95%DA%B5%D8%A7%D8%AA%DB%8C_%DA%A9%D9%88%D8%B1%D8%AF%D8%B3%D8%AA%D8%A7%D9%86',
+    dedicationAfterPlace:
+      '، لە ژێر سەرکوتی کۆماری سێدارەی ئیسلامیی ئێراندا تووشی ستەم، لەدەستدان و ئازار بوون. با چیرۆکەکانیان و ئازایەتییان هەرگیز لەبیر نەکرێت.',
     noAccount: 'هەژماری ناچاری نییە. شیکاریی پێویست نییە.',
     backToTop: 'گەڕانەوە بۆ سەرەوە',
   },
@@ -979,11 +993,16 @@ const kurmanji: SiteCopy = {
     title: 'Pêşkeftina projeyê bişopîne.',
     intro:
       'Sepana Androidê hîn di pêşxistinê de ye. Heta ku were berdan, li GitHubê koda çavkaniyê û rewşa bicîkirinê bibîne.',
-    dedicationBefore:
-      'Bi evîneke bêdawî ❤️ ji aliyê Saro Xizirnijad ve ji bo gelê Kurd hatiye çêkirin, bi evîn û piştgirî ji bo hemû kesên ku li ',
-    dedicationPlace: 'Rojhelat',
-    dedicationAfter:
-      'ê di bin serkutkirina hukûmeta Îranê de zilm, windahî û êş kişandine. Bila çîrok û wêrekiya wan tu carî neyên jibîrkirin.',
+    dedicationProduct: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن)',
+    dedicationBeforeCreator: ' ji aliyê ',
+    dedicationCreator: 'Saro Xizirnijad',
+    dedicationBeforePlace:
+      ' ve, bi hezkirineke bêdawî ji bo hemû gelê Kurd û ji bo hemû wan kesên ku li ',
+    dedicationPlace: 'Rojhilatê Kurdistanê',
+    dedicationPlaceHref:
+      'https://ku.wikipedia.org/wiki/Rojhilata_Kurdistan%C3%AA',
+    dedicationAfterPlace:
+      ', di bin zext û serkutkirina Komara Îslamî ya Îranê, rejîma darvekirinê, de rastî zulm, windahî û êşê hatine, hatiye çêkirin. Bila çîrok û wêrekiya wan tu carî neyê jibîrkirin.',
     noAccount: 'Hesabê mecbûrî tune. Analîtîka mecbûrî tune.',
     backToTop: 'Vegere serî',
   },

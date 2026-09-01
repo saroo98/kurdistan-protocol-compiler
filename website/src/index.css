@@ -2154,10 +2154,36 @@ html[dir='rtl'] .profile-ticket__content {
   letter-spacing: -0.01em;
 }
 
-.footer-dedication em {
+.footer-dedication strong {
+  font-weight: 700;
+}
+
+.footer-dedication__place {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--saffron);
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+
+.footer-dedication__place em {
   font-style: normal;
   font-weight: 700;
+}
+
+.footer-dedication__place:hover {
+  color: #f0bd68;
+}
+
+.footer-dedication__place:focus-visible {
+  border-radius: 0.2rem;
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 0.18rem;
 }
 
 .footer-meta {

@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/generate-locale-pages.mjs",
+    "brand:check": "node scripts/sync-brand-assets.mjs --check --source-root ../brand/kurdistan-vpn/v1",
+    "brand:sync": "node scripts/sync-brand-assets.mjs --website",
+    "predev": "npm run brand:check && node scripts/generate-locale-pages.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/generate-locale-pages.mjs",
+    "prebuild": "npm run brand:check && node scripts/generate-locale-pages.mjs",
     "build": "tsc -b && vite build && node scripts/postbuild-security.mjs",
     "lint": "oxlint",
     "test": "vitest",
