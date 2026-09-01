@@ -167,16 +167,18 @@ func verify(root string) error {
 	if err := validate(value); err != nil {
 		return err
 	}
+	unavailable := make([]string, 0, 3)
 	if err := verifyBaselineCommit(root, value.Baseline.SourceCommit); err != nil {
-		return err
-	}
-	if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
+	} else if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
 		return err
 	}
 	if err := verifyReleaseBoundary(root, value); err != nil {
 		return err
 	}
-	unavailable := make([]string, 0, 2)
 	if err := verifyHumanParity(root, value); err != nil {
 		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
 			return err
@@ -231,10 +233,19 @@ func verifyBaselineCommit(root, sha string) error {
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sha) {
 		return errors.New("baseline source commit is not a full SHA-1")
 	}
-	command := exec.Command("git", "cat-file", "-e", sha+"^{commit}")
-	command.Dir = root
-	if output, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("baseline commit %s does not exist: %w: %s", sha, err, strings.TrimSpace(string(output)))
+	raw, err := immutableGitObjectCommand(root, []byte(sha+"\n"), "cat-file", "--batch-check=%(objectname) %(objecttype)")
+	if err != nil {
+		return fmt.Errorf("inspect baseline commit %s: %w", sha, err)
+	}
+	fields := strings.Fields(string(raw))
+	if len(fields) != 2 || fields[0] != sha {
+		return fmt.Errorf("baseline commit %s returned malformed immutable object metadata", sha)
+	}
+	if fields[1] == "missing" {
+		return fmt.Errorf("%w: baseline commit %s is absent from this bounded Git checkout", errHistoricalEvidenceNotAvailable, sha)
+	}
+	if fields[1] != "commit" {
+		return fmt.Errorf("baseline object %s is %s, not a commit", sha, fields[1])
 	}
 	return nil
 }
@@ -243,9 +254,7 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 	if value.WorkflowPath != ".github/workflows/ci.yml" || strings.Contains(value.WorkflowPath, "..") {
 		return errors.New("baseline workflow path is invalid")
 	}
-	command := exec.Command("git", "show", value.SourceCommit+":"+value.WorkflowPath)
-	command.Dir = root
-	content, err := command.Output()
+	content, err := immutableGitObjectCommand(root, nil, "show", value.SourceCommit+":"+value.WorkflowPath)
 	if err != nil {
 		return fmt.Errorf("read baseline workflow from %s: %w", value.SourceCommit, err)
 	}
@@ -255,6 +264,25 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 		return fmt.Errorf("baseline workflow digest = %s, want %s", actual, value.WorkflowSHA256)
 	}
 	return nil
+}
+
+func immutableGitObjectCommand(root string, input []byte, args ...string) ([]byte, error) {
+	command := exec.Command("git", append([]string{"--no-replace-objects", "--literal-pathspecs", "-C", root}, args...)...)
+	for _, item := range os.Environ() {
+		key, _, _ := strings.Cut(item, "=")
+		if !strings.HasPrefix(strings.ToUpper(key), "GIT_") {
+			command.Env = append(command.Env, item)
+		}
+	}
+	command.Env = append(command.Env, "GIT_NO_LAZY_FETCH=1", "GIT_NO_REPLACE_OBJECTS=1", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0")
+	command.Stdin = bytes.NewReader(input)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	raw, err := command.Output()
+	if err != nil {
+		return nil, fmt.Errorf("immutable Git object read failed (%s): %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
+	}
+	return raw, nil
 }
 
 func verifyReleaseBoundary(root string, value contract) error {
