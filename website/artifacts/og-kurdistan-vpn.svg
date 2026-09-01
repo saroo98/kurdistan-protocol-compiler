@@ -13,20 +13,15 @@
       <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.34"/>
     </filter>
   </defs>
-
   <rect width="1200" height="630" fill="url(#ground)"/>
   <path d="M-80 515 C185 408 322 590 562 482 C777 386 905 470 1280 316" fill="none" stroke="#102f46" stroke-width="74" stroke-linecap="round" opacity="0.9" filter="url(#route-shadow)"/>
   <path d="M-70 477 C208 352 358 567 590 430 C826 292 972 384 1270 252" fill="none" stroke="url(#route)" stroke-width="31" stroke-linecap="round"/>
   <path d="M-80 555 C226 464 374 616 610 526 C858 431 1010 502 1270 394" fill="none" stroke="#d6a04d" stroke-width="14" stroke-linecap="round" opacity="0.86"/>
   <path d="M650 -60 C778 144 925 149 1286 89" fill="none" stroke="#173f55" stroke-width="86" stroke-linecap="round" opacity="0.64"/>
-
-  <image href="../public/kurdistan-mark.svg" x="76" y="76" width="88" height="88"/>
-
-  <text x="196" y="122" fill="#f3efe5" font-family="Arial, sans-serif" font-size="34" font-weight="700">Kurdistan <tspan fill="#48bdb3">VPN</tspan></text>
-  <text x="76" y="270" fill="#f3efe5" font-family="Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">Your internet.</text>
-  <text x="76" y="354" fill="#f3efe5" font-family="Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">Your route.</text>
-  <text x="79" y="392" fill="#aaa8b6" font-family="Arial, sans-serif" font-size="25">Signed profiles. Owner-controlled nodes. Android coming soon.</text>
-
+  <image href="../public/brand/kurdistan-vpn-reverse.svg" x="72" y="62" width="552" height="154"/>
+  <text x="76" y="316" fill="#f3efe5" font-family="Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">Your internet.</text>
+  <text x="76" y="400" fill="#f3efe5" font-family="Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">Your route.</text>
+  <text x="79" y="438" fill="#aaa8b6" font-family="Arial, sans-serif" font-size="25">Signed profiles. Owner-controlled nodes. Android coming soon.</text>
   <g transform="translate(918 510)">
     <rect width="206" height="54" rx="27" fill="#11132b" stroke="#48bdb3" stroke-opacity="0.45"/>
     <circle cx="29" cy="27" r="6" fill="#d6a04d"/>

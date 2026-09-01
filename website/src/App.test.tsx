@@ -249,12 +249,63 @@ describe('Kurdistan VPN public page', () => {
     expect(heroImage).toHaveAttribute('fetchpriority', 'high')
   })
 
-  it('presents the dedication in the active static-page language', () => {
-    document.documentElement.dataset.locale = 'ckb'
-    render(<App />)
+  const dedicationCases = [
+    {
+      locale: 'en',
+      product: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن)',
+      creator: 'Saro Xizirnijad',
+      place: 'Rojhelat',
+      href: 'https://en.wikipedia.org/wiki/Iranian_Kurdistan',
+      text: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن) is created by Saro Xizirnijad with boundless love for all Kurdish people, and for everyone in Rojhelat who has endured oppression, loss, and suffering under the repression of the Islamic Republic of Iran, the regime of the gallows. May their stories and courage never be forgotten.',
+    },
+    {
+      locale: 'ckb',
+      product: 'کوردستان ڤی‌پی‌ئێن (KurdistanVPN)',
+      creator: 'سارۆ خزرنژاد',
+      place: 'ڕۆژهەڵات',
+      href: 'https://ckb.wikipedia.org/wiki/%DA%95%DB%86%DA%98%DA%BE%DB%95%DA%B5%D8%A7%D8%AA%DB%8C_%DA%A9%D9%88%D8%B1%D8%AF%D8%B3%D8%AA%D8%A7%D9%86',
+      text: 'کوردستان ڤی‌پی‌ئێن (KurdistanVPN) لەلایەن سارۆ خزرنژادەوە دروست کراوە بۆ هەموو گەلی کورد بە خۆشەویستییەکی بێ‌سنوورە بۆ هەموو ئەوانەی کە لە ڕۆژهەڵات، لە ژێر سەرکوتی کۆماری سێدارەی ئیسلامیی ئێراندا تووشی ستەم، لەدەستدان و ئازار بوون. با چیرۆکەکانیان و ئازایەتییان هەرگیز لەبیر نەکرێت.',
+    },
+    {
+      locale: 'kmr',
+      product: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن)',
+      creator: 'Saro Xizirnijad',
+      place: 'Rojhilatê Kurdistanê',
+      href: 'https://ku.wikipedia.org/wiki/Rojhilata_Kurdistan%C3%AA',
+      text: 'Kurdistan VPN (کوردستان ڤی‌پی‌ئێن) ji aliyê Saro Xizirnijad ve, bi hezkirineke bêdawî ji bo hemû gelê Kurd û ji bo hemû wan kesên ku li Rojhilatê Kurdistanê, di bin zext û serkutkirina Komara Îslamî ya Îranê, rejîma darvekirinê, de rastî zulm, windahî û êşê hatine, hatiye çêkirin. Bila çîrok û wêrekiya wan tu carî neyê jibîrkirin.',
+    },
+  ] as const
 
-    expect(screen.getByText(/سارۆ خزرنژاد/)).toBeVisible()
-    expect(screen.getByText('ڕۆژهەڵات')).toBeVisible()
-    expect(screen.queryByText(/Saro Xizirnijad/)).not.toBeInTheDocument()
-  })
+  it.each(dedicationCases)(
+    'presents the complete $locale dedication with its locale-specific source link',
+    async ({ locale, product, creator, place, href, text }) => {
+      const user = userEvent.setup()
+      document.documentElement.dataset.locale = locale
+      render(<App />)
+
+      const footer = screen.getByRole('contentinfo')
+      const dedication = footer.querySelector('.footer-dedication')
+      expect(dedication?.textContent?.replace(/\s+/g, ' ').trim()).toBe(text)
+      expect(within(footer).getByText(product).tagName).toBe('STRONG')
+      expect(within(footer).getByText(creator).tagName).toBe('STRONG')
+
+      const placeLink = within(footer).getByRole('link', { name: place })
+      expect(placeLink).toHaveAttribute('href', href)
+      expect(placeLink).toHaveAttribute('target', '_blank')
+      expect(placeLink).toHaveAttribute('rel', 'noopener noreferrer')
+
+      const precedingFooterLink = footer.querySelector(
+        '.footer-actions a:last-child',
+      )
+      expect(precedingFooterLink).toBeInstanceOf(HTMLAnchorElement)
+      ;(precedingFooterLink as HTMLAnchorElement).focus()
+      await user.tab()
+      expect(placeLink).toHaveFocus()
+
+      for (const other of dedicationCases.filter((entry) => entry.locale !== locale)) {
+        expect(dedication).not.toHaveTextContent(other.text)
+        expect(footer.querySelector(`a[href="${other.href}"]`)).toBeNull()
+      }
+    },
+  )
 })

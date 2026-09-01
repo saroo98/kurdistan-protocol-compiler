@@ -312,7 +312,7 @@ func TestValidationWorkflowProvidesHistoryForEvidenceGuards(t *testing.T) {
 
 func TestSecurityPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestSecurityPhase8ProfileCryptographyOverlayMutationsV1(t *testing.T) {
 
 func TestSecurityPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestSecurityPhase8WO801ThreatModelOverlayMutationsV1(t *testing.T) {
 
 func TestBaselineStabilizationEvidenceOverlayV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,7 +560,7 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 	if _, err := loadM2MaintenancePreHashesV1(root); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +602,7 @@ func TestM3ProfileLifecycleEvidenceOverlayV1(t *testing.T) {
 
 func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,7 +659,7 @@ func TestM5RelayDescriptorEvidenceOverlayV1(t *testing.T) {
 
 func TestM6DiagnosticExportEvidenceOverlayV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -711,7 +711,7 @@ func TestM6DiagnosticExportEvidenceOverlayV1(t *testing.T) {
 
 func TestM7AppRuntimeEvidenceOverlayV1(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -777,7 +777,7 @@ func TestWO058MaintenanceManifestExactContentAndFailureModesV1(t *testing.T) {
 	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	copiedPaths := make([]string, 0, len(paths))
 	for _, path := range paths {
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		content, err := evidenceoverlay.ReadSubjectFile(root, path)
 		if errors.Is(err, os.ErrNotExist) && deleted[path] {
 			copiedPaths = append(copiedPaths, path)
 			continue
@@ -847,7 +847,7 @@ func TestPhase14AssuranceOverlayRejectsMutationV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -925,7 +925,7 @@ func TestPhase14AssuranceOverlayCarriesValidatedSuccessorStateV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1051,7 +1051,7 @@ func TestPhase13AndroidProductOverlayRejectsMutationV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1154,7 +1154,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 	}
 
 	fixture := t.TempDir()
-	manifestRaw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	manifestRaw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1368,7 +1368,7 @@ func TestM2MaintenanceOverlayExactContentAndFailureModesV1(t *testing.T) {
 		evidenceoverlay.Phase17SuccessorPath,
 	)
 	for _, path := range fixturePaths {
-		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		content, readErr := evidenceoverlay.ReadSubjectFile(root, path)
 		if errors.Is(readErr, os.ErrNotExist) {
 			continue
 		}
@@ -1416,7 +1416,7 @@ func TestM2ValidatorOverlayExactContentAndFailureModesV1(t *testing.T) {
 	fixture := t.TempDir()
 	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
-		content, readErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		content, readErr := evidenceoverlay.ReadSubjectFile(root, path)
 		if errors.Is(readErr, os.ErrNotExist) && deleted[path] {
 			continue
 		}
@@ -1502,7 +1502,7 @@ func TestM2EvidenceConvergenceMutationsV1(t *testing.T) {
 	fixture := t.TempDir()
 	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		content, err := evidenceoverlay.ReadSubjectFile(root, path)
 		if errors.Is(err, os.ErrNotExist) && deleted[path] {
 			continue
 		}
@@ -1563,7 +1563,7 @@ func TestM2Phase2CompleteOverlayFailureModesV1(t *testing.T) {
 	fixture := t.TempDir()
 	deleted := writePublicationEvidenceTombstones(t, root, fixture)
 	for _, path := range m2Phase2CompletePathsV1 {
-		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		content, err := evidenceoverlay.ReadSubjectFile(root, path)
 		if errors.Is(err, os.ErrNotExist) && deleted[path] {
 			continue
 		}
@@ -1802,7 +1802,7 @@ func TestSecurityPhase8WO801AdoptionOverlayMutationsV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1887,7 +1887,7 @@ func TestSecurityPhase8WorkOrderOverlayChainMutationsV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1952,7 +1952,7 @@ func TestSecurityPhase8GuardMaintenanceOverlayMutationsV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2034,7 +2034,7 @@ func TestPhase8ExistingFileOverlayPreservesHistoricalCandidateBindingV1(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m2MaintenanceSelfPathV1)))
+	raw, err := evidenceoverlay.ReadSubjectFile(root, m2MaintenanceSelfPathV1)
 	if err != nil {
 		t.Fatal(err)
 	}

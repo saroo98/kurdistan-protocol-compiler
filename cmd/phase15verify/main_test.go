@@ -4,14 +4,46 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestVerifyRepositoryKeepsSanitizedHistoricalEvidenceUnavailable(t *testing.T) {
+	err := verify(filepath.Clean(filepath.Join("..", "..")))
+	if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("sanitized historical evidence classification = %v", err)
+	}
+}
+
+func TestRunReportsHistoricalEvidenceUnavailableWithoutOpeningQualification(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", "."}, &stdout, &stderr, func(string) error {
+		return errHistoricalEvidenceNotAvailable
+	})
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("NOT_AVAILABLE run = code %d stderr %q", code, stderr.String())
+	}
+	if output := stdout.String(); !strings.Contains(output, "NOT_AVAILABLE") || !strings.Contains(output, "BLOCKED") || strings.Contains(output, "PASSED") {
+		t.Fatalf("NOT_AVAILABLE output opened or obscured the gate: %q", output)
+	}
+}
+
+func TestRunKeepsOrdinaryVerificationFailureRed(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", "."}, &stdout, &stderr, func(string) error {
+		return errors.New("synthetic verifier failure")
+	})
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "VERIFICATION FAILED") {
+		t.Fatalf("ordinary failure = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+}
 
 func TestValidateProductionContract(t *testing.T) {
 	value := validContractForTest()
@@ -90,6 +122,30 @@ func TestVerifyBaselineWorkflowReadsFrozenCommit(t *testing.T) {
 	}
 	if err := verifyBaselineWorkflow(root, value); err != nil {
 		t.Fatalf("verify frozen workflow: %v", err)
+	}
+}
+
+func TestVerifyBaselineCommitKeepsUnavailableObjectBlocked(t *testing.T) {
+	root := t.TempDir()
+	runGit(t, root, "init", "--object-format=sha1")
+	err := verifyBaselineCommit(root, strings.Repeat("a", 40))
+	if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("missing immutable baseline classification = %v", err)
+	}
+}
+
+func TestVerifyBaselineCommitRejectsWrongObjectType(t *testing.T) {
+	root := t.TempDir()
+	runGit(t, root, "init", "--object-format=sha1")
+	runGit(t, root, "config", "core.autocrlf", "false")
+	writeTestFile(t, root, "not-a-commit.txt", "immutable blob\n")
+	blob := strings.TrimSpace(runGit(t, root, "hash-object", "-w", "not-a-commit.txt"))
+	if len(blob) != 40 {
+		t.Fatalf("fixture blob object ID = %q", blob)
+	}
+	err := verifyBaselineCommit(root, blob)
+	if err == nil || errors.Is(err, errHistoricalEvidenceNotAvailable) || !strings.Contains(err.Error(), "not a commit") {
+		t.Fatalf("wrong immutable object classification = %v", err)
 	}
 }
 

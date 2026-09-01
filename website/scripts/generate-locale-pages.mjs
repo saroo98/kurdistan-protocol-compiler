@@ -65,6 +65,9 @@ function renderPage(locale) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/kurdistan-mark.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
     <link rel="canonical" href="${canonical}" />
     ${alternateLinks()}
     <meta id="theme-color" name="theme-color" content="#090a19" />

@@ -51,6 +51,17 @@ describe('localized static search and sharing metadata', () => {
       expect(page.title).toBe(title)
 
       expect(
+        Array.from(page.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')).map(
+          (link) => [link.type, link.getAttribute('sizes'), link.getAttribute('href')],
+        ),
+      ).toEqual([
+        ['image/svg+xml', null, '/kurdistan-mark.svg'],
+        ['image/png', '16x16', '/favicon-16.png'],
+        ['image/png', '32x32', '/favicon-32.png'],
+        ['image/png', '64x64', '/favicon-64.png'],
+      ])
+
+      expect(
         page.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href,
       ).toBe(canonical)
 

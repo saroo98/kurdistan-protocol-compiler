@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "sourceArchive": {
+    "sha256": "1dd0df382a6a78450ef3460d2c1d08ca4960596369a36750dca580c014996384",
+    "bytes": 140452,
+    "entries": 18
+  },
+  "trademarkClearance": "not-assessed",
+  "assets": {
+    "symbol-only.svg": {
+      "sourceEntry": "assets/symbol-only.svg",
+      "bytes": 440,
+      "sha256": "d0d96c8b73e790d0d53586a5340d662f19af9b6468267c58fedd44b698367007",
+      "viewBox": "0 0 256 256",
+      "svgSafety": "passed"
+    },
+    "primary.svg": {
+      "sourceEntry": "assets/primary.svg",
+      "bytes": 1120,
+      "sha256": "ac9fa81dfd2a63955bd28744f8c8c67f456d88c34a5b9fa76e161a733f37fcea",
+      "viewBox": "0 0 920 256",
+      "svgSafety": "passed"
+    },
+    "reverse.svg": {
+      "sourceEntry": "assets/reverse.svg",
+      "bytes": 1120,
+      "sha256": "43232050c5aaade53b86f55bc3ac0ef955450214eb027a843f2d3fd5b113002c",
+      "viewBox": "0 0 920 256",
+      "svgSafety": "passed"
+    },
+    "compact-transparent.png": {
+      "sourceEntry": "assets/compact-transparent.png",
+      "bytes": 7501,
+      "sha256": "1c28d1e34706f6d86e930436f3411927e69587a627b0e96a399d9c38a3aaf24e"
+    },
+    "16.png": {
+      "sourceEntry": "assets/16.png",
+      "bytes": 289,
+      "sha256": "8371cae2da56de66a0947346af0433355e5759531eedc1f3e87b676263dc5970"
+    },
+    "32.png": {
+      "sourceEntry": "assets/32.png",
+      "bytes": 459,
+      "sha256": "c4e76aba239f583f778f2303b2eb3e775e382b805a0cfa3fe2526c7e668b514e"
+    },
+    "64.png": {
+      "sourceEntry": "assets/64.png",
+      "bytes": 827,
+      "sha256": "365d1cf3c0ad7127b7d5d999a47f684baaa1307cad22fd4370e8a57c8a54c99e"
+    }
+  }
+}

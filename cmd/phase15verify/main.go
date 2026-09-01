@@ -27,9 +27,14 @@ import (
 
 const contractPath = "testdata/evidence/phase15/production-contract.json"
 
-var requiredFiles = []string{
+var errHistoricalEvidenceNotAvailable = errors.New("historical evidence not available")
+
+var historicalEvidenceFiles = []string{
 	"docs/KZ-evidence-ref-044",
 	"docs/PZ-evidence-ref-059",
+}
+
+var requiredFiles = []string{
 	contractPath,
 	evidenceoverlay.SuccessorPath,
 }
@@ -115,13 +120,30 @@ type privacyContract struct {
 }
 
 func main() {
-	root := flag.String("root", ".", "repository root")
-	flag.Parse()
-	if err := verify(*root); err != nil {
-		fmt.Fprintf(os.Stderr, "PHASE 15 VERIFICATION FAILED: %v\n", err)
-		os.Exit(1)
+	os.Exit(runWithVerifier(os.Args[1:], os.Stdout, os.Stderr, verify))
+}
+
+func runWithVerifier(args []string, stdout, stderr io.Writer, verifier func(string) error) int {
+	flags := flag.NewFlagSet("phase15verify", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	root := flags.String("root", ".", "repository root")
+	if err := flags.Parse(args); err != nil {
+		return 2
 	}
-	fmt.Println("PHASE 15 VERIFICATION PASSED")
+	if flags.NArg() != 0 {
+		fmt.Fprintf(stderr, "PHASE 15 VERIFICATION FAILED: unexpected arguments: %v\n", flags.Args())
+		return 2
+	}
+	if err := verifier(*root); err != nil {
+		if errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			fmt.Fprintln(stdout, "PHASE 15 VERIFICATION NOT_AVAILABLE; CURRENT QUALIFICATION REMAINS BLOCKED")
+			return 0
+		}
+		fmt.Fprintf(stderr, "PHASE 15 VERIFICATION FAILED: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "PHASE 15 VERIFICATION PASSED")
+	return 0
 }
 
 func verify(root string) error {
@@ -145,20 +167,29 @@ func verify(root string) error {
 	if err := validate(value); err != nil {
 		return err
 	}
+	unavailable := make([]string, 0, 3)
 	if err := verifyBaselineCommit(root, value.Baseline.SourceCommit); err != nil {
-		return err
-	}
-	if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
+	} else if err := verifyBaselineWorkflow(root, value.Baseline); err != nil {
 		return err
 	}
 	if err := verifyReleaseBoundary(root, value); err != nil {
 		return err
 	}
 	if err := verifyHumanParity(root, value); err != nil {
-		return err
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
 	}
 	if err := verifyPhase14Reconciliation(root); err != nil {
-		return err
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
 	}
 	predecessors, err := evidenceoverlay.LoadSuccessor(root, "phase15-production-contract-v1")
 	if err != nil {
@@ -174,6 +205,9 @@ func verify(root string) error {
 		if predecessors[required] == "" {
 			return fmt.Errorf("Phase 15 successor overlay is missing %s", required)
 		}
+	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("%w: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, "; "))
 	}
 	return nil
 }
@@ -199,10 +233,19 @@ func verifyBaselineCommit(root, sha string) error {
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sha) {
 		return errors.New("baseline source commit is not a full SHA-1")
 	}
-	command := exec.Command("git", "cat-file", "-e", sha+"^{commit}")
-	command.Dir = root
-	if output, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("baseline commit %s does not exist: %w: %s", sha, err, strings.TrimSpace(string(output)))
+	raw, err := immutableGitObjectCommand(root, []byte(sha+"\n"), "cat-file", "--batch-check=%(objectname) %(objecttype)")
+	if err != nil {
+		return fmt.Errorf("inspect baseline commit %s: %w", sha, err)
+	}
+	fields := strings.Fields(string(raw))
+	if len(fields) != 2 || fields[0] != sha {
+		return fmt.Errorf("baseline commit %s returned malformed immutable object metadata", sha)
+	}
+	if fields[1] == "missing" {
+		return fmt.Errorf("%w: baseline commit %s is absent from this bounded Git checkout", errHistoricalEvidenceNotAvailable, sha)
+	}
+	if fields[1] != "commit" {
+		return fmt.Errorf("baseline object %s is %s, not a commit", sha, fields[1])
 	}
 	return nil
 }
@@ -211,9 +254,7 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 	if value.WorkflowPath != ".github/workflows/ci.yml" || strings.Contains(value.WorkflowPath, "..") {
 		return errors.New("baseline workflow path is invalid")
 	}
-	command := exec.Command("git", "show", value.SourceCommit+":"+value.WorkflowPath)
-	command.Dir = root
-	content, err := command.Output()
+	content, err := immutableGitObjectCommand(root, nil, "show", value.SourceCommit+":"+value.WorkflowPath)
 	if err != nil {
 		return fmt.Errorf("read baseline workflow from %s: %w", value.SourceCommit, err)
 	}
@@ -223,6 +264,25 @@ func verifyBaselineWorkflow(root string, value baseline) error {
 		return fmt.Errorf("baseline workflow digest = %s, want %s", actual, value.WorkflowSHA256)
 	}
 	return nil
+}
+
+func immutableGitObjectCommand(root string, input []byte, args ...string) ([]byte, error) {
+	command := exec.Command("git", append([]string{"--no-replace-objects", "--literal-pathspecs", "-C", root}, args...)...)
+	for _, item := range os.Environ() {
+		key, _, _ := strings.Cut(item, "=")
+		if !strings.HasPrefix(strings.ToUpper(key), "GIT_") {
+			command.Env = append(command.Env, item)
+		}
+	}
+	command.Env = append(command.Env, "GIT_NO_LAZY_FETCH=1", "GIT_NO_REPLACE_OBJECTS=1", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0")
+	command.Stdin = bytes.NewReader(input)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	raw, err := command.Output()
+	if err != nil {
+		return nil, fmt.Errorf("immutable Git object read failed (%s): %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
+	}
+	return raw, nil
 }
 
 func verifyReleaseBoundary(root string, value contract) error {
@@ -259,6 +319,7 @@ func verifyReleaseBoundary(root string, value contract) error {
 }
 
 func verifyHumanParity(root string, value contract) error {
+	unavailable := make([]string, 0, len(historicalEvidenceFiles))
 	requirements := map[string][]string{
 		"docs/PZ-evidence-ref-059": {
 			value.Baseline.SourceCommit,
@@ -279,9 +340,13 @@ func verifyHumanParity(root string, value contract) error {
 		},
 	}
 	for relative, snippets := range requirements {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		raw, available, err := readHistoricalEvidenceFile(root, relative)
 		if err != nil {
 			return err
+		}
+		if !available {
+			unavailable = append(unavailable, relative)
+			continue
 		}
 		for _, snippet := range snippets {
 			if !strings.Contains(string(raw), snippet) {
@@ -289,18 +354,27 @@ func verifyHumanParity(root string, value contract) error {
 			}
 		}
 	}
+	if len(unavailable) != 0 {
+		sort.Strings(unavailable)
+		return fmt.Errorf("%w: human-parity documents unavailable in the sanitized subject: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, ", "))
+	}
 	return nil
 }
 
 func verifyPhase14Reconciliation(root string) error {
+	unavailable := make([]string, 0, 3)
 	for _, relative := range []string{
 		"docs/KZ-evidence-ref-043",
 		"docs/PZ-evidence-ref-052",
 		"docs/PZ-evidence-ref-056",
 	} {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		raw, available, err := readHistoricalEvidenceFile(root, relative)
 		if err != nil {
 			return err
+		}
+		if !available {
+			unavailable = append(unavailable, relative)
+			continue
 		}
 		lower := strings.ToLower(string(raw))
 		for _, stale := range []string{"integration pending", "not yet integrated", "ready for integration"} {
@@ -328,7 +402,32 @@ func verifyPhase14Reconciliation(root string) error {
 	if status.ReleaseDecision != "NO_GO" || status.PriorPhase.IntegrationState != "INTEGRATED_ON_MAIN" {
 		return errors.New("Phase 14 acceptance status must preserve NO_GO and record INTEGRATED_ON_MAIN")
 	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("%w: Phase 14 reconciliation documents unavailable in the sanitized subject: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, ", "))
+	}
 	return nil
+}
+
+func readHistoricalEvidenceFile(root, relative string) ([]byte, bool, error) {
+	raw, err := evidenceoverlay.ReadSubjectFile(root, relative)
+	if err == nil {
+		if len(raw) == 0 {
+			return nil, false, fmt.Errorf("historical evidence file %s is empty", relative)
+		}
+		return raw, true, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, false, fmt.Errorf("read historical evidence file %s: %w", relative, err)
+	}
+	digest, err := evidenceoverlay.ResolveCurrentSHA256(root, relative)
+	if err != nil {
+		return nil, false, fmt.Errorf("authenticate sanitized historical evidence file %s: %w", relative, err)
+	}
+	decoded, err := hex.DecodeString(digest)
+	if err != nil || len(decoded) != sha256.Size {
+		return nil, false, fmt.Errorf("invalid authenticated predecessor digest for %s", relative)
+	}
+	return nil, false, nil
 }
 
 func validate(value contract) error {

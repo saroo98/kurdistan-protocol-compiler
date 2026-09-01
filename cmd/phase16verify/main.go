@@ -32,6 +32,8 @@ const (
 	ownerInputDefault           = ".tools/phase16/private/owner-inputs.json"
 )
 
+var errHistoricalEvidenceNotAvailable = errors.New("historical evidence not available")
+
 var requiredFiles = []string{
 	"README.md",
 	"docs/self-hosting/INSTALL.md",
@@ -302,15 +304,32 @@ type wifInputs struct {
 }
 
 func main() {
-	root := flag.String("root", ".", "repository root")
-	mode := flag.String("mode", "offline", "offline or external")
-	ownerPath := flag.String("owner-inputs", ownerInputDefault, "private owner input file")
-	flag.Parse()
-	if err := verify(*root, *mode, *ownerPath); err != nil {
-		fmt.Fprintln(os.Stderr, "PHASE 16 VERIFICATION FAILED:", err)
-		os.Exit(1)
+	os.Exit(runWithVerifier(os.Args[1:], os.Stdout, os.Stderr, verify))
+}
+
+func runWithVerifier(args []string, stdout, stderr io.Writer, verifier func(string, string, string) error) int {
+	flags := flag.NewFlagSet("phase16verify", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	root := flags.String("root", ".", "repository root")
+	mode := flags.String("mode", "offline", "offline or external")
+	ownerPath := flags.String("owner-inputs", ownerInputDefault, "private owner input file")
+	if err := flags.Parse(args); err != nil {
+		return 2
 	}
-	fmt.Printf("PHASE 16 %s VERIFICATION PASSED\n", strings.ToUpper(*mode))
+	if flags.NArg() != 0 {
+		fmt.Fprintf(stderr, "PHASE 16 VERIFICATION FAILED: unexpected arguments: %v\n", flags.Args())
+		return 2
+	}
+	if err := verifier(*root, *mode, *ownerPath); err != nil {
+		if errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			fmt.Fprintf(stdout, "PHASE 16 %s VERIFICATION NOT_AVAILABLE; CURRENT QUALIFICATION REMAINS BLOCKED\n", strings.ToUpper(*mode))
+			return 0
+		}
+		fmt.Fprintln(stderr, "PHASE 16 VERIFICATION FAILED:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "PHASE 16 %s VERIFICATION PASSED\n", strings.ToUpper(*mode))
+	return 0
 }
 
 func verify(root, mode, ownerPath string) error {
@@ -329,11 +348,18 @@ func verify(root, mode, ownerPath string) error {
 	if err := decodeFile(root, statusPath, &value); err != nil {
 		return err
 	}
+	unavailable := make([]string, 0, 2)
 	if err := validateStatus(root, value, mode); err != nil {
-		return err
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
 	}
 	if err := verifySelfHostedQualification(root); err != nil {
-		return err
+		if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			return err
+		}
+		unavailable = append(unavailable, err.Error())
 	}
 	if err := verifyDocuments(root); err != nil {
 		return err
@@ -352,6 +378,9 @@ func verify(root, mode, ownerPath string) error {
 	}
 	if mode == "external" {
 		return errors.New("legacy centralized external mode is superseded; use the self-hosted VPS acceptance verifier")
+	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("%w: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, "; "))
 	}
 	return nil
 }
@@ -453,11 +482,7 @@ func validateStatus(root string, value status, mode string) error {
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(value.BaselineCommit) {
 		return errors.New("invalid baseline commit")
 	}
-	cmd := exec.Command("git", "cat-file", "-e", value.BaselineCommit+"^{commit}")
-	cmd.Dir = root
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("baseline commit unavailable: %s", strings.TrimSpace(string(output)))
-	}
+	baselineAvailability := historicalCommitAvailability(root, value.BaselineCommit, "phase16 production-trust baseline")
 	if value.ReleaseDecision != "NO_GO" {
 		return errors.New("Phase 16 cannot widen the full VPN release decision")
 	}
@@ -510,6 +535,21 @@ func validateStatus(root string, value status, mode string) error {
 				return fmt.Errorf("complete status lacks external evidence: %s", item.ID)
 			}
 		}
+	}
+	return baselineAvailability
+}
+
+func historicalCommitAvailability(root, commit, label string) error {
+	if _, err := gitValue(root, "rev-parse", "--git-dir"); err != nil {
+		return fmt.Errorf("historical repository boundary: %w", err)
+	}
+	if _, err := gitValue(root, "cat-file", "-e", "HEAD^{commit}"); err != nil {
+		return fmt.Errorf("current repository subject: %w", err)
+	}
+	command := exec.Command("git", "cat-file", "-e", commit+"^{commit}")
+	command.Dir = root
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("%w: %s %s", errHistoricalEvidenceNotAvailable, label, commit)
 	}
 	return nil
 }
@@ -825,9 +865,7 @@ func verifySelfHostedQualification(root string) error {
 		value.Source.BaselineCommit != value.Source.PackageSourceCommit || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(value.Source.BaselineCommit) {
 		return errors.New("self-hosted qualification source identity mismatch")
 	}
-	if _, err := gitValue(root, "cat-file", "-e", value.Source.BaselineCommit+"^{commit}"); err != nil {
-		return fmt.Errorf("self-hosted qualification baseline: %w", err)
-	}
+	baselineAvailability := historicalCommitAvailability(root, value.Source.BaselineCommit, "phase16 self-hosted qualification baseline")
 	if value.Packages.Version != "0.16.3-phase16" || !validDigest(value.Packages.AMD64SHA256) || !validDigest(value.Packages.ARM64SHA256) ||
 		value.Packages.AMD64SHA256 == value.Packages.ARM64SHA256 || !value.Packages.IndependentBuildsMatched || value.Packages.Signed || value.Packages.RelayDataPlane {
 		return errors.New("self-hosted package qualification is incomplete or widens Phase 16 authority")
@@ -877,7 +915,7 @@ func verifySelfHostedQualification(root string) error {
 	if regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`).Match(raw) {
 		return errors.New("self-hosted qualification exposes a raw IPv4 endpoint")
 	}
-	return nil
+	return baselineAvailability
 }
 
 func verifyServiceUnit(root string) error {

@@ -61,9 +61,19 @@ export function SiteFooter() {
         </div>
 
         <p className="footer-dedication">
-          {copy.footer.dedicationBefore}
-          <em>{copy.footer.dedicationPlace}</em>
-          {copy.footer.dedicationAfter}
+          <strong>{copy.footer.dedicationProduct}</strong>
+          {copy.footer.dedicationBeforeCreator}
+          <strong>{copy.footer.dedicationCreator}</strong>
+          {copy.footer.dedicationBeforePlace}
+          <a
+            className="footer-dedication__place"
+            href={copy.footer.dedicationPlaceHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <em>{copy.footer.dedicationPlace}</em>
+          </a>
+          {copy.footer.dedicationAfterPlace}
         </p>
 
         <div className="footer-meta">
