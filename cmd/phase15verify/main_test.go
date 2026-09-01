@@ -4,14 +4,46 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestVerifyRepositoryKeepsSanitizedHistoricalEvidenceUnavailable(t *testing.T) {
+	err := verify(filepath.Clean(filepath.Join("..", "..")))
+	if !errors.Is(err, errHistoricalEvidenceNotAvailable) {
+		t.Fatalf("sanitized historical evidence classification = %v", err)
+	}
+}
+
+func TestRunReportsHistoricalEvidenceUnavailableWithoutOpeningQualification(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", "."}, &stdout, &stderr, func(string) error {
+		return errHistoricalEvidenceNotAvailable
+	})
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("NOT_AVAILABLE run = code %d stderr %q", code, stderr.String())
+	}
+	if output := stdout.String(); !strings.Contains(output, "NOT_AVAILABLE") || !strings.Contains(output, "BLOCKED") || strings.Contains(output, "PASSED") {
+		t.Fatalf("NOT_AVAILABLE output opened or obscured the gate: %q", output)
+	}
+}
+
+func TestRunKeepsOrdinaryVerificationFailureRed(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithVerifier([]string{"-root", "."}, &stdout, &stderr, func(string) error {
+		return errors.New("synthetic verifier failure")
+	})
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "VERIFICATION FAILED") {
+		t.Fatalf("ordinary failure = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+}
 
 func TestValidateProductionContract(t *testing.T) {
 	value := validContractForTest()

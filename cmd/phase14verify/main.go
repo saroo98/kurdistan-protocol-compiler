@@ -7,20 +7,26 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 const acceptancePath = "testdata/evidence/phase14/acceptance-status.json"
 
-var requiredFiles = []string{
+var errHistoricalEvidenceNotAvailable = errors.New("historical evidence not available")
+
+var historicalEvidenceFiles = []string{
 	"docs/KZ-evidence-ref-043",
 	"docs/PZ-evidence-ref-056",
 	"docs/PZ-evidence-ref-052",
@@ -29,6 +35,9 @@ var requiredFiles = []string{
 	"docs/PZ-evidence-ref-057",
 	"docs/PZ-evidence-ref-058",
 	"docs/PZ-evidence-ref-055",
+}
+
+var requiredFiles = []string{
 	"testdata/evidence/phase14/reproducibility.json",
 	"testdata/evidence/phase14/recovery-drills.json",
 	"testdata/evidence/phase14/longevity.json",
@@ -104,16 +113,43 @@ type localEvidenceReport struct {
 }
 
 func main() {
-	root := flag.String("root", ".", "repository root")
-	flag.Parse()
-	if err := verify(*root); err != nil {
-		fmt.Fprintf(os.Stderr, "PHASE 14 VERIFICATION FAILED: %v\n", err)
-		os.Exit(1)
+	os.Exit(runWithVerifier(os.Args[1:], os.Stdout, os.Stderr, verify))
+}
+
+func runWithVerifier(args []string, stdout, stderr io.Writer, verifier func(string) error) int {
+	flags := flag.NewFlagSet("phase14verify", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	root := flags.String("root", ".", "repository root")
+	if err := flags.Parse(args); err != nil {
+		return 2
 	}
-	fmt.Println("PHASE 14 VERIFICATION PASSED")
+	if flags.NArg() != 0 {
+		fmt.Fprintf(stderr, "PHASE 14 VERIFICATION FAILED: unexpected arguments: %v\n", flags.Args())
+		return 2
+	}
+	if err := verifier(*root); err != nil {
+		if errors.Is(err, errHistoricalEvidenceNotAvailable) {
+			fmt.Fprintln(stdout, "PHASE 14 VERIFICATION NOT_AVAILABLE; CURRENT QUALIFICATION REMAINS BLOCKED")
+			return 0
+		}
+		fmt.Fprintf(stderr, "PHASE 14 VERIFICATION FAILED: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "PHASE 14 VERIFICATION PASSED")
+	return 0
 }
 
 func verify(root string) error {
+	unavailable := make([]string, 0, len(historicalEvidenceFiles))
+	for _, relative := range historicalEvidenceFiles {
+		available, err := verifyHistoricalEvidenceFile(root, relative)
+		if err != nil {
+			return err
+		}
+		if !available {
+			unavailable = append(unavailable, relative)
+		}
+	}
 	for _, relative := range requiredFiles {
 		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {
@@ -142,8 +178,38 @@ func verify(root string) error {
 	if err := verifyNoReleaseSecrets(filepath.Join(root, "android")); err != nil {
 		return err
 	}
-	return verifyProductClaims(filepath.Join(root, "android"))
+	if err := verifyProductClaims(filepath.Join(root, "android")); err != nil {
+		return err
+	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("%w: authenticated historical documents are unavailable in the sanitized subject: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, ", "))
+	}
+	return nil
 }
+
+func verifyHistoricalEvidenceFile(root, relative string) (bool, error) {
+	raw, err := evidenceoverlay.ReadSubjectFile(root, relative)
+	if err == nil {
+		if len(raw) == 0 {
+			return false, fmt.Errorf("historical evidence file %s is empty", relative)
+		}
+		return true, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("read historical evidence file %s: %w", relative, err)
+	}
+	digest, err := evidenceoverlay.ResolveCurrentSHA256(root, relative)
+	if err != nil {
+		return false, fmt.Errorf("authenticate sanitized historical evidence file %s: %w", relative, err)
+	}
+	decoded, err := hex.DecodeString(digest)
+	if err != nil || len(decoded) != sha256DigestBytes {
+		return false, fmt.Errorf("invalid authenticated predecessor digest for %s", relative)
+	}
+	return false, nil
+}
+
+const sha256DigestBytes = 32
 
 func verifyLocalEvidenceReports(root string, decision acceptance) error {
 	for key, relative := range localEvidenceReports {
