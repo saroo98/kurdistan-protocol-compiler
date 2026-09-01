@@ -30,6 +30,98 @@ import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.model.SelectionMode
 
+/** RuntimeStop atomically retires the handle before cleanup. Never free that retired slot again. */
+private class NativeLiveSessionRelease(
+    private val stopOperation: () -> NativeResult<Unit>,
+) : AutoCloseable {
+    private var stopped: NativeResult<Unit>? = null
+    private var closeStarted = false
+    private var closeProven = false
+    private var stopping = false
+
+    @Synchronized fun stop(): NativeResult<Unit> {
+        stopped?.let { return it }
+        // Mark before calling native code so reentrant cleanup cannot retry.
+        stopped = NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+        stopping = true
+        return try { stopOperation() } catch (_: Throwable) { NativeResult.Failure(OperationError.INTERNAL_FAILURE) }
+            finally { stopping = false }
+            .also { stopped = it }
+    }
+
+    @Synchronized override fun close() {
+        check(!stopping) { "NATIVE_RUNTIME_CLEANUP_UNPROVEN" }
+        if (!closeStarted) {
+            closeStarted = true
+            closeProven = stop() is NativeResult.Success
+        }
+        check(closeProven) { "NATIVE_RUNTIME_CLEANUP_UNPROVEN" }
+    }
+}
+
+/** Owns any published native handle before decoding or constructing its Kotlin owner. */
+private class NativeLiveOpenOwner(
+    private val maximum: Int,
+    private val acquire: (ByteBuffer, LongArray) -> Int,
+    private val retire: (Long) -> NativeResult<Unit>,
+    private val decode: (ByteArray) -> NativeResult<NativeLiveRuntimeSessionSnapshot>,
+    private val construct: (Long, NativeLiveRuntimeSessionSnapshot) -> NativeLiveRuntimeSession,
+    private val failure: (Int) -> OperationError,
+) {
+    fun open(): NativeResult<NativeLiveRuntimeSession> {
+        require(maximum in 1..1_048_576)
+        val output = ByteBuffer.allocateDirect(maximum)
+        val metadata = LongArray(2)
+        var transferred = false
+        var bytes: ByteArray? = null
+        var snapshot: NativeLiveRuntimeSessionSnapshot? = null
+        try {
+            val code = acquire(output, metadata)
+            if (code != 0) return NativeResult.Failure(if (metadata[0] == 0L) failure(code) else OperationError.INTERNAL_FAILURE)
+            // Validate the entire native jlong before any Int conversion or allocation.
+            if (metadata[0] <= 0 || metadata[1] !in 1L..maximum.toLong())
+                return NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+            bytes = ByteArray(metadata[1].toInt())
+            output.position(0)
+            output.get(bytes)
+            val decoded = decode(bytes)
+            if (decoded is NativeResult.Failure) return decoded
+            snapshot = (decoded as NativeResult.Success).value
+            val session = construct(metadata[0], snapshot)
+            transferred = true
+            return NativeResult.Success(session)
+        } catch (_: Throwable) {
+            return NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+        } finally {
+            bytes?.fill(0)
+            for (index in 0 until output.capacity()) output.put(index, 0)
+            val handle = metadata[0]
+            metadata.fill(0)
+            if (!transferred) {
+                snapshot?.wipeOwnedSnapshot()
+                if (handle != 0L) {
+                    val clean = try { retire(handle) is NativeResult.Success } catch (_: Throwable) { false }
+                    check(clean) { "NATIVE_OPEN_CLEANUP_UNPROVEN" }
+                }
+            }
+        }
+    }
+}
+
+private fun NativeLiveRuntimeSessionSnapshot.wipeOwnedSnapshot() {
+    listOf(planDigest, profileFingerprint, strategyFingerprint, relayFingerprint,
+        clientIpv4, dnsIpv4, clientIpv6, dnsIpv6).forEach { it.fill(0) }
+    routes.forEach { it.address.fill(0) }
+}
+
+private fun NativeLiveRuntimeSessionSnapshot.copyOwnedSnapshot() = copy(
+    planDigest = planDigest.copyOf(), profileFingerprint = profileFingerprint.copyOf(),
+    strategyFingerprint = strategyFingerprint.copyOf(), relayFingerprint = relayFingerprint.copyOf(),
+    clientIpv4 = clientIpv4.copyOf(), dnsIpv4 = dnsIpv4.copyOf(), clientIpv6 = clientIpv6.copyOf(), dnsIpv6 = dnsIpv6.copyOf(),
+    packages = packages.toList(), routes = routes.map { it.copy(address = it.address.copyOf()) },
+    payloadProtocols = payloadProtocols.toSet(),
+)
+
 class NativeBridge : KurdNativeCore {
     override fun compatibility(): NativeResult<NativeCompatibility> {
         val output = ByteBuffer.allocateDirect(MAX_ABI_BYTES)
@@ -236,22 +328,14 @@ class NativeBridge : KurdNativeCore {
     }
 
     override fun openLiveRuntimeSession(request: ByteArray): NativeResult<NativeLiveRuntimeSession> {
-        if (request.isEmpty() || request.size > MAX_RUNTIME_OPEN_V2_BYTES) {
-            return NativeResult.Failure(OperationError.SIZE_LIMIT)
-        }
-        val output = ByteBuffer.allocateDirect(MAX_RUNTIME_SNAPSHOT_BYTES)
-        val metadata = LongArray(2)
-        val code = nativeRuntimeSessionOpenV2(request, output, metadata)
-        if (code != CODE_OK) return NativeResult.Failure(mapError(code))
-        return when (val decoded = decodeLiveRuntimeSnapshot(readBytes(output, metadata[1].toInt()))) {
-            is NativeResult.Failure -> {
-                nativeFree(metadata[0])
-                decoded
-            }
-            is NativeResult.Success -> NativeResult.Success(
-                JniLiveRuntimeSession(metadata[0], decoded.value),
-            )
-        }
+        val owned = request.copyOf()
+        return try {
+            if (owned.isEmpty() || owned.size > MAX_RUNTIME_OPEN_V2_BYTES) NativeResult.Failure(OperationError.SIZE_LIMIT)
+            else NativeLiveOpenOwner(MAX_RUNTIME_SNAPSHOT_BYTES,
+                { output, metadata -> nativeRuntimeSessionOpenV2(owned, output, metadata) },
+                { handle -> unitResult(nativeRuntimeStop(handle)) }, ::decodeLiveRuntimeSnapshot,
+                { handle, snapshot -> JniLiveRuntimeSession(handle, snapshot) }, ::mapError).open()
+        } finally { owned.fill(0) }
     }
 
     override fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit> =
@@ -403,9 +487,14 @@ class NativeBridge : KurdNativeCore {
 
     private inner class JniLiveRuntimeSession(
         private val handle: Long,
-        override val snapshot: NativeLiveRuntimeSessionSnapshot,
+        private val ownedSnapshot: NativeLiveRuntimeSessionSnapshot,
     ) : NativeLiveRuntimeSession {
         private var closed = false
+        override val snapshot: NativeLiveRuntimeSessionSnapshot
+            @Synchronized get() { check(!closed); return ownedSnapshot.copyOwnedSnapshot() }
+        private val release = NativeLiveSessionRelease(
+            { unitResult(nativeRuntimeStop(handle)) },
+        )
 
         override fun prepareSocket(): NativeResult<Int> {
             if (closed) return NativeResult.Failure(OperationError.CANCELLED)
@@ -471,17 +560,81 @@ class NativeBridge : KurdNativeCore {
 
         override fun stop(): NativeResult<Unit> {
             if (closed) return NativeResult.Failure(OperationError.CANCELLED)
-            return unitResult(nativeRuntimeStop(handle))
+            return release.stop()
         }
 
-        override fun close() {
-            if (!closed) {
-                closed = true
-                nativeRuntimeStop(handle)
-                nativeFree(handle)
-            }
+        @Synchronized override fun close() {
+            closed = true
+            try { release.close() } finally { ownedSnapshot.wipeOwnedSnapshot() }
         }
     }
+
+    /** FD primitives only. Policy, authorization and cryptography remain in Kotlin. */
+    fun durableFiles(): org.kurdistanvpn.core.nativeapi.DurableFilePrimitives =
+        org.kurdistanvpn.core.nativeapi.CheckedDurableFilePrimitives(object : org.kurdistanvpn.core.nativeapi.DurableNativeTransport {
+            override fun preparePipe(fd: Long, expectedUid: Long, expectedAccess: Int) =
+                nativePrepareBorrowedPipe(fd, expectedUid, expectedAccess)
+            private fun directory(value: org.kurdistanvpn.core.nativeapi.DurableDirectory) =
+                longArrayOf(value.directoryFd, value.expectedUid, value.identity.device, value.identity.inode)
+            private fun identity(value: org.kurdistanvpn.core.nativeapi.DurableFileIdentity) =
+                longArrayOf(value.device, value.inode)
+            override fun openChildDirectory(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, leaf: ByteArray,
+                expected: org.kurdistanvpn.core.nativeapi.DurableFileIdentity?) =
+                nativeDurableOpenChild(directory(directory), leaf, expected?.let(::identity))
+            override fun createChildDirectoryExclusive(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, leaf: ByteArray) =
+                nativeDurableCreateChild(directory(directory), leaf)
+            override fun closeDirectory(fd: Long) = nativeDurableCloseDirectory(fd)
+            override fun read(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, leaf: ByteArray, maxBytes: Int) =
+                nativeDurableRead(directory(directory), leaf, maxBytes.toLong())
+            override fun list(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, maxEntries: Int) =
+                nativeDurableList(directory(directory), maxEntries.toLong())
+            override fun bootstrapLock(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, leaf: ByteArray) =
+                nativeDurableBootstrap(directory(directory), leaf)
+            override fun openWriter(directory: org.kurdistanvpn.core.nativeapi.DurableDirectory, leaf: ByteArray,
+                lock: org.kurdistanvpn.core.nativeapi.DurableFileIdentity) = nativeDurableOpen(directory(directory), leaf, identity(lock))
+            override fun mutate(session: LongArray, directory: org.kurdistanvpn.core.nativeapi.DurableDirectory,
+                lockLeaf: ByteArray, lock: org.kurdistanvpn.core.nativeapi.DurableFileIdentity, leaf: ByteArray,
+                tempLeaf: ByteArray?, expected: org.kurdistanvpn.core.nativeapi.DurableSnapshot?, replacement: ByteArray?, maxBytes: Int
+            ): org.kurdistanvpn.core.nativeapi.DurableRawResult {
+                val previous = expected?.bytes
+                return try {
+                    nativeDurableMutate(session, directory(directory), lockLeaf, identity(lock), leaf, tempLeaf,
+                        expected?.let { identity(it.identity) }, previous, replacement, maxBytes.toLong())
+                } finally { previous?.fill(0) }
+            }
+            override fun close(session: LongArray) = nativeDurableClose(session)
+            override fun syncExisting(session: LongArray, directory: org.kurdistanvpn.core.nativeapi.DurableDirectory,
+                lockLeaf: ByteArray, lock: org.kurdistanvpn.core.nativeapi.DurableFileIdentity, leaf: ByteArray,
+                expected: org.kurdistanvpn.core.nativeapi.DurableSnapshot, maxBytes: Int
+            ): org.kurdistanvpn.core.nativeapi.DurableRawResult {
+                val previous = expected.bytes
+                return try {
+                    nativeDurableSyncExisting(session, directory(directory), lockLeaf, identity(lock), leaf,
+                        identity(expected.identity), previous, maxBytes.toLong())
+                } finally { previous.fill(0) }
+            }
+            override fun restrictExisting(session: LongArray, directory: org.kurdistanvpn.core.nativeapi.DurableDirectory,
+                lockLeaf: ByteArray, lock: org.kurdistanvpn.core.nativeapi.DurableFileIdentity, leaf: ByteArray,
+                maxBytes: Int) = nativeDurableRestrictExisting(session, directory(directory), lockLeaf,
+                    identity(lock), leaf, maxBytes.toLong())
+        })
+
+    private external fun nativePrepareBorrowedPipe(fd: Long, expectedUid: Long, expectedAccess: Int): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableRead(directory: LongArray, leaf: ByteArray, maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableOpenChild(directory: LongArray, leaf: ByteArray, expected: LongArray?): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableCreateChild(directory: LongArray, leaf: ByteArray): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableCloseDirectory(fd: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableList(directory: LongArray, maxEntries: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableBootstrap(directory: LongArray, leaf: ByteArray): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableOpen(directory: LongArray, leaf: ByteArray, lock: LongArray): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableMutate(session: LongArray, directory: LongArray, lockLeaf: ByteArray, lock: LongArray,
+        leaf: ByteArray, tempLeaf: ByteArray?, expectedIdentity: LongArray?, expected: ByteArray?, replacement: ByteArray?,
+        maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableClose(session: LongArray): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableSyncExisting(session: LongArray, directory: LongArray, lockLeaf: ByteArray, lock: LongArray,
+        leaf: ByteArray, expectedIdentity: LongArray, expected: ByteArray, maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
+    private external fun nativeDurableRestrictExisting(session: LongArray, directory: LongArray, lockLeaf: ByteArray,
+        lock: LongArray, leaf: ByteArray, maxBytes: Long): org.kurdistanvpn.core.nativeapi.DurableRawResult
 
     private external fun nativeAbiInfo(output: ByteBuffer, outputLength: IntArray): Int
     private external fun nativeRecipientCreate(validitySeconds: Int, outputHandle: LongArray): Int

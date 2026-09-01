@@ -19,7 +19,7 @@ set_target_properties(
     IMPORTED_SONAME "libkurdistan_bridge.so"
 )
 
-add_library(kurdistan_jni SHARED kvpn_jni.c)
+add_library(kurdistan_jni SHARED kvpn_jni.c kvpn_durable_fs.c kvpn_durable_fs_jni.c)
 
 target_compile_features(kurdistan_jni PRIVATE c_std_17)
 target_compile_options(

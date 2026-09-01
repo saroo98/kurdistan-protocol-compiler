@@ -44,22 +44,66 @@ sealed interface ClientKeyResult {
     data class Failure(val error: OperationError) : ClientKeyResult
 }
 
-data class ClientKeyBackupRecord(
+class ClientKeyBackupRecord(
     val sourceRecordId: String,
     val createdAtEpochSeconds: Long,
     val expiresAtEpochSeconds: Long,
-    val publicRequest: ByteArray,
-    val privateBundle: ByteArray,
+    publicRequest: ByteArray,
+    privateBundle: ByteArray,
+    val sourceStatus: ClientKeyStatus? = null,
+    sourceProfileRecordIds: List<String> = emptyList(),
+    val sourceVersion: Int = 1,
 ) {
-    fun destroy() {
-        publicRequest.fill(0)
-        privateBundle.fill(0)
+    init {
+        require(publicRequest.size in 1..MAX_RECIPIENT_REQUEST_BYTES && privateBundle.size in 1..MAX_RECIPIENT_PRIVATE_BYTES)
+        require(sourceProfileRecordIds.size <= MAX_BOUND_PROFILES)
     }
+    private val bindings = sourceProfileRecordIds.toList()
+    private val requestBytes = publicRequest.copyOf()
+    private val privateBytes = try { privateBundle.copyOf() }
+        catch (error: Throwable) { requestBytes.fill(0); throw error }
+    private var destroyed = false
+    val sourceProfileRecordIds: List<String> get() = bindings.toList()
+    val publicRequest: ByteArray @Synchronized get() { check(!destroyed); return requestBytes.copyOf() }
+    val privateBundle: ByteArray @Synchronized get() { check(!destroyed); return privateBytes.copyOf() }
+    val publicRequestSize: Int get() = requestBytes.size
+    val privateBundleSize: Int get() = privateBytes.size
+
+    /** Copies are scoped to this callback and wiped on every exit. */
+    @Synchronized fun <T> withMaterial(block: (ByteArray, ByteArray) -> T): T {
+        check(!destroyed)
+        val request = requestBytes.copyOf()
+        var privateCopy: ByteArray? = null
+        return try { privateCopy = privateBytes.copyOf(); block(request, privateCopy) }
+        finally { request.fill(0); privateCopy?.fill(0) }
+    }
+
+    fun copy(sourceRecordId: String = this.sourceRecordId, createdAtEpochSeconds: Long = this.createdAtEpochSeconds,
+        expiresAtEpochSeconds: Long = this.expiresAtEpochSeconds, publicRequest: ByteArray? = null, privateBundle: ByteArray? = null,
+        sourceStatus: ClientKeyStatus? = this.sourceStatus, sourceProfileRecordIds: List<String> = this.sourceProfileRecordIds,
+        sourceVersion: Int = this.sourceVersion): ClientKeyBackupRecord = withMaterial { request, privateBytes ->
+        ClientKeyBackupRecord(sourceRecordId, createdAtEpochSeconds, expiresAtEpochSeconds, publicRequest ?: request,
+            privateBundle ?: privateBytes, sourceStatus, sourceProfileRecordIds, sourceVersion)
+    }
+
+    @Synchronized fun destroy() { requestBytes.fill(0); privateBytes.fill(0); destroyed = true }
+    override fun toString(): String = "ClientKeyBackupRecord(sourceVersion=$sourceVersion, sourceStatus=$sourceStatus)"
 }
 
 sealed interface ClientKeyRestoreResult {
-    data class Success(val restored: Int, val localRecordIds: List<String>) : ClientKeyRestoreResult
+    data class Success(val restored: Int, val localRecordIds: List<String>,
+        val associations: List<RestoredClientKeyAssociation> = emptyList()) : ClientKeyRestoreResult
     data class Failure(val error: OperationError) : ClientKeyRestoreResult
+}
+
+/** Mapping only, not a verified profile binding. Current recipient/profile admission
+ * must still succeed before bindProfile; legacy records have no source bindings. */
+class RestoredClientKeyAssociation internal constructor(
+    val sourceRecordId: String, val localRecordId: String, val sourceVersion: Int,
+    sourceProfileRecordIds: List<String>,
+) {
+    private val bindings = sourceProfileRecordIds.toList()
+    val sourceProfileRecordIds: List<String> get() = bindings.toList()
 }
 
 class RecipientCredentialLease internal constructor(
@@ -97,18 +141,26 @@ class KurdRecipientKeyNative(
  * Exact public and private capability bytes remain together in a separately
  * bound encrypted record.
  */
-class ClientKeyBundleStore(
-    private val blobs: SecureBlobAccess,
+class ClientKeyBundleStore private constructor(
+    private val blobs: SecureBlobReadAccess,
+    private val writer: SecureBlobAccess?,
     private val native: RecipientKeyNative,
-    private val newLocalRecordId: () -> String = { UUID.randomUUID().toString() },
+    private val newLocalRecordId: () -> String,
 ) {
-    private val lock = Any()
+    constructor(blobs: SecureBlobAccess, native: RecipientKeyNative,
+        newLocalRecordId: () -> String = { UUID.randomUUID().toString() }) : this(blobs, blobs, native, newLocalRecordId)
 
-    init {
-        synchronized(lock) { recoverPreparedLocked() }
+    private val lock = Any()
+    private fun writes(): SecureBlobAccess = checkNotNull(writer) { "READ_ONLY_RECIPIENT_VIEW" }
+
+    companion object {
+        /** This instance can never acquire a writer, regardless of other initialization order. */
+        fun readOnly(blobs: SecureBlobReadAccess, native: RecipientKeyNative): ClientKeyBundleStore =
+            ClientKeyBundleStore(blobs, null, native) { error("READ_ONLY_RECIPIENT_VIEW") }
     }
 
     fun create(validitySeconds: Int, nowEpochSeconds: Long): ClientKeyResult = synchronized(lock) {
+        writes()
         if (validitySeconds !in 1..24 * 60 * 60 || nowEpochSeconds <= 0) {
             return@synchronized ClientKeyResult.Failure(OperationError.INVALID_INPUT)
         }
@@ -121,14 +173,12 @@ class ClientKeyBundleStore(
                 is NativeResult.Failure -> return@synchronized ClientKeyResult.Failure(result.error)
                 is NativeResult.Success -> result.value
             }
-            val privateBundle = when (val result = recipient.privateBundle()) {
-                is NativeResult.Failure -> {
-                    request.fill(0)
-                    return@synchronized ClientKeyResult.Failure(result.error)
-                }
-                is NativeResult.Success -> result.value
-            }
+            var privateBundle: ByteArray? = null
             try {
+                privateBundle = when (val result = recipient.privateBundle()) {
+                    is NativeResult.Failure -> return@synchronized ClientKeyResult.Failure(result.error)
+                    is NativeResult.Success -> result.value
+                }
                 if (request.size !in 1..MAX_RECIPIENT_REQUEST_BYTES ||
                     privateBundle.size !in 1..MAX_RECIPIENT_PRIVATE_BYTES
                 ) {
@@ -155,7 +205,7 @@ class ClientKeyBundleStore(
                 writeIndexLocked(entries)
                 val payload = encodeBundle(localId, entry.createdAtEpochSeconds, entry.expiresAtEpochSeconds, request, privateBundle)
                 try {
-                    blobs.stage(localId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL, payload)
+                    writes().stage(localId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL, payload)
                 } finally {
                     payload.fill(0)
                 }
@@ -171,20 +221,56 @@ class ClientKeyBundleStore(
                 ClientKeyResult.Failure(OperationError.STORAGE_FAILURE)
             } finally {
                 request.fill(0)
-                privateBundle.fill(0)
+                privateBundle?.fill(0)
             }
         }
     }
 
     fun list(): List<ClientKeySummary> = synchronized(lock) {
-        recoverPreparedLocked()
         readIndexLocked().filter { it.status != ClientKeyStatus.PREPARED }
             .sortedByDescending { it.createdAtEpochSeconds }
-            .map(ClientKeyIndexEntry::summary)
+            .map { entry ->
+                openBundleLocked(entry).useBundle { Unit }
+                entry.summary()
+            }
+    }
+
+    /**
+     * Read-only cross-object validation for a committed snapshot. The broker derives both
+     * inventories from authenticated records; this method never repairs an invalid relationship.
+     * A prepared key can be preserved in quarantine but cannot certify a committed authority view.
+     */
+    fun requireConsistentBindings(admissibleProfileIds: Set<String>, sealedProfileIds: Set<String>,
+        materialRecordIds: Set<String>) {
+        val profiles = admissibleProfileIds.toTypedArray().toSet()
+        val sealed = sealedProfileIds.toTypedArray().toSet()
+        val materials = materialRecordIds.toTypedArray().toSet()
+        require(profiles.size <= 1024 && materials.size <= MAX_CLIENT_KEYS)
+        require(profiles.all { it.matches(PROFILE_RECORD_ID) } && sealed.all { it in profiles })
+        require(materials.all { it.matches(PROFILE_RECORD_ID) })
+        synchronized(lock) {
+            val entries = readIndexLocked()
+            check(entries.map { it.localRecordId }.toSet() == materials) { "RECIPIENT_INDEX_MATERIAL_MISMATCH" }
+            val owners = HashMap<String, String>()
+            for (entry in entries) {
+                check(entry.status != ClientKeyStatus.PREPARED) { "RECIPIENT_RECOVERY_REQUIRED" }
+                openBundleLocked(entry).useBundle { Unit }
+                check((entry.status == ClientKeyStatus.PROFILE_VERIFIED) == entry.boundProfiles.isNotEmpty()) {
+                    "RECIPIENT_STATUS_BINDING_MISMATCH"
+                }
+                for (profile in entry.boundProfiles) {
+                    check(profile in profiles) { "RECIPIENT_PROFILE_MISSING" }
+                    check(profile in sealed) { "RECIPIENT_PROFILE_NOT_SEALED" }
+                    check(owners.put(profile, entry.localRecordId) == null) { "RECIPIENT_BINDING_CONFLICT" }
+                }
+            }
+            check(sealed.all(owners::containsKey)) { "SEALED_PROFILE_BINDING_MISSING" }
+        }
     }
 
     fun publicRequest(localRecordId: String): ByteArray = synchronized(lock) {
         val entry = requireEntryLocked(localRecordId)
+        check(entry.status != ClientKeyStatus.PREPARED) { "RECIPIENT_RECOVERY_REQUIRED" }
         val bundle = openBundleLocked(entry)
         try {
             bundle.publicRequest.clone()
@@ -194,6 +280,7 @@ class ClientKeyBundleStore(
     }
 
     fun markRequestExported(localRecordId: String) = synchronized(lock) {
+        writes()
         val entries = readIndexLocked().toMutableList()
         val index = entries.indexOfFirst { it.localRecordId == localRecordId }
         require(index >= 0)
@@ -206,6 +293,7 @@ class ClientKeyBundleStore(
 
     fun credentials(localRecordId: String): RecipientCredentialLease = synchronized(lock) {
         val entry = requireEntryLocked(localRecordId)
+        check(entry.status != ClientKeyStatus.PREPARED) { "RECIPIENT_RECOVERY_REQUIRED" }
         val bundle = openBundleLocked(entry)
         RecipientCredentialLease(
             localRecordId = localRecordId,
@@ -216,9 +304,10 @@ class ClientKeyBundleStore(
 
     fun credentialsForProfile(profileRecordId: String): RecipientCredentialLease? = synchronized(lock) {
         require(profileRecordId.matches(PROFILE_RECORD_ID))
-        recoverPreparedLocked()
-        val entry = readIndexLocked().singleOrNull { profileRecordId in it.boundProfiles }
-            ?: return@synchronized null
+        val matches = readIndexLocked().filter { profileRecordId in it.boundProfiles }
+        check(matches.size <= 1) { "RECIPIENT_BINDING_CONFLICT" }
+        val entry = matches.singleOrNull() ?: return@synchronized null
+        check(entry.status == ClientKeyStatus.PROFILE_VERIFIED) { "RECIPIENT_STATE_INCONSISTENT" }
         val bundle = openBundleLocked(entry)
         RecipientCredentialLease(
             localRecordId = entry.localRecordId,
@@ -228,7 +317,6 @@ class ClientKeyBundleStore(
     }
 
     fun credentialCandidates(): List<RecipientCredentialLease> = synchronized(lock) {
-        recoverPreparedLocked()
         val leases = mutableListOf<RecipientCredentialLease>()
         try {
             readIndexLocked().asSequence()
@@ -250,12 +338,18 @@ class ClientKeyBundleStore(
     }
 
     fun bindProfile(localRecordId: String, profileRecordId: String) = synchronized(lock) {
+        writes()
         require(profileRecordId.matches(PROFILE_RECORD_ID))
         val entries = readIndexLocked().toMutableList()
         val index = entries.indexOfFirst { it.localRecordId == localRecordId }
         require(index >= 0)
+        check(entries.none { it.localRecordId != localRecordId && profileRecordId in it.boundProfiles }) {
+            "RECIPIENT_BINDING_CONFLICT"
+        }
+        check(entries[index].status != ClientKeyStatus.PREPARED) { "RECIPIENT_RECOVERY_REQUIRED" }
+        openBundleLocked(entries[index]).useBundle { Unit }
         val bound = entries[index].boundProfiles + profileRecordId
-        require(bound.size <= MAX_BOUND_PROFILES)
+        check(bound.size == 1) { "RECIPIENT_BINDING_CONFLICT" }
         entries[index] = entries[index].copy(
             status = ClientKeyStatus.PROFILE_VERIFIED,
             boundProfiles = bound,
@@ -264,6 +358,7 @@ class ClientKeyBundleStore(
     }
 
     fun unbindProfile(profileRecordId: String): ClientKeySummary? = synchronized(lock) {
+        writes()
         require(profileRecordId.matches(PROFILE_RECORD_ID))
         val entries = readIndexLocked().toMutableList()
         var offered: ClientKeySummary? = null
@@ -283,32 +378,45 @@ class ClientKeyBundleStore(
         offered
     }
 
+    /** Read-only scoped-reset selection. Pending keys are excluded; conflicting legacy bindings reject. */
+    fun keysExclusivelyBoundTo(profileRecordIds: Set<String>): List<String> = synchronized(lock) {
+        val owned = profileRecordIds.toTypedArray().toSet()
+        require(owned.all { it.matches(PROFILE_RECORD_ID) })
+        readIndexLocked().filter { entry ->
+            entry.status == ClientKeyStatus.PROFILE_VERIFIED && entry.boundProfiles.isNotEmpty() &&
+                entry.boundProfiles.all { it in owned }
+        }.map { it.localRecordId }
+    }
+
     fun delete(localRecordId: String): Boolean = synchronized(lock) {
+        writes()
         val entries = readIndexLocked().toMutableList()
         val target = entries.singleOrNull { it.localRecordId == localRecordId } ?: return@synchronized false
         require(target.boundProfiles.isEmpty())
-        blobs.delete(localRecordId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL)
+        writes().delete(localRecordId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL)
         entries.remove(target)
         writeIndexLocked(entries)
         true
     }
 
     fun backupRecords(profileRecordId: String? = null): List<ClientKeyBackupRecord> = synchronized(lock) {
-        recoverPreparedLocked()
         val records = mutableListOf<ClientKeyBackupRecord>()
         try {
             readIndexLocked().filter {
-                it.status != ClientKeyStatus.PREPARED &&
+                it.status == ClientKeyStatus.PROFILE_VERIFIED && it.boundProfiles.isNotEmpty() &&
                     (profileRecordId == null || profileRecordId in it.boundProfiles)
             }.forEach { entry ->
                 val bundle = openBundleLocked(entry)
-                records += ClientKeyBackupRecord(
+                try { records += ClientKeyBackupRecord(
                     sourceRecordId = entry.localRecordId,
                     createdAtEpochSeconds = entry.createdAtEpochSeconds,
                     expiresAtEpochSeconds = entry.expiresAtEpochSeconds,
                     publicRequest = bundle.publicRequest,
                     privateBundle = bundle.privateBundle,
-                )
+                    sourceStatus = entry.status,
+                    sourceProfileRecordIds = entry.boundProfiles.filter { profileRecordId == null || it == profileRecordId }.sorted(),
+                    sourceVersion = 2,
+                ) } finally { bundle.destroy() }
             }
             records
         } catch (error: Throwable) {
@@ -318,65 +426,80 @@ class ClientKeyBundleStore(
     }
 
     fun restore(records: List<ClientKeyBackupRecord>): ClientKeyRestoreResult = synchronized(lock) {
+        writes()
         if (records.size > MAX_CLIENT_KEYS) {
             return@synchronized ClientKeyRestoreResult.Failure(OperationError.SIZE_LIMIT)
         }
+        val sourceRecords = records.toList()
+        if (sourceRecords.isEmpty()) return@synchronized ClientKeyRestoreResult.Success(0, emptyList())
+        try { validateBackupKeys(sourceRecords, sourceRecords.first().sourceVersion) }
+        catch (_: Throwable) { return@synchronized ClientKeyRestoreResult.Failure(OperationError.INVALID_INPUT) }
         val current = readIndexLocked().toMutableList()
         val createdIds = mutableListOf<String>()
+        val associations = mutableListOf<RestoredClientKeyAssociation>()
         try {
-            records.forEach { record ->
-                if (!record.sourceRecordId.matches(LOCAL_KEY_ID) ||
-                    record.createdAtEpochSeconds <= 0 ||
-                    record.expiresAtEpochSeconds <= record.createdAtEpochSeconds ||
-                    record.publicRequest.size !in 1..MAX_RECIPIENT_REQUEST_BYTES ||
-                    record.privateBundle.size !in 1..MAX_RECIPIENT_PRIVATE_BYTES
-                ) {
-                    return@synchronized rollbackRestoreLocked(
-                        current,
-                        createdIds,
-                        OperationError.INVALID_INPUT,
-                    )
-                }
-                when (val validation = native.validate(record.publicRequest, record.privateBundle)) {
-                    is NativeResult.Failure -> return@synchronized rollbackRestoreLocked(
-                        current,
-                        createdIds,
-                        validation.error,
-                    )
-                    is NativeResult.Success -> Unit
-                }
-                val requestFingerprint = fingerprint(record.publicRequest)
-                if (current.any { it.requestFingerprint == requestFingerprint }) {
-                    return@forEach
-                }
-                if (current.size >= MAX_CLIENT_KEYS) {
-                    return@synchronized rollbackRestoreLocked(current, createdIds, OperationError.SIZE_LIMIT)
-                }
-                val localId = newUniqueLocalId(current)
-                val payload = encodeBundle(
-                    localId,
-                    record.createdAtEpochSeconds,
-                    record.expiresAtEpochSeconds,
-                    record.publicRequest,
-                    record.privateBundle,
-                )
+            sourceRecords.forEach { record ->
+                val request = record.publicRequest
+                var privateBytes: ByteArray? = null
                 try {
-                    blobs.stage(localId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL, payload)
-                } finally {
-                    payload.fill(0)
-                }
-                createdIds += localId
-                current += ClientKeyIndexEntry(
-                    localRecordId = localId,
-                    requestFingerprint = requestFingerprint,
-                    createdAtEpochSeconds = record.createdAtEpochSeconds,
-                    expiresAtEpochSeconds = record.expiresAtEpochSeconds,
-                    status = ClientKeyStatus.AWAITING_PROFILE,
-                    boundProfiles = emptySet(),
-                )
+                    privateBytes = record.privateBundle
+                    if (!record.sourceRecordId.matches(LOCAL_KEY_ID) ||
+                        record.createdAtEpochSeconds <= 0 ||
+                        record.expiresAtEpochSeconds <= record.createdAtEpochSeconds ||
+                        request.size !in 1..MAX_RECIPIENT_REQUEST_BYTES ||
+                        privateBytes.size !in 1..MAX_RECIPIENT_PRIVATE_BYTES
+                    ) {
+                        return@synchronized rollbackRestoreLocked(
+                            current,
+                            createdIds,
+                            OperationError.INVALID_INPUT,
+                        )
+                    }
+                    when (val validation = native.validate(request, privateBytes)) {
+                        is NativeResult.Failure -> return@synchronized rollbackRestoreLocked(
+                            current,
+                            createdIds,
+                            validation.error,
+                        )
+                        is NativeResult.Success -> Unit
+                    }
+                    val requestFingerprint = fingerprint(request)
+                    val existing = current.singleOrNull { it.requestFingerprint == requestFingerprint }
+                    if (existing != null) {
+                        openBundleLocked(existing).useBundle { Unit }
+                        associations += RestoredClientKeyAssociation(record.sourceRecordId, existing.localRecordId, record.sourceVersion, record.sourceProfileRecordIds)
+                        return@forEach
+                    }
+                    if (current.size >= MAX_CLIENT_KEYS) {
+                        return@synchronized rollbackRestoreLocked(current, createdIds, OperationError.SIZE_LIMIT)
+                    }
+                    val localId = newUniqueLocalId(current)
+                    val payload = encodeBundle(
+                        localId,
+                        record.createdAtEpochSeconds,
+                        record.expiresAtEpochSeconds,
+                        request,
+                        privateBytes,
+                    )
+                    try {
+                        writes().stage(localId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL, payload)
+                    } finally {
+                        payload.fill(0)
+                    }
+                    createdIds += localId
+                    current += ClientKeyIndexEntry(
+                        localRecordId = localId,
+                        requestFingerprint = requestFingerprint,
+                        createdAtEpochSeconds = record.createdAtEpochSeconds,
+                        expiresAtEpochSeconds = record.expiresAtEpochSeconds,
+                        status = ClientKeyStatus.AWAITING_PROFILE,
+                        boundProfiles = emptySet(),
+                    )
+                    associations += RestoredClientKeyAssociation(record.sourceRecordId, localId, record.sourceVersion, record.sourceProfileRecordIds)
+                } finally { request.fill(0); privateBytes?.fill(0) }
             }
             writeIndexLocked(current)
-            ClientKeyRestoreResult.Success(createdIds.size, createdIds.toList())
+            ClientKeyRestoreResult.Success(createdIds.size, createdIds.toList(), associations.toList())
         } catch (_: KeyInvalidatedException) {
             rollbackRestoreLocked(current, createdIds, OperationError.KEY_INVALIDATED)
         } catch (_: Throwable) {
@@ -385,23 +508,21 @@ class ClientKeyBundleStore(
     }
 
     fun rollbackRestored(localRecordIds: List<String>) = synchronized(lock) {
+        writes()
         val entries = readIndexLocked().toMutableList()
-        localRecordIds.forEach { localId ->
-            entries.removeAll { it.localRecordId == localId && it.boundProfiles.isEmpty() }
-            blobs.delete(localId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL)
+        val ownedIds = localRecordIds.toList()
+        require(ownedIds.size == ownedIds.toSet().size && ownedIds.all { it.matches(LOCAL_KEY_ID) })
+        check(entries.none { it.localRecordId in ownedIds && it.boundProfiles.isNotEmpty() }) {
+            "ROLLBACK_REQUIRES_PROFILE_UNBIND"
         }
-        writeIndexLocked(entries)
+        // The broker covers both writes. Never delete material for a still-bound index.
+        writeIndexLocked(entries.filter { it.localRecordId !in ownedIds })
+        ownedIds.forEach { writes().delete(it, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL) }
     }
 
-    internal fun forcePreparedForTesting(localRecordId: String) = synchronized(lock) {
-        val entries = readIndexLocked().toMutableList()
-        val index = entries.indexOfFirst { it.localRecordId == localRecordId }
-        require(index >= 0)
-        entries[index] = entries[index].copy(status = ClientKeyStatus.PREPARED)
-        writeIndexLocked(entries)
-    }
-
-    private fun recoverPreparedLocked() {
+    /** Only a broker-admitted explicit recovery command may call this. Reads never repair. */
+    fun recoverPreparedExplicitly() = synchronized(lock) {
+        writes()
         val entries = readIndexLocked().toMutableList()
         var changed = false
         val iterator = entries.listIterator()
@@ -409,18 +530,14 @@ class ClientKeyBundleStore(
             val entry = iterator.next()
             if (entry.status != ClientKeyStatus.PREPARED) continue
             if (!blobs.exists(entry.localRecordId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL)) {
-                iterator.remove()
-                changed = true
+                // Preserve the quarantined lifecycle record, including recoverable enrollment identity.
                 continue
             }
             val valid = runCatching { openBundleLocked(entry).useBundle { Unit } }.isSuccess
             if (valid) {
                 iterator.set(entry.copy(status = ClientKeyStatus.REQUEST_READY))
-            } else {
-                blobs.delete(entry.localRecordId, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL)
-                iterator.remove()
+                changed = true
             }
-            changed = true
         }
         if (changed) writeIndexLocked(entries)
     }
@@ -458,7 +575,7 @@ class ClientKeyBundleStore(
         createdIds: List<String>,
         error: OperationError,
     ): ClientKeyRestoreResult.Failure {
-        createdIds.forEach { blobs.delete(it, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL) }
+        createdIds.forEach { writes().delete(it, SecureDataClass.RECIPIENT_PRIVATE_MATERIAL) }
         writeIndexLocked(original.filter { it.localRecordId !in createdIds })
         return ClientKeyRestoreResult.Failure(error)
     }
@@ -484,12 +601,12 @@ class ClientKeyBundleStore(
 
     private fun writeIndexLocked(entries: List<ClientKeyIndexEntry>) {
         if (entries.isEmpty()) {
-            blobs.delete(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX)
+            writes().delete(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX)
             return
         }
         val encoded = encodeIndex(entries)
         try {
-            blobs.stage(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX, encoded)
+            writes().stage(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX, encoded)
         } finally {
             encoded.fill(0)
         }
@@ -535,11 +652,18 @@ private inline fun <T> OpenClientKeyBundle.useBundle(block: (OpenClientKeyBundle
 
 private fun encodeIndex(entries: List<ClientKeyIndexEntry>): ByteArray {
     require(entries.size <= MAX_CLIENT_KEYS)
+    require(entries.map { it.localRecordId }.distinct().size == entries.size)
+    require(entries.map { it.requestFingerprint }.distinct().size == entries.size)
+    val allBindings = entries.flatMap { it.boundProfiles }
+    require(allBindings.distinct().size == allBindings.size) { "RECIPIENT_BINDING_CONFLICT" }
     val encoded = entries.map { entry ->
         require(entry.localRecordId.matches(LOCAL_KEY_ID))
         require(entry.requestFingerprint.matches(Regex("[0-9a-f]{64}")))
         require(entry.createdAtEpochSeconds > 0 && entry.expiresAtEpochSeconds > entry.createdAtEpochSeconds)
-        require(entry.boundProfiles.size <= MAX_BOUND_PROFILES)
+        require(entry.boundProfiles.size <= 1) { "RECIPIENT_BINDING_CONFLICT" }
+        require((entry.status == ClientKeyStatus.PROFILE_VERIFIED) == entry.boundProfiles.isNotEmpty()) {
+            "RECIPIENT_STATE_INCONSISTENT"
+        }
         val localId = entry.localRecordId.encodeToByteArray()
         val fingerprint = entry.requestFingerprint.encodeToByteArray()
         val profiles = entry.boundProfiles.sorted().map { profile ->
@@ -592,20 +716,25 @@ private fun decodeIndex(encoded: ByteArray): List<ClientKeyIndexEntry> {
         val expires = reader.long
         val fingerprint = reader.readBoundedString(64)
         val profileCount = reader.get().toInt() and 0xff
-        require(profileCount <= MAX_BOUND_PROFILES)
+        require(profileCount <= 1) { "RECIPIENT_BINDING_CONFLICT" }
         val profiles = buildSet {
-            repeat(profileCount) { add(reader.readBoundedString(64)) }
+            repeat(profileCount) { require(add(reader.readBoundedString(64))) { "DUPLICATE_RECIPIENT_BINDING" } }
         }
         ClientKeyIndexEntry(localId, fingerprint, created, expires, status, profiles).also { entry ->
             require(entry.localRecordId.matches(LOCAL_KEY_ID))
             require(entry.requestFingerprint.matches(Regex("[0-9a-f]{64}")))
             require(entry.createdAtEpochSeconds > 0 && entry.expiresAtEpochSeconds > entry.createdAtEpochSeconds)
             require(entry.boundProfiles.all { it.matches(PROFILE_RECORD_ID) })
+            require((entry.status == ClientKeyStatus.PROFILE_VERIFIED) == entry.boundProfiles.isNotEmpty()) {
+                "RECIPIENT_STATE_INCONSISTENT"
+            }
         }
     }
     require(!reader.hasRemaining())
     require(entries.map { it.localRecordId }.distinct().size == entries.size)
     require(entries.map { it.requestFingerprint }.distinct().size == entries.size)
+    val bindings = entries.flatMap { it.boundProfiles }
+    require(bindings.distinct().size == bindings.size) { "RECIPIENT_BINDING_CONFLICT" }
     return entries
 }
 
@@ -643,13 +772,29 @@ private fun decodeBundle(encoded: ByteArray, expectedLocalRecordId: String): Ope
     require(reader.int == CLIENT_KEY_BUNDLE_MAGIC)
     require(reader.get().toInt() and 0xff == CLIENT_KEY_VERSION)
     require(reader.readBoundedString(64) == expectedLocalRecordId)
+    require(reader.remaining() >= 16)
     val created = reader.long
     val expires = reader.long
     require(created > 0 && expires > created)
-    val request = reader.readBoundedBytes16(MAX_RECIPIENT_REQUEST_BYTES)
-    val privateBundle = reader.readBoundedBytes16(MAX_RECIPIENT_PRIVATE_BYTES)
+    // Validate the entire frame before creating either owned material slice.
+    val requestLength = reader.readBoundedLength16(MAX_RECIPIENT_REQUEST_BYTES)
+    val requestOffset = reader.position()
+    reader.position(requestOffset + requestLength)
+    val privateLength = reader.readBoundedLength16(MAX_RECIPIENT_PRIVATE_BYTES)
+    val privateOffset = reader.position()
+    reader.position(privateOffset + privateLength)
     require(!reader.hasRemaining())
-    return OpenClientKeyBundle(created, expires, request, privateBundle)
+
+    var request: ByteArray? = null
+    var privateBundle: ByteArray? = null
+    var transferred = false
+    return try {
+        request = encoded.copyOfRange(requestOffset, requestOffset + requestLength)
+        privateBundle = encoded.copyOfRange(privateOffset, privateOffset + privateLength)
+        OpenClientKeyBundle(created, expires, request, privateBundle).also { transferred = true }
+    } finally {
+        if (!transferred) { request?.fill(0); privateBundle?.fill(0) }
+    }
 }
 
 private fun ByteBuffer.readBoundedString(maximum: Int): String =
@@ -662,11 +807,11 @@ private fun ByteBuffer.readBoundedBytes(maximum: Int): ByteArray {
     return ByteArray(length).also(::get)
 }
 
-private fun ByteBuffer.readBoundedBytes16(maximum: Int): ByteArray {
+private fun ByteBuffer.readBoundedLength16(maximum: Int): Int {
     require(remaining() >= 2)
     val length = short.toInt() and 0xffff
     require(length in 1..maximum && length <= remaining())
-    return ByteArray(length).also(::get)
+    return length
 }
 
 private fun fingerprint(value: ByteArray): String =

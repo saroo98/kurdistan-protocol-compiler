@@ -95,6 +95,36 @@ func TestHandleRegistryDestroysSensitiveStateExactlyOnce(t *testing.T) {
 	}
 }
 
+type failingDestroyingHandle struct {
+	count int
+}
+
+func (handle *failingDestroyingHandle) DestroyResult() ErrorCode {
+	handle.count++
+	return CodeInternalFailure
+}
+
+func TestHandleRegistryRetiresHandleWhenDestroyFails(t *testing.T) {
+	registry := &HandleRegistry{}
+	value := &failingDestroyingHandle{}
+	handle, code := registry.Open(HandleBackup, value)
+	if code != CodeOK {
+		t.Fatal(code)
+	}
+	if code := registry.Free(handle); code != CodeInternalFailure {
+		t.Fatalf("free code=%v", code)
+	}
+	if value.count != 1 {
+		t.Fatalf("destroy count=%d want=1", value.count)
+	}
+	if code := registry.Free(handle); code != CodeAlreadyClosed {
+		t.Fatalf("duplicate free code=%v", code)
+	}
+	if value.count != 1 {
+		t.Fatalf("destroy count after duplicate free=%d want=1", value.count)
+	}
+}
+
 func TestHandleRegistryCapacityCancellationAndConcurrency(t *testing.T) {
 	registry := &HandleRegistry{}
 	handles := make([]Handle, MaxBridgeHandles)

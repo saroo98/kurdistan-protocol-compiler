@@ -17,6 +17,7 @@ import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
 import org.kurdistanvpn.data.metadata.CatalogHealth
 import org.kurdistanvpn.data.metadata.ProfileCatalogDao
+import org.kurdistanvpn.data.metadata.ProfileCatalogReadAccess
 import org.kurdistanvpn.data.metadata.ProfileCatalogEntity
 import org.kurdistanvpn.data.metadata.TransactionState
 
@@ -60,16 +61,37 @@ sealed interface RuntimeAuthorityResult {
  * command is accepted. Incomplete work is replayed from the encrypted import
  * request after process death.
  */
-class ProfileAdmissionJournal(
+class ProfileAdmissionJournal private constructor(
     private val nativeCore: KurdNativeCore,
-    private val catalog: ProfileCatalogDao,
-    private val blobs: SecureBlobAccess,
+    private val catalog: ProfileCatalogReadAccess,
+    private val blobs: SecureBlobReadAccess,
     private val productionTrust: Boolean,
-    private val recipientKeys: ClientKeyBundleStore? = null,
-    private val random: SecureRandom = SecureRandom(),
+    private val recipientKeys: ClientKeyBundleStore?,
+    private val random: SecureRandom,
+    private val catalogWriter: ProfileCatalogDao?,
+    private val blobWriter: SecureBlobAccess?,
 ) {
-    private companion object {
-        const val RESTORE_RECORD_ID = "restore-current"
+    constructor(nativeCore: KurdNativeCore, catalog: ProfileCatalogDao, blobs: SecureBlobAccess,
+        productionTrust: Boolean, recipientKeys: ClientKeyBundleStore? = null,
+        random: SecureRandom = SecureRandom()) :
+        this(nativeCore, catalog, blobs, productionTrust, recipientKeys, random, catalog, blobs)
+
+    private fun requireWriter() { check(catalogWriter != null && blobWriter != null) { "READ_ONLY_PROTECTED_STATE" } }
+    private fun writeCatalog(): ProfileCatalogDao = checkNotNull(catalogWriter) { "READ_ONLY_PROTECTED_STATE" }
+    private fun writeBlobs(): SecureBlobAccess = checkNotNull(blobWriter) { "READ_ONLY_PROTECTED_STATE" }
+
+    companion object {
+        fun readOnly(nativeCore: KurdNativeCore, catalog: ProfileCatalogReadAccess, blobs: SecureBlobReadAccess,
+            productionTrust: Boolean): ProfileAdmissionJournal = ProfileAdmissionJournal(nativeCore, catalog,
+                blobs, productionTrust, ClientKeyBundleStore.readOnly(blobs, KurdRecipientKeyNative(nativeCore)),
+                SecureRandom(), null, null)
+        private const val RESTORE_RECORD_ID = "restore-current"
+        private val PROFILE_DATA_CLASSES = listOf(
+            SecureDataClass.PROFILE_ARTIFACT, SecureDataClass.VERIFIED_RECEIPT,
+            SecureDataClass.LOCAL_ALIAS, SecureDataClass.IMPORT_REQUEST, SecureDataClass.PROFILE_PREVIEW,
+            SecureDataClass.ACTIVATION_STAGED, SecureDataClass.ACTIVATION_ACTIVE,
+            SecureDataClass.ACTIVATION_LAST_KNOWN_GOOD,
+        )
     }
 
     suspend fun admit(
@@ -77,6 +99,7 @@ class ProfileAdmissionJournal(
         expectedPreview: RedactedProfilePreview,
         recipientKeyLocalId: String? = null,
     ): AdmissionResult = withContext(Dispatchers.IO) {
+        requireWriter()
         admitInternal(
             verifyRequest = verifyRequest,
             expectedPreview = expectedPreview,
@@ -88,6 +111,7 @@ class ProfileAdmissionJournal(
 
     suspend fun restore(records: List<BackupProfileRecord>): RestoreResult =
         withContext(Dispatchers.IO) {
+            requireWriter()
             if (blobs.exists(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)) {
                 return@withContext RestoreResult.Failure(OperationError.RECOVERY_REQUIRED)
             }
@@ -96,7 +120,7 @@ class ProfileAdmissionJournal(
                     return@withContext RestoreResult.Failure(OperationError.INVALID_INPUT)
                 }
             try {
-                blobs.stage(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH, encoded)
+                writeBlobs().stage(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH, encoded)
             } catch (_: KeyInvalidatedException) {
                 return@withContext RestoreResult.Failure(OperationError.KEY_INVALIDATED)
             } catch (_: Throwable) {
@@ -108,6 +132,7 @@ class ProfileAdmissionJournal(
         }
 
     suspend fun recoverPendingRestore(): RestoreResult? = withContext(Dispatchers.IO) {
+        requireWriter()
         if (!blobs.exists(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)) {
             return@withContext null
         }
@@ -136,8 +161,8 @@ class ProfileAdmissionJournal(
             }
             val recordId = newRecordId()
             try {
-                blobs.stage(recordId, SecureDataClass.IMPORT_REQUEST, verifyRequest)
-                catalog.upsert(entity(recordId, TransactionState.PREPARED))
+                writeBlobs().stage(recordId, SecureDataClass.IMPORT_REQUEST, verifyRequest)
+                writeCatalog().upsert(entity(recordId, TransactionState.PREPARED))
             } catch (_: KeyInvalidatedException) {
                 cleanupFailedPreparation(recordId)
                 return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
@@ -145,19 +170,10 @@ class ProfileAdmissionJournal(
                 cleanupFailedPreparation(recordId)
                 return AdmissionResult.Failure(OperationError.STORAGE_FAILURE)
             }
-            val result = activate(recordId, verified, finalHealth)
-            if (result is AdmissionResult.Success && resolved.recipientKeyLocalId != null) {
-                try {
-                    recipientKeys?.bindProfile(resolved.recipientKeyLocalId, result.outcome.localRecordId)
-                        ?: return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
-                } catch (_: Throwable) {
-                    delete(result.outcome.localRecordId)
-                    return AdmissionResult.Failure(OperationError.STORAGE_FAILURE)
-                }
-            }
+            val result = activate(recordId, verified, finalHealth, resolved.recipientKeyLocalId)
             if (result is AdmissionResult.Success && publishSuperseded) {
                 conflict.superseded.forEach { row ->
-                    catalog.upsert(row.copy(health = CatalogHealth.SUPERSEDED.name))
+                    writeCatalog().upsert(row.copy(health = CatalogHealth.SUPERSEDED.name))
                 }
             }
             result
@@ -167,6 +183,7 @@ class ProfileAdmissionJournal(
     }
 
     suspend fun recoverIncomplete(): List<AdmissionResult> = withContext(Dispatchers.IO) {
+        requireWriter()
         catalog.listAll()
             .filter { it.transactionState != TransactionState.FINALIZED.name }
             .map { row ->
@@ -186,6 +203,9 @@ class ProfileAdmissionJournal(
                 val encoded = blobs.reopen(row.localRecordId, SecureDataClass.PROFILE_PREVIEW)
                 try {
                     val (preview, alias) = ProfilePreviewCodec.decode(encoded)
+                    if (preview.sealed) {
+                        checkNotNull(recipientKeys?.credentialsForProfile(row.localRecordId)).close()
+                    }
                     summaries += ProfilePreviewCodec.summary(
                         row.localRecordId,
                         preview,
@@ -195,23 +215,56 @@ class ProfileAdmissionJournal(
                 } finally {
                     encoded.fill(0)
                 }
-            } catch (_: KeyInvalidatedException) {
-                catalog.upsert(row.copy(health = CatalogHealth.KEY_INVALIDATED.name))
-            } catch (_: Throwable) {
-                catalog.upsert(row.copy(health = CatalogHealth.QUARANTINED.name))
-            }
+            } catch (_: Exception) { /* Derived health is reported separately. Listing never repairs. */ }
         }
         summaries
     }
 
     suspend fun storageHealth(): CatalogHealth = withContext(Dispatchers.IO) {
-        val values = catalog.listAll().map { it.health }.toSet()
+        val rows = catalog.listAll()
+        val values = rows.map { it.health }.toMutableSet()
+        if (rows.any { it.transactionState != TransactionState.FINALIZED.name } ||
+            CatalogHealth.RESTORE_PENDING.name in values) values += CatalogHealth.DEGRADED.name
+        for (row in rows.filter { it.transactionState == TransactionState.FINALIZED.name && it.health == CatalogHealth.AVAILABLE.name }) {
+            try {
+                val encoded = blobs.reopen(row.localRecordId, SecureDataClass.PROFILE_PREVIEW)
+                try {
+                    if (ProfilePreviewCodec.decode(encoded).first.sealed) {
+                        checkNotNull(recipientKeys?.credentialsForProfile(row.localRecordId)).close()
+                    }
+                } finally { encoded.fill(0) }
+            } catch (_: KeyInvalidatedException) { values += CatalogHealth.KEY_INVALIDATED.name }
+            catch (_: Exception) { values += CatalogHealth.QUARANTINED.name }
+        }
         when {
             CatalogHealth.KEY_INVALIDATED.name in values -> CatalogHealth.KEY_INVALIDATED
             CatalogHealth.QUARANTINED.name in values -> CatalogHealth.QUARANTINED
             CatalogHealth.DEGRADED.name in values -> CatalogHealth.DEGRADED
             else -> CatalogHealth.AVAILABLE
         }
+    }
+
+    /** Structural cross-object validation only. Expiry and live authority are freshly checked at use. */
+    suspend fun requireCommittedRelationships(materialRecordIds: Set<String>) = withContext(Dispatchers.IO) {
+        val material = materialRecordIds.toTypedArray().toSet()
+        val rows = catalog.listAll().toTypedArray().toList()
+        check(rows.map { it.localRecordId }.toSet().size == rows.size)
+        check(rows.all { it.transactionState == TransactionState.FINALIZED.name }) {
+            "INCOMPLETE_PROFILE_STATE"
+        }
+        val sealed = mutableSetOf<String>()
+        for (row in rows) {
+            val preview = blobs.reopen(row.localRecordId, SecureDataClass.PROFILE_PREVIEW)
+            try { if (ProfilePreviewCodec.decode(preview).first.sealed) sealed += row.localRecordId }
+            finally { preview.fill(0) }
+            for (role in listOf(SecureDataClass.IMPORT_REQUEST, SecureDataClass.ACTIVATION_ACTIVE)) {
+                val value = blobs.reopen(row.localRecordId, role)
+                try { check(value.isNotEmpty()) } finally { value.fill(0) }
+            }
+        }
+        val keys = recipientKeys
+        if (keys == null) check(material.isEmpty() && sealed.isEmpty())
+        else keys.requireConsistentBindings(rows.map { it.localRecordId }.toSet(), sealed, material)
     }
 
     suspend fun backupPayload(localRecordId: String? = null): ByteArray = withContext(Dispatchers.IO) {
@@ -318,11 +371,17 @@ class ProfileAdmissionJournal(
         }
 
     suspend fun delete(localRecordId: String): Boolean = withContext(Dispatchers.IO) {
+        requireWriter()
         try {
-            SecureDataClass.entries.forEach { dataClass ->
-                blobs.delete(localRecordId, dataClass)
+            val row = catalog.get(localRecordId) ?: return@withContext false
+            // Revocation of local admissibility precedes either side of relationship removal.
+            writeCatalog().upsert(row.copy(transactionState = TransactionState.QUARANTINED.name,
+                health = CatalogHealth.QUARANTINED.name))
+            recipientKeys?.unbindProfile(localRecordId)
+            PROFILE_DATA_CLASSES.forEach { dataClass ->
+                writeBlobs().delete(localRecordId, dataClass)
             }
-            catalog.delete(localRecordId)
+            writeCatalog().delete(localRecordId)
             true
         } catch (_: Throwable) {
             false
@@ -330,9 +389,12 @@ class ProfileAdmissionJournal(
     }
 
     suspend fun resetAll(): Boolean = withContext(Dispatchers.IO) {
+        requireWriter()
         try {
-            blobs.deleteAll()
-            catalog.deleteAll()
+            val profiles = catalog.listAll().map { it.localRecordId }.toSet()
+            val exclusiveKeys = recipientKeys?.keysExclusivelyBoundTo(profiles).orEmpty()
+            for (profile in profiles) if (!delete(profile)) return@withContext false
+            for (key in exclusiveKeys) if (recipientKeys?.delete(key) != true) return@withContext false
             true
         } catch (_: Throwable) {
             false
@@ -345,7 +407,7 @@ class ProfileAdmissionJournal(
             val request = blobs.reopen(recordId, SecureDataClass.IMPORT_REQUEST)
             try {
                 clearActivationBlobs(recordId)
-                catalog.upsert(entity(recordId, TransactionState.PREPARED))
+                writeCatalog().upsert(entity(recordId, TransactionState.PREPARED))
                 val resolved = when (val result = resolveVerified(request, null)) {
                     is NativeResult.Failure -> {
                         quarantine(recordId)
@@ -355,12 +417,7 @@ class ProfileAdmissionJournal(
                 }
                 val verified = resolved.verified
                 try {
-                    val activated = activate(recordId, verified)
-                    if (activated is AdmissionResult.Success && resolved.recipientKeyLocalId != null) {
-                        recipientKeys?.bindProfile(resolved.recipientKeyLocalId, recordId)
-                            ?: return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
-                    }
-                    activated
+                    activate(recordId, verified, recipientKeyLocalId = resolved.recipientKeyLocalId)
                 } finally {
                     nativeCore.releaseVerified(verified)
                 }
@@ -368,7 +425,7 @@ class ProfileAdmissionJournal(
                 request.fill(0)
             }
         } catch (_: KeyInvalidatedException) {
-            catalog.upsert(
+            writeCatalog().upsert(
                 entity(
                     recordId,
                     TransactionState.RECOVERY_REQUIRED,
@@ -386,13 +443,14 @@ class ProfileAdmissionJournal(
         recordId: String,
         verified: VerifiedPreviewHandle,
         finalHealth: CatalogHealth = CatalogHealth.AVAILABLE,
+        recipientKeyLocalId: String? = null,
     ): AdmissionResult {
         val session = when (val result = nativeCore.openActivation(verified)) {
             is NativeResult.Failure -> return AdmissionResult.Failure(result.error)
             is NativeResult.Success -> result.value
         }
         return session.use {
-            driveSession(recordId, verified, session, finalHealth)
+            driveSession(recordId, verified, session, finalHealth, recipientKeyLocalId)
         }
     }
 
@@ -401,6 +459,7 @@ class ProfileAdmissionJournal(
         verified: VerifiedPreviewHandle,
         session: NativeActivationSession,
         finalHealth: CatalogHealth,
+        recipientKeyLocalId: String?,
     ): AdmissionResult {
         while (true) {
             val command = when (val result = session.next()) {
@@ -424,7 +483,7 @@ class ProfileAdmissionJournal(
                     val alias = "Kurd profile ${verified.preview.contentFingerprint.take(8)}"
                     val encodedPreview = ProfilePreviewCodec.encode(verified.preview, alias)
                     try {
-                        blobs.stage(
+                        writeBlobs().stage(
                             recordId,
                             SecureDataClass.PROFILE_PREVIEW,
                             encodedPreview,
@@ -432,7 +491,22 @@ class ProfileAdmissionJournal(
                     } finally {
                         encodedPreview.fill(0)
                     }
-                    catalog.upsert(entity(recordId, TransactionState.FINALIZED, finalHealth))
+                    try {
+                        if (verified.preview.sealed) {
+                            val keyId = checkNotNull(recipientKeyLocalId)
+                            checkNotNull(recipientKeys).bindProfile(keyId, recordId)
+                            checkNotNull(recipientKeys.credentialsForProfile(recordId)).use {
+                                check(it.localRecordId == keyId)
+                            }
+                        } else check(recipientKeyLocalId == null)
+                        writeCatalog().upsert(entity(recordId, TransactionState.FINALIZED, finalHealth))
+                    } catch (_: KeyInvalidatedException) {
+                        quarantine(recordId)
+                        return AdmissionResult.Failure(OperationError.KEY_INVALIDATED)
+                    } catch (_: Exception) {
+                        quarantine(recordId)
+                        return AdmissionResult.Failure(OperationError.RECOVERY_REQUIRED)
+                    }
                     return AdmissionResult.Success(
                         AdmissionOutcome(
                             localRecordId = recordId,
@@ -490,41 +564,41 @@ class ProfileAdmissionJournal(
                 ),
             )
             ActivationCommandKind.STAGE_CANDIDATE -> {
-                blobs.stage(
+                writeBlobs().stage(
                     recordId,
                     SecureDataClass.ACTIVATION_STAGED,
                     command.opaqueRecord,
                 )
-                catalog.upsert(entity(recordId, TransactionState.STAGED))
+                writeCatalog().upsert(entity(recordId, TransactionState.STAGED))
                 StoragePayloads()
             }
             ActivationCommandKind.REOPEN_CANDIDATE -> {
                 val reopened = blobs.reopen(recordId, SecureDataClass.ACTIVATION_STAGED)
-                catalog.upsert(entity(recordId, TransactionState.REOPENED))
+                writeCatalog().upsert(entity(recordId, TransactionState.REOPENED))
                 StoragePayloads(reopened = reopened)
             }
             ActivationCommandKind.MARK_ACTIVATION -> {
-                catalog.upsert(entity(recordId, TransactionState.MARKED))
+                writeCatalog().upsert(entity(recordId, TransactionState.MARKED))
                 StoragePayloads()
             }
             ActivationCommandKind.COMMIT_MARKED -> {
                 val staged = blobs.reopen(recordId, SecureDataClass.ACTIVATION_STAGED)
                 try {
-                    blobs.stage(recordId, SecureDataClass.ACTIVATION_ACTIVE, staged)
+                    writeBlobs().stage(recordId, SecureDataClass.ACTIVATION_ACTIVE, staged)
                 } finally {
                     staged.fill(0)
                 }
-                catalog.upsert(entity(recordId, TransactionState.COMMITTED))
+                writeCatalog().upsert(entity(recordId, TransactionState.COMMITTED))
                 StoragePayloads()
             }
             ActivationCommandKind.FINALIZE_ACTIVATION -> {
-                catalog.upsert(entity(recordId, TransactionState.COMMITTED))
-                blobs.delete(recordId, SecureDataClass.ACTIVATION_STAGED)
+                writeCatalog().upsert(entity(recordId, TransactionState.COMMITTED))
+                writeBlobs().delete(recordId, SecureDataClass.ACTIVATION_STAGED)
                 StoragePayloads()
             }
             ActivationCommandKind.RECOVER -> {
                 clearActivationBlobs(recordId)
-                catalog.upsert(entity(recordId, TransactionState.RECOVERY_REQUIRED))
+                writeCatalog().upsert(entity(recordId, TransactionState.RECOVERY_REQUIRED))
                 StoragePayloads()
             }
             ActivationCommandKind.QUARANTINE -> {
@@ -553,6 +627,12 @@ class ProfileAdmissionJournal(
                 encodedPreview.fill(0)
             }
             if (preview.contentFingerprint == verified.preview.contentFingerprint) {
+                if (preview.sealed) {
+                    val valid = runCatching {
+                        checkNotNull(recipientKeys?.credentialsForProfile(row.localRecordId)).close()
+                    }.isSuccess
+                    if (!valid) return AdmissionConflict(OperationError.RECOVERY_REQUIRED)
+                }
                 return AdmissionConflict(OperationError.DUPLICATE)
             }
             if (preview.lineageFingerprint == verified.preview.lineageFingerprint) {
@@ -640,11 +720,11 @@ class ProfileAdmissionJournal(
                     }
                 }
             }
-            catalog.publishRestore(
+            writeCatalog().publishRestore(
                 restoredRecordIds = pending.map { it.localRecordId },
                 supersededRecordIds = superseded.toList(),
             )
-            blobs.delete(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)
+            writeBlobs().delete(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)
             return RestoreResult.Success(pending.size)
         } catch (_: KeyInvalidatedException) {
             return RestoreResult.Failure(OperationError.KEY_INVALIDATED)
@@ -705,20 +785,17 @@ class ProfileAdmissionJournal(
             .filter { it.health == CatalogHealth.RESTORE_PENDING.name }
             .forEach { row ->
                 try {
-                    SecureDataClass.entries.forEach { dataClass ->
-                        blobs.delete(row.localRecordId, dataClass)
-                    }
-                    catalog.delete(row.localRecordId)
+                    check(delete(row.localRecordId))
                 } catch (_: Throwable) {
                     cleanupFailed = true
                     runCatching {
-                        catalog.upsert(row.copy(health = CatalogHealth.QUARANTINED.name))
+                        writeCatalog().upsert(row.copy(health = CatalogHealth.QUARANTINED.name))
                     }
                 }
             }
         if (!cleanupFailed) {
             runCatching {
-                blobs.delete(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)
+                writeBlobs().delete(RESTORE_RECORD_ID, SecureDataClass.RESTORE_BATCH)
             }
         }
     }
@@ -739,12 +816,12 @@ class ProfileAdmissionJournal(
             SecureDataClass.ACTIVATION_ACTIVE,
             SecureDataClass.ACTIVATION_LAST_KNOWN_GOOD,
         ).forEach { dataClass ->
-            blobs.delete(recordId, dataClass)
+            writeBlobs().delete(recordId, dataClass)
         }
     }
 
     private suspend fun quarantine(recordId: String) {
-        catalog.upsert(
+        writeCatalog().upsert(
             entity(
                 recordId,
                 TransactionState.QUARANTINED,
@@ -755,10 +832,10 @@ class ProfileAdmissionJournal(
 
     private suspend fun cleanupFailedPreparation(recordId: String) {
         runCatching {
-            blobs.delete(recordId, SecureDataClass.IMPORT_REQUEST)
+            writeBlobs().delete(recordId, SecureDataClass.IMPORT_REQUEST)
         }
         runCatching {
-            catalog.delete(recordId)
+            writeCatalog().delete(recordId)
         }
     }
 

@@ -35,6 +35,9 @@ import org.kurdistanvpn.core.model.DnsMode
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.nativeapi.BackupPreviewHandle
 import org.kurdistanvpn.core.nativeapi.NativeResult
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
+import org.kurdistanvpn.data.protectedstate.ProtectedBackupEnumeration
+import org.kurdistanvpn.data.secure.BackupPayloadCodec
 import org.kurdistanvpn.runtime.android.KurdVpnService
 import org.kurdistanvpn.runtime.android.LiveTunnelInvariantProbe
 import org.kurdistanvpn.runtime.api.LiveTunnelFailure
@@ -602,6 +605,12 @@ class Phase17LiveDataPlaneDeviceTest {
                 ),
             ),
         )
+        assertTrue(
+            Phase17FieldHarness.isTerminalFieldConnectOutcome(
+                expectDnsAvailable = true,
+                snapshot = VpnRuntimeSnapshot(state = VpnRuntimeState.ACTIVE_KURD_LIVE),
+            ),
+        )
     }
 
     @Test
@@ -665,7 +674,8 @@ class Phase17LiveDataPlaneDeviceTest {
             "kurd",
             "establish",
             "attach:71",
-            "stage:RUNNING",
+            "model:PRE_ACTIVE",
+            "model:NATIVE_READY",
             "stop",
             "close",
             "stage:STOPPED",
@@ -684,32 +694,28 @@ class Phase17LiveDataPlaneDeviceTest {
     @Test
     fun permissionRevocationAndProcessDeathRequireFreshAuthority() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
-        val staged = ByteArray(64) { 0x5a }
         VpnRuntimeController(context).use { controller ->
-            controller.stageAuthority(staged)
+            controller.stageManualStart()
             controller.permissionRejected()
-            assertTrue(staged.all { it == 0.toByte() })
             assertEquals(VpnRuntimeState.FAILED, controller.snapshot.value.state)
             assertEquals("CONSENT_REJECTED", controller.snapshot.value.failure)
             controller.startStaged()
-            assertEquals("MISSING_VERIFIED_AUTHORITY", controller.snapshot.value.failure)
+            assertEquals("MISSING_USER_START", controller.snapshot.value.failure)
         }
 
         VpnRuntimeController(context).use { recreated ->
             recreated.startStaged()
             assertEquals(VpnRuntimeState.FAILED, recreated.snapshot.value.state)
-            assertEquals("MISSING_VERIFIED_AUTHORITY", recreated.snapshot.value.failure)
+            assertEquals("MISSING_USER_START", recreated.snapshot.value.failure)
         }
     }
 
     @Test
     fun emergencyStopLeavesNoRuntimeOrSecretEvidence() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
-        val staged = ByteArray(48) { 0x6b }
         VpnRuntimeController(context).use { controller ->
-            controller.stageAuthority(staged)
+            controller.stageManualStart()
             controller.authorityRejected("PROFILE_REVOKED")
-            assertTrue(staged.all { it == 0.toByte() })
             assertEquals(VpnRuntimeState.FAILED, controller.snapshot.value.state)
             assertEquals("PROFILE_REVOKED", controller.snapshot.value.failure)
             assertNoAuthorityEvidence(controller.snapshot.value)
@@ -953,14 +959,36 @@ class Phase17LiveDataPlaneDeviceTest {
             assertNoAuthorityEvidence(controller.snapshot.value)
         }
 
-        assertTrue(root.resetProtectedState())
-        val journal = requireNotNull(root.admissionJournal)
-        val payload = journal.backupPayload()
+        val initialized = root.initializeProtectedStateForExplicitUserAction()
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=PROTECTED_STATE_AVAILABLE actual=${root.storageFailure?.name ?: "AVAILABLE"} " +
+                "setup=${Phase17FieldHarness.protectedStateSetupState(application, "EXPLICIT_BACKUP_INITIALIZATION")}",
+            initialized,
+        )
+        val reset = root.resetProtectedStateConfirmed()
+        assertTrue(
+            "KURDISTAN_TEST_SETUP expected=RESET_COMMITTED actual=$reset " +
+                "storage=${root.storageFailure?.name ?: "AVAILABLE"}",
+            reset is ProtectedStateApplicationFacade.CommandResult.Committed,
+        )
+        assertNull(root.protectedStateFacade())
+        assertTrue(root.initializeProtectedStateForExplicitUserAction())
+        val facade = requireNotNull(root.protectedStateFacade())
+        val plan = when (val enumeration = facade.enumerateBackup(null, { false }, android.os.SystemClock::elapsedRealtime)) {
+            is ProtectedBackupEnumeration.Ready -> enumeration.plan
+            is ProtectedBackupEnumeration.Rejected -> error(
+                "BACKUP_ENUMERATION_${enumeration.category.name} " +
+                    "snapshot=${facade.snapshot() != null} projection=${facade.readProjection() != null}",
+            )
+        }
+        assertEquals(0, plan.profileCount)
+        assertEquals(0, plan.keyCount)
+        val payload = BackupPayloadCodec.encode(emptyList())
         val passphrase = "phase17-device-backup".encodeToByteArray()
         var opened: BackupPreviewHandle? = null
         var backup = byteArrayOf()
         try {
-            backup = requireSuccess(root.nativeCore.createBackup(payload, passphrase))
+            backup = plan.use { requireSuccess(it.confirmEncryptedExport(passphrase)) }
             opened = requireSuccess(root.nativeCore.openBackup(backup.copyOf(), passphrase))
             val restored = requireSuccess(root.nativeCore.restoreBackup(opened))
             try {
@@ -981,9 +1009,12 @@ class Phase17LiveDataPlaneDeviceTest {
             } finally {
                 tampered.fill(0)
             }
-            assertTrue(root.resetProtectedState())
-            assertTrue(requireNotNull(root.admissionJournal).listProfiles().isEmpty())
+            assertTrue(root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
+            assertNull(root.protectedStateFacade())
+            assertTrue(root.initializeProtectedStateForExplicitUserAction())
+            assertTrue(requireNotNull(root.protectedStateFacade()?.readProjection()).profiles.isEmpty())
         } finally {
+            plan.close()
             opened?.let(root.nativeCore::releaseBackup)
             backup.fill(0)
             payload.fill(0)

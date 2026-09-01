@@ -9,17 +9,98 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"kurdistan/internal/androidbridge"
+	"kurdistan/internal/product/backup"
 	"kurdistan/internal/product/enrollment"
 	"kurdistan/internal/product/envelope"
 	"kurdistan/internal/product/profile"
 	"kurdistan/internal/product/sessionplan"
 	"kurdistan/internal/selfhost"
 )
+
+func TestReleaseBridgeRestoresVersionedRecipientKeyRecordWithVerifiedProfile(t *testing.T) {
+	base := t.TempDir()
+	dataDir := filepath.Join(base, "node")
+	recovery := filepath.Join(base, "offline", "recovery")
+	passphrase := []byte("correct horse battery staple")
+	now := time.Now().UTC().Truncate(time.Second)
+	if _, err := selfhost.Initialize(selfhost.InitOptions{DataDir: dataDir, DeploymentName: "owner-node", Endpoint: "203.0.113.7:443", RecoveryPath: recovery, RecoveryPassphrase: passphrase, Now: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := selfhost.ConfirmRecovery(dataDir, recovery, passphrase, now); err != nil {
+		t.Fatal(err)
+	}
+	issued, err := selfhost.CreateProfile(dataDir, selfhost.CreateProfileOptions{Name: "phone", ValidFor: 24 * time.Hour, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := androidbridge.EncodeVerifyRequest(androidbridge.VerifyRequest{
+		Ingress: envelope.IngressFile, Class: envelope.ArtifactSignedPublic, Parts: [][]byte{issued.Artifact},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(request)
+	keyRecord, err := hex.DecodeString("4b434b330301016b0400000000000000010000000000000002010161000101000102")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(keyRecord)
+	payload := backup.Payload{Version: 2, Records: []backup.Record{
+		{Kind: backup.RecordNativeProfile, LocalID: "a", Generation: issued.Generation, ExactBytes: request},
+		{Kind: backup.RecordLocalAlias, LocalID: "recipient-keys-v3", ExactBytes: keyRecord},
+	}}
+	encodedPayload, err := androidbridge.EncodeBackupPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(encodedPayload)
+	encodedBackup, code := androidbridge.BackupCreate(encodedPayload, passphrase)
+	if code != androidbridge.CodeOK {
+		t.Fatalf("backup create code=%v", code)
+	}
+	defer clear(encodedBackup)
+	var handles androidbridge.HandleRegistry
+	handle, preview, code := androidbridge.BackupOpenPreview(&handles, encodedBackup, passphrase)
+	if code != androidbridge.CodeOK {
+		t.Fatalf("backup open code=%v", code)
+	}
+	defer handles.Free(handle)
+	defer clear(preview)
+	restored, code := androidbridge.BackupRestore(&handles, handle, preview, selfHostedBridgeEnvironment{})
+	if code != androidbridge.CodeOK {
+		t.Fatalf("backup restore code=%v", code)
+	}
+	defer clear(restored)
+	decoded, err := androidbridge.DecodeBackupPayload(restored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer destroyReleaseBackupPayload(&decoded)
+	if decoded.Version != 2 || len(decoded.Records) != 2 || decoded.Records[1].Kind != backup.RecordLocalAlias {
+		t.Fatalf("restored payload=%+v", decoded)
+	}
+}
+
+func TestReleaseBridgeKeepsNativeProfileIdentityBindingForVersionedBackup(t *testing.T) {
+	if err := (selfHostedBridgeEnvironment{}).VerifyBackupRecord(backup.Record{
+		Kind: backup.RecordNativeProfile, LocalID: "a", Generation: 1, ExactBytes: []byte("not-a-verify-request"),
+	}); err == nil {
+		t.Fatal("malformed native profile record was admitted")
+	}
+}
+
+func destroyReleaseBackupPayload(payload *backup.Payload) {
+	for index := range payload.Records {
+		clear(payload.Records[index].ExactBytes)
+	}
+	*payload = backup.Payload{}
+}
 
 func TestReleaseBridgeVerifiesAndStagesOwnerSelfHostedProfile(t *testing.T) {
 	base := t.TempDir()
@@ -272,4 +353,7 @@ func (network *releaseFixtureNetwork) Start(context.Context) androidbridge.Error
 }
 func (*releaseFixtureNetwork) Status() androidbridge.ErrorCode { return androidbridge.CodeOK }
 
-func (network *releaseFixtureNetwork) Close() { network.closed = true }
+func (network *releaseFixtureNetwork) Close() androidbridge.ErrorCode {
+	network.closed = true
+	return androidbridge.CodeOK
+}

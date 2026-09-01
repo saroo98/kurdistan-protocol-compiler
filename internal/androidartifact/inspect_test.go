@@ -5,21 +5,21 @@ package androidartifact
 
 import (
 	"archive/zip"
-	"os"
-	"path/filepath"
+	"bytes"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 )
 
 func TestReadAPKIndexesBoundedContents(t *testing.T) {
-	path := writeAPKFixture(t, map[string]string{
+	raw := writeAPKFixture(t, map[string]string{
 		"classes.dex":                          "release-marker",
 		"lib/arm64-v8a/libkurdistan_bridge.so": "native-marker",
 		"assets/config.txt":                    "asset-marker",
 	})
 
-	artifact, err := ReadAPK(path, Limits{MaxEntryBytes: 1024, MaxTotalBytes: 4096})
+	artifact, err := ParseAPK(raw, Limits{MaxEntryBytes: 1024, MaxTotalBytes: 4096})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,11 +44,11 @@ func TestReadAPKIndexesBoundedContents(t *testing.T) {
 }
 
 func TestAPKContentAccessorsReturnDefensiveCopies(t *testing.T) {
-	path := writeAPKFixture(t, map[string]string{
+	raw := writeAPKFixture(t, map[string]string{
 		"classes.dex": "dex-marker",
 		"assets/a":    "asset-marker",
 	})
-	artifact, err := ReadAPK(path, Limits{MaxEntryBytes: 1024, MaxTotalBytes: 4096})
+	artifact, err := ParseAPK(raw, Limits{MaxEntryBytes: 1024, MaxTotalBytes: 4096})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +68,8 @@ func TestReadAPKRejectsUnsafeOrOversizedEntries(t *testing.T) {
 		"oversized":      {"classes.dex": strings.Repeat("x", 17)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			path := writeAPKFixture(t, fixture)
-			_, err := ReadAPK(path, Limits{MaxEntryBytes: 16, MaxTotalBytes: 64})
+			raw := writeAPKFixture(t, fixture)
+			_, err := ParseAPK(raw, Limits{MaxEntryBytes: 16, MaxTotalBytes: 64})
 			if err == nil {
 				t.Fatal("unsafe APK was accepted")
 			}
@@ -139,14 +139,120 @@ func TestParseManifestRejectsDuplicatePermissionsAndInvalidBooleans(t *testing.T
 	}
 }
 
-func writeAPKFixture(t *testing.T, entries map[string]string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "fixture.apk")
-	file, err := os.Create(path)
+func TestParseManifestPreservesAuthorityServiceAndForegroundPropertyBoundaries(t *testing.T) {
+	raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="example.synthetic">
+<application android:process="example.synthetic" android:permission="example.synthetic.LOCAL" android:directBootAware="false" android:enabled="true">
+<service android:name="example.synthetic.Restore" android:exported="false" android:directBootAware="false" android:enabled="true" android:isolatedProcess="false" android:externalService="false"/>
+<service android:name="example.synthetic.Vpn" android:exported="false" android:directBootAware="false" android:permission="android.permission.BIND_VPN_SERVICE" android:process=":vpn" android:foregroundServiceType="specialUse" android:stopWithTask="false">
+<intent-filter><action android:name="android.net.VpnService"/></intent-filter>
+<meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="true"/>
+<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="synthetic protected VPN transport"/>
+</service></application></manifest>`)
+	manifest, err := ParseManifest(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer := zip.NewWriter(file)
+	if manifest.PackageName != "example.synthetic" || manifest.ApplicationProcess != "example.synthetic" || manifest.ApplicationPermission != "example.synthetic.LOCAL" || manifest.ApplicationDirectBootAware == nil || *manifest.ApplicationDirectBootAware || manifest.ApplicationEnabled == nil || !*manifest.ApplicationEnabled {
+		t.Fatalf("application defaults were lost: %+v", manifest)
+	}
+	restore, vpn := manifest.Services[0], manifest.Services[1]
+	if restore.DirectBootAware == nil || *restore.DirectBootAware || restore.Enabled == nil || !*restore.Enabled || restore.IsolatedProcess == nil || *restore.IsolatedProcess || restore.ExternalService == nil || *restore.ExternalService || restore.IntentFilterCount != 0 {
+		t.Fatalf("restore boundary was lost: %+v", restore)
+	}
+	if vpn.SpecialUseSubtype != "synthetic protected VPN transport" || vpn.IntentFilterCount != 1 || !reflect.DeepEqual(vpn.IntentActions, []string{"android.net.VpnService"}) || vpn.StopWithTask == nil || *vpn.StopWithTask {
+		t.Fatalf("foreground VPN boundary was lost: %+v", vpn)
+	}
+}
+
+func TestParseManifestRejectsAmbiguousBoundaryDeclarations(t *testing.T) {
+	const start = `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application>`
+	const end = `</application></manifest>`
+	for name, raw := range map[string]string{
+		"unnamespaced exported":       start + `<service android:name="Example" exported="false"/>` + end,
+		"foreign namespace":           `<manifest xmlns:android="urn:not-android"><application><service android:name="Example" android:exported="false"/></application></manifest>`,
+		"shadowed namespace":          start + `<service xmlns:other="urn:other" android:name="Example" android:exported="true" other:exported="false"/>` + end,
+		"duplicate attribute":         start + `<service android:name="Example" android:exported="true" android:exported="false"/>` + end,
+		"noncanonical boolean":        start + `<service android:name="Example" android:exported="0"/>` + end,
+		"invalid direct boot":         start + `<service android:name="Example" android:exported="false" android:directBootAware="maybe"/>` + end,
+		"duplicate service":           start + `<service android:name="Example" android:exported="false"/><service android:name="Example" android:exported="false"/>` + end,
+		"blank service":               start + `<service android:name=" " android:exported="false"/>` + end,
+		"duplicate application":       `<manifest><application/><application/></manifest>`,
+		"trailing root":               `<manifest><application/></manifest><manifest><application/></manifest>`,
+		"wrong root":                  `<not-manifest><application/></not-manifest>`,
+		"nested root":                 `<manifest><application/><manifest/></manifest>`,
+		"service outside application": `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application/><service android:name="Example" android:exported="false"/></manifest>`,
+		"empty special use":           start + `<service android:name="Example" android:exported="false"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value=" "/></service>` + end,
+		"duplicate special use":       start + `<service android:name="Example" android:exported="false"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="one"/><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="two"/></service>` + end,
+		"resource special use":        start + `<service android:name="Example" android:exported="false"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:resource="@string/unresolved"/></service>` + end,
+		"wrong special use element":   start + `<service android:name="Example" android:exported="false"><meta-data android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="wrong element"/></service>` + end,
+		"duplicate action":            start + `<service android:name="Example" android:exported="false"><intent-filter><action android:name="android.net.VpnService"/><action android:name="android.net.VpnService"/></intent-filter></service>` + end,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseManifest([]byte(raw)); err == nil {
+				t.Fatal("ambiguous declaration accepted")
+			}
+		})
+	}
+}
+
+func TestParseManifestEnforcesBoundsAndRejectsDirectives(t *testing.T) {
+	var services strings.Builder
+	for index := 0; index < 257; index++ {
+		fmt.Fprintf(&services, `<service android:name="Synthetic%d" android:exported="false"/>`, index)
+	}
+	for name, raw := range map[string][]byte{
+		"empty":      nil,
+		"oversized":  bytes.Repeat([]byte(" "), maxManifestBytes+1),
+		"directive":  []byte(`<!DOCTYPE manifest><manifest><application/></manifest>`),
+		"deep nodes": []byte(`<manifest><application>` + strings.Repeat(`<node>`, 32) + strings.Repeat(`</node>`, 32) + `</application></manifest>`),
+		"services":   []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application>` + services.String() + `</application></manifest>`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseManifest(raw); err == nil {
+				t.Fatal("unbounded or directive-bearing manifest accepted")
+			}
+		})
+	}
+}
+
+func TestReadAPKSharedInspectorRejectsDuplicateEntriesAndOverflowLimits(t *testing.T) {
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for range 2 {
+		entry, err := writer.Create("classes.dex")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte("synthetic")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseAPK(buffer.Bytes(), Limits{MaxEntryBytes: 64, MaxTotalBytes: 128}); err == nil {
+		t.Fatal("duplicate archive entry accepted")
+	}
+	maxInt64 := int64(^uint64(0) >> 1)
+	validArchive := writeAPKFixture(t, map[string]string{"classes.dex": "synthetic"})
+	for _, limits := range []Limits{
+		{MaxEntryBytes: maxInt64, MaxTotalBytes: maxInt64},
+		{MaxEntryBytes: -1, MaxTotalBytes: 128},
+		{MaxEntryBytes: 128, MaxTotalBytes: 64},
+	} {
+		if _, err := ParseAPK(validArchive, limits); err == nil {
+			t.Fatalf("unsafe limits accepted: %+v", limits)
+		}
+	}
+	if _, err := ParseAPK(writeAPKFixture(t, map[string]string{"classes.dex": "first", "assets/a": "second"}), Limits{MaxEntryBytes: 6, MaxTotalBytes: 10}); err == nil {
+		t.Fatal("combined decompression bound exceeded without rejection")
+	}
+}
+
+func writeAPKFixture(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
 	for name, value := range entries {
 		entry, err := writer.Create(name)
 		if err != nil {
@@ -159,8 +265,5 @@ func writeAPKFixture(t *testing.T, entries map[string]string) string {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := file.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return buffer.Bytes()
 }

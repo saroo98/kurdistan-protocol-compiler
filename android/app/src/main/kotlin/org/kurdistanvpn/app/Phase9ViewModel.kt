@@ -7,10 +7,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.BackupWorkflowState
@@ -21,7 +27,6 @@ import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.ImportSource
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.Phase9Settings
-import org.kurdistanvpn.core.model.RedactedProfilePreview
 import org.kurdistanvpn.core.model.ThemePreference
 import org.kurdistanvpn.core.model.ConnectionPreferences
 import org.kurdistanvpn.core.model.DiagnosticPreferences
@@ -35,11 +40,10 @@ import org.kurdistanvpn.core.model.DiagnosticRetention
 import org.kurdistanvpn.core.model.RoutingPreferences
 import org.kurdistanvpn.core.model.TunnelPreferences
 import org.kurdistanvpn.core.model.UpdatePreferences
-import org.kurdistanvpn.core.model.SelectionMode
-import org.kurdistanvpn.core.model.IpMode
-import org.kurdistanvpn.core.model.DnsMode
-import org.kurdistanvpn.core.model.ProbeMethod
 import org.kurdistanvpn.core.model.ResetScope
+import org.kurdistanvpn.core.model.ProtectedRecoveryAction
+import org.kurdistanvpn.core.model.ProtectedRecoveryPresentation
+import org.kurdistanvpn.core.model.ProtectedRecoveryReason
 import org.kurdistanvpn.core.nativeapi.NativeResult
 import org.kurdistanvpn.core.nativeapi.BackupPreviewHandle
 import org.kurdistanvpn.core.nativeapi.DiagnosticPreviewHandle
@@ -49,12 +53,13 @@ import org.kurdistanvpn.data.secure.ClientKeyRestoreResult
 import org.kurdistanvpn.data.secure.ClientKeyResult
 import org.kurdistanvpn.data.secure.ClientKeyStatus
 import org.kurdistanvpn.data.secure.RestoreResult
-import org.kurdistanvpn.data.secure.RuntimeAuthorityResult
 import org.kurdistanvpn.data.metadata.CatalogHealth
+import org.kurdistanvpn.data.protectedstate.ProtectedStatePreviewBackupPolicy
+import org.kurdistanvpn.data.protectedstate.ProtectedExternalPreviewResult
+import org.kurdistanvpn.data.protectedstate.PendingProtectedImport
 import org.kurdistanvpn.platform.importing.ImportCandidate
 import org.kurdistanvpn.platform.importing.ArtifactClass
 import org.kurdistanvpn.platform.importing.VerifyRequestEncoder
-import org.kurdistanvpn.runtime.api.RuntimeStartWire
 import org.kurdistanvpn.runtime.api.VpnRuntimeConfig
 
 class ProductRootViewModel(
@@ -81,68 +86,30 @@ class ProductRootViewModel(
     val enrollmentState: StateFlow<EnrollmentUiState> = mutableEnrollmentState.asStateFlow()
     private val mutableDiagnosticEvents = MutableStateFlow<List<DiagnosticEvent>>(emptyList())
     val diagnosticEvents: StateFlow<List<DiagnosticEvent>> = mutableDiagnosticEvents.asStateFlow()
+    private val mutableProtectedRecovery =
+        MutableStateFlow<ProtectedRecoveryPresentation>(ProtectedRecoveryPresentation.NotRequired)
+    val protectedRecovery: StateFlow<ProtectedRecoveryPresentation> =
+        mutableProtectedRecovery.asStateFlow()
     private var diagnosticSequence = 0L
     private var pending: PendingImport? = null
+    private var previewCleanupUnproven = false
     private var pendingBackup: BackupPreviewHandle? = null
     private var pendingDiagnostic: DiagnosticPreviewHandle? = null
+    private val explicitFirstUseInitialization = Mutex()
 
     init {
-        viewModelScope.launch {
-            coordinators.settings.settings.collect { persisted ->
-                val localSafe = persisted.forLocalPhase13Runtime()
-                if (localSafe.connection != persisted.connection) {
-                    coordinators.settings.setConnection(localSafe.connection)
-                }
-                if (localSafe.tunnel != persisted.tunnel) {
-                    coordinators.settings.setTunnel(localSafe.tunnel)
-                }
-                if (localSafe.updates != persisted.updates) {
-                    coordinators.settings.setUpdates(localSafe.updates)
-                }
-                if (localSafe.probes != persisted.probes) {
-                    coordinators.settings.setProbes(localSafe.probes)
-                }
-                val securePackages = runCatching {
-                    withContext(Dispatchers.IO) { coordinators.settings.routing.load() }
-                }.getOrElse {
-                    mutableState.value = AppState.DegradedStorage
-                    return@collect
-                }
-                val migratedPackages = when {
-                    securePackages.isNotEmpty() -> securePackages
-                    localSafe.routing.packages.isNotEmpty() && coordinators.settings.routing.available() -> {
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                coordinators.settings.routing.save(localSafe.routing.packages)
-                                coordinators.settings.clearLegacyRoutingPackages()
-                            }
-                        }.getOrElse {
-                            mutableState.value = AppState.DegradedStorage
-                            return@collect
-                        }
-                        localSafe.routing.packages
-                    }
-                    else -> emptySet()
-                }
-                mutableSettings.value = localSafe.copy(
-                    routing = localSafe.routing.copy(packages = migratedPackages),
-                )
-            }
-        }
-        viewModelScope.launch { initialize() }
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { coordinators.diagnostics.load() }
-                .onSuccess { events ->
-                    val retained = retainDiagnosticEvents(events, mutableSettings.value.diagnostics.retention)
-                    mutableDiagnosticEvents.value = retained
-                    diagnosticSequence = retained.maxOfOrNull { it.sequence } ?: 0
-                }
-                .onFailure { mutableState.value = AppState.DegradedStorage }
-        }
+        // One startup coroutine owns presentation. A missing projection cannot
+        // race an independent collector or diagnostic job into a healthy state.
+        viewModelScope.launch { initializeReadOnly() }
     }
 
     fun preview(candidate: ImportCandidate, source: ImportSource) {
         clearPendingImport()
+        if (previewCleanupUnproven) {
+            candidate.parts.forEach { it.fill(0) }
+            mutableState.value = AppState.ImportRejected(OperationError.RECOVERY_REQUIRED)
+            return
+        }
         mutableState.value = AppState.Importing(source)
         viewModelScope.launch {
             try {
@@ -154,21 +121,30 @@ class ProductRootViewModel(
                         mutableState.value = AppState.ImportRejected(OperationError.INVALID_INPUT)
                         return@launch
                     }
-                    when (val result = coordinators.profiles.resolvePreview(request)) {
-                        is NativeResult.Failure -> {
-                            finalError = result.error
-                            request.fill(0)
+                    val attempt = try {
+                        root.protectedStateFacade()?.previewExternalImport(request, { false },
+                            android.os.SystemClock::elapsedRealtime)
+                            ?: ProtectedExternalPreviewResult.Rejected(org.kurdistanvpn.data.protectedstate.ProtectedReadFailure.STATE_UNPROVEN)
+                    } finally { request.fill(0) }
+                    when (val result = attempt) {
+                        is ProtectedExternalPreviewResult.Rejected -> {
+                            finalError = if (result.category == org.kurdistanvpn.data.protectedstate.ProtectedReadFailure.CLEANUP_UNPROVEN) {
+                                previewCleanupUnproven = true
+                                publishRecoveryReason(ProtectedRecoveryReason.CLEANUP_UNPROVEN)
+                                OperationError.RECOVERY_REQUIRED
+                            } else {
+                                OperationError.TRUST_REJECTED
+                            }
                         }
-                        is NativeResult.Success -> {
-                            val preview = result.value.verified.preview
-                            coordinators.profiles.nativeCore.releaseVerified(result.value.verified)
-                            pending = PendingImport(
-                                request = request,
-                                preview = preview,
-                                source = source,
-                                recipientKeyLocalId = result.value.recipientKeyLocalId,
-                            )
-                            mutableState.value = AppState.ImportPreview(preview)
+                        is ProtectedExternalPreviewResult.Ready -> {
+                            try {
+                                pending = PendingImport(result.preview, source)
+                                mutableState.value = AppState.ImportPreview(result.preview.display)
+                            } catch (failure: Throwable) {
+                                pending = null
+                                result.preview.close()
+                                throw failure
+                            }
                             return@launch
                         }
                     }
@@ -180,7 +156,6 @@ class ProductRootViewModel(
                 ) {
                     mutableEnrollmentState.value = EnrollmentUiState.MissingKey("unavailable")
                 }
-                recordDiagnostic(DiagnosticLogLevel.WARNING, DiagnosticComponent.PROFILE, "IMPORT_REJECTED")
             } finally {
                 candidate.parts.forEach { it.fill(0) }
             }
@@ -192,33 +167,23 @@ class ProductRootViewModel(
         pending = null
         mutableState.value = AppState.Importing(value.source)
         viewModelScope.launch {
+            var request: ByteArray? = null
             try {
-                val journal = coordinators.profiles.journalOrNull()
-                if (journal == null) {
-                    mutableState.value = AppState.KeyInvalidated
-                    return@launch
-                }
-                when (
-                    val result = journal.admit(
-                        value.request,
-                        value.preview,
-                        value.recipientKeyLocalId,
-                    )
-                ) {
-                    is AdmissionResult.Failure ->
-                        mutableState.value = AppState.ImportRejected(result.error).also {
-                            recordDiagnostic(DiagnosticLogLevel.ERROR, DiagnosticComponent.PROFILE, "ACTIVATION_REJECTED")
-                        }
-                    is AdmissionResult.Success -> {
+                val confirmed = value.request.confirm()
+                when (val result = root.protectedStateFacade()?.confirmImport(confirmed)) {
+                    is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed -> {
                         recordDiagnostic(DiagnosticLogLevel.INFO, DiagnosticComponent.PROFILE, "PROFILE_ACTIVATED")
                         refreshEnrollmentState()
                         refreshProfiles()
                     }
+                    is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Rejected ->
+                        mutableState.value = AppState.ImportRejected(result.error)
+                    else -> mutableState.value = AppState.DegradedStorage
                 }
             } finally {
-                value.request.fill(0)
+                value.request.close()
             }
-        }
+        }.invokeOnCompletion { value.request.close() }
     }
 
     fun cancelImport() {
@@ -237,16 +202,9 @@ class ProductRootViewModel(
 
     fun deleteProfile(localRecordId: String) {
         viewModelScope.launch {
-            if (coordinators.profiles.journalOrNull()?.delete(localRecordId) == true) {
-                val offered = runCatching { coordinators.profiles.unbindProfile(localRecordId) }
-                    .getOrNull()
-                if (offered != null) {
-                    mutableEnrollmentState.value = EnrollmentUiState.OfferKeyDeletion(
-                        offered.toUiSummary(),
-                    )
-                } else {
-                    refreshEnrollmentState()
-                }
+            if (coordinators.profiles.deleteProfile(localRecordId) is
+                org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed) {
+                refreshEnrollmentState()
                 refreshProfiles()
             } else {
                 mutableState.value = AppState.DegradedStorage
@@ -257,19 +215,26 @@ class ProductRootViewModel(
     fun createEnrollmentRequest(validitySeconds: Int = 24 * 60 * 60) {
         mutableEnrollmentState.value = EnrollmentUiState.Working
         viewModelScope.launch(Dispatchers.IO) {
-            when (
-                val result = coordinators.profiles.createEnrollment(
-                    validitySeconds,
-                    System.currentTimeMillis() / 1000,
-                )
-            ) {
-                is ClientKeyResult.Failure -> mutableEnrollmentState.value =
+            val ready = try {
+                prepareProtectedStateForExplicitUserAction()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
+            }
+            if (!ready) {
+                mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
+                return@launch
+            }
+            when (val result = coordinators.profiles.createEnrollment(validitySeconds, System.currentTimeMillis() / 1000)) {
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Rejected -> mutableEnrollmentState.value =
                     if (result.error == OperationError.KEY_INVALIDATED) {
                         EnrollmentUiState.KeyInvalidated
                     } else {
                         EnrollmentUiState.Failed(result.error)
                     }
-                is ClientKeyResult.Success -> refreshEnrollmentState()
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed -> refreshEnrollmentState()
+                else -> mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
             }
         }
     }
@@ -294,19 +259,17 @@ class ProductRootViewModel(
 
     fun deleteEnrollmentKey(localRecordId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val deleted = runCatching {
-                coordinators.profiles.deleteEnrollmentKey(localRecordId)
-            }.getOrDefault(false)
-            if (deleted) refreshEnrollmentState()
+            val deleted = coordinators.profiles.deleteEnrollmentKey(localRecordId)
+            if (deleted is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed) refreshEnrollmentState()
             else mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
         }
     }
 
     fun markEnrollmentRequestExported(localRecordId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { coordinators.profiles.markEnrollmentRequestExported(localRecordId) }
-                .onSuccess { refreshEnrollmentState() }
-                .onFailure { mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired }
+            if (coordinators.profiles.markEnrollmentRequestExported(localRecordId) is
+                org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed) refreshEnrollmentState()
+            else mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
         }
     }
 
@@ -336,14 +299,11 @@ class ProductRootViewModel(
             val passphraseBytes = passphrase.encodeToByteArray()
             val result = try {
                 withContext(Dispatchers.Default) {
-                    val payload = runCatching {
-                        coordinators.profiles.journalOrNull()?.backupPayload(localRecordId)
-                    }.getOrNull()
-                        ?: return@withContext NativeResult.Failure(OperationError.KEY_INVALIDATED)
-                    try {
-                        coordinators.profiles.nativeCore.createBackup(payload, passphraseBytes)
-                    } finally {
-                        payload.fill(0)
+                    when (val plan = root.protectedStateFacade()?.enumerateBackup(localRecordId, { false },
+                        android.os.SystemClock::elapsedRealtime)) {
+                        is org.kurdistanvpn.data.protectedstate.ProtectedBackupEnumeration.Ready ->
+                            try { plan.plan.confirmEncryptedExport(passphraseBytes) } finally { plan.plan.close() }
+                        else -> NativeResult.Failure(OperationError.RECOVERY_REQUIRED)
                     }
                 }
             } finally {
@@ -427,38 +387,22 @@ class ProductRootViewModel(
             } finally {
                 restoredBytes.fill(0)
             }
-            val journal = coordinators.profiles.journalOrNull()
-            val keyStore = coordinators.profiles.clientKeysOrNull()
-            if (journal == null || keyStore == null) {
-                records.clientKeys.forEach { it.destroy() }
-                records.profiles.forEach { it.verifyRequest.fill(0) }
-                mutableBackupState.value = BackupWorkflowState.Failed(OperationError.KEY_INVALIDATED)
-                return@launch
-            }
-            val restoredKeyIds = when (val keyRestore = keyStore.restore(records.clientKeys)) {
-                is ClientKeyRestoreResult.Failure -> {
-                    records.clientKeys.forEach { it.destroy() }
-                    records.profiles.forEach { it.verifyRequest.fill(0) }
-                    mutableBackupState.value = BackupWorkflowState.Failed(keyRestore.error)
-                    return@launch
-                }
-                is ClientKeyRestoreResult.Success -> keyRestore.localRecordIds
-            }
-            val restore = try {
-                journal.restore(records.profiles)
+            val restored = try {
+                root.protectedStateFacade()?.restoreConfirmedBackup(BackupPayloadCodec.encode(records))
             } finally {
                 records.clientKeys.forEach { it.destroy() }
                 records.profiles.forEach { it.verifyRequest.fill(0) }
             }
-            when (restore) {
-                is RestoreResult.Failure -> {
-                    keyStore.rollbackRestored(restoredKeyIds)
-                    mutableBackupState.value = BackupWorkflowState.Failed(restore.error)
+            when (restored) {
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed ->
+                    mutableBackupState.value = BackupWorkflowState.Completed(restored.value)
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Rejected -> {
+                    mutableBackupState.value = BackupWorkflowState.Failed(restored.error)
                     return@launch
                 }
-                is RestoreResult.Success -> {
-                    mutableBackupState.value =
-                        BackupWorkflowState.Completed(restore.restoredProfiles)
+                else -> {
+                    mutableBackupState.value = BackupWorkflowState.Failed(OperationError.RECOVERY_REQUIRED)
+                    return@launch
                 }
             }
             refreshEnrollmentState()
@@ -544,6 +488,42 @@ class ProductRootViewModel(
 
     fun resetAll() = reset(ResetScope.EVERYTHING)
 
+    /** Executes only the broker-backed presentation recovery after the UI consumes confirmation. */
+    fun confirmPresentationRecovery() {
+        val current = mutableProtectedRecovery.value
+        if ((current as? ProtectedRecoveryPresentation.Required)?.canRecoverPresentation != true) return
+        viewModelScope.launch {
+            when (withContext(Dispatchers.IO) { coordinators.recovery.recoverPresentation() }) {
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed -> {
+                    mutableProtectedRecovery.value = ProtectedRecoveryPresentation.NotRequired
+                    initializeReadOnly()
+                }
+                is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Rejected ->
+                    publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+                org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Busy ->
+                    refreshProtectedRecovery()
+                org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Unproven ->
+                    publishRecoveryReason(ProtectedRecoveryReason.MUTATION_UNPROVEN)
+            }
+        }
+    }
+
+    /** UI confirmation only. Migration never runs as part of readonly startup or recovery. */
+    fun confirmLegacyMigration() {
+        viewModelScope.launch {
+            mutableState.value = AppState.CompatibilityCheck
+            if (!root.migrateLegacyProtectedStateForExplicitUserAction()) {
+                mutableState.value = when (coordinators.recovery.storageFailure()) {
+                    Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> AppState.KeyInvalidated
+                    Phase9CompositionRoot.StorageFailure.DEGRADED -> AppState.DegradedStorage
+                    else -> AppState.MigrationRequired
+                }
+                return@launch
+            }
+            initializeReadOnly()
+        }
+    }
+
     fun reset(scope: ResetScope) {
         viewModelScope.launch {
             val succeeded = runCatching {
@@ -589,22 +569,47 @@ class ProductRootViewModel(
                         diagnosticSequence = 0
                         true
                     }
-                    ResetScope.EVERYTHING -> {
-                        if (!coordinators.recovery.resetProtectedState()) return@runCatching false
-                        coordinators.settings.resetAll()
+                    ResetScope.PENDING_CREDENTIALS -> {
                         clearPendingImport()
-                        mutableBackupState.value = BackupWorkflowState.Idle
-                        mutableDiagnosticState.value = DiagnosticWorkflowState.Idle
-                        mutableDiagnosticEvents.value = emptyList()
-                        diagnosticSequence = 0
-                        mutableSettings.value = Phase9Settings()
-                        refreshProfiles()
-                        true
+                        val facade = root.protectedStateFacade() ?: return@runCatching false
+                        when (withContext(Dispatchers.IO) { facade.resetPendingCredentialsConfirmed() }) {
+                            is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed -> {
+                                refreshEnrollmentState()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+                    ResetScope.EVERYTHING -> {
+                        when (root.resetProtectedStateConfirmed()) {
+                            is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed -> {
+                                clearPendingImport()
+                                val backupClosed = pendingBackup?.let(coordinators.profiles.nativeCore::releaseBackup)
+                                pendingBackup = null
+                                val diagnosticClosed = pendingDiagnostic?.let(coordinators.profiles.nativeCore::releaseDiagnostic)
+                                pendingDiagnostic = null
+                                if (backupClosed is NativeResult.Failure || diagnosticClosed is NativeResult.Failure) {
+                                    return@runCatching false
+                                }
+                                mutableBackupState.value = BackupWorkflowState.Idle
+                                mutableDiagnosticState.value = DiagnosticWorkflowState.Idle
+                                mutableDiagnosticEvents.value = emptyList()
+                                diagnosticSequence = 0
+                                // These defaults are an in-memory post-reset projection only.
+                                // Re-provisioning remains a separate explicit user interaction.
+                                mutableSettings.value = Phase9Settings()
+                                mutableEnrollmentState.value = EnrollmentUiState.NoEnrollmentKey
+                                mutableState.value = AppState.NoProfiles
+                                true
+                            }
+                            else -> false
+                        }
                     }
                 }
             }.getOrDefault(false)
             if (!succeeded) {
                 mutableState.value = AppState.DegradedStorage
+                publishRecoveryReason(ProtectedRecoveryReason.MUTATION_UNPROVEN)
             }
         }
     }
@@ -704,7 +709,10 @@ class ProductRootViewModel(
 
     private fun persistSetting(write: suspend () -> Unit, publish: () -> Unit) {
         viewModelScope.launch {
-            runCatching { write() }
+            runCatching {
+                check(prepareProtectedStateForExplicitUserAction()) { "PROTECTED_STATE_UNAVAILABLE" }
+                write()
+            }
                 .onSuccess { publish() }
                 .onFailure {
                     recordDiagnostic(
@@ -716,6 +724,20 @@ class ProductRootViewModel(
                 }
         }
     }
+
+    /** Provisioning is admitted only by an explicit first-use mutation, never by startup or preview. */
+    private suspend fun prepareProtectedStateForExplicitUserAction(): Boolean =
+        explicitFirstUseInitialization.withLock {
+            if (root.protectedStateFacade() == null) {
+                if (root.storageFailure != Phase9CompositionRoot.StorageFailure.FIRST_USE) return@withLock false
+                if (!root.initializeProtectedStateForExplicitUserAction()) return@withLock false
+                initializeAvailableReadOnly()
+            }
+            root.storageFailure == null && when (mutableState.value) {
+                AppState.NoProfiles, is AppState.Ready -> true
+                else -> false
+            }
+        }
 
     private fun rejectSetting(category: String) {
         recordDiagnostic(DiagnosticLogLevel.WARNING, DiagnosticComponent.APP, category)
@@ -755,69 +777,29 @@ class ProductRootViewModel(
         }
     }
 
-    fun prepareRuntimeStart(
+    /** Stages a manual start without reconstructing or exposing runtime authority bytes. */
+    fun prepareManualStart(
         config: VpnRuntimeConfig,
-        onReady: (ByteArray) -> Unit,
+        onReady: () -> Unit,
+        onFailure: (OperationError) -> Unit,
+    ) = prepareManualStartInternal(config, onReady, onFailure)
+
+    internal fun prepareManualStartForTesting(
+        config: VpnRuntimeConfig,
+        onReady: () -> Unit,
+        onFailure: (OperationError) -> Unit,
+    ) = prepareManualStartInternal(config, onReady, onFailure)
+
+    private fun prepareManualStartInternal(
+        config: VpnRuntimeConfig,
+        onReady: () -> Unit,
         onFailure: (OperationError) -> Unit,
     ) {
-        val provider = freshRuntimeAuthorityProvider(config)
-        if (provider == null) {
-            onFailure(OperationError.POLICY_REJECTED)
-            return
-        }
         viewModelScope.launch {
-            when (val prepared = provider.prepare()) {
-                is FreshRuntimeAuthority.Ready -> {
-                    recordDiagnostic(
-                        DiagnosticLogLevel.INFO,
-                        DiagnosticComponent.RUNTIME,
-                        "RUNTIME_AUTHORITY_PREPARED",
-                    )
-                    onReady(prepared.encoded)
-                }
-                is FreshRuntimeAuthority.Rejected -> {
-                    recordDiagnostic(
-                        DiagnosticLogLevel.WARNING,
-                        DiagnosticComponent.RUNTIME,
-                        "RUNTIME_AUTHORITY_UNAVAILABLE",
-                    )
-                    onFailure(
-                        runCatching { OperationError.valueOf(prepared.failure) }
-                            .getOrDefault(OperationError.POLICY_REJECTED),
-                    )
-                }
-            }
-        }
-    }
-
-    internal fun freshRuntimeAuthorityProvider(
-        config: VpnRuntimeConfig,
-    ): FreshRuntimeAuthorityProvider? {
-        val localRecordId = mutableSettings.value.profiles.activeLocalRecordId ?: return null
-        return FreshRuntimeAuthorityProvider {
-            when (val authority = coordinators.runtime.openLiveAuthority(localRecordId)) {
-                is RuntimeAuthorityResult.Success -> authority.material.use { material ->
-                    runCatching {
-                        withContext(Dispatchers.Default) {
-                            RuntimeStartWire.encode(
-                                verifyRequest = material.verifyRequest,
-                                activationRecord = material.activationRecord,
-                                recipientRequest = material.recipientRequest,
-                                recipientPrivate = material.recipientPrivate,
-                                config = config,
-                            )
-                        }
-                    }.fold(
-                        onSuccess = FreshRuntimeAuthority::Ready,
-                        onFailure = {
-                            FreshRuntimeAuthority.Rejected(OperationError.POLICY_REJECTED.name)
-                        },
-                    )
-                }
-                is RuntimeAuthorityResult.Failure ->
-                    FreshRuntimeAuthority.Rejected(authority.error.name)
-                null -> FreshRuntimeAuthority.Rejected(OperationError.STORAGE_FAILURE.name)
-            }
+            val admitted = runCatching {
+                root.validateManualStart(config) == null
+            }.getOrDefault(false)
+            if (admitted) onReady() else onFailure(OperationError.POLICY_REJECTED)
         }
     }
 
@@ -889,8 +871,40 @@ class ProductRootViewModel(
         super.onCleared()
     }
 
-    private suspend fun initialize() {
+    private suspend fun initializeReadOnly() {
         mutableState.value = AppState.CompatibilityCheck
+        try {
+            initializeAvailableReadOnly()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Unexpected startup failure is explicitly fatal, not first-use,
+            // a healthy default, an automatic repair, or a persisted diagnostic.
+            mutableState.value = AppState.FatalRecovery
+            publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+        }
+    }
+
+    private suspend fun initializeAvailableReadOnly() {
+        val startup = withContext(Dispatchers.IO) {
+            coordinators.settings.startup { coordinators.recovery.storageFailure() }.first()
+        }
+        when (startup) {
+            is ProtectedStartupRead.Unavailable -> {
+                mutableState.value = startup.presentation
+                mutableProtectedRecovery.value = startup.recoveryReason?.let {
+                    ProtectedRecoveryPresentation.Required(it)
+                } ?: ProtectedRecoveryPresentation.NotRequired
+                return
+            }
+            ProtectedStartupRead.UnexpectedFailure -> {
+                mutableState.value = AppState.FatalRecovery
+                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+                return
+            }
+            is ProtectedStartupRead.Ready -> mutableSettings.value = startup.projection.settings
+        }
+        currentCoroutineContext().ensureActive()
         when (val compatibility = coordinators.profiles.nativeCore.compatibility()) {
             is NativeResult.Failure -> {
                 mutableState.value = AppState.MigrationRequired
@@ -915,46 +929,29 @@ class ProductRootViewModel(
                 )
             }
         }
-        when (coordinators.recovery.storageFailure()) {
-            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> {
-                mutableState.value = AppState.KeyInvalidated
-                return
-            }
-            Phase9CompositionRoot.StorageFailure.DEGRADED -> {
-                mutableState.value = AppState.DegradedStorage
-                return
-            }
-            null -> Unit
-        }
-        val recovery = coordinators.profiles.journalOrNull()?.recoverIncomplete().orEmpty()
-        if (recovery.any {
-                it is AdmissionResult.Failure && it.error == OperationError.KEY_INVALIDATED
-            }
-        ) {
-            mutableState.value = AppState.KeyInvalidated
+        // Recovery is an explicit broker operation, never a consequence of opening a preview.
+        if (!refreshEnrollmentState()) {
+            mutableState.value = AppState.DegradedStorage
+            publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
             return
         }
-        when (val restore = coordinators.profiles.journalOrNull()?.recoverPendingRestore()) {
-            is RestoreResult.Failure -> {
-                if (restore.error == OperationError.KEY_INVALIDATED) {
-                    mutableState.value = AppState.KeyInvalidated
-                    return
-                }
-            }
-            is RestoreResult.Success, null -> Unit
-        }
-        refreshEnrollmentState()
+        val events = withContext(Dispatchers.IO) { coordinators.diagnostics.load() }
+        currentCoroutineContext().ensureActive()
+        val retained = retainDiagnosticEvents(events, mutableSettings.value.diagnostics.retention)
+        mutableDiagnosticEvents.value = retained
+        diagnosticSequence = retained.maxOfOrNull { it.sequence } ?: 0
         refreshProfiles()
     }
 
-    private fun refreshEnrollmentState() {
+    private fun refreshEnrollmentState(): Boolean {
         val keys = runCatching { coordinators.profiles.enrollmentKeys() }.getOrElse {
+            if (it is CancellationException) throw it
             mutableEnrollmentState.value = EnrollmentUiState.RecoveryRequired
-            return
+            return false
         }
         if (keys.isEmpty()) {
             mutableEnrollmentState.value = EnrollmentUiState.NoEnrollmentKey
-            return
+            return true
         }
         val summaries = keys.map { it.toUiSummary() }
         mutableEnrollmentState.value = when {
@@ -964,61 +961,97 @@ class ProductRootViewModel(
                 EnrollmentUiState.AwaitingProfile(summaries)
             else -> EnrollmentUiState.RequestReady(summaries)
         }
+        return true
     }
 
     private suspend fun refreshProfiles() {
-        val journal = coordinators.profiles.journalOrNull()
-        val profiles = journal?.listProfiles().orEmpty()
-        when (journal?.storageHealth()) {
+        val projection = runCatching { coordinators.profiles.readProfileProjection() }.getOrElse {
+            if (it is CancellationException) throw it
+            mutableState.value = AppState.DegradedStorage
+            publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
+            return
+        }
+        val profiles = projection.profiles
+        when (projection.health) {
             CatalogHealth.KEY_INVALIDATED -> {
                 mutableState.value = AppState.KeyInvalidated
+                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
                 return
             }
             CatalogHealth.QUARANTINED -> {
                 mutableState.value = AppState.Quarantined
+                publishRecoveryReason(ProtectedRecoveryReason.QUARANTINED)
                 return
             }
             CatalogHealth.DEGRADED -> {
                 mutableState.value = AppState.DegradedStorage
+                publishRecoveryReason(ProtectedRecoveryReason.INCONSISTENT)
                 return
             }
             else -> Unit
         }
-        if (profiles.isEmpty()) {
-            if (mutableSettings.value.profiles.activeLocalRecordId != null ||
-                mutableSettings.value.profiles.favoriteLocalRecordIds.isNotEmpty()
-            ) {
-                coordinators.settings.setProfiles(org.kurdistanvpn.core.model.ProfilePreferences())
-                mutableSettings.value = mutableSettings.value.copy(
-                    profiles = org.kurdistanvpn.core.model.ProfilePreferences(),
-                )
+        val preferences = runCatching {
+            ProtectedStatePreviewBackupPolicy.projectProfiles(mutableSettings.value.profiles, profiles.map { it.localRecordId })
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            mutableState.value = AppState.DegradedStorage
+            return
+        }
+        val next = if (profiles.isEmpty()) AppState.NoProfiles else AppState.Ready(profiles)
+        val recovery = readProtectedRecovery(next)
+        currentCoroutineContext().ensureActive()
+        mutableProtectedRecovery.value = recovery
+        if (recovery is ProtectedRecoveryPresentation.Required &&
+            recovery.reason in setOf(ProtectedRecoveryReason.CLEANUP_UNPROVEN, ProtectedRecoveryReason.MUTATION_UNPROVEN)
+        ) {
+            mutableState.value = AppState.DegradedStorage
+            return
+        }
+        mutableSettings.value = mutableSettings.value.copy(profiles = preferences)
+        mutableState.value = next
+    }
+
+    private suspend fun refreshProtectedRecovery() {
+        mutableProtectedRecovery.value = readProtectedRecovery(mutableState.value)
+    }
+
+    private suspend fun readProtectedRecovery(state: AppState): ProtectedRecoveryPresentation {
+        if (previewCleanupUnproven) {
+            return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.CLEANUP_UNPROVEN)
+        }
+        when (state) {
+            AppState.Quarantined -> {
+                return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.QUARANTINED)
             }
-            mutableState.value = AppState.NoProfiles
-        } else {
-            val knownIds = profiles.mapTo(mutableSetOf()) { it.localRecordId }
-            val current = mutableSettings.value.profiles
-            val sanitized = current.copy(
-                activeLocalRecordId = current.activeLocalRecordId?.takeIf(knownIds::contains)
-                    ?: profiles.first().localRecordId,
-                favoriteLocalRecordIds = current.favoriteLocalRecordIds.filterTo(mutableSetOf(), knownIds::contains),
+            AppState.DegradedStorage, AppState.KeyInvalidated, AppState.FatalRecovery -> {
+                return ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.INCONSISTENT)
+            }
+            else -> Unit
+        }
+        val required = withContext(Dispatchers.IO) {
+            coordinators.recovery.presentationRecoveryRequired()
+        }
+        return when (required) {
+            true -> ProtectedRecoveryPresentation.Required(
+                ProtectedRecoveryReason.RECOVERY_REQUIRED,
+                ProtectedRecoveryAction.RECOVER_PRESENTATION,
             )
-            if (sanitized != current) {
-                coordinators.settings.setProfiles(sanitized)
-                mutableSettings.value = mutableSettings.value.copy(profiles = sanitized)
-            }
-            mutableState.value = AppState.Ready(profiles)
+            false -> ProtectedRecoveryPresentation.NotRequired
+            null -> ProtectedRecoveryPresentation.Required(ProtectedRecoveryReason.MUTATION_UNPROVEN)
         }
     }
 
+    private fun publishRecoveryReason(reason: ProtectedRecoveryReason) {
+        mutableProtectedRecovery.value = ProtectedRecoveryPresentation.Required(reason)
+    }
+
     private data class PendingImport(
-        val request: ByteArray,
-        val preview: RedactedProfilePreview,
+        val request: PendingProtectedImport,
         val source: ImportSource,
-        val recipientKeyLocalId: String?,
     )
 
     private fun clearPendingImport() {
-        pending?.request?.fill(0)
+        pending?.request?.close()
         pending = null
     }
 
@@ -1042,40 +1075,6 @@ private fun org.kurdistanvpn.data.secure.ClientKeySummary.toUiSummary(): Enrollm
         boundProfileCount = boundProfileCount,
     )
 
-private fun Phase9Settings.forLocalPhase13Runtime(): Phase9Settings = copy(
-    connection = connection.copy(
-        selectionMode = when (connection.selectionMode) {
-            SelectionMode.AUTOMATIC,
-            SelectionMode.KURD_ONLY,
-            -> connection.selectionMode
-            SelectionMode.MANUAL_STRATEGY -> SelectionMode.AUTOMATIC
-        },
-        autoConnectOnBoot = false,
-        autoConnectOnLaunch = false,
-        reconnectOnFailure = false,
-        killSwitchRequested = false,
-        allowLan = false,
-        connectOnlyOnUntrustedNetworks = false,
-    ),
-    tunnel = tunnel.copy(
-        ipMode = when (tunnel.ipMode) {
-            IpMode.AUTO,
-            IpMode.IPV4_ONLY,
-            -> tunnel.ipMode
-            IpMode.IPV6_ONLY,
-            IpMode.DUAL_STACK,
-            -> IpMode.AUTO
-        },
-        dnsMode = DnsMode.INTERNAL_TUN,
-        customDns = "",
-        showSpeedInNotification = false,
-    ),
-    updates = UpdatePreferences(),
-    probes = probes.copy(
-        method = ProbeMethod.KURD_SESSION,
-        testUrl = ProbePreferences().testUrl,
-    ),
-)
 
 private fun shouldRecord(event: DiagnosticLogLevel, configured: DiagnosticLogLevel): Boolean = when (configured) {
     DiagnosticLogLevel.NONE -> false

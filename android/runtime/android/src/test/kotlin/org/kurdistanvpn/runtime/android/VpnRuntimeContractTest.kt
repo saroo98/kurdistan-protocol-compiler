@@ -15,6 +15,21 @@ import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 class VpnRuntimeContractTest {
+    @Test fun onlyPreciselyMarkedPrivateCommandsAreManualAndExtrasNeverSupplyAuthority() {
+        val id = "1".repeat(32)
+        val valid = mapOf<String, Any?>(RuntimeServiceCommand.MARKER_KEY to RuntimeServiceCommand.MARKER_VERSION,
+            RuntimeServiceCommand.REQUEST_KEY to id)
+        assertEquals(RuntimeServiceCommand.Manual(id), RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_START, valid))
+        assertEquals(RuntimeServiceCommand.Stop, RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_STOP,
+            mapOf(RuntimeServiceCommand.MARKER_KEY to RuntimeServiceCommand.MARKER_VERSION)))
+        for (action in listOf(null, "android.net.VpnService", "synthetic.lifecycle"))
+            assertEquals(RuntimeServiceCommand.AutomaticTrigger, RuntimeServiceCommand.fromScalars(action, emptyMap()))
+        val invalid = listOf(valid + ("authority" to byteArrayOf(1)), valid + (RuntimeServiceCommand.MARKER_KEY to "2"),
+            valid - RuntimeServiceCommand.MARKER_KEY, valid + (RuntimeServiceCommand.REQUEST_KEY to 42))
+        for (extras in invalid) org.junit.Assert.assertTrue(
+            RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_START, extras) is RuntimeServiceCommand.Rejected)
+    }
+
     @Test
     fun defaultSnapshotIsTruthfullyIdleAndUnprotected() {
         val snapshot = VpnRuntimeSnapshot()

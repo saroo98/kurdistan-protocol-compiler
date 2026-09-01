@@ -15,9 +15,19 @@ private const val MAX_DIAGNOSTIC_EVENTS = 200
 private const val MAX_CATEGORY_BYTES = 64
 private const val MAX_ALIAS_BYTES = 32
 
-class EncryptedDiagnosticEventStore(
-    private val blobs: SecureBlobAccess,
+class EncryptedDiagnosticEventStore private constructor(
+    private val blobs: SecureBlobReadAccess,
+    private val writer: SecureBlobAccess?,
 ) {
+    constructor(blobs: SecureBlobAccess) : this(blobs, blobs)
+
+    companion object {
+        /** No cast or later composition can upgrade this instance to a writer. */
+        fun readOnly(blobs: SecureBlobReadAccess): EncryptedDiagnosticEventStore = EncryptedDiagnosticEventStore(blobs, null)
+    }
+
+    private fun writes(): SecureBlobAccess = checkNotNull(writer) { "READ_ONLY_DIAGNOSTIC_VIEW" }
+
     fun load(): List<DiagnosticEvent> {
         if (!blobs.exists(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS)) return emptyList()
         val encoded = blobs.reopen(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS)
@@ -29,6 +39,7 @@ class EncryptedDiagnosticEventStore(
     }
 
     fun save(events: List<DiagnosticEvent>) {
+        val writable = writes()
         require(events.size <= MAX_DIAGNOSTIC_EVENTS) { "TOO_MANY_DIAGNOSTIC_EVENTS" }
         val normalized = events.sortedBy { it.sequence }
         require(normalized.zipWithNext().all { (first, second) -> second.sequence > first.sequence }) {
@@ -62,14 +73,14 @@ class EncryptedDiagnosticEventStore(
             }
         }.array()
         try {
-            blobs.stage(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS, encoded)
+            writable.stage(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS, encoded)
         } finally {
             encoded.fill(0)
         }
     }
 
     fun clear() {
-        blobs.delete(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS)
+        writes().delete(DIAGNOSTIC_RECORD_ID, SecureDataClass.DIAGNOSTIC_EVENTS)
     }
 
     private fun decode(encoded: ByteArray): List<DiagnosticEvent> {

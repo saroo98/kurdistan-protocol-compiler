@@ -39,6 +39,7 @@ type platformRuntimeNetwork struct {
 	tun           *os.File
 	pump          *kruntime.PacketPumpV1
 	terminalCode  androidbridge.ErrorCode
+	cleanupCode   androidbridge.ErrorCode
 }
 
 func newPlatformRuntimeNetwork(ctx context.Context, plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2, seed []byte, endpointIndex uint8) (androidbridge.RuntimeNetworkSession, androidbridge.ErrorCode) {
@@ -304,9 +305,9 @@ func (network *platformRuntimeNetwork) RuntimeNetworkDiagnosticsV1() androidbrid
 	return releaseRuntimeNetworkDiagnostics(pump.SnapshotV1())
 }
 
-func (network *platformRuntimeNetwork) Close() {
+func (network *platformRuntimeNetwork) Close() androidbridge.ErrorCode {
 	if network == nil {
-		return
+		return androidbridge.CodeOK
 	}
 	network.closeOnce.Do(func() {
 		network.mu.Lock()
@@ -318,25 +319,47 @@ func (network *platformRuntimeNetwork) Close() {
 		network.plan.Destroy()
 		network.program = liveprogram.ProgramV1{}
 		network.mu.Unlock()
+		cleanupCode := androidbridge.CodeOK
 		if pump != nil {
-			_ = pump.Close()
-			return
+			if err := pump.Close(); err != nil {
+				// PacketPumpV1 may report either its TUN or carrier close; it
+				// deliberately retains only the first error, so do not mislabel
+				// the uncertain source as a TUN-specific failure.
+				cleanupCode = androidbridge.CodeInternalFailure
+			}
+		} else {
+			if endpoint != nil {
+				endpoint.Abort()
+			}
+			if carrier != nil {
+				if err := carrier.Close(); err != nil {
+					cleanupCode = androidbridge.CodeNetworkLost
+				}
+			} else if raw != nil {
+				if err := raw.Close(); err != nil {
+					cleanupCode = androidbridge.CodeNetworkLost
+				}
+			}
+			if tun != nil {
+				if err := tun.Close(); err != nil && cleanupCode == androidbridge.CodeOK {
+					cleanupCode = androidbridge.CodeTUNIOFailed
+				}
+			}
+			if fd >= 0 {
+				if err := unix.Close(fd); err != nil && cleanupCode == androidbridge.CodeOK {
+					// Linux close may have released the descriptor despite returning
+					// an error. It is intentionally not retried.
+					cleanupCode = androidbridge.CodeInternalFailure
+				}
+			}
 		}
-		if endpoint != nil {
-			endpoint.Abort()
-		}
-		if carrier != nil {
-			_ = carrier.Close()
-		} else if raw != nil {
-			_ = raw.Close()
-		}
-		if tun != nil {
-			_ = tun.Close()
-		}
-		if fd >= 0 {
-			_ = unix.Close(fd)
-		}
+		network.mu.Lock()
+		network.cleanupCode = cleanupCode
+		network.mu.Unlock()
 	})
+	network.mu.Lock()
+	defer network.mu.Unlock()
+	return network.cleanupCode
 }
 
 func releaseConnectFD(ctx context.Context, fd int, endpoint runtimepolicy.EndpointV2) error {

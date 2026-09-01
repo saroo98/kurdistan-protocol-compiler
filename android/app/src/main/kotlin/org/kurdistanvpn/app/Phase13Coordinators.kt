@@ -1,175 +1,157 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright 2026 Saro
-
 package org.kurdistanvpn.app
 
 import kotlinx.coroutines.flow.Flow
-import org.kurdistanvpn.core.model.ConnectionPreferences
-import org.kurdistanvpn.core.model.DiagnosticEvent
-import org.kurdistanvpn.core.model.DiagnosticPreferences
-import org.kurdistanvpn.core.model.ExpertPreferences
-import org.kurdistanvpn.core.model.Phase9Settings
-import org.kurdistanvpn.core.model.ProbePreferences
-import org.kurdistanvpn.core.model.ProfileSummary
-import org.kurdistanvpn.core.model.RoutingPreferences
-import org.kurdistanvpn.core.model.TunnelPreferences
-import org.kurdistanvpn.core.model.UpdatePreferences
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import org.kurdistanvpn.core.model.*
 import org.kurdistanvpn.core.nativeapi.KurdNativeCore
-import org.kurdistanvpn.data.secure.EncryptedDiagnosticEventStore
-import org.kurdistanvpn.data.secure.ClientKeyBundleStore
-import org.kurdistanvpn.data.secure.ClientKeyResult
+import org.kurdistanvpn.data.metadata.CatalogHealth
+import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
 import org.kurdistanvpn.data.secure.ClientKeySummary
-import org.kurdistanvpn.data.secure.RecipientCredentialLease
-import org.kurdistanvpn.data.secure.ProfileAdmissionJournal
-import org.kurdistanvpn.data.secure.RuntimeAuthorityResult
-import org.kurdistanvpn.data.secure.SecureRoutingPolicyStore
-import org.kurdistanvpn.data.settings.Phase9SettingsStore
-import org.kurdistanvpn.core.nativeapi.NativeResult
-import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
 
-internal data class ResolvedProfilePreview(
-    val verified: VerifiedPreviewHandle,
-    val recipientKeyLocalId: String?,
-)
+internal data class ProfileReadProjection(val profiles: List<ProfileSummary>, val health: CatalogHealth)
 
-internal class ProfileAdmissionCoordinator(
-    val nativeCore: KurdNativeCore,
-    private val journal: () -> ProfileAdmissionJournal?,
-    private val clientKeys: () -> ClientKeyBundleStore?,
-) {
-    fun journalOrNull(): ProfileAdmissionJournal? = journal()
-
-    fun clientKeysOrNull(): ClientKeyBundleStore? = clientKeys()
-
-    fun createEnrollment(validitySeconds: Int, nowEpochSeconds: Long): ClientKeyResult =
-        clientKeys()?.create(validitySeconds, nowEpochSeconds)
-            ?: ClientKeyResult.Failure(org.kurdistanvpn.core.model.OperationError.KEY_INVALIDATED)
-
-    fun enrollmentKeys(): List<ClientKeySummary> = clientKeys()?.list().orEmpty()
-
-    fun enrollmentRequest(localRecordId: String): ByteArray? =
-        clientKeys()?.publicRequest(localRecordId)
-
-    fun markEnrollmentRequestExported(localRecordId: String) =
-        clientKeys()?.markRequestExported(localRecordId)
-
-    fun deleteEnrollmentKey(localRecordId: String): Boolean =
-        clientKeys()?.delete(localRecordId) == true
-
-    fun unbindProfile(localRecordId: String): ClientKeySummary? =
-        clientKeys()?.unbindProfile(localRecordId)
-
-    fun resolvePreview(request: ByteArray): NativeResult<ResolvedProfilePreview> {
-        when (val public = nativeCore.verifyPreview(request)) {
-            is NativeResult.Success -> return NativeResult.Success(
-                ResolvedProfilePreview(public.value, null),
-            )
-            is NativeResult.Failure -> Unit
+/** Availability is presentation, never a default projection or permission to initialize storage. */
+internal sealed interface ProtectedStartupRead {
+    data class Ready(val projection: ProtectedStateApplicationFacade.ReadProjection) : ProtectedStartupRead
+    data class Unavailable(val failure: Phase9CompositionRoot.StorageFailure) : ProtectedStartupRead {
+        val presentation: AppState get() = when (failure) {
+            Phase9CompositionRoot.StorageFailure.FIRST_USE -> AppState.FirstLaunch
+            Phase9CompositionRoot.StorageFailure.LOCKED -> AppState.LockedStorage
+            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> AppState.KeyInvalidated
+            Phase9CompositionRoot.StorageFailure.MIGRATION_REQUIRED -> AppState.MigrationRequired
+            Phase9CompositionRoot.StorageFailure.DEGRADED,
+            Phase9CompositionRoot.StorageFailure.MUTATION_UNPROVEN -> AppState.DegradedStorage
         }
-        val candidates = clientKeys()?.credentialCandidates().orEmpty()
-        var finalError = org.kurdistanvpn.core.model.OperationError.TRUST_REJECTED
-        try {
-            for (candidate in candidates) {
-                when (
-                    val result = nativeCore.verifyPreviewWithRecipient(
-                        request,
-                        candidate.publicRequest,
-                        candidate.privateBundle,
-                    )
-                ) {
-                    is NativeResult.Success -> return NativeResult.Success(
-                        ResolvedProfilePreview(result.value, candidate.localRecordId),
-                    )
-                    is NativeResult.Failure -> finalError = result.error
-                }
-            }
-        } finally {
-            candidates.forEach(RecipientCredentialLease::close)
+        val recoveryReason: ProtectedRecoveryReason? get() = when (failure) {
+            Phase9CompositionRoot.StorageFailure.MUTATION_UNPROVEN -> ProtectedRecoveryReason.MUTATION_UNPROVEN
+            Phase9CompositionRoot.StorageFailure.DEGRADED,
+            Phase9CompositionRoot.StorageFailure.KEY_INVALIDATED -> ProtectedRecoveryReason.INCONSISTENT
+            else -> null
         }
-        return NativeResult.Failure(finalError)
+    }
+    data object UnexpectedFailure : ProtectedStartupRead
+}
+
+/** Read-only adapter. Cancellation propagates; unexpected exceptions have a distinct fatal result. */
+internal suspend fun readStartupProjection(
+    failure: Phase9CompositionRoot.StorageFailure?,
+    read: () -> ProtectedStateApplicationFacade.ReadProjection?,
+): ProtectedStartupRead {
+    currentCoroutineContext().ensureActive()
+    if (failure != null) return ProtectedStartupRead.Unavailable(failure)
+    return try {
+        val projection = read()
+        currentCoroutineContext().ensureActive()
+        if (projection == null) ProtectedStartupRead.Unavailable(Phase9CompositionRoot.StorageFailure.DEGRADED)
+        else ProtectedStartupRead.Ready(projection)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        ProtectedStartupRead.UnexpectedFailure
     }
 }
 
-internal class RuntimeSessionCoordinator(
-    private val nativeCore: KurdNativeCore,
-    private val journal: () -> ProfileAdmissionJournal?,
+/** App adapter over the closed typed façade. No journal, key store, DAO, or writer escapes. */
+internal class ProfileAdmissionCoordinator(
+    val nativeCore: KurdNativeCore,
+    private val facade: () -> ProtectedStateApplicationFacade?,
 ) {
-    suspend fun openLiveAuthority(localRecordId: String): RuntimeAuthorityResult? =
-        journal()?.openRuntimeAuthority(localRecordId)
-
-    fun probe(payload: ByteArray) = nativeCore.phase11RoundTrip(payload)
+    suspend fun readProfileProjection(): ProfileReadProjection {
+        val projection = checkNotNull(facade()?.readProjection()) { "PROTECTED_STATE_UNAVAILABLE" }
+        return ProfileReadProjection(projection.profiles, projection.health)
+    }
+    fun enrollmentKeys(): List<ClientKeySummary> = facade()?.enrollmentSummaries().orEmpty()
+    fun enrollmentRequest(id: String): ByteArray? = facade()?.enrollmentRequest(id)
+    suspend fun createEnrollment(validitySeconds: Int, now: Long): ProtectedStateApplicationFacade.CommandResult<ClientKeySummary> =
+        facade()?.createEnrollment(validitySeconds, now) ?: ProtectedStateApplicationFacade.CommandResult.Busy
+    suspend fun deleteEnrollmentKey(id: String): ProtectedStateApplicationFacade.CommandResult<Unit> =
+        facade()?.deleteEnrollment(id) ?: ProtectedStateApplicationFacade.CommandResult.Busy
+    suspend fun markEnrollmentRequestExported(id: String): ProtectedStateApplicationFacade.CommandResult<Unit> =
+        facade()?.markEnrollmentExported(id) ?: ProtectedStateApplicationFacade.CommandResult.Busy
+    suspend fun deleteProfile(id: String): ProtectedStateApplicationFacade.CommandResult<Unit> =
+        facade()?.deleteProfile(id) ?: ProtectedStateApplicationFacade.CommandResult.Busy
 }
 
 internal interface RoutingPolicyRepository {
     fun available(): Boolean
     fun load(): Set<String>
-    fun save(packages: Set<String>)
-    fun clear()
+    suspend fun save(packages: Set<String>)
+    suspend fun clear()
 }
 
-internal class EncryptedRoutingPolicyRepository(
-    private val store: () -> SecureRoutingPolicyStore?,
-) : RoutingPolicyRepository {
-    override fun available(): Boolean = store() != null
-
-    override fun load(): Set<String> = store()?.loadPackages().orEmpty()
-
-    override fun save(packages: Set<String>) {
-        checkNotNull(store()) { "ROUTING_STORAGE_UNAVAILABLE" }.savePackages(packages)
+internal class ProtectedRoutingPolicyRepository(private val facade: () -> ProtectedStateApplicationFacade?) : RoutingPolicyRepository {
+    override fun available(): Boolean = facade()?.readProjection() != null
+    override fun load(): Set<String> = facade()?.readProjection()?.settings?.routing?.packages.orEmpty()
+    override suspend fun save(packages: Set<String>) {
+        check(facade()?.replaceRouting(packages) == true) { "ROUTING_MUTATION_REJECTED" }
     }
+    override suspend fun clear() = save(emptySet())
+}
 
-    override fun clear() {
-        store()?.clear()
+internal class SettingsCoordinator(private val facade: () -> ProtectedStateApplicationFacade?) {
+    val routing: RoutingPolicyRepository = ProtectedRoutingPolicyRepository(facade)
+    fun startup(failure: () -> Phase9CompositionRoot.StorageFailure?): Flow<ProtectedStartupRead> = flow {
+        emit(readStartupProjection(failure()) { facade()?.readProjection() })
     }
+    // Existing non-startup consumers receive only authenticated settings. Missing
+    // state emits nothing, rather than throwing or inventing a valid projection.
+    val settings: Flow<Phase9Settings> = flow {
+        startup { null }.collect { result ->
+            if (result is ProtectedStartupRead.Ready) emit(result.projection.settings)
+        }
+    }
+    private suspend fun replace(transform: (Phase9Settings) -> Phase9Settings) {
+        val current = checkNotNull(facade()?.readProjection()) { "PROTECTED_STATE_UNAVAILABLE" }
+        check(facade()?.replaceSettings(current.revision, transform(current.settings)) is ProtectedStateApplicationFacade.CommandResult.Committed)
+    }
+    suspend fun setConnection(value: ConnectionPreferences) = replace { it.copy(connection = value) }
+    suspend fun setTunnel(value: TunnelPreferences) = replace { it.copy(tunnel = value) }
+    suspend fun setRouting(value: RoutingPreferences) = replace { it.copy(routing = value) }
+    suspend fun setUpdates(value: UpdatePreferences) = replace { it.copy(updates = value) }
+    suspend fun setProbes(value: ProbePreferences) = replace { it.copy(probes = value) }
+    suspend fun setDiagnostics(value: DiagnosticPreferences) = replace { it.copy(diagnostics = value) }
+    suspend fun setExpert(value: ExpertPreferences) = replace { it.copy(expert = value) }
+    suspend fun setTheme(value: ThemePreference) = replace { it.copy(theme = value) }
+    suspend fun setHighContrast(value: Boolean) = replace { it.copy(highContrast = value) }
+    suspend fun setReducedMotion(value: Boolean) = replace { it.copy(reducedMotion = value) }
+    suspend fun setProfiles(value: ProfilePreferences) = replace { it.copy(profiles = value) }
+    suspend fun resetSettings() = replace { old -> Phase9Settings().copy(routing = old.routing, diagnostics = old.diagnostics, profiles = old.profiles) }
+    suspend fun resetProfiles() = replace { old -> old.copy(profiles = Phase9Settings().profiles) }
+    suspend fun resetRouting() = replace { old -> old.copy(routing = Phase9Settings().routing) }
+    suspend fun resetDiagnostics() = replace { old -> old.copy(diagnostics = Phase9Settings().diagnostics) }
+    suspend fun resetAll() = replace { Phase9Settings() }
 }
 
-internal class SettingsCoordinator(
-    private val store: Phase9SettingsStore,
-    val routing: RoutingPolicyRepository,
-) {
-    val settings: Flow<Phase9Settings> = store.settings
-
-    suspend fun setConnection(value: ConnectionPreferences) = store.setConnection(value)
-    suspend fun setTunnel(value: TunnelPreferences) = store.setTunnel(value)
-    suspend fun setRouting(value: RoutingPreferences) = store.setRouting(value)
-    suspend fun setUpdates(value: UpdatePreferences) = store.setUpdates(value)
-    suspend fun setProbes(value: ProbePreferences) = store.setProbes(value)
-    suspend fun setDiagnostics(value: DiagnosticPreferences) = store.setDiagnostics(value)
-    suspend fun setExpert(value: ExpertPreferences) = store.setExpert(value)
-    suspend fun setTheme(value: org.kurdistanvpn.core.model.ThemePreference) = store.setTheme(value)
-    suspend fun setHighContrast(value: Boolean) = store.setHighContrast(value)
-    suspend fun setReducedMotion(value: Boolean) = store.setReducedMotion(value)
-    suspend fun setProfiles(value: org.kurdistanvpn.core.model.ProfilePreferences) = store.setProfiles(value)
-    suspend fun clearLegacyRoutingPackages() = store.clearLegacyRoutingPackages()
-    suspend fun resetAll() = store.resetAll()
-    suspend fun resetSettings() = store.resetSettings()
-    suspend fun resetProfiles() = store.resetProfiles()
-    suspend fun resetRouting() = store.resetRouting()
-    suspend fun resetDiagnostics() = store.resetDiagnostics()
+internal class DiagnosticsCoordinator(private val facade: () -> ProtectedStateApplicationFacade?) {
+    fun load(): List<DiagnosticEvent> = facade()?.diagnostics().orEmpty()
+    suspend fun save(events: List<DiagnosticEvent>) {
+        check(facade()?.replaceDiagnostics(events) is ProtectedStateApplicationFacade.CommandResult.Committed)
+    }
+    suspend fun clear() = save(emptyList())
 }
 
-internal class DiagnosticsCoordinator(
-    private val store: () -> EncryptedDiagnosticEventStore?,
-) {
-    fun load(): List<DiagnosticEvent> = store()?.load().orEmpty()
-    fun save(events: List<DiagnosticEvent>) = checkNotNull(store()) {
-        "DIAGNOSTIC_STORAGE_UNAVAILABLE"
-    }.save(events)
-    fun clear() = store()?.clear()
+internal class RuntimeSessionCoordinator(private val nativeCore: KurdNativeCore) {
+    fun probe(payload: ByteArray) = nativeCore.phase11RoundTrip(payload)
 }
 
 internal class RecoveryCoordinator(
-    private val storageFailure: () -> Phase9CompositionRoot.StorageFailure?,
-    private val resetProtectedState: suspend () -> Boolean,
-    private val resetProfiles: suspend () -> Boolean,
-    private val resetRouting: suspend () -> Boolean,
-    private val resetDiagnostics: suspend () -> Boolean,
+    private val storageFailureCallback: () -> Phase9CompositionRoot.StorageFailure?,
+    private val presentationRecoveryRequiredCallback: () -> Boolean?,
+    private val recoverPresentationCallback: suspend () -> ProtectedStateApplicationFacade.CommandResult<Unit>,
+    private val resetProfilesCallback: suspend () -> Boolean,
+    private val resetRoutingCallback: suspend () -> Boolean,
+    private val resetDiagnosticsCallback: suspend () -> Boolean,
 ) {
-    fun storageFailure(): Phase9CompositionRoot.StorageFailure? = storageFailure.invoke()
-    suspend fun resetProtectedState(): Boolean = resetProtectedState.invoke()
-    suspend fun resetProfiles(): Boolean = resetProfiles.invoke()
-    suspend fun resetRouting(): Boolean = resetRouting.invoke()
-    suspend fun resetDiagnostics(): Boolean = resetDiagnostics.invoke()
+    fun storageFailure(): Phase9CompositionRoot.StorageFailure? = storageFailureCallback.invoke()
+    fun presentationRecoveryRequired(): Boolean? = presentationRecoveryRequiredCallback.invoke()
+    suspend fun recoverPresentation(): ProtectedStateApplicationFacade.CommandResult<Unit> = recoverPresentationCallback.invoke()
+    suspend fun resetProfiles(): Boolean = resetProfilesCallback.invoke()
+    suspend fun resetRouting(): Boolean = resetRoutingCallback.invoke()
+    suspend fun resetDiagnostics(): Boolean = resetDiagnosticsCallback.invoke()
 }
 
 internal class ProviderProjectionRepository {
@@ -179,40 +161,37 @@ internal class ProviderProjectionRepository {
 
 internal data class Phase13Coordinators(
     val profiles: ProfileAdmissionCoordinator,
-    val runtime: RuntimeSessionCoordinator,
     val settings: SettingsCoordinator,
     val diagnostics: DiagnosticsCoordinator,
+    val runtime: RuntimeSessionCoordinator,
     val recovery: RecoveryCoordinator,
     val providers: ProviderProjectionRepository,
 ) {
     companion object {
         fun create(root: Phase9CompositionRoot): Phase13Coordinators {
-            val routing = EncryptedRoutingPolicyRepository { root.sensitiveRoutingStore }
+            val facade = root::protectedStateFacade
+            val routing = ProtectedRoutingPolicyRepository(facade)
+            val settings = SettingsCoordinator(facade)
             return Phase13Coordinators(
-                profiles = ProfileAdmissionCoordinator(
-                    root.nativeCore,
-                    { root.admissionJournal },
-                    { root.clientKeyStore },
-                ),
-                runtime = RuntimeSessionCoordinator(root.nativeCore) { root.admissionJournal },
-                settings = SettingsCoordinator(root.settingsStore, routing),
-                diagnostics = DiagnosticsCoordinator { root.diagnosticEventStore },
+                profiles = ProfileAdmissionCoordinator(root.nativeCore, facade),
+                settings = settings,
+                diagnostics = DiagnosticsCoordinator(facade),
+                runtime = RuntimeSessionCoordinator(root.nativeCore),
                 recovery = RecoveryCoordinator(
-                    storageFailure = { root.storageFailure },
-                    resetProtectedState = root::resetProtectedState,
-                    resetProfiles = {
-                        root.admissionJournal?.resetAll() ?: false
+                    storageFailureCallback = { root.storageFailure },
+                    presentationRecoveryRequiredCallback = {
+                        facade()?.presentationRecoveryRequired() ?: false
                     },
-                    resetRouting = {
-                        root.sensitiveRoutingStore?.let { store ->
-                            runCatching { store.clear() }.isSuccess
-                        } ?: false
+                    recoverPresentationCallback = {
+                        facade()?.recoverPresentationConfirmed()
+                            ?: ProtectedStateApplicationFacade.CommandResult.Busy
                     },
-                    resetDiagnostics = {
-                        root.diagnosticEventStore?.let { store ->
-                            runCatching { store.clear() }.isSuccess
-                        } ?: false
+                    resetProfilesCallback = {
+                        val ids = facade()?.readProjection()?.profiles?.map { it.localRecordId }?.toSet().orEmpty()
+                        facade()?.resetProfiles(ids) is ProtectedStateApplicationFacade.CommandResult.Committed
                     },
+                    resetRoutingCallback = { runCatching { routing.clear() }.isSuccess },
+                    resetDiagnosticsCallback = { runCatching { facade()?.replaceDiagnostics(emptyList()) is ProtectedStateApplicationFacade.CommandResult.Committed }.getOrDefault(false) },
                 ),
                 providers = ProviderProjectionRepository(),
             )

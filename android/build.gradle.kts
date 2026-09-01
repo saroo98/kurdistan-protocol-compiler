@@ -19,6 +19,135 @@ val invokedFromAndroidStudio = providers.gradleProperty("android.injected.invoke
     .map(String::toBoolean)
     .orElse(false)
 
+// Local correction runs are deliberately separate from candidate and CI aggregates.
+val localCorrection = providers.gradleProperty("localCorrection").map(String::toBoolean).orElse(false)
+if (localCorrection.get()) {
+    check(gradle.startParameter.isOffline) { "Local correction requires offline resolution" }
+    val lockWrite = providers.gradleProperty("localCorrectionLockWrite").map(String::toBoolean).orElse(false).get()
+    check(gradle.startParameter.isWriteDependencyLocks == lockWrite) { "Explicit confined lock-write mode required" }
+    if (lockWrite) {
+        check(gradle.startParameter.taskNames == listOf(":resolveLocalCorrectionLocks")) { "Unapproved lock-write task" }
+        val permitted = setOf(":app", ":core:native-api", ":data:protected-state")
+        val known = mutableSetOf<String>()
+        // Existing lock identities are inputs, not writable output targets.
+        allprojects.forEach { candidate ->
+            candidate.file("gradle.lockfile").takeIf(File::isFile)?.readLines()?.forEach { row ->
+                if (row.isNotBlank() && !row.startsWith("#") && !row.startsWith("empty=")) {
+                    known += row.substringBefore('=')
+                }
+            }
+        }
+        check("junit:junit:4.13.2" in known && "org.hamcrest:hamcrest-core:1.3" in known) {
+            "Approved existing test identities missing"
+        }
+        allprojects {
+            configurations.configureEach {
+                val owner = project
+                incoming.beforeResolve {
+                    check(owner.path in permitted) { "Unapproved project lock resolution: ${owner.path}" }
+                    check(owner.dependencyLocking.lockFile.get().asFile.canonicalFile == owner.file("gradle.lockfile").canonicalFile) {
+                        "Unexpected dependency-lock output"
+                    }
+                }
+            }
+        }
+        val lockTasks = permitted.sorted().map { path ->
+            val target = project(path)
+            target.tasks.register("resolveLocalCorrectionLocks") {
+                group = "verification"
+                description = "Resolve this approved project's existing dependencies offline, under its own project lock."
+                if (path == ":data:protected-state") {
+                    // AGP creates androidApis lazily from this resource task. Let Gradle generate
+                    // its empty/file-dependency lock state; never manufacture lock rows by hand.
+                    dependsOn(target.tasks.matching { it.name == "parseDebugLocalResources" })
+                }
+                doLast {
+                    val oldRows = target.file("gradle.lockfile").takeIf(File::isFile)?.readLines().orEmpty()
+                    val old = mutableMapOf<String, MutableMap<String, String>>()
+                    oldRows.filter { it.isNotBlank() && !it.startsWith("#") && !it.startsWith("empty=") }.forEach { row ->
+                        val coordinate = row.substringBefore('=')
+                        val identity = coordinate.substringBeforeLast(':')
+                        row.substringAfter('=').split(',').forEach { configuration ->
+                            old.getOrPut(configuration) { mutableMapOf() }[identity] = coordinate
+                        }
+                    }
+                    target.configurations.filter { it.isCanBeResolved }.sortedBy { it.name }.forEach { configuration ->
+                        configuration.incoming.resolutionResult.allComponents.forEach { component ->
+                            val id = component.id
+                            if (id is org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                                val coordinate = "${id.group}:${id.module}:${id.version}"
+                                check(coordinate in known) { "Unapproved dependency identity: $coordinate" }
+                                val previous = old[configuration.name]?.get("${id.group}:${id.module}")
+                                check(previous == null || previous == coordinate) { "Existing configuration version changed" }
+                            }
+                        }
+                        // Strict verification applies to existing external artifacts. No project APK or AAR is built.
+                        configuration.incoming.artifactView {
+                            componentFilter { it is org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+                        }.files.files.forEach { artifact -> check(artifact.isFile) { "Missing offline dependency artifact" } }
+                    }
+                }
+            }
+        }
+        tasks.register("resolveLocalCorrectionLocks") {
+            group = "verification"
+            description = "Offline identity-preserving lock generation for the three explicitly approved modules only."
+            dependsOn(lockTasks)
+        }
+    }
+    val allowedExec = setOf(
+        ":core:native-jni:buildDebugArm64v8aGoBridge",
+        ":core:native-jni:buildDebugX8664GoBridge",
+        ":core:native-jni:buildInternalArm64v8aGoBridge",
+        ":core:native-jni:buildInternalX8664GoBridge",
+    )
+    val prohibited = Regex("(?i)(assemble|bundle(?!Lib(Compile|Runtime)To(Jar|Dir))|install|uninstall|connected|devicegate|phase17gate|campaign|stress|soak|publish|upload|deploy|sign.*(apk|bundle|release)|^package(Internal|Debug|Release)$)")
+    val confinedRoot = rootDir.parentFile.canonicalFile.toPath()
+    val applicationClassJars = setOf(":app:bundleInternalClassesToCompileJar", ":app:bundleInternalClassesToRuntimeJar")
+    val lintPreparationProjects = setOf(":app", ":core:model", ":core:ui", ":domain", ":core:native-api", ":core:native-jni",
+        ":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":platform:import",
+        ":runtime:api", ":runtime:android", ":feature:home", ":feature:profiles",
+        ":feature:settings-recovery", ":feature:diagnostics-about", ":test:fixtures")
+    fun isConfinedLintPreparation(task: Task): Boolean {
+        // Audited AGP 9.2.1 task: local optional lint.jar copy only, not remote publication.
+        if (task.name != "prepareLintJarForPublish" || task.project.path !in lintPreparationProjects ||
+            task !is com.android.build.gradle.internal.tasks.PrepareLintJarForPublish) return false
+        val output = task.outputs.files.files.singleOrNull()?.canonicalFile ?: return false
+        return output.name == "lint.jar" && output.toPath().startsWith(task.project.layout.buildDirectory.get().asFile.canonicalFile.toPath())
+    }
+    fun isConfinedLocalLintAar(task: Task): Boolean {
+        val variant = Regex("^bundle(Debug|Internal)LocalLintAar$").matchEntire(task.name)?.groupValues?.get(1)?.lowercase()
+            ?: return false
+        if (task.project.path !in lintPreparationProjects ||
+            task !is com.android.build.gradle.tasks.BundleAar) return false
+        val output = task.outputs.files.files.singleOrNull()?.canonicalFile ?: return false
+        return output.name == "out.aar" && output.toPath().startsWith(
+            task.project.layout.buildDirectory.dir("intermediates/local_aar_for_lint/$variant").get().asFile.canonicalFile.toPath())
+    }
+    gradle.taskGraph.whenReady {
+        allTasks.forEach { task ->
+            check(task.path in applicationClassJars || isConfinedLintPreparation(task) || isConfinedLocalLintAar(task) || !prohibited.containsMatchIn(task.name)) { "Prohibited local task: ${task.path}" }
+            check(task !is Exec || task.path in allowedExec) { "Unaudited executable task: ${task.path}" }
+            check(task !is org.gradle.api.tasks.JavaExec) { "Unaudited Java executable task" }
+            task.outputs.files.files.forEach { output ->
+                check(output.canonicalFile.toPath().startsWith(confinedRoot)) { "Output outside local worktree" }
+                check(output.extension.lowercase() !in setOf("apk", "aab", "apks", "jks", "keystore")) { "Packaging/signing output forbidden" }
+            }
+            task.finalizedBy.getDependencies(task).forEach { finalizer ->
+                check(finalizer.path in applicationClassJars || isConfinedLintPreparation(finalizer) || isConfinedLocalLintAar(finalizer) || !prohibited.containsMatchIn(finalizer.name)) { "Prohibited local finalizer" }
+            }
+            logger.lifecycle("LOCAL_CORRECTION_TASK ${task.path} ${task.javaClass.name}")
+        }
+    }
+    subprojects {
+        tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+            val temporary = layout.buildDirectory.dir("local-correction-test-tmp")
+            systemProperty("java.io.tmpdir", temporary.get().asFile.absolutePath)
+            doFirst { check(temporary.get().asFile.isDirectory || temporary.get().asFile.mkdirs()) }
+        }
+    }
+}
+
 val releaseVersionProperties = Properties().apply {
     rootProject.file("../config/release/version.properties").inputStream().use(::load)
 }
@@ -52,6 +181,9 @@ val adbExecutable = androidSdkDirectory.resolve(
 allprojects {
     group = "org.kurdistanvpn"
     version = releaseVersionName
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+        systemProperty("kurdistan.test.sourceRoot", rootDir.parentFile.absolutePath)
+    }
     dependencyLocking {
         lockAllConfigurations()
         // Android Studio resolves ephemeral Configuration copies whose generated

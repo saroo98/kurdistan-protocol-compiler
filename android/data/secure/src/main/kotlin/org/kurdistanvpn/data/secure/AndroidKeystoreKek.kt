@@ -8,6 +8,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
+import android.security.keystore.StrongBoxUnavailableException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -66,7 +67,7 @@ class AndroidKeystoreKek private constructor(
     companion object {
         private const val KEYSTORE = "AndroidKeyStore"
 
-        fun loadExisting(alias: String, generation: Int): AndroidKeystoreKek {
+        @Synchronized fun loadExisting(alias: String, generation: Int): AndroidKeystoreKek {
             require(alias.isNotBlank() && generation > 0)
             val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
             val key = store.getKey(alias, null) as? SecretKey ?: throw MissingKeyException()
@@ -78,20 +79,22 @@ class AndroidKeystoreKek private constructor(
             )
         }
 
-        fun createForFirstUse(
+        @Synchronized fun createForFirstUse(
             alias: String,
             generation: Int,
             preferStrongBox: Boolean = true,
         ): AndroidKeystoreKek {
             require(alias.isNotBlank() && generation > 0)
             val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-            check(!store.containsAlias(alias)) { "refusing to replace an existing Keystore key" }
-            val key = try {
-                generate(alias, preferStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            } catch (error: Exception) {
-                if (!preferStrongBox) throw error
-                generate(alias, false)
-            }
+            val key = FirstUseKeyCreation.create(
+                preferStrongBox = preferStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
+                exists = { store.containsAlias(alias) },
+                generate = { generate(alias, it) },
+                isStrongBoxUnavailable = { failure ->
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                        failure is StrongBoxUnavailableException
+                },
+            )
             return AndroidKeystoreKek(
                 alias = alias,
                 generation = generation,
@@ -100,7 +103,7 @@ class AndroidKeystoreKek private constructor(
             )
         }
 
-        fun deleteForExplicitReset(alias: String) {
+        @Synchronized fun deleteForExplicitReset(alias: String) {
             require(alias.isNotBlank())
             val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
             if (store.containsAlias(alias)) {
@@ -144,5 +147,24 @@ class AndroidKeystoreKek private constructor(
                 "software"
             }
         }.getOrDefault("unknown")
+    }
+}
+
+/** Testable first-use admission. The broker must also hold the cross-process writer lease. */
+internal object FirstUseKeyCreation {
+    fun <T> create(
+        preferStrongBox: Boolean,
+        exists: () -> Boolean,
+        generate: (Boolean) -> T,
+        isStrongBoxUnavailable: (Exception) -> Boolean,
+    ): T {
+        check(!exists()) { "refusing to replace an existing Keystore key" }
+        return try { generate(preferStrongBox) }
+        catch (failure: Exception) {
+            // A generic failure can follow partial publication. Never replace that key,
+            // and never silently change hardware policy after an unrelated provider error.
+            if (!preferStrongBox || !isStrongBoxUnavailable(failure) || exists()) throw failure
+            generate(false)
+        }
     }
 }
