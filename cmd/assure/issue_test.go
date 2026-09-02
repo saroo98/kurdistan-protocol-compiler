@@ -81,7 +81,8 @@ func TestReceiptIssueProducesValidPolicyBoundReceipt(t *testing.T) {
   "status":"PASS",
   "steps":[{"name":"audit","command":["go","run","./cmd/kcheck","--full"],"status":"PASS","exitCode":0}]
 }`)
-	gitTest(t, root, "init")
+	gitTest(t, root, "-c", "core.longpaths=true", "init")
+	gitTest(t, root, "config", "core.longpaths", "true")
 	gitTest(t, root, "config", "user.email", "test@example.invalid")
 	gitTest(t, root, "config", "user.name", "Assure Test")
 	gitTest(t, root, "add", ".")
