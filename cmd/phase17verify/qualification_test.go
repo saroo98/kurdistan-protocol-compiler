@@ -114,6 +114,17 @@ func TestEveryAuthorizedCorrectionProductionInputIsBoundToCandidateInventory(t *
 	}
 }
 
+func TestCopyQualificationInfrastructureReturnsCanonicalRoot(t *testing.T) {
+	root := copyQualificationInfrastructure(t)
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("qualification fixture root cannot be canonicalized: %v", err)
+	}
+	if !sameFilesystemPath(root, resolved) {
+		t.Fatal("qualification fixture root is not canonical")
+	}
+}
+
 func TestQualificationInventoryRejectsUndeclaredOpaqueSource(t *testing.T) {
 	root := copyQualificationInfrastructure(t)
 	path := filepath.Join(root, filepath.FromSlash("android/app/src/main/res/values/launcher_icon_colors.xml"))
@@ -349,7 +360,15 @@ func TestVerifyQualificationInfrastructureRejectsUnlistedCriticalFiles(t *testin
 
 func copyQualificationInfrastructure(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
+	root, err := os.MkdirTemp(filepath.Dir(repositoryRoot(t)), ".phase17verify-qualification-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(root); err != nil {
+			t.Errorf("remove qualification fixture root: %v", err)
+		}
+	})
 	for _, relative := range qualificationRequiredFiles() {
 		source := filepath.Join(repositoryRoot(t), filepath.FromSlash(relative))
 		destination := filepath.Join(root, filepath.FromSlash(relative))
