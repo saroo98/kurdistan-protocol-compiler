@@ -114,6 +114,17 @@ func TestEveryAuthorizedCorrectionProductionInputIsBoundToCandidateInventory(t *
 	}
 }
 
+func TestQualificationInventoryRejectsUndeclaredOpaqueSource(t *testing.T) {
+	root := copyQualificationInfrastructure(t)
+	path := filepath.Join(root, filepath.FromSlash("android/app/src/main/res/values/launcher_icon_colors.xml"))
+	if err := os.WriteFile(path, []byte{0xff, 0xfe, 0xfd}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyQualificationInfrastructure(root); err == nil || !strings.Contains(err.Error(), "is not UTF-8") {
+		t.Fatalf("undeclared opaque source was not rejected: %v", err)
+	}
+}
+
 func TestVerifyQualificationInfrastructureRejectsPolicySchemaAndBoundaryDrift(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -23,6 +23,10 @@ import (
 
 const qualificationMaximumSourceBytes = 16 << 20
 
+var qualificationOpaqueFiles = map[string]struct{}{
+	"android/app/src/main/res/drawable-nodpi/ic_kurdistan_vpn_foreground.png": {},
+}
+
 var qualificationSchemaFiles = []string{
 	"testdata/schemas/phase17-acceptance-registry-v2.schema.json",
 	"testdata/schemas/phase17-candidate-comparison-v1.schema.json",
@@ -204,6 +208,12 @@ var correctionQualificationFiles = []string{
 	"android/app/build.gradle.kts",
 	"android/app/gradle.lockfile",
 	"android/app/src/main/AndroidManifest.xml",
+	"android/app/src/main/res/drawable-nodpi/ic_kurdistan_vpn_foreground.png",
+	"android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn.xml",
+	"android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn_round.xml",
+	"android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn.xml",
+	"android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn_round.xml",
+	"android/app/src/main/res/values/launcher_icon_colors.xml",
 	"android/app/src/main/kotlin/org/kurdistanvpn/app/KurdistanApplication.kt",
 	"android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt",
 	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase13Coordinators.kt",
@@ -514,7 +524,7 @@ func loadQualificationFiles(root string) (map[string][]byte, error) {
 			!os.SameFile(opened, closed) || opened.Size() != closed.Size() || opened.ModTime() != closed.ModTime() {
 			return nil, fmt.Errorf("qualification inventory %s changed while reading", relative)
 		}
-		if !utf8.Valid(raw) {
+		if _, opaque := qualificationOpaqueFiles[relative]; !utf8.Valid(raw) && !opaque {
 			return nil, fmt.Errorf("qualification inventory %s is not UTF-8", relative)
 		}
 		result[relative] = raw
