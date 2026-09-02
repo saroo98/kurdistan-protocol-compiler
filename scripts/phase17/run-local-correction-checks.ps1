@@ -16,6 +16,8 @@ $script:HistoricalCorrectionBaseline = '8ef19dd57520c2930d12e81ed7769a6ec6cf3326
 $script:HistoricalCorrectionTree = '3a51879991388775abffa9e3df7984d624b63852'
 $script:CorrectionBaseline = 'c84473e28249e1d165da23a4bc9be6d4d219784a'
 $script:CorrectionTree = 'b29fac42992b04e072c727b79a33bcd904e5d9aa'
+$script:IntegrationBaseline = '8cf9edf4004335b5933504e5c744a3bfc9145605'
+$script:IntegrationTree = '339967d3793d8173c9b254dc389f3438fed56021'
 $script:CorrectionRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 $script:CorrectionPaths = @'
 M|android/settings.gradle.kts
@@ -228,7 +230,19 @@ M|cmd/phase9devicegate/main_test.go
 N|cmd/phase9devicegate/startup_observer.go
 N|cmd/phase9devicegate/startup_observer_test.go
 M|cmd/assure/main_test.go
+M|cmd/assure/issue_test.go
+M|cmd/phase16verify/main_test.go
 M|cmd/phase17qual/main_test.go
+N|android/app/src/main/res/drawable-nodpi/ic_kurdistan_vpn_foreground.png
+D|android/app/src/main/res/drawable/ic_kurdistan_vpn.xml
+N|android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn.xml
+N|android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn_round.xml
+N|android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn.xml
+N|android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn_round.xml
+N|android/app/src/main/res/values/launcher_icon_colors.xml
+N|android/app/src/test/kotlin/org/kurdistanvpn/app/LauncherIconResourcesTest.kt
+M|website/scripts/sync-brand-assets.mjs
+M|website/src/brandAssets.test.ts
 '@
 function Get-LocalCorrectionWhitelist {
     foreach ($line in ($script:CorrectionPaths -split "\r?\n")) {
@@ -360,23 +374,29 @@ function Assert-LocalCorrectionWorkspace {
     if ($LASTEXITCODE -ne 0 -or $baselineType -cne 'commit') { throw 'Missing immutable baseline commit' }
     $tree = & git -C $script:CorrectionRoot rev-parse ($script:CorrectionBaseline + '^{tree}')
     if ($LASTEXITCODE -ne 0 -or $tree -cne $script:CorrectionTree) { throw 'Wrong immutable tree' }
-    & git -C $script:CorrectionRoot merge-base --is-ancestor $script:CorrectionBaseline $head
-    if ($LASTEXITCODE -ne 0) { throw 'Current HEAD does not descend from the immutable baseline' }
-    $merges = @(& git -C $script:CorrectionRoot rev-list --merges ($script:CorrectionBaseline + '..' + $head))
+    $integrationType = & git -C $script:CorrectionRoot cat-file -t $script:IntegrationBaseline
+    if ($LASTEXITCODE -ne 0 -or $integrationType -cne 'commit') { throw 'Missing immutable integration baseline commit' }
+    $integrationTree = & git -C $script:CorrectionRoot rev-parse ($script:IntegrationBaseline + '^{tree}')
+    if ($LASTEXITCODE -ne 0 -or $integrationTree -cne $script:IntegrationTree) { throw 'Wrong immutable integration tree' }
+    & git -C $script:CorrectionRoot merge-base --is-ancestor $script:CorrectionBaseline $script:IntegrationBaseline
+    if ($LASTEXITCODE -ne 0) { throw 'Integration baseline does not descend from the immutable correction baseline' }
+    & git -C $script:CorrectionRoot merge-base --is-ancestor $script:IntegrationBaseline $head
+    if ($LASTEXITCODE -ne 0) { throw 'Current HEAD does not descend from the immutable integration baseline' }
+    $merges = @(& git -C $script:CorrectionRoot rev-list --merges ($script:IntegrationBaseline + '..' + $head))
     if ($LASTEXITCODE -ne 0 -or $merges.Count -ne 0) { throw 'Merge commits are not admitted in the correction branch' }
     $index = @(& git -C $script:CorrectionRoot diff --cached --name-only)
     if ($LASTEXITCODE -ne 0 -or $index.Count -ne 0) { throw 'Staging is not authorized' }
-    $tracked = @(& git -C $script:CorrectionRoot ls-tree -r --name-only $script:CorrectionBaseline)
+    $tracked = @(& git -C $script:CorrectionRoot ls-tree -r --name-only $script:IntegrationBaseline)
     foreach ($entry in Get-LocalCorrectionWhitelist) {
         Assert-LocalCorrectionPath $entry.Path
         if (($entry.Kind -eq 'N') -eq ($entry.Path -cin $tracked)) { throw 'Whitelist kind does not match baseline' }
     }
-    $committedPaths = @(& git -C $script:CorrectionRoot log --format= --name-only ($script:CorrectionBaseline + '..' + $head) --)
+    $committedPaths = @(& git -C $script:CorrectionRoot log --format= --name-only ($script:IntegrationBaseline + '..' + $head) --)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect committed correction history' }
     foreach ($path in @($committedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)) {
         Assert-LocalCorrectionPath $path
     }
-    $changes = @(& git -C $script:CorrectionRoot -c core.fsmonitor=false -c core.quotepath=true diff --name-status --no-renames $script:CorrectionBaseline --)
+    $changes = @(& git -C $script:CorrectionRoot -c core.fsmonitor=false -c core.quotepath=true diff --name-status --no-renames $script:IntegrationBaseline --)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect correction delta' }
     $changedPaths = [Collections.Generic.List[string]]::new()
     foreach ($change in $changes) {
@@ -401,7 +421,7 @@ function Assert-LocalCorrectionWorkspace {
     $trackedLocalGradle = @(& git -C $script:CorrectionRoot ls-files -- '.gradle-user-home/*')
     if ($LASTEXITCODE -ne 0 -or $trackedLocalGradle.Count -ne 0) { throw 'Local Gradle user home must remain untracked' }
     if ($changedPaths.Count -ne @($changedPaths | Sort-Object -Unique).Count) { throw 'Duplicate correction path accounting' }
-    Write-Output ('PASS: immutable baseline/tree ancestor, linear correction history, 211-path whitelist, zero staged paths; changed paths=' + $changedPaths.Count)
+    Write-Output ('PASS: immutable correction and integration baselines, linear feature history, 223-path whitelist, zero staged paths; changed paths=' + $changedPaths.Count)
 }
 function Resolve-VerifiedLocalJar([string]$Group, [string]$Artifact, [string]$Version) {
     $cache = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.gradle/caches/modules-2/files-2.1'

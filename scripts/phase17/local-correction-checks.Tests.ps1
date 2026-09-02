@@ -20,12 +20,12 @@ if ($global:LASTEXITCODE -ne 0) {
 Assert-Rejected { Assert-ExpectedCompilerDenial 0 @() 'unexpected-success' } 'BV-04'
 Assert-Rejected { Assert-ExpectedCompilerDenial 1 @('unresolved reference: missing') 'wrong-failure' } 'BV-04'
 $paths = @(Get-LocalCorrectionWhitelist)
-if ($paths.Count -ne 211 -or @($paths.Path | Sort-Object -Unique).Count -ne 211) {
+if ($paths.Count -ne 223 -or @($paths.Path | Sort-Object -Unique).Count -ne 223) {
     throw 'BV-01: whitelist accounting mismatch'
 }
-if (@($paths | Where-Object Kind -eq 'M').Count -ne 123 -or
-    @($paths | Where-Object Kind -eq 'N').Count -ne 82 -or
-    @($paths | Where-Object Kind -eq 'D').Count -ne 6) { throw 'BV-01: whitelist disposition mismatch' }
+if (@($paths | Where-Object Kind -eq 'M').Count -ne 127 -or
+    @($paths | Where-Object Kind -eq 'N').Count -ne 89 -or
+    @($paths | Where-Object Kind -eq 'D').Count -ne 7) { throw 'BV-01: whitelist disposition mismatch' }
 foreach ($aclPath in @('internal/selfhost/backup.go','internal/selfhost/private_path_windows.go',
     'internal/selfhost/restore_acl_windows_test.go','cmd/kurdctl/localpath_windows.go',
     'cmd/kurdctl/main_test.go','cmd/kurdctl/localpath_windows_test.go')) {
@@ -37,12 +37,31 @@ foreach ($followupPath in @('.github/workflows/ci.yml',
     'android/app/src/test/kotlin/org/kurdistanvpn/app/FirstUseStartupTest.kt',
     'cmd/phase9devicegate/main.go','cmd/phase9devicegate/main_test.go',
     'cmd/phase9devicegate/startup_observer.go','cmd/phase9devicegate/startup_observer_test.go',
-    'cmd/assure/main_test.go','cmd/phase17qual/main_test.go')) {
+    'cmd/assure/main_test.go','cmd/assure/issue_test.go','cmd/phase16verify/main_test.go',
+    'cmd/phase17qual/main_test.go')) {
     Assert-LocalCorrectionPath $followupPath
+}
+foreach ($logoPath in @('android/app/src/main/res/drawable-nodpi/ic_kurdistan_vpn_foreground.png',
+    'android/app/src/main/res/drawable/ic_kurdistan_vpn.xml',
+    'android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn.xml',
+    'android/app/src/main/res/mipmap-anydpi-v26/ic_kurdistan_vpn_round.xml',
+    'android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn.xml',
+    'android/app/src/main/res/mipmap-anydpi-v33/ic_kurdistan_vpn_round.xml',
+    'android/app/src/main/res/values/launcher_icon_colors.xml',
+    'android/app/src/test/kotlin/org/kurdistanvpn/app/LauncherIconResourcesTest.kt',
+    'website/scripts/sync-brand-assets.mjs','website/src/brandAssets.test.ts')) {
+    Assert-LocalCorrectionPath $logoPath
 }
 if ($script:CorrectionBaseline -cne 'c84473e28249e1d165da23a4bc9be6d4d219784a' -or
     $script:CorrectionTree -cne 'b29fac42992b04e072c727b79a33bcd904e5d9aa') {
     throw 'BV-01: current correction subject is not the sanitized main commit/tree'
+}
+$integrationBaselineVariable = Get-Variable -Name IntegrationBaseline -Scope Script -ErrorAction SilentlyContinue
+$integrationTreeVariable = Get-Variable -Name IntegrationTree -Scope Script -ErrorAction SilentlyContinue
+if ($null -eq $integrationBaselineVariable -or $null -eq $integrationTreeVariable -or
+    $integrationBaselineVariable.Value -cne '8cf9edf4004335b5933504e5c744a3bfc9145605' -or
+    $integrationTreeVariable.Value -cne '339967d3793d8173c9b254dc389f3438fed56021') {
+    throw 'BV-01: current integration baseline is not bound independently from the historical correction baseline'
 }
 $legacyBaseline = Get-Variable -Name HistoricalCorrectionBaseline -Scope Script -ErrorAction SilentlyContinue
 $legacyTree = Get-Variable -Name HistoricalCorrectionTree -Scope Script -ErrorAction SilentlyContinue
@@ -54,15 +73,25 @@ if ($null -eq $legacyBaseline -or $null -eq $legacyTree -or
 Assert-LocalCorrectionWorkspace
 $savedBaseline = $script:CorrectionBaseline
 $savedTree = $script:CorrectionTree
+$savedIntegrationBaseline = $script:IntegrationBaseline
+$savedIntegrationTree = $script:IntegrationTree
 try {
     $script:CorrectionBaseline = '0000000000000000000000000000000000000000'
     Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
     $script:CorrectionBaseline = $savedBaseline
     $script:CorrectionTree = '0000000000000000000000000000000000000000'
     Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
+    $script:CorrectionTree = $savedTree
+    $script:IntegrationBaseline = '0000000000000000000000000000000000000000'
+    Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
+    $script:IntegrationBaseline = $savedIntegrationBaseline
+    $script:IntegrationTree = '0000000000000000000000000000000000000000'
+    Assert-Rejected { Assert-LocalCorrectionWorkspace } 'BV-01'
 } finally {
     $script:CorrectionBaseline = $savedBaseline
     $script:CorrectionTree = $savedTree
+    $script:IntegrationBaseline = $savedIntegrationBaseline
+    $script:IntegrationTree = $savedIntegrationTree
 }
 Assert-LocalCorrectionPath 'android/settings-gradle.lockfile'
 foreach ($historicalVerifier in @('internal/testkit/evidenceoverlay/successor.go',
