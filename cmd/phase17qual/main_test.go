@@ -466,6 +466,7 @@ func TestRunCreatesCandidateOnlyFromCleanExactGitRootAndFourSubjects(t *testing.
 		t.Fatal(err)
 	}
 	runGitTest(t, root, "init")
+	runGitTest(t, root, "config", "core.longpaths", "true")
 	runGitTest(t, root, "config", "user.name", "Phase17 Test")
 	runGitTest(t, root, "config", "user.email", "phase17@example.invalid")
 	runGitTest(t, root, "remote", "add", "origin", "https://github.com/saroo98/kurdistan-protocol-compiler.git")

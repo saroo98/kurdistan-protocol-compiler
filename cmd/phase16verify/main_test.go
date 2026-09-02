@@ -63,7 +63,7 @@ func TestUnavailableHistoricalCommitDoesNotHideInvalidReleaseBoundary(t *testing
 
 func TestUnavailableClassificationDoesNotMaskAnUnboundRepository(t *testing.T) {
 	root := t.TempDir()
-	command := exec.Command("git", "init", "--quiet")
+	command := exec.Command("git", "-c", "core.longpaths=true", "init", "--quiet")
 	command.Dir = root
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("initialize unbound Git fixture: %v: %s", err, output)
@@ -450,6 +450,11 @@ func initEmptyGitRepository(t *testing.T, root string) {
 	command.Dir = root
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("initialize isolated Git subject: %v: %s", err, output)
+	}
+	command = exec.Command("git", "config", "core.longpaths", "true")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("configure isolated Git subject long paths: %v: %s", err, output)
 	}
 	command = exec.Command("git", "-c", "user.name=phase16-test", "-c", "user.email=phase16-test.invalid", "commit", "--quiet", "--allow-empty", "-m", "fixture subject")
 	command.Dir = root
