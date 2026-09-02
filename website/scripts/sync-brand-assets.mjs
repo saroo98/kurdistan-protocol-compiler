@@ -191,6 +191,66 @@ async function atomicRenderPng(path, svg) {
   }
 }
 
+async function renderAndroidForeground(sourceRoot) {
+  const source = resolve(sourceRoot, 'compact-transparent.png')
+  const metadata = await sharp(source).metadata()
+  invariant(
+    metadata.format === 'png' && metadata.width === 512 && metadata.height === 512,
+    'canonical Android launcher source must be a 512 by 512 PNG',
+  )
+  invariant(metadata.hasAlpha === true, 'canonical Android launcher source must retain alpha')
+
+  return sharp(source)
+    .resize(264, 264, { fit: 'contain' })
+    .extend({
+      top: 84,
+      bottom: 84,
+      left: 84,
+      right: 84,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png({ compressionLevel: 9, palette: false })
+    .toBuffer()
+}
+
+function renderAdaptiveIcon({ monochrome }) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/launcher_icon_background" />
+    <foreground android:drawable="@drawable/ic_kurdistan_vpn_foreground" />${
+      monochrome
+        ? '\n    <monochrome android:drawable="@drawable/ic_kurdistan_vpn_foreground" />'
+        : ''
+    }
+</adaptive-icon>
+`
+}
+
+async function syncAndroid(sourceRoot) {
+  validateSource(sourceRoot)
+
+  const resourceRoot = resolve(repositoryRoot, 'android/app/src/main/res')
+  atomicWrite(
+    resolve(resourceRoot, 'drawable-nodpi/ic_kurdistan_vpn_foreground.png'),
+    await renderAndroidForeground(sourceRoot),
+  )
+  atomicWrite(
+    resolve(resourceRoot, 'values/launcher_icon_colors.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="launcher_icon_background">#F8FAFC</color>
+</resources>
+`,
+  )
+
+  for (const version of [26, 33]) {
+    const xml = renderAdaptiveIcon({ monochrome: version >= 33 })
+    for (const name of ['ic_kurdistan_vpn.xml', 'ic_kurdistan_vpn_round.xml']) {
+      atomicWrite(resolve(resourceRoot, `mipmap-anydpi-v${version}/${name}`), xml)
+    }
+  }
+}
+
 function renderSocialSvg() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
@@ -267,7 +327,7 @@ function parseArguments(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
 
-    if (argument === '--check' || argument === '--website') {
+    if (argument === '--check' || argument === '--website' || argument === '--android') {
       invariant(!mode, 'exactly one brand operation is required')
       mode = argument.slice(2)
       continue
@@ -283,7 +343,10 @@ function parseArguments(argv) {
     throw new Error(`unknown argument: ${argument}`)
   }
 
-  invariant(mode === 'check' || mode === 'website', 'use --check or --website')
+  invariant(
+    mode === 'check' || mode === 'website' || mode === 'android',
+    'use --check, --website, or --android',
+  )
   return { mode, sourceRoot }
 }
 
@@ -296,8 +359,14 @@ async function main() {
     return
   }
 
-  await syncWebsite(sourceRoot)
-  console.log('BRAND_WEBSITE=SYNCED')
+  if (mode === 'website') {
+    await syncWebsite(sourceRoot)
+    console.log('BRAND_WEBSITE=SYNCED')
+    return
+  }
+
+  await syncAndroid(sourceRoot)
+  console.log('BRAND_ANDROID=SYNCED')
 }
 
 main().catch((error) => {
