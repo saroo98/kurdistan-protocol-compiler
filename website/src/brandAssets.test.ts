@@ -18,6 +18,7 @@ const websiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryRoot = resolve(websiteRoot, '..')
 const canonicalRoot = resolve(repositoryRoot, 'brand/kurdistan-vpn/v1')
 const generator = resolve(websiteRoot, 'scripts/sync-brand-assets.mjs')
+const androidResourceRoot = resolve(repositoryRoot, 'android/app/src/main/res')
 const temporaryRoots: string[] = []
 
 const expectedArchiveSha256 =
@@ -55,6 +56,14 @@ function runCheck(sourceRoot: string) {
   return spawnSync(
     process.execPath,
     [generator, '--check', '--source-root', sourceRoot],
+    { encoding: 'utf8' },
+  )
+}
+
+function runAndroid(sourceRoot: string) {
+  return spawnSync(
+    process.execPath,
+    [generator, '--android', '--source-root', sourceRoot],
     { encoding: 'utf8' },
   )
 }
@@ -146,6 +155,74 @@ describe('canonical Kurdistan VPN brand assets', () => {
     ).metadata()
     expect(social.width).toBe(1200)
     expect(social.height).toBe(630)
+  })
+
+  it('derives deterministic adaptive Android launcher resources from the canonical compact master', async () => {
+    const result = runAndroid(canonicalRoot)
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('BRAND_ANDROID=SYNCED')
+
+    const foregroundPath = resolve(
+      androidResourceRoot,
+      'drawable-nodpi/ic_kurdistan_vpn_foreground.png',
+    )
+    const expectedForeground = await sharp(
+      resolve(canonicalRoot, 'compact-transparent.png'),
+    )
+      .resize(264, 264, { fit: 'contain' })
+      .extend({
+        top: 84,
+        bottom: 84,
+        left: 84,
+        right: 84,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png({ compressionLevel: 9, palette: false })
+      .toBuffer()
+
+    expect(readFileSync(foregroundPath)).toEqual(expectedForeground)
+    const foreground = await sharp(foregroundPath).metadata()
+    expect(foreground.width).toBe(432)
+    expect(foreground.height).toBe(432)
+
+    for (const version of ['mipmap-anydpi-v26', 'mipmap-anydpi-v33']) {
+      for (const name of ['ic_kurdistan_vpn.xml', 'ic_kurdistan_vpn_round.xml']) {
+        const xml = readFileSync(resolve(androidResourceRoot, version, name), 'utf8')
+        expect(xml).toContain('@color/launcher_icon_background')
+        expect(xml).toContain('@drawable/ic_kurdistan_vpn_foreground')
+        expect(xml.includes('<monochrome')).toBe(version.endsWith('v33'))
+      }
+    }
+  })
+
+  it('refuses missing, malformed, wrong-size, wrong-hash, or substituted Android brand input', async () => {
+    const fixtures = [
+      async (root: string) => rmSync(resolve(root, 'compact-transparent.png')),
+      async (root: string) => writeFileSync(resolve(root, 'compact-transparent.png'), 'not a png'),
+      async (root: string) => {
+        await sharp({
+          create: {
+            width: 1,
+            height: 1,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        }).png().toFile(resolve(root, 'compact-transparent.png'))
+      },
+      async (root: string) => writeFileSync(resolve(root, 'compact-transparent.png'), 'wrong hash'),
+      async (root: string) => {
+        writeFileSync(
+          resolve(root, 'compact-transparent.png'),
+          readFileSync(resolve(root, '64.png')),
+        )
+      },
+    ]
+
+    for (const mutate of fixtures) {
+      const root = newFixture()
+      await mutate(root)
+      expect(runAndroid(root).status).not.toBe(0)
+    }
   })
 
   it('validates the checked-in canonical source without rewriting it', () => {
