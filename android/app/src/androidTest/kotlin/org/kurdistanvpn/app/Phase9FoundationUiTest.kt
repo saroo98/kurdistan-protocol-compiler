@@ -186,6 +186,7 @@ class Phase9FoundationUiTest {
     @Test
     fun primaryNavigationSettingsAndDiagnosticControlsAreOperational() {
         val activity = compose.activity
+        waitForSettledProfileState()
         compose.onNodeWithTag("primary_settings")
             .assertIsDisplayed()
             .performClick()
