@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -369,6 +370,28 @@ func TestVerifyPlanningRejectsOwnedFileBoundaryFailures(t *testing.T) {
 			}
 			assertPlanningError(t, root, changed, tc.want)
 		})
+	}
+}
+
+func TestTask2GeneratedEvidenceBoundary(t *testing.T) {
+	changed := append([]string(nil), expectedOwnedFiles...)
+	changed = append(changed,
+		acceptancePath,
+		"testdata/evidence/phase9/android-licenses.spdx.json",
+		"testdata/evidence/phase9/android-sbom.cdx.json",
+	)
+	if err := validateChangedPaths(changed); err != nil {
+		t.Fatalf("exact Task 2 generated evidence was rejected: %v", err)
+	}
+	for _, unapproved := range []string{
+		"testdata/evidence/phase9/acceptance-status.json",
+		"testdata/evidence/phase9/toolchain-manifest.json",
+		"testdata/evidence/phase18/future-task.json",
+	} {
+		candidate := append(append([]string(nil), changed...), unapproved)
+		if err := validateChangedPaths(candidate); err == nil {
+			t.Fatalf("unapproved evidence path %q was admitted", unapproved)
+		}
 	}
 }
 
@@ -858,6 +881,179 @@ func TestRepositoryBudgetsEncodeAllAcceptedMeasurementSemantics(t *testing.T) {
 	}
 }
 
+func TestRepositoryTask2BuildFoundationMatchesPinnedContract(t *testing.T) {
+	root := filepath.Join("..", "..")
+	read := func(tb testing.TB, relative string) string {
+		tb.Helper()
+		return string(mustRead(tb, filepath.Join(root, filepath.FromSlash(relative))))
+	}
+	requireContains := func(tb testing.TB, relative string, required ...string) {
+		tb.Helper()
+		text := read(tb, relative)
+		for _, value := range required {
+			if !strings.Contains(text, value) {
+				tb.Errorf("%s is missing exact Task 2 contract %q", relative, value)
+			}
+		}
+	}
+	requireExcludes := func(tb testing.TB, relative string, prohibited ...string) {
+		tb.Helper()
+		text := strings.ToLower(read(tb, relative))
+		for _, value := range prohibited {
+			if strings.Contains(text, strings.ToLower(value)) {
+				tb.Errorf("%s contains prohibited Task 2 dependency or behavior %q", relative, value)
+			}
+		}
+	}
+
+	t.Run("exact module set", func(t *testing.T) {
+		settings := read(t, "android/settings.gradle.kts")
+		start := strings.Index(settings, "include(")
+		if start < 0 {
+			t.Fatal("settings has no include block")
+		}
+		end := strings.Index(settings[start:], "\n)")
+		if end < 0 {
+			t.Fatal("settings include block is not terminated")
+		}
+		block := settings[start : start+end]
+		var got []string
+		for _, line := range strings.Split(block, "\n")[1:] {
+			line = strings.TrimSpace(strings.TrimSuffix(line, ","))
+			if len(line) >= 2 && line[0] == '"' && line[len(line)-1] == '"' {
+				got = append(got, strings.Trim(line, "\""))
+			}
+		}
+		want := []string{
+			":app", ":core:model", ":core:ui", ":domain", ":core:native-api", ":core:native-jni",
+			":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":data:node",
+			":platform:import", ":platform:system", ":runtime:api", ":runtime:android", ":feature:home",
+			":feature:profiles", ":feature:settings-recovery", ":feature:diagnostics-about",
+			":feature:onboarding", ":benchmark", ":test:fixtures",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("included modules = %v, want exact Task 2 set %v", got, want)
+		}
+	})
+
+	t.Run("pinned catalog", func(t *testing.T) {
+		requireContains(t, "android/gradle/libs.versions.toml",
+			"appcompat = \"1.7.1\"", "work = \"2.11.2\"", "window = \"1.5.1\"",
+			"benchmark = \"1.4.1\"", "uiautomator = \"2.4.0\"", "serialization = \"1.10.0\"",
+			"androidx-appcompat = { module = \"androidx.appcompat:appcompat\", version.ref = \"appcompat\" }",
+			"androidx-work-runtime = { module = \"androidx.work:work-runtime\", version.ref = \"work\" }",
+			"androidx-work-testing = { module = \"androidx.work:work-testing\", version.ref = \"work\" }",
+			"androidx-window = { module = \"androidx.window:window\", version.ref = \"window\" }",
+			"androidx-window-testing = { module = \"androidx.window:window-testing\", version.ref = \"window\" }",
+			"androidx-benchmark-macro-junit4 = { module = \"androidx.benchmark:benchmark-macro-junit4\", version.ref = \"benchmark\" }",
+			"androidx-test-uiautomator = { module = \"androidx.test.uiautomator:uiautomator\", version.ref = \"uiautomator\" }",
+			"kotlinx-serialization-core = { module = \"org.jetbrains.kotlinx:kotlinx-serialization-core\", version.ref = \"serialization\" }",
+			"android-test = { id = \"com.android.test\", version.ref = \"agp\" }",
+			"kotlin-serialization = { id = \"org.jetbrains.kotlin.plugin.serialization\", version.ref = \"kotlin\" }",
+		)
+		for _, existing := range []string{
+			"agp = \"9.2.1\"", "kotlin = \"2.3.10\"", "ksp = \"2.3.10\"", "activity = \"1.12.4\"",
+			"core = \"1.17.0\"", "lifecycle = \"2.10.0\"", "compose = \"1.11.4\"",
+			"material3 = \"1.4.0\"", "navigation3 = \"1.1.4\"", "room = \"2.8.4\"",
+			"datastore = \"1.2.1\"", "camerax = \"1.6.1\"", "zxing = \"3.5.4\"",
+			"biometric = \"1.1.0\"", "fragment = \"1.8.9\"", "coroutines = \"1.10.2\"",
+			"junit = \"4.13.2\"", "androidx-test = \"1.7.0\"", "espresso = \"3.7.0\"",
+			"compose-test = \"1.11.4\"", "cyclonedx = \"3.3.0\"",
+		} {
+			if !strings.Contains(read(t, "android/gradle/libs.versions.toml"), existing) {
+				t.Errorf("existing dependency pin changed or missing: %s", existing)
+			}
+		}
+	})
+
+	t.Run("data node boundary", func(t *testing.T) {
+		requireContains(t, "android/data/node/build.gradle.kts",
+			"alias(libs.plugins.android.library)", "alias(libs.plugins.kotlin.serialization)",
+			"namespace = \"org.kurdistanvpn.data.node\"", "compileSdk = 36", "minSdk = 26",
+			"implementation(project(\":core:model\"))", "implementation(project(\":domain\"))",
+			"implementation(project(\":core:native-api\"))", "implementation(project(\":data:metadata\"))",
+			"implementation(project(\":data:secure\"))", "implementation(libs.androidx.work.runtime)",
+			"implementation(libs.kotlinx.coroutines.core)", "implementation(libs.kotlinx.serialization.core)",
+			"testImplementation(libs.androidx.work.testing)", "testImplementation(libs.junit4)",
+		)
+		requireExcludes(t, "android/data/node/build.gradle.kts", "okhttp", "retrofit", "ktor", "volley", "analytics", "telemetry")
+	})
+
+	t.Run("platform system boundary", func(t *testing.T) {
+		requireContains(t, "android/platform/system/build.gradle.kts",
+			"alias(libs.plugins.android.library)", "namespace = \"org.kurdistanvpn.platform.system\"",
+			"compileSdk = 36", "minSdk = 26", "implementation(project(\":core:model\"))",
+			"implementation(project(\":domain\"))", "implementation(project(\":runtime:api\"))",
+			"implementation(libs.androidx.core.ktx)", "implementation(libs.kotlinx.coroutines.core)",
+			"implementation(libs.androidx.appcompat)", "implementation(libs.androidx.window)",
+			"testImplementation(libs.androidx.window.testing)", "testImplementation(libs.junit4)",
+		)
+	})
+
+	t.Run("onboarding dependency direction", func(t *testing.T) {
+		requireContains(t, "android/feature/onboarding/build.gradle.kts",
+			"alias(libs.plugins.android.library)", "alias(libs.plugins.compose.compiler)",
+			"namespace = \"org.kurdistanvpn.feature.onboarding\"", "compileSdk = 36", "minSdk = 26",
+			"compose = true", "implementation(project(\":domain\"))",
+			"implementation(project(\":core:model\"))", "implementation(project(\":core:ui\"))",
+		)
+	})
+
+	t.Run("app and benchmark variants", func(t *testing.T) {
+		requireContains(t, "android/build.gradle.kts",
+			"alias(libs.plugins.android.test) apply false",
+			"alias(libs.plugins.kotlin.serialization) apply false",
+			"\":core:native-jni:buildReleaseArm64v8aGoBridge\"",
+			"\":app:bundleBenchmarkClassesToCompileJar\"",
+			"Regex(\"^bundle(Debug|Internal|Release)LocalLintAar$\")",
+		)
+		requireContains(t, "android/app/build.gradle.kts",
+			"create(\"benchmark\")", "initWith(getByName(\"release\"))", "isDebuggable = false",
+			"matchingFallbacks += listOf(\"release\")", "implementation(project(\":data:node\"))",
+			"implementation(project(\":platform:system\"))", "implementation(project(\":feature:onboarding\"))",
+		)
+		requireContains(t, "android/benchmark/build.gradle.kts",
+			"alias(libs.plugins.android.test)", "targetProjectPath = \":app\"", "create(\"benchmark\")",
+			"isDebuggable = false", "matchingFallbacks += listOf(\"release\")",
+			"implementation(libs.androidx.benchmark.macro.junit4)",
+			"implementation(libs.androidx.test.uiautomator)",
+		)
+		requireExcludes(t, "android/benchmark/build.gradle.kts", "com.android.library", "suppressErrors")
+	})
+
+	t.Run("owned path boundary", func(t *testing.T) {
+		want := []string{
+			"android/app/build.gradle.kts",
+			"android/app/gradle.lockfile",
+			"android/benchmark/build.gradle.kts",
+			"android/benchmark/gradle.lockfile",
+			"android/build.gradle.kts",
+			"android/config/phase18-every-control.json",
+			"android/config/phase18-owned-files.txt",
+			"android/config/phase18-performance-budgets.json",
+			"android/config/phase18-required-device-tests.txt",
+			"android/data/node/build.gradle.kts",
+			"android/data/node/gradle.lockfile",
+			"android/feature/onboarding/build.gradle.kts",
+			"android/feature/onboarding/gradle.lockfile",
+			"android/gradle/libs.versions.toml",
+			"android/gradle/verification-metadata.xml",
+			"android/platform/system/build.gradle.kts",
+			"android/platform/system/gradle.lockfile",
+			"android/settings.gradle.kts",
+			"cmd/phase18verify/main.go",
+			"cmd/phase18verify/main_test.go",
+			"docs/PHASE18_ANDROID_PRODUCTION_CONTRACT.md",
+			"docs/PHASE18_EVIDENCE_INDEX.md",
+			"docs/PHASE18_FEATURE_COVERAGE.md",
+		}
+		got := strings.Split(strings.TrimSuffix(read(t, "android/config/phase18-owned-files.txt"), "\n"), "\n")
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("owned paths = %v, want exact through-Task-2 set %v", got, want)
+		}
+	})
+}
+
 func TestRepositoryMarkdownMatchesDeterministicRendering(t *testing.T) {
 	m := readRepositoryFixtureManifest(t)
 	raw, err := json.Marshal(m)
@@ -1146,7 +1342,9 @@ func TestPublicationMembershipRequiresEveryTask1Artifact(t *testing.T) {
 	t.Run("acceptance status is required in publication index", func(t *testing.T) {
 		root, _ := writeValidPlanningFixture(t)
 		initGitFixture(t, root)
-		args := append([]string{"add", "--"}, expectedOwnedFiles...)
+		paths := append([]string(nil), expectedOwnedFiles...)
+		paths = append(paths, expectedGeneratedEvidenceFiles...)
+		args := append([]string{"add", "--"}, paths...)
 		runGitFixture(t, root, args...)
 		if err := verifyPlanning(root); err == nil {
 			t.Fatal("publication membership accepted an untracked acceptance-status record")
@@ -1155,10 +1353,34 @@ func TestPublicationMembershipRequiresEveryTask1Artifact(t *testing.T) {
 		}
 	})
 
+	for _, missing := range expectedGeneratedEvidenceFiles {
+		missing := missing
+		t.Run("generated evidence is required in publication index "+filepath.Base(missing), func(t *testing.T) {
+			root, _ := writeValidPlanningFixture(t)
+			initGitFixture(t, root)
+			paths := append([]string(nil), expectedOwnedFiles...)
+			for _, relative := range expectedGeneratedEvidenceFiles {
+				if relative != missing {
+					paths = append(paths, relative)
+				}
+			}
+			paths = append(paths, acceptancePath)
+			args := append([]string{"add", "--"}, paths...)
+			runGitFixture(t, root, args...)
+			if err := verifyPlanning(root); err == nil {
+				t.Fatalf("publication membership accepted untracked generated evidence %s", missing)
+			} else if !strings.Contains(err.Error(), missing) {
+				t.Fatalf("generated-evidence membership error = %q, want %s", err, missing)
+			}
+		})
+	}
+
 	t.Run("all publication paths tracked is accepted", func(t *testing.T) {
 		root, _ := writeValidPlanningFixture(t)
 		initGitFixture(t, root)
-		paths := append(append([]string(nil), expectedOwnedFiles...), acceptancePath)
+		paths := append([]string(nil), expectedOwnedFiles...)
+		paths = append(paths, expectedGeneratedEvidenceFiles...)
+		paths = append(paths, acceptancePath)
 		args := append([]string{"add", "--"}, paths...)
 		runGitFixture(t, root, args...)
 		if err := verifyPlanning(root); err != nil {
@@ -1383,6 +1605,68 @@ func TestValidatePublicSafetyAcceptsVerifierAndPublicContractSources(t *testing.
 	}
 }
 
+func TestValidatePublicSafetyAllowsOnlyKnownGradleEvidenceRoots(t *testing.T) {
+	root, _ := writeValidPlanningFixture(t)
+	knownRoots := strings.Join([]string{
+		`"` + "." + `tools/phase11/device-gate/latest"`,
+		`"` + "." + `tools/phase13/device-gate/latest"`,
+		`"` + "." + `tools/phase14/device-gate/latest"`,
+	}, "\n") + "\n"
+	mustWriteRelative(t, root, "android/build.gradle.kts", []byte(knownRoots))
+	if err := validatePublicSafety(root); err != nil {
+		t.Fatalf("known public Gradle evidence roots rejected: %v", err)
+	}
+
+	unexpectedRoot := `"` + "." + `tools/phase18/private/latest"` + "\n"
+	mustWriteRelative(t, root, "android/build.gradle.kts", []byte(knownRoots+unexpectedRoot))
+	if err := validatePublicSafety(root); err == nil {
+		t.Fatal("public-safety validator accepted an unapproved Gradle evidence root")
+	}
+
+	mustWriteRelative(t, root, "android/build.gradle.kts", []byte(knownRoots+knownRoots))
+	if err := validatePublicSafety(root); err == nil {
+		t.Fatal("public-safety validator accepted duplicated known Gradle evidence roots")
+	}
+}
+
+func TestValidatePublicSafetyAllowsOnlyAuditedGeneratedProvenanceURLs(t *testing.T) {
+	root, _ := writeValidPlanningFixture(t)
+	scheme := "https" + "://"
+	mustWriteRelative(t, root, "android/gradle/verification-metadata.xml", []byte(
+		"<verification-metadata xmlns=\""+scheme+"schema.gradle.org/dependency-verification\"/>\n",
+	))
+	mustWriteRelative(t, root, "testdata/evidence/phase9/android-licenses.spdx.json", []byte(
+		`{"documentNamespace":"`+scheme+`github.com/saroo98/kurdistan-protocol-compiler/spdx/phase9/0.9.0"}`+"\n",
+	))
+	mustWriteRelative(t, root, "testdata/evidence/phase9/android-sbom.cdx.json", []byte(
+		`{"url":"`+scheme+`www.apache.org/licenses/LICENSE-2.0"}`+"\n",
+	))
+	if err := validatePublicSafety(root); err != nil {
+		t.Fatalf("audited generated provenance URLs rejected: %v", err)
+	}
+
+	mustWriteRelative(t, root, "testdata/evidence/phase9/android-sbom.cdx.json", []byte(
+		`{"url":"`+scheme+`private.invalid/component"}`+"\n",
+	))
+	if err := validatePublicSafety(root); err == nil {
+		t.Fatal("public-safety validator accepted an unaudited generated-evidence host")
+	}
+
+	mustWriteRelative(t, root, "testdata/evidence/phase9/android-sbom.cdx.json", []byte(
+		`{"url":"`+scheme+`user@github.com/component"}`+"\n",
+	))
+	if err := validatePublicSafety(root); err == nil {
+		t.Fatal("public-safety validator accepted generated-evidence URL user information")
+	}
+
+	mustWriteRelative(t, root, "testdata/evidence/phase9/android-sbom.cdx.json", []byte(
+		`{"url":"`+scheme+`github.com/component?credential=placeholder"}`+"\n",
+	))
+	if err := validatePublicSafety(root); err == nil {
+		t.Fatal("public-safety validator accepted a generated-evidence URL query")
+	}
+}
+
 func writeValidPlanningFixture(t *testing.T) (string, []string) {
 	t.Helper()
 	root := t.TempDir()
@@ -1394,17 +1678,7 @@ func writeValidPlanningFixture(t *testing.T) (string, []string) {
 		ControlSetSHA256: controlSetSHA256, ImplementationStatus: "NOT_STARTED",
 		Phase18Decision: "NO_GO", ReleaseAuthorization: "NO_GO",
 	})
-	owned := []string{
-		"android/config/phase18-every-control.json",
-		"android/config/phase18-owned-files.txt",
-		"android/config/phase18-performance-budgets.json",
-		"android/config/phase18-required-device-tests.txt",
-		"cmd/phase18verify/main.go",
-		"cmd/phase18verify/main_test.go",
-		"docs/PHASE18_ANDROID_PRODUCTION_CONTRACT.md",
-		"docs/PHASE18_EVIDENCE_INDEX.md",
-		"docs/PHASE18_FEATURE_COVERAGE.md",
-	}
+	owned := append([]string(nil), expectedOwnedFiles...)
 	mustWriteRelative(t, root, "android/config/phase18-owned-files.txt", []byte(strings.Join(owned, "\n")+"\n"))
 	mustWriteRelative(t, root, "android/config/phase18-required-device-tests.txt", []byte(strings.Join(fixtureDeviceTests(), "\n")+"\n"))
 	mustWriteRelative(t, root, "docs/PHASE18_ANDROID_PRODUCTION_CONTRACT.md", []byte(fixtureTask0Contract()))
@@ -1412,7 +1686,18 @@ func writeValidPlanningFixture(t *testing.T) (string, []string) {
 	mustWriteRelative(t, root, "docs/PHASE18_EVIDENCE_INDEX.md", []byte(fixtureEvidenceMarkdown()))
 	mustWriteRelative(t, root, "cmd/phase18verify/main.go", []byte("package main\n"))
 	mustWriteRelative(t, root, "cmd/phase18verify/main_test.go", []byte("package main\n"))
+	for _, relative := range owned {
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(relative))); errors.Is(err, os.ErrNotExist) {
+			mustWriteRelative(t, root, relative, []byte("Task 2 fixture\n"))
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, relative := range expectedGeneratedEvidenceFiles {
+		mustWriteRelative(t, root, relative, []byte("Task 2 generated evidence fixture\n"))
+	}
 	changed := append([]string(nil), owned...)
+	changed = append(changed, expectedGeneratedEvidenceFiles...)
 	changed = append(changed, "testdata/evidence/phase18/acceptance-status.json")
 	sort.Strings(changed)
 	return root, changed
@@ -1611,7 +1896,7 @@ func mustWrite(t *testing.T, path string, raw []byte) {
 	}
 }
 
-func mustRead(t *testing.T, path string) []byte {
+func mustRead(t testing.TB, path string) []byte {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {

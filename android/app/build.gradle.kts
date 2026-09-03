@@ -55,6 +55,12 @@ android {
                 rootProject.file("config/proguard/phase9-rules.pro"),
             )
         }
+        create("benchmark") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
 
     buildFeatures {
@@ -197,13 +203,16 @@ dependencies {
     implementation(project(":data:secure"))
     implementation(project(":data:settings"))
     implementation(project(":data:protected-state"))
+    implementation(project(":data:node"))
     implementation(project(":platform:import"))
+    implementation(project(":platform:system"))
     implementation(project(":runtime:api"))
     implementation(project(":runtime:android"))
     implementation(project(":feature:home"))
     implementation(project(":feature:profiles"))
     implementation(project(":feature:settings-recovery"))
     implementation(project(":feature:diagnostics-about"))
+    implementation(project(":feature:onboarding"))
     "internalImplementation"(project(":test:fixtures"))
 
     implementation(libs.androidx.core.ktx)

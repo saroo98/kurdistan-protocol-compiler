@@ -10,7 +10,9 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.test) apply false
     alias(libs.plugins.compose.compiler) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.cyclonedx)
 }
@@ -100,14 +102,20 @@ if (localCorrection.get()) {
         ":core:native-jni:buildDebugX8664GoBridge",
         ":core:native-jni:buildInternalArm64v8aGoBridge",
         ":core:native-jni:buildInternalX8664GoBridge",
+        ":core:native-jni:buildReleaseArm64v8aGoBridge",
     )
     val prohibited = Regex("(?i)(assemble|bundle(?!Lib(Compile|Runtime)To(Jar|Dir))|install|uninstall|connected|devicegate|phase17gate|campaign|stress|soak|publish|upload|deploy|sign.*(apk|bundle|release)|^package(Internal|Debug|Release)$)")
     val confinedRoot = rootDir.parentFile.canonicalFile.toPath()
-    val applicationClassJars = setOf(":app:bundleInternalClassesToCompileJar", ":app:bundleInternalClassesToRuntimeJar")
+    val applicationClassJars = setOf(
+        ":app:bundleBenchmarkClassesToCompileJar",
+        ":app:bundleInternalClassesToCompileJar",
+        ":app:bundleInternalClassesToRuntimeJar",
+    )
     val lintPreparationProjects = setOf(":app", ":core:model", ":core:ui", ":domain", ":core:native-api", ":core:native-jni",
-        ":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":platform:import",
+        ":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":data:node",
+        ":platform:import", ":platform:system",
         ":runtime:api", ":runtime:android", ":feature:home", ":feature:profiles",
-        ":feature:settings-recovery", ":feature:diagnostics-about", ":test:fixtures")
+        ":feature:settings-recovery", ":feature:diagnostics-about", ":feature:onboarding", ":test:fixtures")
     fun isConfinedLintPreparation(task: Task): Boolean {
         // Audited AGP 9.2.1 task: local optional lint.jar copy only, not remote publication.
         if (task.name != "prepareLintJarForPublish" || task.project.path !in lintPreparationProjects ||
@@ -116,7 +124,7 @@ if (localCorrection.get()) {
         return output.name == "lint.jar" && output.toPath().startsWith(task.project.layout.buildDirectory.get().asFile.canonicalFile.toPath())
     }
     fun isConfinedLocalLintAar(task: Task): Boolean {
-        val variant = Regex("^bundle(Debug|Internal)LocalLintAar$").matchEntire(task.name)?.groupValues?.get(1)?.lowercase()
+        val variant = Regex("^bundle(Debug|Internal|Release)LocalLintAar$").matchEntire(task.name)?.groupValues?.get(1)?.lowercase()
             ?: return false
         if (task.project.path !in lintPreparationProjects ||
             task !is com.android.build.gradle.tasks.BundleAar) return false

@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,15 +107,34 @@ var productFailureCodes = []string{
 }
 
 var expectedOwnedFiles = []string{
+	"android/app/build.gradle.kts",
+	"android/app/gradle.lockfile",
+	"android/benchmark/build.gradle.kts",
+	"android/benchmark/gradle.lockfile",
+	"android/build.gradle.kts",
 	"android/config/phase18-every-control.json",
 	"android/config/phase18-owned-files.txt",
 	"android/config/phase18-performance-budgets.json",
 	"android/config/phase18-required-device-tests.txt",
+	"android/data/node/build.gradle.kts",
+	"android/data/node/gradle.lockfile",
+	"android/feature/onboarding/build.gradle.kts",
+	"android/feature/onboarding/gradle.lockfile",
+	"android/gradle/libs.versions.toml",
+	"android/gradle/verification-metadata.xml",
+	"android/platform/system/build.gradle.kts",
+	"android/platform/system/gradle.lockfile",
+	"android/settings.gradle.kts",
 	"cmd/phase18verify/main.go",
 	"cmd/phase18verify/main_test.go",
 	"docs/PHASE18_ANDROID_PRODUCTION_CONTRACT.md",
 	"docs/PHASE18_EVIDENCE_INDEX.md",
 	"docs/PHASE18_FEATURE_COVERAGE.md",
+}
+
+var expectedGeneratedEvidenceFiles = []string{
+	"testdata/evidence/phase9/android-licenses.spdx.json",
+	"testdata/evidence/phase9/android-sbom.cdx.json",
 }
 
 var expectedDeviceTests = []string{
@@ -1035,8 +1055,19 @@ func validateOwnedFiles(root string, requirePublicationMembership bool) error {
 			return fmt.Errorf("owned path %s is not a regular in-repository file", relative)
 		}
 	}
+	for _, relative := range expectedGeneratedEvidenceFiles {
+		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			return fmt.Errorf("generated evidence path %s is missing: %w", relative, err)
+		}
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("generated evidence path %s is not a regular in-repository file", relative)
+		}
+	}
 	if requirePublicationMembership {
-		publicationPaths := append(append([]string(nil), expectedOwnedFiles...), acceptancePath)
+		publicationPaths := append([]string(nil), expectedOwnedFiles...)
+		publicationPaths = append(publicationPaths, expectedGeneratedEvidenceFiles...)
+		publicationPaths = append(publicationPaths, acceptancePath)
 		for _, relative := range publicationPaths {
 			tracked, err := gitIndexTracks(root, relative)
 			if err != nil {
@@ -1100,7 +1131,7 @@ func validateCanonicalTextFile(root, relative string, expected []string, label s
 		}
 	}
 	if !reflect.DeepEqual(lines, expected) {
-		return fmt.Errorf("%s differs from the exact Task 0/Task 1 set", label)
+		return fmt.Errorf("%s differs from the exact current Phase 18 task set", label)
 	}
 	return nil
 }
@@ -1600,8 +1631,11 @@ func parseGitStatusPaths(raw []byte) ([]string, error) {
 }
 
 func validateChangedPaths(paths []string) error {
-	allowed := make(map[string]struct{}, len(expectedOwnedFiles)+1)
+	allowed := make(map[string]struct{}, len(expectedOwnedFiles)+len(expectedGeneratedEvidenceFiles)+1)
 	for _, path := range expectedOwnedFiles {
+		allowed[path] = struct{}{}
+	}
+	for _, path := range expectedGeneratedEvidenceFiles {
 		allowed[path] = struct{}{}
 	}
 	allowed[acceptancePath] = struct{}{}
@@ -1623,15 +1657,31 @@ func validateChangedPaths(paths []string) error {
 }
 
 var absoluteWindowsPathPattern = regexp.MustCompile(`(?i)(^|[[:space:]"'\(])[a-z]:[\\/]`)
+var publicURLPattern = regexp.MustCompile(`(?i)https?://[^\x00-\x20"'<>]+`)
 
 func validatePublicSafety(root string) error {
-	paths := append(append([]string(nil), expectedOwnedFiles...), acceptancePath)
+	paths := append([]string(nil), expectedOwnedFiles...)
+	paths = append(paths, expectedGeneratedEvidenceFiles...)
+	paths = append(paths, acceptancePath)
 	for _, relative := range paths {
 		raw, err := readBounded(root, relative, maxJSONBytes)
 		if err != nil {
 			return err
 		}
 		text := strings.ToLower(string(raw))
+		text, err = scrubAuditedGeneratedURLs(relative, text)
+		if err != nil {
+			return err
+		}
+		for _, allowed := range publicSafetyAllowedFragments(relative) {
+			count := strings.Count(text, allowed)
+			if count > 1 {
+				return fmt.Errorf("privacy/public-safety rejection in %s: duplicated allowed fragment", relative)
+			}
+			if count == 1 {
+				text = strings.Replace(text, allowed, "", 1)
+			}
+		}
 		for _, forbidden := range publicSafetyForbiddenCategories() {
 			if strings.Contains(text, forbidden) {
 				return fmt.Errorf("privacy/public-safety rejection in %s: forbidden category %q", relative, forbidden)
@@ -1645,6 +1695,66 @@ func validatePublicSafety(root string) error {
 		}
 	}
 	return nil
+}
+
+func scrubAuditedGeneratedURLs(relative, text string) (string, error) {
+	allowedHosts := publicSafetyURLHosts(relative)
+	if len(allowedHosts) == 0 {
+		return text, nil
+	}
+	for _, rawURL := range publicURLPattern.FindAllString(text, -1) {
+		parsed, err := url.Parse(rawURL)
+		if err != nil || !parsed.IsAbs() || parsed.Hostname() == "" {
+			return "", fmt.Errorf("privacy/public-safety rejection in %s: malformed generated URL", relative)
+		}
+		host := strings.ToLower(parsed.Hostname())
+		if parsed.User != nil || parsed.Port() != "" || parsed.RawQuery != "" || parsed.Fragment != "" || !allowedHosts[host] {
+			return "", fmt.Errorf("privacy/public-safety rejection in %s: unaudited generated URL", relative)
+		}
+		text = strings.Replace(text, rawURL, "", 1)
+	}
+	return text, nil
+}
+
+func publicSafetyURLHosts(relative string) map[string]bool {
+	var hosts []string
+	switch relative {
+	case "android/gradle/verification-metadata.xml":
+		hosts = []string{"schema.gradle.org", "www.w3.org"}
+	case "testdata/evidence/phase9/android-licenses.spdx.json":
+		hosts = []string{"github.com"}
+	case "testdata/evidence/phase9/android-sbom.cdx.json":
+		hosts = []string{
+			"code.google.com",
+			"cs.android.com",
+			"github.com",
+			"opensource.org",
+			"oss.sonatype.org",
+			"source.android.com",
+			"www.apache.org",
+			"www.google.com",
+		}
+	default:
+		return nil
+	}
+	allowed := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		allowed[host] = true
+	}
+	return allowed
+}
+
+func publicSafetyAllowedFragments(relative string) []string {
+	if relative != "android/build.gradle.kts" {
+		return nil
+	}
+	// These exact public Gradle arguments select ignored device-gate output roots.
+	// Any other local-output reference remains categorically rejected below.
+	return []string{
+		`"` + "." + `tools/phase11/device-gate/latest"`,
+		`"` + "." + `tools/phase13/device-gate/latest"`,
+		`"` + "." + `tools/phase14/device-gate/latest"`,
+	}
 }
 
 func publicSafetyForbiddenCategories() []string {
