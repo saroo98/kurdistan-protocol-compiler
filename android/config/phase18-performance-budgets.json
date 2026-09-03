@@ -1,0 +1,142 @@
+{
+  "decision": "PLANNING_ONLY",
+  "metrics": [
+    {
+      "iterations": 20,
+      "measurement": "physical-arm64-api36-release-like",
+      "medianMilliseconds": 1000,
+      "metricId": "cold-start-ttid",
+      "p95Milliseconds": 1500
+    },
+    {
+      "firstUsableStates": [
+        "Home",
+        "onboarding"
+      ],
+      "fullyDrawnRequired": true,
+      "measurement": "physical-arm64-api36-fully-drawn",
+      "metricId": "cold-start-ttfd",
+      "p95Milliseconds": 2000
+    },
+    {
+      "iterations": 20,
+      "measurement": "physical-arm64-api36",
+      "metricId": "warm-start",
+      "p95Milliseconds": 750
+    },
+    {
+      "measurement": "home-profiles-settings-five-deep-flows",
+      "metricId": "navigation-settled-frame",
+      "p95Milliseconds": 100
+    },
+    {
+      "measurement": "physical-60hz-redacted-fixtures",
+      "metricId": "large-list-scroll",
+      "p95Milliseconds": 16.7,
+      "p99Milliseconds": 33.4,
+      "profileCount": 1000
+    },
+    {
+      "measurement": "app-controlled-transition",
+      "metricId": "connect-to-preparing",
+      "p95Milliseconds": 100
+    },
+    {
+      "measurement": "remote-handshake-excluded",
+      "metricId": "route-plan-to-tun",
+      "p95Milliseconds": 500
+    },
+    {
+      "actions": [
+        "Recover Internet",
+        "Stop"
+      ],
+      "measurement": "proxy-and-socket-teardown-included",
+      "metricId": "stop-to-closed-tun",
+      "p95Milliseconds": 1000
+    },
+    {
+      "maximumMilliseconds": 500,
+      "measurement": "network-callback-to-visible-recovery-state",
+      "metricId": "handover-reaction",
+      "transitionDirections": [
+        "Wi-Fi-to-cellular",
+        "cellular-to-Wi-Fi"
+      ],
+      "transitions": 10,
+      "visibleStates": [
+        "FallingBack",
+        "Reconnecting"
+      ]
+    },
+    {
+      "measurement": "ten-minute-idle-and-active-transfer-samples",
+      "metricId": "steady-connected-pss",
+      "p95MiB": 160,
+      "processScope": "app+:vpn"
+    },
+    {
+      "cycles": 100,
+      "maximumMiB": 10,
+      "measurement": "after-garbage-collection-stabilization",
+      "metricId": "memory-growth",
+      "processScope": "same-process-pair"
+    },
+    {
+      "durationMinutes": 10,
+      "measurement": "screen-off-no-scheduled-probe-or-update",
+      "metricId": "idle-cpu",
+      "p95Percent": 2,
+      "processScope": "app+:vpn"
+    },
+    {
+      "conditions": [
+        "stable-power",
+        "stable-Wi-Fi"
+      ],
+      "durationHours": 3,
+      "maximumPercentagePointsPerHour": 2,
+      "measurement": "median-of-three-dedicated-runs",
+      "metricId": "screen-off-battery",
+      "runs": 3
+    },
+    {
+      "causalFailureRule": "severe-or-higher-caused-by-app-work",
+      "maximumCategory": "below-severe",
+      "measurement": "connected-idle-transfer-proxy-probe",
+      "metricId": "thermal"
+    },
+    {
+      "maximumActivePerDeployment": 1,
+      "maximumSeconds": 30,
+      "measurement": "fake-clock-unit-tests-plus-dedicated-network-run",
+      "metricId": "update-worker",
+      "terminalOutcomes": [
+        "CATEGORICAL_TIMEOUT",
+        "COMPLETED"
+      ]
+    },
+    {
+      "authenticationRequired": true,
+      "firstConnectMaximumMilliseconds": 250,
+      "measurement": "local-overhead-native-handshake-excluded",
+      "metricId": "proxy",
+      "overLimitRejectMaximumMilliseconds": 100,
+      "protocolOperation": "CONNECT"
+    },
+    {
+      "connectStopCycles": 100,
+      "maximumFailures": 0,
+      "measurement": "dedicated-phase18-device",
+      "metricId": "reliability",
+      "navigationCycles": 1000,
+      "zeroFailureCategories": [
+        "crash",
+        "deadlock",
+        "leaked-service",
+        "stuck-operation"
+      ]
+    }
+  ],
+  "schemaVersion": "phase18-performance-budgets-v1"
+}

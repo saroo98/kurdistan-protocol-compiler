@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "phase18-acceptance-status-v1",
+  "evidenceKind": "acceptance-status",
+  "controlSetSHA256": "b922c3411014eb680b2aeef0bb75c3c35a6872734c92e8a14faab4a485c401c7",
+  "implementationStatus": "NOT_STARTED",
+  "phase18Decision": "NO_GO",
+  "releaseAuthorization": "NO_GO"
+}
