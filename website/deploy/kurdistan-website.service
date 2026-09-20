@@ -1,0 +1,25 @@
+[Unit]
+Description=Kurdistan VPN static website server
+After=network.target
+
+[Service]
+Type=simple
+# Create this non-root service user and install the project here before use.
+User=kurdistan-website
+Group=kurdistan-website
+WorkingDirectory=/srv/kurdistan-website
+ExecStart=/usr/bin/env node scripts/serve.mjs
+Environment=HOST=127.0.0.1
+Environment=PORT=4174
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=/srv/kurdistan-website
+
+[Install]
+WantedBy=multi-user.target
