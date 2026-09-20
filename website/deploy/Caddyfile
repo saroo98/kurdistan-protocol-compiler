@@ -1,0 +1,9 @@
+# Owner must set SITE_HOST to a hostname they control and configure DNS first.
+# Example command: SITE_HOST=your-owned-hostname caddy run --config deploy/Caddyfile
+# Caddy manages HTTPS. This configuration was inspected, not deployed in this task.
+{$SITE_HOST} {
+    # Conservative initial policy: no includeSubDomains and no preload assertion.
+    header Strict-Transport-Security "max-age=86400"
+    # Security/CSP headers come from the per-document Node production server.
+    reverse_proxy 127.0.0.1:4174
+}

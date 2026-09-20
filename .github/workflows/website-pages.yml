@@ -39,17 +39,21 @@ jobs:
         working-directory: website
         run: npm ci
 
-      - name: Install Chromium
+      - name: Install isolated browser QA tools
         working-directory: website
-        run: npx playwright install --with-deps chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/website-qa" --no-package-lock --ignore-scripts playwright@1.62.1 axe-core@4.13.0
+          "$RUNNER_TEMP/website-qa/node_modules/.bin/playwright" install --with-deps chromium
+          echo "PLAYWRIGHT_MODULE=$RUNNER_TEMP/website-qa/node_modules/playwright" >> "$GITHUB_ENV"
+          echo "AXE_SOURCE=$RUNNER_TEMP/website-qa/node_modules/axe-core/axe.min.js" >> "$GITHUB_ENV"
+
+      - name: Check publication boundary
+        working-directory: website
+        run: node scripts/publication-boundary.mjs
 
       - name: Run complete quality check
         working-directory: website
-        run: npm run check
-
-      - name: Run Lighthouse CI
-        working-directory: website
-        run: npm run audit:lighthouse
+        run: npm run verify
 
       - name: Configure GitHub Pages
         id: pages
@@ -58,7 +62,7 @@ jobs:
       - name: Build GitHub Pages artifact
         working-directory: website
         env:
-          WEBSITE_BASE_PATH: /kurdistan-protocol-compiler/
+          SITE_URL: https://saroo98.github.io/kurdistan-protocol-compiler/
         run: npm run build
 
       - name: Upload GitHub Pages artifact

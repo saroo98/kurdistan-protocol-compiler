@@ -1,0 +1,12 @@
+Third-party project marks
+
+These unmodified images identify their respective projects in a simulated protocol
+selection preview. They do not indicate endorsement or a released integration.
+Names and marks belong to their respective owners; they are not relicensed under
+the website's software license. Original download and project URLs are recorded
+in src/refinement/protocol-logos.json.
+
+WireGuard is a registered trademark of Jason A. Donenfeld. Its original color and
+proportions are preserved. https://www.wireguard.com/trademark-policy/
+VLESS uses the Xray project mark; VMess uses the V2Fly project mark.
+No distinct project mark was established for the other text-only entries.

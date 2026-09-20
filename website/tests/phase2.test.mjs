@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {locales} from '../src/content/locales.mjs';
+import {pathFor,normalize} from '../src/lib/core.mjs';
+import {makeContext} from '../src/components/document.mjs';
+test('Public locale scope is exactly English, Sorani and Kurmanji',()=>assert.deepEqual(Object.keys(locales),['en','ckb','kmr']));
+test('A localized content link stays in its language',()=>assert.equal(makeContext('ckb','/site/').p('docs/profile'),'/site/ckb/docs/profile/'));
+test('Removed public locales cannot be emitted',()=>assert.throws(()=>pathFor('','fa')));
+test('Sorani search normalizes Arabic kaf and yeh variants',()=>assert.equal(normalize('كوردی'),normalize('کوردی')));
+test('Kurmanji search matches accented and unaccented input',()=>assert.equal(normalize('Mîheng'),normalize('Miheng')));

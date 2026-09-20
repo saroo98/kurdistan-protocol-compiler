@@ -1,0 +1,13 @@
+{
+  "wireguard": {"file":"wireguard.png","source":"https://www.wireguard.com/img/icons/favicon-128.png","project":"https://www.wireguard.com/"},
+  "vless": {"file":"xray.svg","source":"https://xtls.github.io/logo-light.svg","project":"https://xtls.github.io/","identity":"Xray project"},
+  "vmess": {"file":"v2fly.png","source":"https://www.v2fly.org/apple-touch-icon.png","project":"https://www.v2fly.org/","identity":"V2Fly project"},
+  "trojan": {"file":"trojan.png","source":"https://avatars.githubusercontent.com/u/33605505?v=4&s=96","project":"https://github.com/trojan-gfw"},
+  "shadowsocks": {"file":"shadowsocks.png","source":"https://avatars.githubusercontent.com/u/3006190?v=4&s=96","project":"https://github.com/shadowsocks"},
+  "hysteria": {"file":"hysteria.png","source":"https://v1.hysteria.network/assets/thunder.png","project":"https://v1.hysteria.network/"},
+  "hysteria2": {"file":"hysteria2.svg","source":"https://hysteria.network/assets/logo.svg","project":"https://hysteria.network/"},
+  "juicity": {"file":"juicity.png","source":"https://avatars.githubusercontent.com/u/140835620?v=4&s=96","project":"https://github.com/juicity"},
+  "openconnect": {"file":"openconnect.png","source":"https://www.infradead.org/openconnect/images/openconnect.png","project":"https://www.infradead.org/openconnect/"},
+  "trusttunnel": {"file":"trusttunnel.png","source":"https://trusttunnel.org/assets/logo.png","project":"https://trusttunnel.org/"},
+  "brook": {"file":"brook.png","source":"https://www.txthinking.com/images/brook.png","project":"https://www.txthinking.com/brook.html"}
+}

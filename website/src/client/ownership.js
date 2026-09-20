@@ -1,0 +1,12 @@
+import {msg} from './locale.js';
+export function setupOwnership(){
+ document.querySelectorAll('[data-ownership]').forEach(explorer=>{
+  const nav=explorer.querySelector('[data-owner-nav]')||explorer.querySelector('nav'),tabs=[...nav.querySelectorAll('[data-owner]')],panels=[...explorer.querySelectorAll('.ownership-panel')],horizontal=explorer.hasAttribute('data-hero-ownership');
+  nav.setAttribute('role','tablist');if(!nav.getAttribute('aria-label'))nav.setAttribute('aria-label',msg('Ownership boundaries'));nav.setAttribute('aria-orientation',horizontal?'horizontal':'vertical');
+  function choose(i,focus=false){tabs.forEach((tab,j)=>{tab.setAttribute('aria-selected',String(i===j));tab.tabIndex=i===j?0:-1;panels[j].hidden=i!==j;if(i===j)panels[j].dataset.entered='true';else delete panels[j].dataset.entered;});explorer.dataset.selected=tabs[i].dataset.owner;if(focus)tabs[i].focus();}
+  tabs.forEach((tab,i)=>{tab.setAttribute('role','tab');tab.id=panels[i].id+'-tab';tab.setAttribute('aria-controls',panels[i].id);panels[i].setAttribute('role','tabpanel');panels[i].setAttribute('aria-labelledby',tab.id);panels[i].tabIndex=0;tab.addEventListener('click',e=>{e.preventDefault();choose(i);});tab.addEventListener('keydown',e=>{let delta=0;if(e.key==='ArrowDown')delta=1;if(e.key==='ArrowUp')delta=-1;if(e.key==='ArrowRight')delta=document.documentElement.dir==='rtl'?-1:1;if(e.key==='ArrowLeft')delta=document.documentElement.dir==='rtl'?1:-1;let n=delta?(i+delta+tabs.length)%tabs.length:e.key==='Home'?0:e.key==='End'?tabs.length-1:null;if(n===null)return;e.preventDefault();choose(n,true);});});
+  const fromHash=tabs.findIndex(t=>t.getAttribute('href')===location.hash);choose(fromHash>=0?fromHash:0);
+ });
+ document.querySelectorAll('.proof,.technical').forEach((d,i)=>{const summary=d.querySelector('summary'),body=d.querySelector('.detail-body');if(!body)return;body.id=body.id||'disclosure-'+i;summary.setAttribute('aria-controls',body.id);summary.setAttribute('aria-expanded',String(d.open));d.addEventListener('toggle',()=>summary.setAttribute('aria-expanded',String(d.open)));});
+ if('IntersectionObserver' in window){const links=[...document.querySelectorAll('[data-toc-link]')];const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)links.forEach(a=>{if(a.hash==='#'+entry.target.id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});},{rootMargin:'-12% 0px -65% 0px'});document.querySelectorAll('[data-reading-section]').forEach(s=>observer.observe(s));}
+}

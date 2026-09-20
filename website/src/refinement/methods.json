@@ -1,0 +1,156 @@
+[
+  {
+    "id": "kurd",
+    "name": "Kurd",
+    "family": "native",
+    "url": "https://github.com/saroo98/kurdistan-protocol-compiler",
+    "sourceKind": "project-source"
+  },
+  {
+    "id": "wireguard",
+    "name": "WireGuard",
+    "family": "tunnels",
+    "url": "https://www.wireguard.com/",
+    "sourceKind": "official-project"
+  },
+  {
+    "id": "vless",
+    "name": "VLESS",
+    "family": "proxy",
+    "url": "https://xtls.github.io/en/development/protocols/vless.html",
+    "sourceKind": "official-specification"
+  },
+  {
+    "id": "vmess",
+    "name": "VMess",
+    "family": "proxy",
+    "url": "https://www.v2fly.org/en_US/developer/protocols/vmess.html",
+    "sourceKind": "official-specification"
+  },
+  {
+    "id": "trojan",
+    "name": "Trojan",
+    "family": "proxy",
+    "url": "https://trojan-gfw.github.io/trojan/",
+    "sourceKind": "official-project"
+  },
+  {
+    "id": "shadowsocks",
+    "name": "Shadowsocks",
+    "family": "proxy",
+    "url": "https://shadowsocks.org/",
+    "sourceKind": "official-project"
+  },
+  {
+    "id": "shadowsocksr",
+    "name": "ShadowsocksR",
+    "family": "proxy",
+    "url": "https://github.com/shadowsocksrr/shadowsocksr",
+    "sourceKind": "community-continuation"
+  },
+  {
+    "id": "hysteria",
+    "name": "Hysteria",
+    "family": "quic",
+    "url": "https://v1.hysteria.network/",
+    "sourceKind": "official-version-docs"
+  },
+  {
+    "id": "hysteria2",
+    "name": "Hysteria2",
+    "family": "quic",
+    "url": "https://hysteria.network/",
+    "sourceKind": "official-project"
+  },
+  {
+    "id": "anytls",
+    "name": "AnyTLS",
+    "family": "proxy",
+    "url": "https://github.com/anytls/anytls-go",
+    "sourceKind": "official-source"
+  },
+  {
+    "id": "tuic",
+    "name": "TUIC",
+    "family": "quic",
+    "url": "https://github.com/tuic-protocol/tuic",
+    "sourceKind": "official-specification"
+  },
+  {
+    "id": "juicity",
+    "name": "Juicity",
+    "family": "quic",
+    "url": "https://github.com/juicity/juicity",
+    "sourceKind": "official-source"
+  },
+  {
+    "id": "socks",
+    "name": "SOCKS",
+    "family": "standards",
+    "url": "https://www.rfc-editor.org/rfc/rfc1928",
+    "sourceKind": "standard"
+  },
+  {
+    "id": "http-https-proxy",
+    "name": "HTTP / HTTPS proxy",
+    "family": "standards",
+    "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.6",
+    "sourceKind": "standard"
+  },
+  {
+    "id": "ssh-tunnelling",
+    "name": "SSH tunnelling",
+    "family": "tunnels",
+    "url": "https://www.openssh.org/",
+    "sourceKind": "official-implementation"
+  },
+  {
+    "id": "openconnect",
+    "name": "OpenConnect",
+    "family": "tunnels",
+    "url": "https://www.infradead.org/openconnect/",
+    "sourceKind": "official-project"
+  },
+  {
+    "id": "trusttunnel",
+    "name": "TrustTunnel",
+    "family": "tunnels",
+    "url": "https://github.com/TrustTunnel/TrustTunnel",
+    "sourceKind": "official-source"
+  },
+  {
+    "id": "masque",
+    "name": "MASQUE",
+    "family": "quic",
+    "url": "https://datatracker.ietf.org/wg/masque/about/",
+    "sourceKind": "standards-working-group"
+  },
+  {
+    "id": "snell",
+    "name": "Snell",
+    "family": "proxy",
+    "url": "https://manual.nssurge.com/policies/snell.html",
+    "sourceKind": "official-documentation"
+  },
+  {
+    "id": "mieru",
+    "name": "Mieru",
+    "family": "proxy",
+    "url": "https://github.com/enfein/mieru",
+    "sourceKind": "official-source"
+  },
+  {
+    "id": "brook",
+    "name": "Brook",
+    "family": "proxy",
+    "url": "https://github.com/txthinking/brook",
+    "sourceKind": "official-source"
+  },
+  {
+    "id": "multi-hop",
+    "name": "Multi-hop",
+    "family": "standards",
+    "url": "https://github.com/saroo98/kurdistan-protocol-compiler",
+    "sourceKind": "project-feature"
+  }
+]

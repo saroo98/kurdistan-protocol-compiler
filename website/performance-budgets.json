@@ -1,0 +1,8 @@
+{
+  "cssGzipBytes": 18000,
+  "javascriptGzipBytes": 25000,
+  "htmlGzipBytes": 18000,
+  "posterBytes": 100000,
+  "labLcpMs": 2500,
+  "labCls": 0.1
+}

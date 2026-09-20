@@ -1,0 +1,425 @@
+{
+  "reviewed": "2026-09-16",
+  "revision": "b86f475cfaa77ee2a2596ed2a29914f031bff506",
+  "scope": "Website evidence registry; not a newly discovered multi-protocol runtime registry. Owner reports do not substitute for qualification receipts.",
+  "protocols": [
+    {
+      "id": "kurd",
+      "name": "Kurd",
+      "category": "transport",
+      "status": "implemented-unqualified",
+      "implemented": true,
+      "qualified": false,
+      "connectable": false,
+      "tested": "Controlled-path tests are described in source; not rerun as VPN tests here.",
+      "experimental": true,
+      "roadmapOnly": null,
+      "demoSelectable": true,
+      "accent": "sun",
+      "descriptionKey": "kurdBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "wireguard",
+      "name": "WireGuard",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "vless",
+      "name": "VLESS",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "vmess",
+      "name": "VMess",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "trojan",
+      "name": "Trojan",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "shadowsocks",
+      "name": "Shadowsocks",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "shadowsocksr",
+      "name": "ShadowsocksR",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "hysteria",
+      "name": "Hysteria",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "hysteria2",
+      "name": "Hysteria2",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "anytls",
+      "name": "AnyTLS",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "tuic",
+      "name": "TUIC",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "juicity",
+      "name": "Juicity",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "socks",
+      "name": "SOCKS",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "http-https-proxy",
+      "name": "HTTP / HTTPS proxy",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "ssh-tunnelling",
+      "name": "SSH tunnelling",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "openconnect",
+      "name": "OpenConnect",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "trusttunnel",
+      "name": "TrustTunnel",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "masque",
+      "name": "MASQUE",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "snell",
+      "name": "Snell",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "mieru",
+      "name": "Mieru",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "brook",
+      "name": "Brook",
+      "category": "transport",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    },
+    {
+      "id": "multi-hop",
+      "name": "Multi-hop",
+      "category": "topology",
+      "status": "not-established",
+      "implemented": null,
+      "qualified": false,
+      "connectable": false,
+      "tested": null,
+      "experimental": null,
+      "roadmapOnly": null,
+      "demoSelectable": false,
+      "accent": "neutral",
+      "descriptionKey": "otherBoundary",
+      "evidence": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+      ]
+    }
+  ]
+}
