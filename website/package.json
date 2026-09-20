@@ -1,51 +1,25 @@
 {
-  "name": "website",
+  "name": "kurdistan-vpn-website",
+  "version": "3.0.0",
   "private": true,
-  "version": "0.0.0",
+  "description": "Source-grounded, static-first Kurdistan VPN public website. Website version, not a VPN release.",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "brand:check": "node scripts/sync-brand-assets.mjs --check --source-root ../brand/kurdistan-vpn/v1",
-    "brand:sync": "node scripts/sync-brand-assets.mjs --website",
-    "predev": "npm run brand:check && node scripts/generate-locale-pages.mjs",
-    "dev": "vite",
-    "prebuild": "npm run brand:check && node scripts/generate-locale-pages.mjs",
-    "build": "tsc -b && vite build && node scripts/postbuild-security.mjs",
-    "lint": "oxlint",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:update": "playwright test --update-snapshots=all",
-    "test:e2e:ui": "playwright test --ui",
-    "optimize:images": "node scripts/optimize-images.mjs",
-    "audit:dependencies": "npm audit --omit=dev",
-    "audit:bundle": "node scripts/check-bundle-budget.mjs",
-    "audit:lighthouse": "node scripts/run-lighthouse.mjs",
-    "preview": "vite preview",
-    "check": "npm run lint && npm run audit:dependencies && npm run build && npm run test:run && npm run test:e2e && npm run audit:bundle"
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/build.mjs && node scripts/serve.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:artifacts": "node --test tests/artifacts/*.test.mjs",
+    "test:browser": "node scripts/python.mjs tests/browser_qa.py",
+    "test:cross-browser": "node scripts/python.mjs tests/browser_qa.py --all-engines --live",
+    "qa:performance": "node scripts/python.mjs tests/performance.py",
+    "qa:requirements": "node scripts/requirements.mjs",
+    "verify": "node scripts/verify.mjs",
+    "package": "node scripts/package.mjs"
   },
-  "dependencies": {
-    "@fontsource-variable/azeret-mono": "^5.3.0",
-    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
-    "@fontsource-variable/manrope": "^5.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
-  },
-  "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
-    "@lhci/cli": "^0.15.1",
-    "@playwright/test": "^1.62.1",
-    "@testing-library/jest-dom": "^7.0.0",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.3",
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "jsdom": "^30.0.1",
-    "oxlint": "^1.75.0",
-    "sharp": "^0.35.4",
-    "typescript": "~6.0.2",
-    "vite": "^8.2.0",
-    "vitest": "^4.1.10"
-  }
+  "license": "AGPL-3.0-or-later"
 }

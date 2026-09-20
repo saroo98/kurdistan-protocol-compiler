@@ -1,0 +1,4 @@
+# Separate QA tooling, never deployed in dist. Browser binaries are separate installs.
+playwright==1.57.0
+beautifulsoup4==4.14.3
+Pillow==12.3.0
