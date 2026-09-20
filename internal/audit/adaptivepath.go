@@ -277,6 +277,13 @@ func AdaptivePathPublicDocsGate() GateResult {
 		failures = append(failures, err.Error())
 		return gate("adaptivepath_public_docs", false, "required", "repository root unavailable", nil, failures)
 	}
+	return adaptivePathPublicDocsGateAt(root)
+}
+
+// Check committed static-site inputs without requiring generated output or Node
+// in the Go audit. The website artifact suite checks their rendered output.
+func adaptivePathPublicDocsGateAt(root string) GateResult {
+	failures := []string{}
 	read := func(rel string) string {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
@@ -286,33 +293,40 @@ func AdaptivePathPublicDocsGate() GateResult {
 		return string(raw)
 	}
 	readme := read("README.md")
-	index := read("website/index.html")
-	translations := read("website/src/i18n/translations.ts")
+	index := read("website/src/components/document.mjs")
+	translations := read("website/src/refinement/copy.json")
+	locales := read("website/src/content/locales.mjs")
+	pages := read("website/src/content/pages.mjs")
 	security := read("docs/self-hosting/SECURITY.md")
+	contents := map[string]string{
+		"README.md":                           readme,
+		"website/src/components/document.mjs": index,
+		"website/src/refinement/copy.json":    translations,
+		"website/src/content/locales.mjs":     locales,
+		"website/src/content/pages.mjs":       pages,
+		"docs/self-hosting/SECURITY.md":       security,
+	}
 	if strings.Contains(readme, "## Current Status") || strings.Contains(readme, "| Milestone | Status |") {
 		failures = append(failures, "README still contains public current-status table")
 	}
 	for name, required := range map[string][]string{
-		"README.md": {"profile-driven, self-hosted relay transport system", "Each operator controls", "no telemetry"},
-		"website/index.html": {"Kurdistan VPN is an Android VPN in development", "hreflang=\"ckb\"", "hreflang=\"kmr\"", "id=\"root\""},
-		"website/src/i18n/translations.ts": {"See release readiness", "not released", "ئامادەیی بۆ بڵاوکردنەوە", "Amadekariya berdanê"},
-		"docs/self-hosting/SECURITY.md": {"There is no Kurdistan account", "global root", "It cannot control another deployment"},
+		"README.md":                           {"profile-driven, self-hosted relay transport system", "Each operator controls", "no telemetry"},
+		"website/src/components/document.mjs": {"<main id=\"content\"", "hreflang=\"${locales[code].hreflang}\"", "Object.keys(locales)", "localizeHTML"},
+		"website/src/content/locales.mjs":     {"en:", "ckb:", "kmr:", "dir:'rtl'", "hreflang:'ku-Arab'", "hreflang:'ku-Latn'"},
+		"website/src/refinement/copy.json":    {"Android app coming soon", "ئەپەکەی ئەندرۆید بەم زووانە", "Sepana Android di nêzîk de"},
+		"website/src/content/pages.mjs":       {"slug:'download'", "The reviewed project is pre-release.", "This website does not offer a production APK"},
+		"docs/self-hosting/SECURITY.md":       {"There is no Kurdistan account", "global root", "It cannot control another deployment"},
 	} {
-		content := map[string]string{
-			"README.md": readme,
-			"website/index.html": index,
-			"website/src/i18n/translations.ts": translations,
-			"docs/self-hosting/SECURITY.md": security,
-		}[name]
+		content := contents[name]
 		for _, needle := range required {
 			if !strings.Contains(content, needle) {
 				failures = append(failures, name+" missing "+needle)
 			}
 		}
 	}
-	failures = append(failures, publicClaimFailures("README.md", readme)...)
-	failures = append(failures, publicClaimFailures("website/index.html", index)...)
-	failures = append(failures, publicClaimFailures("website/src/i18n/translations.ts", translations)...)
+	for name, content := range contents {
+		failures = append(failures, publicClaimFailures(name, content)...)
+	}
 	privateMarkers := []string{
 		strings.Join([]string{"road", "map"}, ""),
 		strings.Join([]string{"private", " plan"}, ""),
@@ -323,7 +337,7 @@ func AdaptivePathPublicDocsGate() GateResult {
 		strings.Join([]string{"super", "powers"}, ""),
 		strings.Join([]string{"impe", "ccable"}, ""),
 	}
-	for name, content := range map[string]string{"README.md": readme, "website/index.html": index, "website/src/i18n/translations.ts": translations} {
+	for name, content := range contents {
 		lower := strings.ToLower(content)
 		for _, marker := range privateMarkers {
 			if strings.Contains(lower, strings.ToLower(marker)) {
@@ -331,8 +345,12 @@ func AdaptivePathPublicDocsGate() GateResult {
 			}
 		}
 	}
+	// These exact public privacy statements are not analytics integrations.
+	// Do not exempt entire lines: a script added alongside them must still fail.
+	dependencySurface := strings.ReplaceAll(index, "No ads or analytics", "")
+	dependencySurface = strings.ReplaceAll(dependencySurface, "This website does not send analytics.", "")
 	for _, forbidden := range []string{"src=\"http://", "src=\"https://", "googletagmanager", "google-analytics", "analytics", "cdn.jsdelivr", "unpkg.com", "fonts.googleapis", "fonts.gstatic"} {
-		if strings.Contains(strings.ToLower(index), forbidden) {
+		if strings.Contains(strings.ToLower(dependencySurface), forbidden) {
 			failures = append(failures, "public site includes external dependency or analytics marker "+forbidden)
 		}
 	}
