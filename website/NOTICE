@@ -1,0 +1,24 @@
+Kurdistan VPN website
+
+Website source: AGPL-3.0-or-later; see LICENSE.
+The original K-shaped mark is preserved byte-for-byte from:
+  saroo98/kurdistan-protocol-compiler
+  revision b86f475cfaa77ee2a2596ed2a29914f031bff506
+  website/public/kurdistan-mark.svg
+The upstream project declares AGPL-3.0-or-later. Its README carries
+SPDX-License-Identifier: CC-BY-SA-4.0 and Copyright 2026 Saro notices.
+Website copy paraphrases source material with source links.
+
+The GNU Affero General Public License text in LICENSE is the unmodified
+standard version 3 text (FSF, 2007). No third-party package code was copied
+from the locally installed package that provided that standard license text.
+
+Self-hosted font files are included under public/assets/fonts.
+IBM Plex fonts include their SIL Open Font License. See docs/FONT_INTEGRATION.md.
+Protocol artwork provenance is recorded in src/refinement/protocol-logos.json.
+The supplied prototype is synthetic; public website code does not confer
+VPN protection, a product release, an audit, or a certification.
+
+Before publicly deploying modified AGPL-covered material, make the actual
+corresponding source of this website available. The upstream repository URL
+alone does not publish this new, unpushed implementation. See README.md.
