@@ -15,7 +15,7 @@
     "heroKurdTitle": "A connection on your terms.",
     "heroKurdBody": "Kurd is our open-source protocol. Your profile brings the settings; you choose the connection.",
     "heroPhoneTitle": "Your phone, your choice.",
-    "heroPhoneBody": "You choose the profile and when to connect. A profile does not give its issuer remote control of your phone.",
+    "heroPhoneBody": "You choose the profile and when to connect.",
     "heroServerTitle": "Run your own, or use one you trust.",
     "heroServerBody": "The server operator runs the VPN software. The hosting provider supplies the underlying infrastructure.",
     "diagramNote": "Interactive explanation · not a live VPN session",
