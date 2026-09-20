@@ -1,0 +1,60 @@
+{
+  "reviewed": "2026-09-16",
+  "roles": [
+    {
+      "id": "device",
+      "nameKey": "deviceRole",
+      "visibleKey": "deviceSees",
+      "limitKey": "deviceLimit",
+      "source": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/docs/self-hosting/SECURITY.md",
+        "https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security"
+      ]
+    },
+    {
+      "id": "project",
+      "nameKey": "projectRole",
+      "visibleKey": "projectSees",
+      "limitKey": "projectLimit",
+      "source": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/docs/self-hosting/SECURITY.md",
+        "https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security"
+      ]
+    },
+    {
+      "id": "operator",
+      "nameKey": "operatorRole",
+      "visibleKey": "operatorSees",
+      "limitKey": "operatorLimit",
+      "source": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/docs/self-hosting/SECURITY.md",
+        "https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security"
+      ]
+    },
+    {
+      "id": "hosting",
+      "nameKey": "hostingRole",
+      "visibleKey": "hostingSees",
+      "limitKey": "hostingLimit",
+      "source": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/docs/self-hosting/SECURITY.md",
+        "https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security"
+      ]
+    },
+    {
+      "id": "destination",
+      "nameKey": "destinationRole",
+      "visibleKey": "destinationSees",
+      "limitKey": "destinationLimit",
+      "source": [
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/docs/self-hosting/SECURITY.md",
+        "https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security"
+      ]
+    }
+  ]
+}
