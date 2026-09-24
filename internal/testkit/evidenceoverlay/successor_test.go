@@ -558,6 +558,34 @@ func TestHistoricalDirectoryIsNotAbsent(t *testing.T) {
 	}
 }
 
+func TestExactSubjectKeepsRequestedBaselineAndDefensiveInventory(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	const commit = "3085db310d17ac5e9bed023d9daf4129e806ef4b"
+	const tree = "bf938d47610f2c30eefc0e856657f5357306a17f"
+	s, err := OpenExactSubject(root, commit, tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.Read("go.mod")
+	if err != nil || f.Commit != commit || f.Tree != tree {
+		t.Fatalf("wrong subject: %+v %v", f, err)
+	}
+	paths := s.Paths()
+	if len(paths) == 0 {
+		t.Fatal("empty inventory")
+	}
+	first := paths[0]
+	paths[0] = "changed"
+	if s.Paths()[0] != first {
+		t.Fatal("inventory alias")
+	}
+	for _, bad := range [][2]string{{commit, HistoricalTree}, {strings.Repeat("f", 40), tree}} {
+		if _, err := OpenExactSubject(root, bad[0], bad[1]); err == nil {
+			t.Fatal("wrong binding accepted")
+		}
+	}
+}
+
 func TestHistoricalCheckoutCRLFIsDerivedOnlyFromPinnedAttributes(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", "..", ".."))
 	file, err := ReadHistoricalFile(root, "android/gradlew.bat")

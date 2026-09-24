@@ -15,6 +15,7 @@ import (
 
 	"kurdistan/internal/protocol/compiler"
 	"kurdistan/internal/protocol/ir"
+	"kurdistan/internal/testkit/committedevidence"
 )
 
 var _ func(*ir.Profile, string, Options, AuthorizationCatalogV1) (Result, error) = GenerateStrict
@@ -107,14 +108,16 @@ func TestModulePathSafety(t *testing.T) {
 
 func TestStrictGeneratedIdentifiersSixPathSHAEvidence(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
-	verifyCommittedEvidenceSetV1(t, root, "WO-043", []committedEvidenceExpectationV1{
-		{"internal/codegen/generator.go", "06873bd0001f41d358cc21a9e2920ef1fc2c67b3e561141171ebed46f8da6142"},
-		{"internal/codegen/generator_templates.go", "a0dfd4c908849a554e94a34db244f403253d30bdea23dca528efc6b13caf4c91"},
-		{"internal/codegen/generator_test.go", "0dcbb2a95f14de69a198013bc7c64597716cf00f4f3b284f950e233571e0acbe"},
-		{"internal/codegen/scanner.go", "fffcddbc632e5c2ceb418555ad8e571638e23843d04749e52c0a792a4687e960"},
-		{"internal/codegen/scanner_test.go", "40ff6664134ed86769c5adf0c25b26b1690f50b55f7c8adfffee933f3a805306"},
-		{"internal/runtime/policy_enforcement_test.go", "ABSENT"},
-	})
+	if err := committedevidence.VerifyHistoricalSet(root, "WO-043", []committedevidence.ExpectedEntry{
+		{Path: "internal/codegen/generator.go", PreEvidence: "06873bd0001f41d358cc21a9e2920ef1fc2c67b3e561141171ebed46f8da6142"},
+		{Path: "internal/codegen/generator_templates.go", PreEvidence: "a0dfd4c908849a554e94a34db244f403253d30bdea23dca528efc6b13caf4c91"},
+		{Path: "internal/codegen/generator_test.go", PreEvidence: "0dcbb2a95f14de69a198013bc7c64597716cf00f4f3b284f950e233571e0acbe"},
+		{Path: "internal/codegen/scanner.go", PreEvidence: "fffcddbc632e5c2ceb418555ad8e571638e23843d04749e52c0a792a4687e960"},
+		{Path: "internal/codegen/scanner_test.go", PreEvidence: "40ff6664134ed86769c5adf0c25b26b1690f50b55f7c8adfffee933f3a805306"},
+		{Path: "internal/runtime/policy_enforcement_test.go", PreEvidence: "ABSENT"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGenerateCreatesBuildableProfileSpecificModule(t *testing.T) {

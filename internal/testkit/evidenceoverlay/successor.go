@@ -121,6 +121,32 @@ type historicalSubject struct {
 	results            map[string]map[string]string
 }
 
+// ExactSubject reads only the explicitly bound immutable Git subject.
+type ExactSubject struct{ subject *historicalSubject }
+
+func OpenExactSubject(root, commit, tree string) (*ExactSubject, error) {
+	s, err := openHistoricalSubject(root, commit, tree)
+	if err != nil {
+		return nil, err
+	}
+	return &ExactSubject{subject: s}, nil
+}
+
+func (s *ExactSubject) Read(path string) (HistoricalFile, error) {
+	return s.subject.read(path)
+}
+
+func (s *ExactSubject) Paths() []string {
+	paths := make([]string, 0, len(s.subject.entries))
+	for path, entry := range s.subject.entries {
+		if entry.Type != "tree" {
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 var historicalSubjects sync.Map
 
 func gitObjectCommand(root string, input []byte, args ...string) ([]byte, error) {
@@ -176,6 +202,30 @@ func openHistoricalSubject(root, commit, tree string) (*historicalSubject, error
 	if !validObjectID(commit) || !validObjectID(tree) {
 		return nil, errors.New("exact immutable commit and tree required")
 	}
+	raw, err := gitObjectCommand(root, nil, "cat-file", "commit", commit)
+	if err != nil {
+		return nil, err
+	}
+	first, _, _ := bytes.Cut(raw, []byte{'\n'})
+	if gitObjectID("commit", raw) != commit || string(first) != "tree "+tree {
+		return nil, errors.New("immutable commit/tree binding mismatch")
+	}
+	s, err := openTreeSubject(root, tree)
+	if err != nil {
+		return nil, err
+	}
+	s.commit = commit
+	for path, entry := range s.entries {
+		entry.Commit = commit
+		s.entries[path] = entry
+	}
+	return s, nil
+}
+
+func openTreeSubject(root, tree string) (*historicalSubject, error) {
+	if !validObjectID(tree) {
+		return nil, errors.New("exact immutable tree required")
+	}
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -187,15 +237,7 @@ func openHistoricalSubject(root, commit, tree string) (*historicalSubject, error
 	if filepath.Clean(filepath.FromSlash(strings.TrimSpace(string(top)))) != filepath.Clean(abs) {
 		return nil, errors.New("evidence root is not the exact Git worktree root")
 	}
-	raw, err := gitObjectCommand(abs, nil, "cat-file", "commit", commit)
-	if err != nil {
-		return nil, err
-	}
-	first, _, _ := bytes.Cut(raw, []byte{'\n'})
-	if gitObjectID("commit", raw) != commit || string(first) != "tree "+tree {
-		return nil, errors.New("immutable commit/tree binding mismatch")
-	}
-	raw, err = gitObjectCommand(abs, nil, "cat-file", "tree", tree)
+	raw, err := gitObjectCommand(abs, nil, "cat-file", "tree", tree)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +248,7 @@ func openHistoricalSubject(root, commit, tree string) (*historicalSubject, error
 	if err != nil {
 		return nil, err
 	}
-	s := &historicalSubject{root: abs, commit: commit, tree: tree, entries: map[string]HistoricalFile{}, content: map[string][]byte{}}
+	s := &historicalSubject{root: abs, tree: tree, entries: map[string]HistoricalFile{}, content: map[string][]byte{}}
 	for _, row := range bytes.Split(raw, []byte{0}) {
 		if len(row) == 0 {
 			continue
@@ -230,7 +272,7 @@ func openHistoricalSubject(root, commit, tree string) (*historicalSubject, error
 		if err != nil || (length < 0 && fields[1] != "tree") {
 			return nil, errors.New("invalid immutable object length")
 		}
-		s.entries[path] = HistoricalFile{Commit: commit, Tree: tree, Path: path, Mode: fields[0], Type: fields[1], ObjectID: fields[2], Length: length}
+		s.entries[path] = HistoricalFile{Tree: tree, Path: path, Mode: fields[0], Type: fields[1], ObjectID: fields[2], Length: length}
 	}
 	return s, nil
 }
