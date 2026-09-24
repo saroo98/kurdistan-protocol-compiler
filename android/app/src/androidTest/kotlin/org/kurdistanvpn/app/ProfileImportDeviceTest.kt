@@ -77,9 +77,12 @@ class ProfileImportDeviceTest {
         compose.onNodeWithTag("primary_profiles").performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.device_enrollment_export_file)).performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.confirm)).performScrollTo().performClick()
-        compose.waitUntil(15_000) { !compose.activity.hasWindowFocus() }
-        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
-            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
+        assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+        automation.waitForIdle(100, 2_000)
+        if (automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
+            assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
         compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
         assertEquals(before.revision, facade.readProjection()?.revision)
         assertEquals(keys, facade.enrollmentSummaries())
