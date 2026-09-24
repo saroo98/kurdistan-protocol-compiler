@@ -38,6 +38,9 @@ func treeSubjectFixture(t *testing.T) (root, commit, tree, blob string) {
 	t.Helper()
 	root = t.TempDir()
 	treeSubjectGit(t, root, "", "init", "--object-format=sha1")
+	// Windows runners may supply an 8.3 TEMP path; the reader requires Git's
+	// exact worktree spelling, not an equivalent filesystem alias.
+	root = filepath.FromSlash(treeSubjectGit(t, root, "", "rev-parse", "--show-toplevel"))
 	treeSubjectGit(t, root, "", "config", "user.name", "Fixture")
 	treeSubjectGit(t, root, "", "config", "user.email", "fixture@example.invalid")
 	base := treeSubjectGit(t, root, "", "mktree")
