@@ -8,9 +8,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"time"
 
 	"kurdistan/internal/product/envelope"
 	"kurdistan/internal/product/profile"
+	"kurdistan/internal/selfhost"
 )
 
 const (
@@ -30,6 +32,91 @@ type VerificationEnvironment interface {
 // the exact enrollment capability retained by the Android secure store.
 type RecipientVerificationEnvironment interface {
 	VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (profile.OfflineVerifiedArtifact, error)
+}
+
+func verifyMaintenanceCurrentV1(current MaintenanceCurrentInputV1, environment RecipientVerificationEnvironmentAt, now time.Time, limits selfhost.LiveMaintenanceLimits) (profile.OfflineVerifiedArtifact, selfhost.LiveMaintenanceBounds, maintenanceCheckedCurrentV1, RecipientCredentials, MaintenanceResultV1) {
+	if environment == nil || now.IsZero() || now.Unix() <= 0 {
+		return profile.OfflineVerifiedArtifact{}, selfhost.LiveMaintenanceBounds{}, maintenanceCheckedCurrentV1{}, RecipientCredentials{}, MaintenanceInvalidRequest
+	}
+	artifact, credentials, result := decodeMaintenanceCurrentIngressV1(current, limits)
+	if result != MaintenanceSuccess {
+		return profile.OfflineVerifiedArtifact{}, selfhost.LiveMaintenanceBounds{}, maintenanceCheckedCurrentV1{}, RecipientCredentials{}, result
+	}
+	// decodeMaintenanceCurrentIngressV1 has rejected empty and original-cap
+	// oversized input. This call verifies only those exact owned current bytes;
+	// the original limits remain with the parent for future candidates.
+	currentLimits := limits
+	currentLimits.MaxArtifactBytes = uint32(len(artifact))
+	verified, bounds, err := environment.VerifyWithRecipientAt(artifact, envelope.ArtifactDeviceRecipient, credentials.Clone(), now, currentLimits)
+	if err != nil {
+		clear(artifact)
+		destroyMaintenanceVerifiedV1(&verified)
+		credentials.Destroy()
+		return profile.OfflineVerifiedArtifact{}, selfhost.LiveMaintenanceBounds{}, maintenanceCheckedCurrentV1{}, RecipientCredentials{}, maintenanceResultFromError(err)
+	}
+	record, err := DecodeActivationRecord(current.ActivationRecord)
+	if err != nil || !runtimeRecordMatches(VerifyPreview{Verified: verified}, record) {
+		clear(artifact)
+		destroyMaintenanceActivationRecordV1(&record)
+		destroyMaintenanceVerifiedV1(&verified)
+		credentials.Destroy()
+		return profile.OfflineVerifiedArtifact{}, selfhost.LiveMaintenanceBounds{}, maintenanceCheckedCurrentV1{}, RecipientCredentials{}, MaintenanceInvalidState
+	}
+	checked := maintenanceCheckedCurrentV1{state: record.State, scope: maintenanceScopeIdentityV1(verified), artifact: artifact}
+	destroyMaintenanceActivationRecordV1(&record)
+	return verified, bounds, checked, credentials, MaintenanceSuccess
+}
+
+// Shared bounded ingress only. Maintenance still verifies before decoding the
+// activation record, preserving its existing error precedence.
+func decodeMaintenanceCurrentIngressV1(current MaintenanceCurrentInputV1, limits selfhost.LiveMaintenanceLimits) ([]byte, RecipientCredentials, MaintenanceResultV1) {
+	request, artifact, code := decodeVerifyArtifact(current.VerifyRequest)
+	if code != CodeOK {
+		result := MaintenanceInvalidRequest
+		if code == CodeSizeLimit {
+			result = MaintenanceSizeLimit
+		}
+		return nil, RecipientCredentials{}, result
+	}
+	class := request.Class
+	for index := range request.Parts {
+		clear(request.Parts[index])
+	}
+	request = VerifyRequest{}
+	if class != envelope.ArtifactDeviceRecipient || len(artifact) == 0 {
+		clear(artifact)
+		return nil, RecipientCredentials{}, MaintenanceInvalidRequest
+	}
+	if uint64(len(artifact)) > uint64(limits.MaxArtifactBytes) {
+		clear(artifact)
+		return nil, RecipientCredentials{}, MaintenanceSizeLimit
+	}
+	credentials, code := DecodeRecipientCredentials(current.RecipientRequest, current.RecipientPrivate)
+	if code != CodeOK {
+		clear(artifact)
+		return nil, RecipientCredentials{}, MaintenanceInvalidRequest
+	}
+	return artifact, credentials, MaintenanceSuccess
+}
+
+func destroyMaintenanceVerifiedV1(verified *profile.OfflineVerifiedArtifact) {
+	if verified == nil {
+		return
+	}
+	clear(verified.ExactArtifact)
+	clear(verified.ExactSignedObject)
+	clear(verified.Profile.Policy)
+	*verified = profile.OfflineVerifiedArtifact{}
+}
+
+func destroyMaintenanceActivationRecordV1(record *profile.ActivationRecord) {
+	if record == nil {
+		return
+	}
+	clear(record.Artifact)
+	clear(record.SignedObject)
+	clear(record.Profile.Policy)
+	*record = profile.ActivationRecord{}
 }
 
 // TrustPreviewEnvironment optionally supplies redacted, independently
@@ -131,6 +218,14 @@ func DecodeVerifyRequest(encoded []byte) (VerifyRequest, error) {
 		return VerifyRequest{}, errors.New("androidbridge: invalid verify segment count")
 	}
 	parts := make([][]byte, count)
+	transferred := false
+	defer func() {
+		if !transferred {
+			for _, part := range parts {
+				clear(part)
+			}
+		}
+	}()
 	offset := verifyRequestHeader
 	for index := range parts {
 		if offset+4 > len(encoded) {
@@ -149,6 +244,7 @@ func DecodeVerifyRequest(encoded []byte) (VerifyRequest, error) {
 	}
 	request := VerifyRequest{Ingress: ingress, Class: class, Parts: parts}
 	canonical, err := EncodeVerifyRequest(request)
+	defer clear(canonical)
 	if err != nil || len(canonical) != len(encoded) {
 		return VerifyRequest{}, errors.New("androidbridge: non-canonical verify request")
 	}
@@ -157,6 +253,7 @@ func DecodeVerifyRequest(encoded []byte) (VerifyRequest, error) {
 			return VerifyRequest{}, errors.New("androidbridge: non-canonical verify request")
 		}
 	}
+	transferred = true
 	return request, nil
 }
 
@@ -191,6 +288,12 @@ func VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes []byte, e
 		return VerifyPreview{}, CodeTrustUnavailable
 	}
 	request, artifact, code := decodeVerifyArtifact(encoded)
+	defer func() {
+		for _, part := range request.Parts {
+			clear(part)
+		}
+		clear(artifact)
+	}()
 	if code != CodeOK {
 		return VerifyPreview{}, code
 	}
@@ -202,6 +305,12 @@ func VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes []byte, e
 		return VerifyPreview{}, code
 	}
 	verified, err := environment.VerifyWithRecipient(artifact, request.Class, credentials.Clone())
+	transferred := false
+	defer func() {
+		if !transferred {
+			destroyMaintenanceVerifiedV1(&verified)
+		}
+	}()
 	if err != nil {
 		credentials.Destroy()
 		return VerifyPreview{}, CodeVerificationRejected
@@ -214,6 +323,7 @@ func VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes []byte, e
 			return VerifyPreview{}, CodeVerificationRejected
 		}
 	}
+	transferred = true
 	return VerifyPreview{
 		Inspection: profile.InspectRedacted(verified),
 		Verified:   verified,
@@ -224,6 +334,14 @@ func VerifyAndPreviewWithRecipient(encoded, requestBytes, privateBytes []byte, e
 
 func decodeVerifyArtifact(encoded []byte) (VerifyRequest, []byte, ErrorCode) {
 	request, err := DecodeVerifyRequest(encoded)
+	transferred := false
+	defer func() {
+		if !transferred {
+			for _, part := range request.Parts {
+				clear(part)
+			}
+		}
+	}()
 	if err != nil {
 		return VerifyRequest{}, nil, CodeInvalidArgument
 	}
@@ -254,6 +372,7 @@ func decodeVerifyArtifact(encoded []byte) (VerifyRequest, []byte, ErrorCode) {
 		}
 		return VerifyRequest{}, nil, CodeVerificationRejected
 	}
+	transferred = true
 	return request, artifact, CodeOK
 }
 

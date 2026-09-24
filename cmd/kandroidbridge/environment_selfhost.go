@@ -38,6 +38,22 @@ func (selfHostedBridgeEnvironment) VerifyWithRecipient(artifact []byte, class en
 	return verified, err
 }
 
+func (selfHostedBridgeEnvironment) VerifyWithRecipientAt(artifact []byte, class envelope.ArtifactClass, credentials androidbridge.RecipientCredentials, now time.Time, limits selfhost.LiveMaintenanceLimits) (profile.OfflineVerifiedArtifact, selfhost.LiveMaintenanceBounds, error) {
+	defer credentials.Destroy()
+	if class != envelope.ArtifactDeviceRecipient {
+		return profile.OfflineVerifiedArtifact{}, selfhost.LiveMaintenanceBounds{}, errors.New("self-hosted bridge: unsupported recipient artifact class")
+	}
+	return selfhost.VerifyLiveMaintenanceCurrentForRecipient(artifact, now, 1, credentials.Request, credentials.Private, limits)
+}
+
+func (selfHostedBridgeEnvironment) VerifyProductionCurrentAt(artifact []byte, class envelope.ArtifactClass, current lifecycle.VerifiedState, credentials androidbridge.RecipientCredentials, now time.Time, limits selfhost.LiveMaintenanceLimits) (*selfhost.LiveRuntimeCurrentV1, error) {
+	defer credentials.Destroy()
+	if class != envelope.ArtifactDeviceRecipient {
+		return nil, errors.New("self-hosted bridge: unsupported recipient artifact class")
+	}
+	return selfhost.VerifyLiveRuntimeCurrentForRecipient(artifact, now, current, credentials.Request, credentials.Private, limits)
+}
+
 func (selfHostedBridgeEnvironment) TrustPreview(artifact []byte, class envelope.ArtifactClass) (androidbridge.TrustPreview, error) {
 	if class != envelope.ArtifactSignedPublic {
 		return androidbridge.TrustPreview{}, errors.New("self-hosted bridge: unsupported artifact class")
@@ -60,7 +76,15 @@ func (selfHostedBridgeEnvironment) TrustPreviewWithRecipient(artifact []byte, cl
 	if class != envelope.ArtifactDeviceRecipient {
 		return androidbridge.TrustPreview{}, errors.New("self-hosted bridge: unsupported recipient artifact class")
 	}
-	verified, _, err := selfhost.VerifyLiveBundleForRecipient(artifact, time.Now().UTC(), 1, credentials.Request, credentials.Private)
+	verified, owned, err := selfhost.VerifyLiveBundleForRecipient(artifact, time.Now().UTC(), 1, credentials.Request, credentials.Private)
+	return recipientTrustPreviewAndDestroy(verified, owned, err)
+}
+
+// The redacted bundle metadata contains no mutable graph. The separately
+// returned verified artifact is discarded by this read and remains ours to wipe.
+func recipientTrustPreviewAndDestroy(verified selfhost.VerifiedBundle, owned profile.OfflineVerifiedArtifact, err error) (androidbridge.TrustPreview, error) {
+	preview := androidbridge.VerifyPreview{Verified: owned}
+	defer preview.Destroy()
 	if err != nil {
 		return androidbridge.TrustPreview{}, err
 	}
@@ -106,6 +130,37 @@ func (environment selfHostedBridgeEnvironment) VerifyBackupRecord(record backup.
 	defer preview.Destroy()
 	if preview.Verified.Profile.Generation != record.Generation || !bytes.Equal(preview.Verified.ExactArtifact, request.Parts[0]) {
 		return errors.New("self-hosted restore: record identity mismatch")
+	}
+	return nil
+}
+
+func (environment selfHostedBridgeEnvironment) VerifyBackupRecordWithRecipient(record backup.Record, key backup.RecipientKeyRecord) error {
+	if record.Kind != backup.RecordNativeProfile || record.Generation == 0 || key.SourceVersion != 2 {
+		return errors.New("restore: invalid recipient profile binding")
+	}
+	bound := false
+	for _, id := range key.SourceProfiles {
+		if id == record.LocalID {
+			bound = true
+		}
+	}
+	if !bound {
+		return errors.New("restore: missing recipient profile binding")
+	}
+	request, err := androidbridge.DecodeVerifyRequest(record.ExactBytes)
+	defer func() {
+		for _, part := range request.Parts {
+			clear(part)
+		}
+	}()
+	if err != nil || request.Class != envelope.ArtifactDeviceRecipient || len(request.Parts) != 1 {
+		return errors.New("restore: invalid recipient verify request")
+	}
+	verified, code := androidbridge.VerifyAndPreviewWithRecipient(record.ExactBytes, key.PublicRequest, key.PrivateBundle, environment)
+	defer verified.Destroy()
+	if code != androidbridge.CodeOK || verified.Verified.Profile.Generation != record.Generation ||
+		!bytes.Equal(verified.Verified.ExactArtifact, request.Parts[0]) {
+		return errors.New("restore: recipient profile verification rejected")
 	}
 	return nil
 }

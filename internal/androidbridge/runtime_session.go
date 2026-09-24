@@ -200,8 +200,19 @@ func DecodeRuntimeOpenRequest(encoded []byte) (RuntimeOpenRequest, error) {
 	customDNS := string(encoded[offset : offset+dnsLength])
 	offset += dnsLength
 	verifyRequest := bytes.Clone(encoded[offset : offset+verifyLength])
+	transferred := false
+	defer func() {
+		if !transferred {
+			clear(verifyRequest)
+		}
+	}()
 	offset += verifyLength
 	activation := bytes.Clone(encoded[offset : offset+activationLength])
+	defer func() {
+		if !transferred {
+			clear(activation)
+		}
+	}()
 	request := RuntimeOpenRequest{
 		VerifyRequest:    verifyRequest,
 		ActivationRecord: activation,
@@ -219,9 +230,11 @@ func DecodeRuntimeOpenRequest(encoded []byte) (RuntimeOpenRequest, error) {
 		},
 	}
 	reencoded, err := EncodeRuntimeOpenRequest(request)
+	defer clear(reencoded)
 	if err != nil || !bytes.Equal(reencoded, encoded) {
 		return RuntimeOpenRequest{}, errors.New("androidbridge: non-canonical runtime open request")
 	}
+	transferred = true
 	return request, nil
 }
 

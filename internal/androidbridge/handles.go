@@ -14,16 +14,24 @@ const (
 	HandleBackup
 	HandleRuntimeSession
 	HandleRecipient
+	HandleMaintenance
+	HandleProductionSession
 )
 
 type Handle uint64
 
 type handleSlot struct {
-	generation uint32
-	kind       HandleType
-	value      any
-	cancelled  bool
-	occupied   bool
+	generation                  uint32
+	kind                        HandleType
+	value                       any
+	cancelled                   bool
+	occupied                    bool
+	privatelyReserved           bool
+	productionConstructionClaim bool
+	productionReservationEpoch  uint64
+	productionParent            *productionParentV1
+	retiredParent               retiredParentV1
+	productionGeneration        uint32
 }
 
 type handleDestroyer interface {
@@ -39,19 +47,21 @@ type handleCanceller interface {
 }
 
 type HandleRegistry struct {
-	mu    sync.Mutex
-	slots [MaxBridgeHandles]handleSlot
+	mu                sync.Mutex
+	slots             [MaxBridgeHandles]handleSlot
+	maintenanceScopes [MaxBridgeHandles]maintenanceScopeSlotV1
+	maintenanceEpoch  uint64
 }
 
 func (r *HandleRegistry) Open(kind HandleType, value any) (Handle, ErrorCode) {
-	if r == nil || kind < HandleVerifyPreview || kind > HandleRecipient || value == nil {
+	if r == nil || kind < HandleVerifyPreview || kind > HandleMaintenance || value == nil {
 		return 0, CodeInvalidArgument
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for index := range r.slots {
 		slot := &r.slots[index]
-		if slot.occupied {
+		if slot.occupied || slot.privatelyReserved {
 			continue
 		}
 		slot.generation++
@@ -62,6 +72,10 @@ func (r *HandleRegistry) Open(kind HandleType, value any) (Handle, ErrorCode) {
 		slot.value = value
 		slot.cancelled = false
 		slot.occupied = true
+		if parent, ok := value.(*maintenanceAuthorityV1); kind == HandleMaintenance && ok && parent.output != nil {
+			// Immutable allocation identity, captured before publishing the handle.
+			parent.outputSlotProductionEpoch = slot.productionReservationEpoch
+		}
 		return encodeHandle(uint16(index), slot.generation, kind), CodeOK
 	}
 	return 0, CodeSizeLimit
@@ -160,7 +174,7 @@ func decodeHandle(handle Handle) (uint16, uint32, HandleType, bool) {
 	generation := uint32(raw >> 16)
 	kind := HandleType(raw >> 56)
 	if indexPlusOne == 0 || int(indexPlusOne) > MaxBridgeHandles ||
-		generation == 0 || kind < HandleVerifyPreview || kind > HandleRecipient {
+		generation == 0 || kind < HandleVerifyPreview || kind > HandleMaintenance {
 		return 0, 0, 0, false
 	}
 	return indexPlusOne - 1, generation, kind, true
