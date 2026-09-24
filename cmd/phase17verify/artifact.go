@@ -321,12 +321,16 @@ func verifyServiceBoundaries(manifest androidartifact.Manifest, alwaysOn bool) e
 }
 
 func verifyPhase17APKMarkers(artifact androidartifact.APK) error {
-	for _, required := range phase17RequiredAPKMarkers {
+	return verifyAPKMarkers(artifact, currentRequiredAPKMarkers, currentForbiddenAPKMarkers)
+}
+
+func verifyAPKMarkers(artifact androidartifact.APK, required, forbidden []string) error {
+	for _, required := range required {
 		if !artifact.Contains(required) {
 			return fmt.Errorf("release APK is missing live-path marker %q", required)
 		}
 	}
-	for _, forbidden := range phase17ForbiddenAPKMarkers {
+	for _, forbidden := range forbidden {
 		if artifact.Contains(forbidden) {
 			return fmt.Errorf("release APK contains forbidden predecessor or third-party marker %q", forbidden)
 		}
@@ -335,6 +339,7 @@ func verifyPhase17APKMarkers(artifact androidartifact.APK) error {
 }
 
 func verifyPhase17NativeSurface(artifact androidartifact.APK, internal bool) error {
+	bridgeSymbols, jniSymbols := currentNativeSymbols(internal)
 	abis := []string{"arm64-v8a"}
 	if internal {
 		abis = append(abis, "x86_64")
@@ -358,7 +363,7 @@ func verifyPhase17NativeSurface(artifact androidartifact.APK, internal bool) err
 		if !ok {
 			return fmt.Errorf("missing native bridge %q", bridgeName)
 		}
-		if err := requirePhase17Symbols(bridge, "kvpn_", phase17BridgeSymbols); err != nil {
+		if err := requireCurrentSymbols(bridge, bridgeSymbols); err != nil {
 			return fmt.Errorf("%s exports: %w", bridgeName, err)
 		}
 		if err := requirePhase17ELFIdentity(bridge, "libkurdistan_bridge.so", ""); err != nil {
@@ -368,7 +373,7 @@ func verifyPhase17NativeSurface(artifact androidartifact.APK, internal bool) err
 		if !ok {
 			return fmt.Errorf("missing JNI bridge %q", jniName)
 		}
-		if err := requirePhase17JNISymbols(jni, phase17JNISymbols); err != nil {
+		if err := requireCurrentSymbols(jni, jniSymbols); err != nil {
 			return fmt.Errorf("%s exports: %w", jniName, err)
 		}
 		if err := requirePhase17ELFIdentity(jni, "libkurdistan_jni.so", "libkurdistan_bridge.so"); err != nil {
