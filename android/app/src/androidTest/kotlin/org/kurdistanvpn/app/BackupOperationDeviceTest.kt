@@ -76,7 +76,11 @@ class BackupOperationDeviceTest {
             try {
                 try {
                     if (root.protectedStateFacade() != null) {
-                        val reset = root.resetProtectedStateConfirmed()
+                        var reset = root.resetProtectedStateConfirmed()
+                        // Bounded reset may pause with its authenticated manifest intact. Resume
+                        // that operation once; never start a replacement or accept partial cleanup.
+                        if (reset is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Unproven)
+                            reset = root.resetProtectedStateConfirmed(recoverPending = true)
                         assertTrue("KURDISTAN_TEST_SETUP expected=COMMITTED actual=${reset.javaClass.simpleName.uppercase(java.util.Locale.ROOT)} setup=BACKUP_RESET", reset is
                             org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed)
                     }
