@@ -17,6 +17,8 @@ import org.kurdistanvpn.feature.settingsrecovery.PrivacyRecoveryViewModel
 class PrivacyBackupDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     private fun export(save: Boolean) = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val root = (instrumentation.targetContext.applicationContext as KurdistanApplication).compositionRoot
