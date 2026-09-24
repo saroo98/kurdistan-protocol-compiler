@@ -220,3 +220,7 @@ func (environment internalBridgeEnvironment) VerifyBackupRecord(record backup.Re
 	}
 	return errors.New("phase9 internal restore: profile verification rejected")
 }
+
+func (internalBridgeEnvironment) VerifyBackupRecordWithRecipient(record backup.Record, key backup.RecipientKeyRecord) error {
+	return (selfHostedBridgeEnvironment{}).VerifyBackupRecordWithRecipient(record, key)
+}

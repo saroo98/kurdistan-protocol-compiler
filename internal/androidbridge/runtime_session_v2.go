@@ -368,37 +368,21 @@ func OpenRuntimeSessionV2(registry *HandleRegistry, encoded []byte, environment 
 		return 0, RuntimeSessionSnapshotV2{}, CodeInvalidArgument
 	}
 	defer clearRuntimeOpenRequestV2(&request)
-	preview, code := VerifyAndPreviewWithRecipient(request.VerifyRequest, request.RecipientRequest, request.RecipientPrivate, environment)
+	calculated, code := calculateLegacyBootstrapV1(request, environment, now)
 	if code != CodeOK {
 		return 0, RuntimeSessionSnapshotV2{}, code
 	}
-	defer preview.Destroy()
-	record, err := DecodeActivationRecord(request.ActivationRecord)
-	if err != nil || !runtimeRecordMatches(preview, record) || preview.recipient == nil {
-		return 0, RuntimeSessionSnapshotV2{}, CodePolicyRejected
-	}
-	policy, err := runtimepolicy.DecodeV2At(record.Profile.Policy, now)
-	if err != nil || !runtimeRecipientMatchesPolicy(*preview.recipient, policy) {
-		return 0, RuntimeSessionSnapshotV2{}, CodePolicyRejected
-	}
-	narrowing, err := runtimeNarrowingV2(request.Policy)
-	if err != nil {
-		return 0, RuntimeSessionSnapshotV2{}, CodePolicyRejected
-	}
-	plan, err := sessionplan.BuildV2At(sessionplan.RequestV2{
-		Profile: record.Profile, ActivationReceipt: record.State.Receipt, RuntimePolicy: policy, Requested: narrowing,
-	}, now)
-	if err != nil {
-		return 0, RuntimeSessionSnapshotV2{}, CodePolicyRejected
-	}
-	credentials := *preview.recipient
-	preview.recipient = nil
-	snapshot := runtimeSnapshotV2(preview, request.Policy, plan)
+	defer calculated.destroy()
+	credentials := *calculated.preview.recipient
+	calculated.preview.recipient = nil
+	plan := calculated.plan
+	calculated.plan = sessionplan.PlanV2{}
+	snapshot := runtimeSnapshotV2(calculated.preview, request.Policy, plan)
 	ctx, cancel := context.WithCancel(context.Background())
 	state := &runtimeSessionV2Handle{
 		ctx: ctx, cancel: cancel, state: RuntimeStateVerified, snapshot: snapshot,
 		plan: plan, credentials: credentials, factory: factory,
-		maxFallbackAttempts: runtimeFallbackAttemptsV2(plan, policy),
+		maxFallbackAttempts: calculated.fallback,
 	}
 	handle, code := registry.Open(HandleRuntimeSession, state)
 	if code != CodeOK {

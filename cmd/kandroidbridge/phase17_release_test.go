@@ -131,6 +131,27 @@ func TestReleaseTLSClientConfigPinsExactLeafAndProtocol(t *testing.T) {
 	}
 }
 
+func TestProductionTLSClientConfigCapturedTimeAndStrictLegacy(t *testing.T) {
+	p, seed, now := releasePolicyFixture(t)
+	defer clear(seed)
+	c, err := productionTLSClientConfigV1(p, now)
+	if err != nil || c.Time == nil || !c.Time().Equal(now) || c.InsecureSkipVerify || c.MinVersion != tls.VersionTLS13 || c.MaxVersion != tls.VersionTLS13 {
+		t.Fatalf("TLS config: %v", err)
+	}
+	p.SchemaVersion = runtimepolicy.SchemaVersionV3
+	p.Services = &runtimepolicy.ServicesV1{Version: 1, Probes: &runtimepolicy.ProbesV1{Targets: []runtimepolicy.ProbeTargetV1{{ID: 1, Address: []byte{8, 8, 8, 8}, Port: 443, Methods: []uint8{1}, Modes: []uint8{1, 2}, TimeoutMillis: 1000}}, MaxConcurrentOperations: 1, MaxSamplesPerOperation: 1, MinAttemptIntervalMillis: 1000, MaxAttemptsPerMinute: 10, MaxOperationMillis: 30000}}
+	p.RelayAdmissionDigest, err = runtimepolicy.RelayAdmissionDigestV3At(p, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := releaseTLSClientConfig(p, now); err == nil {
+		t.Fatal("legacy accepted schema3")
+	}
+	if _, err := productionTLSClientConfigV1(p, now); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReleaseClientSeedMustMatchSignedPolicy(t *testing.T) {
 	policy, seed, _ := releasePolicyFixture(t)
 	defer clear(seed)

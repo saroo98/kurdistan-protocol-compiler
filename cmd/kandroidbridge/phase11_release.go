@@ -5,10 +5,4 @@
 
 package main
 
-import "kurdistan/internal/androidbridge"
-
-const phase11MaximumPayloadBytes = 32 << 10
-
-func phase11RoundTrip([]byte) ([]byte, androidbridge.ErrorCode) {
-	return nil, androidbridge.CodeTrustUnavailable
-}
+// Historical conformance helpers are compiled only by phase9internal.

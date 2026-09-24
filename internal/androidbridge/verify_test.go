@@ -17,6 +17,74 @@ import (
 
 type fixtureRecipientVerificationEnvironment struct{ fixtureVerificationEnvironment }
 
+type bootstrapCleanupVerificationEnvironment struct {
+	artifact    []byte
+	verified    profile.OfflineVerifiedArtifact
+	rejectTrust bool
+}
+
+func (e *bootstrapCleanupVerificationEnvironment) VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (profile.OfflineVerifiedArtifact, error) {
+	e.artifact = artifact
+	v, err := (fixtureRecipientVerificationEnvironment{}).VerifyWithRecipient(artifact, class, credentials)
+	e.verified = v
+	return v, err
+}
+
+func (e *bootstrapCleanupVerificationEnvironment) TrustPreviewWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (TrustPreview, error) {
+	defer credentials.Destroy()
+	if e.rejectTrust {
+		return TrustPreview{}, profile.ErrOfflineVerify
+	}
+	return TrustPreview{OwnerControlled: true}, nil
+}
+
+func TestVerifyAndPreviewWithRecipientBootstrapTemporaryCleanup(t *testing.T) {
+	spec := phase8issuance.ValidSpec(envelope.ArtifactDeviceRecipient)
+	artifact, err := profile.IssueOffline(spec, phase8issuance.NewIssuer(), phase8issuance.NewRecipientSealer())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire, _ := EncodeVerifyRequest(VerifyRequest{Ingress: envelope.IngressFile, Class: spec.Class, Parts: [][]byte{artifact}})
+	public, private, err := enrollment.Generate(time.Unix(1_800_000_000, 0).UTC(), time.Hour, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearRecipientTestPrivate(private)
+	pub, _ := enrollment.EncodeRequestV1(public)
+	priv, _ := enrollment.EncodePrivateBundleV1(private)
+	defer clear(priv)
+	before := bytes.Clone(wire)
+	for _, reject := range []bool{false, true} {
+		name := "success"
+		if reject {
+			name = "trust-failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			e := &bootstrapCleanupVerificationEnvironment{rejectTrust: reject}
+			preview, code := VerifyAndPreviewWithRecipient(wire, pub, priv, e)
+			if reject {
+				if code != CodeVerificationRejected || preview.recipient != nil {
+					t.Fatal("trust failure status/ownership", code)
+				}
+				if !allZero(e.verified.ExactArtifact) || !allZero(e.verified.ExactSignedObject) || !allZero(e.verified.Profile.Policy) {
+					t.Fatal("failed verified graph not wiped")
+				}
+			} else {
+				if code != CodeOK || !bytes.Equal(preview.Verified.ExactArtifact, artifact) || preview.recipient == nil {
+					t.Fatal("success ownership changed", code)
+				}
+			}
+			if !allZero(e.artifact) {
+				t.Fatal("decoded temporary artifact not wiped")
+			}
+			if !bytes.Equal(wire, before) {
+				t.Fatal("caller input changed")
+			}
+			preview.Destroy()
+		})
+	}
+}
+
 func (fixtureRecipientVerificationEnvironment) VerifyWithRecipient(artifact []byte, class envelope.ArtifactClass, credentials RecipientCredentials) (profile.OfflineVerifiedArtifact, error) {
 	defer credentials.Destroy()
 	if credentials.Request.RequestID == "" || len(credentials.Private.RecipientPrivate) == 0 {

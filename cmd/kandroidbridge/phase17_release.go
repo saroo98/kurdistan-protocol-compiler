@@ -165,6 +165,22 @@ func releaseTLSClientConfig(policy runtimepolicy.PolicyV2, now time.Time) (*tls.
 	if err := runtimepolicy.ValidateV2At(policy, now); err != nil {
 		return nil, errors.New("release TLS authority rejected")
 	}
+	return pinnedTLSClientConfigV1(policy, now)
+}
+
+func productionTLSClientConfigV1(policy runtimepolicy.PolicyV2, now time.Time) (*tls.Config, error) {
+	if now.IsZero() || runtimepolicy.ValidateRuntimeAt(policy, now) != nil {
+		return nil, errors.New("production TLS authority rejected")
+	}
+	config, err := pinnedTLSClientConfigV1(policy, now)
+	if err != nil {
+		return nil, err
+	}
+	config.Time = func() time.Time { return now }
+	return config, nil
+}
+
+func pinnedTLSClientConfigV1(policy runtimepolicy.PolicyV2, now time.Time) (*tls.Config, error) {
 	leaf, err := x509.ParseCertificate(policy.TLSLeafDER)
 	if err != nil || !bytes.Equal(leaf.Raw, policy.TLSLeafDER) || leaf.VerifyHostname(policy.TLSServerName) != nil ||
 		now.Before(leaf.NotBefore) || now.After(leaf.NotAfter) {
@@ -184,18 +200,26 @@ func releaseClientHandshake(plan sessionplan.PlanV2, policy runtimepolicy.Policy
 	if err != nil {
 		return nil, liveprogram.ProgramV1{}, errors.New("release Kurd authority rejected")
 	}
+	handshake, err := productionClientHandshakeV1(plan, policy, program, clientAuthSeed)
+	if err != nil {
+		return nil, liveprogram.ProgramV1{}, err
+	}
+	return handshake, program, nil
+}
+
+func productionClientHandshakeV1(plan sessionplan.PlanV2, policy runtimepolicy.PolicyV2, program liveprogram.ProgramV1, clientAuthSeed []byte) (*kruntime.ProcessWireClientHandshakeV1, error) {
 	config, err := auth.NewProjectedProcessHandshakeConfigV1(policy.ClientAuthKeyID, policy.RelayAuthKeyID, program, policy.CarrierFamily)
 	if err != nil {
-		return nil, liveprogram.ProgramV1{}, errors.New("release Kurd authority rejected")
+		return nil, errors.New("release Kurd authority rejected")
 	}
 	handshake, err := kruntime.NewProcessWireClientHandshakeV1(config, auth.Dependencies{
 		Identity: releaseIdentityV1{id: policy.ClientAuthKeyID, seed: clientAuthSeed},
 		Trust:    releaseTrustV1{id: policy.RelayAuthKeyID, public: policy.RelayAuthPublic},
 	}, plan.Digest)
 	if err != nil {
-		return nil, liveprogram.ProgramV1{}, errors.New("release Kurd authority rejected")
+		return nil, errors.New("release Kurd authority rejected")
 	}
-	return handshake, program, nil
+	return handshake, nil
 }
 
 func releaseClientSeedMatchesPolicy(seed []byte, policy runtimepolicy.PolicyV2) bool {
