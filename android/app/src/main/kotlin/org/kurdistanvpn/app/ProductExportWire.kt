@@ -10,7 +10,7 @@ import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
-internal object Phase9ExportWire {
+internal object ProductExportWire {
     fun diagnosticRequest(profileCount: Int, events: List<DiagnosticEvent> = emptyList()): ByteArray {
         val failures = events.asSequence()
             .filter { it.level == DiagnosticLogLevel.ERROR || it.level == DiagnosticLogLevel.WARNING }

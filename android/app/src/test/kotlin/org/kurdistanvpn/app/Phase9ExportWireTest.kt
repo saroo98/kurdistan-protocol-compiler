@@ -13,19 +13,19 @@ import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
-class Phase9ExportWireTest {
+class ProductExportWireTest {
     @Test
     fun backupPreviewAcceptsLiteralLegacyGoldenWithAllFiveKinds() {
         val encoded = hexBytes("4b425631000f00010002000300040005")
 
-        assertEquals(15 to 1, Phase9ExportWire.backupPreview(encoded))
+        assertEquals(15 to 1, ProductExportWire.backupPreview(encoded))
     }
 
     @Test
     fun backupPreviewAcceptsLiteralV2GoldenWithAllFiveKinds() {
         val encoded = hexBytes("4b425632001f00010002000400080010")
 
-        assertEquals(31 to 1, Phase9ExportWire.backupPreview(encoded))
+        assertEquals(31 to 1, ProductExportWire.backupPreview(encoded))
     }
 
     @Test
@@ -42,7 +42,7 @@ class Phase9ExportWireTest {
         for ((hex, expected) in cases) {
             for (version in listOf('1', '2')) {
                 val encoded = hexBytes(hex).apply { this[3] = version.code.toByte() }
-                assertEquals("version $version: $hex", expected, Phase9ExportWire.backupPreview(encoded))
+                assertEquals("version $version: $hex", expected, ProductExportWire.backupPreview(encoded))
             }
         }
     }
@@ -53,12 +53,12 @@ class Phase9ExportWireTest {
             val encoded = hexBytes(hex)
             for (length in 0 until encoded.size) {
                 assertThrows("truncated length $length", IllegalArgumentException::class.java) {
-                    Phase9ExportWire.backupPreview(encoded.copyOf(length))
+                    ProductExportWire.backupPreview(encoded.copyOf(length))
                 }
             }
             for (suffix in listOf(byteArrayOf(0), byteArrayOf(1), encoded)) {
                 assertThrows("trailing bytes", IllegalArgumentException::class.java) {
-                    Phase9ExportWire.backupPreview(encoded + suffix)
+                    ProductExportWire.backupPreview(encoded + suffix)
                 }
             }
         }
@@ -70,13 +70,13 @@ class Phase9ExportWireTest {
         for (version in 0..255) {
             if (version == '1'.code || version == '2'.code) continue
             assertThrows("version $version", IllegalArgumentException::class.java) {
-                Phase9ExportWire.backupPreview(encoded.copyOf().apply { this[3] = version.toByte() })
+                ProductExportWire.backupPreview(encoded.copyOf().apply { this[3] = version.toByte() })
             }
         }
         for (index in 0..2) {
             for (value in listOf(0, 0x80, 0xff)) {
                 assertThrows("magic byte $index", IllegalArgumentException::class.java) {
-                    Phase9ExportWire.backupPreview(encoded.copyOf().apply { this[index] = value.toByte() })
+                    ProductExportWire.backupPreview(encoded.copyOf().apply { this[index] = value.toByte() })
                 }
             }
         }
@@ -90,7 +90,7 @@ class Phase9ExportWireTest {
                 for (delta in listOf(-1, 1)) {
                     val malformed = encoded.copyOf().apply { this[index] = (this[index] + delta).toByte() }
                     assertThrows("count byte $index, delta $delta", IllegalArgumentException::class.java) {
-                        Phase9ExportWire.backupPreview(malformed)
+                        ProductExportWire.backupPreview(malformed)
                     }
                 }
             }
@@ -110,7 +110,7 @@ class Phase9ExportWireTest {
             for (version in listOf('1', '2')) {
                 val encoded = hexBytes(hex).apply { this[3] = version.code.toByte() }
                 assertThrows("version $version: $hex", IllegalArgumentException::class.java) {
-                    Phase9ExportWire.backupPreview(encoded)
+                    ProductExportWire.backupPreview(encoded)
                 }
             }
         }
@@ -120,7 +120,7 @@ class Phase9ExportWireTest {
                 this[index + 1] = 0xff.toByte()
             }
             assertThrows("unsigned kind at byte $index", IllegalArgumentException::class.java) {
-                Phase9ExportWire.backupPreview(encoded)
+                ProductExportWire.backupPreview(encoded)
             }
         }
     }
@@ -180,7 +180,7 @@ class Phase9ExportWireTest {
     @Test
     fun diagnosticRequestNeverAddsCountsToNonCountCategories() {
         for (profileCount in listOf(0, 1, 8, Int.MAX_VALUE)) {
-            val encoded = Phase9ExportWire.diagnosticRequest(profileCount)
+            val encoded = ProductExportWire.diagnosticRequest(profileCount)
             assertEquals(22, encoded.size)
             assertEquals(0, encoded[15].toInt())
             assertEquals(0, encoded[18].toInt())
@@ -190,13 +190,13 @@ class Phase9ExportWireTest {
 
     @Test
     fun diagnosticRequestUsesOnlyAbsentOrAdmittedProfileLifecycleValues() {
-        assertEquals(4, Phase9ExportWire.diagnosticRequest(0)[17].toInt())
-        assertEquals(5, Phase9ExportWire.diagnosticRequest(1)[17].toInt())
+        assertEquals(4, ProductExportWire.diagnosticRequest(0)[17].toInt())
+        assertEquals(5, ProductExportWire.diagnosticRequest(1)[17].toInt())
     }
 
     @Test
     fun diagnosticRequestAggregatesOnlyVocabularySafeFailureCategories() {
-        val encoded = Phase9ExportWire.diagnosticRequest(
+        val encoded = ProductExportWire.diagnosticRequest(
             1,
             listOf(
                 DiagnosticEvent(1, DiagnosticLogLevel.WARNING, DiagnosticComponent.STORAGE, "SETTINGS_PERSIST_FAILED", 1),

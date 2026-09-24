@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.kurdistanvpn.core.model.AppState
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProtectedRecoveryReason
 import org.kurdistanvpn.data.metadata.CatalogHealth
 import org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade
@@ -19,9 +19,73 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FirstUseStartupTest {
+    @Test fun probeConcurrentClicksAndCancelledLateReturnKeepOneActualWorker() = runBlocking {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val publications = java.util.concurrent.CopyOnWriteArrayList<org.kurdistanvpn.core.model.ProbeExecutionState>()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val invocation = RuntimeProbeInvocationV1(scope, {
+            calls.incrementAndGet()
+            entered.countDown()
+            check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            org.kurdistanvpn.core.nativeapi.NativeProductResult.Success(org.kurdistanvpn.core.nativeapi.NativeProbeResult(
+                org.kurdistanvpn.core.nativeapi.NativeProbePath.ACTIVE_RELAY_END_TO_END,
+                org.kurdistanvpn.core.nativeapi.NativeProbeMethod.TCP_CONNECT, 1, 1, 0, 0, 123456, null, 0,
+                org.kurdistanvpn.core.nativeapi.NativeProbeStability.NOT_ENOUGH_SAMPLES,
+                org.kurdistanvpn.core.nativeapi.NativeProbeCompletion.COMPLETE))
+        }, publications::add)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
+        try {
+            val clicks = (1..8).map {
+                pool.submit<kotlinx.coroutines.Job?> { invocation.start(org.kurdistanvpn.core.model.ProbePreferences()) }
+            }
+            val jobs = clicks.mapNotNull { it.get(5, java.util.concurrent.TimeUnit.SECONDS) }
+            assertEquals(1, jobs.size)
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            jobs.single().cancel()
+            assertNull(invocation.start(org.kurdistanvpn.core.model.ProbePreferences()))
+            assertEquals(1, calls.get())
+            release.countDown()
+            kotlinx.coroutines.withTimeout(5000) { jobs.single().join() }
+            assertEquals(listOf(org.kurdistanvpn.core.model.ProbeExecutionState.Running), publications.toList())
+            val next = checkNotNull(invocation.start(org.kurdistanvpn.core.model.ProbePreferences()))
+            kotlinx.coroutines.withTimeout(5000) { next.join() }
+            assertEquals(2, calls.get())
+            assertEquals(org.kurdistanvpn.core.model.ProbeExecutionState.Succeeded(123), publications.last())
+        } finally {
+            release.countDown()
+            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            pool.shutdownNow()
+        }
+    }
+
+    @Test fun cancelledProbeScopeDoesNotInvokeNativeOrLeaveAdmissionHeld() = runBlocking {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Job().also { it.cancel() })
+        var calls = 0
+        val invocation = RuntimeProbeInvocationV1(scope, {
+            calls++
+            org.kurdistanvpn.core.nativeapi.NativeProductResult.Failure(org.kurdistanvpn.core.model.ProductFailureCode.INTERNAL_FAILURE)
+        }, {})
+        repeat(2) {
+            val job = checkNotNull(invocation.start(org.kurdistanvpn.core.model.ProbePreferences()))
+            kotlinx.coroutines.withTimeout(5000) { job.join() }
+        }
+        assertEquals(0, calls)
+    }
+
+    @org.junit.Test fun unsupportedResetScopeCannotStopRuntimeOrDispatchReset() {
+        var stopped = false
+        var dispatched = false
+        val error = dispatchSupportedReset(org.kurdistanvpn.core.model.ResetScope.LOCAL_CREDENTIALS,
+            { stopped = true }, { dispatched = true })
+        org.junit.Assert.assertEquals(org.kurdistanvpn.core.model.OperationError.AUTHORITY_UNAVAILABLE, error)
+        org.junit.Assert.assertFalse(stopped)
+        org.junit.Assert.assertFalse(dispatched)
+    }
     @Test fun storageFailureInvokesItsCallbackExactlyOnceWithoutChangingItsOutcome() {
         assertDirectCallbackContract(
-            listOf(null) + Phase9CompositionRoot.StorageFailure.entries,
+            listOf(null) + ProductCompositionRoot.StorageFailure.entries,
             { callback -> recoveryCoordinator(storageFailure = callback) },
             RecoveryCoordinator::storageFailure,
         )
@@ -75,7 +139,7 @@ class FirstUseStartupTest {
         var recoveryWrites = 0
         var diagnosticWrites = 0
         val recovery = recoveryCoordinator(
-            storageFailure = { failureReads++; Phase9CompositionRoot.StorageFailure.FIRST_USE },
+            storageFailure = { failureReads++; ProductCompositionRoot.StorageFailure.FIRST_USE },
             recoverPresentation = { recoveryWrites++; error("First use cannot recover presentation") },
             resetProfiles = { recoveryWrites++; error("First use cannot reset profiles or keys") },
             resetRouting = { recoveryWrites++; error("First use cannot reset routing") },
@@ -92,7 +156,7 @@ class FirstUseStartupTest {
 
         assertEquals(1, outcomes.size)
         val unavailable = outcomes.single() as ProtectedStartupRead.Unavailable
-        assertSame(Phase9CompositionRoot.StorageFailure.FIRST_USE, unavailable.failure)
+        assertSame(ProductCompositionRoot.StorageFailure.FIRST_USE, unavailable.failure)
         assertSame(AppState.FirstLaunch, unavailable.presentation)
         assertNull(unavailable.recoveryReason)
         assertFalse(outcomes.any { it is ProtectedStartupRead.Ready })
@@ -135,7 +199,7 @@ class FirstUseStartupTest {
             Triple(ProtectedStateApplicationFacade.OpenResult.Unproven, AppState.DegradedStorage, ProtectedRecoveryReason.MUTATION_UNPROVEN),
         )
         for ((opened, state, reason) in cases) {
-            val failure = Phase9CompositionRoot.classifyStorageOpen(opened)
+            val failure = ProductCompositionRoot.classifyStorageOpen(opened)
             val result = readStartupProjection(failure) { error("Unavailable state must not read a projection") }
             assertTrue(result is ProtectedStartupRead.Unavailable)
             result as ProtectedStartupRead.Unavailable
@@ -157,7 +221,7 @@ class FirstUseStartupTest {
     }
 
     @Test fun availableSettingsComeOnlyFromTheActualAuthenticatedProjection() = runBlocking {
-        val settings = Phase9Settings(highContrast = true)
+        val settings = ProductSettings(highContrast = true)
         val projection = ProtectedStateApplicationFacade.ReadProjection(2L, settings, emptyList(), CatalogHealth.AVAILABLE)
         var reads = 0
         val result = readStartupProjection(null) { reads++; projection } as ProtectedStartupRead.Ready
@@ -167,7 +231,7 @@ class FirstUseStartupTest {
     }
 
     private fun recoveryCoordinator(
-        storageFailure: () -> Phase9CompositionRoot.StorageFailure? = { error("Unexpected storage read") },
+        storageFailure: () -> ProductCompositionRoot.StorageFailure? = { error("Unexpected storage read") },
         presentationRecoveryRequired: () -> Boolean? = { error("Unexpected recovery-state read") },
         recoverPresentation: suspend () -> ProtectedStateApplicationFacade.CommandResult<Unit> = { error("Unexpected recovery") },
         resetProfiles: suspend () -> Boolean = { error("Unexpected profile reset") },

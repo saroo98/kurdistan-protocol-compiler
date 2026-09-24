@@ -6,6 +6,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VpnRuntimeControllerTest {
+    @Test fun foregroundLaunchIsOneShotAndNeverTurnsResumeIntoRepeatedConnections() {
+        val launch = ForegroundLaunchAdmission()
+        assertFalse(launch.consume(resumed = false, enabled = true, paused = false))
+        assertTrue(launch.consume(resumed = true, enabled = true, paused = false))
+        assertFalse(launch.consume(resumed = true, enabled = true, paused = false))
+        val paused = ForegroundLaunchAdmission()
+        assertFalse(paused.consume(resumed = true, enabled = true, paused = true))
+        assertFalse(paused.consume(resumed = true, enabled = true, paused = false))
+        val disabled = ForegroundLaunchAdmission()
+        assertFalse(disabled.consume(resumed = true, enabled = false, paused = false))
+        assertFalse(disabled.consume(resumed = true, enabled = true, paused = false))
+    }
+
     @Test fun consumedConsentTicketCannotSurviveStopOrAnotherUserStart() {
         val gate = ManualStartAdmission()
         val first = gate.stage()

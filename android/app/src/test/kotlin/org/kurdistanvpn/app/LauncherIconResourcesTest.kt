@@ -21,13 +21,25 @@ class LauncherIconResourcesTest {
     }
 
     @Test
-    fun manifestChangesOnlyLauncherIconReferences() {
+    fun manifestPreservesLauncherBaselineWithOnlyScopedPackageDiscovery() {
         val manifest = source("AndroidManifest.xml").readText().replace("\r\n", "\n")
 
         assertTrue(manifest.contains("android:icon=\"@mipmap/ic_kurdistan_vpn\""))
         assertTrue(manifest.contains("android:roundIcon=\"@mipmap/ic_kurdistan_vpn\""))
 
-        val normalized = manifest
+        // Task 13 adds only launchable-package discovery. Keep the original whole-manifest
+        // baseline, excluding this exact reviewed addition rather than repinning its hash.
+        val scopedPackageQuery = """
+            |    <queries>
+            |        <intent>
+            |            <action android:name="android.intent.action.MAIN" />
+            |            <category android:name="android.intent.category.LAUNCHER" />
+            |        </intent>
+            |    </queries>
+            |
+        """.trimMargin()
+        assertEquals(1, manifest.windowed(scopedPackageQuery.length).count { it == scopedPackageQuery })
+        val normalized = manifest.replace(scopedPackageQuery, "")
             .replace(Regex("android:icon=\"[^\"]+\""), "android:icon=\"@ICON@\"")
             .replace(Regex("android:roundIcon=\"[^\"]+\""), "android:roundIcon=\"@ROUND_ICON@\"")
         assertEquals(
