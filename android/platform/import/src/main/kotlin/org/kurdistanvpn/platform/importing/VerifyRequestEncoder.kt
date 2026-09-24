@@ -35,7 +35,7 @@ object VerifyRequestEncoder {
     private const val MAGIC = 0x4B564931
     private const val HEADER_BYTES = 8
 
-    fun encode(candidate: ImportCandidate): ByteArray {
+    fun encodedSize(candidate: ImportCandidate): Int {
         require(candidate.parts.isNotEmpty() && candidate.parts.size <= MAX_QR_CHUNKS)
         if (candidate.ingress != IngressKind.QR_CHUNKS) {
             require(candidate.parts.size == 1)
@@ -46,6 +46,11 @@ object VerifyRequestEncoder {
             size = Math.addExact(size, 4 + part.size)
         }
         require(size <= 1_500_000)
+        return size
+    }
+
+    fun encode(candidate: ImportCandidate): ByteArray {
+        val size = encodedSize(candidate)
         return ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN).apply {
             putInt(MAGIC)
             put(candidate.ingress.wire.toByte())
