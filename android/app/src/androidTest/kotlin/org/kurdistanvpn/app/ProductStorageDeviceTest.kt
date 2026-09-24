@@ -141,8 +141,9 @@ class ProductStorageDeviceTest {
         committed(runBlocking { fixture.facade!!.migrateProductProjectionConfirmed(2) })
         val fault = fixture.failProjectionSync()
         fixture.reopen(primitives = fault); fault.armed = true
-        assertFalse(runBlocking { fixture.facade!!.recordUpdate(4, "profile-kept",
-            StoredUpdateState(7uL, 1uL, UpdateCategory.UNCHANGED, 500_000, 500_001, 1)) } is ProtectedStateApplicationFacade.CommandResult.Committed)
+        val display = DeploymentDisplayMetadata(listOf(DeploymentDisplayEntry(CatalogId("profile-kept"),
+            SafeAlias(CANARIES[0]), 7, true, UpdateCategory.NOT_CHECKED)))
+        assertFalse(runBlocking { fixture.facade!!.setDeploymentDisplay(4, display) } is ProtectedStateApplicationFacade.CommandResult.Committed)
         assertTrue(fault.fired)
         assertNull(fixture.facade!!.readProductStorage())
         assertNotNull(fixture.rows().operation)
@@ -182,11 +183,12 @@ class ProductStorageDeviceTest {
         } finally { hmac.fill(0) }
         val update = StoredUpdateState(7uL, 1uL, UpdateCategory.UNCHANGED, 500_000, 500_001, 1)
         committed(runBlocking { fixture.facade!!.recordUpdate(10, "profile-kept", update) })
-        committed(runBlocking { fixture.facade!!.recordStart(12, 500_000) })
+        // Presentation observations persist without changing security authorization.
+        assertEquals(10L, checkNotNull(fixture.facade!!.readProductStorage()).revision)
+        committed(runBlocking { fixture.facade!!.recordStart(10, 500_000) })
         val fault = fixture.failProjectionSync().apply { throwAtBoundary = true }
         fixture.reopen(primitives = fault); fault.armed = true
-        assertFalse(runBlocking { fixture.facade!!.recordUpdate(14, "profile-kept",
-            StoredUpdateState(7uL, 1uL, UpdateCategory.UNCHANGED, 500_001, 500_002, 2)) } is ProtectedStateApplicationFacade.CommandResult.Committed)
+        assertFalse(runBlocking { fixture.facade!!.recordCleanStop(12, 500_001) } is ProtectedStateApplicationFacade.CommandResult.Committed)
         assertTrue(fault.fired)
         assertEquals(1, fault.thrownMessages.size)
         fault.armed = false
@@ -195,7 +197,7 @@ class ProductStorageDeviceTest {
         val before = fixture.hashes()
         fixture.reopen(readOnly = true)
         val projection = checkNotNull(fixture.facade!!.readProductStorage("profile-kept"))
-        assertEquals(16L, projection.revision)
+        assertEquals(14L, projection.revision)
         assertEquals(display.entries, checkNotNull(projection.deploymentDisplay).entries)
         val expectedUpdate = update.encode(); val actualUpdate = checkNotNull(projection.update).encode()
         try { assertArrayEquals(expectedUpdate, actualUpdate) } finally { expectedUpdate.fill(0); actualUpdate.fill(0) }
@@ -267,7 +269,7 @@ class ProductStorageDeviceTest {
         committed(runBlocking { fixture.facade!!.migrateProductProjectionConfirmed(2) })
         committed(runBlocking { fixture.facade!!.recordUpdate(4, "profile-kept",
             StoredUpdateState(2uL, 1uL, UpdateCategory.AVAILABLE, 500_000, 500_000, 0)) })
-        committed(runBlocking { fixture.facade!!.recordStart(6, 500_000) })
+        committed(runBlocking { fixture.facade!!.recordStart(4, 500_000) })
         committed(runBlocking { fixture.facade!!.resetProfiles(setOf("profile-kept")) })
         fixture.reopen()
         assertTrue(checkNotNull(fixture.facade!!.readProjection()).profiles.isEmpty())
