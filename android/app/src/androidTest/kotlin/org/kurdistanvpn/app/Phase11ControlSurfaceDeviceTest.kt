@@ -28,7 +28,7 @@ import org.kurdistanvpn.core.model.DiagnosticWorkflowState
 import org.kurdistanvpn.core.model.EnrollmentKeySummary
 import org.kurdistanvpn.core.model.EnrollmentUiState
 import org.kurdistanvpn.core.model.OperationError
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProfileSummary
 import org.kurdistanvpn.core.model.ProfileTrust
 import org.kurdistanvpn.core.model.ProfilePreferences
@@ -74,13 +74,24 @@ class Phase11ControlSurfaceDeviceTest {
         }
 
         compose.setContent {
+            ProductNavigationChrome(current = AppDestination.HOME, onNavigate = { destination ->
+                when (destination) {
+                    AppDestination.SETTINGS -> record("settings")
+                    AppDestination.PROFILES -> record("profiles")
+                    else -> Unit
+                }
+            }) {
             HomeScreen(
                 state = appState,
-                settings = Phase9Settings(profiles = ProfilePreferences(activeLocalRecordId = profile.localRecordId)),
+                settings = ProductSettings(profiles = ProfilePreferences(activeLocalRecordId = profile.localRecordId)),
                 vpnRuntime = runtime,
                 onStartVpn = {
                     record("start")
-                    runtime = VpnRuntimeSnapshot(VpnRuntimeState.ACTIVE_KURD_LOOPBACK)
+                    runtime = VpnRuntimeSnapshot(VpnRuntimeState.ACTIVE_KURD_LIVE,
+                        runtimeRequestId = "1".repeat(32), startedAtElapsedRealtime = 1,
+                        profileGeneration = 7uL, planDigest = "2".repeat(64),
+                        profileFingerprint = "3".repeat(64), strategyFingerprint = "4".repeat(64),
+                        relayFingerprint = "5".repeat(64))
                 },
                 onStopVpn = {
                     record("stop")
@@ -94,6 +105,7 @@ class Phase11ControlSurfaceDeviceTest {
                     appState = AppState.Ready(emptyList())
                 },
             )
+            }
         }
 
         compose.onNodeWithText(context.getString(UiR.string.connect))
@@ -104,10 +116,10 @@ class Phase11ControlSurfaceDeviceTest {
         compose.onNodeWithTag("home_profiles")
             .performScrollTo()
             .performClick()
-        compose.onNodeWithTag("home_settings")
-            .performScrollTo()
+        compose.onNodeWithTag("primary_settings")
             .performClick()
-        compose.onNodeWithText(context.getString(UiR.string.diagnostics_about))
+        compose.onNodeWithTag("home_details").performScrollTo().performClick()
+        compose.onNodeWithTag("home_diagnostics")
             .performScrollTo()
             .performClick()
         compose.runOnIdle {
@@ -173,16 +185,20 @@ class Phase11ControlSurfaceDeviceTest {
             )
         }
 
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.import_profile_file))
             .performScrollTo()
             .performClick()
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.import_clipboard))
             .performScrollTo()
             .performClick()
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.scan_offline_qr))
             .performScrollTo()
             .performClick()
         val link = "kurd://artifact/phase11-control"
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.profile_link_label))
             .performScrollTo()
             .performTextInput(link)
@@ -190,6 +206,7 @@ class Phase11ControlSurfaceDeviceTest {
             .performScrollTo()
             .performClick()
 
+        compose.onNodeWithTag("profile_details_phase11-control-profile").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.export_encrypted_profile))
             .performScrollTo()
             .performClick()
@@ -275,7 +292,7 @@ class Phase11ControlSurfaceDeviceTest {
             )
         }
 
-        compose.onNodeWithTag("create_enrollment_request").performClick()
+        compose.onNodeWithTag("create_enrollment_request").performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.device_enrollment_export_file))
             .performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.device_enrollment_public_export_warning))
@@ -312,9 +329,9 @@ class Phase11ControlSurfaceDeviceTest {
                     validUntilEpochSeconds = 2_000_000_000,
                     sealed = false,
                     deploymentFingerprint = fingerprint,
-                    relayEndpointSummary = "owner-node.example:443",
-                    authorityScope = "deployment-local",
-                    updateLocation = "",
+                    relayEndpoint = org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
+                    authorityScope = org.kurdistanvpn.core.model.PreviewAuthorityScope.DEPLOYMENT_LOCAL,
+                    updateSource = org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED,
                     ownerControlled = true,
                     updatesEnabled = false,
                 ),
@@ -344,7 +361,7 @@ class Phase11ControlSurfaceDeviceTest {
     @Test
     fun settingsAndRecoveryInvokeEveryExposedControlAndBranch() {
         var backupState by mutableStateOf<BackupWorkflowState>(BackupWorkflowState.Idle)
-        var settings by mutableStateOf(Phase9Settings())
+        var settings by mutableStateOf(ProductSettings())
         val invoked = linkedMapOf<String, Int>()
         fun record(name: String) {
             invoked[name] = invoked.getOrDefault(name, 0) + 1
@@ -385,9 +402,7 @@ class Phase11ControlSurfaceDeviceTest {
             )
         }
 
-        compose.onNodeWithText(
-            context.getString(UiR.string.theme_value, ThemePreference.SYSTEM.name),
-        ).performClick()
+        compose.onNodeWithTag("theme_LIGHT").performScrollTo().performClick()
         val highContrast = context.getString(UiR.string.high_contrast)
         compose.onNodeWithContentDescription(highContrast)
             .performScrollTo()
@@ -492,12 +507,12 @@ class Phase11ControlSurfaceDeviceTest {
         }
 
         compose.onNodeWithText(context.getString(UiR.string.prepare_diagnostics))
-            .performClick()
+            .performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.cancel))
             .performScrollTo()
             .performClick()
         compose.onNodeWithText(context.getString(UiR.string.prepare_diagnostics))
-            .performClick()
+            .performScrollTo().performClick()
         compose.onNodeWithText(context.getString(UiR.string.confirm_export))
             .performScrollTo()
             .performClick()

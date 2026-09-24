@@ -31,7 +31,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.nativeapi.BackupPreviewHandle
 import org.kurdistanvpn.core.nativeapi.NativeResult
@@ -733,23 +733,23 @@ class Phase17LiveDataPlaneDeviceTest {
         val permitted = VpnRuntimeConfig(
             routingPolicy = VpnRoutingPolicy(),
             ipMode = IpMode.DUAL_STACK,
-            dnsMode = DnsMode.INTERNAL_TUN,
+            dnsMode = ResolverPolicy.INTERNAL,
             mtu = 1280,
         ).validatedForLiveTransport()
         assertEquals(IpMode.DUAL_STACK, permitted.ipMode)
-        assertEquals(DnsMode.INTERNAL_TUN, permitted.dnsMode)
+        assertEquals(ResolverPolicy.INTERNAL, permitted.dnsMode)
         assertEquals(1280, permitted.mtu)
 
         assertPolicyRejected {
             VpnRuntimeConfig(
                 routingPolicy = VpnRoutingPolicy(),
-                dnsMode = DnsMode.CLOUDFLARE,
+                dnsMode = ResolverPolicy.PRESET,
             ).validatedForLiveTransport()
         }
         assertPolicyRejected {
             VpnRuntimeConfig(
                 routingPolicy = VpnRoutingPolicy(),
-                dnsMode = DnsMode.CUSTOM,
+                dnsMode = ResolverPolicy.CUSTOM,
                 customDns = "resolver.example",
             ).validatedForLiveTransport()
         }
@@ -1050,7 +1050,10 @@ class Phase17LiveDataPlaneDeviceTest {
         )
 
         compose.onNodeWithTag("connection_hero").assertIsDisplayed()
-        compose.onNodeWithTag("connect_button").assertIsDisplayed().assertHasClickAction()
+        val hasProfile = (activity.appStateSnapshotForTesting() as? org.kurdistanvpn.core.model.AppState.Ready)
+            ?.profiles?.isNotEmpty() == true
+        compose.onNodeWithTag(if (hasProfile) "connect_button" else "home_add_profile")
+            .assertIsDisplayed().assertHasClickAction()
         assertFalse(activity.appStateSnapshotForTesting().toString().contains("PRODUCTION_READY"))
     }
 
@@ -1085,7 +1088,7 @@ class Phase17LiveDataPlaneDeviceTest {
     ) = VpnRuntimeSnapshot(
         state = VpnRuntimeState.ACTIVE_KURD_LIVE,
         startedAtElapsedRealtime = startedAt,
-        profileGeneration = 7,
+        profileGeneration = 7uL,
         planDigest = "a".repeat(64),
         profileFingerprint = "profile",
         strategyFingerprint = "strategy",
@@ -1095,7 +1098,7 @@ class Phase17LiveDataPlaneDeviceTest {
     )
 
     private fun assertNoAuthorityEvidence(snapshot: org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot) {
-        assertEquals(0, snapshot.profileGeneration)
+        assertEquals(0uL, snapshot.profileGeneration)
         assertNull(snapshot.planDigest)
         assertNull(snapshot.profileFingerprint)
         assertNull(snapshot.strategyFingerprint)

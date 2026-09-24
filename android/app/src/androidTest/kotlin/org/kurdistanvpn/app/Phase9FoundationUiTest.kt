@@ -4,6 +4,7 @@
 package org.kurdistanvpn.app
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -16,9 +17,12 @@ import android.content.ServiceConnection
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -28,6 +32,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.core.content.ContextCompat
@@ -50,7 +59,7 @@ import org.junit.Test
 import org.kurdistanvpn.core.model.AppState
 import org.kurdistanvpn.core.model.BackupWorkflowState
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProtectedRecoveryAction
 import org.kurdistanvpn.core.model.ProtectedRecoveryPresentation
 import org.kurdistanvpn.core.model.ProtectedRecoveryReason
@@ -98,7 +107,7 @@ class Phase9FoundationUiTest {
             activity.setContent {
                 SettingsRecoveryScreen(
                 backupState = BackupWorkflowState.Idle,
-                settings = Phase9Settings(),
+                settings = ProductSettings(),
                 onTheme = {},
                 onHighContrast = {},
                 onReducedMotion = {},
@@ -158,15 +167,17 @@ class Phase9FoundationUiTest {
 
     @Test
     fun phase11PresentsOnlyTheTruthfulOwnedLoopbackRuntimeControl() {
-        compose.onNodeWithText(compose.activity.getString(UiR.string.product_name))
+        compose.onNodeWithTag("home_brand")
+            .assertContentDescriptionEquals(compose.activity.getString(UiR.string.product_name))
             .assertIsDisplayed()
         compose.onNodeWithText(compose.activity.getString(UiR.string.disconnected))
             .performScrollTo()
             .assertIsDisplayed()
+        compose.onNodeWithTag("home_details").performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.phase13_external_boundary))
             .performScrollTo()
             .assertIsDisplayed()
-        compose.onNodeWithTag("connect_button")
+        compose.onNodeWithTag("home_add_profile")
             .performScrollTo()
             .assertIsDisplayed()
     }
@@ -174,12 +185,12 @@ class Phase9FoundationUiTest {
     @Test
     fun packagedPhase11NativeRoundTripIsExactAndBounded() {
         val payload = "phase11-packaged-abi".encodeToByteArray()
-        val result = NativeBridge().phase11RoundTrip(payload)
+        val result = org.kurdistanvpn.core.nativejni.InternalConformanceBridge().phase11RoundTrip(payload)
         assertTrue("packaged Phase 11 bridge rejected a bounded payload: $result", result is NativeResult.Success)
         assertArrayEquals(payload, (result as NativeResult.Success).value)
         assertTrue(
             "empty payload must fail closed",
-            NativeBridge().phase11RoundTrip(byteArrayOf()) is NativeResult.Failure,
+            org.kurdistanvpn.core.nativejni.InternalConformanceBridge().phase11RoundTrip(byteArrayOf()) is NativeResult.Failure,
         )
     }
 
@@ -244,9 +255,11 @@ class Phase9FoundationUiTest {
             .performScrollTo()
             .performClick()
         compose.onNodeWithText(activity.getString(UiR.string.cancel_reset))
+            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         compose.onNodeWithText(activity.getString(UiR.string.prepare_reset))
+            .performScrollTo()
             .assertIsDisplayed()
         compose.onNodeWithText(activity.getString(UiR.string.back))
             .performScrollTo()
@@ -255,7 +268,9 @@ class Phase9FoundationUiTest {
         compose.onNodeWithTag("settings_diagnostics")
             .performScrollTo()
             .performClick()
+        compose.onNodeWithTag("diagnostic_about").performScrollTo().performClick()
         compose.onNodeWithText(activity.getString(UiR.string.phase11_runtime_scope))
+            .performScrollTo()
             .assertIsDisplayed()
         compose.onNodeWithText(activity.getString(UiR.string.prepare_diagnostics))
             .performScrollTo()
@@ -279,7 +294,8 @@ class Phase9FoundationUiTest {
             .performClick()
         compose.onNodeWithTag("primary_home")
             .performClick()
-        compose.onNodeWithText(activity.getString(UiR.string.product_name))
+        compose.onNodeWithTag("home_brand")
+            .assertContentDescriptionEquals(activity.getString(UiR.string.product_name))
             .assertIsDisplayed()
     }
 
@@ -295,14 +311,14 @@ class Phase9FoundationUiTest {
             val clipboard = activity.getSystemService(ClipboardManager::class.java)
             clipboard.setPrimaryClip(ClipData.newPlainText("phase11-test", "not-a-kurd-profile"))
         }
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(activity.getString(UiR.string.import_clipboard))
             .performScrollTo()
             .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             activity.appStateSnapshotForTesting() is AppState.ImportRejected
         }
-        compose.onNodeWithText(activity.getString(UiR.string.back))
-            .performScrollTo()
+        compose.onNodeWithTag("primary_home")
             .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
@@ -320,6 +336,7 @@ class Phase9FoundationUiTest {
 
         compose.onNodeWithTag("primary_profiles")
             .performClick()
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(activity.getString(UiR.string.profile_link_label))
             .performScrollTo()
             .performTextInput("not-a-kurd-profile-link")
@@ -329,8 +346,7 @@ class Phase9FoundationUiTest {
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             activity.appStateSnapshotForTesting() is AppState.ImportRejected
         }
-        compose.onNodeWithText(activity.getString(UiR.string.back))
-            .performScrollTo()
+        compose.onNodeWithTag("primary_home")
             .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
             runCatching {
@@ -354,6 +370,7 @@ class Phase9FoundationUiTest {
         }
         compose.onNodeWithTag("primary_profiles")
             .performClick()
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(activity.getString(UiR.string.scan_offline_qr))
             .performScrollTo()
             .performClick()
@@ -368,17 +385,54 @@ class Phase9FoundationUiTest {
 
     @Test
     fun profileManagementIsReachableByKeyboardAndSemanticsTree() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        try {
+        // Enter Android's keyboard mode before requesting focus on Material controls.
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_TAB)
+        compose.waitForIdle()
         compose.onNodeWithTag("primary_profiles")
             .assertIsDisplayed()
-            .performClick()
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.Tab) }
+        compose.onNodeWithTag("primary_settings").assertIsFocused()
+            .performKeyInput {
+                keyDown(Key.ShiftLeft)
+                pressKey(Key.Tab)
+                keyUp(Key.ShiftLeft)
+            }
+        compose.onNodeWithTag("primary_profiles").assertIsFocused()
+            .performKeyInput { pressKey(Key.Enter) }
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            runCatching {
+                compose.onNodeWithText(compose.activity.getString(UiR.string.kurd_profiles)).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
         compose.onNodeWithText(compose.activity.getString(UiR.string.kurd_profiles))
             .assertIsDisplayed()
+        compose.onNodeWithTag("profiles_add").performScrollTo()
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            runCatching {
+                compose.onNodeWithTag("profiles_add").performSemanticsAction(SemanticsActions.RequestFocus)
+                    .assertIsFocused()
+                true
+            }.getOrDefault(false)
+        }
+        compose.onNodeWithTag("profiles_add").assertIsFocused()
+            .performKeyInput { pressKey(Key.Enter) }
         compose.onNodeWithText(compose.activity.getString(UiR.string.import_profile_file))
             .performScrollTo()
             .assertIsDisplayed()
         compose.onNodeWithText(compose.activity.getString(UiR.string.scan_offline_qr))
             .performScrollTo()
             .assertIsDisplayed()
+        } finally {
+            // Input mode outlives an Activity. Do not leak keyboard focus and IME requests
+            // into a later touch-navigation or locale-recreation fixture.
+            instrumentation.setInTouchMode(true)
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+        }
     }
 
     @Test
@@ -395,6 +449,8 @@ class Phase9FoundationUiTest {
         val existing = compose.activity.appStateSnapshotForTesting()
         if (existing is AppState.Ready && existing.profiles.isNotEmpty()) {
             compose.onNodeWithTag("primary_profiles").performClick()
+            compose.onNodeWithTag("profile_details_${existing.profiles.single().localRecordId}")
+                .performScrollTo().performClick()
             compose.onNodeWithText(compose.activity.getString(UiR.string.delete_profile))
                 .performScrollTo()
                 .performClick()
@@ -585,20 +641,35 @@ class Phase9FoundationUiTest {
             context.startForegroundService(start)
             runBlocking {
                 probe.await(
+                    state = VpnRuntimeState.CONNECTING,
+                    failure = null,
+                    timeoutMillis = runtimeTimeout(10_000),
+                    stage = "duplicate authority current request",
+                    expectedRequestId = requestId,
+                )
+                probe.await(
                     state = VpnRuntimeState.BLOCKED,
                     failure = "AUTHORITY_REJECTED",
                     timeoutMillis = runtimeTimeout(40_000),
                     stage = "duplicate authority first rejection",
                 )
             }
-            context.startForegroundService(Intent(start))
-            val terminal = runBlocking {
-                probe.await(
-                    state = VpnRuntimeState.BLOCKED,
-                    failure = "AUTHORITY_REJECTED",
-                    timeoutMillis = runtimeTimeout(5_000),
-                    stage = "duplicate authority replay rejection",
-                )
+            // Clear the first terminal display before replay. Querying the same retained
+            // service otherwise lets its old BLOCKED snapshot satisfy the second assertion.
+            resetRuntimeService(context)
+            val replay = DirectRuntimeStatusProbe(context, requestId = null)
+            val terminal = try {
+                context.startForegroundService(Intent(start))
+                runBlocking {
+                    replay.await(
+                        state = VpnRuntimeState.BLOCKED,
+                        failure = "AUTHORITY_REJECTED",
+                        timeoutMillis = runtimeTimeout(5_000),
+                        stage = "duplicate authority replay rejection",
+                    )
+                }
+            } finally {
+                replay.close()
             }
             assertEquals(0L, terminal.packetsRead)
             assertEquals(0L, terminal.packetsWritten)
@@ -647,17 +718,16 @@ class Phase9FoundationUiTest {
 
     private fun prepareLegacyAuthorityExpectingRejection(routingPolicy: VpnRoutingPolicy): String {
         ensureLegacySignedProfileIsReady()
-        val outcome = CompletableDeferred<String>()
-        compose.activity.runOnUiThread {
-            compose.activity.prepareManualStartForTesting(
-                config = VpnRuntimeConfig(routingPolicy = routingPolicy),
-                onReady = {
-                    outcome.complete("UNEXPECTED_AUTHORITY")
-                },
-                onFailure = { error -> outcome.complete(error.name) },
-            )
-        }
-        return runBlocking { withTimeout(runtimeTimeout(20_000)) { outcome.await() } }
+        val activity = compose.activity
+        val facade = checkNotNull((activity.application as KurdistanApplication).compositionRoot.protectedStateFacade())
+        val error = facade.validateManualStart(VpnRuntimeConfig(routingPolicy = routingPolicy),
+            object : org.kurdistanvpn.data.protectedstate.ProtectedAuthorityEnvironment {
+                override fun isUserUnlocked() = activity.getSystemService(android.os.UserManager::class.java).isUserUnlocked
+                override fun isConsentPrepared() = android.net.VpnService.prepare(activity) == null
+                override fun isCancelled() = false
+                override fun elapsedRealtimeMillis() = android.os.SystemClock.elapsedRealtime()
+            })
+        return if (error == null) "UNEXPECTED_AUTHORITY" else org.kurdistanvpn.core.model.OperationError.POLICY_REJECTED.name
     }
 
     private fun waitForText(text: String) {
@@ -701,6 +771,20 @@ class Phase9FoundationUiTest {
         } finally {
             probe.close()
         }
+        awaitRuntimeServiceStopped(context)
+    }
+
+    @Suppress("DEPRECATION") // Android still exposes the calling application's own services.
+    private fun awaitRuntimeServiceStopped(context: Context) {
+        val manager = context.getSystemService(ActivityManager::class.java)
+        val service = ComponentName(context, KurdVpnService::class.java)
+        // IDLE is published before stopSelf/onDestroy. Await actual stopped ownership:
+        // either gone, or retained solely by the app's process-owned quiescence binding.
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            manager.getRunningServices(Int.MAX_VALUE).filter { it.service == service }.all {
+                !it.started && !it.foreground && it.clientCount > 0
+            }
+        }
     }
 
     private fun runtimeTimeout(baseMillis: Long): Long {
@@ -719,50 +803,37 @@ private class DirectRuntimeStatusProbe(
     private val context: Context,
     private val requestId: String?,
 ) : AutoCloseable {
-    private val snapshots = Channel<VpnRuntimeSnapshot>(Channel.UNLIMITED)
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != VpnRuntimeContract.ACTION_STATUS) return
-            val incomingRequestId = intent.getStringExtra(VpnRuntimeContract.EXTRA_RUNTIME_REQUEST)
-            if (requestId != null && incomingRequestId != requestId) return
-            val state = intent.getStringExtra(VpnRuntimeContract.EXTRA_STATE)
-                ?.let { runCatching { VpnRuntimeState.valueOf(it) }.getOrNull() }
-                ?: return
-            snapshots.trySend(
-                VpnRuntimeSnapshot(
-                    state = state,
-                    packetsRead = intent.getLongExtra(VpnRuntimeContract.EXTRA_PACKETS, 0),
-                    packetsWritten = intent.getLongExtra(VpnRuntimeContract.EXTRA_PACKETS_WRITTEN, 0),
-                    failure = intent.getStringExtra(VpnRuntimeContract.EXTRA_FAILURE),
-                    planDigest = intent.getStringExtra(VpnRuntimeContract.EXTRA_PLAN_DIGEST),
-                    runtimeRequestId = incomingRequestId,
-                ),
-            )
+    private val ready = CompletableDeferred<org.kurdistanvpn.runtime.android.IRuntimeControl>()
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: android.os.IBinder?) {
+            ready.complete(org.kurdistanvpn.runtime.android.IRuntimeControl.Stub.asInterface(binder))
         }
+        override fun onServiceDisconnected(name: ComponentName?) = Unit
     }
-
-    init {
-        ContextCompat.registerReceiver(
-            context,
-            receiver,
-            IntentFilter(VpnRuntimeContract.ACTION_STATUS),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-    }
+    private val bound = context.bindService(
+        Intent(org.kurdistanvpn.runtime.android.RuntimeControlBinder.ACTION_BIND)
+            .setComponent(ComponentName(context, KurdVpnService::class.java)),
+        connection, Context.BIND_AUTO_CREATE)
 
     suspend fun await(
         state: VpnRuntimeState,
         failure: String?,
         timeoutMillis: Long,
         stage: String = "runtime status",
+        expectedRequestId: String? = null,
     ): VpnRuntimeSnapshot {
         val observed = ArrayDeque<String>()
         val matched = withTimeoutOrNull(timeoutMillis) {
             while (true) {
-                val snapshot = snapshots.receive()
+                val snapshot = org.kurdistanvpn.runtime.api.RuntimeStatusWire.decode(ready.await().queryStatus(org.kurdistanvpn.runtime.api.RuntimeStatusWire.VERSION))
+                if (requestId != null && snapshot.runtimeRequestId != requestId) {
+                    kotlinx.coroutines.delay(10); continue
+                }
                 if (observed.size == 8) observed.removeFirst()
                 observed.addLast("${snapshot.state}/${snapshot.failure ?: "NONE"}")
-                if (snapshot.state == state && snapshot.failure == failure) return@withTimeoutOrNull snapshot
+                if (snapshot.state == state && snapshot.failure == failure &&
+                    (expectedRequestId == null || snapshot.runtimeRequestId == expectedRequestId)) return@withTimeoutOrNull snapshot
+                kotlinx.coroutines.delay(10)
             }
             @Suppress("UNREACHABLE_CODE")
             null
@@ -773,10 +844,9 @@ private class DirectRuntimeStatusProbe(
     }
 
     override fun close() {
-        runCatching { context.unregisterReceiver(receiver) }
-        snapshots.close()
+        if (bound) context.unbindService(connection)
     }
 }
 
-private const val INTERNAL_SIGNED_PROFILE_LINK =
+internal const val INTERNAL_SIGNED_PROFILE_LINK =
     "kurd://artifact/0oRYfacBJgKDOgABAAA6AAEAAToAAQACA3gmYXBwbGljYXRpb24vdm5kLmt1cmRpc3Rhbi5wcm9maWxlK2Nib3IET2lzc3Vlci1rZXktMDAwMToAAQAAAToAAQABAToAAQACWBykAW1zaWduZWQtcHVibGljAmZwdWJsaWMDQAQAoFi5tAEBAmxjb250ZW50LjAwMDEDbHByb2ZpbGVzLm9uZQRsbGluZWFnZS4wMDAxBW1wcm92aWRlci4wMDAxBngccHJvZHVjdC1wcm9maWxlLWFkbWlzc2lvbi12MQdvcmV2b2NhdGlvbi4wMDAxCG1mdWxsLXNuYXBzaG90CWdpbml0aWFsCgcLAgwYZA0ZA-gOAw8EEGARYBKBanJlbGF5LjAwMDETgW1zdHJhdGVneS4wMDAxFEOhAQFYQIyvXzY5H1CgLKQm26giaBLLV6CAbkQKzkQ1HSviotuUH7d0vG2K_bpRTUPIOG4rLTwtcIO3NyXHKdmzRzbQs9g"

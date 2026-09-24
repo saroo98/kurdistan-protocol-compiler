@@ -5,6 +5,7 @@ package org.kurdistanvpn.app
 
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -25,14 +26,33 @@ class ZzzExternalPickerDeviceTest {
 
     @Test
     fun profileFileImportLaunchesTheSystemDocumentPickerWithoutCrashing() {
+        compose.waitUntil(10_000) {
+            compose.activity.lifecycle.currentState == androidx.lifecycle.Lifecycle.State.RESUMED &&
+                compose.activity.hasWindowFocus()
+        }
         compose.onNodeWithTag("primary_profiles")
             .performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("profiles_add").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("profiles_add").performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.import_profile_file))
             .performScrollTo()
             .performClick()
 
         compose.waitUntil(timeoutMillis = 10_000) {
             !compose.activity.hasWindowFocus()
+        }
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        compose.waitUntil(10_000) {
+            automation.rootInActiveWindow?.packageName?.toString()?.endsWith("documentsui") == true
+        }
+        org.junit.Assert.assertTrue(automation.performGlobalAction(
+            android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+        compose.waitUntil(10_000) { compose.activity.hasWindowFocus() }
+        compose.onNodeWithTag("primary_profiles").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("profiles_add").fetchSemanticsNodes().isNotEmpty()
         }
     }
 }
