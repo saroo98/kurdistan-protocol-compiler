@@ -321,3 +321,5 @@ The project is licensed under the
 [GNU Affero General Public License v3.0 or later](LICENSE). Additional notices
 and third-party licensing information are available in [NOTICE](NOTICE) and
 [`LICENSES/`](LICENSES/).
+The bundled Android fonts have separate [asset notices](docs/third-party/android-fonts.md)
+and are not relicensed under the source-code license.
