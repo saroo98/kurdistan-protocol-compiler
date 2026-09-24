@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package org.kurdistanvpn.data.protectedstate
 
+import org.kurdistanvpn.runtime.api.RuntimeAuthorityLimits
+
 /**
  * Default-process admission shared by the broker and authority provider. This is
  * cooperative serialization, not a security boundary against same-UID code.
@@ -151,13 +153,20 @@ internal class ActiveSessionMutationPolicy(private val acquireQuiescence: (() ->
         return handle
     }
 
+    /** Observation only: a released final lease is neither consulted nor renewed. */
+    fun isRegisteredCurrent(session: OwnedSession, revision: Long): Boolean = synchronized(monitor) {
+        val entry = owners[session] ?: return false
+        !exhausted && !draining && writer == null && entry.revision == revision &&
+            !entry.retired && !entry.clean && !entry.closing
+    }
+
     fun acquireFinalLease(session: OwnedSession, revision: Long, deadline: Long): FinalLease? =
         synchronized(monitor) {
             val entry = owners[session] ?: return null
             val now = nowOrInvalid()
             if (exhausted || draining || writer != null || entry.retired ||
                 entry.clean || entry.finalLeaseIssued || revision != entry.revision ||
-                now < 0 || deadline <= now || deadline - now > MAX_LEASE_MILLIS) return null
+                now < 0 || deadline <= now || deadline - now > RuntimeAuthorityLimits.MAX_FINAL_LEASE_MILLIS) return null
             entry.finalLeaseIssued = true
             Lease(session, entry, revision, deadline).also { entry.finalLease = it }
         }
@@ -168,10 +177,14 @@ internal class ActiveSessionMutationPolicy(private val acquireQuiescence: (() ->
      * Reservation itself is not permission to change product state: requireCurrent fails
      * until the policy has independently retired and cleaned every owned session.
      */
-    fun reserveMutation(): MutationReservation? {
+    fun inactive(): Boolean = synchronized(monitor) {
+        !exhausted && !draining && writer == null && owners.values.all { it.clean }
+    }
+
+    fun reserveMutation(requireInactive: Boolean = false): MutationReservation? {
         // Do not issue another remote admission request after an owned quiescence release is
         // uncertain.  A late Binder operation may still hold the VPN-process lease.
-        if (synchronized(monitor) { exhausted }) return null
+        if (synchronized(monitor) { exhausted || (requireInactive && owners.values.any { !it.clean }) }) return null
         val quiescence = try { acquireQuiescence?.invoke() }
         catch (_: Throwable) {
             synchronized(monitor) { exhausted = true }
@@ -181,6 +194,7 @@ internal class ActiveSessionMutationPolicy(private val acquireQuiescence: (() ->
         val admitted = synchronized(monitor) {
             val now = nowOrInvalid()
             if (now < 0 || draining || writer != null || exhausted ||
+                (requireInactive && owners.values.any { !it.clean }) ||
                 owners.values.any { it.finalLease?.blocksMutation(now) == true }) null
             else WriteLease(quiescence).also { writer = it }
         }
@@ -230,6 +244,5 @@ internal class ActiveSessionMutationPolicy(private val acquireQuiescence: (() ->
     private companion object {
         const val MAX_IDENTITIES = 4096
         const val MAX_FAILURES = 4096
-        const val MAX_LEASE_MILLIS = 2000L
     }
 }

@@ -135,8 +135,9 @@ interface ProfileCatalogDao : ProfileCatalogReadAccess {
 }
 
 @Database(
-    entities = [ProfileCatalogEntity::class, RecipientBindingEntity::class, ProtectedProjectionEntity::class],
-    version = 2,
+    entities = [ProfileCatalogEntity::class, RecipientBindingEntity::class, ProtectedProjectionEntity::class,
+        ProductOperationProjectionEntity::class],
+    version = 3,
     exportSchema = true,
 )
 abstract class KurdistanMetadataDatabase : RoomDatabase() {
@@ -144,6 +145,12 @@ abstract class KurdistanMetadataDatabase : RoomDatabase() {
     abstract fun protectedProjection(): ProtectedProjectionDao
 
     companion object {
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `product_operation_projection` (`operationId` TEXT NOT NULL, `kind` TEXT NOT NULL, `scopeRecordId` TEXT, `state` TEXT NOT NULL, `attempt` INTEGER NOT NULL, `settingsRevisionBefore` INTEGER NOT NULL, `settingsRevisionAfter` INTEGER NOT NULL, `startedEpochHour` INTEGER NOT NULL, `resumable` INTEGER NOT NULL, PRIMARY KEY(`operationId`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_product_operation_projection_state_startedEpochHour` ON `product_operation_projection` (`state`, `startedEpochHour`)")
+            }
+        }
         /** Non-destructive. The broker must separately validate and adopt legacy state. */
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -176,7 +183,7 @@ data class ProtectedProjectionEntity(
 }
 
 class CatalogProjection(rows: List<ProfileCatalogEntity>, val witness: ProtectedProjectionEntity?,
-    bindings: List<RecipientBindingEntity> = emptyList()) {
+    bindings: List<RecipientBindingEntity> = emptyList(), val operation: ProductOperationProjectionEntity? = null) {
     private val owned = rows.toTypedArray().toList()
     private val ownedBindings = bindings.toTypedArray().toList()
     val rows: List<ProfileCatalogEntity> get() = java.util.Collections.unmodifiableList(ArrayList(owned))
@@ -185,6 +192,12 @@ class CatalogProjection(rows: List<ProfileCatalogEntity>, val witness: Protected
 
 @Dao
 abstract class ProtectedProjectionDao {
+    @Query("SELECT * FROM product_operation_projection ORDER BY operationId")
+    protected abstract suspend fun operationRows(): List<ProductOperationProjectionEntity>
+    @Upsert
+    protected abstract suspend fun putOperation(value: ProductOperationProjectionEntity)
+    @Query("DELETE FROM product_operation_projection")
+    protected abstract suspend fun clearOperation()
     @Query("SELECT * FROM profile_catalog ORDER BY localRecordId")
     protected abstract suspend fun rows(): List<ProfileCatalogEntity>
     @Query("SELECT * FROM protected_projection WHERE singleton = 1")
@@ -206,6 +219,9 @@ abstract class ProtectedProjectionDao {
     open suspend fun read(): CatalogProjection {
         val observed = rows().toTypedArray().toList()
         val observedBindings = bindings().toTypedArray().toList()
+        val operations = operationRows().toTypedArray().toList()
+        check(operations.size <= 1) { "MULTIPLE_OPERATION_PROJECTIONS" }
+        val operation = operations.singleOrNull()?.also { it.validate() }
         val identity = witness()?.also {
             it.validate()
             observed.forEach { row -> row.requireCommittedFor(it) }
@@ -215,29 +231,49 @@ abstract class ProtectedProjectionDao {
             }
         }
         check(identity != null || observedBindings.isEmpty()) { "UNWITNESSED_RECIPIENT_BINDING" }
-        return CatalogProjection(observed, identity, observedBindings)
+        check(operation == null || (identity != null && operation.operationId == identity.operationId)) {
+            "UNWITNESSED_OR_STALE_OPERATION_PROJECTION"
+        }
+        return CatalogProjection(observed, identity, observedBindings, operation)
     }
 
     @Transaction
     open suspend fun publish(expectedOld: CatalogProjection, next: ProtectedProjectionEntity,
-        replacement: List<ProfileCatalogEntity>, replacementBindings: List<RecipientBindingEntity> = emptyList()) {
+        replacement: List<ProfileCatalogEntity>, replacementBindings: List<RecipientBindingEntity> = emptyList(),
+        replacementOperation: ProductOperationProjectionEntity? = null) =
+        writeProjection(expectedOld, next, replacement, replacementBindings, replacementOperation, false)
+
+    /** Typed broker recovery only. The same journal operation may rebind its projection digest. */
+    @Transaction
+    open suspend fun recover(expectedOld: CatalogProjection, next: ProtectedProjectionEntity,
+        replacement: List<ProfileCatalogEntity>, replacementBindings: List<RecipientBindingEntity> = emptyList(),
+        replacementOperation: ProductOperationProjectionEntity? = null) =
+        writeProjection(expectedOld, next, replacement, replacementBindings, replacementOperation, true)
+
+    private suspend fun writeProjection(expectedOld: CatalogProjection, next: ProtectedProjectionEntity,
+        replacement: List<ProfileCatalogEntity>, replacementBindings: List<RecipientBindingEntity>,
+        replacementOperation: ProductOperationProjectionEntity?, recovering: Boolean) {
         val owned = replacement.toTypedArray().toList()
         val ownedBindings = replacementBindings.toTypedArray().toList()
         next.validate()
+        replacementOperation?.let { it.validate(); check(it.operationId == next.operationId) { "INVALID_NEW_OPERATION_WITNESS" } }
         owned.forEach { it.requireCommittedFor(next) }
         requireBindingsFor(owned, ownedBindings, next)
         check(next.imageDigest == ProfileCatalogProjectionCodec.imageDigest(owned, ownedBindings)) { "INVALID_NEW_ROOM_WITNESS" }
         val observed = read()
         check(observed.witness == expectedOld.witness && observed.rows == expectedOld.rows &&
-            observed.bindings == expectedOld.bindings) { "STALE_ROOM_PROJECTION" }
+            observed.bindings == expectedOld.bindings && observed.operation == expectedOld.operation) { "STALE_ROOM_PROJECTION" }
         if (expectedOld.witness != null) {
             expectedOld.witness.validate()
-            check(expectedOld.witness.storeEpoch == next.storeEpoch && next.revision > expectedOld.witness.revision)
+            check(expectedOld.witness.storeEpoch == next.storeEpoch && (next.revision > expectedOld.witness.revision ||
+                (recovering && next.revision == expectedOld.witness.revision && next.operationId == expectedOld.witness.operationId)))
         }
+        clearOperation()
         clearBindings()
         clearRows()
         putRows(owned)
         putBindings(ownedBindings)
+        replacementOperation?.let { putOperation(it) }
         putWitness(next)
     }
 }
@@ -289,6 +325,7 @@ object ProfileCatalogProjectionCodec {
     }
 
     fun decode(input: ByteArray): List<ProfileCatalogEntity> {
+        if (ProductCatalogProjectionCodec.isProduct(input)) return ProductCatalogProjectionCodec.decode(input).rows
         val owned = input.clone()
         try {
             require(owned.size in 8..MAX_BYTES)

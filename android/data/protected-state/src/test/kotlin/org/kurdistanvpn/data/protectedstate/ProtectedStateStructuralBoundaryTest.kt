@@ -32,13 +32,40 @@ class ProtectedStateStructuralBoundaryTest {
         for (field in type("ProtectedStateApplicationFacade").declaredFields.filterNot { it.isSynthetic }) {
             if (field.type in forbidden) assertTrue(field.name, Modifier.isPrivate(field.modifiers))
         }
+        val productCommands = setOf("migrateProductProjectionConfirmed", "recoverProductSchemaConfirmed",
+            "recoverProductOperationConfirmed", "setDeploymentDisplay", "recordUpdate", "recordProbe",
+            "replaceTrustedRules", "recordUsage", "recordAppLockFailure", "recordStart", "recordCleanStop")
+        val exposed = type("ProtectedStateApplicationFacade").declaredMethods.filter { it.name in productCommands && !it.isSynthetic }
+        assertEquals(productCommands, exposed.map { it.name }.toSet())
+        for (method in exposed) {
+            // Suspend wrappers return Object on JVM; the continuation carries the typed outcome.
+            assertTrue(method.name, method.genericParameterTypes.last().typeName.contains("ProtectedStateApplicationFacade\$CommandResult"))
+            assertFalse(method.name, method.genericParameterTypes.any { parameter ->
+                listOf("DurableMutationResult", "ProductOperationState", "SettingsOperationState", "ProfileCatalogEntity",
+                    "ProductOperationProjectionEntity", "kotlinx.coroutines.flow").any { it in parameter.typeName }
+            })
+        }
+        for (projection in listOf("ProductStorageReadProjection", "TrustedNetworkStorageSummary")) {
+            val projected = type("ProtectedStateApplicationFacade\$$projection")
+            assertTrue(projection, projected.declaredFields.none { it.type in forbidden })
+            assertTrue(projection, projected.declaredMethods.filterNot { it.isSynthetic }.all {
+                it.name.startsWith("get") || it.name == "toString"
+            })
+        }
+        val trust = exposed.single { it.name == "replaceTrustedRules" }
+        assertEquals(listOf(Long::class.javaPrimitiveType, org.kurdistanvpn.data.secure.StoredTrustedNetworks::class.java),
+            trust.parameterTypes.dropLast(1))
+        val command = ProductStoreCommand.ReplaceTrustedRules::class.java
+        assertEquals(listOf(org.kurdistanvpn.data.secure.StoredTrustedNetworks::class.java),
+            command.declaredFields.filterNot { it.isSynthetic }.map { it.type })
     }
 
     @Test fun readProjectionHasNoMutationMethodAndNoWritableRootCapability() {
         val methods = type("ProtectedProjectionReadAccess").declaredMethods.filterNot { it.isSynthetic }
-        assertEquals(listOf("read"), methods.map { it.name })
-        assertEquals(0, methods.single().parameterCount)
-        assertEquals(type("ProjectionImages"), methods.single().returnType)
+        assertEquals(setOf("read", "readForCheckpoint"), methods.map { it.name }.toSet())
+        assertEquals(0, methods.single { it.name == "read" }.parameterCount)
+        assertEquals(listOf(type("ProtectedStateSnapshot")), methods.single { it.name == "readForCheckpoint" }.parameterTypes.toList())
+        assertTrue(methods.all { it.returnType == type("ProjectionImages") })
         assertTrue(type("ReadOnlyCheckpointProjectionAccess").declaredFields.none {
             it.type == type("ProtectedProjectionAccess") || it.type == type("JournalStorage") ||
                 it.type == type("ImmutableProtectedObjectWriter")
@@ -47,14 +74,35 @@ class ProtectedStateStructuralBoundaryTest {
 
     @Test fun credentialParentOpenFlagsDoNotDependOnHiddenFrameworkFields() {
         val companion = type("ProtectedStateApplicationFacade").getField("Companion").get(null)
-        val method = companion.javaClass.declaredMethods.single { it.name == "credentialParentOpenFlags" }
-        assertEquals("credential-parent flags must not require a reflected framework constant", 0, method.parameterCount)
+        val method = companion.javaClass.getDeclaredMethod("credentialParentOpenFlags", Int::class.javaPrimitiveType)
         method.isAccessible = true
-        val flags = method.invoke(companion) as Int
-        assertEquals("O_DIRECTORY", 0x00010000, flags and 0x00010000)
-        assertEquals("O_CLOEXEC", 0x00080000, flags and 0x00080000)
-        assertEquals("no write access", 0, flags and 0x00000003)
-        assertEquals("no creation", 0, flags and 0x00000040)
+        // Independent NDK asm/fcntl.h values: ARM64 and x86_64 do not share O_DIRECTORY.
+        // Both combinations retain readonly, directory-only, no-follow and atomic close-on-exec.
+        assertEquals(0x0008c000, method.invoke(companion, 0x00008000))
+        assertEquals(0x000b0000, method.invoke(companion, 0x00020000))
+        for (unsupported in listOf(0, -1, 0x00010000, 0x00028000)) {
+            val failure = assertThrows(java.lang.reflect.InvocationTargetException::class.java) {
+                method.invoke(companion, unsupported)
+            }
+            assertTrue(failure.cause is IllegalStateException)
+        }
+    }
+
+    @Test fun frameworkPreparationCannotClassifyPartialMutationAsMigrationRequired() {
+        val companion = type("ProtectedStateApplicationFacade").getField("Companion").get(null)
+        val classify = companion.javaClass.getDeclaredMethod("frameworkPreparationFailure",
+            Boolean::class.javaPrimitiveType, Throwable::class.java).apply { isAccessible = true }
+        val failureType = type("ProtectedStateApplicationFacade\$Companion\$OpenFailure")
+        val constructor = failureType.getDeclaredConstructor(ProtectedStateApplicationFacade.OpenResult::class.java)
+            .apply { isAccessible = true }
+        val migration = constructor.newInstance(ProtectedStateApplicationFacade.OpenResult.MigrationRequired) as Throwable
+        val ordinary = IllegalStateException("test-only IO uncertainty")
+        val result = failureType.getDeclaredMethod("getResult").apply { isAccessible = true }
+        for (failure in listOf(migration, ordinary)) {
+            assertSame("preflight failures retain their classification", failure, classify.invoke(companion, false, failure))
+            val partial = classify.invoke(companion, true, failure)
+            assertEquals(ProtectedStateApplicationFacade.OpenResult.Unproven, result.invoke(partial))
+        }
     }
 
     @Test fun projectionRootTrustComesFromBoundIdentityNotCanonicalPathSpelling() {

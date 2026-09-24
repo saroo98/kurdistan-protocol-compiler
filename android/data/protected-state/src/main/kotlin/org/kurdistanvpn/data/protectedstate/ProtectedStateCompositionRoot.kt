@@ -21,7 +21,7 @@ import org.kurdistanvpn.data.metadata.KurdistanMetadataDatabase
 import org.kurdistanvpn.data.metadata.ProfileCatalogProjectionCodec
 import org.kurdistanvpn.data.metadata.ProtectedProjectionEntity
 import org.kurdistanvpn.data.metadata.RecipientBindingEntity
-import org.kurdistanvpn.data.settings.Phase9SettingsStore
+import org.kurdistanvpn.data.settings.ProductSettingsStore
 import org.kurdistanvpn.data.settings.SettingsProjection
 import org.kurdistanvpn.data.settings.SettingsProjectionCodec
 import org.kurdistanvpn.data.settings.SettingsProjectionIdentity
@@ -32,13 +32,14 @@ import android.os.ParcelFileDescriptor
 import android.os.UserManager
 import android.system.Os
 import android.system.OsConstants
+import android.system.ErrnoException
 import org.kurdistanvpn.core.nativeapi.KurdNativeCore
 import org.kurdistanvpn.core.nativeapi.DurableOwnedDirectory
 import org.kurdistanvpn.data.secure.AndroidKeystoreKek
 import org.kurdistanvpn.data.secure.KeyInvalidatedException
 import org.kurdistanvpn.data.secure.MissingKeyException
 import org.kurdistanvpn.core.model.OperationError
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProfileSummary
 import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.data.metadata.CatalogHealth
@@ -48,6 +49,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
+import org.kurdistanvpn.data.settings.SettingsApplyCoordinator
+import org.kurdistanvpn.data.settings.SettingsMutationPort
+import org.kurdistanvpn.data.settings.SettingsPortResult
+import org.kurdistanvpn.core.model.ProductFailureCode
+import org.kurdistanvpn.domain.SettingsRepository
+import org.kurdistanvpn.core.model.CatalogId
+import org.kurdistanvpn.data.secure.*
 
 /** Explicit provisioning only. The known cross-process lock covers the last absence check and
  * first-use key creation. An empty existing directory is not evidence that any prior reset
@@ -140,6 +148,54 @@ internal class EncryptedJournalStorage private constructor(
     private var writerThread: Thread? = null
     private var poisoned = false
 
+    /** A read-only, explicitly owned view for one capture; never retained by the facade. */
+    fun captureReadScope() = CaptureReadScope()
+
+    inner class CaptureReadScope internal constructor() : JournalStorage by this@EncryptedJournalStorage, AutoCloseable {
+        private var closed = false
+        private val entries = LinkedHashMap<String, AuthenticatedJournalRead>()
+        private var retainedBytes = 0
+        @Synchronized override fun read(name: String, maximum: Int): ByteArray? {
+            check(!closed) { "CAPTURE_READ_SCOPE_CLOSED" }
+            return this@EncryptedJournalStorage.read(name, maximum, this)
+        }
+        override fun <T> exclusive(block: () -> T): T = error("READ_ONLY_CAPTURE")
+        override fun compareAndReplace(name: String, expected: ByteArray?, replacement: ByteArray): Unit = error("READ_ONLY_CAPTURE")
+        override fun delete(name: String, expected: ByteArray): Unit = error("READ_ONLY_CAPTURE")
+        @Synchronized override fun inventory(maximum: Int): List<JournalStoredEntry> {
+            check(!closed) { "CAPTURE_READ_SCOPE_CLOSED" }
+            return this@EncryptedJournalStorage.inventory(maximum)
+        }
+        internal fun previous(name: String, encoded: ByteArray, maximum: Int): ByteArray? {
+            val entry = entries[name] ?: return null
+            if (entry.generation != key.generation || !MessageDigest.isEqual(entry.encoded, encoded)) return null
+            require(entry.plaintext.size <= maximum)
+            return entry.plaintext.clone()
+        }
+        internal fun remember(name: String, encoded: ByteArray, plaintext: ByteArray) {
+            // Controls/store identities always unwrap afresh, as do all selected authority objects.
+            if (!(name.startsWith("journal-checkpoint-") || name.startsWith("journal-projection-") ||
+                    name.startsWith("journal-record-") || name.startsWith("journal-intent-") ||
+                    name.startsWith("journal-resolution-"))) return
+            entries.remove(name)?.let { retainedBytes -= it.encoded.size + it.plaintext.size; it.close() }
+            val size = encoded.size.toLong() + plaintext.size
+            // The measured capture has 16 distinct eligible records. Larger histories fall back
+            // to ordinary authentication instead of retaining unbounded decrypted journal data.
+            if (entries.size >= 16 || size > 256 * 1024 - retainedBytes) return
+            entries[name] = AuthenticatedJournalRead(encoded.clone(), plaintext.clone(), key.generation)
+            retainedBytes += size.toInt()
+        }
+        @Synchronized override fun close() {
+            closed = true
+            entries.values.forEach { it.close() }
+            entries.clear(); retainedBytes = 0
+        }
+    }
+
+    private class AuthenticatedJournalRead(val encoded: ByteArray, val plaintext: ByteArray, val generation: Int) {
+        fun close() { encoded.fill(0); plaintext.fill(0) }
+    }
+
     /** Only a newly provisioned installation may call this. Existing data is never adopted. */
     fun provisionStoreIdentity(storeId: ByteArray) = exclusive {
         check(inventory(JournalLimits.OBJECTS).all { it.name == LOCK }) { "EXISTING_STATE_CANNOT_BE_BOOTSTRAPPED" }
@@ -186,9 +242,11 @@ internal class EncryptedJournalStorage private constructor(
     }
 
     /** Ciphertext only. Reading an absent or corrupt reference never repairs storage. */
-    fun readObject(name: String): ByteArray? {
-        require(name.startsWith("object-") && name.validRecordId())
-        val observed = primitives.read(directory, name, JournalLimits.OBJECT_BYTES)
+    fun readObject(name: String): ByteArray? = readObject(name, JournalLimits.OBJECT_BYTES)
+
+    fun readObject(name: String, maximum: Int): ByteArray? {
+        require(name.startsWith("object-") && name.validRecordId() && maximum in 1..JournalLimits.OBJECT_BYTES)
+        val observed = primitives.read(directory, name, maximum)
         if (observed.code == DurableCode.ABSENT) return null
         if (observed.code != DurableCode.OK) throw IOException("OBJECT_READ_UNPROVEN")
         return checkNotNull(observed.snapshot).bytes
@@ -236,17 +294,18 @@ internal class EncryptedJournalStorage private constructor(
     fun garbageObjects(): JournalObjectAccess = object : JournalObjectAccess {
         override fun inventory(): List<JournalStoredEntry> = this@EncryptedJournalStorage.inventory(JournalLimits.OBJECTS)
         override fun read(name: String): ByteArray? = readObject(name)
+        override fun read(name: String, maximum: Int): ByteArray? = readObject(name, maximum)
         override fun delete(name: String, expected: ByteArray) {
             require(name.startsWith("object-") && name.validRecordId())
             val owned = expected.clone()
             try {
                 val active = currentWriter()
-                val current = active.read(name, JournalLimits.OBJECT_BYTES)
+                val current = active.read(name, owned.size)
                 check(current.code == DurableCode.OK)
                 val snapshot = checkNotNull(current.snapshot)
                 val actual = snapshot.bytes
                 try { check(MessageDigest.isEqual(owned, actual)) } finally { actual.fill(0) }
-                if (active.delete(name, snapshot, JournalLimits.OBJECT_BYTES).code != DurableCode.OK) {
+                if (active.delete(name, snapshot, owned.size).code != DurableCode.OK) {
                     poisoned = true; throw IOException("MUTATION_UNPROVEN")
                 }
             } finally { owned.fill(0) }
@@ -258,18 +317,23 @@ internal class EncryptedJournalStorage private constructor(
         return checkNotNull(writer) { "WRITER_CAPABILITY_UNAVAILABLE" }
     }
 
-    override fun read(name: String, maximum: Int): ByteArray? {
+    override fun read(name: String, maximum: Int): ByteArray? = read(name, maximum, null)
+
+    private fun read(name: String, maximum: Int, scope: CaptureReadScope?): ByteArray? {
         require(name.validRecordId() && maximum in 1..JournalLimits.OBJECT_BYTES)
-        val result = primitives.read(directory, leaf(name), JournalLimits.OBJECT_BYTES)
+        // Bound native allocation and wiping to this record plus the envelope allowance.
+        val result = primitives.read(directory, leaf(name), minOf(JournalLimits.OBJECT_BYTES, maximum + 2048))
         if (result.code == DurableCode.ABSENT) return null
         if (result.code != DurableCode.OK) throw IOException("PROTECTED_READ_${result.code.name}")
         val encoded = checkNotNull(result.snapshot).bytes
         return try {
             require(codec.keyGeneration(encoded) == key.generation)
+            scope?.previous(name, encoded, maximum)?.let { return it }
             val opened = codec.open(encoded, name, key)
             try {
                 require(opened.dataClass == category(name) && opened.plaintext.size <= maximum)
                 if (name == "journal-control") requireStoreIdentity(JournalControl.decode(opened.plaintext).storeId())
+                scope?.remember(name, encoded, opened.plaintext)
                 opened.plaintext.clone()
             } finally { opened.plaintext.fill(0) }
         } finally { encoded.fill(0) }
@@ -309,7 +373,8 @@ internal class EncryptedJournalStorage private constructor(
     override fun delete(name: String, expected: ByteArray) {
         val acquired = currentWriter()
         check(!poisoned && name.validRecordId())
-        val current = acquired.read(leaf(name), JournalLimits.OBJECT_BYTES)
+        val maximum = minOf(JournalLimits.OBJECT_BYTES, expected.size + 2048)
+        val current = acquired.read(leaf(name), maximum)
         check(current.code == DurableCode.OK)
         val snapshot = checkNotNull(current.snapshot)
         val encoded = snapshot.bytes
@@ -318,7 +383,7 @@ internal class EncryptedJournalStorage private constructor(
             val opened = codec.open(encoded, name, key)
             try { check(opened.dataClass == category(name) && MessageDigest.isEqual(expectedCopy, opened.plaintext)) }
             finally { opened.plaintext.fill(0) }
-            val code = acquired.delete(leaf(name), snapshot, JournalLimits.OBJECT_BYTES).code
+            val code = acquired.delete(leaf(name), snapshot, encoded.size).code
             if (code != DurableCode.OK) { poisoned = true; throw IOException("MUTATION_UNPROVEN") }
         } finally { encoded.fill(0); expectedCopy.fill(0) }
     }
@@ -341,6 +406,9 @@ internal class EncryptedJournalStorage private constructor(
     }
     private fun leaf(name: String): String = "$name.blob"
     private fun category(name: String): SecureDataClass = when {
+        ProtectedUiDraftStore.isName(name) -> SecureDataClass.OPERATION_STATE
+        ProtectedProbeHistoryStore.isName(name) -> SecureDataClass.PROBE_HISTORY
+        ProtectedProbeHistoryStore.isUpdateName(name) -> SecureDataClass.UPDATE_STATE
         name == "journal-control" || name == "journal-store" -> SecureDataClass.PROTECTED_JOURNAL_CONTROL
         name == "journal-reset" || name == "journal-reset-ready" -> SecureDataClass.PROTECTED_RESET_MANIFEST
         name.startsWith("journal-checkpoint-") || name.startsWith("journal-projection-") -> SecureDataClass.PROTECTED_CHECKPOINT
@@ -441,9 +509,22 @@ internal class ClosedProjectionFiles(private val directory: DurableDirectory,
         return checkNotNull(result.snapshot).bytes
     }
 
+    fun roomVersion(expected: List<ProjectionFileObservation>, writer: DurableWriter): Int {
+        val result = read(ProjectionFileRole.ROOM_MAIN, writer)
+        requireSameProjectionFiles(listOf(expected.single { it.role == ProjectionFileRole.ROOM_MAIN }),
+            listOf(ProjectionFileObservation.fromRead(ProjectionFileRole.ROOM_MAIN, result)))
+        val bytes = checkNotNull(result.snapshot).bytes
+        return try { ProductProjectionSchemaMigration.headerVersion(bytes) } finally { bytes.fill(0) }
+    }
+
     private fun read(role: ProjectionFileRole, writer: DurableWriter?): DurableReadResult =
         if (writer == null) primitives.read(directory, layout.leaf(role), limit(role)) else writer.read(layout.leaf(role), limit(role))
-    private fun limit(role: ProjectionFileRole) = if (role == ProjectionFileRole.DATASTORE) 65536 else JournalLimits.OBJECT_BYTES
+    private fun limit(role: ProjectionFileRole) = when (role) {
+        ProjectionFileRole.ROOM_MAIN -> JournalLimits.OBJECT_BYTES
+        ProjectionFileRole.DATASTORE -> 65536
+        // Closed SQLite sidecars must be absent or empty; one byte detects any violation.
+        else -> 1
+    }
 }
 
 private fun requireSameProjectionFiles(expected: List<ProjectionFileObservation>, observed: List<ProjectionFileObservation>) {
@@ -459,8 +540,11 @@ private fun requireSameProjectionFiles(expected: List<ProjectionFileObservation>
 internal class ReadOnlyCheckpointProjectionAccess(private val files: ClosedProjectionFiles,
     private val checkpoint: () -> ProtectedStateSnapshot,
     private val physicalWitness: (ProtectedStateSnapshot) -> PhysicalProjectionWitness) : ProtectedProjectionReadAccess {
-    override fun read(): ProjectionImages {
-        val snapshot = checkpoint()
+    fun withReaders(checkpoint: () -> ProtectedStateSnapshot,
+        physicalWitness: (ProtectedStateSnapshot) -> PhysicalProjectionWitness) =
+        ReadOnlyCheckpointProjectionAccess(files, checkpoint, physicalWitness)
+    override fun read(): ProjectionImages = readForCheckpoint(checkpoint())
+    override fun readForCheckpoint(snapshot: ProtectedStateSnapshot): ProjectionImages {
         val observed = files.observe()
         physicalWitness(snapshot).requireMatches(snapshot, observed)
         val catalog = snapshot.catalogBytes(); val settings = snapshot.settingsBytes()
@@ -504,14 +588,28 @@ internal class ProjectionOwnership : AutoCloseable {
 internal interface ProjectionStoreSession {
     fun readCatalog(): CatalogProjection
     fun publishCatalog(expected: CatalogProjection, next: ProtectedProjectionEntity,
-        rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>)
+        rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+        operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?)
     fun readSettings(): SettingsProjection
     fun publishSettings(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity)
+    fun recoverCatalog(expected: CatalogProjection, next: ProtectedProjectionEntity,
+        rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+        operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?) =
+        publishCatalog(expected, next, rows, bindings, operation)
+    fun recoverSettings(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity) =
+        publishSettings(expected, replacement, next)
 }
 internal interface ProjectionStoreOwnerFactory {
     fun requireRootIdentity()
     fun open(ownership: ProjectionOwnership, withSettings: Boolean): ProjectionStoreSession
+    fun inspectClosed(writer: DurableWriter, files: ClosedProjectionFiles): ClosedSchemaProjection =
+        error("CLOSED_SCHEMA_INSPECTION_UNSUPPORTED")
+    fun openMigrating(ownership: ProjectionOwnership, withSettings: Boolean,
+        permit: ProductProjectionSchemaMigration.Permit): ProjectionStoreSession = error("SCHEMA_MIGRATION_UNSUPPORTED")
 }
+
+internal data class ClosedSchemaProjection(val version: Int, val catalog: CatalogProjection,
+    val settings: SettingsProjection, val physical: List<ProjectionFileObservation>)
 
 /**
  * Interactive DIRTY-operation adapter only. No writer-supplied normalized success is accepted.
@@ -527,10 +625,36 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
     private val unprovenOwners = ArrayList<ProjectionOwnership>()
     private class PendingProjection(val writer: DurableWriter, val snapshot: ProtectedStateSnapshot, val images: ProjectionImages)
 
+    override fun requireClosedSchema(expected: ProtectedStateSnapshot, version: Int) {
+        synchronized(monitor) {
+            check(!poisoned)
+            check(leases.withCurrentWriter { writer ->
+                val control = readControl()
+                check(!control.dirty && control.revision == expected.revision && control.storeId().contentEquals(expected.storeId()))
+                val authenticated = committed.read().also { it.requireMatches(expected) }
+                val inspected = owners.inspectClosed(writer, files)
+                check(inspected.version == version)
+                requireSameProjectionFiles(authenticated.physical(), inspected.physical)
+                requireMatchingIdentities(inspected.catalog, inspected.settings)
+                val bytes = expected.catalogBytes(); val settings = expected.settingsBytes()
+                val actual = catalogInExpectedFormat(inspected.catalog, bytes); val actualSettings = inspected.settings.image()
+                try { check(MessageDigest.isEqual(bytes, actual) && MessageDigest.isEqual(settings, actualSettings)) }
+                finally { bytes.fill(0); settings.fill(0); actual.fill(0); actualSettings.fill(0) }
+                check(inspected.catalog.bindings == bindings(expected).sortedBy { it.profileRecordId })
+            } != null) { "BROKER_WRITER_REQUIRED" }
+        }
+    }
+
     override fun read(): ProjectionImages = synchronized(monitor) {
         check(!poisoned) { "PROJECTION_CLEANUP_UNPROVEN" }
         val current = pending
         if (current != null) {
+            if (!readControl().dirty) {
+                // A completed security write may be followed immediately by a new presentation
+                // writer. Its old DIRTY cache is not committed evidence for either lease.
+                pending = null
+                return@synchronized committed.read()
+            }
             val value = leases.withCurrentWriter { writer ->
                 check(writer === current.writer) { "STALE_PROJECTION_LEASE" }
                 requireDirty(current.snapshot)
@@ -547,32 +671,58 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
 
     override fun publish(expected: ProjectionImages, replacement: ProtectedStateSnapshot) = write(expected.copyOwned(), replacement)
     override fun initialize(replacement: ProtectedStateSnapshot) = write(null, replacement)
+    override fun recover(prior: ProtectedStateSnapshot, candidate: ProtectedStateSnapshot, replacement: ProtectedStateSnapshot) =
+        write(null, replacement, prior to candidate)
+    override fun migrateSchema(prior: ProtectedStateSnapshot, candidate: ProtectedStateSnapshot,
+        replacement: ProtectedStateSnapshot, verifyEvidence: () -> Unit) = write(null, replacement, prior to candidate, verifyEvidence)
 
-    private fun write(expected: ProjectionImages?, replacement: ProtectedStateSnapshot) = synchronized(monitor) {
+    private fun write(expected: ProjectionImages?, replacement: ProtectedStateSnapshot,
+        recovery: Pair<ProtectedStateSnapshot, ProtectedStateSnapshot>? = null,
+        schemaEvidence: (() -> Unit)? = null) = synchronized(monitor) {
         check(!poisoned) { "PROJECTION_CLEANUP_UNPROVEN" }
         pending = null
         val result = leases.withCurrentWriter { writer ->
             requireDirty(replacement)
             owners.requireRootIdentity()
-            val initial = files.observe(writer, allowAbsent = expected == null)
-            if (expected == null) check(initial.none { it.present }) { "EXISTING_PROJECTION_CANNOT_BE_INITIALIZED" }
-            else requireSameProjectionFiles(expected.physical(), initial)
+            val initial = files.observe(writer, allowAbsent = expected == null && recovery == null)
+            if (expected == null && recovery == null) check(initial.none { it.present }) { "EXISTING_PROJECTION_CANNOT_BE_INITIALIZED" }
+            else if (expected != null) requireSameProjectionFiles(expected.physical(), initial)
+            val permit = if (schemaEvidence == null) null else {
+                schemaEvidence()
+                check(readControl().kind == MutationKind.PROJECTION_SCHEMA)
+                val inspected = owners.inspectClosed(writer, files)
+                check(inspected.version == 2 || inspected.version == 3)
+                requireSameProjectionFiles(initial, inspected.physical)
+                val endpoints = checkNotNull(recovery)
+                requireRecoveryComponents(inspected.catalog, inspected.settings, endpoints.first, endpoints.second, replacement)
+                ProductProjectionSchemaMigration.Permit.acquire(writer, leases, readControl, replacement, schemaEvidence)
+            }
             val catalogBytes = replacement.catalogBytes(); val settingsBytes = replacement.settingsBytes()
             try {
-                val rows = ProfileCatalogProjectionCodec.decode(catalogBytes)
+                val content = org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.decode(catalogBytes)
+                val rows = content.rows
                 val relationships = bindings(replacement).toTypedArray().toList()
                 val store = replacement.storeId().hexString(); val operation = replacement.operationId().hexString()
                 val nextRoom = ProtectedProjectionEntity(storeEpoch = store, operationId = operation, revision = replacement.revision,
                     imageDigest = ProfileCatalogProjectionCodec.imageDigest(rows, relationships))
                 val nextSettings = SettingsProjectionIdentity.capture(store, operation, replacement.revision, settingsBytes)
-                withOwners(withSettings = true) { opened ->
+                if (permit != null) {
+                    owners.requireRootIdentity()
+                    requireSameProjectionFiles(initial, files.observe(writer))
+                    permit.requireCurrentWriterAndDirtySchemaOperation()
+                }
+                withOwners(withSettings = true, permit = permit) { opened ->
                     val previousRoom = opened.readCatalog()
                     val previousSettings = opened.readSettings()
-                    if (expected == null) {
-                        check(previousRoom.rows.isEmpty() && previousRoom.bindings.isEmpty() && previousRoom.witness == null &&
+                    if (recovery != null) {
+                        requireRecoveryComponents(previousRoom, previousSettings, recovery.first, recovery.second, replacement)
+                    } else if (expected == null) {
+                        check(previousRoom.rows.isEmpty() && previousRoom.bindings.isEmpty() && previousRoom.operation == null && previousRoom.witness == null &&
                             previousSettings.witness == null) { "PROJECTION_INITIALIZATION_NOT_EMPTY" }
                     } else {
-                        val observedRows = ProfileCatalogProjectionCodec.encode(previousRoom.rows)
+                        val expectedCatalog = expected.catalog()
+                        val observedRows = catalogInExpectedFormat(previousRoom, expectedCatalog)
+                        expectedCatalog.fill(0)
                         val previousImage = previousSettings.image()
                         try {
                             check(MessageDigest.isEqual(observedRows, expected.catalog()) &&
@@ -581,8 +731,13 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
                         } finally { observedRows.fill(0); previousImage.fill(0) }
                     }
                     requireDirty(replacement)
-                    opened.publishCatalog(previousRoom, nextRoom, rows, relationships)
-                    opened.publishSettings(previousSettings, settingsBytes, nextSettings)
+                    if (recovery == null) {
+                        opened.publishCatalog(previousRoom, nextRoom, rows, relationships, content.operation)
+                        opened.publishSettings(previousSettings, settingsBytes, nextSettings)
+                    } else {
+                        opened.recoverCatalog(previousRoom, nextRoom, rows, relationships, content.operation)
+                        opened.recoverSettings(previousSettings, settingsBytes, nextSettings)
+                    }
                 }
                 // Both writable owners are closed here. Every present file is synchronized and reread.
                 owners.requireRootIdentity()
@@ -598,7 +753,7 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
                 check(observedRoom.witness == nextRoom && observedSettings.witness == nextSettings) { "PROJECTION_COMMIT_MISMATCH" }
                 val freshRelationships = bindings(replacement).toTypedArray().toList()
                 check(observedRoom.bindings == freshRelationships.sortedBy { it.profileRecordId }) { "RECIPIENT_PROJECTION_MISMATCH" }
-                val actualRows = ProfileCatalogProjectionCodec.encode(observedRoom.rows)
+                val actualRows = catalogInExpectedFormat(observedRoom, catalogBytes)
                 val actualSettings = observedSettings.image()
                 try {
                     val actual = ProjectionImages(actualRows, actualSettings, ProjectionImageWitness.reconstruct(replacement.storeId(),
@@ -621,10 +776,46 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
         finally { op.fill(0); requested.fill(0); store.fill(0); expectedStore.fill(0) }
     }
 
-    private fun <T> withOwners(withSettings: Boolean, action: (ProjectionStoreSession) -> T): T {
+    /** Each independently atomic file may be at either authenticated endpoint, never a third value. */
+    private fun requireRecoveryComponents(room: CatalogProjection, settings: SettingsProjection,
+        prior: ProtectedStateSnapshot, candidate: ProtectedStateSnapshot, replacement: ProtectedStateSnapshot) {
+        requireDirty(candidate)
+        check(prior.storeId().contentEquals(candidate.storeId()))
+        var roomMatches = false; var settingsMatch = false
+        val actualSettings = settings.image()
+        try {
+            for (snapshot in listOf(prior, candidate, replacement)) {
+                val rows = snapshot.catalogBytes(); val image = snapshot.settingsBytes()
+                try {
+                    val relationships = bindings(snapshot).sortedBy { it.profileRecordId }
+                    val expectedRoom = ProtectedProjectionEntity(storeEpoch = snapshot.storeId().hexString(),
+                        operationId = snapshot.operationId().hexString(), revision = snapshot.revision,
+                        imageDigest = ProfileCatalogProjectionCodec.imageDigest(ProfileCatalogProjectionCodec.decode(rows), relationships))
+                    val expectedSettings = SettingsProjectionIdentity.capture(snapshot.storeId().hexString(),
+                        snapshot.operationId().hexString(), snapshot.revision, image)
+                    val actualRows = catalogInExpectedFormat(room, rows)
+                    try { roomMatches = roomMatches || (MessageDigest.isEqual(actualRows, rows) && room.witness == expectedRoom && room.bindings == relationships) }
+                    finally { actualRows.fill(0) }
+                    settingsMatch = settingsMatch || (MessageDigest.isEqual(actualSettings, image) && settings.witness == expectedSettings)
+                } finally { rows.fill(0); image.fill(0) }
+            }
+            if (!roomMatches || !settingsMatch) throw ProjectionSchemaRejected("UNBOUND_RECOVERY_PROJECTION")
+        } finally { actualSettings.fill(0) }
+    }
+
+    private fun catalogInExpectedFormat(room: CatalogProjection, expected: ByteArray): ByteArray {
+        // The expected descriptor is authenticated. Room supplies only the independently observed one.
+        if (!org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.isProduct(expected) && room.operation == null) {
+            return ProfileCatalogProjectionCodec.encode(room.rows)
+        }
+        return org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.encode(room.rows, room.operation)
+    }
+
+    private fun <T> withOwners(withSettings: Boolean, permit: ProductProjectionSchemaMigration.Permit? = null,
+        action: (ProjectionStoreSession) -> T): T {
         val ownership = ProjectionOwnership()
         var failure: Throwable? = null
-        try { return action(owners.open(ownership, withSettings)) }
+        try { return action(if (permit == null) owners.open(ownership, withSettings) else owners.openMigrating(ownership, withSettings, permit)) }
         catch (error: Throwable) { failure = error; throw error }
         finally {
             try { ownership.close() }
@@ -645,6 +836,21 @@ internal class ClosedStoreProjectionAccess(private val owners: ProjectionStoreOw
 }
 
 private fun ByteArray.hexString(): String = try { joinToString("") { "%02x".format(it) } } finally { fill(0) }
+
+/** The only permitted schema step, checked again immediately before Room delegates migration. */
+internal class PermittedProjectionCallback(private val delegate: androidx.sqlite.db.SupportSQLiteOpenHelper.Callback,
+    private val permit: ProductProjectionSchemaMigration.Permit) : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(delegate.version) {
+    override fun onConfigure(db: androidx.sqlite.db.SupportSQLiteDatabase) = delegate.onConfigure(db)
+    override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase): Unit = error("SCHEMA_MIGRATION_CANNOT_INITIALIZE")
+    override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) = delegate.onOpen(db)
+    override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        check(oldVersion == 2 && newVersion == 3) { "PROJECTION_SCHEMA_STEP_REJECTED" }
+        permit.requireCurrentWriterAndDirtySchemaOperation()
+        delegate.onUpgrade(db, oldVersion, newVersion)
+    }
+    override fun onDowngrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = error("PROJECTION_DOWNGRADE_NOT_SUPPORTED")
+    override fun onCorruption(db: androidx.sqlite.db.SupportSQLiteDatabase): Unit = error("PROJECTION_CORRUPTION_PRESERVED")
+}
 
 /** Default SQLite corruption recovery deletes files. Projection evidence must instead be preserved. */
 internal class NonDestructiveProjectionCallback(private val delegate: androidx.sqlite.db.SupportSQLiteOpenHelper.Callback) :
@@ -736,9 +942,9 @@ private class FdSnapshotLegacyMigrationAccess(
             val rows = database?.let { snapshot -> readCopiedRows(snapshot) } ?: emptyList()
             val preferences = settingsBytes?.let { snapshot ->
                 val stored = snapshot.bytes
-                try { runBlocking { SettingsProjectionCodec.fromStoredBytes(stored).image() } }
+                try { runBlocking { SettingsProjectionCodec.captureLegacyStoredBytes(stored).image() } }
                 finally { stored.fill(0) }
-            } ?: SettingsProjectionCodec.fromModel(Phase9Settings())
+            } ?: SettingsProjectionCodec.fromModel(ProductSettings())
             val objects = LinkedHashMap<LegacyObjectName, ByteArray>()
             for ((name, snapshot) in blobBytes) objects[name] = snapshot.bytes
             val witness = witness(database, settingsBytes, blobBytes, metadataEntries)
@@ -902,23 +1108,60 @@ internal class AndroidProjectionStoreOwnerFactory(private val context: android.c
     private fun verifiedCanonicalRoot(): java.io.File =
         canonicalProjectionRootForBoundIdentity(root, directory, ::observe)
     override fun requireRootIdentity() { verifiedCanonicalRoot() }
-    override fun open(ownership: ProjectionOwnership, withSettings: Boolean): ProjectionStoreSession {
+    override fun inspectClosed(writer: DurableWriter, files: ClosedProjectionFiles): ClosedSchemaProjection {
+        val verifiedRoot = verifiedCanonicalRoot()
+        val before = files.observe(writer)
+        val version = files.roomVersion(before, writer)
+        val path = java.io.File(verifiedRoot, layout.room).absolutePath
+        val db = android.database.sqlite.SQLiteDatabase.openDatabase(path, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY or android.database.sqlite.SQLiteDatabase.NO_LOCALIZED_COLLATORS,
+            android.database.DatabaseErrorHandler { error("PROJECTION_CORRUPTION_PRESERVED") })
+        val catalog = try {
+            check(db.isReadOnly)
+            ProductProjectionSchemaMigration.inspect(version) { sql, columns, bound ->
+                db.rawQuery(sql, null).use { cursor ->
+                    ProductProjectionSchemaMigration.readRows(cursor, columns, bound)
+                }
+            }
+        } finally { db.close() }
+        verifiedCanonicalRoot()
+        val after = files.observe(writer)
+        requireSameProjectionFiles(before, after)
+        val settings = files.settingsBytes(after, writer)
+        return try { ClosedSchemaProjection(version, catalog, runBlocking { SettingsProjectionCodec.fromStoredBytes(settings) }, after) }
+        finally { settings.fill(0) }
+    }
+    override fun open(ownership: ProjectionOwnership, withSettings: Boolean): ProjectionStoreSession = openInternal(ownership, withSettings, null)
+    override fun openMigrating(ownership: ProjectionOwnership, withSettings: Boolean,
+        permit: ProductProjectionSchemaMigration.Permit): ProjectionStoreSession {
+        permit.claimOpen()
+        return openInternal(ownership, withSettings, permit)
+    }
+    private fun openInternal(ownership: ProjectionOwnership, withSettings: Boolean,
+        permit: ProductProjectionSchemaMigration.Permit?): ProjectionStoreSession {
         // Room and DataStore accept path names rather than directory descriptors. Bind both the
         // Android alias and its canonical spelling to the already verified directory capability
         // before either path-based owner receives the canonical spelling.
         val verifiedRoot = verifiedCanonicalRoot()
         val room = ownership.own(AndroidRoomOwner(context, java.io.File(verifiedRoot, layout.room)))
-        room.open()
+        room.open(permit)
         val settings = if (withSettings) ownership.own(AndroidSettingsOwner(java.io.File(verifiedRoot, layout.settings))).also { it.open() } else null
         verifiedCanonicalRoot()
         return object : ProjectionStoreSession {
             override fun readCatalog(): CatalogProjection = room.read()
             override fun publishCatalog(expected: CatalogProjection, next: ProtectedProjectionEntity,
-                rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>) =
-                room.publish(expected, next, rows, bindings)
+                rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+                operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?) =
+                room.publish(expected, next, rows, bindings, operation)
             override fun readSettings(): SettingsProjection = checkNotNull(settings).read()
             override fun publishSettings(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity) =
                 checkNotNull(settings).publish(expected, replacement, next)
+            override fun recoverCatalog(expected: CatalogProjection, next: ProtectedProjectionEntity,
+                rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+                operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?) =
+                room.recover(expected, next, rows, bindings, operation)
+            override fun recoverSettings(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity) =
+                checkNotNull(settings).recover(expected, replacement, next)
         }
     }
 
@@ -926,17 +1169,19 @@ internal class AndroidProjectionStoreOwnerFactory(private val context: android.c
         private var database: KurdistanMetadataDatabase? = null
         private var executor: java.util.concurrent.ExecutorService? = null
         private var closed = false
-        fun open() {
+        fun open(permit: ProductProjectionSchemaMigration.Permit? = null) {
             check(!closed && database == null && executor == null)
             executor = java.util.concurrent.Executors.newSingleThreadExecutor()
             val worker = checkNotNull(executor)
             database = androidx.room.Room.databaseBuilder(context, KurdistanMetadataDatabase::class.java, file.absolutePath)
+                .addMigrations(KurdistanMetadataDatabase.MIGRATION_1_2, KurdistanMetadataDatabase.MIGRATION_2_3)
                 .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
                 .openHelperFactory { configuration ->
                     check(configuration.name == file.absolutePath) { "PROJECTION_PATH_SUBSTITUTION" }
                     androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory().create(
                         androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(configuration.context)
-                            .name(file.absolutePath).callback(NonDestructiveProjectionCallback(configuration.callback))
+                            .name(file.absolutePath).callback(if (permit == null) NonDestructiveProjectionCallback(configuration.callback)
+                                else PermittedProjectionCallback(configuration.callback, permit))
                             .noBackupDirectory(false).allowDataLossOnRecovery(false).build())
                 }
                 .setQueryExecutor(worker).setTransactionExecutor(worker).build()
@@ -951,8 +1196,14 @@ internal class AndroidProjectionStoreOwnerFactory(private val context: android.c
         }
         fun read(): CatalogProjection { check(!closed); return runBlocking { checkNotNull(database).protectedProjection().read() } }
         fun publish(expected: CatalogProjection, next: ProtectedProjectionEntity,
-            rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>) {
-            check(!closed); runBlocking { checkNotNull(database).protectedProjection().publish(expected, next, rows, bindings) }
+            rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+            operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?) {
+            check(!closed); runBlocking { checkNotNull(database).protectedProjection().publish(expected, next, rows, bindings, operation) }
+        }
+        fun recover(expected: CatalogProjection, next: ProtectedProjectionEntity,
+            rows: List<org.kurdistanvpn.data.metadata.ProfileCatalogEntity>, bindings: List<RecipientBindingEntity>,
+            operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?) {
+            check(!closed); runBlocking { checkNotNull(database).protectedProjection().recover(expected, next, rows, bindings, operation) }
         }
         override fun close() {
             closed = true
@@ -966,12 +1217,15 @@ internal class AndroidProjectionStoreOwnerFactory(private val context: android.c
         }
     }
     private class AndroidSettingsOwner(private val file: java.io.File) : AutoCloseable {
-        private var store: Phase9SettingsStore? = null
+        private var store: ProductSettingsStore? = null
         private var closed = false
-        fun open() { check(!closed && store == null); store = Phase9SettingsStore.openOwnedProjection(file) }
+        fun open() { check(!closed && store == null); store = ProductSettingsStore.openOwnedProjection(file) }
         fun read(): SettingsProjection { check(!closed); return runBlocking { checkNotNull(store).readProjection() } }
         fun publish(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity) {
             check(!closed); runBlocking { checkNotNull(store).publishProjection(expected, replacement, next) }
+        }
+        fun recover(expected: SettingsProjection, replacement: ByteArray, next: SettingsProjectionIdentity) {
+            check(!closed); runBlocking { checkNotNull(store).recoverProjection(expected, replacement, next) }
         }
         override fun close() {
             closed = true
@@ -1044,33 +1298,40 @@ class ProtectedStateProcessOwner(private val acquireMutationQuiescence: (() -> A
         private enum class State { OPEN, CLOSING, CLEAN, UNPROVEN }
         private var state = State.OPEN
         private var invalidated: (() -> Unit)? = null
+        private var finalizeRegistration: (() -> Unit)? = null
+        private var retired: ((Boolean) -> Unit)? = null
+        private var completing = false
 
-        fun installInvalidation(callback: () -> Unit): java.io.Closeable {
+        fun installInvalidation(callback: () -> Unit, finalize: () -> Unit,
+            onRetired: (Boolean) -> Unit): java.io.Closeable {
             val callNow = synchronized(monitor) {
-                if (state == State.CLEAN) true
+                val late = if (state == State.CLEAN && !completing) {
+                    state = State.OPEN
+                    true
+                }
                 else if (state != State.OPEN) throw IllegalStateException("ACTIVE_REGISTRATION_CLEANUP_UNPROVEN")
-                else {
-                    check(invalidated == null) { "ACTIVE_REGISTRATION_ALREADY_INSTALLED" }
-                    invalidated = callback
-                    false
-                }
+                else false
+                check(invalidated == null) { "ACTIVE_REGISTRATION_ALREADY_INSTALLED" }
+                invalidated = callback; finalizeRegistration = finalize; retired = onRetired
+                late
             }
-            if (callNow) callback()
+            if (callNow) close()
             return java.io.Closeable {
-                val removed = synchronized(monitor) {
-                    if (invalidated === callback) {
-                        invalidated = null
-                        true
-                    } else false
+                // Detach only. The containing registration retires the policy session, whose
+                // owner close runs the same completion path without calling this callback.
+                synchronized(monitor) {
+                    if (invalidated === callback) invalidated = null
                 }
-                if (removed) close()
             }
         }
 
         override fun close() {
             val callback = synchronized(monitor) {
                 when (state) {
-                    State.CLEAN -> return
+                    State.CLEAN -> {
+                        check(!completing) { "ACTIVE_REGISTRATION_CLEANUP_UNPROVEN" }
+                        return
+                    }
                     State.OPEN -> {
                         state = State.CLOSING
                         invalidated.also { invalidated = null }
@@ -1080,14 +1341,32 @@ class ProtectedStateProcessOwner(private val acquireMutationQuiescence: (() -> A
             }
             try {
                 callback?.invoke()
-                synchronized(monitor) { state = State.CLEAN }
+                val completion = synchronized(monitor) {
+                    state = State.CLEAN
+                    completing = true
+                    finalizeRegistration.also { finalizeRegistration = null }
+                }
+                completion?.invoke()
+                val acknowledgement = synchronized(monitor) {
+                    completing = false
+                    retired.also { retired = null }
+                }
+                acknowledgement?.invoke(true)
             } catch (failure: Throwable) {
-                synchronized(monitor) { state = State.UNPROVEN }
+                val acknowledgement = synchronized(monitor) {
+                    state = State.UNPROVEN; completing = false; finalizeRegistration = null
+                    retired.also { retired = null }
+                }
+                try { acknowledgement?.invoke(false) } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                 throw IllegalStateException("ACTIVE_REGISTRATION_CLEANUP_UNPROVEN", failure)
             }
         }
 
-        fun cleanupProven(): Boolean = synchronized(monitor) { state == State.CLEAN }
+        fun callbackProven(): Boolean = synchronized(monitor) { state == State.CLEAN }
+        fun registeredOpen(): Boolean = synchronized(monitor) {
+            state == State.OPEN && !completing && invalidated != null
+        }
+        fun cleanupProven(): Boolean = synchronized(monitor) { state == State.CLEAN && !completing }
     }
 }
 
@@ -1103,6 +1382,7 @@ class ProtectedRuntimeRevisionRegistration internal constructor(
     private enum class State { OPEN, CLOSING, CLEAN, UNPROVEN }
     private var state = State.OPEN
     private var finalIssued = false
+    private var releaseClaimed = false
 
     fun acquireFinalLease(deadlineElapsedMillis: Long): ProtectedRuntimeRevisionLease? {
         val lease = synchronized(monitor) {
@@ -1114,23 +1394,76 @@ class ProtectedRuntimeRevisionRegistration internal constructor(
 
     internal fun isClosed(): Boolean = synchronized(monitor) { state != State.OPEN }
 
+    /** No owner monitor spans the fresh facade observation. Neither check issues a lease. */
+    fun isRegisteredCurrent(observe: () -> Boolean): Boolean {
+        fun admitted(): Boolean = synchronized(monitor) {
+            state == State.OPEN && finalIssued && invalidation.registeredOpen() &&
+                policy.isRegisteredCurrent(session, revision)
+        }
+        if (!admitted()) return false
+        // Preserve the observation owner's cleanup failure for its boundary to latch.
+        val fresh = observe()
+        return fresh && admitted()
+    }
+
+    internal fun installActive(onInvalidated: () -> Unit, onRetired: (Boolean) -> Unit): java.io.Closeable =
+        invalidation.installInvalidation(onInvalidated, ::finalizeRetirement, onRetired)
+
+    /** Only the successfully returned invalidation owner may enter this metadata phase. */
+    private fun finalizeRetirement() {
+        synchronized(monitor) {
+            check(state != State.UNPROVEN && invalidation.callbackProven()) { "RUNTIME_REGISTRATION_CLEANUP_UNPROVEN" }
+            if (state == State.CLEAN) return
+            state = State.CLOSING
+        }
+        try {
+            // On policy-owned cleanup this does not remove the closing entry. Only the
+            // original cleanOwned finally block can do so after this finalizer returns.
+            session.close()
+            releaseProcessReference()
+            synchronized(monitor) {
+                check(state != State.UNPROVEN) { "RUNTIME_REGISTRATION_CLEANUP_UNPROVEN" }
+                state = State.CLEAN
+            }
+        } catch (failure: Throwable) {
+            synchronized(monitor) { state = State.UNPROVEN }
+            throw failure
+        }
+    }
+
+    private fun releaseProcessReference() {
+        synchronized(monitor) {
+            if (releaseClaimed) return
+            releaseClaimed = true
+        }
+        process.release(this)
+    }
+
     override fun close() {
         val shouldClose = synchronized(monitor) {
             when (state) {
                 State.OPEN -> { state = State.CLOSING; true }
-                State.CLEAN -> false
+                State.CLEAN -> {
+                    check(invalidation.cleanupProven()) { "RUNTIME_REGISTRATION_CLEANUP_UNPROVEN" }
+                    false
+                }
                 State.CLOSING, State.UNPROVEN -> throw IllegalStateException("RUNTIME_REGISTRATION_CLEANUP_UNPROVEN")
             }
         }
         if (shouldClose) {
             try {
                 session.close()
-                check(invalidation.cleanupProven()) { "RUNTIME_REGISTRATION_CLEANUP_UNPROVEN" }
-                synchronized(monitor) { state = State.CLEAN }
+                synchronized(monitor) {
+                    if (state == State.UNPROVEN || !invalidation.cleanupProven()) {
+                        state = State.UNPROVEN
+                        error("RUNTIME_REGISTRATION_CLEANUP_UNPROVEN")
+                    }
+                    state = State.CLEAN
+                }
             } catch (failure: Throwable) {
                 synchronized(monitor) { state = State.UNPROVEN }
                 throw failure
-            } finally { process.release(this) }
+            } finally { releaseProcessReference() }
         }
     }
 }
@@ -1151,14 +1484,18 @@ class ProtectedRuntimeRevisionLease internal constructor(
     }
 
     /** The returned closeable owns the active registration, not the final lease. */
-    fun registerActive(onInvalidated: () -> Unit): java.io.Closeable {
+    fun registerActive(onInvalidated: () -> Unit): java.io.Closeable = registerActive(onInvalidated) { }
+
+    /** onRetired publishes bounded provider-local state only; it must not throw, close
+     * resources, invoke IPC/native code, or call other callbacks. */
+    fun registerActive(onInvalidated: () -> Unit, onRetired: (Boolean) -> Unit): java.io.Closeable {
         synchronized(monitor) {
             check(!closed && !registration.isClosed() && !activeRegistered && lease.validate(revision)) {
                 "FINAL_LEASE_NOT_CURRENT"
             }
             activeRegistered = true
         }
-        val installed = try { invalidation.installInvalidation(onInvalidated) }
+        val installed = try { registration.installActive(onInvalidated, onRetired) }
         catch (failure: Throwable) {
             try { registration.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
             throw failure
@@ -1177,6 +1514,68 @@ class ProtectedRuntimeRevisionLease internal constructor(
     }
 }
 
+/** Closed application result vocabulary, including failures raised when a broker lease closes. */
+internal fun <T> protectedCommandResult(action: () -> BrokerMutation<T>?): ProtectedStateApplicationFacade.CommandResult<T> = try {
+    val value = action()
+    when (value?.status) {
+        ProtectedMutationStatus.COMMITTED -> ProtectedStateApplicationFacade.CommandResult.Committed(checkNotNull(value.value))
+        ProtectedMutationStatus.NO_MUTATION -> ProtectedStateApplicationFacade.CommandResult.Rejected(value.error ?: OperationError.RECOVERY_REQUIRED)
+        ProtectedMutationStatus.DIRTY, ProtectedMutationStatus.MUTATION_UNPROVEN,
+        ProtectedMutationStatus.QUARANTINED -> ProtectedStateApplicationFacade.CommandResult.Unproven
+        ProtectedMutationStatus.CAPACITY_EXHAUSTED -> ProtectedStateApplicationFacade.CommandResult.Rejected(OperationError.RESOURCE_LIMIT)
+        null -> ProtectedStateApplicationFacade.CommandResult.Busy
+    }
+} catch (cancelled: java.util.concurrent.CancellationException) { throw cancelled }
+catch (_: Throwable) { ProtectedStateApplicationFacade.CommandResult.Unproven }
+
+/** Single-attempt authenticated aggregate read. Every collaborator is read-only. */
+internal fun readProductStorageProjection(snapshots: ProtectedStateSnapshotReader,
+    projections: ProtectedProjectionReadAccess, readEncrypted: (String) -> ByteArray?,
+    codec: SecureEnvelopeCodec, key: KeyEncryptionKey, profileId: String?, isClosed: () -> Boolean,
+): ProtectedStateApplicationFacade.ProductStorageReadProjection? = try {
+    check(!isClosed())
+    profileId?.let { CatalogId(it) }
+    val snapshot = snapshots.readVerified()
+    check(snapshot.disposition == ProtectedStateDisposition.VERIFIED)
+    val before = snapshot.encode()
+    try {
+        val observed = projections.read()
+        observed.requireMatches(snapshot)
+        snapshots.requirePhysicalProjection(snapshot, observed.physical())
+        val catalog = snapshot.catalogBytes()
+        val content = try { org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.decode(catalog) }
+            finally { catalog.fill(0) }
+        val ids = content.rows.map { it.localRecordId }.toSet()
+        check(profileId == null || profileId in ids)
+        val blobs = ReadOnlyProtectedBlobView(snapshot.objects(), readEncrypted, codec, key)
+        validateProductRecordScopes(snapshot.objects(), ids, blobs)
+        validateProductProfileRelationships(snapshot.objects(), ids, blobs)
+        readProductSettings(snapshot, blobs) // Includes legacy-aware revision and policy mirror validation.
+        val trust = TrustedNetworkStore.readOnly(blobs).load()?.use {
+            ProtectedStateApplicationFacade.TrustedNetworkStorageSummary(it.settingsRevision, it.rules.size, it.selectedRuleIds)
+        }
+        val result = ProtectedStateApplicationFacade.ProductStorageReadProjection(snapshot.revision, profileId,
+            profileId?.let { ProfileProjectionStore.readOnly(blobs).load(it) },
+            DeploymentDisplayMetadataStore.readOnly(blobs).load(),
+            profileId?.let { UpdateStateStore.readOnly(blobs).load(it) },
+            profileId?.let { ProbeHistoryStore.readOnly(blobs).load(it) }, trust,
+            UsageAggregatesStore.readOnly(blobs).load(), AppLockStateStore.readOnly(blobs).load(),
+            LocalProxyPolicyStore.readOnly(blobs).load(), CrashSafeModeStore.readOnly(blobs).load(), content.operation,
+            PauseStateStore.readOnly(blobs).load(),
+            profileId?.let { snapshot.objectFor(it, SecureDataClass.ACTIVATION_ACTIVE.wireValue)?.binding?.revision })
+        val current = snapshots.readCheckpointSnapshot()
+        val after = current.encode()
+        try { check(MessageDigest.isEqual(before, after)) { "TRUSTED_STATE_CHANGED" } }
+        finally { after.fill(0) }
+        val fresh = projections.read()
+        fresh.requireMatches(current)
+        snapshots.requirePhysicalProjection(current, fresh.physical())
+        requireSameProjectionFiles(observed.physical(), fresh.physical())
+        check(!isClosed())
+        result
+    } finally { before.fill(0) }
+} catch (_: Throwable) { null }
+
 /** Public default-process boundary. It owns every directory capability and exposes no store. */
 class ProtectedStateApplicationFacade private constructor(
     private val owners: List<DurableOwnedDirectory>,
@@ -1192,8 +1591,25 @@ class ProtectedStateApplicationFacade private constructor(
     private val requireResetScope: (() -> Unit)? = null,
 ) : AutoCloseable {
     data class Snapshot(val revision: Long, val disposition: Int, val selectedProfileId: String?)
-    data class ReadProjection(val revision: Long, val settings: Phase9Settings,
-        val profiles: List<ProfileSummary>, val health: CatalogHealth)
+    data class ReadProjection(val revision: Long, val settings: ProductSettings,
+        val profiles: List<ProfileSummary>, val health: CatalogHealth,
+        val operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity? = null,
+        val runtimeProfile: org.kurdistanvpn.runtime.api.RuntimeProfilePresentation? = null)
+    class TrustedNetworkStorageSummary internal constructor(val settingsRevision: Long, val ruleCount: Int,
+        selectedRuleIds: Set<CatalogId>) {
+        val selectedRuleIds: Set<CatalogId> = java.util.Collections.unmodifiableSet(LinkedHashSet(selectedRuleIds))
+        override fun toString(): String = "TrustedNetworkStorageSummary(redacted)"
+    }
+    class ProductStorageReadProjection internal constructor(val revision: Long, val profileId: String?,
+        val profile: StoredProfileProjection?, val deploymentDisplay: DeploymentDisplayMetadata?,
+        val update: StoredUpdateState?, val probeHistory: StoredProbeHistory?,
+        val trustedNetworks: TrustedNetworkStorageSummary?, val usage: StoredUsageAggregates?,
+        val appLock: StoredAppLockState?, val proxyPolicy: StoredProxyPolicy?,
+        val crashSafeMode: StoredCrashSafeMode?,
+        val operation: org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity?,
+        val pause: StoredPauseState? = null, val profileTrustRevision: Long? = null) {
+        override fun toString(): String = "ProductStorageReadProjection(redacted)"
+    }
     sealed interface CommandResult<out T> {
         data class Committed<T>(val value: T) : CommandResult<T>
         data class Rejected(val error: OperationError) : CommandResult<Nothing>
@@ -1208,33 +1624,83 @@ class ProtectedStateApplicationFacade private constructor(
         data object KeyInvalidated : OpenResult
         data object Unproven : OpenResult
     }
-    private var closed = false
+    @Volatile private var closed = false
     private var closeFailure: Throwable? = null
+    private val productSettings: SettingsRepository? by lazy { createSettingsRepository(null) }
+    private fun createSettingsRepository(runtime: org.kurdistanvpn.data.settings.SettingsRuntimePort?): SettingsRepository? =
+        broker?.let { owner ->
+            val commands = owner.settingsPort()
+            val port = object : SettingsMutationPort {
+                override suspend fun read() = settingsAccess { commands.read() }
+                override suspend fun validate(expectedJournal: Long, expectedApplied: Long, requested: ProductSettings) =
+                    settingsAccess { commands.validate(expectedJournal, expectedApplied, requested) }
+                override suspend fun apply(expectedJournal: Long, expectedApplied: Long, requested: ProductSettings) =
+                    settingsAccess { commands.apply(expectedJournal, expectedApplied, requested) }
+                override suspend fun rollback(expectedJournal: Long) = settingsAccess { commands.rollback(expectedJournal) }
+            }
+            SettingsApplyCoordinator(port, runtime ?: owner.inactiveRuntimePort(), ProtectedUiDraftStore(storage))
+        }
+
+    /** Manual DI, inactive-session application only. No unavailable runtime is treated as success. */
+    fun settingsRepository(): SettingsRepository? = if (closed) null else productSettings
+    fun settingsRepository(runtime: org.kurdistanvpn.data.settings.SettingsRuntimePort): SettingsRepository? =
+        if (closed) null else createSettingsRepository(runtime)
+
+    private suspend fun <T> settingsAccess(action: suspend () -> SettingsPortResult<T>): SettingsPortResult<T> =
+        withContext(Dispatchers.IO) {
+            if (closed) SettingsPortResult.Rejected(ProductFailureCode.STORAGE_DEGRADED) else action()
+        }
 
     fun snapshot(): Snapshot? = try {
         val value = snapshots.readCheckpointSnapshot()
         Snapshot(value.revision, value.disposition.wire, value.selectedProfile)
     } catch (_: Throwable) { null }
 
+    fun readProductStorage(profileId: String? = null): ProductStorageReadProjection? = try {
+        run {
+            val base = readProductStorageProjection(snapshots, projectionReads, storage::readObject, codec, key, profileId) { closed }
+                ?: return@run null
+            val history = if (profileId != null && base.profileTrustRevision != null)
+                ProtectedProbeHistoryStore(storage).read(CatalogId(profileId), base.profileTrustRevision) else null
+            val update = if (profileId != null && base.profileTrustRevision != null)
+                ProtectedProbeHistoryStore(storage).readUpdate(CatalogId(profileId), base.profileTrustRevision) else null
+            check(snapshots.readCheckpointSnapshot().revision == base.revision && !closed)
+            if (history == null && update == null) base else ProductStorageReadProjection(base.revision, base.profileId, base.profile,
+                base.deploymentDisplay, update ?: base.update, history ?: base.probeHistory, base.trustedNetworks, base.usage, base.appLock,
+                base.proxyPolicy, base.crashSafeMode, base.operation, base.pause, base.profileTrustRevision)
+        }
+    } catch (_: Exception) { null }
+
     /** Fresh, authenticated UI projection. It cannot repair, bootstrap, or acquire a writer. */
-    fun readProjection(): ReadProjection? = try {
+    fun readProjection(): ReadProjection? = try { readProjectionChecked() } catch (_: Throwable) { null }
+
+    internal fun readProjectionChecked(): ReadProjection {
         val snapshot = snapshots.readCheckpointSnapshot()
         val observed = projectionReads.read()
         observed.requireMatches(snapshot)
         snapshots.requirePhysicalProjection(snapshot, observed.physical())
-        val settingsBytes = snapshot.settingsBytes()
-        val settings = try {
-            val base = SettingsProjectionCodec.toModel(settingsBytes)
-            ProtectedPresentationOverlay.read(storage::read, snapshot.storeId())?.use { it.merge(base) } ?: base
-        } finally { settingsBytes.fill(0) }
+        val settings = readPresentedProductSettings(snapshot,
+            ReadOnlyProtectedBlobView(snapshot.objects(), storage::readObject, codec, key), storage::read)
         val catalogBytes = snapshot.catalogBytes()
-        val catalog = try { PreparedCatalog(ProfileCatalogProjectionCodec.decode(catalogBytes)) } finally { catalogBytes.fill(0) }
+        val content = try { org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.decode(catalogBytes) } finally { catalogBytes.fill(0) }
+        val catalog = PreparedCatalog(content.rows)
         try {
             val blobs = ReadOnlyProtectedBlobView(snapshot.objects(), storage::readObject, codec, key)
             val admission = org.kurdistanvpn.data.secure.ProfileAdmissionJournal.readOnly(native, catalog, blobs, false)
-            ReadProjection(snapshot.revision, settings, runBlocking { admission.listProfiles() }, runBlocking { admission.storageHealth() })
+            val profiles = runBlocking { admission.listProfiles() }
+            val selected = profiles.singleOrNull { it.localRecordId == snapshot.selectedProfile }
+            val image = snapshot.settingsBytes()
+            val settingsRevision = try {
+                if (org.kurdistanvpn.data.settings.ProductSettingsImage.isVersionTwo(image))
+                    org.kurdistanvpn.data.settings.ProductSettingsImage.decode(image).revision else 0L
+            } finally { image.fill(0) }
+            val trust = selected?.let { snapshot.objectFor(it.localRecordId, SecureDataClass.ACTIVATION_ACTIVE.wireValue) }
+            val runtimeProfile = if (selected == null || trust == null || selected.generation == 0uL) null else
+                org.kurdistanvpn.runtime.api.RuntimeProfilePresentation(selected.localRecordId, selected.generation,
+                    trust.binding.revision, settingsRevision)
+            return ReadProjection(snapshot.revision, settings, profiles, runBlocking { admission.storageHealth() }, content.operation, runtimeProfile)
         } finally { catalog.close() }
-    } catch (_: Throwable) { null }
+    }
 
     /**
      * Read-only eligibility check for the one explicit presentation-recovery command. A null
@@ -1250,6 +1716,22 @@ class ProtectedStateApplicationFacade private constructor(
 
     fun reconstructAuthority(environment: ProtectedAuthorityEnvironment): AuthorityReadResult =
         ProtectedStateAuthorityFactory(snapshots, storage::readObject, codec, key, native, projectionReads, environment).reconstruct()
+
+    fun reconstructProductionCapture(environment: ProtectedAuthorityEnvironment): ProductionCaptureReadResult {
+        if (closed) return ProductionCaptureReadResult.Rejected(AuthorityReadFailure.STATE_UNPROVEN)
+        val fresh = ProtectedStateAuthorityFactory(snapshots, storage::readObject, codec, key, native, projectionReads, environment)
+        val committed = projectionReads as? ReadOnlyCheckpointProjectionAccess ?: return fresh.reconstructProductionCapture()
+        return storage.captureReadScope().use { scope ->
+            val journal = ProtectedStateOperationJournal(scope)
+            val scopedSnapshots = ProtectedStateSnapshotReader(journal) { reference ->
+                checkNotNull(storage.readObject(reference.physicalId))
+            }
+            val physical = committed.withReaders(scopedSnapshots::readCheckpointSnapshot, journal::readProjectionWitness)
+            // Material transfer can occur later. Its final read must not capture the disposed scope.
+            ProtectedStateAuthorityFactory(scopedSnapshots, storage::readObject, codec, key, native, physical,
+                environment, fresh::requireCurrent).reconstructProductionCapture()
+        }
+    }
 
     /** Validates fresh committed authority then destroys it without ever exposing its bytes to UI. */
     fun validateManualStart(config: VpnRuntimeConfig, environment: ProtectedAuthorityEnvironment): OperationError? = try {
@@ -1288,12 +1770,13 @@ class ProtectedStateApplicationFacade private constructor(
     suspend fun restoreConfirmedBackup(payload: ByteArray): CommandResult<Int> =
         mutation { it.restoreBackup(payload) }
 
-    suspend fun deleteProfile(id: String): CommandResult<Unit> = mutation { it.deleteProfile(id) }
+    suspend fun deleteProfile(id: String, expectedRevision: Long? = null): CommandResult<Unit> =
+        mutation { it.deleteProfile(id, expectedRevision) }
 
-    suspend fun resetProfiles(ids: Set<String>): CommandResult<Unit> = mutation { it.resetProfiles(ids) }
+    suspend fun resetProfiles(ids: Set<String>, expectedRevision: Long? = null): CommandResult<Unit> = mutation { it.resetProfiles(ids, expectedRevision) }
 
     /** Called only after the separate pending-credential reset confirmation. */
-    suspend fun resetPendingCredentialsConfirmed(): CommandResult<Int> = mutation { it.resetPendingCredentials() }
+    suspend fun resetPendingCredentialsConfirmed(expectedRevision: Long? = null): CommandResult<Int> = mutation { it.resetPendingCredentials(expectedRevision) }
 
     /** Explicit user-confirmed action only. Restore readers have neither capability. */
     suspend fun resetProtectedStateConfirmed(recoverPending: Boolean = false): CommandResult<Unit> =
@@ -1333,14 +1816,62 @@ class ProtectedStateApplicationFacade private constructor(
 
     suspend fun deleteEnrollment(id: String): CommandResult<Unit> = mutation { it.deleteCredential(id) }
 
-    suspend fun replaceSettings(expectedRevision: Long, settings: Phase9Settings): CommandResult<Unit> =
-        mutation { it.replaceSettings(expectedRevision, settings) }
+    suspend fun replaceSettings(expectedRevision: Long, settings: ProductSettings,
+        residuePolicy: org.kurdistanvpn.data.settings.LegacySettingsResiduePolicy = org.kurdistanvpn.data.settings.LegacySettingsResiduePolicy.PRESERVE,
+    ): CommandResult<Unit> = mutation { it.replaceSettings(expectedRevision, settings, residuePolicy) }
+
+    /** Explicit production upgrade; subsequent settings drafts retain the authenticated bootstrap format. */
+    suspend fun applyProductionSettings(expectedRevision: Long, expectedSettingsRevision: Long,
+        requested: ProductSettings): CommandResult<ProductSettingsCommit> =
+        mutation { it.applyProductionSettings(expectedRevision, expectedSettingsRevision, requested) }
+
+    suspend fun applyPause(expectedRevision: Long, expectedSettingsRevision: Long,
+        timer: StoredPauseState?): CommandResult<ProductSettingsCommit> =
+        mutation { it.applyPause(expectedRevision, expectedSettingsRevision, timer) }
 
     suspend fun replaceDiagnostics(events: List<DiagnosticEvent>): CommandResult<Unit> =
         presentation { it.replaceDiagnostics(events) }
 
     /** Separate explicit recovery command. Read-only UI/backup/restoration never invoke it. */
     suspend fun recoverPresentationConfirmed(): CommandResult<Unit> = presentation { it.recoverPresentationConfirmed() }
+
+    suspend fun migrateProductProjectionConfirmed(expectedRevision: Long): CommandResult<Unit> =
+        mutation { it.migrateProductProjectionConfirmed(expectedRevision) }
+
+    suspend fun recoverProductSchemaConfirmed(rollback: Boolean = false): CommandResult<Unit> =
+        mutation { it.recoverProductSchemaConfirmed(rollback) }
+
+    suspend fun recoverProductOperationConfirmed(rollback: Boolean = false): CommandResult<Unit> =
+        mutation { it.recoverProductOperationConfirmed(rollback) }
+
+    suspend fun recoverProductSettingsConfirmed(rollback: Boolean): CommandResult<ProductSettingsCommit> =
+        mutation { it.recoverProductSettingsConfirmed(rollback) }
+
+    suspend fun setDeploymentDisplay(expectedRevision: Long, value: DeploymentDisplayMetadata): CommandResult<Unit> =
+        mutation { it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.SetDeploymentDisplay(value)) }
+
+    suspend fun recordUpdate(expectedRevision: Long, profileId: String, value: StoredUpdateState): CommandResult<Unit> =
+        presentation { it.recordUpdatePresentation(expectedRevision, profileId, value) }
+
+    suspend fun recordProbe(expectedRevision: Long, profileId: String, value: StoredProbeHistory): CommandResult<Unit> =
+        presentation { it.recordProbePresentation(expectedRevision, profileId, value) }
+
+    suspend fun replaceTrustedRules(expectedRevision: Long, value: StoredTrustedNetworks): CommandResult<Unit> =
+        mutation { it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.ReplaceTrustedRules(value)) }
+
+    suspend fun recordUsage(expectedRevision: Long, value: StoredUsageAggregates): CommandResult<Unit> =
+        mutation { it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.RecordUsage(value)) }
+
+    suspend fun recordAppLockFailure(expectedRevision: Long, expectedSettingsRevision: Long,
+        nextEligibleEpochMinute: Long): CommandResult<Unit> = mutation {
+        it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.RecordAppLockFailure(expectedSettingsRevision, nextEligibleEpochMinute))
+    }
+
+    suspend fun recordCleanStop(expectedRevision: Long, epochHour: Long): CommandResult<Unit> =
+        mutation { it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.RecordCleanStop(epochHour)) }
+
+    suspend fun recordStart(expectedRevision: Long, epochHour: Long): CommandResult<Unit> =
+        mutation { it.applyProductStoreCommand(expectedRevision, ProductStoreCommand.RecordStart(epochHour)) }
 
     fun diagnostics(): List<DiagnosticEvent>? = try {
         val snapshot = snapshots.readCheckpointSnapshot()
@@ -1369,20 +1900,11 @@ class ProtectedStateApplicationFacade private constructor(
     } catch (_: Throwable) { null }
 
     private suspend fun <T> mutation(block: (ProtectedStateMutationBroker) -> BrokerMutation<T>): CommandResult<T> =
-        withContext(Dispatchers.IO) { brokerResult(broker?.let(block)) }
+        withContext(Dispatchers.IO) { if (closed) CommandResult.Busy else protectedCommandResult { broker?.let(block) } }
 
     /** IO dispatch only; the selected broker methods never reserve or retire an ACTIVE authority owner. */
     private suspend fun <T> presentation(block: (ProtectedStateMutationBroker) -> BrokerMutation<T>): CommandResult<T> =
-        withContext(Dispatchers.IO) { brokerResult(broker?.let(block)) }
-
-    private fun <T> brokerResult(value: BrokerMutation<T>?): CommandResult<T> = when (value?.status) {
-        ProtectedMutationStatus.COMMITTED -> CommandResult.Committed(checkNotNull(value.value))
-        ProtectedMutationStatus.NO_MUTATION -> CommandResult.Rejected(value.error ?: OperationError.RECOVERY_REQUIRED)
-        ProtectedMutationStatus.DIRTY, ProtectedMutationStatus.MUTATION_UNPROVEN,
-        ProtectedMutationStatus.QUARANTINED -> CommandResult.Unproven
-        ProtectedMutationStatus.CAPACITY_EXHAUSTED -> CommandResult.Rejected(OperationError.RESOURCE_LIMIT)
-        null -> CommandResult.Busy
-    }
+        withContext(Dispatchers.IO) { if (closed) CommandResult.Busy else protectedCommandResult { broker?.let(block) } }
 
     @Synchronized override fun close() {
         if (closed) {
@@ -1411,10 +1933,6 @@ class ProtectedStateApplicationFacade private constructor(
         // the public Java OsConstants field was added only in API 27. Supplying it to
         // Os.open keeps close-on-exec atomic with descriptor creation.
         private const val LINUX_O_CLOEXEC = 0x00080000
-        // Bionic also exposes O_DIRECTORY on every supported API, while the public
-        // Android SDK does not expose a Java field for it. Supply the native value
-        // directly so directory-only opening never depends on hidden-API reflection.
-        private const val LINUX_O_DIRECTORY = 0x00010000
         private val layout = ProjectionLeafLayout("protected-metadata.db", "protected-settings.preferences_pb")
         private class OpenFailure(val result: OpenResult) : IllegalStateException()
 
@@ -1448,7 +1966,9 @@ class ProtectedStateApplicationFacade private constructor(
                     true
                 } catch (_: MissingKeyException) { false }
                 catch (_: KeyInvalidatedException) { throw OpenFailure(OpenResult.KeyInvalidated) }
-                if (existingKey || knownLegacyStateExists(primitives, checkNotNull(ce.borrow())))
+                if (existingKey) throw OpenFailure(OpenResult.MigrationRequired)
+                prepareFrameworkParentsForFirstUse(checkNotNull(ce.borrow()))
+                if (knownLegacyStateExists(primitives, checkNotNull(ce.borrow())))
                     throw OpenFailure(OpenResult.MigrationRequired)
                 backup = openOrCreateChild(primitives, checkNotNull(ce.borrow()), NO_BACKUP)
                 val existing = primitives.openChildDirectory(checkNotNull(backup.borrow()), ROOT)
@@ -1495,7 +2015,7 @@ class ProtectedStateApplicationFacade private constructor(
                             "$NO_BACKUP/$ROOT"), directory, layout), files,
                         object : ProjectionWriterLeaseAccess { override fun <T> withCurrentWriter(block: (DurableWriter) -> T): T? = storage.withCurrentWriter(block) },
                         journal::readControl, committed, { snapshot -> recipientBindings(snapshot, storage, key, native) })
-                    val settings = SettingsProjectionCodec.fromModel(Phase9Settings())
+                    val settings = SettingsProjectionCodec.fromModel(ProductSettings())
                     val catalog = ProfileCatalogProjectionCodec.encode(emptyList())
                     val initial = ProtectedStateSnapshot.create(store, 2, null, emptyList(), settings, catalog, operation)
                     try {
@@ -1636,13 +2156,27 @@ class ProtectedStateApplicationFacade private constructor(
             var result: OpenResult = OpenResult.Unproven
             try {
                 ce = openCredentialParent(context) ?: throw OpenFailure(OpenResult.Unproven)
-                backup = primitives.openChildDirectory(checkNotNull(ce.borrow()), NO_BACKUP).owner
-                    ?: throw OpenFailure(OpenResult.Missing)
-                root = primitives.openChildDirectory(checkNotNull(backup.borrow()), ROOT).owner
-                    ?: throw OpenFailure(OpenResult.Missing)
+                val parent = checkNotNull(ce.borrow())
+                val backupOpen = primitives.openChildDirectory(parent, NO_BACKUP)
+                if (backupOpen.code != DurableCode.OK) {
+                    if (backupOpen.code !in setOf(DurableCode.ABSENT, DurableCode.UNSAFE))
+                        throw OpenFailure(OpenResult.Unproven)
+                    // A framework 0771 parent is not an absent protected store. Prove
+                    // absence/legacy state without repairing permissions during startup.
+                    inspectFrameworkParents(parent, prepare = false)
+                    throw OpenFailure(OpenResult.Missing)
+                }
+                backup = checkNotNull(backupOpen.owner)
+                val rootOpen = primitives.openChildDirectory(checkNotNull(backup.borrow()), ROOT)
+                if (rootOpen.code != DurableCode.OK) {
+                    if (rootOpen.code != DurableCode.ABSENT) throw OpenFailure(OpenResult.Unproven)
+                    inspectFrameworkParents(parent, prepare = false)
+                    throw OpenFailure(OpenResult.Missing)
+                }
+                root = checkNotNull(rootOpen.owner)
                 val directory = checkNotNull(root.borrow())
                 val existingKey = try { AndroidKeystoreKek.loadExisting(KEY_ALIAS, 1) }
-                catch (_: MissingKeyException) { throw OpenFailure(OpenResult.Missing) }
+                catch (_: MissingKeyException) { throw OpenFailure(OpenResult.Unproven) }
                 catch (_: KeyInvalidatedException) { throw OpenFailure(OpenResult.KeyInvalidated) }
                 val lock = primitives.read(directory, LOCK, 1)
                 if (lock.code != DurableCode.OK || checkNotNull(lock.snapshot).size != 0)
@@ -1721,6 +2255,111 @@ class ProtectedStateApplicationFacade private constructor(
             return ProtectedStateResetRecoveryCoordinator(storage, access, existing, owner.mutationPolicy())
         }
 
+        /** Android can create databases and no_backup as 0771 before explicit first use.
+         * Tighten only these empty-of-product-state framework parents. Native protected
+         * directory checks remain exact 0700; existing state and read-only opens never repair modes. */
+        private fun prepareFrameworkParentsForFirstUse(parent: DurableDirectory) =
+            inspectFrameworkParents(parent, prepare = true)
+
+        private fun inspectFrameworkParents(parent: DurableDirectory, prepare: Boolean) {
+            val anchor = "/proc/self/fd/${parent.directoryFd}"
+            val parentStat = Os.stat(anchor)
+            if (!OsConstants.S_ISDIR(parentStat.st_mode) || parentStat.st_mode and 4095 != 448 ||
+                parentStat.st_uid.toLong() != parent.expectedUid ||
+                parentStat.st_dev != parent.identity.device || parentStat.st_ino != parent.identity.inode)
+                throw OpenFailure(OpenResult.Unproven)
+            fun statOrAbsent(path: String): android.system.StructStat? = try { Os.lstat(path) }
+                catch (error: ErrnoException) {
+                    if (error.errno != OsConstants.ENOENT) throw error
+                    null
+                }
+            fun sameDirectory(left: android.system.StructStat, right: android.system.StructStat): Boolean =
+                OsConstants.S_ISDIR(right.st_mode) && right.st_uid.toLong() == parent.expectedUid &&
+                    right.st_dev == parentStat.st_dev && right.st_ino != parentStat.st_ino &&
+                    right.st_nlink >= 1 && left.st_dev == right.st_dev && left.st_ino == right.st_ino &&
+                    left.st_uid == right.st_uid && left.st_mode == right.st_mode
+            data class FrameworkParent(val name: String, val owner: ParcelFileDescriptor,
+                var observed: android.system.StructStat)
+            val names = listOf("databases", NO_BACKUP)
+            val opened = mutableListOf<FrameworkParent>()
+            var mutationAttempted = false
+            try {
+                for (name in names) {
+                    val path = "$anchor/$name"
+                    val named = statOrAbsent(path) ?: continue
+                    if (!sameDirectory(named, named) || named.st_mode and 4095 !in setOf(448, 505))
+                        throw OpenFailure(OpenResult.Unproven)
+                    val fd = Os.open(path, credentialParentOpenFlags(), 0)
+                    try {
+                        val actual = Os.fstat(fd)
+                        if (!sameDirectory(named, actual) || !sameDirectory(actual, Os.lstat(path)))
+                            throw OpenFailure(OpenResult.Unproven)
+                        opened += FrameworkParent(name, ParcelFileDescriptor.dup(fd), actual)
+                    } finally { Os.close(fd) }
+                }
+                val requiresPreparation = opened.any { it.observed.st_mode and 4095 == 505 }
+                fun validateAll() {
+                    val currentParent = Os.stat(anchor)
+                    if (currentParent.st_dev != parentStat.st_dev || currentParent.st_ino != parentStat.st_ino ||
+                        currentParent.st_uid != parentStat.st_uid || currentParent.st_mode != parentStat.st_mode)
+                        throw OpenFailure(OpenResult.Unproven)
+                    // Never classify an existing/partial protected root as fresh or legacy
+                    // merely because its framework parent could not be opened natively.
+                    if (!prepare) {
+                        val backup = opened.singleOrNull { it.name == NO_BACKUP }
+                        if (backup != null && statOrAbsent("/proc/self/fd/${backup.owner.fd}/$ROOT") != null)
+                            throw OpenFailure(OpenResult.Unproven)
+                    }
+                    for (name in names) {
+                        val directory = opened.singleOrNull { it.name == name }
+                        val named = statOrAbsent("$anchor/$name")
+                        if (directory == null) {
+                            if (named != null) throw OpenFailure(OpenResult.Unproven)
+                            continue
+                        }
+                        val actual = Os.fstat(directory.owner.fileDescriptor)
+                        if (named == null || !sameDirectory(directory.observed, actual) || !sameDirectory(actual, named))
+                            throw OpenFailure(OpenResult.Unproven)
+                        // Product-state absence is checked through the held directory, not a reopened name.
+                        val held = "/proc/self/fd/${directory.owner.fd}"
+                        val legacy = if (name == "databases") "phase9-metadata.db" else "phase9-v1"
+                        if (statOrAbsent("$held/$legacy") != null) throw OpenFailure(OpenResult.MigrationRequired)
+                        if (requiresPreparation && name == NO_BACKUP && statOrAbsent("$held/$ROOT") != null)
+                            throw OpenFailure(OpenResult.Unproven)
+                    }
+                }
+                validateAll()
+                if (!prepare) return
+                // Prove both directory handles support durability before changing either mode.
+                opened.forEach { Os.fsync(it.owner.fileDescriptor) }
+                validateAll()
+                for (directory in opened.filter { it.observed.st_mode and 4095 == 505 }) {
+                    validateAll()
+                    mutationAttempted = true
+                    Os.fchmod(directory.owner.fileDescriptor, 448)
+                    Os.fsync(directory.owner.fileDescriptor)
+                    val prepared = Os.fstat(directory.owner.fileDescriptor)
+                    if (prepared.st_mode and 4095 != 448 || prepared.st_dev != directory.observed.st_dev ||
+                        prepared.st_ino != directory.observed.st_ino || prepared.st_uid != directory.observed.st_uid)
+                        throw OpenFailure(OpenResult.Unproven)
+                    directory.observed = prepared
+                    validateAll()
+                }
+            } catch (failure: Throwable) {
+                throw frameworkPreparationFailure(mutationAttempted, failure)
+            } finally {
+                var closeUnproven = false
+                opened.asReversed().forEach {
+                    try { it.owner.close() } catch (_: Throwable) { closeUnproven = true }
+                }
+                // A failure after one chmod is unproven; this does not promise atomic rollback.
+                if (closeUnproven) throw OpenFailure(OpenResult.Unproven)
+            }
+        }
+
+        private fun frameworkPreparationFailure(mutationAttempted: Boolean, failure: Throwable): Throwable =
+            if (mutationAttempted) OpenFailure(OpenResult.Unproven) else failure
+
         private fun openOrCreateChild(primitives: DurableFilePrimitives, parent: DurableDirectory,
             leaf: String): DurableOwnedDirectory {
             val existing = primitives.openChildDirectory(parent, leaf)
@@ -1784,7 +2423,19 @@ class ProtectedStateApplicationFacade private constructor(
         }
 
         private fun credentialParentOpenFlags(): Int =
-            OsConstants.O_RDONLY or LINUX_O_DIRECTORY or LINUX_O_CLOEXEC or OsConstants.O_NOFOLLOW
+            credentialParentOpenFlags(OsConstants.O_NOFOLLOW)
+
+        private fun credentialParentOpenFlags(noFollow: Int): Int {
+            // Bionic's ARM and x86 flag families differ. The public O_NOFOLLOW value
+            // identifies the loaded ABI without reflecting a hidden O_DIRECTORY field.
+            // NDK asm/fcntl.h: ARM64 uses 0x4000; 0x10000 is O_DIRECT there.
+            val directory = when (noFollow) {
+                0x00008000 -> 0x00004000
+                0x00020000 -> 0x00010000
+                else -> error("UNSUPPORTED_DIRECTORY_OPEN_FLAG_FAMILY")
+            }
+            return OsConstants.O_RDONLY or directory or LINUX_O_CLOEXEC or noFollow
+        }
 
         private fun credentialProtectedDataDir(context: Context): String =
             checkNotNull(context.applicationInfo::class.java.getField("credentialProtectedDataDir")

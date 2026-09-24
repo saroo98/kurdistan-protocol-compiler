@@ -544,6 +544,9 @@ internal class ProtectedStateResetRecoveryCoordinator(
                 (leaf.startsWith("object-") && leaf.length == 63 &&
                     leaf.drop(7).all { it in '0'..'9' || it in 'a'..'f' })
         private fun isRecoveryLeaf(leaf: String): Boolean {
+            if (leaf.endsWith(".blob") && ProtectedUiDraftStore.isName(leaf.removeSuffix(".blob"))) return true
+            if (leaf.endsWith(".blob") && ProtectedProbeHistoryStore.isName(leaf.removeSuffix(".blob"))) return true
+            if (leaf.endsWith(".blob") && ProtectedProbeHistoryStore.isUpdateName(leaf.removeSuffix(".blob"))) return true
             if (leaf in setOf("journal-control.blob", "journal-store.blob", "journal-gc.blob",
                     "${ProtectedPresentationOverlay.NAME}.blob")) return true
             val prefix = listOf("journal-record-", "journal-intent-", "journal-resolution-", "journal-checkpoint-", "journal-projection-").firstOrNull(leaf::startsWith)

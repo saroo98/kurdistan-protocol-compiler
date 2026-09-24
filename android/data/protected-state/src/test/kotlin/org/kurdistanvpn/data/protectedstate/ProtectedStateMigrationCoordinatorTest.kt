@@ -10,6 +10,38 @@ import org.kurdistanvpn.data.secure.SecureEnvelopeCodec
 import org.kurdistanvpn.data.settings.SettingsProjectionCodec
 
 class ProtectedStateMigrationCoordinatorTest {
+    @Test fun malformedPhysicalAuthorityCannotPublishMigrationOrModifySource() {
+        for ((index, fields) in invalidLegacyAuthorityFields().withIndex()) {
+            val original = legacyAuthorityFixture(fields, true)
+            val file = java.io.File(java.nio.file.Files.createTempDirectory("invalid-authority").toFile().canonicalFile, "test.preferences_pb")
+            file.writeBytes(original)
+            val state = MigrationFixture(storedSettings = file)
+            state.requireDirtyBeforeLegacyRead = true
+            assertEquals("migration/$index", ProtectedMutationStatus.DIRTY, state.coordinator().migrateConfirmed().status)
+            assertArrayEquals(original, file.readBytes())
+            assertEquals(0, state.projectionWrites); assertTrue(state.objects.isEmpty()); assertEquals(0, state.nativeCalls)
+            assertThrows(IllegalStateException::class.java) { state.journal.readCheckpoint() }
+        }
+    }
+    @Test fun physicalWrongTypeDisplayMigratesWithExactRawCheckpointAndNoRuntimeAuthority() = kotlinx.coroutines.runBlocking {
+        val source = legacyWrongTypeDisplayStoredFixture()
+        val file = java.io.File(java.nio.file.Files.createTempDirectory("raw-protected-migration").toFile().canonicalFile, "test.preferences_pb")
+        file.writeBytes(source)
+        val captured = SettingsProjectionCodec.captureLegacyStoredBytes(file.readBytes()).image()
+        val state = MigrationFixture(captured)
+        state.requireDirtyBeforeLegacyRead = true
+        val result = state.coordinator().migrateConfirmed()
+        assertEquals(ProtectedMutationStatus.COMMITTED, result.status)
+        assertEquals(ProtectedStateDisposition.VERIFIED, result.disposition)
+        val snapshot = ProtectedStateSnapshot.decode(state.journal.readCheckpoint())
+        assertArrayEquals(captured, snapshot.settingsBytes())
+        assertArrayEquals(source, file.readBytes())
+        assertNull(snapshot.selectedProfile)
+        assertTrue(snapshot.objects().isEmpty())
+        assertEquals(0, state.nativeCalls)
+        assertEquals(1, state.projectionWrites)
+        assertFalse(SettingsProjectionCodec.toModel(snapshot.settingsBytes()).highContrast)
+    }
     @Test fun unmarkedAwaitingKeyIsQuarantinedWithoutGuessingEnrollmentOrInterruptedRestore() {
         val state = MigrationFixture()
         state.addUnboundRecipient(org.kurdistanvpn.data.secure.ClientKeyStatus.AWAITING_PROFILE)
@@ -128,7 +160,7 @@ class ProtectedStateMigrationCoordinatorTest {
     }
 }
 
-private class MigrationFixture {
+private class MigrationFixture(private val initialSettings: ByteArray? = null, private val storedSettings: java.io.File? = null) {
     val storage = MemoryJournalStorage()
     val journal = ProtectedStateOperationJournal(storage).also { it.initialize(ByteArray(16) { 1 }) }
     val codec = SecureEnvelopeCodec()
@@ -184,11 +216,16 @@ private class MigrationFixture {
                 if (requireDirtyBeforeLegacyRead) assertTrue(journal.readControl().dirty)
             }
             override fun rows(): List<ProfileCatalogEntity> = emptyList<ProfileCatalogEntity>().also { requireAdmittedRead() }
-            override fun settingsImage(): ByteArray = SettingsProjectionCodec.fromModel(org.kurdistanvpn.core.model.Phase9Settings())
-                .also { requireAdmittedRead() }
+            override fun settingsImage(): ByteArray {
+                requireAdmittedRead()
+                return storedSettings?.let { kotlinx.coroutines.runBlocking { SettingsProjectionCodec.captureLegacyStoredBytes(it.readBytes()).image() } }
+                    ?: initialSettings?.clone() ?: SettingsProjectionCodec.fromModel(org.kurdistanvpn.core.model.ProductSettings())
+            }
             override fun objects(): List<LegacyObjectName> = legacy.keys.toList().also { requireAdmittedRead() }
             override fun envelope(name: LegacyObjectName): ByteArray = legacy.getValue(name).clone().also { requireAdmittedRead() }
             override fun sourceWitness(): ByteArray = java.security.MessageDigest.getInstance("SHA-256").run {
+                initialSettings?.let { update(it) }
+                storedSettings?.let { update(it.readBytes()) }
                 legacy.entries.sortedBy { it.key.role.wireValue.toString() + it.key.logicalId }.forEach { (name, bytes) ->
                     update(name.logicalId.encodeToByteArray()); update(name.role.wireValue.toByte()); update(bytes)
                 }

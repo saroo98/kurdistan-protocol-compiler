@@ -10,6 +10,19 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class ProtectedStateResetRecoveryCoordinatorTest {
+    @Test fun resetInventoryDeletesEveryProductRoleAndOperationTemporaryBeforeKeyErasure() {
+        val rig = Rig()
+        val leaves = (2L..10L).map { operationObjectLeaf(OPERATION, it) } + operationObjectLeaf(OPERATION, 1)
+        leaves.forEachIndexed { index, leaf -> rig.putProduct(ResetDirectoryRole.JOURNAL, leaf, byteArrayOf(index.toByte(), 42)) }
+        assertEquals(ResetRecoveryResult.COMPLETED, rig.engine().start(OPERATION))
+        val keyErase = rig.events.indexOf("before:key-erase")
+        leaves.forEach { leaf ->
+            assertFalse(rig.hasFile(ResetDirectoryRole.JOURNAL, leaf))
+            assertTrue(rig.events.indexOf("before:delete:JOURNAL:$leaf") in 0 until keyErase)
+        }
+        assertTrue(rig.onlyLocksRemain()); assertEquals(1, rig.keyEraseCalls)
+        assertEquals(0, rig.decryptAfterKeyErasure)
+    }
     @Test fun explicitFreshInitializationHoldsKnownLockAcrossAbsenceCheckAndKeyCreation() {
         val events = mutableListOf<String>()
         val directory = DurableDirectory(10, 10000, DurableFileIdentity(1, 2))

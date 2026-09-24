@@ -5,6 +5,34 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProtectedStateValidatorTest {
+    @Test fun optionalPolicyLoadAuthenticatesOnceAndNeverTreatsBrokenCommittedDataAsAbsent() {
+        val key = JournalTestKey()
+        val codec = org.kurdistanvpn.data.secure.SecureEnvelopeCodec()
+        val role = org.kurdistanvpn.data.secure.SecureDataClass.PAUSE_STATE
+        val id = org.kurdistanvpn.data.secure.StoredPauseState.RECORD_ID
+        val binding = syntheticObjectBinding()
+        val raw = org.kurdistanvpn.data.secure.StoredPauseState(100, 200, 1, 300).encode()
+        val encoded = codec.sealForOperation(id, role, raw, key, binding)
+        val ref = ProtectedObjectReference.fromEncryptedObject(role.wireValue, id, "object-pause", 1, encoded, binding)
+        var reads = 0
+        val view = ReadOnlyProtectedBlobView(listOf(ref), { reads++; encoded.clone() }, codec, key)
+        val store = org.kurdistanvpn.data.secure.PauseStateStore.readOnly(view)
+        assertEquals(300L, checkNotNull(store.load()).durationMillis)
+        assertEquals("one authenticated read, not exists then reopen", 1, reads)
+        assertEquals(300L, checkNotNull(store.load()).durationMillis)
+        assertEquals("each load must still read fresh bytes", 2, reads)
+        assertNull(org.kurdistanvpn.data.secure.PauseStateStore.readOnly(
+            ReadOnlyProtectedBlobView(emptyList(), { error("absent reference must not read") }, codec, key)).load())
+        for (material in listOf<ByteArray?>(null, encoded.clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() })) {
+            assertThrows(Exception::class.java) {
+                org.kurdistanvpn.data.secure.PauseStateStore.readOnly(
+                    ReadOnlyProtectedBlobView(listOf(ref), { material?.clone() }, codec, key)).load()
+            }
+        }
+        raw.fill(0)
+        encoded.fill(0)
+    }
+
     @Test fun minimalCheckpointMatchesIndependentBigEndianGoldenAndEveryPrefixRejects() {
         // Literal schema oracle, assembled independently of the codec: KPS1, v2, VERIFIED,
         // store[16], revision u64be, operation[32], empty selected ID, two one-byte images, zero refs.

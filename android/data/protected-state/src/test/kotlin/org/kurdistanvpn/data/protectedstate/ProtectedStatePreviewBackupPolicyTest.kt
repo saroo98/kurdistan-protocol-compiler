@@ -12,6 +12,40 @@ import org.kurdistanvpn.data.metadata.ProfileCatalogProjectionCodec
 import org.kurdistanvpn.data.settings.SettingsProjectionCodec
 
 class ProtectedStatePreviewBackupPolicyTest {
+    @Test fun previewOwnerClosesResidueRegardlessOfReleaseCallbackWithoutRetrying() {
+        for (outcome in 0..2) {
+            val residue = NativePreviewFields(listOf(byteArrayOf(1), byteArrayOf(), byteArrayOf()))
+            val handle = VerifiedPreviewHandle(1, RedactedProfilePreview("public", "synthetic", "fingerprint", "lineage", 1u, 1, false), residue)
+            var releases = 0
+            val result = ReleasedNativePreviewRequest.resolve(byteArrayOf(1), { NativeResult.Success(handle) }, {
+                releases++
+                when (outcome) {
+                    0 -> NativeResult.Success(Unit)
+                    1 -> NativeResult.Failure(OperationError.INTERNAL_FAILURE)
+                    else -> error("release failed")
+                }
+            })
+            assertEquals(1, releases)
+            assertThrows(IllegalStateException::class.java) { residue.withLegacyFields { } }
+            if (outcome == 0) {
+                assertTrue(result is NativePreviewRequestOutcome.Ready)
+            } else assertEquals(NativePreviewRequestOutcome.CleanupUnproven, result)
+        }
+    }
+    @Test fun includeOnlyMetadataSurvivesCodecAndSecurePackageMergeWithoutWidening() {
+        val requested = ProductSettings(routing = org.kurdistanvpn.core.model.RoutingPreferences(
+            mode = org.kurdistanvpn.core.model.PerAppSelectionMode.INCLUDE_ONLY))
+        val image = SettingsProjectionCodec.fromModel(requested)
+        val decoded = SettingsProjectionCodec.toModel(image)
+        assertEquals(org.kurdistanvpn.core.model.PerAppSelectionMode.INCLUDE_ONLY, decoded.routing.mode)
+        assertTrue(decoded.routing.packages.isEmpty())
+        val projected = ProtectedStatePreviewBackupPolicy.projectSettings(decoded, setOf("org.example.app"))
+        assertEquals(org.kurdistanvpn.core.model.PerAppSelectionMode.INCLUDE_ONLY, projected.routing.validated().mode)
+        assertEquals(setOf("org.example.app"), projected.routing.packages)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            projected.routing.effective(256, emptySet(), emptySet())
+        }
+    }
     @Test fun externalPreviewOwnsInputClosesNativeAndConfirmsOnlyOnceWithoutWrites() {
         val fixture = PreviewFixture()
         val borrowed = byteArrayOf(41, 42)
@@ -225,24 +259,24 @@ class ProtectedStatePreviewBackupPolicyTest {
 
     @Test fun settingsProjectionNeverPromotesLegacyRoutesOrMutatesSource() {
         val legacyPackages = mutableSetOf("org.legacy.app")
-        val persisted = Phase9Settings(
-            connection = ConnectionPreferences(selectionMode = SelectionMode.MANUAL_STRATEGY, autoConnectOnBoot = true, reconnectOnFailure = true),
-            tunnel = TunnelPreferences(ipMode = IpMode.DUAL_STACK, dnsMode = DnsMode.CUSTOM, customDns = "192.0.2.1"),
+        val persisted = ProductSettings(
+            connection = ConnectionPreferences(selectionMode = SelectionMode.MANUAL_STRATEGY, autoConnectOnLaunch = true, reconnectOnFailure = true),
+            tunnel = TunnelPreferences(ipMode = IpMode.DUAL_STACK, dnsMode = ResolverPolicy.CUSTOM, customDns = "192.0.2.1"),
             routing = RoutingPreferences(mode = PerAppSelectionMode.INCLUDE_ONLY, packages = legacyPackages),
             updates = UpdatePreferences(automatic = true),
-            probes = ProbePreferences(method = ProbeMethod.HTTP_GET, testUrl = "https://example.invalid/"),
+            probes = ProbePreferences(method = ProbeMethod.HTTP_GET, signedTargetId = org.kurdistanvpn.core.model.CatalogId("probe-1")),
         )
         val view = ProtectedStatePreviewBackupPolicy.projectSettings(persisted, emptySet())
         assertEquals(SelectionMode.AUTOMATIC, view.connection.selectionMode)
-        assertFalse(view.connection.autoConnectOnBoot)
+        assertFalse(view.connection.autoConnectOnLaunch)
         assertFalse(view.connection.reconnectOnFailure)
         assertEquals(IpMode.AUTO, view.tunnel.ipMode)
-        assertEquals(DnsMode.INTERNAL_TUN, view.tunnel.dnsMode)
+        assertEquals(ResolverPolicy.INTERNAL, view.tunnel.dnsMode)
         assertEquals("", view.tunnel.customDns)
         assertTrue(view.routing.packages.isEmpty())
         assertFalse(view.updates.automatic)
         assertEquals(ProbeMethod.KURD_SESSION, view.probes.method)
-        assertTrue(persisted.connection.autoConnectOnBoot)
+        assertTrue(persisted.connection.autoConnectOnLaunch)
         assertEquals(setOf("org.legacy.app"), persisted.routing.packages)
         assertEquals("192.0.2.1", persisted.tunnel.customDns)
         // Empty INCLUDE_ONLY remains invalid, never widened to ALL_APPS for runtime.
@@ -251,7 +285,7 @@ class ProtectedStatePreviewBackupPolicyTest {
 
     @Test fun committedPackageProjectionTakesDefensiveCopyAndKeepsSupportedSettings() {
         val packages = mutableSetOf("org.committed.app")
-        val persisted = Phase9Settings(connection = ConnectionPreferences(selectionMode = SelectionMode.KURD_ONLY), tunnel = TunnelPreferences(ipMode = IpMode.IPV4_ONLY, mtu = 1400))
+        val persisted = ProductSettings(connection = ConnectionPreferences(selectionMode = SelectionMode.KURD_ONLY), tunnel = TunnelPreferences(ipMode = IpMode.IPV4_ONLY, mtu = 1400))
         val view = ProtectedStatePreviewBackupPolicy.projectSettings(persisted, packages)
         packages.clear()
         assertEquals(setOf("org.committed.app"), view.routing.packages)
@@ -386,7 +420,7 @@ private class PreviewFixture(keyCount: Int = 0, withProfiles: Boolean = false, p
             ProfileCatalogEntity("profile-public", "FINALIZED", 1, 1, "AVAILABLE"),
             ProfileCatalogEntity("profile-quarantined", "QUARANTINED", 1, 1, "QUARANTINED")) else emptyList()
         snapshot = ProtectedStateSnapshot.create(ByteArray(16) { 1 }, 2, null, refs,
-            SettingsProjectionCodec.fromModel(Phase9Settings()), ProfileCatalogProjectionCodec.encode(rows), ByteArray(JournalLimits.OPERATION_BYTES) { 2 })
+            SettingsProjectionCodec.fromModel(ProductSettings()), ProfileCatalogProjectionCodec.encode(rows), ByteArray(JournalLimits.OPERATION_BYTES) { 2 })
         journal.initialize(ByteArray(16) { 1 })
         val raw = snapshot.encode()
         assertEquals(ProtectedMutationStatus.COMMITTED, journal.mutate(MutationKind.MIGRATION, ByteArray(JournalLimits.OPERATION_BYTES) { 2 }, raw, {}, {

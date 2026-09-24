@@ -4,6 +4,86 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProtectedStateJournalLifecycleTest {
+    @Test fun explicitMutationCompactsBeforeHistoryDominatesRuntimePublication() {
+        val disk = MemoryJournalStorage()
+        val journal = ProtectedStateOperationJournal(disk)
+        journal.initialize(ByteArray(16) { 1 })
+        repeat(16) { index ->
+            assertEquals(ProtectedMutationStatus.COMMITTED, journal.mutate(MutationKind.ROUTING,
+                ByteArray(32) { (index + 1).toByte() }, byteArrayOf(7), {}, { byteArrayOf(7) }))
+        }
+        val before = journal.readCheckpoint()
+        assertEquals(JournalAdmission.COMPACT_FIRST,
+            ProtectedStateJournalLifecycle.admission(journal.readControl(), disk.inventory(JournalLimits.OBJECTS), 0))
+        val revision = journal.readControl().revision
+        assertEquals(ProtectedMutationStatus.COMMITTED, journal.compact { before.clone() })
+        assertEquals(revision, journal.readControl().revision)
+        assertArrayEquals(before, journal.readCheckpoint())
+        assertEquals(JournalAdmission.ADMIT,
+            ProtectedStateJournalLifecycle.admission(journal.readControl(), disk.inventory(JournalLimits.OBJECTS), 0))
+    }
+    @Test fun preReservationRejectionWritesNothingAndKeepsExactCleanControl() {
+        val storage = MemoryJournalStorage()
+        val journal = ProtectedStateOperationJournal(storage)
+        journal.initialize(ByteArray(16) { 1 })
+        val before = journal.readControl().encode()
+        storage.events.clear()
+        var calls = 0
+        assertEquals(ProtectedMutationStatus.NO_MUTATION, journal.mutate(MutationKind.PROJECTION_SCHEMA,
+            ByteArray(32) { 2 }, byteArrayOf(3), { error("mutation must not run") }, { error("reconstruction must not run") },
+            beforeReservation = { current ->
+                calls++; assertFalse(current.dirty); assertArrayEquals(before, current.encode()); error("SCHEMA_CHANGED")
+            }))
+        assertEquals(1, calls)
+        assertArrayEquals(before, journal.readControl().encode())
+        assertFalse(storage.events.any { it.startsWith("write:") })
+    }
+    @Test fun dirtyProductEnvelopeCannotBeCollectedAndCommittedReadsSurviveGcAndCompaction() {
+        val state = BrokerFixture()
+        state.projections.beforePublish = { error("SYNTHETIC_INTERRUPTION") }
+        assertEquals(ProtectedMutationStatus.DIRTY, state.broker().applyProductStoreCommand(2, ProductStoreCommand.RecordStart(100)).status)
+        state.projections.beforePublish = null
+        val temporary = operationObjectLeaf(state.journal.readControl().operationId(), 1)
+        val objects = object : JournalObjectAccess {
+            override fun inventory() = state.objects.map { JournalStoredEntry(it.key, it.value.size.toLong()) }
+            override fun read(name: String) = state.objects[name]?.clone()
+            override fun delete(name: String, expected: ByteArray) {
+                check(state.objects[name]?.contentEquals(expected) == true)
+                state.objects.remove(name)?.fill(0)
+            }
+        }
+        val collector = ProtectedStateGarbageCollector(state.storage, state.journal, objects)
+        assertEquals(GarbageResult.MAINTENANCE_UNPROVEN, collector.collect(ByteArray(32) { 8 }, emptySet(), emptySet(), emptySet()))
+        assertTrue(state.objects.containsKey(temporary))
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().recoverProductOperationConfirmed(false).status)
+        assertEquals(GarbageResult.COMPLETE, collector.collect(ByteArray(32) { 9 }, emptySet(), emptySet(), emptySet()))
+        assertFalse(state.objects.containsKey(temporary))
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().recoverProductOperationConfirmed(false).status)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.journal.compact { state.snapshot().encode() })
+        assertEquals(GarbageResult.COMPLETE, collector.collect(ByteArray(32) { 10 }, emptySet(), emptySet(), emptySet()))
+        val snapshot = state.snapshot()
+        val blobs = ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)
+        assertEquals(100L, org.kurdistanvpn.data.secure.CrashSafeModeStore.readOnly(blobs).load()!!.startedEpochHour)
+        assertNotEquals(ProtectedMutationStatus.COMMITTED, state.broker().recoverProductOperationConfirmed(false).status)
+    }
+
+    @Test fun noOpAtCompactionBoundaryPerformsNoMaintenanceWrites() {
+        val state = BrokerFixture()
+        var starts = 0
+        while (starts < 11 || state.journal.readControl().recordCount < JournalLimits.COMPACT_RECORDS) {
+            val revision = state.journal.readControl().revision
+            assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductStoreCommand(revision, ProductStoreCommand.RecordStart(revision)).status)
+            starts++
+        }
+        val revision = state.journal.readControl().revision
+        assertEquals(JournalAdmission.COMPACT_FIRST, ProtectedStateJournalLifecycle.admission(state.journal.readControl(), state.storage.inventory(JournalLimits.OBJECTS), 0))
+        state.storage.events.clear()
+        val objects = state.objectWrites
+        // The count is saturated; the exact prior start hour is the final operation's old revision.
+        assertEquals(ProtectedMutationStatus.NO_MUTATION, state.broker().applyProductStoreCommand(revision, ProductStoreCommand.RecordStart(revision - 2)).status)
+        assertEquals(objects, state.objectWrites)
+        assertFalse(state.storage.events.any { it.startsWith("write:") })
+    }
     @Test fun identicalStateAfterABAStillHasANewerDurableRevisionAndRejectsTheOriginalCas() {
         val storage = MemoryJournalStorage()
         val journal = ProtectedStateOperationJournal(storage)

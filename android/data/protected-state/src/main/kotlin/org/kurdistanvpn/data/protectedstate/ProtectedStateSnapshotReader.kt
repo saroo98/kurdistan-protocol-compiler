@@ -13,6 +13,9 @@ import org.kurdistanvpn.data.secure.SecureDataClass
 import org.kurdistanvpn.data.secure.SecureEnvelopeCodec
 import org.kurdistanvpn.data.secure.SecureOperationBinding
 
+/** Temporary role 27 is deliberately not admissible as a live checkpoint reference. */
+internal fun isLiveProtectedRole(role: Int): Boolean = role in 1..13 || role in 19..26 || role in 28..30
+
 /** Immutable references and a read function only. This type has no mutable storage supertype. */
 internal class ReadOnlyProtectedBlobView(
     references: List<ProtectedObjectReference>,
@@ -24,7 +27,7 @@ internal class ReadOnlyProtectedBlobView(
         owned.associateBy { it.dataClass to it.logicalId }.also { require(it.size == owned.size) }
     }
     override fun reopen(localRecordId: String, dataClass: SecureDataClass): ByteArray {
-        require(localRecordId.validRecordId() && dataClass.wireValue in 1..13)
+        require(localRecordId.validRecordId() && isLiveProtectedRole(dataClass.wireValue))
         val reference = checkNotNull(entries[dataClass.wireValue to localRecordId]) { "OBJECT_NOT_COMMITTED" }
         require(reference.keyGeneration == key.generation)
         val encrypted = checkNotNull(readEncrypted(reference.physicalId)) { "OBJECT_MISSING" }
@@ -38,11 +41,15 @@ internal class ReadOnlyProtectedBlobView(
         } finally { encrypted.fill(0) }
     }
     override fun exists(localRecordId: String, dataClass: SecureDataClass): Boolean {
-        require(localRecordId.validRecordId() && dataClass.wireValue in 1..13)
-        if (!entries.containsKey(dataClass.wireValue to localRecordId)) return false
-        // Missing/corrupt referenced material is an integrity failure, not an absent optional record.
-        reopen(localRecordId, dataClass).fill(0)
+        val plaintext = reopenIfPresent(localRecordId, dataClass) ?: return false
+        plaintext.fill(0)
         return true
+    }
+    override fun reopenIfPresent(localRecordId: String, dataClass: SecureDataClass): ByteArray? {
+        require(localRecordId.validRecordId() && isLiveProtectedRole(dataClass.wireValue))
+        if (!entries.containsKey(dataClass.wireValue to localRecordId)) return null
+        // Missing/corrupt referenced material is an integrity failure, not an absent optional record.
+        return reopen(localRecordId, dataClass)
     }
 }
 
@@ -85,7 +92,7 @@ internal class ProtectedObjectReference private constructor(
             return ProtectedObjectReference(role, logical, physical, generation, length, digest, binding)
         }
         private fun validate(role: Int, logical: String, physical: String, generation: Int, length: Int) {
-            require(role in 1..13 && logical.validRecordId() && physical.validRecordId())
+            require(isLiveProtectedRole(role) && logical.validRecordId() && physical.validRecordId())
             require(generation > 0 && length in 1..JournalLimits.OBJECT_BYTES)
         }
     }
@@ -132,6 +139,11 @@ internal class ProtectedStateSnapshot private constructor(
                 require(operation.size == JournalLimits.OPERATION_BYTES && operation.any { it != 0.toByte() })
                 require(selected == null || selected.validRecordId())
                 require(ownedSettings.size in 1..64 * 1024 && ownedCatalog.size in 1..512 * 1024)
+                if (org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.isProduct(ownedCatalog)) {
+                    org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.decode(ownedCatalog).operation?.let {
+                        require(it.operationId == operation.joinToString("") { byte -> "%02x".format(byte) }) { "STALE_OPERATION_DESCRIPTOR" }
+                    }
+                }
                 require(ownedRefs.size <= JournalLimits.OBJECTS)
                 require(ownedRefs.map { it.dataClass to it.logicalId }.toSet().size == ownedRefs.size)
                 require(ownedRefs.map { it.physicalId }.toSet().size == ownedRefs.size)
