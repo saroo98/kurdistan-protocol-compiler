@@ -560,8 +560,8 @@ func TestHistoricalDirectoryIsNotAbsent(t *testing.T) {
 
 func TestExactSubjectKeepsRequestedBaselineAndDefensiveInventory(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", "..", ".."))
-	const commit = "3085db310d17ac5e9bed023d9daf4129e806ef4b"
-	const tree = "bf938d47610f2c30eefc0e856657f5357306a17f"
+	const commit = "701640938e945c8fac499b165d6d2dcb92f49122"
+	const tree = "8adfeb2b80eb7fee19202eefa49ecf7eba8560a3"
 	s, err := OpenExactSubject(root, commit, tree)
 	if err != nil {
 		t.Fatal(err)
