@@ -7,8 +7,6 @@ import (
 	"bytes"
 	"debug/elf"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -139,11 +137,27 @@ const phase17AppPackage = "org.kurdistanvpn.app"
 const phase17SystemVPNAction = "android.net.VpnService"
 
 func verifyPhase17SourceManifest(root string) error {
-	manifest, err := androidartifact.ReadManifest(filepath.Join(root, filepath.FromSlash(phase17RuntimeAndroidManifestPath)))
+	return verifySourceManifest(root, true)
+}
+
+func verifySourceManifest(root string, alwaysOn bool) error {
+	runtimeSource, err := readRequired(root, phase17RuntimeAndroidManifestPath)
+	if err != nil {
+		return err
+	}
+	appSource, err := readRequired(root, phase17AppAndroidManifestPath)
+	if err != nil {
+		return err
+	}
+	return verifySourceManifestBytes([]byte(runtimeSource), []byte(appSource), alwaysOn)
+}
+
+func verifySourceManifestBytes(runtimeSource, appSource []byte, alwaysOn bool) error {
+	manifest, err := androidartifact.ParseManifest(runtimeSource)
 	if err != nil {
 		return fmt.Errorf("read runtime Android manifest: %w", err)
 	}
-	app, err := androidartifact.ReadManifest(filepath.Join(root, filepath.FromSlash(phase17AppAndroidManifestPath)))
+	app, err := androidartifact.ParseManifest(appSource)
 	if err != nil {
 		return fmt.Errorf("read application Android manifest: %w", err)
 	}
@@ -163,49 +177,48 @@ func verifyPhase17SourceManifest(root string) error {
 		service.Name = phase17QualifiedServiceName(service.Name, "org.kurdistanvpn.runtime.android")
 		app.Services = append(app.Services, service)
 	}
-	if err := verifyPhase17ServiceBoundaries(app); err != nil {
+	if err := verifyServiceBoundaries(app, alwaysOn); err != nil {
 		return fmt.Errorf("corrected source service boundaries: %w", err)
 	}
 	return nil
 }
 
-func verifyPhase17Artifacts(releasePath, internalPath, manifestPath string) error {
-	info, err := os.Stat(releasePath)
-	if err != nil {
-		return fmt.Errorf("release APK: %w", err)
-	}
-	if info.Size() > phase17MaxReleaseAPKBytes {
-		return fmt.Errorf("release APK is %d bytes, exceeds %d-byte budget", info.Size(), phase17MaxReleaseAPKBytes)
-	}
-	manifest, err := androidartifact.ReadManifest(manifestPath)
-	if err != nil {
-		return fmt.Errorf("merged release manifest: %w", err)
-	}
-	if err := verifyPhase17Manifest(manifest); err != nil {
-		return fmt.Errorf("merged release manifest: %w", err)
-	}
-	limits := androidartifact.Limits{MaxEntryBytes: 64 << 20, MaxTotalBytes: 512 << 20}
-	release, err := androidartifact.ReadAPK(releasePath, limits)
-	if err != nil {
-		return fmt.Errorf("release APK: %w", err)
-	}
-	if err := verifyPhase17APKMarkers(release); err != nil {
-		return err
-	}
-	if err := verifyPhase17NativeSurface(release, false); err != nil {
-		return fmt.Errorf("release APK: %w", err)
-	}
-	internal, err := androidartifact.ReadAPK(internalPath, limits)
-	if err != nil {
-		return fmt.Errorf("internal APK: %w", err)
-	}
-	if err := verifyPhase17NativeSurface(internal, true); err != nil {
-		return fmt.Errorf("internal APK: %w", err)
-	}
-	if err := verifyPhase17InternalAPKMarkers(internal); err != nil {
-		return err
-	}
-	return nil
+func verifyPhase17Artifacts(releasePath, internalPath, manifestPath, aapt2Path string) error {
+	return withReleaseSnapshot(releasePath, func(raw []byte, snapshot string) error {
+		resolver, err := inspectWorkManagerAPK(aapt2Path, snapshot)
+		if err != nil {
+			return fmt.Errorf("release APK WorkManager binding: %w", err)
+		}
+		manifest, err := androidartifact.ReadManifestWithServiceEnabledResolver(manifestPath, resolver)
+		if err != nil {
+			return fmt.Errorf("merged release manifest: %w", err)
+		}
+		if err := verifyCurrentArtifactManifest(manifest); err != nil {
+			return fmt.Errorf("merged release manifest: %w", err)
+		}
+		limits := androidartifact.Limits{MaxEntryBytes: 64 << 20, MaxTotalBytes: 512 << 20}
+		release, err := androidartifact.ParseAPK(raw, limits)
+		if err != nil {
+			return fmt.Errorf("release APK: %w", err)
+		}
+		if err := verifyPhase17APKMarkers(release); err != nil {
+			return err
+		}
+		if err := verifyPhase17NativeSurface(release, false); err != nil {
+			return fmt.Errorf("release APK: %w", err)
+		}
+		internal, err := androidartifact.ReadAPK(internalPath, limits)
+		if err != nil {
+			return fmt.Errorf("internal APK: %w", err)
+		}
+		if err := verifyPhase17NativeSurface(internal, true); err != nil {
+			return fmt.Errorf("internal APK: %w", err)
+		}
+		if err := verifyPhase17InternalAPKMarkers(internal); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func verifyPhase17InternalAPKMarkers(artifact androidartifact.APK) error {
@@ -252,6 +265,10 @@ func phase17QualifiedServiceName(name, namespace string) string {
 }
 
 func verifyPhase17ServiceBoundaries(manifest androidartifact.Manifest) error {
+	return verifyServiceBoundaries(manifest, true)
+}
+
+func verifyServiceBoundaries(manifest androidartifact.Manifest, alwaysOn bool) error {
 	if manifest.PackageName != phase17AppPackage || (manifest.ApplicationProcess != "" && manifest.ApplicationProcess != phase17AppPackage) || manifest.ApplicationPermission != "" ||
 		boolTrue(manifest.ApplicationDirectBootAware) || boolTrue(manifest.DefaultToDeviceProtectedStorage) || boolFalse(manifest.ApplicationEnabled) {
 		return fmt.Errorf("application defaults violate the default-process credential-protected boundary")
@@ -292,8 +309,8 @@ func verifyPhase17ServiceBoundaries(manifest androidartifact.Manifest) error {
 		strings.TrimSpace(vpn.SpecialUseSubtype) == "" || len(vpn.SpecialUseSubtype) > 1024 {
 		return fmt.Errorf("invalid Kurd VpnService declaration boundary")
 	}
-	if vpn.SupportsAlwaysOn == nil || !*vpn.SupportsAlwaysOn {
-		return fmt.Errorf("Kurd VpnService must explicitly support system-managed always-on VPN")
+	if vpn.SupportsAlwaysOn == nil || *vpn.SupportsAlwaysOn != alwaysOn {
+		return fmt.Errorf("Kurd VpnService must explicitly declare qualified always-on support %t", alwaysOn)
 	}
 	if reissue.Exported || !boolFalse(reissue.DirectBootAware) || boolFalse(reissue.Enabled) || boolTrue(reissue.IsolatedProcess) || boolTrue(reissue.ExternalService) ||
 		reissue.Permission != "" || (reissue.Process != "" && reissue.Process != phase17AppPackage) || reissue.ForegroundServiceType != "" || reissue.SpecialUseSubtype != "" ||

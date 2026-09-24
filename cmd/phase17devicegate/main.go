@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Saro
 
-// Command phase17devicegate runs the exact current Phase 17 instrumentation
-// inventory through the hardened Android device runner.
+// Command phase17devicegate runs the exact current Android instrumentation
+// inventory through the hardened runner, retaining the Phase 17 core subset.
 package main
 
 import (
@@ -96,7 +96,7 @@ func main() {
 	flag.StringVar(&value.appPackage, "app-package", "org.kurdistanvpn.app.internal", "application package")
 	flag.StringVar(&value.testPackage, "test-package", "org.kurdistanvpn.app.internal.test", "instrumentation package")
 	flag.StringVar(&value.conflictingPackage, "conflicting-app-package", "org.kurdistanvpn.app.debug", "sibling package to stop")
-	flag.StringVar(&value.expectedTests, "expected-tests", "android/config/phase17-required-device-tests.txt", "exact Phase 17 test manifest")
+	flag.StringVar(&value.expectedTests, "expected-tests", "android/config/phase18-current-device-tests.txt", "current exact test manifest (explicit historical manifests supported)")
 	flag.StringVar(&value.evidenceDir, "evidence-dir", ".tools/phase17/device-gate/latest", "bounded raw device evidence directory")
 	flag.IntVar(&value.minimumTests, "minimum-tests", 1, "minimum completed tests")
 	flag.IntVar(&value.expectedAPI, "expected-api", 0, "exact Android API lane")

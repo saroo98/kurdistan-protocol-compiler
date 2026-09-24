@@ -9,6 +9,7 @@ import (
 	"debug/elf"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -165,14 +166,20 @@ func TestPhase17ManifestRejectsEveryReissueAndTunnelBoundaryMismatch(t *testing.
 
 func TestPhase17NativeJNIInventoryIncludesExactDurableExports(t *testing.T) {
 	// This independently checks source declarations, not linked or installed ELF behavior.
+	// Phase17's immutable policy belongs to its exact historical subject, not the
+	// current Task7 sources, whose export policy is checked separately.
+	subject, err := evidenceoverlay.OpenExactSubject(repositoryRoot(t), phase17InventoryCommit, phase17InventoryTree)
+	if err != nil {
+		t.Fatal(err)
+	}
 	declaration := regexp.MustCompile(`JNIEXPORT\s+\w+\s+JNICALL\s+(\w+)\s*\(`)
 	var actual []string
 	for _, name := range []string{"kvpn_jni.c", "kvpn_durable_fs_jni.c"} {
-		raw, err := os.ReadFile(filepath.Join(repositoryRoot(t), "android", "core", "native-jni", "src", "main", "cpp", name))
+		file, err := subject.Read("android/core/native-jni/src/main/cpp/" + name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, match := range declaration.FindAllSubmatch(raw, -1) {
+		for _, match := range declaration.FindAllSubmatch(file.Content, -1) {
 			actual = append(actual, string(match[1]))
 		}
 	}
@@ -276,13 +283,13 @@ func TestPhase17InternalAPKRequiresOwnerSocketProtectionBridge(t *testing.T) {
 }
 
 func TestArtifactPathsRequireAllOrNone(t *testing.T) {
-	if enabled, err := validateArtifactPaths("", "", ""); err != nil || enabled {
+	if enabled, err := validateArtifactPaths("", "", "", ""); err != nil || enabled {
 		t.Fatalf("empty artifact paths = %v, %v", enabled, err)
 	}
-	if enabled, err := validateArtifactPaths("release.apk", "internal.apk", "manifest.xml"); err != nil || !enabled {
+	if enabled, err := validateArtifactPaths("release.apk", "internal.apk", "manifest.xml", "sdk/aapt2"); err != nil || !enabled {
 		t.Fatalf("complete artifact paths = %v, %v", enabled, err)
 	}
-	if _, err := validateArtifactPaths("release.apk", "", "manifest.xml"); err == nil {
+	if _, err := validateArtifactPaths("release.apk", "", "manifest.xml", "sdk/aapt2"); err == nil {
 		t.Fatal("partial artifact paths were accepted")
 	}
 }
@@ -316,6 +323,24 @@ func phase17ManifestFixture(t *testing.T, extraPermissions []string, cleartext b
 			Name:            "org.kurdistanvpn.app.RuntimeAuthorityReissueService",
 			DirectBootAware: &directBootAware,
 		}},
+	}
+}
+
+func TestCurrentWorkManagerManifestPolicy(t *testing.T) {
+	manifest := phase17ManifestFixture(t, []string{"android.permission.WAKE_LOCK", "android.permission.RECEIVE_BOOT_COMPLETED"}, false)
+	if err := verifyPhase17Manifest(manifest); err == nil {
+		t.Fatal("historical permission policy widened")
+	}
+	yes, no := true, false
+	manifest.Services = append(manifest.Services,
+		androidartifact.Service{Name: "androidx.work.impl.background.systemjob.SystemJobService", Permission: "android.permission.BIND_JOB_SERVICE", PermissionDeclared: true, Exported: true, Enabled: &yes, DirectBootAware: &no},
+		androidartifact.Service{Name: "androidx.work.impl.foreground.SystemForegroundService", Enabled: &yes, DirectBootAware: &no})
+	before := append([]string(nil), manifest.Permissions...)
+	if err := verifyCurrentArtifactManifest(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(manifest.Permissions, before) {
+		t.Fatal("caller permissions mutated")
 	}
 }
 
@@ -365,7 +390,7 @@ func TestPhase17SourceManifestRejectsAlwaysOnOptOut(t *testing.T) {
 	}
 }
 
-func TestPhase17CurrentSourceManifestCorrectionBoundary(t *testing.T) {
+func TestCurrentSourceManifestPreservesQualifiedAlwaysOnBoundary(t *testing.T) {
 	// This is an integration gate over the actual source declarations, not the
 	// passing synthetic fixtures above and not merged or installed evidence.
 	if err := verifyPhase17SourceManifest(repositoryRoot(t)); err != nil {

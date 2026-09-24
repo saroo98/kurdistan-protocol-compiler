@@ -131,6 +131,23 @@
       ]
     },
     {
+      "name": "androidx.window:window-core-android",
+      "SPDXID": "SPDXRef-Package-074c514fa32d39ea",
+      "versionInfo": "1.5.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.window/window-core-android@1.5.1?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.lifecycle:lifecycle-common-jvm",
       "SPDXID": "SPDXRef-Package-079bab65c414c93a",
       "versionInfo": "2.10.0",
@@ -233,6 +250,23 @@
       ]
     },
     {
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-bom",
+      "SPDXID": "SPDXRef-Package-0a57557df2b4e1ca",
+      "versionInfo": "1.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-bom@1.10.0?type=pom"
+        }
+      ]
+    },
+    {
       "name": "androidx.media3:media3-common",
       "SPDXID": "SPDXRef-Package-0a85ce97d86537d9",
       "versionInfo": "1.9.0",
@@ -280,6 +314,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-android@2.10.0?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.emoji2:emoji2-views-helper",
+      "SPDXID": "SPDXRef-Package-0fa908d47804a382",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.emoji2/emoji2-views-helper@1.3.0?type=aar"
         }
       ]
     },
@@ -399,6 +450,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.concurrent/concurrent-futures@1.1.0?type=jar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.activity:activity",
+      "SPDXID": "SPDXRef-Package-15b82515cf9a4412",
+      "versionInfo": "1.8.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.activity/activity@1.8.0?type=aar"
         }
       ]
     },
@@ -845,6 +913,23 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+      "SPDXID": "SPDXRef-Package-2e81f436b607cfc6",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel-savedstate@2.6.2?type=aar"
+        }
+      ]
+    },
+    {
       "name": "com.squareup.okio:okio",
       "SPDXID": "SPDXRef-Package-30948842ed7058ef",
       "versionInfo": "3.9.1",
@@ -1134,6 +1219,23 @@
       ]
     },
     {
+      "name": "androidx.appcompat:appcompat",
+      "SPDXID": "SPDXRef-Package-3e20c971818953bd",
+      "versionInfo": "1.7.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.appcompat/appcompat@1.7.1?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.datastore:datastore-core-android",
       "SPDXID": "SPDXRef-Package-3e84d5fe851f8754",
       "versionInfo": "1.2.1",
@@ -1355,6 +1457,23 @@
       ]
     },
     {
+      "name": "androidx.appcompat:appcompat-resources",
+      "SPDXID": "SPDXRef-Package-4b4b33e55455e346",
+      "versionInfo": "1.7.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.appcompat/appcompat-resources@1.7.1?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.compose.material:material-ripple-android",
       "SPDXID": "SPDXRef-Package-4b588bdcee0e9f55",
       "versionInfo": "1.8.1",
@@ -1436,6 +1555,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.1?type=jar"
+        }
+      ]
+    },
+    {
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      "SPDXID": "SPDXRef-Package-4e5c20c56bc3c364",
+      "versionInfo": "1.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-json@1.10.0?type=pom"
         }
       ]
     },
@@ -1644,6 +1780,23 @@
       ]
     },
     {
+      "name": "androidx.collection:collection",
+      "SPDXID": "SPDXRef-Package-5a0a77d63e96c590",
+      "versionInfo": "1.4.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.collection/collection@1.4.2?type=pom"
+        }
+      ]
+    },
+    {
       "name": "androidx.print:print",
       "SPDXID": "SPDXRef-Package-5a8e2b3a88115ef8",
       "versionInfo": "1.0.0",
@@ -1674,6 +1827,57 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.navigationevent/navigationevent-compose-android@1.1.2?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+      "SPDXID": "SPDXRef-Package-5b94ca0a03e12365",
+      "versionInfo": "1.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm@1.10.0?type=jar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.lifecycle:lifecycle-process",
+      "SPDXID": "SPDXRef-Package-5b983efca074c38e",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-process@2.6.2?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.emoji2:emoji2-views-helper",
+      "SPDXID": "SPDXRef-Package-5c5d4a0e18db02a9",
+      "versionInfo": "1.4.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.emoji2/emoji2-views-helper@1.4.0?type=aar"
         }
       ]
     },
@@ -1729,6 +1933,23 @@
       ]
     },
     {
+      "name": "androidx.emoji2:emoji2",
+      "SPDXID": "SPDXRef-Package-5fddfd02af2aa313",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.emoji2/emoji2@1.3.0?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.lifecycle:lifecycle-viewmodel",
       "SPDXID": "SPDXRef-Package-5ff19fc5860da3c1",
       "versionInfo": "2.6.1",
@@ -1776,6 +1997,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.room/room-common@2.8.4?type=pom"
+        }
+      ]
+    },
+    {
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+      "SPDXID": "SPDXRef-Package-61ac787b367902db",
+      "versionInfo": "1.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.10.0?type=jar"
         }
       ]
     },
@@ -1899,6 +2137,23 @@
       ]
     },
     {
+      "name": "androidx.work:work-runtime",
+      "SPDXID": "SPDXRef-Package-6dcf9c7ac237203f",
+      "versionInfo": "2.11.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.work/work-runtime@2.11.2?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.datastore:datastore-preferences-external-protobuf",
       "SPDXID": "SPDXRef-Package-6e100f43dfa305ec",
       "versionInfo": "1.2.1",
@@ -1929,6 +2184,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-runtime-ktx-android@2.10.0?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.lifecycle:lifecycle-livedata",
+      "SPDXID": "SPDXRef-Package-6f261a564194db69",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-livedata@2.6.2?type=aar"
         }
       ]
     },
@@ -1984,6 +2256,23 @@
       ]
     },
     {
+      "name": "androidx.fragment:fragment",
+      "SPDXID": "SPDXRef-Package-748f70ee44bb135f",
+      "versionInfo": "1.5.4",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.fragment/fragment@1.5.4?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.camera:camera-camera2",
       "SPDXID": "SPDXRef-Package-77333e246ba4ff49",
       "versionInfo": "1.6.1",
@@ -2014,6 +2303,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.annotation/annotation-experimental@1.5.0?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.window:window",
+      "SPDXID": "SPDXRef-Package-78b58e428224f57f",
+      "versionInfo": "1.5.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.window/window@1.5.1?type=aar"
         }
       ]
     },
@@ -2188,6 +2494,23 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-common",
+      "SPDXID": "SPDXRef-Package-7fd863643a78a431",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-common@2.6.2?type=jar"
+        }
+      ]
+    },
+    {
       "name": "androidx.compose.runtime:runtime-saveable-android",
       "SPDXID": "SPDXRef-Package-80917a6801090572",
       "versionInfo": "1.11.4",
@@ -2235,6 +2558,40 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.concurrent/concurrent-futures-ktx@1.1.0?type=jar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.core:core-ktx",
+      "SPDXID": "SPDXRef-Package-87ad4fe98d51e103",
+      "versionInfo": "1.12.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.core/core-ktx@1.12.0?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-core",
+      "SPDXID": "SPDXRef-Package-87f4b815b484b53e",
+      "versionInfo": "1.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core@1.10.0?type=pom"
         }
       ]
     },
@@ -2545,6 +2902,23 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-service",
+      "SPDXID": "SPDXRef-Package-95132a3657a7f3c7",
+      "versionInfo": "2.10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-service@2.10.0?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.media3:media3-container",
       "SPDXID": "SPDXRef-Package-95533e71bf37fac4",
       "versionInfo": "1.9.0",
@@ -2575,6 +2949,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.exifinterface/exifinterface@1.4.2?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.collection:collection-jvm",
+      "SPDXID": "SPDXRef-Package-96ae8c392a0d25b5",
+      "versionInfo": "1.4.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.collection/collection-jvm@1.4.2?type=jar"
         }
       ]
     },
@@ -3055,6 +3446,23 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-runtime",
+      "SPDXID": "SPDXRef-Package-bc832d9f230facf7",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-runtime@2.6.2?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.annotation:annotation-jvm",
       "SPDXID": "SPDXRef-Package-bc8c12c90e5dc18a",
       "versionInfo": "1.9.1",
@@ -3293,6 +3701,40 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-livedata-core",
+      "SPDXID": "SPDXRef-Package-cafd044c2dff8367",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-livedata-core@2.6.2?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.tracing:tracing-ktx",
+      "SPDXID": "SPDXRef-Package-cbb730f71cf4e4ec",
+      "versionInfo": "1.2.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.tracing/tracing-ktx@1.2.0?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.window:window",
       "SPDXID": "SPDXRef-Package-cc082b17ef0d354c",
       "versionInfo": "1.5.0",
@@ -3306,6 +3748,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.window/window@1.5.0?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.lifecycle:lifecycle-viewmodel",
+      "SPDXID": "SPDXRef-Package-ce00516bd5c17ebd",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-viewmodel@2.6.2?type=aar"
         }
       ]
     },
@@ -3425,6 +3884,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.navigation3/navigation3-runtime-android@1.1.4?type=aar"
+        }
+      ]
+    },
+    {
+      "name": "androidx.resourceinspection:resourceinspection-annotation",
+      "SPDXID": "SPDXRef-Package-d5493f239ba897be",
+      "versionInfo": "1.0.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.resourceinspection/resourceinspection-annotation@1.0.1?type=jar"
         }
       ]
     },
@@ -3616,6 +4092,23 @@
       ]
     },
     {
+      "name": "androidx.core:core",
+      "SPDXID": "SPDXRef-Package-def7188165fdbb54",
+      "versionInfo": "1.12.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.core/core@1.12.0?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.window:window-core",
       "SPDXID": "SPDXRef-Package-defa3e3eadd1d4c1",
       "versionInfo": "1.5.0",
@@ -3735,6 +4228,23 @@
       ]
     },
     {
+      "name": "androidx.lifecycle:lifecycle-service",
+      "SPDXID": "SPDXRef-Package-e9f50775176cb97a",
+      "versionInfo": "2.6.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-service@2.6.2?type=aar"
+        }
+      ]
+    },
+    {
       "name": "androidx.compose.runtime:runtime",
       "SPDXID": "SPDXRef-Package-eb8a203b30d2b3f0",
       "versionInfo": "1.11.4",
@@ -3850,6 +4360,23 @@
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:maven/androidx.lifecycle/lifecycle-runtime-ktx@2.9.4?type=pom"
+        }
+      ]
+    },
+    {
+      "name": "androidx.window:window-core",
+      "SPDXID": "SPDXRef-Package-f499e839abc4c212",
+      "versionInfo": "1.5.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/androidx.window/window-core@1.5.1?type=pom"
         }
       ]
     },
@@ -4131,6 +4658,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-074c514fa32d39ea"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-079bab65c414c93a"
     },
     {
@@ -4161,6 +4693,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-0a57557df2b4e1ca"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-0a85ce97d86537d9"
     },
     {
@@ -4172,6 +4709,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-0e1b97c92f49457c"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-0fa908d47804a382"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4207,6 +4749,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-1594e23b0b0486b2"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-15b82515cf9a4412"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4341,6 +4888,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-2e81f436b607cfc6"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-30948842ed7058ef"
     },
     {
@@ -4426,6 +4978,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-3e20c971818953bd"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-3e84d5fe851f8754"
     },
     {
@@ -4491,6 +5048,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-4b4b33e55455e346"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-4b588bdcee0e9f55"
     },
     {
@@ -4512,6 +5074,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-4de53412c1c023c9"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-4e5c20c56bc3c364"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4576,12 +5143,32 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-5a0a77d63e96c590"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-5a8e2b3a88115ef8"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-5b23cbf299075df9"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-5b94ca0a03e12365"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-5b983efca074c38e"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-5c5d4a0e18db02a9"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4601,6 +5188,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-5fddfd02af2aa313"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-5ff19fc5860da3c1"
     },
     {
@@ -4612,6 +5204,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-609608cad28862bb"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-61ac787b367902db"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4651,12 +5248,22 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-6dcf9c7ac237203f"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-6e100f43dfa305ec"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-6ef7223bcf76c03d"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-6f261a564194db69"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4676,12 +5283,22 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-748f70ee44bb135f"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-77333e246ba4ff49"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-7859e90ac49a1f54"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-78b58e428224f57f"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4736,6 +5353,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-7fd863643a78a431"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-80917a6801090572"
     },
     {
@@ -4747,6 +5369,16 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-84031842478279a1"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-87ad4fe98d51e103"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-87f4b815b484b53e"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4841,12 +5473,22 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-95132a3657a7f3c7"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-95533e71bf37fac4"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-95f6c017d66fe415"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-96ae8c392a0d25b5"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -4991,6 +5633,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-bc832d9f230facf7"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-bc8c12c90e5dc18a"
     },
     {
@@ -5061,7 +5708,22 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-cafd044c2dff8367"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-cbb730f71cf4e4ec"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-cc082b17ef0d354c"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-ce00516bd5c17ebd"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -5097,6 +5759,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-d537bfb54d59d3fb"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-d5493f239ba897be"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -5156,6 +5823,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-def7188165fdbb54"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-defa3e3eadd1d4c1"
     },
     {
@@ -5191,6 +5863,11 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-e9f50775176cb97a"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-eb8a203b30d2b3f0"
     },
     {
@@ -5222,6 +5899,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-f3ef904b825bdea1"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-f499e839abc4c212"
     },
     {
       "spdxElementId": "SPDXRef-DOCUMENT",

@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"kurdistan/internal/testkit/evidenceoverlay"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,8 +15,34 @@ import (
 	"testing"
 )
 
+func TestArtifactArgumentsRejectEveryIncompleteCombination(t *testing.T) {
+	for mask := 1; mask < 15; mask++ {
+		values := make([]string, 4)
+		for i := range values {
+			if mask&(1<<i) != 0 {
+				values[i] = "provided"
+			}
+		}
+		if enabled, err := validateArtifactPaths(values[0], values[1], values[2], values[3]); err == nil || enabled {
+			t.Fatalf("partial combination %d accepted", mask)
+		}
+	}
+}
+
 func TestVerifyRepositoryLiveDataPlaneAuthority(t *testing.T) {
 	if err := verify(repositoryRoot(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGoCopiesDoNotRequireRetiredAndroidState(t *testing.T) {
+	root := copyAuthority(t)
+	value, err := loadContract(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Current transport validation must not depend on the retired Kotlin owner.
+	if err := verifyGoCopies(root, value); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -271,38 +298,47 @@ func TestLiveDataPlaneAuthorityRejectsDuplicateAndUnknownFields(t *testing.T) {
 	}
 }
 
+func fixtureStage(t *testing.T, root string, stage func(string, contract) error) func() error {
+	t.Helper()
+	value, err := loadContract(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateContract(value); err != nil {
+		t.Fatal(err)
+	}
+	check := func() error { return stage(root, value) }
+	if err := check(); err != nil {
+		t.Fatalf("unmutated stage control: %v", err)
+	}
+	return check
+}
+
+func requireStageFailure(t *testing.T, check func() error, diagnostic string) {
+	t.Helper()
+	if err := check(); err == nil || !strings.Contains(err.Error(), diagnostic) {
+		t.Fatalf("stage error = %v, want %q", err, diagnostic)
+	}
+}
+
 func TestLiveDataPlaneVerifierRejectsAuthorityAndDocumentationDrift(t *testing.T) {
-	root := copyAuthority(t)
-	if err := replaceFile(root, "internal/transport/tlstcp/carrier.go", `ALPN          = "kurd/1"`, `ALPN          = "other/1"`); err != nil {
-		t.Fatal(err)
-	}
-	if err := verify(root); err == nil {
-		t.Fatal("Go carrier authority drift accepted")
-	}
-
-	root = copyAuthority(t)
-	if err := replaceFile(root, "deploy/selfhost/native/kurd-node.service", "MemoryMax=512M", "MemoryMax=513M"); err != nil {
-		t.Fatal(err)
-	}
-	if err := verify(root); err == nil {
-		t.Fatal("deployment authority drift accepted")
-	}
-
-	root = copyAuthority(t)
-	if err := replaceFile(root, "docs/protocol/KURD-WIRE-V1-LIVE.md", "ALPN `kurd/1`", "ALPN `other/1`"); err != nil {
-		t.Fatal(err)
-	}
-	if err := verify(root); err == nil {
-		t.Fatal("public protocol documentation drift accepted")
-	}
-
-	root = copyAuthority(t)
-	path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
-	if err := os.WriteFile(path, append(mustReadFile(t, path), []byte("\nPhase 18 will make this production-ready.\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := verify(root); err == nil {
-		t.Fatal("private sequencing or unsupported readiness claim accepted")
+	for _, test := range []struct {
+		name, path, old, new, diagnostic string
+		stage                            func(string, contract) error
+	}{
+		{"carrier", "internal/transport/tlstcp/carrier.go", `ALPN          = "kurd/1"`, `ALPN          = "other/1"`, "ALPN disagrees with authority", verifyGoCopies},
+		{"service", "deploy/selfhost/native/kurd-node.service", "MemoryMax=512M", "MemoryMax=513M", "missing \"MemoryMax=512M\"", verifyDeploymentCopies},
+		{"protocol", "docs/protocol/KURD-WIRE-V1-LIVE.md", "ALPN `kurd/1`", "ALPN `other/1`", "protocol documentation disagrees", verifyPublicDocumentation},
+		{"readiness", "docs/self-hosting/LIVE-DATA-PLANE.md", "Native Linux deployment only", "Native Linux deployment only. Phase 18 will make this production-ready.", "forbidden content", verifyPublicDocumentation},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := copyAuthority(t)
+			check := fixtureStage(t, root, test.stage)
+			if err := replaceFile(root, test.path, test.old, test.new); err != nil {
+				t.Fatal(err)
+			}
+			requireStageFailure(t, check, test.diagnostic)
+		})
 	}
 }
 
@@ -364,30 +400,45 @@ func TestLiveDataPlaneAuthorityRejectsNullAtEveryJSONTypeBoundary(t *testing.T) 
 
 func TestLiveDataPlaneVerifierRejectsCarrierWireRuntimeAndKotlinDrift(t *testing.T) {
 	mutations := []struct {
-		name, path, old, new string
+		name, path, old, new, diagnostic string
 	}{
-		{"TLS minimum", "internal/transport/tlstcp/carrier.go", "cfg.MinVersion = tls.VersionTLS13", "cfg.MinVersion = tls.VersionTLS12"},
-		{"TLS resumption", "internal/transport/tlstcp/carrier.go", "cfg.SessionTicketsDisabled = true", "cfg.SessionTicketsDisabled = false"},
-		{"exporter context", "internal/transport/tlstcp/carrier.go", "state.ExportKeyingMaterial(exporterLabel, planDigest[:], 32)", "state.ExportKeyingMaterial(exporterLabel, nil, 32)"},
-		{"profile-bind type", "internal/protocol/wirev1/codec.go", "TypeProfileBind  uint8 = 3", "TypeProfileBind  uint8 = 9"},
-		{"outer flags", "internal/protocol/wirev1/codec.go", "knownFlags         = FlagCritical", "knownFlags         = 0"},
-		{"control ceiling", "internal/protocol/wirev1/codec.go", "MaxControlBytes       = 64 << 10", "MaxControlBytes       = 65 << 10"},
-		{"profile-bind body", "internal/runtime/process_record_v1.go", "body := make([]byte, 72)", "body := make([]byte, 71)"},
-		{"legacy protected-record cap", "internal/runtime/protected_channel.go", "strictFragmentMaxOperationsV1 = 8", "strictFragmentMaxOperationsV1 = 9"},
-		{"Kotlin runtime MTU", "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt", "mtu in 1280..1500", "mtu in 1279..1500"},
-		{"Kotlin native plan digest", "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt", "reader.fixedBytes(32)", "reader.fixedBytes(31)"},
-		{"live unit device boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=no", "PrivateDevices=yes"},
-		{"live unit authenticated reload", "deploy/selfhost/native/kurd-node.service", "ExecReload=/usr/local/bin/kurdctl node reload", "ExecReload=/bin/true"},
+		{"TLS minimum", "internal/transport/tlstcp/carrier.go", "cfg.MinVersion = tls.VersionTLS13", "cfg.MinVersion = tls.VersionTLS12", "carrier implementation disagrees"},
+		{"TLS resumption", "internal/transport/tlstcp/carrier.go", "cfg.SessionTicketsDisabled = true", "cfg.SessionTicketsDisabled = false", "carrier implementation disagrees"},
+		{"exporter context", "internal/transport/tlstcp/carrier.go", "state.ExportKeyingMaterial(exporterLabel, planDigest[:], 32)", "state.ExportKeyingMaterial(exporterLabel, nil, 32)", "carrier implementation disagrees"},
+		{"profile-bind type", "internal/protocol/wirev1/codec.go", "TypeProfileBind  uint8 = 3", "TypeProfileBind  uint8 = 9", "TypeProfileBind disagrees"},
+		{"outer flags", "internal/protocol/wirev1/codec.go", "knownFlags         = FlagCritical", "knownFlags         = 0", "knownFlags disagrees"},
+		{"wire delegation", "internal/protocol/wirev1/codec.go", "writeFrame(out, frame)", "// writeFrame(out, frame)", "wire Encode disagrees"},
+		{"wire helper length", "internal/protocol/wirev1/codec_buffers.go", "binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))", "binary.BigEndian.PutUint32(out[12:16], uint32(0)) // binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))", "wire writeFrame disagrees"},
+		{"wire helper magic", "internal/protocol/wirev1/codec_buffers.go", "copy(out[0:4], magic[:])", "copy(out[0:4], []byte(\"NOPE\"))", "wire writeFrame disagrees"},
+		{"wire helper versions", "internal/protocol/wirev1/codec_buffers.go", "out[4], out[5], out[6], out[7] = MajorVersion, MinorVersion, frame.Type, frame.Flags", "out[4], out[5], out[6], out[7] = 0, 0, frame.Type, frame.Flags", "wire writeFrame disagrees"},
+		{"wire helper stream", "internal/protocol/wirev1/codec_buffers.go", "binary.BigEndian.PutUint32(out[8:12], frame.StreamID)", "binary.BigEndian.PutUint32(out[8:12], 0)", "wire writeFrame disagrees"},
+		{"wire helper digest", "internal/protocol/wirev1/codec_buffers.go", "copy(out[16:48], frame.PlanDigest[:])", "copy(out[16:47], frame.PlanDigest[:])", "wire writeFrame disagrees"},
+		{"wire unrelated delegation", "internal/protocol/wirev1/codec.go", "writeFrame(out, frame)", "_ = out\n}\nfunc unrelated(out []byte, frame Frame) ([]byte, error) {\nwriteFrame(out, frame)", "wire Encode disagrees"},
+		{"wire unrelated helper", "internal/protocol/wirev1/codec_buffers.go", "func writeFrame(out []byte, frame Frame) {", "func writeFrame(out []byte, frame Frame) {}\nfunc unrelated(out []byte, frame Frame) {", "wire writeFrame disagrees"},
+		{"control ceiling", "internal/protocol/wirev1/codec.go", "MaxControlBytes       = 64 << 10", "MaxControlBytes       = 65 << 10", "MaxControlBytes disagrees"},
+		{"profile-bind body", "internal/runtime/process_record_v1.go", "body := make([]byte, 72)", "body := make([]byte, 71)", "process record implementation disagrees"},
+		{"legacy protected-record cap", "internal/runtime/protected_channel.go", "strictFragmentMaxOperationsV1 = 8", "strictFragmentMaxOperationsV1 = 9", "strictFragmentMaxOperationsV1 disagrees"},
+		{"Kotlin runtime MTU", "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt", "require(mtu in 1280..1500)", "require(mtu in 1279..1500)", "Kotlin RuntimeStatus predecessor surface disagrees"},
+		{"Kotlin native plan digest", "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt", "reader.fixedBytes(32)", "reader.fixedBytes(31)", "non-authorized session-plan digest width"},
+		{"live unit device boundary", "deploy/selfhost/native/kurd-node.service", "PrivateDevices=no", "PrivateDevices=yes", "native deployment copy disagrees"},
+		{"live unit authenticated reload", "deploy/selfhost/native/kurd-node.service", "ExecReload=/usr/local/bin/kurdctl node reload", "ExecReload=/bin/true", "native deployment copy disagrees"},
 	}
 	for _, mutation := range mutations {
 		t.Run(mutation.name, func(t *testing.T) {
 			root := copyAuthority(t)
+			stage := verifyGoCopies
+			if strings.HasPrefix(mutation.path, "deploy/") {
+				stage = verifyDeploymentCopies
+			}
+			if strings.HasPrefix(mutation.path, "android/") {
+				copyHistoricalAndroid(t, root)
+				stage = verifyFixtureAndroidPredecessor
+			}
+			check := fixtureStage(t, root, stage)
 			if err := replaceFile(root, mutation.path, mutation.old, mutation.new); err != nil {
 				t.Fatal(err)
 			}
-			if err := verify(root); err == nil {
-				t.Fatalf("accepted %s drift", mutation.name)
-			}
+			requireStageFailure(t, check, mutation.diagnostic)
 		})
 	}
 }
@@ -401,12 +452,11 @@ func TestLiveUnitSupportsAuthenticatedOwnerLocalReload(t *testing.T) {
 
 func TestLiveDataPlaneVerifierRequiresNormativePrivacyAndNonReadinessMarkers(t *testing.T) {
 	root := copyAuthority(t)
+	check := fixtureStage(t, root, verifyPublicDocumentation)
 	if err := replaceFile(root, "docs/self-hosting/LIVE-DATA-PLANE.md", "KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED", "KURD-LIVE-CONTRACT: READINESS=CLAIMED"); err != nil {
 		t.Fatal(err)
 	}
-	if err := verify(root); err == nil {
-		t.Fatal("documentation without the non-readiness marker accepted")
-	}
+	requireStageFailure(t, check, "missing \"KURD-LIVE-CONTRACT: READINESS=NOT_CLAIMED\"")
 }
 
 func TestLiveDataPlaneVerifierRejectsAffirmativeLoggingReadinessAndHostClaims(t *testing.T) {
@@ -417,16 +467,16 @@ func TestLiveDataPlaneVerifierRejectsAffirmativeLoggingReadinessAndHostClaims(t 
 		"\nhttps://node.example.invalid/\n",
 		"\nnode.example.invalid\n",
 	}
-	for _, mutation := range mutations {
+	diagnostics := []string{"affirmative unsafe claim", "affirmative unsafe claim", "forbidden content", "host literal", "host literal"}
+	for index, mutation := range mutations {
 		t.Run(strings.TrimSpace(mutation), func(t *testing.T) {
 			root := copyAuthority(t)
+			check := fixtureStage(t, root, verifyPublicDocumentation)
 			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
 			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if err := verify(root); err == nil {
-				t.Fatal("affirmative claim accepted")
-			}
+			requireStageFailure(t, check, diagnostics[index])
 		})
 	}
 }
@@ -437,22 +487,23 @@ func TestLiveDataPlaneVerifierRejectsContradictoryPublicProse(t *testing.T) {
 		"\nThe live service is available for operation.\n",
 		"\nThe owner endpoint is maintained separately.\n",
 	}
-	for _, mutation := range mutations {
+	diagnostics := []string{"affirmative unsafe claim", "affirmative unsafe claim", "forbidden content"}
+	for index, mutation := range mutations {
 		t.Run(strings.TrimSpace(mutation), func(t *testing.T) {
 			root := copyAuthority(t)
+			check := fixtureStage(t, root, verifyPublicDocumentation)
 			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
 			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if err := verify(root); err == nil {
-				t.Fatal("contradictory public documentation accepted despite the required negative markers")
-			}
+			requireStageFailure(t, check, diagnostics[index])
 		})
 	}
 }
 
 func TestLiveDataPlaneVerifierRequiresExactNormalizedPrivacyStatement(t *testing.T) {
 	root := copyAuthority(t)
+	check := fixtureStage(t, root, verifyPublicDocumentation)
 	if err := replaceFile(
 		root,
 		"docs/self-hosting/LIVE-DATA-PLANE.md",
@@ -461,23 +512,20 @@ func TestLiveDataPlaneVerifierRequiresExactNormalizedPrivacyStatement(t *testing
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := verify(root); err == nil {
-		t.Fatal("documentation accepted a non-approved privacy paraphrase")
-	}
+	requireStageFailure(t, check, "approved normalized privacy statement")
 }
 
 func TestLiveDataPlaneVerifierRejectsPublicIPLiteralOutsideAuthority(t *testing.T) {
 	for _, literal := range []string{"198.51.100.7", "198.51.100.7:443", "2001:db8::7"} {
 		t.Run(literal, func(t *testing.T) {
 			root := copyAuthority(t)
+			check := fixtureStage(t, root, verifyPublicDocumentation)
 			path := filepath.Join(root, filepath.FromSlash("docs/self-hosting/LIVE-DATA-PLANE.md"))
 			mutation := "\n`" + literal + "`\n"
 			if err := os.WriteFile(path, append(mustReadFile(t, path), []byte(mutation)...), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if err := verify(root); err == nil {
-				t.Fatal("public IP literal outside machine authority accepted")
-			}
+			requireStageFailure(t, check, "IP literal outside authority")
 		})
 	}
 }
@@ -491,6 +539,38 @@ func repositoryRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
 }
 
+func copyHistoricalAndroid(t *testing.T, root string) {
+	t.Helper()
+	subject, err := evidenceoverlay.OpenExactSubject(repositoryRoot(t), phase17InventoryCommit, phase17InventoryTree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",
+		"android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt",
+	} {
+		file, err := subject.Read(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(path)), file.Content, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func verifyFixtureAndroidPredecessor(root string, value contract) error {
+	status, err := readRequired(root, "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt")
+	if err != nil {
+		return err
+	}
+	bridge, err := readRequired(root, "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt")
+	if err != nil {
+		return err
+	}
+	return verifyAndroidPredecessorCopies(status, bridge, value)
+}
+
 func copyAuthority(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -500,6 +580,7 @@ func copyAuthority(t *testing.T) string {
 		"docs/self-hosting/LIVE-DATA-PLANE.md",
 		"internal/transport/tlstcp/carrier.go",
 		"internal/protocol/wirev1/codec.go",
+		"internal/protocol/wirev1/codec_buffers.go",
 		"internal/runtime/process_record_v1.go",
 		"internal/runtime/protected_channel.go",
 		"android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt",

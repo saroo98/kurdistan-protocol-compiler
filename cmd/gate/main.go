@@ -142,12 +142,24 @@ func gateSteps(quick bool, jsonOut, statusOut string) []step {
 		{"test", "go", []string{"test", "-timeout=" + goSuiteTimeout, "-count=1", "./..."}, ""},
 		{"executable-evidence", "go", []string{"run", "./cmd/executableevidence"}, ""},
 		{"audit", "go", []string{"run", "./cmd/kcheck", auditMode, "--out", jsonOut, "--status", statusOut}, ""},
+	}
+	steps = append(steps, operatorSteps(false)...)
+	return append(steps, phase17QualificationSourceSteps(false)...)
+}
+
+func operatorSteps(includeGo bool) []step {
+	steps := []step{
 		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
 		{"phase16-offline-authority", "go", []string{"run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"}, ""},
-		{"phase16-selfhost-tests", "go", []string{"test", "-count=1", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
-		{"phase16-selfhost-vet", "go", []string{"vet", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
 	}
-	return append(steps, phase17QualificationSourceSteps(false)...)
+	if includeGo {
+		packages := []string{"./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}
+		steps = append(steps,
+			step{"phase16-selfhost-tests", "go", append([]string{"test", "-count=1"}, packages...), ""},
+			step{"phase16-selfhost-vet", "go", append([]string{"vet"}, packages...), ""},
+		)
+	}
+	return steps
 }
 
 func phase17QualificationPackages() []string {
@@ -193,7 +205,7 @@ func proofSteps(proof string, quick bool, jsonOut, statusOut string) ([]step, er
 		audit.args = []string{"run", "./cmd/kcheck", "--full"}
 		return []step{audit}, nil
 	case "operator":
-		return steps[6:10], nil
+		return operatorSteps(true), nil
 	case "docs-evidence":
 		return []step{
 			{name: "phase15-evidence", program: "go", args: []string{"run", "./cmd/phase15verify", "-root", "."}},
@@ -442,7 +454,7 @@ func androidDeviceStep(api int) step {
 			"-test-package", "org.kurdistanvpn.app.internal.test",
 			"-conflicting-app-package", "org.kurdistanvpn.app.debug",
 			"-minimum-tests", "1",
-			"-expected-tests", "android/config/phase17-required-device-tests.txt",
+			"-expected-tests", "android/config/phase18-current-device-tests.txt",
 			"-expected-api", fmt.Sprintf("%d", api),
 			"-expected-abi", "x86_64",
 		},
