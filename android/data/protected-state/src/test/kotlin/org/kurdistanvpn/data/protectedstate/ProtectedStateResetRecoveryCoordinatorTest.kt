@@ -403,6 +403,18 @@ class ProtectedStateResetRecoveryCoordinatorTest {
         assertThrows(IllegalArgumentException::class.java) { DurableResetFileAccess(listOf(alias, alias)) { error("no access") } }
     }
 
+    @Test fun slowPreparationDoesNotConsumeTheIrreversibleCleanupBudget() {
+        val rig = Rig()
+        var time = 0L
+        rig.onEvent = { if (it == "after:put:journal-reset-ready") time = 4_500_000_000L }
+        rig.afterKeyErase = { time = 6_000_000_000L }
+        assertEquals(ResetRecoveryResult.COMPLETED, rig.engine { time }.start(OPERATION))
+        assertFalse(rig.keyPresent)
+        assertEquals(1, rig.keyEraseCalls)
+        assertTrue(rig.onlyLocksRemain())
+        assertEquals(0, rig.decryptAfterKeyErasure)
+    }
+
     @Test fun timeoutAfterKeyErasureLeavesRecoveryResidueQuarantined() {
         val rig = Rig()
         var time = 0L

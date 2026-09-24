@@ -336,10 +336,13 @@ internal class ProtectedStateResetRecoveryCoordinator(
             retained += RetainedRecord(role, entry.leaf, actual)
         }
         requireKey(plan); budget.check(); reservation.requireCurrent()
+        // Preparation can be resumed while the key exists. Once it is erased, the
+        // retained ciphertext must get a full bounded cleanup phase of its own.
+        val finalizationBudget = Budget(monotonicNanos)
         key.eraseExisting(plan.keyGeneration)
         check(key.observe() == ResetKeyObservation.Absent) { "RESET_KEY_ERASURE_UNPROVEN" }
         for (entry in retained) {
-            budget.check()
+            finalizationBudget.check()
             val current = checkNotNull(files.read(entry.role, entry.leaf))
             check(sameSnapshot(entry.snapshot, current)) { "POST_ERASE_RESIDUAL_SUBSTITUTED" }
             files.delete(entry.role, entry.leaf, current)
