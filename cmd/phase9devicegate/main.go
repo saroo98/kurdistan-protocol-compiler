@@ -79,6 +79,7 @@ type options struct {
 	conflictingAppPackage string
 	label                 string
 	startupSubject        startupSubjectBinding
+	ownedEmulatorName     string
 }
 
 type expectedTest struct {
@@ -93,6 +94,7 @@ func main() {
 	var value options
 	flag.StringVar(&value.adbPath, "adb", "", "adb executable; defaults to the configured Android SDK or PATH")
 	flag.StringVar(&value.serial, "serial", "", "connected Android device serial; required when multiple devices are connected")
+	flag.StringVar(&value.ownedEmulatorName, "owned-emulator-name", "", "exact disposable owned AVD name; enables class-isolated data resets and temporary test prerequisites")
 	flag.StringVar(&value.appAPK, "app-apk", "", "debug application APK")
 	flag.StringVar(&value.testAPK, "test-apk", "", "debug instrumentation APK")
 	flag.StringVar(&value.appPackage, "app-package", defaultAppPackage, "application package under test")
@@ -225,6 +227,17 @@ func run(value options) error {
 	if err := verifyExpectedDeviceIdentity(value.expectedAPI, value.expectedABI, sdkLevel, primaryABI); err != nil {
 		return err
 	}
+	if value.ownedEmulatorName != "" {
+		name, nameErr := client.captureOutput(ctx, "emu", "avd", "name")
+		lines := strings.Fields(name)
+		if len(lines) != 2 || lines[1] != "OK" {
+			return errors.New("emulator console did not return an exact AVD identity")
+		}
+		hardware, hardwareErr := client.captureOutput(ctx, "shell", "getprop", "ro.hardware")
+		if err := errors.Join(nameErr, hardwareErr, verifyOwnedEmulator(value.ownedEmulatorName, lines[0], hardware, value.appPackage)); err != nil {
+			return err
+		}
+	}
 	if err := waitForAndroidFramework(ctx, client, "02a"); err != nil {
 		return err
 	}
@@ -304,47 +317,14 @@ func run(value options) error {
 	if err := prepareLogcatBaseline(ctx, client, "12-pre-test-clear-logcat.txt", value.appPackage); err != nil {
 		return fmt.Errorf("clear pre-test logcat: %w", err)
 	}
-	instrumentationArgs, err := prepareNativeFilesystemInstrumentation(
-		ctx,
-		client,
-		value.appPackage,
-		value.testPackage,
-		value.testPackage+"/"+value.runner,
-	)
+	var instrumentation string
+	if value.ownedEmulatorName != "" {
+		instrumentation, err = runIsolatedDeviceSuite(ctx, client, value, expectedTests)
+	} else {
+		instrumentation, err = runDeviceInstrumentation(ctx, client, value, expectedTests, minimumTests, nil)
+	}
 	if err != nil {
 		return err
-	}
-	instrumentation, instrumentationErr := client.captureInstrumentation(
-		ctx,
-		"13-instrumentation-summary.txt",
-		instrumentationArgs...,
-	)
-	logcat, logcatErr := client.captureDiagnostic(ctx, "14-device-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("all")...)
-	crashLog, crashLogErr := client.captureDiagnostic(ctx, "15-crash-diagnostics.txt", value.appPackage, diagnosticLogcatArgs("crash")...)
-	if logcatErr != nil {
-		return fmt.Errorf("capture logcat: %w", logcatErr)
-	}
-	if crashLogErr != nil {
-		return fmt.Errorf("capture crash log: %w", crashLogErr)
-	}
-	if err := evaluateInstrumentation(
-		instrumentation,
-		logcat+"\n"+crashLog,
-		value.appPackage,
-		minimumTests,
-	); err != nil {
-		if instrumentationErr != nil {
-			return fmt.Errorf("%w; adb instrumentation error: %v", err, instrumentationErr)
-		}
-		return err
-	}
-	if len(expectedTests) > 0 {
-		if err := verifyExpectedTests(instrumentation, expectedTests); err != nil {
-			return err
-		}
-	}
-	if instrumentationErr != nil {
-		return fmt.Errorf("instrumentation command: %w", instrumentationErr)
 	}
 	summary := fmt.Sprintf(
 		"device_gate=passed\nlabel=%s\napplication=%s\nsdk_level=%d\nprimary_abi=%s\nexpected_sdk_level=%d\nexpected_primary_abi=%s\nminimum_tests=%d\ncompleted_tests=%d\nexpected_tests=%d\n",

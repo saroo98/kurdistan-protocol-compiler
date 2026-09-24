@@ -80,6 +80,7 @@ type options struct {
 	minimumTests       int
 	expectedAPI        int
 	expectedABI        string
+	ownedEmulatorName  string
 }
 
 func main() {
@@ -91,6 +92,7 @@ func main() {
 	var value options
 	flag.StringVar(&value.adbPath, "adb", "", "adb executable")
 	flag.StringVar(&value.serial, "serial", "", "connected Android device serial")
+	flag.StringVar(&value.ownedEmulatorName, "owned-emulator-name", "", "exact disposable owned AVD name for isolated current-suite execution")
 	flag.StringVar(&value.appAPK, "app-apk", "", "internal application APK")
 	flag.StringVar(&value.testAPK, "test-apk", "", "internal instrumentation APK")
 	flag.StringVar(&value.appPackage, "app-package", "org.kurdistanvpn.app.internal", "application package")
@@ -388,6 +390,9 @@ func buildDelegateArgs(value options) []string {
 	}
 	if value.serial != "" {
 		arguments = append(arguments, "-serial", value.serial)
+	}
+	if value.ownedEmulatorName != "" {
+		arguments = append(arguments, "-owned-emulator-name", value.ownedEmulatorName)
 	}
 	arguments = append(arguments,
 		"-app-apk", value.appAPK,

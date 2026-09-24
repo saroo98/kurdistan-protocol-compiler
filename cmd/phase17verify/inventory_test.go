@@ -30,6 +30,7 @@ func TestCurrentDeviceInventoryPreservesFrozenNamesAndLanes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, bad := range map[string][]byte{
+		"always-on-on-26": []byte(strings.Replace(string(raw), "minSdk=36 org.kurdistanvpn.app.ProductionProxyServiceDeviceTest#systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled", "org.kurdistanvpn.app.ProductionProxyServiceDeviceTest#systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled", 1)),
 		"locale-on-26":    []byte(strings.Replace(string(raw), "minSdk=34 org.kurdistanvpn.app.ProductLocaleLifecycleDeviceTest", "org.kurdistanvpn.app.ProductLocaleLifecycleDeviceTest", 1)),
 		"frozen-metadata": []byte(strings.Replace(string(raw), "minSdk=34 org.kurdistanvpn.app.Phase17", "minSdk=26 org.kurdistanvpn.app.Phase17", 1)),
 		"duplicate":       append(append([]byte(nil), raw...), strings.Split(string(raw), "\n")[0]+"\n"...),

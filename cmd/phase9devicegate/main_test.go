@@ -1544,6 +1544,9 @@ func TestCurrentDeviceRosterRequiresEveryAddedMethodOnItsSupportedLanes(t *testi
 				continue
 			}
 			want := name != locale || api >= 34
+			if name == "org.kurdistanvpn.app.ProductionProxyServiceDeviceTest#systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled" {
+				want = api >= 36
+			}
 			if required[name] != want {
 				t.Fatalf("method %s required on API %d=%t want %t", name, api, required[name], want)
 			}

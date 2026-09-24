@@ -457,6 +457,7 @@ func androidDeviceStep(api int) step {
 			"-expected-tests", "android/config/phase18-current-device-tests.txt",
 			"-expected-api", fmt.Sprintf("%d", api),
 			"-expected-abi", "x86_64",
+			"-owned-emulator-name", fmt.Sprintf("kurdistan_phase17_api%d", api),
 		},
 	}
 }

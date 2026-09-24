@@ -131,12 +131,14 @@ func TestBuildDelegateArgsPreservesExactLaneAndArtifacts(t *testing.T) {
 		minimumTests:       1,
 		expectedAPI:        34,
 		expectedABI:        "x86_64",
+		ownedEmulatorName:  "kurdistan_phase17_api34",
 	}
 	want := []string{
 		"run", "./cmd/phase9devicegate",
 		"-label", "PHASE 17",
 		"-adb", "adb",
 		"-serial", "emulator-5554",
+		"-owned-emulator-name", "kurdistan_phase17_api34",
 		"-app-apk", "app.apk",
 		"-test-apk", "test.apk",
 		"-app-package", "org.kurdistanvpn.app.internal",
