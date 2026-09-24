@@ -228,7 +228,9 @@ class ProductionProxyServiceDeviceTest {
             }
             if (state.state != VpnRuntimeState.ACTIVE_KURD_LIVE) {
                 // Existing bounded scalar observations only; no authority or exception text.
-                fail("Proxy activation: ${state.state}/${state.failure}/${state.packetDisposition}; opening=$openingStates; publication=${publicationDiagnostic()}")
+                fun category(value: String?): String = value?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
+                throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${state.state.name} setup=PROXY_ACTIVATION,${category(state.failure)},${category(state.packetDisposition)}",
+                    AssertionError("Proxy activation: ${state.state}/${state.failure}/${state.packetDisposition}; opening=$openingStates; publication=${publicationDiagnostic()}"))
             }
             val presentation = checkNotNull(state.presentation) { "Production presentation evidence missing" }
             if (manualAction) {

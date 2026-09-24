@@ -53,7 +53,19 @@ class PrivacyBackupDeviceTest {
             automation.waitForIdle(100, 2_000)
             if (automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
                 assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-            compose.waitUntil(10_000) { compose.activity !== old && compose.activity.backupStateSnapshotForTesting() == BackupWorkflowState.Idle }
+            try {
+                compose.waitUntil(10_000) { compose.activity !== old && compose.activity.backupStateSnapshotForTesting() == BackupWorkflowState.Idle }
+            } catch (error: AssertionError) {
+                val current = compose.activity
+                val actual = current.backupStateSnapshotForTesting().javaClass.simpleName.uppercase(java.util.Locale.ROOT)
+                val recreated = if (current !== old) "RECREATED" else "ORIGINAL_ACTIVITY"
+                val foreground = when (automation.rootInActiveWindow?.packageName?.toString()) {
+                    "com.android.documentsui", "com.google.android.documentsui" -> "PICKER"
+                    instrumentation.targetContext.packageName -> "APPLICATION"
+                    else -> "OTHER_WINDOW"
+                }
+                throw AssertionError("KURDISTAN_TEST_SETUP expected=IDLE actual=$actual setup=EXPORT_CANCEL,$recreated,$foreground", error)
+            }
         }
         val after = checkNotNull(root.protectedStateFacade()?.readProjection())
         assertEquals(before.revision, after.revision)
