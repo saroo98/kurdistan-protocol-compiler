@@ -237,7 +237,9 @@ func (p *ServicePumpV1) finishProbeV1(i int, handle uint64, failure error) error
 	g.state = 3
 	g.tombstone = minServiceTimeV1(p.deadline, p.lastNow.Add(30*time.Second))
 	id := g.id
-	sent := !g.sentAt.IsZero()
+	// A terminal peer result already retires that request. Reset only an
+	// outstanding request, including cancellation before its result arrives.
+	sent := !g.sentAt.IsZero() && !g.resultSeen
 	cancel := g.cancel
 	retireProbeAdmissionV1(g)
 	for j := range p.queue {
