@@ -6,11 +6,90 @@ package androidartifact
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestManifestServiceEnabledResolution(t *testing.T) {
+	raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="androidx.work.impl.background.systemjob.SystemJobService" android:exported="true" android:enabled="@bool/enable_system_job_service_default" /></application></manifest>`)
+	if _, err := ParseManifest(raw); err == nil {
+		t.Fatal("legacy parser accepted resource boolean")
+	}
+	manifest, err := ParseManifestWithServiceEnabledResolver(raw, func(name, reference string) (bool, error) {
+		if name != "androidx.work.impl.background.systemjob.SystemJobService" || reference != "@bool/enable_system_job_service_default" {
+			t.Fatal("incorrect resolver input")
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Services[0].Enabled == nil || !*manifest.Services[0].Enabled {
+		t.Fatal("enabled resource was not resolved")
+	}
+}
+
+func TestServiceResolverCannotRelaxOtherManifestFields(t *testing.T) {
+	for _, field := range []string{"exported", "directBootAware", "isolatedProcess", "externalService", "stopWithTask"} {
+		t.Run(field, func(t *testing.T) {
+			attributes := `android:exported="false" `
+			if field == "exported" {
+				attributes = ""
+			}
+			raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="owner.Service" ` + attributes + `android:` + field + `="@bool/enabled" /></application></manifest>`)
+			if _, err := ParseManifestWithServiceEnabledResolver(raw, func(string, string) (bool, error) { t.Fatal("resolver used for non-enabled field"); return true, nil }); err == nil {
+				t.Fatal("nonliteral security boolean accepted")
+			}
+		})
+	}
+	for _, field := range []string{"enabled", "directBootAware", "allowBackup", "usesCleartextTraffic", "defaultToDeviceProtectedStorage"} {
+		raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:` + field + `="@bool/enabled" /></manifest>`)
+		if _, err := ParseManifestWithServiceEnabledResolver(raw, func(string, string) (bool, error) { t.Fatal("application consulted resolver"); return true, nil }); err == nil {
+			t.Fatalf("application %s accepted", field)
+		}
+	}
+	raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="owner.Service" android:exported="false"><meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="@bool/enabled" /></service></application></manifest>`)
+	if _, err := ParseManifestWithServiceEnabledResolver(raw, func(string, string) (bool, error) { t.Fatal("VPN metadata consulted resolver"); return true, nil }); err == nil {
+		t.Fatal("resource VPN metadata accepted")
+	}
+}
+
+func TestServiceResolverRetainsErrorsAndLegacyReadBoundary(t *testing.T) {
+	raw := []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><service android:name="owner.Service" android:exported="false" android:enabled="@bool/enabled" /></application></manifest>`)
+	if _, err := ParseManifestWithServiceEnabledResolver(raw, nil); err == nil {
+		t.Fatal("nil resolver accepted reference")
+	}
+	failure := errors.New("resource rejected")
+	if _, err := ParseManifestWithServiceEnabledResolver(raw, func(string, string) (bool, error) { return false, failure }); !errors.Is(err, failure) {
+		t.Fatalf("resolver error lost: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "manifest.xml")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadManifest(path); err == nil {
+		t.Fatal("legacy reader accepted reference")
+	}
+	manifest, err := ReadManifestWithServiceEnabledResolver(path, func(string, string) (bool, error) { return false, nil })
+	if err != nil || manifest.Services[0].Enabled == nil || *manifest.Services[0].Enabled {
+		t.Fatalf("resolved false lost: %v", err)
+	}
+	for _, invalid := range []string{
+		strings.Replace(string(raw), `android:enabled="@bool/enabled"`, `android:enabled="@bool/enabled" android:enabled="true"`, 1),
+		strings.Replace(string(raw), `android:enabled=`, `enabled=`, 1),
+		strings.Replace(string(raw), `@bool/enabled`, `invalid`, 1),
+		string(raw) + string(raw),
+	} {
+		if _, err := ParseManifestWithServiceEnabledResolver([]byte(invalid), func(string, string) (bool, error) { return true, nil }); err == nil {
+			t.Fatal("opt-in bypassed preflight or canonical syntax")
+		}
+	}
+}
 
 func TestReadAPKIndexesBoundedContents(t *testing.T) {
 	raw := writeAPKFixture(t, map[string]string{

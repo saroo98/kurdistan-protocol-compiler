@@ -364,6 +364,15 @@ func manifestSecurityAttribute(element, attribute string) bool {
 
 // ParseManifest parses a text merged Android manifest into a canonical surface.
 func ParseManifest(raw []byte) (Manifest, error) {
+	return ParseManifestWithServiceEnabledResolver(raw, nil)
+}
+
+// ServiceEnabledResolver resolves only a service's resource-valued enabled field.
+// All other security booleans remain literal-only, including in opt-in parsing.
+type ServiceEnabledResolver func(serviceName, reference string) (bool, error)
+
+// ParseManifestWithServiceEnabledResolver opts into service enabled resolution.
+func ParseManifestWithServiceEnabledResolver(raw []byte, resolver ServiceEnabledResolver) (Manifest, error) {
 	if len(raw) == 0 || len(raw) > maxManifestBytes {
 		return Manifest{}, fmt.Errorf("manifest length outside bound")
 	}
@@ -469,7 +478,14 @@ func ParseManifest(raw []byte) (Manifest, error) {
 			{"externalService", service.ExternalService, &item.ExternalService},
 			{"stopWithTask", service.StopWithTask, &item.StopWithTask},
 		} {
-			if *field.target, err = parseOptionalBool(field.raw); err != nil {
+			if field.name == "enabled" && resolver != nil && (strings.HasPrefix(field.raw, "@") || strings.HasPrefix(field.raw, "?")) {
+				var resolved bool
+				resolved, err = resolver(service.Name, field.raw)
+				*field.target = &resolved
+			} else {
+				*field.target, err = parseOptionalBool(field.raw)
+			}
+			if err != nil {
 				return Manifest{}, fmt.Errorf("service %q %s: %w", service.Name, field.name, err)
 			}
 		}
@@ -508,6 +524,12 @@ func ParseManifest(raw []byte) (Manifest, error) {
 
 // ReadManifest reads and parses one merged text manifest.
 func ReadManifest(filePath string) (Manifest, error) {
+	return ReadManifestWithServiceEnabledResolver(filePath, nil)
+}
+
+// ReadManifestWithServiceEnabledResolver reads a bounded text manifest with the
+// same opt-in boundary as ParseManifestWithServiceEnabledResolver.
+func ReadManifestWithServiceEnabledResolver(filePath string, resolver ServiceEnabledResolver) (Manifest, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return Manifest{}, err
@@ -517,7 +539,7 @@ func ReadManifest(filePath string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	return ParseManifest(raw)
+	return ParseManifestWithServiceEnabledResolver(raw, resolver)
 }
 
 func parseOptionalBool(value string) (*bool, error) {

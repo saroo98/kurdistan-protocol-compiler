@@ -8,6 +8,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -68,6 +69,22 @@ func TestValidatePhase17InventoryRejectsMissingLiveDataPlaneTest(t *testing.T) {
 	}
 	if err := validatePhase17Inventory(path); err == nil {
 		t.Fatal("incomplete Phase 17 device inventory was accepted")
+	}
+}
+
+func TestCurrentRosterRetainsRequiredHistoricalCore(t *testing.T) {
+	if err := validatePhase17Inventory(filepath.Join("..", "..", "android", "config", "phase18-current-device-tests.txt")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeviceGateDefaultsToCurrentRoster(t *testing.T) {
+	raw, err := exec.Command("go", "run", ".", "-h").CombinedOutput()
+	if err != nil {
+		t.Fatalf("device gate help: %v %s", err, raw)
+	}
+	if !strings.Contains(string(raw), `default "android/config/phase18-current-device-tests.txt"`) {
+		t.Fatalf("current roster is not the CLI default: %s", raw)
 	}
 }
 

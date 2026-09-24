@@ -12,12 +12,44 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestVerifyRepositoryOffline(t *testing.T) {
 	if err := verify(repositoryRoot(t), "offline", ownerInputDefault); err != nil && !errors.Is(err, errHistoricalEvidenceNotAvailable) {
 		t.Fatal(err)
+	}
+}
+
+func TestVerifyExternalModeRemainsExplicitlySuperseded(t *testing.T) {
+	err := verify(repositoryRoot(t), "external", ownerInputDefault)
+	const want = "legacy centralized external mode is superseded; use the self-hosted VPS acceptance verifier"
+	if err == nil || err.Error() != want {
+		t.Fatalf("external result: %v", err)
+	}
+}
+
+func TestVerifyExternalModeDoesNotBypassRequiredFiles(t *testing.T) {
+	root := copyRepositoryAuthority(t)
+	for _, rel := range requiredFiles {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatalf("fixture required file %s: %v", rel, err)
+		}
+		if !info.Mode().IsRegular() {
+			t.Fatalf("fixture required file is not regular: %s", rel)
+		}
+	}
+	if err := os.Remove(filepath.Join(root, filepath.FromSlash(statusPath))); err != nil {
+		t.Fatal(err)
+	}
+	want := "required file unavailable: " + statusPath
+	for _, mode := range []string{"offline", "external"} {
+		t.Run(mode, func(t *testing.T) {
+			err := verify(root, mode, ownerInputDefault)
+			if err == nil || err.Error() != want {
+				t.Fatalf("got %v; want %s", err, want)
+			}
+		})
 	}
 }
 
@@ -299,44 +331,6 @@ func TestRejectUnknownStatusField(t *testing.T) {
 	}
 }
 
-func TestValidateOwnerRejectsProjectReuseAndApprovalCollision(t *testing.T) {
-	var value ownerInputs
-	root := repositoryRoot(t)
-	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
-		t.Fatal(err)
-	}
-	value.ProductionProjects.Trust = value.QualificationProjects.Trust
-	if err := validateOwner(value); err == nil {
-		t.Fatal("project reuse accepted")
-	}
-	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
-		t.Fatal(err)
-	}
-	value.ApprovalClasses[0].ExecutorActorRef = value.ApprovalClasses[0].ApproverActorRefs[0]
-	if err := validateOwner(value); err == nil {
-		t.Fatal("approver/executor collision accepted")
-	}
-}
-
-func TestValidateOwnerRequiresExactProtectedWorkflowAndEnvironmentSet(t *testing.T) {
-	var value ownerInputs
-	root := repositoryRoot(t)
-	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
-		t.Fatal(err)
-	}
-	value.WIF.Environments[0] = "phase16-production"
-	if err := validateOwner(value); err == nil {
-		t.Fatal("duplicate protected environment accepted")
-	}
-	if err := decodeFile(root, "testdata/fixtures/phase16/owner-inputs.example.json", &value); err != nil {
-		t.Fatal(err)
-	}
-	value.WIF.WorkflowPaths[0] = ".github/workflows/ordinary.yml"
-	if err := validateOwner(value); err == nil {
-		t.Fatal("unapproved production workflow accepted")
-	}
-}
-
 func TestValidateStatusRejectsFalseCompletion(t *testing.T) {
 	var value status
 	root := repositoryRoot(t)
@@ -372,37 +366,6 @@ func TestLegacyCloudMutationWorkflowsRemainDisabled(t *testing.T) {
 			strings.Contains(text, "id-token: write") || strings.Contains(text, "google-github-actions/") {
 			t.Fatalf("legacy workflow is not safely disabled: %s", relative)
 		}
-	}
-}
-
-func TestValidateExternalReceiptBindsExactSubjectPolicyAndFreshness(t *testing.T) {
-	now := time.Date(2026, 8, 6, 12, 0, 0, 0, time.UTC)
-	receipt := externalReceipt{
-		Schema: "phase16-external-receipt-v1", Kind: "CLOUD_IDENTITY_READBACK",
-		SubjectCommit: strings.Repeat("a", 40), SubjectTree: strings.Repeat("b", 40), PolicyDigest: strings.Repeat("c", 64),
-		StartedAt: now.Add(-time.Hour).Format(time.RFC3339), FinishedAt: now.Add(-time.Minute).Format(time.RFC3339), Result: "PASS",
-		ArtifactDigests: []string{strings.Repeat("d", 64)},
-	}
-	if err := validateExternalReceipt("cloud-identity-readback", receipt, receipt.SubjectCommit, receipt.SubjectTree, receipt.PolicyDigest, now); err != nil {
-		t.Fatal(err)
-	}
-	for name, mutate := range map[string]func(*externalReceipt){
-		"wrong subject": func(value *externalReceipt) { value.SubjectTree = strings.Repeat("e", 40) },
-		"wrong policy":  func(value *externalReceipt) { value.PolicyDigest = strings.Repeat("e", 64) },
-		"failed":        func(value *externalReceipt) { value.Result = "FAIL" },
-		"stale":         func(value *externalReceipt) { value.FinishedAt = now.Add(-15 * 24 * time.Hour).Format(time.RFC3339) },
-		"duplicate": func(value *externalReceipt) {
-			value.ArtifactDigests = append(value.ArtifactDigests, value.ArtifactDigests[0])
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			candidate := receipt
-			candidate.ArtifactDigests = append([]string(nil), receipt.ArtifactDigests...)
-			mutate(&candidate)
-			if err := validateExternalReceipt("cloud-identity-readback", candidate, receipt.SubjectCommit, receipt.SubjectTree, receipt.PolicyDigest, now); err == nil {
-				t.Fatal("invalid external receipt accepted")
-			}
-		})
 	}
 }
 

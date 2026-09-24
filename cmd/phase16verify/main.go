@@ -2,10 +2,9 @@
 // Copyright 2026 Saro
 
 // Command phase16verify validates the local Phase 16 evidence boundary and the
-// current decentralized self-hosting authority. Its external mode remains a
-// legacy validator for the superseded cloud experiment until that code is
-// removed or isolated. It never calls a cloud API and never treats local
-// evidence as production evidence.
+// current decentralized self-hosting authority. It explicitly rejects the
+// superseded external mode; exercised legacy cloud contracts are test-only. It
+// never calls a cloud API and never treats local evidence as production evidence.
 package main
 
 import (
@@ -21,7 +20,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -66,21 +64,6 @@ var excludedPublicationFiles = []string{
 	"docs/PZ-evidence-ref-060",
 	"docs/PZ-evidence-ref-062",
 	"docs/PZ-evidence-ref-063",
-}
-
-var expectedRoles = []string{"approver", "auditor", "deployer", "emergency", "executor", "publisher", "recovery", "requester", "viewer"}
-
-var privilegedActions = map[string]bool{
-	"emergency.deny":       true,
-	"key.destroy.schedule": true,
-	"key.issuer.rotate":    true,
-	"key.root.rotate":      true,
-	"profile.issue":        true,
-	"profile.revoke":       true,
-	"profile.rotate":       true,
-	"publication.publish":  true,
-	"recovery.prepare":     true,
-	"retention.lock":       true,
 }
 
 type status struct {
@@ -187,122 +170,6 @@ type selfHostedQualification struct {
 	ReleaseDecision string `json:"releaseDecision"`
 }
 
-type externalReceipt struct {
-	Schema          string   `json:"schema"`
-	Kind            string   `json:"kind"`
-	SubjectCommit   string   `json:"subjectCommit"`
-	SubjectTree     string   `json:"subjectTree"`
-	PolicyDigest    string   `json:"policyDigest"`
-	StartedAt       string   `json:"startedAt"`
-	FinishedAt      string   `json:"finishedAt"`
-	Result          string   `json:"result"`
-	ArtifactDigests []string `json:"artifactDigests"`
-	Limitations     []string `json:"limitations"`
-}
-
-type rolePolicy struct {
-	Schema                    string     `json:"schema"`
-	Roles                     []string   `json:"roles"`
-	ForbiddenRoleCombinations [][]string `json:"forbiddenRoleCombinations"`
-	IdentityRules             struct {
-		OpaqueActorsOnly                          bool `json:"opaqueActorsOnly"`
-		RawEmailForbidden                         bool `json:"rawEmailForbidden"`
-		RequesterSelfApprovalForbidden            bool `json:"requesterSelfApprovalForbidden"`
-		ExecutorApprovalForbidden                 bool `json:"executorApprovalForbidden"`
-		MinimumDistinctApprovers                  int  `json:"minimumDistinctApprovers"`
-		PrivilegedAuthenticationMaximumAgeSeconds int  `json:"privilegedAuthenticationMaximumAgeSeconds"`
-		BreakGlassMaximumSeconds                  int  `json:"breakGlassMaximumSeconds"`
-	} `json:"identityRules"`
-}
-
-type actionPolicy struct {
-	Schema               string       `json:"schema"`
-	Actions              []actionRule `json:"actions"`
-	MutationRequirements struct {
-		IdempotencyKey   bool   `json:"idempotencyKey"`
-		ExpectedRevision bool   `json:"expectedRevision"`
-		ExpectedEpoch    bool   `json:"expectedEpoch"`
-		BoundedBodyBytes int    `json:"boundedBodyBytes"`
-		ContentType      string `json:"contentType"`
-		APIVersion       string `json:"apiVersion"`
-	} `json:"mutationRequirements"`
-}
-
-type actionRule struct {
-	ID                  string   `json:"id"`
-	RequestRoles        []string `json:"requestRoles"`
-	ApprovalRoles       []string `json:"approvalRoles"`
-	ExecuteRole         string   `json:"executeRole"`
-	Approvals           int      `json:"approvals"`
-	RequiresAnchor      bool     `json:"requiresAnchor"`
-	RequiresPublication bool     `json:"requiresPublication"`
-}
-
-type ownerInputs struct {
-	Schema                string          `json:"schema"`
-	OrganizationRef       string          `json:"organizationRef"`
-	BillingAccountRef     string          `json:"billingAccountRef"`
-	QualificationProjects projects        `json:"qualificationProjects"`
-	ProductionProjects    projects        `json:"productionProjects"`
-	Region                string          `json:"region"`
-	SpannerConfiguration  string          `json:"spannerConfiguration"`
-	DomainZoneRef         string          `json:"domainZoneRef"`
-	IdentityTenantRef     string          `json:"identityTenantRef"`
-	ApprovalClasses       []approvalClass `json:"approvalClasses"`
-	Deployment            struct {
-		BootstrapIdentityRef    string `json:"bootstrapIdentityRef"`
-		TerraformStateBucketRef string `json:"terraformStateBucketRef"`
-		PrivatePlanBucketRef    string `json:"privatePlanBucketRef"`
-	} `json:"deployment"`
-	WIF                wifInputs `json:"wif"`
-	SecretResourceRefs []string  `json:"secretResourceRefs"`
-	AlertChannelRefs   []string  `json:"alertChannelRefs"`
-	Budget             struct {
-		QualificationMonthlyMinorUnits      int64  `json:"qualificationMonthlyMinorUnits"`
-		ProductionMonthlyMinorUnits         int64  `json:"productionMonthlyMinorUnits"`
-		Currency                            string `json:"currency"`
-		AutomaticQualificationTeardownHours int    `json:"automaticQualificationTeardownHours"`
-	} `json:"budget"`
-	Retention struct {
-		AuditDays        int    `json:"auditDays"`
-		PublicationDays  int    `json:"publicationDays"`
-		BackupDays       int    `json:"backupDays"`
-		LegalOwnerRef    string `json:"legalOwnerRef"`
-		IncidentOwnerRef string `json:"incidentOwnerRef"`
-	} `json:"retention"`
-	Backup struct {
-		TargetProjectRef  string   `json:"targetProjectRef"`
-		RecoveryOwnerRefs []string `json:"recoveryOwnerRefs"`
-	} `json:"backup"`
-	Authorizations struct {
-		ProductionMutation string `json:"productionMutation"`
-		RetentionLock      string `json:"retentionLock"`
-		KeyDestruction     string `json:"keyDestruction"`
-		ProductionDNS      string `json:"productionDNS"`
-	} `json:"authorizations"`
-}
-
-type projects struct {
-	Trust       string `json:"trust"`
-	Control     string `json:"control"`
-	Publication string `json:"publication"`
-	Audit       string `json:"audit"`
-	Ops         string `json:"ops"`
-}
-type approvalClass struct {
-	Class             string   `json:"class"`
-	ApproverActorRefs []string `json:"approverActorRefs"`
-	ExecutorActorRef  string   `json:"executorActorRef"`
-}
-type wifInputs struct {
-	PoolRef       string   `json:"poolRef"`
-	ProviderRef   string   `json:"providerRef"`
-	Repository    string   `json:"repository"`
-	Ref           string   `json:"ref"`
-	WorkflowPaths []string `json:"workflowPaths"`
-	Environments  []string `json:"environments"`
-}
-
 func main() {
 	os.Exit(runWithVerifier(os.Args[1:], os.Stdout, os.Stderr, verify))
 }
@@ -383,86 +250,6 @@ func verify(root, mode, ownerPath string) error {
 		return fmt.Errorf("%w: %s", errHistoricalEvidenceNotAvailable, strings.Join(unavailable, "; "))
 	}
 	return nil
-}
-
-func verifyExternalReceipts(root string, value status, now time.Time) error {
-	commit, err := gitValue(root, "rev-parse", "HEAD")
-	if err != nil {
-		return err
-	}
-	tree, err := gitValue(root, "rev-parse", "HEAD^{tree}")
-	if err != nil {
-		return err
-	}
-	policyDigest := statusPolicyDigest(value)
-	for _, evidence := range value.ExternalEvidence {
-		if evidence.Status != "PASS" {
-			continue
-		}
-		path := filepath.ToSlash(filepath.Join(".tools/phase16/private/evidence", evidence.ID+".json"))
-		observedDigest, err := fileDigest(filepath.Join(root, filepath.FromSlash(path)))
-		if err != nil {
-			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
-		}
-		if observedDigest != evidence.EvidenceDigest {
-			return fmt.Errorf("external evidence digest mismatch: %s", evidence.ID)
-		}
-		var receipt externalReceipt
-		if err := decodeFile(root, path, &receipt); err != nil {
-			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
-		}
-		if err := validateExternalReceipt(evidence.ID, receipt, commit, tree, policyDigest, now); err != nil {
-			return fmt.Errorf("external evidence %s: %w", evidence.ID, err)
-		}
-	}
-	return nil
-}
-
-func validateExternalReceipt(id string, receipt externalReceipt, commit, tree, policyDigest string, now time.Time) error {
-	wantKind := strings.ToUpper(strings.ReplaceAll(id, "-", "_"))
-	if receipt.Schema != "phase16-external-receipt-v1" || receipt.Kind != wantKind ||
-		receipt.SubjectCommit != commit || receipt.SubjectTree != tree || receipt.PolicyDigest != policyDigest ||
-		receipt.Result != "PASS" || len(receipt.ArtifactDigests) == 0 || len(receipt.ArtifactDigests) > 64 || len(receipt.Limitations) > 32 {
-		return errors.New("receipt identity, subject, policy, or result mismatch")
-	}
-	started, err := time.Parse(time.RFC3339, receipt.StartedAt)
-	if err != nil {
-		return errors.New("invalid receipt start time")
-	}
-	finished, err := time.Parse(time.RFC3339, receipt.FinishedAt)
-	if err != nil || finished.Before(started) || finished.Sub(started) > 24*time.Hour || finished.After(now.Add(5*time.Minute)) || now.Sub(finished) > 14*24*time.Hour {
-		return errors.New("receipt time window is invalid or stale")
-	}
-	digests := append([]string(nil), receipt.ArtifactDigests...)
-	sort.Strings(digests)
-	for index, digest := range digests {
-		if !validDigest(digest) || index > 0 && digest == digests[index-1] {
-			return errors.New("receipt artifact digest inventory is invalid")
-		}
-	}
-	limitations := append([]string(nil), receipt.Limitations...)
-	sort.Strings(limitations)
-	for index, limitation := range limitations {
-		if len(limitation) < 3 || len(limitation) > 256 || index > 0 && limitation == limitations[index-1] {
-			return errors.New("receipt limitations are invalid")
-		}
-	}
-	return nil
-}
-
-func statusPolicyDigest(value status) string {
-	material := strings.Join([]string{
-		"phase16-production-policy-bundle-v1",
-		"actions=" + value.PolicyDigests.Actions,
-		"keyPolicy=" + value.PolicyDigests.KeyPolicy,
-		"regions=" + value.PolicyDigests.Regions,
-		"retention=" + value.PolicyDigests.Retention,
-		"roles=" + value.PolicyDigests.Roles,
-		"services=" + value.PolicyDigests.Services,
-		"tools=" + value.PolicyDigests.Tools,
-	}, "\n") + "\n"
-	digest := sha256.Sum256([]byte(material))
-	return hex.EncodeToString(digest[:])
 }
 
 func gitValue(root string, args ...string) (string, error) {
@@ -550,86 +337,6 @@ func historicalCommitAvailability(root, commit, label string) error {
 	command.Dir = root
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("%w: %s %s", errHistoricalEvidenceNotAvailable, label, commit)
-	}
-	return nil
-}
-
-func validateRoles(value rolePolicy) error {
-	if value.Schema != "phase16-role-policy-v1" || !equalStrings(value.Roles, expectedRoles) {
-		return errors.New("role inventory drift")
-	}
-	r := value.IdentityRules
-	if !r.OpaqueActorsOnly || !r.RawEmailForbidden || !r.RequesterSelfApprovalForbidden || !r.ExecutorApprovalForbidden || r.MinimumDistinctApprovers != 2 || r.PrivilegedAuthenticationMaximumAgeSeconds > 900 || r.BreakGlassMaximumSeconds > 1800 {
-		return errors.New("identity rules are weaker than Phase 16 authority")
-	}
-	for _, pair := range value.ForbiddenRoleCombinations {
-		if len(pair) != 2 || pair[0] >= pair[1] {
-			return errors.New("invalid forbidden role combination")
-		}
-	}
-	return nil
-}
-
-func validateActions(value actionPolicy) error {
-	if value.Schema != "phase16-action-policy-v1" || len(value.Actions) < len(privilegedActions) {
-		return errors.New("action policy identity or inventory invalid")
-	}
-	last := ""
-	for _, action := range value.Actions {
-		if action.ID <= last || action.ID == "" || action.ExecuteRole == "" {
-			return errors.New("actions must be uniquely sorted and bounded")
-		}
-		last = action.ID
-		if privilegedActions[action.ID] && (action.Approvals != 2 || !action.RequiresAnchor) {
-			return fmt.Errorf("privileged action weakens dual control or anchoring: %s", action.ID)
-		}
-		deleteCopy := false
-		for _, role := range action.ApprovalRoles {
-			if role == action.ExecuteRole {
-				deleteCopy = true
-			}
-		}
-		if deleteCopy {
-			return fmt.Errorf("executor may approve action %s", action.ID)
-		}
-	}
-	r := value.MutationRequirements
-	if !r.IdempotencyKey || !r.ExpectedRevision || !r.ExpectedEpoch || r.BoundedBodyBytes < 1024 || r.BoundedBodyBytes > 65536 || r.ContentType != "application/json" || r.APIVersion != "v1" {
-		return errors.New("mutation requirements are incomplete")
-	}
-	return nil
-}
-
-func validateOwner(value ownerInputs) error {
-	if value.Schema != "phase16-owner-inputs-v1" || value.Region != "europe-west2" || value.SpannerConfiguration != "eur6" {
-		return errors.New("owner input identity or residency invalid")
-	}
-	refs := append(projectValues(value.QualificationProjects), projectValues(value.ProductionProjects)...)
-	if duplicates(refs) {
-		return errors.New("qualification and production projects must be distinct")
-	}
-	classes := map[string]bool{}
-	for _, item := range value.ApprovalClasses {
-		if classes[item.Class] || len(item.ApproverActorRefs) != 2 || item.ApproverActorRefs[0] == item.ApproverActorRefs[1] || item.ExecutorActorRef == item.ApproverActorRefs[0] || item.ExecutorActorRef == item.ApproverActorRefs[1] {
-			return fmt.Errorf("invalid separation of duties for %s", item.Class)
-		}
-		classes[item.Class] = true
-	}
-	for _, required := range []string{"root", "issuer", "publication", "revocation", "recovery", "emergency", "retention-lock", "key-destruction"} {
-		if !classes[required] {
-			return fmt.Errorf("missing approval class %s", required)
-		}
-	}
-	if value.WIF.Repository != "saroo98/kurdistan-protocol-compiler" || value.WIF.Ref != "refs/heads/main" ||
-		!sameSet(value.WIF.Environments, []string{"phase16-production-plan", "phase16-production", "phase16-drill"}) ||
-		!sameSet(value.WIF.WorkflowPaths, []string{".github/workflows/phase16-production-plan.yml", ".github/workflows/phase16-production-apply.yml", ".github/workflows/phase16-drill.yml"}) {
-		return errors.New("WIF claims are not sufficiently restricted")
-	}
-	if duplicates([]string{value.Deployment.BootstrapIdentityRef, value.Deployment.TerraformStateBucketRef, value.Deployment.PrivatePlanBucketRef}) {
-		return errors.New("deployment bootstrap references are absent or reused")
-	}
-	if value.Budget.QualificationMonthlyMinorUnits <= 0 || value.Budget.ProductionMonthlyMinorUnits <= 0 || value.Budget.AutomaticQualificationTeardownHours < 1 || value.Budget.AutomaticQualificationTeardownHours > 72 {
-		return errors.New("budget is absent or unbounded")
 	}
 	return nil
 }
@@ -1084,44 +791,4 @@ func validDigest(v string) bool {
 	}
 	_, err := hex.DecodeString(v)
 	return err == nil
-}
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-func sameSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	want := make(map[string]bool, len(b))
-	for _, value := range b {
-		want[value] = true
-	}
-	for _, value := range a {
-		if !want[value] {
-			return false
-		}
-		delete(want, value)
-	}
-	return len(want) == 0
-}
-func projectValues(p projects) []string {
-	return []string{p.Trust, p.Control, p.Publication, p.Audit, p.Ops}
-}
-func duplicates(values []string) bool {
-	seen := map[string]bool{}
-	for _, v := range values {
-		if v == "" || seen[v] {
-			return true
-		}
-		seen[v] = true
-	}
-	return false
 }

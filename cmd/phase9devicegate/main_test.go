@@ -1515,6 +1515,42 @@ func TestPhase17FieldQualificationRunsOnTheMinimumSupportedAPI(t *testing.T) {
 	t.Fatal("Phase 17 field qualification is skipped on the supported API 26 lane")
 }
 
+func TestCurrentDeviceRosterRequiresEveryAddedMethodOnItsSupportedLanes(t *testing.T) {
+	current, err := readExpectedTests(filepath.Join("..", "..", "android", "config", "phase18-current-device-tests.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen, err := readExpectedTests(filepath.Join("..", "..", "android", "config", "phase17-required-device-tests.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Current source/selector equality is checked by phase17verify. This gate
+	// checks lane admission, not a second manually maintained current count.
+	if len(current) <= len(frozen) || len(frozen) != 82 {
+		t.Fatalf("current=%d frozen=%d", len(current), len(frozen))
+	}
+	const locale = "org.kurdistanvpn.app.ProductLocaleLifecycleDeviceTest#applicationLocaleRecreationKeepsRealActivityAndFilterModalInTheSameLanguage"
+	old := map[string]bool{}
+	for _, name := range expectedTestsForSDK(frozen, 36) {
+		old[name] = true
+	}
+	for _, api := range []int{26, 34, 36} {
+		required := map[string]bool{}
+		for _, name := range expectedTestsForSDK(current, api) {
+			required[name] = true
+		}
+		for _, name := range expectedTestsForSDK(current, 36) {
+			if old[name] {
+				continue
+			}
+			want := name != locale || api >= 34
+			if required[name] != want {
+				t.Fatalf("method %s required on API %d=%t want %t", name, api, required[name], want)
+			}
+		}
+	}
+}
+
 func TestEvaluateInstrumentationRejectsZeroTests(t *testing.T) {
 	if err := evaluateInstrumentation("OK (0 tests)", "clean", defaultAppPackage, 1); err == nil {
 		t.Fatal("evaluateInstrumentation() accepted a zero-test run")

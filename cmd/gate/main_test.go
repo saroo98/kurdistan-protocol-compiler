@@ -373,9 +373,9 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 		options gateOptions
 		want    []string
 	}{
-		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
-		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
-		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests", "android-assurance-host"}},
+		{name: "default", want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
+		{name: "quick", options: gateOptions{quick: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}},
+		{name: "legacy Android", options: gateOptions{android: true}, want: []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests", "android-assurance-host"}},
 		{name: "Android only", options: gateOptions{androidOnly: true}, want: []string{"android-assurance-host"}},
 		{name: "proof", options: gateOptions{proof: "operator"}, want: []string{"phase12-control-plane", "phase16-offline-authority", "phase16-selfhost-tests", "phase16-selfhost-vet"}},
 	}
@@ -388,8 +388,8 @@ func TestStepsForOptionsPreservesLegacyModesAndIsolatesAndroidOnly(t *testing.T)
 			if got := stepNames(steps); !equalStrings(got, test.want) {
 				t.Fatalf("steps = %v, want %v", got, test.want)
 			}
-			if test.options.quick && !containsString(steps[5].args, "--quick") {
-				t.Fatalf("quick audit args = %v", steps[5].args)
+			if test.options.quick && !containsString(namedStep(t, steps, "audit").args, "--quick") {
+				t.Fatalf("quick audit args = %v", namedStep(t, steps, "audit").args)
 			}
 		})
 	}
@@ -565,33 +565,79 @@ func containsString(values []string, target string) bool {
 	return false
 }
 
-func TestGateStepsRemainCacheProof(t *testing.T) {
-	steps := gateSteps(false, "report.json", "status.md")
-	if len(steps) != 14 {
-		t.Fatalf("got %d default gate steps", len(steps))
-	}
-	if got := steps[0].args; len(got) != 2 || got[0] != "mod" || got[1] != "verify" {
-		t.Fatalf("module verification gate missing: %v", got)
-	}
-	if got := steps[3].args; len(got) < 3 || got[0] != "test" || !containsString(got, "-timeout=15m") || !containsString(got, "-count=1") {
-		t.Fatalf("test gate is not cache-proof: %v", got)
-	}
-	for _, value := range steps[:12] {
-		if value.program != "go" {
-			t.Fatalf("unexpected Go gate program %q", value.program)
+func namedStep(t *testing.T, steps []step, name string) step {
+	t.Helper()
+	for _, value := range steps {
+		if value.name == name {
+			return value
 		}
 	}
-	if steps[12].name != "phase17-privacy-python" || (steps[12].program != "python" && steps[12].program != "python3") {
-		t.Fatalf("Phase 17 Python privacy gate missing: %#v", steps[12])
+	t.Fatalf("missing step %q", name)
+	return step{}
+}
+
+func TestGateStepsRemainCacheProof(t *testing.T) {
+	steps := gateSteps(false, "report.json", "status.md")
+	wantNames := []string{"module-verify", "build", "vet", "test", "executable-evidence", "audit", "phase12-control-plane", "phase16-offline-authority", "phase17-workflow-contract", "phase17-qualification-verifier", "phase17-privacy-python", "phase17-wrapper-tests"}
+	if !equalStrings(stepNames(steps), wantNames) {
+		t.Fatalf("steps = %v, want %v", stepNames(steps), wantNames)
 	}
-	if want := []string{"-B", "-I", "scripts/phase17/privacy_scan_b_test.py"}; !equalStrings(steps[12].args, want) {
-		t.Fatalf("Phase 17 Python privacy gate can write bytecode: args=%v want=%v", steps[12].args, want)
+	for name, want := range map[string][]string{
+		"module-verify":                  {"mod", "verify"},
+		"test":                           {"test", "-timeout=15m", "-count=1", "./..."},
+		"vet":                            {"vet", "./..."},
+		"phase12-control-plane":          {"run", "./cmd/koperator", "verify"},
+		"phase16-offline-authority":      {"run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"},
+		"phase17-workflow-contract":      {"run", "./cmd/assure", "workflow", "-root", "."},
+		"phase17-qualification-verifier": {"run", "./cmd/phase17verify", "-root", "."},
+	} {
+		value := namedStep(t, steps, name)
+		if value.program != "go" || !equalStrings(value.args, want) {
+			t.Fatalf("%s = %#v, want go %v", name, value, want)
+		}
 	}
-	if steps[13].name != "phase17-wrapper-tests" || steps[13].program != "pwsh" {
-		t.Fatalf("Phase 17 wrapper gate missing: %#v", steps[13])
+	counts := map[string]int{}
+	for _, value := range steps {
+		if value.program == "go" && len(value.args) > 0 {
+			if value.args[0] == "test" || value.args[0] == "vet" {
+				counts[value.args[0]]++
+				if !containsString(value.args, "./...") || containsString(value.args, "./internal/selfhost/...") {
+					t.Fatalf("aggregate subset: %#v", value)
+				}
+			}
+		}
 	}
-	if got := steps[6].args; len(got) != 3 || got[0] != "run" || got[1] != "./cmd/koperator" || got[2] != "verify" {
-		t.Fatalf("Phase 12 control-plane gate missing: %v", got)
+	if counts["test"] != 1 || counts["vet"] != 1 {
+		t.Fatalf("root suite counts: %v", counts)
+	}
+	privacy := namedStep(t, steps, "phase17-privacy-python")
+	if (privacy.program != "python" && privacy.program != "python3") || !equalStrings(privacy.args, []string{"-B", "-I", "scripts/phase17/privacy_scan_b_test.py"}) {
+		t.Fatalf("privacy step = %#v", privacy)
+	}
+	wrapper := namedStep(t, steps, "phase17-wrapper-tests")
+	if wrapper.program != "pwsh" || !equalStrings(wrapper.args, []string{"-NoProfile", "-File", "scripts/phase17/owned-vps-scripts.Tests.ps1"}) {
+		t.Fatalf("wrapper step = %#v", wrapper)
+	}
+}
+
+func TestStandaloneOperatorCommandsRemainComplete(t *testing.T) {
+	steps, err := proofSteps("operator", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []step{
+		{"phase12-control-plane", "go", []string{"run", "./cmd/koperator", "verify"}, ""},
+		{"phase16-offline-authority", "go", []string{"run", "./cmd/phase16verify", "-root", ".", "-mode", "offline"}, ""},
+		{"phase16-selfhost-tests", "go", []string{"test", "-count=1", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
+		{"phase16-selfhost-vet", "go", []string{"vet", "./internal/selfhost/...", "./cmd/kurdctl", "./cmd/kurd-node", "./cmd/kurdpackage", "./cmd/kandroidbridge", "./cmd/phase16androidverify"}, ""},
+	}
+	if !equalStrings(stepNames(steps), stepNames(want)) {
+		t.Fatalf("operator steps = %v", stepNames(steps))
+	}
+	for i, value := range steps {
+		if value.program != want[i].program || value.dir != want[i].dir || !equalStrings(value.args, want[i].args) {
+			t.Fatalf("operator step = %#v, want %#v", value, want[i])
+		}
 	}
 }
 
@@ -630,6 +676,24 @@ func TestAndroidPRStepUsesCacheEnabledFeedbackTask(t *testing.T) {
 	for _, prohibited := range []string{"--no-build-cache", "--no-configuration-cache", "--rerun-tasks"} {
 		if containsString(value.args, prohibited) {
 			t.Fatalf("Android PR feedback unexpectedly disables cache with %q: %#v", prohibited, value)
+		}
+	}
+}
+
+func TestAndroidDeviceStepsBindTheCurrentRosterForEveryLane(t *testing.T) {
+	for _, api := range []int{26, 34, 36} {
+		step := androidDeviceStep(api)
+		count := 0
+		for i, arg := range step.args {
+			if arg == "-expected-tests" {
+				count++
+				if i+1 >= len(step.args) || step.args[i+1] != "android/config/phase18-current-device-tests.txt" {
+					t.Fatalf("API %d does not bind current roster: %v", api, step.args)
+				}
+			}
+		}
+		if count != 1 {
+			t.Fatalf("API %d expected-tests count=%d", api, count)
 		}
 	}
 }

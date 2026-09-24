@@ -88,6 +88,8 @@ var qualificationFiles = []string{
 	"cmd/phase17scan/main_test.go",
 	"cmd/phase17verify/artifact.go",
 	"cmd/phase17verify/artifact_test.go",
+	"cmd/phase17verify/constants.go",
+	"cmd/phase17verify/constants_test.go",
 	"cmd/phase17verify/inventory.go",
 	"cmd/phase17verify/inventory_test.go",
 	"cmd/phase17verify/main.go",
@@ -95,6 +97,8 @@ var qualificationFiles = []string{
 	"cmd/phase17verify/native_durable_fs_linux_test.go",
 	"cmd/phase17verify/qualification.go",
 	"cmd/phase17verify/qualification_test.go",
+	"cmd/phase17verify/workmanager_artifact.go",
+	"cmd/phase17verify/workmanager_artifact_test.go",
 	"config/phase17-acceptance-registry-v2.json",
 	"config/phase17/qualification-policy-v1.json",
 	"internal/phase17boundary/monitor.go",
@@ -285,12 +289,66 @@ var correctionQualificationFiles = []string{
 	"android/settings.gradle.kts",
 }
 
+var currentCorrectionReplacements = map[string][]string{
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase13Coordinators.kt": {
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductConnectionRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductSettingsRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductProfileRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductPrivacyRecoveryRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductDiagnosticsRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductNodeMaintenanceRepository.kt",
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/DefaultProductStartupRepository.kt",
+	},
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase9CompositionRoot.kt": {
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductCompositionRoot.kt",
+	},
+	"android/app/src/main/kotlin/org/kurdistanvpn/app/Phase9ExportWire.kt": {
+		"android/app/src/main/kotlin/org/kurdistanvpn/app/ProductExportWire.kt",
+	},
+	"android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/Phase9SettingsStore.kt": {
+		"android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/ProductSettingsStore.kt",
+		"android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/SettingsMigration.kt",
+		"android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/SettingsApplyCoordinator.kt",
+	},
+}
+
 func qualificationRequiredFiles() []string {
-	result := make([]string, 0, len(qualificationFiles)+len(qualificationSchemaFiles))
-	result = append(result, qualificationFiles...)
-	result = append(result, qualificationSchemaFiles...)
-	result = append(result, correctionQualificationFiles...)
+	var result []string
+	seen := map[string]bool{}
+	for _, list := range [][]string{qualificationFiles, qualificationSchemaFiles, correctionQualificationFiles} {
+		for _, path := range list {
+			inputs := []string{path}
+			if replacements, retired := currentCorrectionReplacements[path]; retired {
+				inputs = replacements
+			}
+			for _, input := range inputs {
+				if !seen[input] {
+					seen[input] = true
+					result = append(result, input)
+				}
+			}
+		}
+	}
 	return result
+}
+
+func verifyCurrentCorrectionRetirements(root string) error {
+	for retired, replacements := range currentCorrectionReplacements {
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(retired))); !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("retired qualification input must remain absent: %s", retired)
+		}
+		seen := map[string]bool{}
+		if len(replacements) == 0 {
+			return errors.New("current correction replacement set must not be empty")
+		}
+		for _, replacement := range replacements {
+			if replacement == "" || seen[replacement] || replacement == retired {
+				return errors.New("empty or duplicate current correction replacement")
+			}
+			seen[replacement] = true
+		}
+	}
+	return nil
 }
 
 func verifyQualificationInfrastructure(root string) error {
@@ -476,6 +534,9 @@ func loadQualificationFiles(root string) (map[string][]byte, error) {
 	}
 	if !sameFilesystemPath(rootAbs, resolvedRoot) {
 		return nil, errors.New("qualification root contains a symbolic link")
+	}
+	if err := verifyCurrentCorrectionRetirements(rootAbs); err != nil {
+		return nil, err
 	}
 	if err := verifyQualificationInventoryCompleteness(rootAbs); err != nil {
 		return nil, err

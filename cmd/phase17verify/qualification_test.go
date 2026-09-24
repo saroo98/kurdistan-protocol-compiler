@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,9 +86,120 @@ func TestCorrectionDefinitionsAndVerifiersAreMandatoryQualificationInputs(t *tes
 	}
 }
 
-func TestEveryAuthorizedCorrectionProductionInputIsBoundToCandidateInventory(t *testing.T) {
+func TestCurrentCorrectionInventoryReplacesOnlyRetiredSettingsInput(t *testing.T) {
+	paths := qualificationRequiredFiles()
+	retired := "android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/Phase9SettingsStore.kt"
+	counts := map[string]int{}
+	for _, path := range paths {
+		counts[path]++
+	}
+	if counts[retired] != 0 {
+		t.Fatal("retired settings input remains required")
+	}
+	for _, name := range []string{"ProductSettingsStore.kt", "SettingsMigration.kt", "SettingsApplyCoordinator.kt"} {
+		path := "android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/" + name
+		if counts[path] != 1 {
+			t.Fatalf("replacement %s bound %d times", name, counts[path])
+		}
+	}
+}
+
+func TestQualificationRejectsEachMissingWorkManagerAdapterInput(t *testing.T) {
+	for _, name := range []string{"workmanager_artifact.go", "workmanager_artifact_test.go"} {
+		t.Run(name, func(t *testing.T) {
+			root := copyQualificationInfrastructure(t)
+			path := filepath.Join(root, "cmd", "phase17verify", name)
+			if _, err := os.Stat(path); err != nil {
+				t.Fatalf("current adapter input not inventoried: %v", err)
+			}
+			if _, err := loadQualificationFiles(root); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := loadQualificationFiles(root); err == nil || !strings.Contains(err.Error(), name) {
+				t.Fatalf("missing adapter accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestCurrentCompositionReplacementInputsCannotBeOmittedOrResurrected(t *testing.T) {
+	const app = "android/app/src/main/kotlin/org/kurdistanvpn/app/"
+	for _, retired := range []string{"Phase13Coordinators.kt", "Phase9CompositionRoot.kt", "Phase9ExportWire.kt"} {
+		if len(currentCorrectionReplacements[app+retired]) == 0 {
+			t.Fatalf("retired composition input has no current replacement: %s", retired)
+		}
+	}
+	root := copyQualificationInfrastructure(t)
+	if _, err := loadQualificationFiles(root); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ProductCompositionRoot.kt", "ProductExportWire.kt", "ProductConnectionRepository.kt",
+		"ProductSettingsRepository.kt", "ProductProfileRepository.kt", "ProductPrivacyRecoveryRepository.kt",
+		"ProductDiagnosticsRepository.kt", "ProductNodeMaintenanceRepository.kt", "DefaultProductStartupRepository.kt"} {
+		path := filepath.Join(root, filepath.FromSlash(app+name))
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		_, rejected := loadQualificationFiles(root)
+		if err := os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if rejected == nil || !strings.Contains(rejected.Error(), name) {
+			t.Fatalf("missing %s accepted: %v", name, rejected)
+		}
+	}
+	for _, retired := range []string{"Phase13Coordinators.kt", "Phase9CompositionRoot.kt", "Phase9ExportWire.kt"} {
+		path := filepath.Join(root, filepath.FromSlash(app+retired))
+		if err := os.WriteFile(path, []byte("retired input"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, rejected := loadQualificationFiles(root)
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		if rejected == nil || !strings.Contains(rejected.Error(), retired) {
+			t.Fatalf("resurrected %s accepted: %v", retired, rejected)
+		}
+	}
+}
+
+func TestCurrentCorrectionInventoryRejectsEachMissingReplacementAndResurrection(t *testing.T) {
+	for _, name := range []string{"ProductSettingsStore.kt", "SettingsMigration.kt", "SettingsApplyCoordinator.kt", "Phase9SettingsStore.kt"} {
+		t.Run(name, func(t *testing.T) {
+			root := copyQualificationInfrastructure(t)
+			if _, err := loadQualificationFiles(root); err != nil {
+				t.Fatalf("positive: %v", err)
+			}
+			path := "android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/" + name
+			if name == "Phase9SettingsStore.kt" {
+				if err := os.WriteFile(filepath.Join(root, path), []byte("class Retired {}\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.Remove(filepath.Join(root, path)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := loadQualificationFiles(root); err == nil || !strings.Contains(err.Error(), name) {
+				t.Fatalf("missing/resurrected replacement accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestHistoricalCorrectionScriptProductionInputsAreBoundToCurrentReplacements(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repositoryRoot(t), "scripts", "phase17", "run-local-correction-checks.ps1"))
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyHistoricalCorrectionRecordCoverage(raw); err != nil {
 		t.Fatal(err)
 	}
 	bound := map[string]bool{}
@@ -105,6 +217,17 @@ func TestEveryAuthorizedCorrectionProductionInputIsBoundToCandidateInventory(t *
 			continue
 		}
 		count++
+		if replacements, retired := currentCorrectionReplacements[path]; retired {
+			if _, err := os.Lstat(filepath.Join(repositoryRoot(t), filepath.FromSlash(path))); !os.IsNotExist(err) {
+				t.Errorf("retired original remains present: %s", path)
+			}
+			for _, replacement := range replacements {
+				if replacement == "" || !bound[replacement] {
+					t.Errorf("replacement input not bound: %s", replacement)
+				}
+			}
+			continue
+		}
 		if !bound[path] {
 			t.Errorf("production correction input is not bound: %s", path)
 		}
@@ -112,6 +235,69 @@ func TestEveryAuthorizedCorrectionProductionInputIsBoundToCandidateInventory(t *
 	if count < 60 {
 		t.Fatal("critical source accounting unexpectedly reduced")
 	}
+}
+
+func verifyHistoricalCorrectionRecordCoverage(raw []byte) error {
+	records := map[string]bool{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "M|android/") && !strings.HasPrefix(line, "N|android/") {
+			continue
+		}
+		_, path, _ := strings.Cut(line, "|")
+		if records[path] {
+			return fmt.Errorf("duplicate historical correction record: %s", path)
+		}
+		records[path] = true
+	}
+	expected := append([]string(nil), correctionQualificationFiles...)
+	expected = append(expected, "android/build.gradle.kts", "android/runtime/android/src/main/kotlin/org/kurdistanvpn/runtime/android/KurdVpnService.kt")
+	for _, path := range expected {
+		if !records[path] {
+			return fmt.Errorf("missing original historical correction record: %s", path)
+		}
+	}
+	return nil
+}
+
+func TestHistoricalCorrectionScriptCannotLoseAnOriginalProductionRecord(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repositoryRoot(t), "scripts/phase17/run-local-correction-checks.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyHistoricalCorrectionRecordCoverage(raw); err != nil {
+		t.Fatalf("positive: %v", err)
+	}
+	bad := strings.Replace(string(raw), "M|android/build.gradle.kts", "", 1)
+	if bad == string(raw) {
+		t.Fatal("fixture record absent")
+	}
+	if err := verifyHistoricalCorrectionRecordCoverage([]byte(bad)); err == nil || !strings.Contains(err.Error(), "missing original") {
+		t.Fatalf("lost original record accepted: %v", err)
+	}
+}
+
+func TestCurrentCorrectionRejectsUnknownMissingInputAndDuplicateReplacement(t *testing.T) {
+	t.Run("unknown-missing", func(t *testing.T) {
+		root := copyQualificationInfrastructure(t)
+		path := "android/core/native-api/src/main/kotlin/org/kurdistanvpn/core/nativeapi/DurableFilePrimitives.kt"
+		if err := os.Remove(filepath.Join(root, path)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadQualificationFiles(root); err == nil || !strings.Contains(err.Error(), "DurableFilePrimitives.kt") {
+			t.Fatalf("arbitrary missing file accepted as retired: %v", err)
+		}
+	})
+	t.Run("duplicate-replacement", func(t *testing.T) {
+		root := copyQualificationInfrastructure(t)
+		const retired = "android/data/settings/src/main/kotlin/org/kurdistanvpn/data/settings/Phase9SettingsStore.kt"
+		original := currentCorrectionReplacements[retired]
+		defer func() { currentCorrectionReplacements[retired] = original }()
+		currentCorrectionReplacements[retired] = []string{original[0], original[1], original[0]}
+		if _, err := loadQualificationFiles(root); err == nil || !strings.Contains(err.Error(), "duplicate") {
+			t.Fatalf("duplicate replacement accepted: %v", err)
+		}
+	})
 }
 
 func TestCopyQualificationInfrastructureReturnsCanonicalRoot(t *testing.T) {
@@ -382,6 +568,9 @@ func copyQualificationInfrastructure(t *testing.T) string {
 		if err := os.WriteFile(destination, raw, 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := loadQualificationFiles(root); err != nil {
+		t.Fatalf("positive current qualification input fixture: %v", err)
 	}
 	return root
 }

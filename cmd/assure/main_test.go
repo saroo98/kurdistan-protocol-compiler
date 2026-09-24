@@ -399,7 +399,7 @@ func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
 				"-test-package", "org.kurdistanvpn.app.internal.test",
 				"-conflicting-app-package", "org.kurdistanvpn.app.debug",
 				"-minimum-tests", "1",
-				"-expected-tests", "android/config/phase17-required-device-tests.txt",
+				"-expected-tests", "android/config/phase18-current-device-tests.txt",
 				"-expected-api", api,
 				"-expected-abi", "x86_64",
 			}

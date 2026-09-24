@@ -11,6 +11,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/ast"
+	"go/constant"
+	"go/format"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/netip"
 	"os"
@@ -20,6 +25,7 @@ import (
 	"strings"
 
 	phase17evidence "kurdistan/internal/phase17evidence"
+	"kurdistan/internal/testkit/evidenceoverlay"
 )
 
 const contractPath = "config/runtime/live-data-plane-v1.json"
@@ -241,8 +247,9 @@ func main() {
 	releaseAPK := flag.String("release-apk", "", "path to the unsigned Phase 17 release APK")
 	internalAPK := flag.String("internal-apk", "", "path to the Phase 17 internal APK")
 	manifest := flag.String("manifest", "", "path to the merged Phase 17 release manifest")
+	aapt2 := flag.String("aapt2", "", "absolute path to the pinned SDK36 aapt2 executable")
 	flag.Parse()
-	artifactsEnabled, err := validateArtifactPaths(*releaseAPK, *internalAPK, *manifest)
+	artifactsEnabled, err := validateArtifactPaths(*releaseAPK, *internalAPK, *manifest, *aapt2)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "PHASE 17 LIVE DATA-PLANE VERIFICATION FAILED: %v\n", err)
 		os.Exit(2)
@@ -252,17 +259,17 @@ func main() {
 		os.Exit(1)
 	}
 	if artifactsEnabled {
-		if err := verifyPhase17Artifacts(*releaseAPK, *internalAPK, *manifest); err != nil {
+		if err := verifyPhase17Artifacts(*releaseAPK, *internalAPK, *manifest, *aapt2); err != nil {
 			fmt.Fprintf(os.Stderr, "PHASE 17 LIVE DATA-PLANE VERIFICATION FAILED: %v\n", err)
 			os.Exit(1)
 		}
 	}
-	fmt.Println("PHASE 17 LIVE DATA-PLANE VERIFICATION PASSED")
+	fmt.Println("CURRENT SOURCE AND DEVICE INVENTORY VERIFIED; IMMUTABLE PHASE 17 COMPATIBILITY RETAINED (NOT CURRENT DEVICE EXECUTION OR RELEASE AUTHORIZATION)")
 }
 
-func validateArtifactPaths(releaseAPK, internalAPK, manifest string) (bool, error) {
+func validateArtifactPaths(releaseAPK, internalAPK, manifest, aapt2 string) (bool, error) {
 	provided := 0
-	for _, value := range []string{releaseAPK, internalAPK, manifest} {
+	for _, value := range []string{releaseAPK, internalAPK, manifest, aapt2} {
 		if value != "" {
 			provided++
 		}
@@ -270,8 +277,8 @@ func validateArtifactPaths(releaseAPK, internalAPK, manifest string) (bool, erro
 	if provided == 0 {
 		return false, nil
 	}
-	if provided != 3 {
-		return false, fmt.Errorf("release-apk, internal-apk, and manifest must be provided together")
+	if provided != 4 {
+		return false, fmt.Errorf("release-apk, internal-apk, manifest, and aapt2 must be provided together")
 	}
 	return true, nil
 }
@@ -285,6 +292,9 @@ func verify(root string) error {
 		return err
 	}
 	if err := verifyGoCopies(root, value); err != nil {
+		return err
+	}
+	if err := verifyHistoricalAndroidCopies(root, value); err != nil {
 		return err
 	}
 	if err := verifyDeploymentCopies(root, value); err != nil {
@@ -550,9 +560,13 @@ func verifyGoCopies(root string, value contract) error {
 	if err != nil {
 		return err
 	}
+	if err := requireGoConstants("carrier implementation", carrier, map[string]constant.Value{
+		"ALPN":          constant.MakeString(value.Wire.ALPN),
+		"exporterLabel": constant.MakeString(value.Wire.ExporterLabel),
+	}); err != nil {
+		return err
+	}
 	if err := requireSnippets("carrier implementation", carrier, []string{
-		fmt.Sprintf("ALPN          = %q", value.Wire.ALPN),
-		fmt.Sprintf("exporterLabel = %q", value.Wire.ExporterLabel),
 		"cfg.MinVersion = tls.VersionTLS13", "cfg.MaxVersion = tls.VersionTLS13",
 		"cfg.NextProtos = []string{ALPN}", "cfg.SessionTicketsDisabled = true", "cfg.ClientSessionCache = nil",
 		"state.ExportKeyingMaterial(exporterLabel, planDigest[:], 32)",
@@ -564,17 +578,78 @@ func verifyGoCopies(root string, value contract) error {
 	if err != nil {
 		return err
 	}
+	if err := requireGoConstants("wire implementation", wire, map[string]constant.Value{
+		"HeaderBytes":      constant.MakeInt64(int64(value.Wire.HeaderBytes)),
+		"MajorVersion":     constant.MakeInt64(int64(value.Wire.MajorVersion)),
+		"MinorVersion":     constant.MakeInt64(int64(value.Wire.MinorVersion)),
+		"MaxControlBytes":  constant.MakeInt64(int64(value.Wire.MaxControlBytes)),
+		"MaxPayloadBytes":  constant.MakeInt64(int64(value.Wire.MaxPayloadBytes)),
+		"TypeProfileBind":  constant.MakeInt64(int64(value.Wire.ProfileBindRecordType)),
+		"TypeEngineReady":  constant.MakeInt64(int64(value.Wire.EngineReadyRecordType)),
+		"TypeClose":        constant.MakeInt64(int64(value.Wire.CloseRecordType)),
+		"TypeReliableData": constant.MakeInt64(int64(value.Wire.ReliableDataRecordType)),
+		"FlagCritical":     constant.MakeInt64(1),
+		"knownFlags":       constant.MakeInt64(1),
+	}); err != nil {
+		return err
+	}
 	if err := requireSnippets("wire implementation", wire, []string{
-		fmt.Sprintf("HeaderBytes           = %d", value.Wire.HeaderBytes),
-		fmt.Sprintf("MajorVersion    uint8 = %d", value.Wire.MajorVersion),
-		fmt.Sprintf("MinorVersion    uint8 = %d", value.Wire.MinorVersion),
 		"var magic = [4]byte{'K', 'U', 'R', 'D'}",
-		"MaxControlBytes       = 64 << 10", "MaxPayloadBytes       = 1 << 20",
-		fmt.Sprintf("TypeProfileBind  uint8 = %d", value.Wire.ProfileBindRecordType),
-		fmt.Sprintf("TypeEngineReady  uint8 = %d", value.Wire.EngineReadyRecordType),
-		fmt.Sprintf("TypeClose        uint8 = %d", value.Wire.CloseRecordType),
-		fmt.Sprintf("TypeReliableData uint8 = %d", value.Wire.ReliableDataRecordType),
-		"knownFlags         = FlagCritical", "binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))",
+	}); err != nil {
+		return err
+	}
+	// Match direct statements in the execution-bearing declaration, not comments
+	// or a similarly shaped unrelated function. Parsing omits comments.
+	requireFunctionStatements := func(source, name string, required []string) error {
+		label := "wire " + name
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, label, source, 0)
+		if err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+		var body *ast.BlockStmt
+		for _, declaration := range file.Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok || function.Recv != nil || function.Name.Name != name {
+				continue
+			}
+			if body != nil || function.Body == nil {
+				return fmt.Errorf("%s disagrees with authority: duplicate or missing body", label)
+			}
+			body = function.Body
+		}
+		if body == nil {
+			return fmt.Errorf("%s disagrees with authority: missing function", label)
+		}
+		statements := map[string]bool{}
+		for _, statement := range body.List {
+			var rendered bytes.Buffer
+			if err := format.Node(&rendered, fset, statement); err != nil {
+				return err
+			}
+			statements[normalizeWhitespace(rendered.String())] = true
+		}
+		for _, statement := range required {
+			if !statements[normalizeWhitespace(statement)] {
+				return fmt.Errorf("%s disagrees with authority: missing statement %q", label, statement)
+			}
+		}
+		return nil
+	}
+	if err := requireFunctionStatements(wire, "Encode", []string{"writeFrame(out, frame)"}); err != nil {
+		return err
+	}
+	wireBuffers, err := readRequired(root, "internal/protocol/wirev1/codec_buffers.go")
+	if err != nil {
+		return err
+	}
+	if err := requireFunctionStatements(wireBuffers, "writeFrame", []string{
+		"copy(out[HeaderBytes:], frame.Payload)",
+		"copy(out[0:4], magic[:])",
+		"out[4], out[5], out[6], out[7] = MajorVersion, MinorVersion, frame.Type, frame.Flags",
+		"binary.BigEndian.PutUint32(out[8:12], frame.StreamID)",
+		"binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))",
+		"copy(out[16:48], frame.PlanDigest[:])",
 	}); err != nil {
 		return err
 	}
@@ -595,23 +670,48 @@ func verifyGoCopies(root string, value contract) error {
 	if err != nil {
 		return err
 	}
-	if err := requireSnippets("legacy protected-record implementation", legacyProtectedChannel, []string{
-		fmt.Sprintf("strictFragmentMaxOperationsV1 = %d", value.Limits.LegacyProtectedRecordIncompleteOperations),
+	if err := requireGoConstants("legacy protected-record implementation", legacyProtectedChannel, map[string]constant.Value{
+		"strictFragmentMaxOperationsV1": constant.MakeInt64(int64(value.Limits.LegacyProtectedRecordIncompleteOperations)),
 	}); err != nil {
 		return err
 	}
-	runtimeStatus, err := readRequired(root, "android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt")
+	return nil
+}
+
+// Android predecessor assertions belong to the immutable accepted subject, not
+// the successor owner. Shared Go transport assertions above remain current.
+func verifyHistoricalAndroidCopies(root string, value contract) error {
+	subject, err := evidenceoverlay.OpenExactSubject(root, phase17InventoryCommit, phase17InventoryTree)
 	if err != nil {
 		return err
 	}
+	status, err := subject.Read("android/runtime/api/src/main/kotlin/org/kurdistanvpn/runtime/api/RuntimeStatus.kt")
+	if err != nil {
+		return err
+	}
+	bridge, err := subject.Read("android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt")
+	if err != nil {
+		return err
+	}
+	if err := verifyAndroidPredecessorCopies(string(status.Content), string(bridge.Content), value); err != nil {
+		return err
+	}
+	runtimeFile, err := subject.Read(phase17RuntimeAndroidManifestPath)
+	if err != nil {
+		return err
+	}
+	appFile, err := subject.Read(phase17AppAndroidManifestPath)
+	if err != nil {
+		return err
+	}
+	return verifySourceManifestBytes(runtimeFile.Content, appFile.Content, true)
+}
+
+func verifyAndroidPredecessorCopies(runtimeStatus, nativeBridge string, value contract) error {
 	if err := requireSnippets("Kotlin RuntimeStatus predecessor surface", runtimeStatus, []string{
 		"ACTIVE_KURD_LOOPBACK", "validatedForLoopbackTransport", "val planDigest: String? = null",
 		fmt.Sprintf("require(mtu in %d..%d)", value.Android.RuntimeStatusMTUMin, value.Android.RuntimeStatusMTUMax),
 	}); err != nil {
-		return err
-	}
-	nativeBridge, err := readRequired(root, "android/core/native-jni/src/main/kotlin/org/kurdistanvpn/core/nativejni/NativeBridge.kt")
-	if err != nil {
 		return err
 	}
 	if err := requireSnippets("Kotlin NativeBridge predecessor surface", nativeBridge, []string{
@@ -852,12 +952,20 @@ func requireSnippets(scope, text string, required []string) error {
 }
 
 func readRequired(root, relative string) (string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+	file, err := os.Open(filepath.Join(root, filepath.FromSlash(relative)))
+	if err != nil {
+		return "", fmt.Errorf("read required %s: %w", relative, err)
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, qualificationMaximumSourceBytes+1))
 	if err != nil {
 		return "", fmt.Errorf("read required %s: %w", relative, err)
 	}
 	if len(raw) == 0 {
 		return "", fmt.Errorf("required %s is empty", relative)
+	}
+	if len(raw) > qualificationMaximumSourceBytes {
+		return "", fmt.Errorf("required %s exceeds source byte limit", relative)
 	}
 	return string(raw), nil
 }

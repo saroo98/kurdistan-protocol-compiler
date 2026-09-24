@@ -379,7 +379,7 @@ jobs:
           $paths = @{
             'internal-apk' = '.tools/device/app-internal.apk'
             'instrumentation-apk' = '.tools/device/app-internal-androidTest.apk'
-            'expected-tests' = 'android/config/phase17-required-device-tests.txt'
+            'expected-tests' = 'android/config/phase18-current-device-tests.txt'
           }
           foreach ($entry in $metadata.artifacts) {
             if (-not $paths.ContainsKey($entry.name)) { throw "unexpected device artifact $($entry.name)" }
@@ -415,7 +415,7 @@ jobs:
           -artifact .tools/device/app-internal.apk
           -artifact .tools/device/app-internal-androidTest.apk
           -artifact .tools/device/device-artifacts.json
-          -artifact android/config/phase17-required-device-tests.txt
+          -artifact android/config/phase18-current-device-tests.txt
           -artifact .tools/phase17/emulator-api${{ matrix.api }}-identity.json
       - name: Validate passing receipt
         if: steps.proof.outcome == 'success'

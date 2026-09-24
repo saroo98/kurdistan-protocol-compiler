@@ -1145,18 +1145,30 @@ func TestUnrelatedUIDProbeActivityRemainsTestOnlyAndExported(t *testing.T) {
 func TestVpnServiceDeclaresUnderlyingNetworkOnBuilderBeforeEstablish(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join(
 		"..", "..", "android", "runtime", "android", "src", "main", "kotlin",
-		"org", "kurdistanvpn", "runtime", "android", "KurdVpnService.kt",
+		"org", "kurdistanvpn", "runtime", "android", "RuntimeProductionPlatformOwner.kt",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
-	builderBinding := bytes.Index(source, []byte(".setUnderlyingNetworks(arrayOf(underlyingNetwork))"))
-	establish := bytes.Index(source, []byte("val descriptor = builder.establish()"))
-	if builderBinding < 0 || establish < 0 || builderBinding > establish {
+	validOrder := func(raw []byte) bool {
+		start := bytes.Index(raw, []byte("fun establishTun("))
+		if start < 0 {
+			return false
+		}
+		raw = raw[start:]
+		binding := bytes.Index(raw, []byte("configured.setUnderlyingNetworks(arrayOf(underlying))"))
+		// The earlier PlatformTunOwner lambda is deferred, not establishment.
+		establish := bytes.Index(raw, []byte("checkNotNull(platform.establish())"))
+		published := bytes.Index(raw, []byte("check(service.setUnderlyingNetworks(arrayOf(underlying)))"))
+		return binding >= 0 && establish > binding && published > establish
+	}
+	if !validOrder(source) {
 		t.Fatal("VPN builder must declare the verified underlying network before establish")
 	}
-	if bytes.Contains(source, []byte("if (!setUnderlyingNetworks(arrayOf(selectedUnderlyingNetwork)))")) {
-		t.Fatal("VpnService.setUnderlyingNetworks must not run before the VPN is established")
+	mutation := bytes.Replace(source, []byte("configured.setUnderlyingNetworks(arrayOf(underlying))"),
+		[]byte("checkNotNull(platform.establish())\nconfigured.setUnderlyingNetworks(arrayOf(underlying))"), 1)
+	if validOrder(mutation) {
+		t.Fatal("premature establishment mutation was accepted")
 	}
 }
 
