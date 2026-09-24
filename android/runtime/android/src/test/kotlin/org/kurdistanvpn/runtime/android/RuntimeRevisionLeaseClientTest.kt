@@ -7,6 +7,35 @@ import org.junit.Test
 import org.kurdistanvpn.runtime.api.*
 
 class RuntimeRevisionLeaseClientTest {
+    @Test fun freshPublicationUsesFiveSecondBudgetButNotItsExactExpiryOrLongerRequestLifetime() {
+        listOf(5099L to true, 5100L to false).forEach { (publicationTime, expected) ->
+            val full = request().copy(deadlineElapsedMillis = 60_000)
+            val client = RuntimeRevisionLeaseClient(full)
+            assertTrue(client.beginFinalLease(100))
+            assertTrue(client.accept(lease(RuntimeAuthorityPurpose.PRE_TUN, full), checks()))
+            assertTrue(client.authorizeTun(checks()))
+            assertTrue(client.accept(lease(RuntimeAuthorityPurpose.PRE_ACTIVE, full),
+                checks().copy(nowElapsedMillis = 3000)))
+            assertEquals(expected, client.authorizePublication(checks().copy(nowElapsedMillis = publicationTime)))
+            assertFalse(client.beginFinalLease(publicationTime))
+        }
+    }
+
+    @Test fun extendedBudgetNeverReplacesFreshPermissionRevisionOrCancellationChecks() {
+        listOf(checks().copy(revision = 4), checks().copy(unlocked = false),
+            checks().copy(vpnPrepared = false), checks().copy(cancelled = true)).forEach { invalid ->
+            val full = request().copy(deadlineElapsedMillis = 60_000)
+            val client = RuntimeRevisionLeaseClient(full)
+            assertTrue(client.beginFinalLease(100))
+            assertTrue(client.accept(lease(RuntimeAuthorityPurpose.PRE_TUN, full), checks()))
+            assertTrue(client.authorizeTun(checks()))
+            assertTrue(client.accept(lease(RuntimeAuthorityPurpose.PRE_ACTIVE, full),
+                checks().copy(nowElapsedMillis = 3000)))
+            assertFalse(client.authorizePublication(invalid.copy(nowElapsedMillis = 3001)))
+            assertFalse(client.authorizePublication(checks().copy(nowElapsedMillis = 3002)))
+        }
+    }
+
     @Test fun finalLeaseBoundStartsBeforeRpcAndCannotBeExtendedByLateResponse() {
         val full = request().copy(deadlineElapsedMillis = 60_000)
         val client = RuntimeRevisionLeaseClient(full)
@@ -59,8 +88,8 @@ class RuntimeRevisionLeaseClientTest {
     private fun request() = RuntimeAuthorityRequest("1".repeat(32), "5".repeat(32), "2".repeat(32), 1,
         RuntimeAuthorityPurpose.FULL_AUTHORITY, RuntimeAuthorityTrigger.MANUAL, 2, 1000,
         "3".repeat(32), "6".repeat(32), RuntimeDescriptorBinding("4".repeat(32), 1, 2, 1000, 4480, 232, 0), 2, 0)
-    private fun lease(purpose: RuntimeAuthorityPurpose): RuntimeVerifiedAuthority {
-        val expected = request().forPurpose(purpose, request().descriptor.copy(length = RuntimeAuthorityFrameCodec.encodedLength(0).toLong()))
+    private fun lease(purpose: RuntimeAuthorityPurpose, full: RuntimeAuthorityRequest = request()): RuntimeVerifiedAuthority {
+        val expected = full.forPurpose(purpose, full.descriptor.copy(length = RuntimeAuthorityFrameCodec.encodedLength(0).toLong()))
         val frame = RuntimeAuthorityFrameCodec.sealer(ByteArray(32) { 5 }, expected).seal(byteArrayOf())!!
         return (RuntimeAuthorityFrameCodec.verifier(ByteArray(32) { 5 }, expected)
             .verifyAndConsume(frame, expected.descriptor, 100) as RuntimeFrameVerification.Verified).authority

@@ -43,7 +43,8 @@ data class RuntimeReissueStart(val consumerEpoch: String, val requestId: String,
 
 /** The provider admits these logical role IDs once; each response owns fresh physical pipes. */
 data class RuntimeAuthorityOffer(val start: RuntimeReissueStart, val providerEpoch: String, val revision: Long,
-    val signedRetryBudget: Int, val payloadLength: Int, val capabilityChannelId: String, val frameChannelId: String) {
+    val signedRetryBudget: Int, val payloadLength: Int, val capabilityChannelId: String, val frameChannelId: String,
+    val presentation: RuntimeProfilePresentation? = null) {
     init {
         require(RuntimeAuthorityLimits.validId(providerEpoch) && providerEpoch != start.consumerEpoch)
         require(RuntimeAuthorityLimits.validRevision(revision) && signedRetryBudget in 0..RuntimeAuthorityLimits.MAX_RETRIES)
@@ -54,6 +55,8 @@ data class RuntimeAuthorityOffer(val start: RuntimeReissueStart, val providerEpo
     fun request(purpose: RuntimeAuthorityPurpose, descriptor: RuntimeDescriptorBinding) = RuntimeAuthorityRequest(
         start.consumerEpoch, providerEpoch, start.requestId, start.generation, purpose, start.trigger, revision,
         start.deadlineElapsedMillis, capabilityChannelId, frameChannelId, descriptor, signedRetryBudget, start.retryAttempt)
+    fun sameAuthority(other: RuntimeAuthorityOffer): Boolean =
+        copy(presentation = null) == other.copy(presentation = null)
 }
 
 /** Observed by a pipe owner while its descriptor cannot be closed or transferred. */
@@ -521,8 +524,9 @@ class RuntimeAuthorityReissueClient(private val context: Context, private val co
             val accepted = rpc(RuntimeAuthorityReissueWire.RESPONSE, { parcel ->
                 parcel.writeString(current.requestId); parcel.writeInt(purpose.wire); parcel.writeString(descriptorId)
                 parcel.writeLong(current.deadlineElapsedMillis)
-                capability.first.withDescriptor { parcel.writeTypedObject(it, 0) }
-                frames.second.withDescriptor { parcel.writeTypedObject(it, 0) }
+                // Transfer ownership silently so sender close cannot consume peer status.
+                capability.first.withDescriptor { parcel.writeTypedObject(it, android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE) }
+                frames.second.withDescriptor { parcel.writeTypedObject(it, android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE) }
             }) { it.readInt() == 1 }
             check(accepted)
             capability.first.close(); frames.second.close()

@@ -10,11 +10,39 @@ import java.io.InputStream
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
 class VpnRuntimeContractTest {
+    @Test fun initialListenersMustBeReadyBeforeConnectedCanBePublished() {
+        val health = RuntimeSessionHealth()
+        assertEquals(VpnRuntimeState.CONNECTING, health.state)
+        health.proxyFailed = true
+        assertEquals(VpnRuntimeState.CONNECTING, health.state)
+        health.proxyFailed = false
+        health.ready = true
+        assertEquals(VpnRuntimeState.ACTIVE_KURD_LIVE, health.state)
+    }
+    @Test fun proxyRecoveryCannotEraseIndependentNativeDegradation() {
+        val health = RuntimeSessionHealth().apply { ready = true; nativeDegraded = true; proxyFailed = true }
+        assertEquals(VpnRuntimeState.DEGRADED, health.state)
+        health.proxyFailed = false
+        assertEquals(VpnRuntimeState.DEGRADED, health.state)
+        assertNull(health.failure)
+        val proxyOnlyFailure = RuntimeSessionHealth().apply { ready = true; proxyFailed = true }
+        assertEquals("PROXY_LISTENER_FAILED", proxyOnlyFailure.failure)
+        proxyOnlyFailure.proxyFailed = false
+        assertEquals(VpnRuntimeState.ACTIVE_KURD_LIVE, proxyOnlyFailure.state)
+    }
+    @Test fun recoveryCannotCarryAuthorityOrBeRequestedWithAnUnmarkedIntent() {
+        val marker = mapOf<String, Any?>(RuntimeServiceCommand.MARKER_KEY to RuntimeServiceCommand.MARKER_VERSION)
+        assertEquals(RuntimeServiceCommand.Recover, RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_RECOVER, marker))
+        org.junit.Assert.assertTrue(RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_RECOVER,
+            marker + (RuntimeServiceCommand.REQUEST_KEY to "1".repeat(32))) is RuntimeServiceCommand.Rejected)
+        org.junit.Assert.assertTrue(RuntimeServiceCommand.fromScalars(RuntimeServiceCommand.ACTION_RECOVER, emptyMap()) is RuntimeServiceCommand.Rejected)
+    }
     @Test fun onlyPreciselyMarkedPrivateCommandsAreManualAndExtrasNeverSupplyAuthority() {
         val id = "1".repeat(32)
         val valid = mapOf<String, Any?>(RuntimeServiceCommand.MARKER_KEY to RuntimeServiceCommand.MARKER_VERSION,
@@ -31,14 +59,14 @@ class VpnRuntimeContractTest {
     }
 
     @Test
-    fun defaultSnapshotIsTruthfullyIdleAndUnprotected() {
+    fun defaultSnapshotIsTruthfullyIdleWithoutInventingSystemPolicy() {
         val snapshot = VpnRuntimeSnapshot()
 
         assertEquals(VpnRuntimeState.IDLE, snapshot.state)
         assertEquals(0, snapshot.packetsRead)
         assertEquals(0, snapshot.packetsWritten)
-        assertFalse(snapshot.alwaysOn)
-        assertFalse(snapshot.lockdown)
+        assertNull(snapshot.alwaysOn)
+        assertNull(snapshot.lockdown)
         assertEquals(0, snapshot.maxReconnectAttempts)
         assertEquals(null, snapshot.runtimeRequestId)
     }

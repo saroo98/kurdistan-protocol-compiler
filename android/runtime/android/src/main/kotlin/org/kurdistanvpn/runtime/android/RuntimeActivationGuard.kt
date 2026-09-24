@@ -5,7 +5,7 @@ package org.kurdistanvpn.runtime.android
 import java.io.Closeable
 
 enum class RuntimeCleanupState { CLEANUP_REQUIRED, UNPROVEN, CLEAN }
-enum class RuntimeResourceKind { AUTHORITY_DESCRIPTOR, NATIVE_SESSION, SOCKET, TUN, NOTIFICATION, HEALTH_MONITOR }
+enum class RuntimeResourceKind { AUTHORITY_DESCRIPTOR, NATIVE_SESSION, SOCKET, TUN, NOTIFICATION, HEALTH_MONITOR, LOCAL_PROXY }
 
 /** Constructed without acquiring external resources. The guard registers this owner before
  * prepare runs. Every partial acquisition is retained by this object until close; prepare
@@ -162,6 +162,28 @@ class RuntimeActivationGuard internal constructor(private val monitor: Any) : Cl
         return published
     }
 
+    /** The production native owner already holds its authenticated registration. This commits
+     * platform lifecycle/display only; it does not replace native execution authorization.
+     * Called by that owner after its actual RoutePlanReady and platform resource acquisition. */
+    internal fun activateNativeOwned(requiresTun: Boolean, notification: RuntimeActivationResource,
+        healthMonitor: RuntimeActivationResource, current: () -> Boolean, publish: () -> Unit): Boolean {
+        val notificationOwner = own(RuntimeResourceKind.NOTIFICATION, notification)
+        val healthOwner = own(RuntimeResourceKind.HEALTH_MONITOR, healthMonitor)
+        if (notificationOwner == null || healthOwner == null) { cancel(); return false }
+        if (!acquire { scope -> scope.prepareOwned(notification); scope.prepareOwned(healthMonitor) }) return false
+        val published = synchronized(monitor) {
+            if (cancelled || unproven || acquiring != 0 || active ||
+                !hasKind(RuntimeResourceKind.NATIVE_SESSION) || (requiresTun && !hasKind(RuntimeResourceKind.TUN)) ||
+                findOwner(notification)?.isPrepared() != true || findOwner(healthMonitor)?.isPrepared() != true) false
+            else try {
+                if (!current() || cancelled || unproven) false
+                else { publish(); active = !cancelled && !unproven; active }
+            } catch (_: Throwable) { false }
+        }
+        if (!published) cancel()
+        return published
+    }
+
     /** Optional display delivery is serialized with invalidation and cannot escape
      * into the activation transaction. Required foreground promotion happens before
      * this barrier with a truthful CONNECTING label, never an early ACTIVE claim. */
@@ -180,6 +202,12 @@ class RuntimeActivationGuard internal constructor(private val monitor: Any) : Cl
 
     /** Serial cancellation has no foreign callbacks. The caller must still drain owned cleanup. */
     internal fun markCancellation() = synchronized(monitor) { cancelled = true; active = false }
+
+    /** Cancellation observation only, never authority or a grant for future acquisition. */
+    internal fun isAcquisitionCurrent(): Boolean = synchronized(monitor) { !cancelled && !unproven }
+
+    /** Read under the same monitor as scoped STOPPING publication; never cleanup proof. */
+    internal fun acquisitionInFlight(): Boolean = synchronized(monitor) { acquiring != 0 }
 
     fun cancel(): RuntimeCleanupState {
         var cursor = synchronized(monitor) {

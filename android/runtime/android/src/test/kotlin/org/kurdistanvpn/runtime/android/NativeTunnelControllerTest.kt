@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.PerAppSelectionMode
@@ -1067,7 +1067,7 @@ private fun snapshot(dualStack: Boolean = false) = NativeLiveRuntimeSessionSnaps
     perAppMode = PerAppSelectionMode.ALL_APPS,
     packages = emptyList(),
     ipMode = if (dualStack) IpMode.DUAL_STACK else IpMode.IPV4_ONLY,
-    dnsMode = DnsMode.INTERNAL_TUN,
+    dnsMode = ResolverPolicy.INTERNAL,
     mtu = 1280,
     metered = false,
     clientIpv4 = byteArrayOf(10, 77, 0, 2),

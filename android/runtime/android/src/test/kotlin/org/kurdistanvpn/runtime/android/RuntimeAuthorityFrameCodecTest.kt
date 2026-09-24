@@ -17,6 +17,23 @@ import javax.crypto.spec.SecretKeySpec
 import org.kurdistanvpn.runtime.api.*
 
 class RuntimeAuthorityFrameCodecTest {
+    @Test fun sharedRequestWireMatchesIndependentFieldOrderAndBoundedSpan() {
+        val expected=hex("1111111111111111111111111111111155555555555555555555555555555555"+
+            "22222222222222222222222222222222"+
+            "00000000000000010101000000000000000200000000000003e8"+
+            "3333333333333333333333333333333366666666666666666666666666666666"+
+            "44444444444444444444444444444444"+
+            "0000000000000001000000000000000200000000000003e80000000000001180"+
+            "00000000000000d7000200")
+        val bytes=ByteArray(167){99}
+        val output=java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.BIG_ENDIAN).apply{position(1);limit(166)}
+        RuntimeAuthorityRequestWire.write(output,request())
+        assertEquals(166,output.position());assertEquals(99,bytes[0].toInt());assertEquals(99,bytes[166].toInt())
+        assertArrayEquals(expected,bytes.copyOfRange(1,166))
+        val input=java.nio.ByteBuffer.wrap(expected).order(java.nio.ByteOrder.BIG_ENDIAN)
+        assertEquals(request(),RuntimeAuthorityRequestWire.read(input));assertFalse(input.hasRemaining())
+        assertThrows(java.nio.BufferUnderflowException::class.java){RuntimeAuthorityRequestWire.read(java.nio.ByteBuffer.wrap(expected.copyOf(164)))}
+    }
     @Test fun canonicalFrameMatchesIndependentlyCalculatedLiteralVector() {
         // Independently framed literal and .NET HMAC-SHA256, not this codec's output.
         val expected = hex("4b524146020000b5000000d700000002" +

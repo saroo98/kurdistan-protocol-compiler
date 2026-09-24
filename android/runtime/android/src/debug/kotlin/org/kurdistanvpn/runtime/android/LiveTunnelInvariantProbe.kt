@@ -3,7 +3,7 @@
 
 package org.kurdistanvpn.runtime.android
 
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.model.SelectionMode
@@ -86,7 +86,7 @@ private class ProbeSession(private val events: MutableList<String>) : NativeLive
         perAppMode = PerAppSelectionMode.ALL_APPS,
         packages = emptyList(),
         ipMode = IpMode.IPV4_ONLY,
-        dnsMode = DnsMode.INTERNAL_TUN,
+        dnsMode = ResolverPolicy.INTERNAL,
         mtu = 1280,
         metered = false,
         clientIpv4 = byteArrayOf(10, 77, 0, 2),
