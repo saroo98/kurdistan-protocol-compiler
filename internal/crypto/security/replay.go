@@ -6,6 +6,7 @@ package security
 import (
 	"fmt"
 	"math"
+	"math/bits"
 	"sync"
 )
 
@@ -129,6 +130,7 @@ type replayWindowStateV1 struct {
 	initialized bool
 	highest     uint64
 	seen        map[uint64]struct{}
+	bitmap      []uint64
 }
 
 func NewReplayWindowV1(policy string, windowSize int) (*ReplayWindowV1, error) {
@@ -162,7 +164,11 @@ func (r *ReplayWindowV1) CommitAuthenticated(sequence uint64) error {
 	if err := state.checkV1Locked(sequence); err != nil {
 		return err
 	}
-	state.seen[sequence] = struct{}{}
+	if state.bitmap != nil {
+		state.insertBitmapV3Locked(sequence)
+	} else {
+		state.seen[sequence] = struct{}{}
+	}
 	if !state.initialized || sequence > state.highest {
 		state.highest = sequence
 	}
@@ -180,7 +186,7 @@ func (r *ReplayWindowV1) MetadataV1() ReplayMetadataV1 {
 	defer state.mu.Unlock()
 	return ReplayMetadataV1{
 		Policy: state.policy, WindowSize: uint32(state.window), Initialized: state.initialized,
-		Highest: state.highest, SeenCount: len(state.seen),
+		Highest: state.highest, SeenCount: state.seenCountV3Locked(),
 	}
 }
 
@@ -197,7 +203,7 @@ func validateReplayPolicyV1(policy string, windowSize int) error {
 }
 
 func (r *replayWindowStateV1) checkV1Locked(sequence uint64) error {
-	if _, duplicate := r.seen[sequence]; duplicate {
+	if r.containsV3Locked(sequence) {
 		return ErrReplayDuplicate
 	}
 	switch r.policy {
@@ -284,4 +290,45 @@ func (r *replayWindowStateV1) pruneV1Locked() {
 			delete(r.seen, sequence)
 		}
 	}
+}
+
+func (r *replayWindowStateV1) containsV3Locked(sequence uint64) bool {
+	if r.bitmap == nil {
+		_, found := r.seen[sequence]
+		return found
+	}
+	if !r.initialized || sequence > r.highest || sequence < replayLowerBoundV1(r.highest, r.window) {
+		return false
+	}
+	residue := sequence % r.window
+	return r.bitmap[residue/64]&(uint64(1)<<(residue%64)) != 0
+}
+
+func (r *replayWindowStateV1) seenCountV3Locked() int {
+	if r.bitmap == nil {
+		return len(r.seen)
+	}
+	count := 0
+	for _, word := range r.bitmap {
+		count += bits.OnesCount64(word)
+	}
+	return count
+}
+
+func (r *replayWindowStateV1) insertBitmapV3Locked(sequence uint64) {
+	if r.initialized && sequence > r.highest {
+		oldLower := replayLowerBoundV1(r.highest, r.window)
+		newLower := replayLowerBoundV1(sequence, r.window)
+		difference := newLower - oldLower
+		if difference >= r.window {
+			clear(r.bitmap)
+		} else {
+			for offset := uint64(0); offset < difference; offset++ {
+				residue := (oldLower + offset) % r.window
+				r.bitmap[residue/64] &^= uint64(1) << (residue % 64)
+			}
+		}
+	}
+	residue := sequence % r.window
+	r.bitmap[residue/64] |= uint64(1) << (residue % 64)
 }

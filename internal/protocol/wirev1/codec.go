@@ -5,10 +5,7 @@
 // Payload authentication remains owned by the existing Kurd runtime.
 package wirev1
 
-import (
-	"encoding/binary"
-	"errors"
-)
+import "errors"
 
 const (
 	MajorVersion    uint8 = 1
@@ -52,38 +49,16 @@ func Encode(frame Frame) ([]byte, error) {
 		return nil, err
 	}
 	out := make([]byte, HeaderBytes+len(frame.Payload))
-	copy(out[0:4], magic[:])
-	out[4] = MajorVersion
-	out[5] = MinorVersion
-	out[6] = frame.Type
-	out[7] = frame.Flags
-	binary.BigEndian.PutUint32(out[8:12], frame.StreamID)
-	binary.BigEndian.PutUint32(out[12:16], uint32(len(frame.Payload)))
-	copy(out[16:48], frame.PlanDigest[:])
-	copy(out[HeaderBytes:], frame.Payload)
+	writeFrame(out, frame)
 	return out, nil
 }
 
 func Decode(encoded []byte) (Frame, error) {
-	if len(encoded) < HeaderBytes || len(encoded) > HeaderBytes+MaxPayloadBytes ||
-		string(encoded[0:4]) != string(magic[:]) ||
-		encoded[4] != MajorVersion || encoded[5] != MinorVersion {
-		return Frame{}, ErrInvalidFrame
-	}
-	length := binary.BigEndian.Uint32(encoded[12:16])
-	if int64(length)+HeaderBytes != int64(len(encoded)) {
-		return Frame{}, ErrInvalidFrame
-	}
-	frame := Frame{
-		Type: encoded[6], Flags: encoded[7],
-		StreamID: binary.BigEndian.Uint32(encoded[8:12]),
-		Payload:  append([]byte(nil), encoded[HeaderBytes:]...),
-	}
-	copy(frame.PlanDigest[:], encoded[16:48])
-	if err := validate(frame); err != nil {
-		clear(frame.Payload)
+	frame, err := DecodeView(encoded)
+	if err != nil {
 		return Frame{}, err
 	}
+	frame.Payload = append([]byte(nil), frame.Payload...)
 	return frame, nil
 }
 

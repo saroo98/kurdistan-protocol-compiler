@@ -54,15 +54,23 @@ func codecSpecFromLiveProgram(program liveprogram.ProgramV1) (codecSpec, error) 
 	if err := liveprogram.ValidateV1(program); err != nil {
 		return codecSpec{}, fmt.Errorf("live program framing rejected")
 	}
-	spec := codecSpec{lengthMode: program.Frame.LengthMode, checksumMode: program.Frame.ChecksumMode, headerOrder: append([]string(nil), program.Frame.HeaderOrder...), fragmentationMode: program.Frame.FragmentationMode, paddingPlacement: program.Frame.PaddingPlacement,
+	headerOrder := make([]string, len(program.Frame.HeaderOrder))
+	copy(headerOrder, program.Frame.HeaderOrder)
+	spec := codecSpec{lengthMode: program.Frame.LengthMode, checksumMode: program.Frame.ChecksumMode, headerOrder: headerOrder, fragmentationMode: program.Frame.FragmentationMode, paddingPlacement: program.Frame.PaddingPlacement,
 		padding:       ir.PaddingPolicy{Mode: program.Padding.Mode, MinPaddingBytes: program.Padding.MinPaddingBytes, MaxPaddingBytes: program.Padding.MaxPaddingBytes, Probability: program.Padding.Probability},
 		maxFrameBytes: program.Limits.MaxFrameBytes, maxPayloadBytes: program.Limits.MaxPayloadBytes, maxBatchBytes: program.Scheduler.MaxBatchBytes, streamEncodingMode: program.Stream.IDEncodingMode,
 		profileXORStreamMask: program.Frame.Compiled.ProfileXORStreamMask, tableStreamMask: program.Frame.Compiled.TableStreamMask, crc32PrefixState: program.Frame.Compiled.CRC32PrefixState}
 	spec.messages = []codecMessage{
-		{semantic: program.Messages[0].Semantic, wireSymbol: program.Messages[0].WireSymbol, typeTag: append([]byte(nil), program.Frame.Compiled.DataTypeTag...)},
-		{semantic: program.Messages[1].Semantic, wireSymbol: program.Messages[1].WireSymbol, typeTag: append([]byte(nil), program.Frame.Compiled.PaddingTypeTag...)},
+		{semantic: program.Messages[0].Semantic, wireSymbol: program.Messages[0].WireSymbol, typeTag: copyCodecTag(program.Frame.Compiled.DataTypeTag)},
+		{semantic: program.Messages[1].Semantic, wireSymbol: program.Messages[1].WireSymbol, typeTag: copyCodecTag(program.Frame.Compiled.PaddingTypeTag)},
 	}
 	return spec, nil
+}
+
+func copyCodecTag(tag []byte) []byte {
+	out := make([]byte, len(tag))
+	copy(out, tag)
+	return out
 }
 
 func legacyTypeTagFromProfile(profile *ir.Profile, message ir.MessageSymbol) []byte {

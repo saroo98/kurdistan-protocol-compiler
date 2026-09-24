@@ -60,6 +60,11 @@ type strictEnvelopeStateV1 struct {
 	nonces          envelopeNonceOwnerV1
 	replayAuthority *authenticatedReplayAuthorityV1
 	sealFail        func() error // package-private deterministic test seam
+	bounded         bool
+	destroyed       bool
+	windows         []ReplayWindowV1
+	boundedClient   *ClientNonceOwnerV1
+	boundedRelay    *RelayNonceOwnerV1
 }
 
 // EnvelopeCodecV1 is an additive strict codec. Copies share allocation and
@@ -147,36 +152,68 @@ func (state *authenticatedReplayStateV1) validLockedV1() bool {
 }
 
 func NewClientEnvelopeV1(schedule KeySchedule, context EnvelopeContextV1) (*EnvelopeCodecV1, error) {
-	if err := validateEnvelopeContextV1(context); err != nil {
-		return nil, err
-	}
-	owner, err := NewClientNonceOwnerV1(schedule, context.EffectivePolicy.NonceMode)
-	if err != nil {
-		return nil, err
-	}
-	return newEnvelopeCodecV1(schedule, context, envelopeNonceOwnerV1{
-		outboundDirection: owner.OutboundDirectionV1(), inboundDirection: owner.InboundDirectionV1(),
-		allocateControl: owner.AllocateOutboundControlV1, allocateApp: owner.AllocateOutboundApplicationV1,
-		expectedControl: owner.ExpectedInboundControlV1, expectedApp: owner.ExpectedInboundApplicationV1,
-	}, schedule.ClientWriteKey, schedule.ServerWriteKey)
+	return newRoleEnvelopeV1(schedule, context, true, false)
 }
 
 func NewRelayEnvelopeV1(schedule KeySchedule, context EnvelopeContextV1) (*EnvelopeCodecV1, error) {
+	return newRoleEnvelopeV1(schedule, context, false, false)
+}
+
+func newRoleEnvelopeV1(schedule KeySchedule, context EnvelopeContextV1, client, bounded bool) (*EnvelopeCodecV1, error) {
 	if err := validateEnvelopeContextV1(context); err != nil {
 		return nil, err
 	}
-	owner, err := NewRelayNonceOwnerV1(schedule, context.EffectivePolicy.NonceMode)
+	if bounded {
+		if _, err := EnvelopeOwnedBytesV3(context); err != nil {
+			return nil, err
+		}
+	}
+	if !client {
+		return newRelayEnvelopeBackendV1(schedule, context, bounded)
+	}
+	owner, err := newClientNonceOwnerV1(schedule, context.EffectivePolicy.NonceMode, bounded)
 	if err != nil {
 		return nil, err
 	}
-	return newEnvelopeCodecV1(schedule, context, envelopeNonceOwnerV1{
+	codec, err := newEnvelopeCodecBackendV1(schedule, context, envelopeNonceOwnerV1{
 		outboundDirection: owner.OutboundDirectionV1(), inboundDirection: owner.InboundDirectionV1(),
 		allocateControl: owner.AllocateOutboundControlV1, allocateApp: owner.AllocateOutboundApplicationV1,
 		expectedControl: owner.ExpectedInboundControlV1, expectedApp: owner.ExpectedInboundApplicationV1,
-	}, schedule.ServerWriteKey, schedule.ClientWriteKey)
+	}, schedule.ClientWriteKey, schedule.ServerWriteKey, bounded)
+	if err == nil && bounded {
+		codec.state.boundedClient = owner
+		owner.outbound.config.mode = codec.context.EffectivePolicy.NonceMode
+		owner.inbound.mode = codec.context.EffectivePolicy.NonceMode
+	}
+	return codec, err
+}
+
+func newRelayEnvelopeBackendV1(schedule KeySchedule, context EnvelopeContextV1, bounded bool) (*EnvelopeCodecV1, error) {
+	if err := validateEnvelopeContextV1(context); err != nil {
+		return nil, err
+	}
+	owner, err := newRelayNonceOwnerV1(schedule, context.EffectivePolicy.NonceMode, bounded)
+	if err != nil {
+		return nil, err
+	}
+	codec, err := newEnvelopeCodecBackendV1(schedule, context, envelopeNonceOwnerV1{
+		outboundDirection: owner.OutboundDirectionV1(), inboundDirection: owner.InboundDirectionV1(),
+		allocateControl: owner.AllocateOutboundControlV1, allocateApp: owner.AllocateOutboundApplicationV1,
+		expectedControl: owner.ExpectedInboundControlV1, expectedApp: owner.ExpectedInboundApplicationV1,
+	}, schedule.ServerWriteKey, schedule.ClientWriteKey, bounded)
+	if err == nil && bounded {
+		codec.state.boundedRelay = owner
+		owner.outbound.config.mode = codec.context.EffectivePolicy.NonceMode
+		owner.inbound.mode = codec.context.EffectivePolicy.NonceMode
+	}
+	return codec, err
 }
 
 func newEnvelopeCodecV1(schedule KeySchedule, context EnvelopeContextV1, owner envelopeNonceOwnerV1, outboundKey, inboundKey []byte) (*EnvelopeCodecV1, error) {
+	return newEnvelopeCodecBackendV1(schedule, context, owner, outboundKey, inboundKey, false)
+}
+
+func newEnvelopeCodecBackendV1(schedule KeySchedule, context EnvelopeContextV1, owner envelopeNonceOwnerV1, outboundKey, inboundKey []byte, bounded bool) (*EnvelopeCodecV1, error) {
 	if err := validateEnvelopeContextV1(context); err != nil {
 		return nil, err
 	}
@@ -191,11 +228,28 @@ func newEnvelopeCodecV1(schedule KeySchedule, context EnvelopeContextV1, owner e
 	if err != nil {
 		return nil, err
 	}
-	context.EffectivePolicy.ClientMandatoryCapabilities = append([]string(nil), context.EffectivePolicy.ClientMandatoryCapabilities...)
-	context.EffectivePolicy.ServerMandatoryCapabilities = append([]string(nil), context.EffectivePolicy.ServerMandatoryCapabilities...)
-	context.EffectivePolicy.SelectedCapabilities = append([]string(nil), context.EffectivePolicy.SelectedCapabilities...)
+	clone := func(in []string) []string {
+		if !bounded {
+			return append([]string(nil), in...)
+		}
+		out := make([]string, len(in))
+		copy(out, in)
+		return out
+	}
+	context.EffectivePolicy.ClientMandatoryCapabilities = clone(context.EffectivePolicy.ClientMandatoryCapabilities)
+	context.EffectivePolicy.ServerMandatoryCapabilities = clone(context.EffectivePolicy.ServerMandatoryCapabilities)
+	context.EffectivePolicy.SelectedCapabilities = clone(context.EffectivePolicy.SelectedCapabilities)
+	if bounded {
+		cloneBoundedPolicyTextV3(&context.EffectivePolicy)
+	}
+	state := &strictEnvelopeStateV1{nonces: owner, bounded: bounded, replayAuthority: &authenticatedReplayAuthorityV1{marker: 1}}
+	if bounded {
+		state.windows = newReplayArenaV3(context)
+	} else {
+		state.replay = make(map[uint16]*ReplayWindowV1)
+	}
 	return &EnvelopeCodecV1{context: context, epoch: schedule.Epoch, outbound: outbound, inbound: inbound,
-		state: &strictEnvelopeStateV1{nonces: owner, replay: make(map[uint16]*ReplayWindowV1), replayAuthority: &authenticatedReplayAuthorityV1{marker: 1}}}, nil
+		state: state}, nil
 }
 
 func newAEADV1(key []byte) (cipher.AEAD, error) {
@@ -213,20 +267,27 @@ func newAEADV1(key []byte) (cipher.AEAD, error) {
 	return aead, nil
 }
 
-func validateEnvelopeContextV1(context EnvelopeContextV1) error {
-	p := context.EffectivePolicy
+func validateEnvelopePolicyV1(p ir.EffectiveSecurityPolicy) error {
 	if p.AEADSuite != "aead_aes_256_gcm" || validateNonceModeV1(p.NonceMode) != nil ||
 		validateReplayPolicyV1(p.ReplayPolicy, p.ReplayWindowSize) != nil {
 		return ErrPolicyInvalid
 	}
 	switch p.SecureEnvelopeMode {
-	case "metadata_authenticated", "synthetic_aead_test":
-	case "full_context_bound_envelope":
+	case "metadata_authenticated", "synthetic_aead_test", "full_context_bound_envelope":
+	default:
+		return ErrPolicyInvalid
+	}
+	return nil
+}
+
+func validateEnvelopeContextV1(context EnvelopeContextV1) error {
+	if err := validateEnvelopePolicyV1(context.EffectivePolicy); err != nil {
+		return err
+	}
+	if context.EffectivePolicy.SecureEnvelopeMode == "full_context_bound_envelope" {
 		if zeroHashV1(context.CapabilityHash) || zeroHashV1(context.ProfileHash) || zeroHashV1(context.FramingHash) || zeroHashV1(context.CarrierContextHash) {
 			return ErrEnvelopeContextInvalid
 		}
-	default:
-		return ErrPolicyInvalid
 	}
 	if context.MaxEnvelopeBytes < 16 || zeroHashV1(context.EffectivePolicyHash) || zeroHashV1(context.TranscriptHash) {
 		return ErrEnvelopeContextInvalid
@@ -237,7 +298,7 @@ func validateEnvelopeContextV1(context EnvelopeContextV1) error {
 func zeroHashV1(value [32]byte) bool { return value == [32]byte{} }
 
 func (c *EnvelopeCodecV1) ExpectedClassV1() (uint16, error) {
-	if c == nil || c.state == nil {
+	if c == nil || c.state == nil || c.state.destroyed {
 		return 0, ErrEnvelopeContextInvalid
 	}
 	switch c.context.EffectivePolicy.SecureEnvelopeMode {
@@ -259,7 +320,11 @@ func (c *EnvelopeCodecV1) SealApplicationV1(slot uint16, plaintext []byte) (Enve
 }
 
 func (c *EnvelopeCodecV1) sealV1(class nonceRecordClassV1, recordType, slot uint16, plaintext, recordAAD []byte) (EnvelopeRecordV1, error) {
-	if c == nil || c.state == nil || c.outbound == nil || recordType == 0 {
+	return c.sealDestinationV1(nil, false, class, recordType, slot, plaintext, recordAAD)
+}
+
+func (c *EnvelopeCodecV1) sealDestinationV1(dst []byte, into bool, class nonceRecordClassV1, recordType, slot uint16, plaintext, recordAAD []byte) (EnvelopeRecordV1, error) {
+	if c == nil || c.state == nil || c.state.destroyed || c.outbound == nil || recordType == 0 {
 		return EnvelopeRecordV1{}, ErrNonceMismatch
 	}
 	if (class == nonceApplicationRecordV1 && recordType != 1) || (class == nonceControlRecordV1 && recordType == 1) {
@@ -267,6 +332,14 @@ func (c *EnvelopeCodecV1) sealV1(class nonceRecordClassV1, recordType, slot uint
 	}
 	if uint64(len(plaintext))+uint64(c.outbound.Overhead()) > uint64(c.context.MaxEnvelopeBytes) {
 		return EnvelopeRecordV1{}, ErrAEADInvalid
+	}
+	if into {
+		if err := validateNonceSlotV1(class, slot); err != nil {
+			return EnvelopeRecordV1{}, err
+		}
+		if uint64(len(dst)) < uint64(len(plaintext))+uint64(c.outbound.Overhead()) || envelopeSlicesOverlapV3(dst, plaintext) {
+			return EnvelopeRecordV1{}, ErrAEADInvalid
+		}
 	}
 	var allocation NonceAllocationV1
 	var err error
@@ -285,7 +358,18 @@ func (c *EnvelopeCodecV1) sealV1(class nonceRecordClassV1, recordType, slot uint
 			return EnvelopeRecordV1{}, ErrAEADInvalid
 		}
 	}
-	record.Ciphertext = c.outbound.Seal(nil, allocation.Nonce[:], plaintext, c.aadV1(record, recordAAD))
+	var scratch [222]byte
+	var aad []byte
+	if into {
+		aad = c.writeApplicationAADV1(scratch[:], record)
+		dst = dst[:0:int(record.SealedLength)]
+	} else {
+		aad = c.aadV1(record, recordAAD)
+	}
+	record.Ciphertext = c.outbound.Seal(dst, allocation.Nonce[:], plaintext, aad)
+	if into {
+		record.Ciphertext = record.Ciphertext[:len(record.Ciphertext):len(record.Ciphertext)]
+	}
 	return record, nil
 }
 
@@ -330,7 +414,11 @@ func (c *EnvelopeCodecV1) AuthenticateApplicationV1(record EnvelopeRecordV1) ([]
 }
 
 func (c *EnvelopeCodecV1) authenticateV1(class nonceRecordClassV1, record EnvelopeRecordV1, recordAAD []byte) ([]byte, AuthenticatedReplayV1, error) {
-	if c == nil || c.state == nil || c.inbound == nil || record.RecordType == 0 ||
+	return c.authenticateDestinationV1(nil, false, class, record, recordAAD)
+}
+
+func (c *EnvelopeCodecV1) authenticateDestinationV1(dst []byte, into bool, class nonceRecordClassV1, record EnvelopeRecordV1, recordAAD []byte) ([]byte, AuthenticatedReplayV1, error) {
+	if c == nil || c.state == nil || c.state.destroyed || c.inbound == nil || record.RecordType == 0 ||
 		record.Direction != c.state.nonces.inboundDirection || record.Epoch != c.epoch {
 		return nil, AuthenticatedReplayV1{}, ErrNonceMismatch
 	}
@@ -341,6 +429,10 @@ func (c *EnvelopeCodecV1) authenticateV1(class nonceRecordClassV1, record Envelo
 		return nil, AuthenticatedReplayV1{}, err
 	}
 	if len(record.Ciphertext) < c.inbound.Overhead() || uint64(len(record.Ciphertext)) > uint64(c.context.MaxEnvelopeBytes) || uint64(record.SealedLength) != uint64(len(record.Ciphertext)) {
+		return nil, AuthenticatedReplayV1{}, ErrAEADInvalid
+	}
+	plainBytes := len(record.Ciphertext) - c.inbound.Overhead()
+	if into && (len(dst) < plainBytes || envelopeSlicesOverlapV3(dst, record.Ciphertext)) {
 		return nil, AuthenticatedReplayV1{}, ErrAEADInvalid
 	}
 	var expected [nonceBytesV1]byte
@@ -360,9 +452,23 @@ func (c *EnvelopeCodecV1) authenticateV1(class nonceRecordClassV1, record Envelo
 	if err := replay.Plausible(record.Sequence); err != nil {
 		return nil, AuthenticatedReplayV1{}, err
 	}
-	temporary, err := c.inbound.Open(nil, expected[:], record.Ciphertext, c.aadV1(record, recordAAD))
+	var scratch [222]byte
+	var aad []byte
+	if into {
+		aad = c.writeApplicationAADV1(scratch[:], record)
+		dst = dst[:0:plainBytes]
+	} else {
+		aad = c.aadV1(record, recordAAD)
+	}
+	temporary, err := c.inbound.Open(dst, expected[:], record.Ciphertext, aad)
 	if err != nil {
+		if into {
+			clear(dst[:plainBytes])
+		}
 		return nil, AuthenticatedReplayV1{}, ErrAuthenticationFailed
+	}
+	if into {
+		temporary = temporary[:len(temporary):len(temporary)]
 	}
 	return temporary, newAuthenticatedReplayV1(c, record.Slot, record.Sequence), nil
 }
@@ -378,6 +484,13 @@ func (c *EnvelopeCodecV1) replayKeyV1(slot uint16) uint16 {
 func (c *EnvelopeCodecV1) replayPrecheckV1(slot uint16) (*ReplayWindowV1, error) {
 	key := c.replayKeyV1(slot)
 	c.state.mu.Lock()
+	if c.state.bounded {
+		defer c.state.mu.Unlock()
+		if c.state.destroyed {
+			return nil, ErrNonceMismatch
+		}
+		return &c.state.windows[key], nil
+	}
 	if replay := c.state.replay[key]; replay != nil {
 		c.state.mu.Unlock()
 		return replay, nil
@@ -390,6 +503,12 @@ func (c *EnvelopeCodecV1) commitReplayV1(slot uint16, sequence uint64) error {
 	key := c.replayKeyV1(slot)
 	c.state.mu.Lock()
 	defer c.state.mu.Unlock()
+	if c.state.bounded {
+		if c.state.destroyed {
+			return ErrNonceMismatch
+		}
+		return c.state.windows[key].CommitAuthenticated(sequence)
+	}
 	replay := c.state.replay[key]
 	if replay == nil {
 		var err error
@@ -437,25 +556,7 @@ func (c *EnvelopeCodecV1) applicationAADV1(record EnvelopeRecordV1) []byte {
 	if c.context.EffectivePolicy.SecureEnvelopeMode == "full_context_bound_envelope" {
 		capacity = 222
 	}
-	out := bytes.NewBuffer(make([]byte, 0, capacity))
-	_ = binary.Write(out, binary.BigEndian, uint16(1))
-	_ = binary.Write(out, binary.BigEndian, uint16(1))
-	out.Write(c.context.EffectivePolicyHash[:])
-	out.Write(c.context.TranscriptHash[:])
-	class, _ := c.ExpectedClassV1()
-	_ = binary.Write(out, binary.BigEndian, class)
-	_ = binary.Write(out, binary.BigEndian, record.Epoch)
-	_ = binary.Write(out, binary.BigEndian, record.Direction)
-	_ = binary.Write(out, binary.BigEndian, record.Slot)
-	_ = binary.Write(out, binary.BigEndian, record.Sequence)
-	_ = binary.Write(out, binary.BigEndian, record.SealedLength)
-	if c.context.EffectivePolicy.SecureEnvelopeMode == "full_context_bound_envelope" {
-		out.Write(c.context.CapabilityHash[:])
-		out.Write(c.context.ProfileHash[:])
-		out.Write(c.context.FramingHash[:])
-		out.Write(c.context.CarrierContextHash[:])
-	}
-	return out.Bytes()
+	return c.writeApplicationAADV1(make([]byte, capacity), record)
 }
 
 type SecureEnvelope struct {

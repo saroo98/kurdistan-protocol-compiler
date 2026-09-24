@@ -33,42 +33,8 @@ func DecodeV1(encoded []byte) (ProgramV1, error) {
 	if err := validateCore(encoded); err != nil {
 		return ProgramV1{}, fail(ErrorNonCanonical)
 	}
-	fields, err := rawMap(encoded, programFieldCount)
+	program, err := decodeProgramFieldsV1(encoded)
 	if err != nil {
-		return ProgramV1{}, err
-	}
-	var program ProgramV1
-	if err := decode(fields[1], &program.Schema); err != nil || program.Schema != SchemaV1 {
-		return ProgramV1{}, fail(ErrorSchema)
-	}
-	if err := fixedBytes(fields[2], program.ProgramID[:]); err != nil {
-		return ProgramV1{}, fail(ErrorSchema)
-	}
-	if err := decode(fields[3], &program.SourceSchemaVersion); err != nil {
-		return ProgramV1{}, fail(ErrorSchema)
-	}
-	if err := fixedBytes(fields[4], program.SourceGenerationHash[:]); err != nil {
-		return ProgramV1{}, fail(ErrorSchema)
-	}
-	if program.Messages, err = decodeMessages(fields[5]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Frame, err = decodeFrame(fields[6]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Scheduler, err = decodeScheduler(fields[7]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Stream, err = decodeStream(fields[8]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Padding, err = decodePadding(fields[9]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Security, err = decodeSecurity(fields[10]); err != nil {
-		return ProgramV1{}, err
-	}
-	if program.Limits, err = decodeLimits(fields[11]); err != nil {
 		return ProgramV1{}, err
 	}
 	if err := ValidateV1(program); err != nil {
@@ -129,7 +95,7 @@ func limitsMap(value LimitsV1) map[uint64]any {
 	return map[uint64]any{1: value.MaxFrameBytes, 2: value.MaxPayloadBytes, 3: value.MaxSessionMillis, 4: value.MaxSessionMessages, 5: value.MaxKeyLifetimeMessages}
 }
 
-func decodeMessages(raw []byte) ([]MessageV1, error) {
+func decodeMessages(raw []byte, decode func([]byte, any) error) ([]MessageV1, error) {
 	var values []cbor.RawMessage
 	if err := decode(raw, &values); err != nil || len(values) != 2 {
 		return nil, fail(ErrorSchema)
@@ -144,7 +110,7 @@ func decodeMessages(raw []byte) ([]MessageV1, error) {
 	return out, nil
 }
 
-func decodeFrame(raw []byte) (FrameV1, error) {
+func decodeFrame(raw []byte, decode func([]byte, any) error) (FrameV1, error) {
 	fields, err := rawMap(raw, 7)
 	if err != nil {
 		return FrameV1{}, err
@@ -160,7 +126,7 @@ func decodeFrame(raw []byte) (FrameV1, error) {
 	return out, nil
 }
 
-func decodeScheduler(raw []byte) (SchedulerV1, error) {
+func decodeScheduler(raw []byte, decode func([]byte, any) error) (SchedulerV1, error) {
 	fields, err := rawMap(raw, 5)
 	if err != nil {
 		return SchedulerV1{}, err
@@ -172,7 +138,7 @@ func decodeScheduler(raw []byte) (SchedulerV1, error) {
 	return out, nil
 }
 
-func decodeStream(raw []byte) (StreamV1, error) {
+func decodeStream(raw []byte, decode func([]byte, any) error) (StreamV1, error) {
 	fields, err := rawMap(raw, 2)
 	if err != nil {
 		return StreamV1{}, err
@@ -184,7 +150,7 @@ func decodeStream(raw []byte) (StreamV1, error) {
 	return out, nil
 }
 
-func decodePadding(raw []byte) (PaddingV1, error) {
+func decodePadding(raw []byte, decode func([]byte, any) error) (PaddingV1, error) {
 	fields, err := rawMap(raw, 4)
 	if err != nil {
 		return PaddingV1{}, err
@@ -196,7 +162,7 @@ func decodePadding(raw []byte) (PaddingV1, error) {
 	return out, nil
 }
 
-func decodeSecurity(raw []byte) (SecurityV1, error) {
+func decodeSecurity(raw []byte, decode func([]byte, any) error) (SecurityV1, error) {
 	fields, err := rawMap(raw, 6)
 	if err != nil {
 		return SecurityV1{}, err
@@ -219,7 +185,7 @@ func decodeSecurity(raw []byte) (SecurityV1, error) {
 	return out, nil
 }
 
-func decodeLimits(raw []byte) (LimitsV1, error) {
+func decodeLimits(raw []byte, decode func([]byte, any) error) (LimitsV1, error) {
 	fields, err := rawMap(raw, 5)
 	if err != nil {
 		return LimitsV1{}, err
@@ -260,7 +226,7 @@ func rawMap(raw []byte, count int) (map[uint64]cbor.RawMessage, error) {
 	return fields, nil
 }
 
-func fixedBytes(raw []byte, destination []byte) error {
+func fixedBytes(raw []byte, destination []byte, decode func([]byte, any) error) error {
 	var value []byte
 	if decode(raw, &value) != nil || len(value) != len(destination) {
 		return fmt.Errorf("fixed bytes")
@@ -288,4 +254,50 @@ func validateCore(encoded []byte) error {
 func strictMode() (cbor.DecMode, error) {
 	return cbor.DecOptions{DupMapKey: cbor.DupMapKeyEnforcedAPF, MaxNestedLevels: 32, MaxArrayElements: 64, MaxMapPairs: 32,
 		IndefLength: cbor.IndefLengthForbidden, TagsMd: cbor.TagsForbidden, IntDec: cbor.IntDecConvertNone, UTF8: cbor.UTF8RejectInvalid, BignumTag: cbor.BignumTagForbidden}.DecMode()
+}
+
+func decodeProgramFieldsV1(encoded []byte) (ProgramV1, error) {
+	return decodeProgramFieldsWithDecoderV1(encoded, decode)
+}
+
+func decodeProgramFieldsWithDecoderV1(encoded []byte, decode func([]byte, any) error) (ProgramV1, error) {
+	fields, err := rawMap(encoded, programFieldCount)
+	if err != nil {
+		return ProgramV1{}, err
+	}
+	var program ProgramV1
+	if err := decode(fields[1], &program.Schema); err != nil || program.Schema != SchemaV1 {
+		return ProgramV1{}, fail(ErrorSchema)
+	}
+	if err := fixedBytes(fields[2], program.ProgramID[:], decode); err != nil {
+		return ProgramV1{}, fail(ErrorSchema)
+	}
+	if err := decode(fields[3], &program.SourceSchemaVersion); err != nil {
+		return ProgramV1{}, fail(ErrorSchema)
+	}
+	if err := fixedBytes(fields[4], program.SourceGenerationHash[:], decode); err != nil {
+		return ProgramV1{}, fail(ErrorSchema)
+	}
+	if program.Messages, err = decodeMessages(fields[5], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Frame, err = decodeFrame(fields[6], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Scheduler, err = decodeScheduler(fields[7], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Stream, err = decodeStream(fields[8], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Padding, err = decodePadding(fields[9], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Security, err = decodeSecurity(fields[10], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	if program.Limits, err = decodeLimits(fields[11], decode); err != nil {
+		return ProgramV1{}, err
+	}
+	return program, nil
 }

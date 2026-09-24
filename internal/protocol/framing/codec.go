@@ -358,27 +358,20 @@ func encodeFrameWithSpec(spec codecSpec, op Operation, pad []byte, fragIndex, fr
 	if err != nil {
 		return nil, err
 	}
-	payloadSection := append(meta, op.Payload...)
-	if len(pad) > 0 {
-		switch spec.paddingPlacement {
-		case "prefix":
-			payloadSection = append(append([]byte(nil), pad...), payloadSection...)
-		default:
-			payloadSection = append(append([]byte(nil), payloadSection...), pad...)
+	contentBytes := 0
+	for _, size := range [...]int{len(meta), len(op.Payload), len(pad)} {
+		if size > spec.maxFrameBytes-contentBytes {
+			return nil, fmt.Errorf("frame exceeds profile limit")
 		}
+		contentBytes += size
 	}
-	fields, err := encodeHeaderFieldsWithSpec(spec, msg, op.StreamID, fragIndex, fragCount, len(pad))
+	body, wrapper, err := frameSizeWithSpec(spec, msg, op.StreamID, contentBytes)
 	if err != nil {
 		return nil, err
 	}
-	body := append(fields, payloadSection...)
-	if spec.checksumMode == "crc32" {
-		body = appendCRCWithSpec(spec, body)
-	}
-	if len(body) > spec.maxFrameBytes {
-		return nil, fmt.Errorf("frame exceeds profile limit")
-	}
-	return wrapLengthWithSpec(spec, body)
+	out := make([]byte, body+wrapper)
+	writeFrameWithSpec(spec, out, msg, op.StreamID, meta, op.Payload, pad, fragIndex, fragCount, body, wrapper)
+	return out, nil
 }
 
 func DecodeFrame(p *ir.Profile, frame []byte) (DecodedFrame, error) {
@@ -390,96 +383,26 @@ func DecodeFrame(p *ir.Profile, frame []byte) (DecodedFrame, error) {
 }
 
 func decodeFrameWithSpec(spec codecSpec, frame []byte) (DecodedFrame, error) {
-	if len(frame) == 0 || len(frame) > spec.maxFrameBytes+binary.MaxVarintLen64 {
-		return DecodedFrame{}, fmt.Errorf("invalid frame size")
-	}
-	body, err := unwrapLengthWithSpec(spec, frame)
+	view, err := parseFrameView(spec, frame)
 	if err != nil {
 		return DecodedFrame{}, err
 	}
-	if spec.checksumMode == "crc32" {
-		if len(body) < 4 {
-			return DecodedFrame{}, fmt.Errorf("missing checksum")
-		}
-		want := binary.BigEndian.Uint32(body[len(body)-4:])
-		body = body[:len(body)-4]
-		if crcForSpec(spec, body) != want {
-			return DecodedFrame{}, fmt.Errorf("checksum mismatch")
-		}
-	}
-	msg, streamID, fragIndex, fragCount, padLen, payloadSection, err := decodeHeaderAndPayloadWithSpec(spec, body)
-	if err != nil {
-		return DecodedFrame{}, err
-	}
-	if padLen > len(payloadSection) {
-		return DecodedFrame{}, fmt.Errorf("padding length exceeds payload section")
-	}
-	payloadWithMeta := payloadSection
-	if padLen > 0 {
-		switch spec.paddingPlacement {
-		case "prefix":
-			payloadWithMeta = payloadSection[padLen:]
-		default:
-			payloadWithMeta = payloadSection[:len(payloadSection)-padLen]
-		}
-	}
-	meta, payload, err := decodeOperationMetadata(payloadWithMeta)
-	if err != nil {
-		return DecodedFrame{}, err
-	}
-	if len(payload) > spec.maxPayloadBytes {
-		return DecodedFrame{}, fmt.Errorf("payload exceeds profile limit")
-	}
-	meta.Semantic = msg.semantic
-	meta.StreamID = streamID
-	meta.Payload = payload
-	return DecodedFrame{
-		Operation:    meta,
-		WireSymbol:   msg.wireSymbol,
-		FrameBytes:   len(frame),
-		PayloadBytes: len(payload),
-		PaddingBytes: padLen,
-		FragIndex:    fragIndex,
-		FragCount:    fragCount,
-	}, nil
+	op := view.metadata.materialize()
+	op.Semantic = view.msg.semantic
+	op.StreamID = view.streamID
+	op.Payload = view.payload
+	return DecodedFrame{Operation: op, WireSymbol: view.msg.wireSymbol, FrameBytes: len(frame), PayloadBytes: len(view.payload), PaddingBytes: view.padLen, FragIndex: view.fragIndex, FragCount: view.fragCount}, nil
 }
 
 func encodeHeaderFieldsWithSpec(spec codecSpec, msg codecMessage, streamID uint32, fragIndex, fragCount, padLen int) ([]byte, error) {
-	var out []byte
-	for _, field := range spec.headerOrder {
-		switch field {
-		case "length":
-			continue
-		case "type":
-			tag := msg.typeTag
-			if len(tag) > 255 {
-				return nil, fmt.Errorf("type tag too long")
-			}
-			out = append(out, byte(len(tag)))
-			out = append(out, tag...)
-		case "stream":
-			encoded, err := encodeStreamIDWithSpec(spec, streamID)
-			if err != nil {
-				return nil, err
-			}
-			if len(encoded) > 255 {
-				return nil, fmt.Errorf("stream id encoding too long")
-			}
-			out = append(out, byte(len(encoded)))
-			out = append(out, encoded...)
-		case "flags":
-			var b [7]byte
-			if fragCount > 1 {
-				b[0] |= 1
-			}
-			if padLen > 0 {
-				b[0] |= 2
-			}
-			binary.BigEndian.PutUint16(b[1:3], uint16(fragIndex))
-			binary.BigEndian.PutUint16(b[3:5], uint16(fragCount))
-			binary.BigEndian.PutUint16(b[5:7], uint16(padLen))
-			out = append(out, b[:]...)
-		}
+	size, err := headerFieldsSize(spec, msg, streamID, spec.maxFrameBytes)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]byte, size)
+	_, err = writeHeaderFields(spec, out, msg, streamID, fragIndex, fragCount, padLen)
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -627,80 +550,24 @@ func encodeOperationMetadata(op Operation) ([]byte, error) {
 	if op.PayloadByteCount < 0 || op.ResponseByteCount < 0 || op.ResponseChunkIndex < 0 {
 		return nil, fmt.Errorf("proxy byte counts and chunk indexes cannot be negative")
 	}
-	var out []byte
-	var fixed [41]byte
-	binary.BigEndian.PutUint64(fixed[0:8], op.Sequence)
-	binary.BigEndian.PutUint64(fixed[8:16], op.Offset)
-	binary.BigEndian.PutUint32(fixed[16:20], uint32(op.CreditBytes))
-	if op.EndStream {
-		fixed[20] = 1
-	}
-	binary.BigEndian.PutUint64(fixed[21:29], op.RelayIntentID)
-	binary.BigEndian.PutUint32(fixed[29:33], uint32(op.PayloadByteCount))
-	binary.BigEndian.PutUint32(fixed[33:37], uint32(op.ResponseByteCount))
-	binary.BigEndian.PutUint32(fixed[37:41], uint32(op.ResponseChunkIndex))
-	out = append(out, fixed[:]...)
-	for _, value := range []string{
-		op.Reason,
-		op.Priority,
-		op.TargetClass,
-		op.TargetVariant,
-		op.RequestClass,
-		op.ResponseMode,
-		op.TargetErrorCode,
-		op.TargetCloseReason,
-		op.TargetResetReason,
-		op.MetadataClass,
-	} {
+	size := 51
+	for _, value := range operationMetadataStrings(op) {
 		if len(value) > 255 {
 			return nil, fmt.Errorf("proxy metadata value too long")
 		}
-		out = append(out, byte(len(value)))
-		out = append(out, []byte(value)...)
+		size += len(value)
 	}
+	out := make([]byte, size)
+	writeOperationMetadata(out, op)
 	return out, nil
 }
 
 func decodeOperationMetadata(in []byte) (Operation, []byte, error) {
-	if len(in) < 51 {
-		return Operation{}, nil, io.ErrUnexpectedEOF
+	view, payload, err := parseMetadataView(in)
+	if err != nil {
+		return Operation{}, nil, err
 	}
-	op := Operation{
-		Sequence:           binary.BigEndian.Uint64(in[0:8]),
-		Offset:             binary.BigEndian.Uint64(in[8:16]),
-		CreditBytes:        int(binary.BigEndian.Uint32(in[16:20])),
-		EndStream:          in[20] != 0,
-		RelayIntentID:      binary.BigEndian.Uint64(in[21:29]),
-		PayloadByteCount:   int(binary.BigEndian.Uint32(in[29:33])),
-		ResponseByteCount:  int(binary.BigEndian.Uint32(in[33:37])),
-		ResponseChunkIndex: int(binary.BigEndian.Uint32(in[37:41])),
-	}
-	rest := in[41:]
-	values := []*string{
-		&op.Reason,
-		&op.Priority,
-		&op.TargetClass,
-		&op.TargetVariant,
-		&op.RequestClass,
-		&op.ResponseMode,
-		&op.TargetErrorCode,
-		&op.TargetCloseReason,
-		&op.TargetResetReason,
-		&op.MetadataClass,
-	}
-	for _, target := range values {
-		if len(rest) < 1 {
-			return Operation{}, nil, io.ErrUnexpectedEOF
-		}
-		n := int(rest[0])
-		rest = rest[1:]
-		if len(rest) < n {
-			return Operation{}, nil, io.ErrUnexpectedEOF
-		}
-		*target = string(rest[:n])
-		rest = rest[n:]
-	}
-	return op, rest, nil
+	return view.materialize(), payload, nil
 }
 
 func validateProxyOperation(p *ir.Profile, op Operation) error {
@@ -737,26 +604,12 @@ func validateProxyOperation(p *ir.Profile, op Operation) error {
 }
 
 func encodeStreamIDWithSpec(spec codecSpec, streamID uint32) ([]byte, error) {
-	switch spec.streamEncodingMode {
-	case "fixed32_be", "":
-		var b [4]byte
-		binary.BigEndian.PutUint32(b[:], streamID)
-		return b[:], nil
-	case "profile_xor32":
-		var b [4]byte
-		binary.BigEndian.PutUint32(b[:], streamID^spec.profileXORStreamMask)
-		return b[:], nil
-	case "table_mapped32_le":
-		var b [4]byte
-		binary.LittleEndian.PutUint32(b[:], streamID^spec.tableStreamMask)
-		return b[:], nil
-	case "varint":
-		buf := make([]byte, binary.MaxVarintLen32)
-		n := binary.PutUvarint(buf, uint64(streamID))
-		return buf[:n], nil
-	default:
-		return nil, fmt.Errorf("unsupported stream id encoding")
+	var buf [binary.MaxVarintLen32]byte
+	n, err := writeStreamID(spec, buf[:], streamID)
+	if err != nil {
+		return nil, err
 	}
+	return buf[:n], nil
 }
 
 func decodeStreamIDWithSpec(spec codecSpec, encoded []byte) (uint32, error) {
