@@ -4,14 +4,15 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"kurdistan/internal/winprivate"
 )
 
-var errUnsupportedFilesystem = errors.New("unsupported filesystem")
+var errUnsupportedFilesystem = winprivate.ErrUnsafe
 
 type privateOutputRoot struct {
 	path string
