@@ -6,12 +6,65 @@ package auth
 import (
 	"bytes"
 	"crypto/sha256"
+	"reflect"
+	"strings"
 	"testing"
 
 	"kurdistan/internal/crypto/security"
 	"kurdistan/internal/protocol/ir"
 	"kurdistan/internal/protocol/liveprogram"
 )
+
+func TestProjectProcessResourcesV3RealHandshakeParity(t *testing.T) {
+	result, p := projectedResultV3(t)
+	for _, mode := range []string{"metadata_authenticated", "full_context_bound_envelope", "synthetic_aead_test"} {
+		t.Run(mode, func(t *testing.T) {
+			program := p.Clone()
+			program.Security.Policy.SecureEnvelopeMode = mode
+			r, _ := projectedResultProgramV3(t, program)
+			s, err := r.ProjectedContextSnapshotV3(program, "tls13-tcp", ProjectedContextValidationBytesV3)
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := ProjectProcessResourcesV3(program, "tls13-tcp", ProjectedContextValidationBytesV3)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(v.Policy, s.EffectivePolicy) || v.ConfigSource != s.ClientConfigSourceBlock || v.Limits != s.ClientLimitBlock {
+				t.Fatal("nonsecret sizing differs from real result")
+			}
+			v.Policy.SelectedCapabilities[0] = "changed"
+			if program.Security.SelectedCapabilities[0] == "changed" || s.EffectivePolicy.SelectedCapabilities[0] == "changed" {
+				t.Fatal("projection aliases input/result")
+			}
+		})
+	}
+	if _, ok := result.ContextSnapshotV1(); !ok {
+		t.Fatal("projection consumed unrelated secret")
+	}
+}
+
+func TestProjectProcessResourcesV3RejectsBeforeProjection(t *testing.T) {
+	_, p := projectedResultV3(t)
+	for _, mutate := range []func(*liveprogram.ProgramV1){
+		func(p *liveprogram.ProgramV1) { p.SourceSchemaVersion = strings.Repeat("x", 257) },
+		func(p *liveprogram.ProgramV1) { p.Messages = make([]liveprogram.MessageV1, 65) },
+		func(p *liveprogram.ProgramV1) { p.Frame.Compiled.DataTypeTag = make([]byte, 511) },
+		func(p *liveprogram.ProgramV1) { p.ProgramID[0] ^= 1 },
+	} {
+		bad := p.Clone()
+		mutate(&bad)
+		if _, err := ProjectProcessResourcesV3(bad, "tls13-tcp", ProjectedContextValidationBytesV3); err == nil {
+			t.Fatal("malformed projection admitted")
+		}
+	}
+	if _, err := ProjectProcessResourcesV3(p, "other", ProjectedContextValidationBytesV3); err == nil {
+		t.Fatal("carrier")
+	}
+	if _, err := ProjectProcessResourcesV3(p, "tls13-tcp", ProjectedContextValidationBytesV3-1); err == nil {
+		t.Fatal("budget")
+	}
+}
 
 func TestNewProjectedProcessHandshakeConfigV1CompletesAuthenticatedHandshake(t *testing.T) {
 	t.Setenv("GODEBUG", "cryptocustomrand=1")

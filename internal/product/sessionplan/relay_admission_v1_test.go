@@ -7,10 +7,75 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"kurdistan/internal/product/envelope"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestRelayAdmissionPrefaceWorkspaceV1(t *testing.T) {
+	plan, err := BuildV2At(fixtureRequestV2(t), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := RelayAdmissionPrefaceWorkspaceV1(plan)
+	if err != nil || n == 0 {
+		t.Fatalf("workspace: %d %v", n, err)
+	}
+	if got := testing.AllocsPerRun(20, func() { _, _ = RelayAdmissionPrefaceWorkspaceV1(plan) }); got != 0 {
+		t.Fatalf("sizing allocated: %v", got)
+	}
+	plan.ProfileContentID = strings.Repeat("x", 128)
+	max, err := RelayAdmissionPrefaceWorkspaceV1(plan)
+	if err != nil || max < n {
+		t.Fatalf("maximum: %d %v", max, err)
+	}
+	plan.ProfileContentID += "x"
+	if _, err := RelayAdmissionPrefaceWorkspaceV1(plan); err != ErrRelayAdmissionV1 {
+		t.Fatalf("over maximum: %v", err)
+	}
+	c := relayPrefaceArithmeticV1{}
+	if c.add(^uint64(0), 1) != 0 || !c.overflow {
+		t.Fatal("addition overflow")
+	}
+	c = relayPrefaceArithmeticV1{}
+	if c.mul(^uint64(0), 2) != 0 || !c.overflow {
+		t.Fatal("multiplication overflow")
+	}
+	if cborHeadBytesV1(23) != 1 || cborHeadBytesV1(24) != 2 || cborHeadBytesV1(255) != 2 || cborHeadBytesV1(256) != 3 {
+		t.Fatal("CBOR header threshold")
+	}
+}
+
+func TestRelayAdmissionPrefaceV1ExplicitTime(t *testing.T) {
+	now := time.Now().UTC()
+	plan, err := BuildV2At(fixtureRequestV2(t), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := NewRelayAdmissionPrefaceV1(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	explicit, err := NewRelayAdmissionPrefaceV1At(plan, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := EncodeRelayAdmissionPrefaceV1(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := EncodeRelayAdmissionPrefaceV1(explicit)
+	if err != nil || !bytes.Equal(a, b) {
+		t.Fatal("explicit time changed canonical preface")
+	}
+	for _, rejected := range []time.Time{{}, now.Add(100 * 365 * 24 * time.Hour)} {
+		if _, err := NewRelayAdmissionPrefaceV1At(plan, rejected); err != ErrRelayAdmissionV1 {
+			t.Fatalf("invalid time: %v", err)
+		}
+	}
+}
 
 func TestRelayAdmissionPrefaceV1RoundTripRebuildsExactPlan(t *testing.T) {
 	now := time.Now().UTC()
@@ -54,6 +119,11 @@ func TestRelayAdmissionPrefaceV1RoundTripRebuildsExactPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if facts, ok := rebuilt.ConstructionFactsV2(); !ok || facts.ProfileBytes != envelope.MaxPayloadBytes {
+		t.Fatal("relay did not retain authenticated conservative profile bound")
+	}
+	// Private sizing provenance intentionally differs; wire authority stays exact.
+	rebuilt.admittedProfileBytes = plan.admittedProfileBytes
 	if rebuilt.Digest != plan.Digest || !reflect.DeepEqual(rebuilt, plan) {
 		t.Fatal("relay did not independently rebuild the exact client plan")
 	}

@@ -26,6 +26,60 @@ import (
 	"kurdistan/internal/protocol/liveprogramcompile"
 )
 
+func TestConstructionFactsV2RetainsVerifiedProvenance(t *testing.T) {
+	request := fixtureRequestV2(t)
+	plan, err := BuildV2(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer plan.Destroy()
+	encoded, err := envelope.EncodeCanonicalProfileV1(request.Profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(encoded)
+	facts, ok := plan.ConstructionFactsV2()
+	if !ok || facts.ProfileBytes != uint32(len(encoded)) || facts.ProxyBufferBytes != 0 {
+		t.Fatal("missing exact verified construction facts")
+	}
+	wire, err := runtimepolicy.EncodeRuntimeAt(request.RuntimePolicy, time.Now())
+	if err != nil || !bytes.Equal(wire, plan.runtimePolicyBytes) || plan.Digest != digestPlanV2(plan) {
+		t.Fatal("private facts changed wire authority or digest", err)
+	}
+	clear(wire)
+	clone := plan.Clone()
+	if got, ok := clone.ConstructionFactsV2(); !ok || got != facts {
+		t.Fatal("clone lost provenance")
+	}
+	clone.Destroy()
+	if _, ok := clone.ConstructionFactsV2(); ok {
+		t.Fatal("destroy retained provenance")
+	}
+	for _, change := range []func(*PlanV2){
+		func(p *PlanV2) { p.runtimePolicyBytes[0] ^= 1 },
+		func(p *PlanV2) { p.RuntimePolicyDigest[0] ^= 1 },
+		func(p *PlanV2) { p.Version = "unsupported" },
+		func(p *PlanV2) { p.Digest = [32]byte{} },
+	} {
+		mutated := plan.Clone()
+		change(&mutated)
+		if _, ok := mutated.ConstructionFactsV2(); ok {
+			t.Fatal("tampered provenance accepted")
+		}
+		mutated.Destroy()
+	}
+	if _, ok := (PlanV2{}).ConstructionFactsV2(); ok {
+		t.Fatal("missing provenance accepted")
+	}
+	plan.MaxQueuePackets++
+	if _, ok := plan.ConstructionFactsV2(); !ok {
+		t.Fatal("bounded facts unexpectedly validate projection")
+	}
+	if ValidateV2(plan) == nil {
+		t.Fatal("facts blessed edited projection")
+	}
+}
+
 func TestBuildV2UsesSignedDefaultsAndManualSelection(t *testing.T) {
 	req := fixtureRequestV2(t)
 	automatic, err := BuildV2(req)
@@ -51,6 +105,49 @@ func TestBuildV2UsesSignedDefaultsAndManualSelection(t *testing.T) {
 	}
 	if manual.StrategyID != req.Requested.StrategyID || manual.Digest != automatic.Digest {
 		t.Fatalf("equivalent manual selection changed authority: auto=%x manual=%x", automatic.Digest, manual.Digest)
+	}
+}
+
+func TestSelectNetworkV2TransfersExclusiveRowsWithoutRedundantClones(t *testing.T) {
+	policy := runtimepolicy.PolicyV2{ClientIPv4: []byte{10, 77, 0, 2}, DNSIPv4: []byte{10, 77, 0, 1}}
+	var routes []runtimepolicy.PrefixV2
+	var dns [][]byte
+	allocations := testing.AllocsPerRun(100, func() {
+		var err error
+		routes, dns, _, _, _, _, err = selectNetworkV2(policy, runtimepolicy.IPModeIPv4Only, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	// Two bounded row vectors, one route address and one independent DNS row.
+	if allocations > 4 {
+		t.Fatalf("exclusive network rows unnecessarily cloned: %.0f allocations", allocations)
+	}
+	dns[0][0] = 99
+	routes[0].Address[0] = 99
+	if policy.DNSIPv4[0] != 10 || policy.ClientIPv4[0] != 10 {
+		t.Fatal("returned network aliases caller")
+	}
+	_, _, _, _, _, _, err := selectNetworkV2(policy, runtimepolicy.IPModeIPv4Only, []runtimepolicy.PrefixV2{{Address: []byte{1, 2, 3, 4}}}, nil)
+	if !errors.Is(err, ErrWideningV2) {
+		t.Fatal("rejection changed", err)
+	}
+}
+
+func TestPlanV2DestroyRetiresMutableVectorsAndPreservesRequest(t *testing.T) {
+	request := fixtureRequestV2(t)
+	plan, err := BuildV2(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoints, routes, protocols, wire := plan.Endpoints, plan.Routes, plan.PayloadProtocols, plan.runtimePolicyBytes
+	caller := request.RuntimePolicy.Clone()
+	plan.Destroy()
+	if endpoints[0].Address != nil || routes[0].Address != nil || protocols[0] != "" || !bytes.Equal(wire, make([]byte, len(wire))) {
+		t.Fatal("retired plan vectors retain mutable values")
+	}
+	if !reflect.DeepEqual(request.RuntimePolicy, caller) {
+		t.Fatal("plan retirement changed borrowed request")
 	}
 }
 

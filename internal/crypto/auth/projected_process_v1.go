@@ -15,6 +15,34 @@ import (
 
 const projectedCarrierTLS13TCPV1 = "tls13-tcp"
 
+// ProjectedProcessResourcesV3 is a calculation, not an authenticated context,
+// authority or trust receipt. Its policy lists belong to the caller.
+type ProjectedProcessResourcesV3 struct {
+	Policy       ir.EffectiveSecurityPolicy
+	ConfigSource security.ConfigSourceBlockV1
+	Limits       security.LimitBlockV1
+}
+
+// ProjectProcessResourcesV3 reuses the handshake's nonsecret projection without
+// constructing identities, transcripts, handshake results or channel secrets.
+func ProjectProcessResourcesV3(program liveprogram.ProgramV1, carrierFamily string, budgetBytes uint64) (ProjectedProcessResourcesV3, error) {
+	if budgetBytes < ProjectedContextValidationBytesV3 || !boundedProgramInputV3(program) {
+		return ProjectedProcessResourcesV3{}, fail(FailureInternalLimit)
+	}
+	if carrierFamily != projectedCarrierTLS13TCPV1 || liveprogram.ValidateV1(program) != nil {
+		return ProjectedProcessResourcesV3{}, fail(FailureProfileMismatch)
+	}
+	policy, err := projectedEffectivePolicyV1(program)
+	if err != nil {
+		return ProjectedProcessResourcesV3{}, err
+	}
+	binding, err := projectedModeBindingV1(program, policy, carrierFamily)
+	if err != nil {
+		return ProjectedProcessResourcesV3{}, err
+	}
+	return ProjectedProcessResourcesV3{Policy: policy, ConfigSource: binding.ConfigSourceBlock, Limits: binding.LimitBlock}, nil
+}
+
 // NewProjectedProcessHandshakeConfigV1 constructs both role-separated peers
 // from one validated product-safe live program. Callers cannot supply an
 // independent policy or mode binding beside the signed projection.

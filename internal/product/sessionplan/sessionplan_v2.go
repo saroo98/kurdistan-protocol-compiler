@@ -81,7 +81,25 @@ type PlanV2 struct {
 	IdleTimeout             time.Duration
 	Digest                  [32]byte
 
-	runtimePolicyBytes []byte
+	runtimePolicyBytes     []byte
+	admittedProfileBytes   uint32
+	signedProxyBufferBytes uint32
+}
+
+// ConstructionFactsV2 is allocation-free sizing provenance, not fresh authority.
+type ConstructionFactsV2 struct{ ProfileBytes, ProxyBufferBytes uint32 }
+
+func (p PlanV2) ConstructionFactsV2() (ConstructionFactsV2, bool) {
+	if p.admittedProfileBytes == 0 || p.admittedProfileBytes > envelope.MaxPayloadBytes ||
+		p.signedProxyBufferBytes != 0 && (p.signedProxyBufferBytes < 16<<20 || p.signedProxyBufferBytes > 128<<20) ||
+		p.Version != VersionV2 || !boundedV2(p.ProfileContentID, 128) || p.ProfileGeneration == 0 ||
+		p.ActivationReceiptDigest == ([32]byte{}) || p.RuntimePolicyDigest == ([32]byte{}) || p.LiveProgramDigest == ([32]byte{}) ||
+		p.Digest == ([32]byte{}) || p.StrategyID != supportedStrategyTLS13TCP || !boundedV2(p.RelayKeyID, 64) ||
+		p.CarrierFamily != runtimepolicy.CarrierFamilyTLS13TCP || p.ALPN != "kurd/1" ||
+		len(p.runtimePolicyBytes) == 0 || sha256.Sum256(p.runtimePolicyBytes) != p.RuntimePolicyDigest {
+		return ConstructionFactsV2{}, false
+	}
+	return ConstructionFactsV2{p.admittedProfileBytes, p.signedProxyBufferBytes}, true
 }
 
 func (p PlanV2) Clone() PlanV2 {
@@ -99,11 +117,12 @@ func (p PlanV2) RuntimePolicyAt(now time.Time) (runtimepolicy.PolicyV2, error) {
 	if err := ValidateV2At(p, now); err != nil {
 		return runtimepolicy.PolicyV2{}, ErrInvalidV2
 	}
-	policy, err := runtimepolicy.DecodeV2At(p.runtimePolicyBytes, now)
+	policy, err := runtimepolicy.DecodeRuntimeAt(p.runtimePolicyBytes, now)
 	if err != nil {
+		policy.Destroy()
 		return runtimepolicy.PolicyV2{}, ErrInvalidV2
 	}
-	return policy.Clone(), nil
+	return policy, nil
 }
 
 // Destroy clears the plan's retained authority bytes and mutable projections.
@@ -119,6 +138,9 @@ func (p *PlanV2) Destroy() {
 	for index := range p.Routes {
 		clear(p.Routes[index].Address)
 	}
+	clear(p.Endpoints)
+	clear(p.Routes)
+	clear(p.PayloadProtocols)
 	*p = PlanV2{}
 }
 
@@ -128,17 +150,21 @@ func BuildV2(request RequestV2) (PlanV2, error) {
 
 // BuildV2At constructs client authority using the caller's trusted time.
 func BuildV2At(request RequestV2, now time.Time) (PlanV2, error) {
-	if _, err := envelope.EncodeCanonicalProfileV1(request.Profile); err != nil ||
+	profileBytes, profileError := envelope.EncodeCanonicalProfileV1(request.Profile)
+	profileLength := uint32(len(profileBytes))
+	clear(profileBytes)
+	if profileError != nil ||
 		now.IsZero() || request.Profile.Generation == 0 || now.Unix() < request.Profile.ValidFrom || now.Unix() >= request.Profile.ValidUntil {
 		return PlanV2{}, ErrInvalidV2
 	}
 	if !receiptMatchesProfileV2(request.ActivationReceipt, request.Profile) {
 		return PlanV2{}, ErrReceiptV2
 	}
-	if request.RuntimePolicy.ValidateAgainstEnvelopeAt(request.Profile, now) != nil {
+	if runtimepolicy.ValidateRuntimeAgainstEnvelopeAt(request.RuntimePolicy, request.Profile, now) != nil {
 		return PlanV2{}, ErrInvalidV2
 	}
 	return buildAuthorityV2(authorityV2{
+		admittedProfileBytes:    profileLength,
 		profileContentID:        request.Profile.ContentID,
 		profileGeneration:       request.Profile.Generation,
 		activationReceiptDigest: digestReceiptV2(request.ActivationReceipt),
@@ -149,6 +175,7 @@ func BuildV2At(request RequestV2, now time.Time) (PlanV2, error) {
 }
 
 type authorityV2 struct {
+	admittedProfileBytes    uint32
 	profileContentID        string
 	profileGeneration       uint64
 	activationReceiptDigest [32]byte
@@ -158,20 +185,22 @@ type authorityV2 struct {
 }
 
 func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now time.Time) (PlanV2, error) {
-	if now.IsZero() || !boundedV2(authority.profileContentID, 128) || authority.profileGeneration == 0 ||
+	if authority.admittedProfileBytes == 0 || authority.admittedProfileBytes > envelope.MaxPayloadBytes || now.IsZero() || !boundedV2(authority.profileContentID, 128) || authority.profileGeneration == 0 ||
 		authority.activationReceiptDigest == ([32]byte{}) || len(authority.strategyIDs) == 0 || len(authority.relayIDs) == 0 {
 		return PlanV2{}, ErrInvalidV2
 	}
 	policy := authority.policy.Clone()
-	if err := runtimepolicy.ValidateV2At(policy, now); err != nil ||
+	defer destroyOwnedPolicyV2(&policy)
+	if err := runtimepolicy.ValidateRuntimeAt(policy, now); err != nil ||
 		len(policy.LiveProgram) == 0 {
 		return PlanV2{}, ErrInvalidV2
 	}
-	policyBytes, err := runtimepolicy.EncodeV2At(policy, now)
+	policyBytes, err := runtimepolicy.EncodeRuntimeAt(policy, now)
+	defer clear(policyBytes)
 	if err != nil {
 		return PlanV2{}, ErrInvalidV2
 	}
-	carrierAuthority, err := livecarrier.ResolveV2At(policy, now)
+	carrierAuthority, err := livecarrier.ResolveRuntimeAt(policy, now)
 	if err != nil || !carrierAuthority.Networked || carrierAuthority.EndpointCount != len(policy.Endpoints) {
 		return PlanV2{}, ErrUnsupportedV2
 	}
@@ -184,6 +213,7 @@ func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now t
 		return PlanV2{}, ErrWideningV2
 	}
 	endpointIndexes, err := selectEndpointIndexesV2(policy.Fallback.EndpointIndexes, requested.EndpointIndexes)
+	defer clear(endpointIndexes)
 	if err != nil {
 		return PlanV2{}, err
 	}
@@ -191,11 +221,13 @@ func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now t
 	if err != nil {
 		return PlanV2{}, err
 	}
-	routes, _, client4, dns4, client6, dns6, err := selectNetworkV2(policy, mode, requested.Routes, requested.DNSServers)
+	routes, dns, client4, dns4, client6, dns6, err := selectNetworkV2(policy, mode, requested.Routes, requested.DNSServers)
+	defer destroyOwnedNetworkV2(routes, dns)
 	if err != nil {
 		return PlanV2{}, err
 	}
 	protocols, err := selectProtocolsV2(policy.AllowedProtocols, requested.PayloadProtocols)
+	defer clear(protocols)
 	if err != nil {
 		return PlanV2{}, err
 	}
@@ -208,7 +240,8 @@ func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now t
 	}
 
 	plan := PlanV2{
-		Version: VersionV2, ProfileContentID: authority.profileContentID, ProfileGeneration: authority.profileGeneration,
+		admittedProfileBytes: authority.admittedProfileBytes,
+		Version:              VersionV2, ProfileContentID: authority.profileContentID, ProfileGeneration: authority.profileGeneration,
 		ActivationReceiptDigest: authority.activationReceiptDigest, RuntimePolicyDigest: sha256.Sum256(policyBytes),
 		LiveProgramDigest: policy.LiveProgramSHA256, StrategyID: strategyID, RelayKeyID: policy.RelayAuthKeyID,
 		CarrierFamily: carrierAuthority.CarrierFamily, ALPN: carrierAuthority.ALPN, Endpoints: selectEndpointsV2(policy.Endpoints, endpointIndexes),
@@ -217,6 +250,10 @@ func buildAuthorityV2(authority authorityV2, requested NarrowingRequestV2, now t
 		DialTimeout:        time.Duration(policy.Fallback.AttemptTimeoutSeconds) * time.Second,
 		IdleTimeout:        time.Duration(policy.Limits.MaxIdleSeconds) * time.Second,
 		runtimePolicyBytes: bytes.Clone(policyBytes),
+	}
+	defer plan.Destroy()
+	if policy.Services != nil && policy.Services.Proxy != nil {
+		plan.signedProxyBufferBytes = policy.Services.Proxy.MaxBufferBytes
 	}
 	plan.Digest = digestPlanV2(plan)
 	if err := ValidateV2At(plan, now); err != nil {
@@ -242,7 +279,8 @@ func ValidateV2At(plan PlanV2, now time.Time) error {
 		sha256.Sum256(plan.runtimePolicyBytes) != plan.RuntimePolicyDigest {
 		return ErrInvalidV2
 	}
-	policy, err := runtimepolicy.DecodeV2At(plan.runtimePolicyBytes, now)
+	policy, err := runtimepolicy.DecodeRuntimeAt(plan.runtimePolicyBytes, now)
+	defer destroyOwnedPolicyV2(&policy)
 	if err != nil || policy.LiveProgramSHA256 != plan.LiveProgramDigest || policy.RelayAuthKeyID != plan.RelayKeyID ||
 		plan.MaxQueuePackets > uint16(policy.Limits.MaxQueuedPackets) || plan.MaxIncompleteOps > uint16(policy.Limits.MaxQueuedPackets) ||
 		uint32(plan.MaxReconnectAttempts) > policy.Limits.MaxReconnectAttempts ||
@@ -266,6 +304,7 @@ func receiptMatchesProfileV2(receipt lifecycle.VerifiedReceipt, profile envelope
 		return false
 	}
 	decoded, err := hex.DecodeString(receipt.AuthenticatedArtifactSHA256)
+	defer clear(decoded)
 	return err == nil && len(decoded) == 32 && receipt.AuthenticatedArtifactSHA256 == hex.EncodeToString(decoded)
 }
 
@@ -329,6 +368,12 @@ func modePermittedV2(signed []runtimepolicy.IPModeV2, requested runtimepolicy.IP
 func selectNetworkV2(policy runtimepolicy.PolicyV2, mode runtimepolicy.IPModeV2, requestedRoutes []runtimepolicy.PrefixV2, requestedDNS [][]byte) ([]runtimepolicy.PrefixV2, [][]byte, [4]byte, [4]byte, [16]byte, [16]byte, error) {
 	wantRoutes := make([]runtimepolicy.PrefixV2, 0, 2)
 	wantDNS := make([][]byte, 0, 2)
+	transferred := false
+	defer func() {
+		if !transferred {
+			destroyOwnedNetworkV2(wantRoutes, wantDNS)
+		}
+	}()
 	var client4, dns4 [4]byte
 	var client6, dns6 [16]byte
 	if mode == runtimepolicy.IPModeIPv4Only || mode == runtimepolicy.IPModeDualStack {
@@ -353,7 +398,8 @@ func selectNetworkV2(policy runtimepolicy.PolicyV2, mode runtimepolicy.IPModeV2,
 		len(requestedDNS) != 0 && !reflectBytes2DV2(requestedDNS, wantDNS) {
 		return nil, nil, client4, dns4, client6, dns6, ErrWideningV2
 	}
-	return clonePrefixesV2(wantRoutes), cloneBytes2DV2(wantDNS), client4, dns4, client6, dns6, nil
+	transferred = true
+	return wantRoutes, wantDNS, client4, dns4, client6, dns6, nil
 }
 
 func selectProtocolsV2(signed, requested []runtimepolicy.PayloadProtocolV2) ([]runtimepolicy.PayloadProtocolV2, error) {
@@ -439,7 +485,8 @@ func endpointsSubsetV2(policy runtimepolicy.PolicyV2, endpoints []runtimepolicy.
 }
 
 func networkMatchesModeV2(policy runtimepolicy.PolicyV2, plan PlanV2) bool {
-	routes, _, client4, dns4, client6, dns6, err := selectNetworkV2(policy, plan.IPMode, plan.Routes, nil)
+	routes, dns, client4, dns4, client6, dns6, err := selectNetworkV2(policy, plan.IPMode, plan.Routes, nil)
+	defer destroyOwnedNetworkV2(routes, dns)
 	return err == nil && reflectPrefixesV2(routes, plan.Routes) && client4 == plan.ClientIPv4 && dns4 == plan.DNSIPv4 && client6 == plan.ClientIPv6 && dns6 == plan.DNSIPv6
 }
 
@@ -462,7 +509,9 @@ func digestPlanV2(plan PlanV2) [32]byte {
 	writeStringV2(h, plan.ProfileContentID)
 	_, _ = h.Write(plan.ActivationReceiptDigest[:])
 	writeBytesV2(h, plan.runtimePolicyBytes)
-	writeBytesV2(h, effectiveNarrowingV2(plan))
+	narrowing := effectiveNarrowingV2(plan)
+	writeBytesV2(h, narrowing)
+	clear(narrowing)
 	writeStringV2(h, plan.StrategyID)
 	writeStringV2(h, plan.RelayKeyID)
 	writeEndpointsV2(h, plan.Endpoints)
@@ -535,8 +584,26 @@ func writeProtocolsV2(h hashWriterV2, protocols []runtimepolicy.PayloadProtocolV
 
 func sumV2(h interface{ Sum([]byte) []byte }) [32]byte {
 	var result [32]byte
-	copy(result[:], h.Sum(nil))
+	encoded := h.Sum(nil)
+	copy(result[:], encoded)
+	clear(encoded)
 	return result
+}
+
+// These helpers retire exclusively owned calculation values, never request aliases.
+func destroyOwnedNetworkV2(routes []runtimepolicy.PrefixV2, dns [][]byte) {
+	for _, route := range routes {
+		clear(route.Address)
+	}
+	for _, address := range dns {
+		clear(address)
+	}
+	clear(routes)
+	clear(dns)
+}
+
+func destroyOwnedPolicyV2(policy *runtimepolicy.PolicyV2) {
+	policy.Destroy()
 }
 
 func cloneEndpointsV2(values []runtimepolicy.EndpointV2) []runtimepolicy.EndpointV2 {

@@ -213,10 +213,16 @@ func sameRootSet(left, right RootSetArtifact) bool {
 }
 
 func validateActiveRootSet(root RootSetArtifact, now int64) error {
+	return validateActiveRootSetWithRejection(root, now, nil)
+}
+
+func validateActiveRootSetWithRejection(root RootSetArtifact, now int64, rejected VerificationRejectionSink) error {
 	if err := ValidateRootSet(root); err != nil {
+		rejectVerification(rejected, VerificationStageRoot, VerificationReasonMalformed)
 		return err
 	}
 	if now < root.ValidFrom || now >= root.ValidUntil {
+		rejectVerification(rejected, VerificationStageRoot, VerificationReasonTimeInvalid)
 		return fmt.Errorf("%w: root set is not active", ErrInvalidDelegation)
 	}
 	return nil
@@ -275,25 +281,51 @@ type IssuerDelegationArtifact struct {
 }
 
 func ValidateIssuerDelegation(root RootSetArtifact, delegation IssuerDelegationArtifact, now int64, providerID, lineageID, profileID string) error {
-	if err := validateActiveRootSet(root, now); err != nil {
+	return validateIssuerDelegationWithRejection(root, delegation, now, providerID, lineageID, profileID, nil)
+}
+
+func ValidateIssuerDelegationWithRejection(root RootSetArtifact, delegation IssuerDelegationArtifact, now int64, providerID, lineageID, profileID string, rejected VerificationRejectionSink) error {
+	return validateIssuerDelegationWithRejection(root, delegation, now, providerID, lineageID, profileID, firstVerificationRejectionSink(rejected))
+}
+
+func validateIssuerDelegationWithRejection(root RootSetArtifact, delegation IssuerDelegationArtifact, now int64, providerID, lineageID, profileID string, rejected VerificationRejectionSink) error {
+	if err := validateActiveRootSetWithRejection(root, now, rejected); err != nil {
 		return err
 	}
 	if delegation.RootEpoch != root.Epoch || !rootContains(root, delegation.RootKeyID) {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonRootMismatch)
 		return fmt.Errorf("%w: unknown root or epoch", ErrInvalidDelegation)
 	}
 	if err := delegation.IssuerKey.validate(); err != nil {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonMalformed)
 		return err
 	}
 	if rootContains(root, delegation.IssuerKey.KeyID) || delegation.IssuerKey.KeyID == delegation.RootKeyID {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonBindingMismatch)
 		return fmt.Errorf("%w: issuer/root key-ID collision", ErrInvalidDelegation)
 	}
 	if err := delegation.Scope.validate(); err != nil {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonMalformed)
 		return err
 	}
-	if delegation.DelegationEpoch == 0 || delegation.MaxProfileValiditySecs == 0 || delegation.Revoked || now < delegation.ValidFrom || now >= delegation.ValidUntil || delegation.ValidUntil <= delegation.ValidFrom {
+	if delegation.DelegationEpoch == 0 || delegation.MaxProfileValiditySecs == 0 {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonMalformed)
+		return fmt.Errorf("%w: issuer delegation is expired, revoked, or malformed", ErrInvalidDelegation)
+	}
+	if delegation.Revoked {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonExplicitRevocation)
+		return fmt.Errorf("%w: issuer delegation is expired, revoked, or malformed", ErrInvalidDelegation)
+	}
+	if now < delegation.ValidFrom || now >= delegation.ValidUntil {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonTimeInvalid)
+		return fmt.Errorf("%w: issuer delegation is expired, revoked, or malformed", ErrInvalidDelegation)
+	}
+	if delegation.ValidUntil <= delegation.ValidFrom {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonMalformed)
 		return fmt.Errorf("%w: issuer delegation is expired, revoked, or malformed", ErrInvalidDelegation)
 	}
 	if !delegation.Scope.contains(providerID, lineageID, profileID) {
+		rejectVerification(rejected, VerificationStageDelegation, VerificationReasonScopeMismatch)
 		return fmt.Errorf("%w: profile is outside issuer scope", ErrInvalidDelegation)
 	}
 	return nil

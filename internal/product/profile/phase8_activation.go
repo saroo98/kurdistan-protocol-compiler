@@ -125,6 +125,7 @@ type ActivationRequest struct {
 	MinRootEpoch       uint64
 	MinRevocationEpoch uint64
 	Observe            func(ActivationStage)
+	Rejected           VerificationRejectionSink
 }
 
 type verifiedCandidate struct {
@@ -172,10 +173,17 @@ func ActivateVerifiedProfile(request ActivationRequest) (ActivationRecord, error
 }
 
 func verifyActivationCandidate(request ActivationRequest, artifact []byte) (verifiedCandidate, error) {
-	if len(artifact) == 0 || len(artifact) > envelope.MaxTotalInputBytes || request.Verifier == nil {
+	request.Rejected = firstVerificationRejectionSink(request.Rejected)
+	if len(artifact) == 0 || len(artifact) > envelope.MaxTotalInputBytes {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
+		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+	}
+	if request.Verifier == nil {
+		rejectVerification(request.Rejected, VerificationStageProfileSignature, VerificationReasonIncompatible)
 		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 	}
 	if err := envelope.ValidateArtifactMetadata(request.Dispatch); err != nil {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
 		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 	}
 	var signedObject []byte
@@ -185,41 +193,69 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 	nativeArtifact := bytes.Clone(artifact)
 	if request.UnwrapArtifact != nil {
 		if request.UnwrapSignedObject != nil {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonIncompatible)
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		nativeArtifact, err = request.UnwrapArtifact(bytes.Clone(artifact))
-		if err != nil || len(nativeArtifact) == 0 || len(nativeArtifact) > envelope.MaxTotalInputBytes {
+		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonUnknown)
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		if len(nativeArtifact) == 0 || len(nativeArtifact) > envelope.MaxTotalInputBytes {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 	}
 	if request.UnwrapSignedObject != nil {
-		if request.Dispatch.Class != envelope.ArtifactSignedPublic || request.Resolver != nil || request.Opener != nil || request.OfflineOpener != nil {
+		if request.Dispatch.Class != envelope.ArtifactSignedPublic {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonIncompatible)
+			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+		}
+		if request.Resolver != nil || request.Opener != nil || request.OfflineOpener != nil {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonIncompatible)
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		signedObject, err = request.UnwrapSignedObject(bytes.Clone(artifact))
-		if err != nil || len(signedObject) == 0 || len(signedObject) > envelope.MaxTotalInputBytes {
+		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonUnknown)
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		if len(signedObject) == 0 || len(signedObject) > envelope.MaxTotalInputBytes {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 		observe(request, StageOuterParsed)
 	} else if request.Dispatch.Class == envelope.ArtifactSignedPublic {
 		if request.Resolver != nil || request.Opener != nil || request.OfflineOpener != nil {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonIncompatible)
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		signedObject = bytes.Clone(nativeArtifact)
 		observe(request, StageOuterParsed)
 	} else {
 		sealed, err := envelope.ParseSealedProfileOpaque(nativeArtifact)
-		if err != nil || request.Resolver == nil || (request.Opener == nil) == (request.OfflineOpener == nil) {
+		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
+			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
+		}
+		if request.Resolver == nil || (request.Opener == nil) == (request.OfflineOpener == nil) {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonIncompatible)
 			return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 		}
 		context, err := envelope.DecodeSealProtectedContextV1(sealed.Protected)
-		if err != nil || context.Metadata != request.Dispatch || context.SuiteID != envelope.SuiteClassicalV1 || context.ContentType != envelope.SignedObjectContentType {
+		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		if context.Metadata != request.Dispatch || context.SuiteID != envelope.SuiteClassicalV1 || context.ContentType != envelope.SignedObjectContentType {
+			rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 		outer = &context
 		observe(request, StageOuterParsed)
 		resolved, err := ResolveRecipientForMetadata(request.Resolver, context.Metadata)
 		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonRecipientRejected)
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 		if request.OfflineOpener != nil {
@@ -227,7 +263,12 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 		} else {
 			signedObject, err = request.Opener.Open(resolved, sealed.Encapsulation, sealed.Ciphertext)
 		}
-		if err != nil || len(signedObject) == 0 || len(signedObject) > envelope.MaxSignedObjectBytes {
+		if err != nil {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonRecipientRejected)
+			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+		}
+		if len(signedObject) == 0 || len(signedObject) > envelope.MaxSignedObjectBytes {
+			rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonMalformed)
 			return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 		}
 		recipient = &resolved
@@ -235,11 +276,17 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 	}
 	parsed, err := envelope.ParseSignedProfileOpaque(signedObject)
 	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
 		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 	}
 	observe(request, StageSignedObjectParsed)
 	signedContext, err := envelope.DecodeSignedProtectedContextV1(parsed.Protected)
-	if err != nil || signedContext.SuiteID != envelope.SuiteClassicalV1 || signedContext.ContentType != envelope.SignedPayloadContentType {
+	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonMalformed)
+		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+	}
+	if signedContext.SuiteID != envelope.SuiteClassicalV1 || signedContext.ContentType != envelope.SignedPayloadContentType {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	if err := verifyDelegation(request); err != nil {
@@ -251,25 +298,35 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 	}
 	observe(request, StageRevocationsVerified)
 	if string(signedContext.KeyID) != request.Delegation.Artifact.IssuerKey.KeyID {
+		rejectVerification(request.Rejected, VerificationStageProfileSignature, VerificationReasonBindingMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	sigStructure, err := envelope.BuildCOSESigStructure(parsed.Protected, parsed.Payload)
-	if err != nil || request.Verifier.Verify(request.Delegation.Artifact.IssuerKey, sigStructure, parsed.Signature) != nil {
+	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageProfileSignature, VerificationReasonMalformed)
+		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
+	}
+	if request.Verifier.Verify(request.Delegation.Artifact.IssuerKey, sigStructure, parsed.Signature) != nil {
+		rejectVerification(request.Rejected, VerificationStageProfileSignature, VerificationReasonSignatureInvalid)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	observe(request, StageProfileSignatureVerified)
 	if outer != nil && signedContext.Metadata != outer.Metadata {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	if signedContext.Metadata != request.Dispatch {
+		rejectVerification(request.Rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	observe(request, StageDispatchMatched)
 	profileValue, err := envelope.DecodeCanonicalProfileV1(parsed.Payload)
 	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonMalformed)
 		return verifiedCandidate{}, activationFailure(ActivationInvalidArtifact)
 	}
 	if recipient != nil && !RecipientBindingContainsProfile(*recipient, profileValue) {
+		rejectVerification(request.Rejected, VerificationStageRecipient, VerificationReasonScopeMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationTrustRejected)
 	}
 	observe(request, StageProfileSemanticsDecoded)
@@ -283,6 +340,7 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 	decision := lifecycle.VerifiedDecision{Decision: lifecycle.Decision{Action: lifecycle.Admit, ProfileID: profileValue.ProfileID, Scope: profileValue.RevocationScope, EvidenceReference: receipt.AuthenticatedArtifactSHA256, Generation: profileValue.Generation}, Receipt: receipt}
 	next, err := lifecycle.ApplyVerified(request.Current, decision)
 	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return verifiedCandidate{}, activationFailure(ActivationPolicyRejected)
 	}
 	record := ActivationRecord{Artifact: bytes.Clone(artifact), SignedObject: bytes.Clone(parsed.ExactObject), Profile: cloneCanonicalProfile(profileValue), State: next}
@@ -291,39 +349,100 @@ func verifyActivationCandidate(request ActivationRequest, artifact []byte) (veri
 
 func verifyDelegation(request ActivationRequest) error {
 	d := request.Delegation
-	if err := validateActiveRootSet(request.Root, request.Now); err != nil || d.RootKey.validate() != nil || !rootContainsReference(request.Root, d.RootKey) || d.RootKey.KeyID != d.Artifact.RootKeyID || d.Artifact.RootEpoch != request.Root.Epoch {
+	if err := validateActiveRootSetWithRejection(request.Root, request.Now, request.Rejected); err != nil {
+		return errors.New("invalid delegation root")
+	}
+	if d.RootKey.validate() != nil {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonMalformed)
+		return errors.New("invalid delegation root")
+	}
+	if !rootContainsReference(request.Root, d.RootKey) {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonRootMismatch)
+		return errors.New("invalid delegation root")
+	}
+	if d.RootKey.KeyID != d.Artifact.RootKeyID {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonBindingMismatch)
+		return errors.New("invalid delegation root")
+	}
+	if d.Artifact.RootEpoch != request.Root.Epoch {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonRootMismatch)
 		return errors.New("invalid delegation root")
 	}
 	canonical, err := EncodeIssuerDelegationV1(d.Artifact)
-	if err != nil || !bytes.Equal(canonical, d.Payload) {
+	if err != nil {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonMalformed)
 		return errors.New("non-canonical delegation")
 	}
-	return request.Verifier.Verify(d.RootKey, d.Payload, d.Signature)
-}
-
-func verifyRevocations(request ActivationRequest) error {
-	r := request.Revocations
-	if r.RootKey.validate() != nil || !rootContainsReference(request.Root, r.RootKey) || r.RootKey.KeyID != request.Delegation.Artifact.RootKeyID || r.Set.RootEpoch != request.Root.Epoch {
-		return errors.New("invalid revocation root")
+	if !bytes.Equal(canonical, d.Payload) {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonBindingMismatch)
+		return errors.New("non-canonical delegation")
 	}
-	canonical, err := EncodeRevocationSetV1(r.Set)
-	if err != nil || !bytes.Equal(canonical, r.Payload) || request.Verifier.Verify(r.RootKey, r.Payload, r.Signature) != nil {
-		return errors.New("invalid revocation signature")
-	}
-	if request.Now < r.Set.IssuedAt || request.Now >= r.Set.ExpiresAt || uint64(request.Now-r.Set.IssuedAt) > r.Set.MaxOfflineStalenessSecs {
-		return errors.New("stale revocations")
+	if err := request.Verifier.Verify(d.RootKey, d.Payload, d.Signature); err != nil {
+		rejectVerification(request.Rejected, VerificationStageDelegation, VerificationReasonSignatureInvalid)
+		return err
 	}
 	return nil
 }
 
+func verifyRevocations(request ActivationRequest) error {
+	r := request.Revocations
+	if r.RootKey.validate() != nil {
+		rejectVerification(request.Rejected, VerificationStageRevocations, VerificationReasonMalformed)
+		return errors.New("invalid revocation root")
+	}
+	if !rootContainsReference(request.Root, r.RootKey) {
+		rejectVerification(request.Rejected, VerificationStageRevocations, VerificationReasonRootMismatch)
+		return errors.New("invalid revocation root")
+	}
+	if r.RootKey.KeyID != request.Delegation.Artifact.RootKeyID {
+		rejectVerification(request.Rejected, VerificationStageRevocations, VerificationReasonBindingMismatch)
+		return errors.New("invalid revocation root")
+	}
+	if r.Set.RootEpoch != request.Root.Epoch {
+		rejectVerification(request.Rejected, VerificationStageRevocations, VerificationReasonRootMismatch)
+		return errors.New("invalid revocation root")
+	}
+	_, err := verifySignedRevocationSetCore(
+		r,
+		request.Verifier,
+		request.Now,
+		errors.New("invalid revocation signature"),
+		errors.New("stale revocations"),
+		request.Rejected,
+	)
+	return err
+}
+
 func validateActivationPolicy(request ActivationRequest, p envelope.CanonicalProfileV1, authenticatedDigest string) error {
-	if p.ContractVersion != request.ContractVersion || p.SnapshotMode != "full-snapshot" || p.RequiredSafetyFloor < request.MinSafetyFloor || p.RootEpoch < request.MinRootEpoch || p.RootEpoch != request.Root.Epoch || p.RevocationEpoch < request.MinRevocationEpoch || p.RevocationEpoch != request.Revocations.Set.Epoch || p.RevocationScope != request.Revocations.Set.Scope || request.Now < p.ValidFrom || request.Now >= p.ValidUntil || uint64(p.ValidUntil-p.ValidFrom) > request.Delegation.Artifact.MaxProfileValiditySecs {
+	if p.ContractVersion != request.ContractVersion || p.SnapshotMode != "full-snapshot" {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonIncompatible)
 		return errors.New("profile floor or validity")
 	}
-	if err := ValidateIssuerDelegation(request.Root, request.Delegation.Artifact, request.Now, p.ProviderID, p.LineageID, p.ProfileID); err != nil {
+	if p.RequiredSafetyFloor < request.MinSafetyFloor || p.RootEpoch < request.MinRootEpoch {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonFloorRejected)
+		return errors.New("profile floor or validity")
+	}
+	if p.RootEpoch != request.Root.Epoch {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonBindingMismatch)
+		return errors.New("profile floor or validity")
+	}
+	if p.RevocationEpoch < request.MinRevocationEpoch {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonFloorRejected)
+		return errors.New("profile floor or validity")
+	}
+	if p.RevocationEpoch != request.Revocations.Set.Epoch || p.RevocationScope != request.Revocations.Set.Scope {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonBindingMismatch)
+		return errors.New("profile floor or validity")
+	}
+	if request.Now < p.ValidFrom || request.Now >= p.ValidUntil || uint64(p.ValidUntil-p.ValidFrom) > request.Delegation.Artifact.MaxProfileValiditySecs {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonTimeInvalid)
+		return errors.New("profile floor or validity")
+	}
+	if err := validateIssuerDelegationWithRejection(request.Root, request.Delegation.Artifact, request.Now, p.ProviderID, p.LineageID, p.ProfileID, request.Rejected); err != nil {
 		return err
 	}
 	if request.Revocations.Set.EmergencyDenied || containsSorted(request.Revocations.Set.RevokedIssuerKeyIDs, request.Delegation.Artifact.IssuerKey.KeyID) || containsSorted(request.Revocations.Set.RevokedContentIDs, p.ContentID) {
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonExplicitRevocation)
 		return errors.New("revoked")
 	}
 	current := request.Current
@@ -331,25 +450,31 @@ func validateActivationPolicy(request ActivationRequest, p envelope.CanonicalPro
 		if p.ContentID == current.Receipt.ContentID && p.ProviderID == current.Receipt.ProviderID && p.LineageID == current.Receipt.LineageID && p.RootEpoch == current.Receipt.RootEpoch && p.RevocationEpoch == current.Receipt.RevocationEpoch && authenticatedDigest == current.Receipt.AuthenticatedArtifactSHA256 {
 			return nil
 		}
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return errors.New("conflicting equal generation")
 	}
 	if current.Status == lifecycle.Admitted && p.Generation > current.Generation && (p.RootEpoch < current.Receipt.RootEpoch || p.RevocationEpoch < current.Receipt.RevocationEpoch) {
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return errors.New("authenticated epoch rollback")
 	}
 	switch p.UpdateKind {
 	case "initial":
 		if current.Status != "" && current.Status != lifecycle.Absent || p.PreviousContentID != "" || p.PreviousProviderID != "" {
+			rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 			return errors.New("invalid initial")
 		}
 	case "replacement":
 		if current.Status != lifecycle.Admitted || p.PreviousContentID != current.Receipt.ContentID || p.ProviderID != current.Receipt.ProviderID || p.LineageID != current.Receipt.LineageID || p.PreviousProviderID != "" {
+			rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 			return errors.New("invalid replacement")
 		}
 	case "provider-migration":
 		if current.Status != lifecycle.Admitted || p.PreviousContentID != current.Receipt.ContentID || p.PreviousProviderID != current.Receipt.ProviderID || p.ProviderID == current.Receipt.ProviderID || p.LineageID != current.Receipt.LineageID {
+			rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 			return errors.New("invalid migration")
 		}
 	default:
+		rejectVerification(request.Rejected, VerificationStageProfilePolicy, VerificationReasonIncompatible)
 		return errors.New("unknown update kind")
 	}
 	return nil

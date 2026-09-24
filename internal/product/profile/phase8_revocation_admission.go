@@ -22,19 +22,67 @@ func VerifySignedRevocationSet(
 	verifier Verifier,
 	now int64,
 ) (VerifiedRevocationSet, error) {
-	if verifier == nil || validateActiveRootSet(root, now) != nil ||
-		signed.RootKey.validate() != nil || !rootContainsReference(root, signed.RootKey) ||
-		signed.Set.RootEpoch != root.Epoch {
+	return VerifySignedRevocationSetWithRejection(root, signed, verifier, now, nil)
+}
+
+func VerifySignedRevocationSetWithRejection(
+	root RootSetArtifact,
+	signed SignedRevocationSetV1,
+	verifier Verifier,
+	now int64,
+	rejected VerificationRejectionSink,
+) (VerifiedRevocationSet, error) {
+	rejected = firstVerificationRejectionSink(rejected)
+	if verifier == nil {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonIncompatible)
 		return VerifiedRevocationSet{}, fmt.Errorf("%w: invalid revocation root", ErrOfflineVerify)
 	}
+	if validateActiveRootSetWithRejection(root, now, rejected) != nil {
+		return VerifiedRevocationSet{}, fmt.Errorf("%w: invalid revocation root", ErrOfflineVerify)
+	}
+	if signed.RootKey.validate() != nil {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonMalformed)
+		return VerifiedRevocationSet{}, fmt.Errorf("%w: invalid revocation root", ErrOfflineVerify)
+	}
+	if !rootContainsReference(root, signed.RootKey) || signed.Set.RootEpoch != root.Epoch {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonRootMismatch)
+		return VerifiedRevocationSet{}, fmt.Errorf("%w: invalid revocation root", ErrOfflineVerify)
+	}
+	return verifySignedRevocationSetCore(
+		signed,
+		verifier,
+		now,
+		fmt.Errorf("%w: invalid revocation signature", ErrOfflineVerify),
+		fmt.Errorf("%w: stale revocations", ErrOfflineVerify),
+		rejected,
+	)
+}
+
+func verifySignedRevocationSetCore(
+	signed SignedRevocationSetV1,
+	verifier Verifier,
+	now int64,
+	invalidSignature error,
+	stale error,
+	rejected VerificationRejectionSink,
+) (VerifiedRevocationSet, error) {
 	canonical, err := EncodeRevocationSetV1(signed.Set)
-	if err != nil || !bytes.Equal(canonical, signed.Payload) ||
-		verifier.Verify(signed.RootKey, signed.Payload, signed.Signature) != nil {
-		return VerifiedRevocationSet{}, fmt.Errorf("%w: invalid revocation signature", ErrOfflineVerify)
+	if err != nil {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonMalformed)
+		return VerifiedRevocationSet{}, invalidSignature
+	}
+	if !bytes.Equal(canonical, signed.Payload) {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonBindingMismatch)
+		return VerifiedRevocationSet{}, invalidSignature
+	}
+	if verifier.Verify(signed.RootKey, signed.Payload, signed.Signature) != nil {
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonSignatureInvalid)
+		return VerifiedRevocationSet{}, invalidSignature
 	}
 	if now < signed.Set.IssuedAt || now >= signed.Set.ExpiresAt ||
 		uint64(now-signed.Set.IssuedAt) > signed.Set.MaxOfflineStalenessSecs {
-		return VerifiedRevocationSet{}, fmt.Errorf("%w: stale revocations", ErrOfflineVerify)
+		rejectVerification(rejected, VerificationStageRevocations, VerificationReasonTimeInvalid)
+		return VerifiedRevocationSet{}, stale
 	}
 	return VerifiedRevocationSet{
 		set:     cloneRevocationSet(signed.Set),

@@ -98,15 +98,18 @@ func NormalizeProfileIngress(input ProfileIngress) ([]byte, error) {
 		return nil, ingressError(IngressInvalidKind, string(input.Kind))
 	}
 	if err != nil {
+		clear(normalized)
 		return nil, err
 	}
 	if len(normalized) == 0 {
+		clear(normalized)
 		return nil, ingressError(IngressEmpty, "opaque artifact")
 	}
 	if len(normalized) > MaxTotalInputBytes {
+		clear(normalized)
 		return nil, ingressError(IngressSizeLimit, "opaque artifact")
 	}
-	return bytes.Clone(normalized), nil
+	return normalized, nil
 }
 
 func EncodeArtifactURI(opaque []byte) (string, error) {
@@ -132,6 +135,7 @@ func decodeArtifactURI(value string) ([]byte, error) {
 	}
 	decoded, err := base64.RawURLEncoding.Strict().DecodeString(encoded)
 	if err != nil || base64.RawURLEncoding.EncodeToString(decoded) != encoded {
+		clear(decoded)
 		return nil, ingressError(IngressAmbiguousBase, "non-canonical base64url")
 	}
 	return decoded, nil
@@ -167,6 +171,11 @@ func decodeQRChunks(chunks []string) ([]byte, error) {
 	}
 	total := 0
 	parts := make([][]byte, len(chunks))
+	defer func() {
+		for _, part := range parts {
+			clear(part)
+		}
+	}()
 	seen := make([]bool, len(chunks))
 	for _, chunk := range chunks {
 		if len(chunk) == 0 || len(chunk) > MaxIngressChunkChars || !strings.HasPrefix(chunk, qrChunkPrefix) {
@@ -191,20 +200,26 @@ func decodeQRChunks(chunks []string) ([]byte, error) {
 		}
 		decoded, err := base64.RawURLEncoding.Strict().DecodeString(fields[2])
 		if err != nil || base64.RawURLEncoding.EncodeToString(decoded) != fields[2] {
+			clear(decoded)
 			return nil, ingressError(IngressAmbiguousBase, "QR payload base64url")
 		}
 		seen[index-1] = true
 		parts[index-1] = decoded
 	}
-	var normalized []byte
+	assembledBytes := 0
 	for i, part := range parts {
 		if !seen[i] {
 			return nil, ingressError(IngressMalformedChunks, "missing chunk")
 		}
-		if len(normalized)+len(part) > MaxTotalInputBytes {
+		if len(part) > MaxTotalInputBytes-assembledBytes {
 			return nil, ingressError(IngressSizeLimit, "assembled QR artifact")
 		}
-		normalized = append(normalized, part...)
+		assembledBytes += len(part)
+	}
+	normalized := make([]byte, assembledBytes)
+	offset := 0
+	for _, part := range parts {
+		offset += copy(normalized[offset:], part)
 	}
 	return normalized, nil
 }

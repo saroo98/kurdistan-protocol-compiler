@@ -21,6 +21,17 @@ type VerifiedActivationAdmission struct {
 	inspection RedactedInspection
 }
 
+// Destroy invalidates this single-owner admission and clears its owned mutable
+// backing. Copies of the value alias that backing and must not outlive the owner.
+// Immutable strings and opaque cryptographic objects are not securely erased.
+func (verified *VerifiedActivationAdmission) Destroy() {
+	if verified == nil {
+		return
+	}
+	destroyActivationRecord(&verified.record)
+	verified.inspection = RedactedInspection{}
+}
+
 // VerifyActivationAdmission runs the same trust, delegation, revocation,
 // lifecycle, and policy validation used by the activation transaction without
 // mutating the supplied persistence provider.
@@ -47,6 +58,7 @@ func VerifyActivationAdmission(request ActivationRequest) (VerifiedActivationAdm
 // VerifyInitialActivationAdmission admits only an initial profile against an
 // absent lifecycle state. It cannot be used as rotation authority.
 func VerifyInitialActivationAdmission(request ActivationRequest) (VerifiedActivationAdmission, error) {
+	request.Rejected = firstVerificationRejectionSink(request.Rejected)
 	verified, err := VerifyActivationAdmission(request)
 	if err != nil {
 		return VerifiedActivationAdmission{}, err
@@ -56,6 +68,7 @@ func VerifyInitialActivationAdmission(request ActivationRequest) (VerifiedActiva
 	explicitAbsent := lifecycle.VerifiedState{State: lifecycle.State{Status: lifecycle.Absent}}
 	if profileValue.UpdateKind != "initial" ||
 		(request.Current != empty && request.Current != explicitAbsent) {
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return VerifiedActivationAdmission{}, fmt.Errorf("%w: initial admission requires absent state", ErrOfflineVerify)
 	}
 	return verified, nil
@@ -69,7 +82,9 @@ func VerifyReplacementActivationAdmission(
 	current VerifiedActivationAdmission,
 	request ActivationRequest,
 ) (VerifiedActivationAdmission, error) {
+	request.Rejected = firstVerificationRejectionSink(request.Rejected)
 	if len(current.record.Artifact) == 0 || request.Current != current.record.State {
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return VerifiedActivationAdmission{}, fmt.Errorf("%w: replacement current state is not the admitted artifact", ErrOfflineVerify)
 	}
 	verified, err := VerifyActivationAdmission(request)
@@ -81,6 +96,7 @@ func VerifyReplacementActivationAdmission(
 		profileValue.ProfileID != current.record.Profile.ProfileID ||
 		profileValue.LineageID != current.record.Profile.LineageID ||
 		profileValue.Generation != current.record.Profile.Generation+1 {
+		rejectVerification(request.Rejected, VerificationStageLifecycle, VerificationReasonLifecycleMismatch)
 		return VerifiedActivationAdmission{}, fmt.Errorf("%w: replacement is not the next exact lifecycle record", ErrOfflineVerify)
 	}
 	return verified, nil

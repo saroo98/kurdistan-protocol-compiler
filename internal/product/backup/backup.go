@@ -97,6 +97,13 @@ type RestoreVerifier interface {
 	VerifyBackupRecord(Record) error
 }
 
+// RecipientRestoreVerifier verifies a profile using its authenticated source binding.
+// Material is borrowed for this call only; it is wiped by Restore on every exit.
+// A source binding selects credentials, never establishes current trust itself.
+type RecipientRestoreVerifier interface {
+	VerifyBackupRecordWithRecipient(Record, RecipientKeyRecord) error
+}
+
 type RandomSource interface {
 	Read([]byte) (int, error)
 }
@@ -209,10 +216,35 @@ func Restore(opened Opened, expected Preview, verifier RestoreVerifier) (Payload
 		opened.preview.RecordCount != len(opened.payload.Records) {
 		return Payload{}, ErrRestoreRejected
 	}
+	keys, err := DecodeRecipientKeyRecords(opened.payload)
+	if err != nil {
+		return Payload{}, ErrRestoreRejected
+	}
+	defer func() {
+		for i := range keys {
+			keys[i].Destroy()
+		}
+	}()
 	for _, record := range opened.payload.Records {
 		candidate := cloneRecord(record)
 		err := verifier.VerifyBackupRecord(candidate)
 		clear(candidate.ExactBytes)
+		if err != nil && record.Kind == RecordNativeProfile {
+			if recipientVerifier, ok := verifier.(RecipientRestoreVerifier); ok {
+				for _, key := range keys {
+					if key.SourceVersion != 2 {
+						continue
+					}
+					for _, id := range key.SourceProfiles {
+						if id == record.LocalID {
+							candidate = cloneRecord(record)
+							err = recipientVerifier.VerifyBackupRecordWithRecipient(candidate, key)
+							clear(candidate.ExactBytes)
+						}
+					}
+				}
+			}
+		}
 		if err != nil {
 			return Payload{}, ErrRestoreRejected
 		}

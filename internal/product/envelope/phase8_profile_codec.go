@@ -110,29 +110,9 @@ func DecodeCanonicalProfileV1(encoded []byte) (CanonicalProfileV1, error) {
 	if err := ValidateCoreDeterministicCBOR(encoded); err != nil {
 		return CanonicalProfileV1{}, codecError(CodecNonCanonical, err.Error())
 	}
-	var fields map[uint64]cbor.RawMessage
-	if err := unmarshalStrict(encoded, &fields); err != nil || len(fields) != canonicalProfileFieldCount {
-		return CanonicalProfileV1{}, codecError(CodecSchema, "canonical profile map")
-	}
-	for label := uint64(1); label <= canonicalProfileFieldCount; label++ {
-		if _, ok := fields[label]; !ok {
-			return CanonicalProfileV1{}, codecError(CodecSchema, fmt.Sprintf("missing field %d", label))
-		}
-	}
-	var version uint64
-	var profile CanonicalProfileV1
-	values := []any{&version, &profile.ContentID, &profile.ProfileID, &profile.LineageID, &profile.ProviderID,
-		&profile.ContractVersion, &profile.RevocationScope, &profile.SnapshotMode, &profile.UpdateKind,
-		&profile.Generation, &profile.RequiredSafetyFloor, &profile.ValidFrom, &profile.ValidUntil,
-		&profile.RootEpoch, &profile.RevocationEpoch, &profile.PreviousContentID, &profile.PreviousProviderID,
-		&profile.RelayIDs, &profile.StrategyIDs, &profile.Policy}
-	for i, destination := range values {
-		if err := unmarshalStrict(fields[uint64(i+1)], destination); err != nil {
-			return CanonicalProfileV1{}, codecError(CodecSchema, fmt.Sprintf("field %d type", i+1))
-		}
-	}
-	if version != CanonicalProfileVersion {
-		return CanonicalProfileV1{}, codecError(CodecUnsupportedVersion, fmt.Sprintf("profile version %d", version))
+	profile, err := decodeCanonicalProfileFieldsV1(encoded, false)
+	if err != nil {
+		return CanonicalProfileV1{}, err
 	}
 	if err := validateCanonicalProfileV1(profile); err != nil {
 		return CanonicalProfileV1{}, err
@@ -262,37 +242,11 @@ func ParseSignedProfileOpaque(encoded []byte) (ParsedSignedProfile, error) {
 	if err := ValidateCoreDeterministicCBOR(encoded); err != nil {
 		return ParsedSignedProfile{}, codecError(CodecNonCanonical, err.Error())
 	}
-	var tagged cbor.RawTag
-	if err := unmarshalStrict(encoded, &tagged); err != nil || tagged.Number != COSESign1Tag {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tag")
+	fields, err := decodeSignedProfileFieldsV1(encoded, false)
+	if err != nil {
+		return ParsedSignedProfile{}, err
 	}
-	if !hasCBORMajorType(tagged.Content, 4) {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tag content must be a direct array")
-	}
-	var fields []cbor.RawMessage
-	if err := unmarshalStrict(tagged.Content, &fields); err != nil || len(fields) != 4 {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "array arity")
-	}
-	// COSE_Sign1 permits one tag, the outer tag 18.  Each direct array member
-	// must use its untagged CBOR major type so an alternative tagged spelling
-	// cannot authenticate the same signed bytes under a different artifact.
-	if !hasCBORMajorType(fields[0], 2) || !hasCBORMajorType(fields[1], 5) || !hasCBORMajorType(fields[2], 2) || !hasCBORMajorType(fields[3], 2) {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tagged or invalid direct field")
-	}
-	var protected, payload, signature []byte
-	var unprotected map[int64]cbor.RawMessage
-	if err := unmarshalStrict(fields[0], &protected); err != nil || len(protected) == 0 || len(protected) > MaxSignedProtectedBytes {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "protected headers")
-	}
-	if err := unmarshalStrict(fields[1], &unprotected); err != nil || len(unprotected) != 0 {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "unprotected headers")
-	}
-	if err := unmarshalStrict(fields[2], &payload); err != nil || len(payload) == 0 || len(payload) > MaxPayloadBytes {
-		return ParsedSignedProfile{}, codecError(CodecSizeLimit, "signed payload")
-	}
-	if err := unmarshalStrict(fields[3], &signature); err != nil || len(signature) != ES256RawSignatureSize {
-		return ParsedSignedProfile{}, codecError(CodecSignedObject, "signature encoding")
-	}
+	protected, payload, signature := fields.Protected, fields.Payload, fields.Signature
 	if _, _, err := DecodeRawES256Signature(signature); err != nil {
 		return ParsedSignedProfile{}, codecError(CodecSignedObject, "signature encoding")
 	}
@@ -317,11 +271,123 @@ func ParseSealedProfileOpaque(encoded []byte) (ParsedSealedProfile, error) {
 	if err := ValidateCoreDeterministicCBOR(encoded); err != nil {
 		return ParsedSealedProfile{}, codecError(CodecNonCanonical, err.Error())
 	}
+	fields, err := decodeSealedProfileFieldsV1(encoded, false)
+	if err != nil {
+		return ParsedSealedProfile{}, err
+	}
+	protected, enc, ciphertext := fields.Protected, fields.Encapsulation, fields.Ciphertext
+	if _, err := outerMetadataBytes(protected); err != nil {
+		return ParsedSealedProfile{}, codecError(CodecSealedFrame, err.Error())
+	}
+	return ParsedSealedProfile{ExactFrame: bytes.Clone(encoded), Protected: bytes.Clone(protected), Encapsulation: bytes.Clone(enc), Ciphertext: bytes.Clone(ciphertext)}, nil
+}
+
+func decodeCanonicalProfileFieldsV1(encoded []byte, resources bool) (CanonicalProfileV1, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
+	var fields map[uint64]cbor.RawMessage
+	if err := decode(encoded, &fields); err != nil || len(fields) != canonicalProfileFieldCount {
+		return CanonicalProfileV1{}, codecError(CodecSchema, "canonical profile map")
+	}
+	for label := uint64(1); label <= canonicalProfileFieldCount; label++ {
+		if _, ok := fields[label]; !ok {
+			return CanonicalProfileV1{}, codecError(CodecSchema, fmt.Sprintf("missing field %d", label))
+		}
+	}
+	if resources {
+		defer clearResourceMapV1(fields)
+	}
+	var version uint64
+	var profile CanonicalProfileV1
+	complete := false
+	defer func() {
+		if resources && !complete {
+			clear(profile.Policy)
+		}
+	}()
+	values := []any{&version, &profile.ContentID, &profile.ProfileID, &profile.LineageID, &profile.ProviderID,
+		&profile.ContractVersion, &profile.RevocationScope, &profile.SnapshotMode, &profile.UpdateKind,
+		&profile.Generation, &profile.RequiredSafetyFloor, &profile.ValidFrom, &profile.ValidUntil,
+		&profile.RootEpoch, &profile.RevocationEpoch, &profile.PreviousContentID, &profile.PreviousProviderID,
+		&profile.RelayIDs, &profile.StrategyIDs, &profile.Policy}
+	for i, destination := range values {
+		if err := decode(fields[uint64(i+1)], destination); err != nil {
+			return CanonicalProfileV1{}, codecError(CodecSchema, fmt.Sprintf("field %d type", i+1))
+		}
+	}
+	if version != CanonicalProfileVersion {
+		return CanonicalProfileV1{}, codecError(CodecUnsupportedVersion, fmt.Sprintf("profile version %d", version))
+	}
+	complete = true
+	return profile, nil
+}
+
+func decodeSignedProfileFieldsV1(encoded []byte, resources bool) (ParsedSignedProfile, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
+	var tagged cbor.RawTag
+	if err := unmarshalStrict(encoded, &tagged); err != nil || tagged.Number != COSESign1Tag {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tag")
+	}
+	if !hasCBORMajorType(tagged.Content, 4) {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tag content must be a direct array")
+	}
+	if resources {
+		defer clear(tagged.Content)
+	}
+	var fields []cbor.RawMessage
+	if err := decode(tagged.Content, &fields); err != nil || len(fields) != 4 {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "array arity")
+	}
+	// COSE_Sign1 permits one tag, the outer tag 18.  Each direct array member
+	// must use its untagged CBOR major type so an alternative tagged spelling
+	// cannot authenticate the same signed bytes under a different artifact.
+	if !hasCBORMajorType(fields[0], 2) || !hasCBORMajorType(fields[1], 5) || !hasCBORMajorType(fields[2], 2) || !hasCBORMajorType(fields[3], 2) {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "tagged or invalid direct field")
+	}
+	if resources {
+		defer clearResourceArrayV1(fields)
+	}
+	var protected, payload, signature []byte
+	complete := false
+	defer func() {
+		if resources && !complete {
+			clear(protected)
+			clear(payload)
+			clear(signature)
+		}
+	}()
+	var unprotected map[int64]cbor.RawMessage
+	if err := decode(fields[0], &protected); err != nil || len(protected) == 0 || len(protected) > MaxSignedProtectedBytes {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "protected headers")
+	}
+	if err := decode(fields[1], &unprotected); err != nil || len(unprotected) != 0 {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "unprotected headers")
+	}
+	if err := decode(fields[2], &payload); err != nil || len(payload) == 0 || len(payload) > MaxPayloadBytes {
+		return ParsedSignedProfile{}, codecError(CodecSizeLimit, "signed payload")
+	}
+	if err := decode(fields[3], &signature); err != nil || len(signature) != ES256RawSignatureSize {
+		return ParsedSignedProfile{}, codecError(CodecSignedObject, "signature encoding")
+	}
+	complete = true
+	return ParsedSignedProfile{Protected: protected, Payload: payload, Signature: signature}, nil
+}
+
+func decodeSealedProfileFieldsV1(encoded []byte, resources bool) (ParsedSealedProfile, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
 	if !hasCBORMajorType(encoded, 4) {
 		return ParsedSealedProfile{}, codecError(CodecSealedFrame, "frame must be an untagged direct array")
 	}
 	var fields []cbor.RawMessage
-	if err := unmarshalStrict(encoded, &fields); err != nil || len(fields) != 3 {
+	if err := decode(encoded, &fields); err != nil || len(fields) != 3 {
 		return ParsedSealedProfile{}, codecError(CodecSealedFrame, "array arity")
 	}
 	for _, field := range fields {
@@ -329,18 +395,27 @@ func ParseSealedProfileOpaque(encoded []byte) (ParsedSealedProfile, error) {
 			return ParsedSealedProfile{}, codecError(CodecSealedFrame, "tagged or invalid direct field")
 		}
 	}
+	if resources {
+		defer clearResourceArrayV1(fields)
+	}
 	var protected, enc, ciphertext []byte
-	if err := unmarshalStrict(fields[0], &protected); err != nil || len(protected) == 0 || len(protected) > MaxOuterProtectedBytes {
+	complete := false
+	defer func() {
+		if resources && !complete {
+			clear(protected)
+			clear(enc)
+			clear(ciphertext)
+		}
+	}()
+	if err := decode(fields[0], &protected); err != nil || len(protected) == 0 || len(protected) > MaxOuterProtectedBytes {
 		return ParsedSealedProfile{}, codecError(CodecSealedFrame, "protected metadata")
 	}
-	if err := unmarshalStrict(fields[1], &enc); err != nil || len(enc) != HPKEP256EncSize {
+	if err := decode(fields[1], &enc); err != nil || len(enc) != HPKEP256EncSize {
 		return ParsedSealedProfile{}, codecError(CodecSealedFrame, "encapsulation")
 	}
-	if err := unmarshalStrict(fields[2], &ciphertext); err != nil || len(ciphertext) <= HPKEAEADTagSize || len(ciphertext) > MaxCiphertextBytes {
+	if err := decode(fields[2], &ciphertext); err != nil || len(ciphertext) < HPKEAEADTagSize || !resources && len(ciphertext) == HPKEAEADTagSize || len(ciphertext) > MaxCiphertextBytes {
 		return ParsedSealedProfile{}, codecError(CodecSizeLimit, "ciphertext")
 	}
-	if _, err := outerMetadataBytes(protected); err != nil {
-		return ParsedSealedProfile{}, codecError(CodecSealedFrame, err.Error())
-	}
-	return ParsedSealedProfile{ExactFrame: bytes.Clone(encoded), Protected: bytes.Clone(protected), Encapsulation: bytes.Clone(enc), Ciphertext: bytes.Clone(ciphertext)}, nil
+	complete = true
+	return ParsedSealedProfile{Protected: protected, Encapsulation: enc, Ciphertext: ciphertext}, nil
 }
