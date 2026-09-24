@@ -38,6 +38,7 @@ class BackupOperationDeviceTest {
             })
         val password = "task13-isolated-native-round-trip".encodeToByteArray()
         var encrypted: ByteArray? = null
+        var primaryFailure: Throwable? = null
         try {
             assertTrue(root.initializeProtectedStateForExplicitUserAction())
             val facade = checkNotNull(root.protectedStateFacade())
@@ -67,12 +68,24 @@ class BackupOperationDeviceTest {
             assertEquals(original.generation, restored.generation)
             assertEquals(original.trust, restored.trust)
             assertEquals(original.expiresAtEpochSeconds, restored.expiresAtEpochSeconds)
+        } catch (error: Throwable) {
+            primaryFailure = error
+            throw error
         } finally {
             encrypted?.fill(0); password.fill(0)
             try {
-                if (root.protectedStateFacade() != null) assertTrue(root.resetProtectedStateConfirmed() is
-                    org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed)
-            } finally { root.close() }
+                try {
+                    if (root.protectedStateFacade() != null) {
+                        val reset = root.resetProtectedStateConfirmed()
+                        assertTrue("KURDISTAN_TEST_SETUP expected=COMMITTED actual=${reset.javaClass.simpleName.uppercase(java.util.Locale.ROOT)} setup=BACKUP_RESET", reset is
+                            org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed)
+                    }
+                } finally { root.close() }
+            } catch (cleanup: Throwable) {
+                val primary = primaryFailure ?: throw cleanup
+                primary.addSuppressed(cleanup)
+                throw primary
+            }
             check(checkNotNull(parent.parentFile).canonicalFile == target.cacheDir.canonicalFile && parent.name.startsWith("task13-operation-"))
             check(parent.deleteRecursively())
         }
