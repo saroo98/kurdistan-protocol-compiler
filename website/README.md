@@ -23,4 +23,7 @@ npm run package
 
 Verification fails closed. Packaging checks the current source, production manifest and evidence against the completed verification receipt. The archive includes the authorized fonts, source, tests, static output and current screenshots. Private originals, historical reports and planning documents are excluded.
 
-See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/FONT_INTEGRATION.md` and `docs/LIMITATIONS.md`. Local QA does not establish production VPN availability, native-language approval or field performance.
+Public implementation entry points are `scripts/build.mjs`, `src/content/`,
+`src/i18n/`, `src/client/` and `tests/`. Product operation and security guidance
+are in [`../docs/self-hosting/`](../docs/self-hosting/). Local QA does not establish
+production VPN availability, native-language approval or field performance.
