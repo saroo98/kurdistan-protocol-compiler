@@ -32,14 +32,25 @@ type localDNS struct {
 
 func newLocalDNS(t testing.TB, udpReply, tcpReply func([]byte) [][]byte) *localDNS {
 	t.Helper()
-	tcp, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatal(err)
+	var udp *net.UDPConn
+	var tcp *net.TCPListener
+	var endpoint netip.AddrPort
+	var err error
+	// TCP allocation does not reserve a usable UDP port. Keep both sockets
+	// only after the same numeric endpoint is available in both namespaces.
+	for attempt := 0; attempt < 16; attempt++ {
+		udp, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		endpoint = udp.LocalAddr().(*net.UDPAddr).AddrPort()
+		tcp, err = net.ListenTCP("tcp4", net.TCPAddrFromAddrPort(endpoint))
+		if err == nil {
+			break
+		}
+		_ = udp.Close()
 	}
-	endpoint := tcp.Addr().(*net.TCPAddr).AddrPort()
-	udp, err := net.ListenUDP("udp4", net.UDPAddrFromAddrPort(endpoint))
 	if err != nil {
-		_ = tcp.Close()
 		t.Fatal(err)
 	}
 	s := &localDNS{endpoint: endpoint, udp: udp, tcp: tcp}
