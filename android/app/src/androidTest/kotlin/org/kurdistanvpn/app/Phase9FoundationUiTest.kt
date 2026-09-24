@@ -90,6 +90,7 @@ class Phase9FoundationUiTest {
     fun configureHostedEmulatorIdlingBudget() {
         IdlingPolicies.setMasterPolicyTimeout(2, TimeUnit.MINUTES)
         IdlingPolicies.setIdlingResourceTimeout(2, TimeUnit.MINUTES)
+        compose.continueFromWelcome(compose.activity)
     }
 
     @Test
@@ -198,21 +199,13 @@ class Phase9FoundationUiTest {
     fun primaryNavigationSettingsAndDiagnosticControlsAreOperational() {
         val activity = compose.activity
         waitForSettledProfileState()
+        ensureProtectedStateInitializedForImport()
         compose.onNodeWithTag("primary_settings")
             .assertIsDisplayed()
             .performClick()
-        compose.onNodeWithTag("settings_privacy")
+        compose.onNodeWithTag("settings_appearance")
             .performScrollTo()
             .performClick()
-        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
-            runCatching {
-                compose.onNodeWithText(activity.getString(UiR.string.privacy_recovery))
-                    .assertIsDisplayed()
-                true
-            }.getOrDefault(false)
-        }
-        compose.onNodeWithText(activity.getString(UiR.string.privacy_recovery))
-            .assertIsDisplayed()
 
         val highContrast = activity.getString(UiR.string.high_contrast)
         compose.onNodeWithContentDescription(highContrast)
@@ -251,6 +244,10 @@ class Phase9FoundationUiTest {
             }.getOrDefault(false)
         }
 
+        compose.onNodeWithTag("settings_cancel").performScrollTo().performClick()
+        compose.onNodeWithText(activity.getString(UiR.string.back)).performScrollTo().performClick()
+        compose.onNodeWithTag("settings_privacy").performScrollTo().performClick()
+        compose.onNodeWithText(activity.getString(UiR.string.privacy_recovery)).assertIsDisplayed()
         compose.onNodeWithText(activity.getString(UiR.string.prepare_reset))
             .performScrollTo()
             .performClick()
@@ -473,6 +470,9 @@ class Phase9FoundationUiTest {
                   .invoke(compose.activity, intent)
           }
 
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            compose.activity.appStateSnapshotForTesting() is AppState.ImportPreview
+        }
         compose.onNodeWithText(compose.activity.getString(UiR.string.confirm_encrypted_storage))
             .assertIsDisplayed()
             .performClick()
@@ -695,6 +695,9 @@ class Phase9FoundationUiTest {
                     .getDeclaredMethod("handleExternalIntent", Intent::class.java)
                     .apply { isAccessible = true }
                     .invoke(compose.activity, intent)
+            }
+            compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+                compose.activity.appStateSnapshotForTesting() is AppState.ImportPreview
             }
             compose.onNodeWithText(compose.activity.getString(UiR.string.confirm_encrypted_storage))
                 .assertIsDisplayed()

@@ -16,6 +16,7 @@ class Phase14LongevityDeviceTest {
 
     @Test
     fun repeatedPrimaryNavigationRemainsResponsiveWithoutProcessFailure() {
+        compose.continueFromWelcome(compose.activity)
         repeat(50) {
             compose.onNodeWithTag("primary_profiles").performClick()
             compose.onNodeWithTag("primary_profiles").assertIsDisplayed()

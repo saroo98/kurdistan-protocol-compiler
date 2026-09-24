@@ -18,6 +18,8 @@ import org.junit.Test
 class ProductShellDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test fun stoppedNavigationCallbacksCannotChangeTheSavedRoute() {
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("primary_home").fetchSemanticsNodes().isNotEmpty() }

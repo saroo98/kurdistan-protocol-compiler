@@ -19,7 +19,10 @@ import org.kurdistanvpn.core.model.DiagnosticWorkflowState
 class ExportDestinationDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     private fun openExport() {
+        compose.continueFromWelcome(compose.activity)
         compose.onNodeWithTag("home_details").performScrollTo().performClick()
         compose.onNodeWithTag("home_diagnostics").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostic_prepare").performScrollTo().performClick()

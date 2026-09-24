@@ -14,6 +14,8 @@ import org.kurdistanvpn.core.ui.R as UiR
 class PrivacyRecoveryDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test fun confirmedSettingsResetUsesTheSharedTransactionAndOriginalSettingsCanBeRestored() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as KurdistanApplication
         val root = app.compositionRoot

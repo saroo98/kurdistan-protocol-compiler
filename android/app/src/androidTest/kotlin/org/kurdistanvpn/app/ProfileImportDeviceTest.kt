@@ -19,6 +19,8 @@ import org.kurdistanvpn.core.ui.R as UiR
 class ProfileImportDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test fun signedPreviewSurvivesRotationAndCancelLeavesExistingStorageUntouched() {
         val root = (compose.activity.application as KurdistanApplication).compositionRoot
         val before = checkNotNull(root.protectedStateFacade()?.readProjection())
