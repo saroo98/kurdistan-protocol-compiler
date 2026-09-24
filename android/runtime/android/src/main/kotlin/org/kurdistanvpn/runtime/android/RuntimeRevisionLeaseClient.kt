@@ -4,6 +4,7 @@ package org.kurdistanvpn.runtime.android
 
 import java.io.Closeable
 import org.kurdistanvpn.runtime.api.*
+import org.kurdistanvpn.runtime.api.RuntimeAuthorityLimits.MAX_FINAL_LEASE_MILLIS
 
 /** epoch is the VPN/consumer epoch. providerEpoch is freshly observed by the bound provider
  * connection; provider/Binder death must also close this lease before any final activation. */
@@ -18,7 +19,7 @@ class RuntimeRevisionLeaseClient(val request: RuntimeAuthorityRequest) : Closeab
     init { require(request.purpose == RuntimeAuthorityPurpose.FULL_AUTHORITY) }
 
     /** Start before PRE_TUN IPC. Android processes share elapsedRealtime: this earlier
-     * consumer bound cannot outlive a provider lease acquired later for at most 2s. */
+     * consumer bound cannot outlive a provider lease acquired later with the same cap. */
     @Synchronized fun beginFinalLease(nowElapsedMillis: Long): Boolean {
         if (stage != Stage.WAIT_PRE_TUN || finalDeadline != null || !request.isLiveAt(nowElapsedMillis) ||
             nowElapsedMillis > Long.MAX_VALUE - MAX_FINAL_LEASE_MILLIS) return fail()
@@ -29,7 +30,7 @@ class RuntimeRevisionLeaseClient(val request: RuntimeAuthorityRequest) : Closeab
     @Synchronized fun accept(verified: RuntimeVerifiedAuthority, checks: RuntimeActivationChecks): Boolean {
         val payload = verified.takePayload()
         return try {
-            // A request whose entire remaining life is already <=2s is conservatively
+            // A request whose entire remaining life is within the lease cap is conservatively
             // bounded even without a separate earlier start call (including fixed vectors).
             if (finalDeadline == null && stage == Stage.WAIT_PRE_TUN &&
                 request.isLiveAt(checks.nowElapsedMillis) &&
@@ -65,5 +66,4 @@ class RuntimeRevisionLeaseClient(val request: RuntimeAuthorityRequest) : Closeab
         c.revision == request.revision && c.unlocked && c.vpnPrepared && !c.cancelled && request.isLiveAt(c.nowElapsedMillis) &&
         finalDeadline?.let { c.nowElapsedMillis < it } == true
     private fun fail(): Boolean { stage = Stage.TERMINAL; return false }
-    private companion object { const val MAX_FINAL_LEASE_MILLIS = 2_000L }
 }

@@ -11,6 +11,160 @@ import org.junit.Test
 import org.kurdistanvpn.runtime.api.*
 
 class RuntimeStartCoordinatorTest {
+    @Test fun terminalFailureDuringProviderDeathCannotBecomeARecoveryAtSettlement() {
+        val coordinator = coordinator()
+        val first = coordinator.begin(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertTrue(coordinator.acceptProductionAuthority(first.token, 1))
+        val failure = providerDeathFailureV1(RuntimeStartFailure.INTERNAL_FAILURE, true, false)
+        assertEquals(RuntimeStartFailure.INTERNAL_FAILURE, failure)
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.INTERNAL_FAILURE),
+            coordinator.failed(first.token, checkNotNull(failure)))
+        val settled = providerDeathFailureV1(RuntimeStartFailure.AUTHORITY_REJECTED, false, true)
+        assertEquals(RuntimeStartDecision.Stale, coordinator.failed(first.token, checkNotNull(settled)))
+        assertNull(coordinator.currentToken())
+    }
+
+    @Test fun providerDeathRetryStillRequiresCleanRetirementAndTheExistingBudget() {
+        for (budget in 0..1) for (clean in listOf(false, true)) {
+            val coordinator = coordinator()
+            val first = coordinator.begin(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+            assertTrue(coordinator.acceptProductionAuthority(first.token, budget))
+            first.guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, Closeable {
+                check(clean) { "retirement unproven" }
+            })
+            assertNull(providerDeathFailureV1(RuntimeStartFailure.ENDPOINT_UNAVAILABLE, true, false))
+            val outcome = coordinator.failed(first.token,
+                checkNotNull(providerDeathFailureV1(RuntimeStartFailure.AUTHORITY_REJECTED, false, true)))
+            if (!clean) assertTrue(outcome is RuntimeStartDecision.CleanupPending)
+            else if (budget == 0) assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.RETRY_EXHAUSTED), outcome)
+            else {
+                val retry = outcome as RuntimeStartDecision.RequestAuthority
+                assertNotEquals(first.token.requestId, retry.token.requestId)
+                coordinator.stop(RuntimeStopReason.REVOKE)
+                assertFalse(coordinator.acceptProductionAuthority(retry.token, 1))
+            }
+        }
+        assertEquals(RuntimeStartFailure.AUTHORITY_REJECTED,
+            providerDeathFailureV1(RuntimeStartFailure.AUTHORITY_REJECTED, false, false))
+    }
+    @Test fun onlySixtySecondsOfCurrentActiveSessionResetRetryCount() {
+        val coordinator = coordinator()
+        val start = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertTrue(coordinator.acceptProductionAuthority(start.token, 1))
+        val retry = coordinator.failed(start.token, RuntimeStartFailure.NETWORK_LOST) as RuntimeStartDecision.RequestAuthority
+        assertFalse(coordinator.recordStableSession(retry.token, 60_000))
+        assertTrue(coordinator.acceptProductionAuthority(retry.token, 1))
+        retry.guard.own(RuntimeResourceKind.NATIVE_SESSION, Closeable {})
+        retry.guard.own(RuntimeResourceKind.TUN, Closeable {})
+        assertTrue(retry.guard.activateNativeOwned(true, setup(), setup(), { true }, {}))
+        assertTrue(coordinator.activationCompleted(retry.token) is RuntimeStartDecision.Active)
+        assertFalse(coordinator.recordStableSession(start.token, 60_000))
+        assertFalse(coordinator.recordStableSession(retry.token, 59_999))
+        assertTrue(coordinator.recordStableSession(retry.token, 60_000))
+        val fresh = coordinator.failed(retry.token, RuntimeStartFailure.NETWORK_LOST) as RuntimeStartDecision.RequestAuthority
+        assertEquals(1, fresh.token.retryAttempt)
+        assertEquals(1000L, fresh.delayMillis)
+    }
+    @Test fun reconnectJitterStaysWithinTheSignedAttemptBudget() {
+        for ((random, expected) in listOf(0.0 to 800L, 0.5 to 1000L, 0.999999 to 1199L)) {
+            var id = 1
+            val coordinator = RuntimeStartCoordinator("1".repeat(32), retryRandom = { random }) {
+                (id++).toString(16).padStart(32, '0')
+            }
+            val start = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+            assertTrue(coordinator.acceptProductionAuthority(start.token, 1))
+            val retry = coordinator.failed(start.token, RuntimeStartFailure.NETWORK_LOST) as RuntimeStartDecision.RequestAuthority
+            assertEquals(expected, retry.delayMillis)
+            assertTrue(coordinator.acceptProductionAuthority(retry.token, 1))
+            assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.RETRY_EXHAUSTED),
+                coordinator.failed(retry.token, RuntimeStartFailure.NETWORK_LOST))
+        }
+    }
+    @Test fun anAdmittedOwnerMustRetainTheExactGuardNotJustCopyItsToken() {
+        val coordinator = coordinator()
+        val admitted = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertTrue(coordinator.ownsAdmission(admitted))
+        assertFalse(coordinator.ownsAdmission(admitted.copy(guard = RuntimeActivationGuard())))
+        coordinator.stop(RuntimeStopReason.STOP)
+        assertFalse(coordinator.ownsAdmission(admitted))
+    }
+    @Test fun productionAdmissionBindsRetryBudgetToTheCurrentAttemptOnly() {
+        val coordinator = coordinator()
+        val initial = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertFalse(coordinator.acceptProductionAuthority(initial.token.copy(generation = initial.token.generation + 1), 3))
+        assertFalse(coordinator.acceptProductionAuthority(initial.token, 6))
+        assertTrue(coordinator.acceptProductionAuthority(initial.token, 2))
+        assertFalse(coordinator.acceptProductionAuthority(initial.token, 3))
+        val retry = coordinator.failed(initial.token, RuntimeStartFailure.NETWORK_LOST) as RuntimeStartDecision.RequestAuthority
+        assertEquals(1, retry.token.retryAttempt)
+        assertEquals(2, retry.retryBudgetCeiling)
+        assertFalse(coordinator.acceptProductionAuthority(retry.token, 3))
+        assertTrue(coordinator.acceptProductionAuthority(retry.token, 1))
+        assertEquals(RuntimeStartDecision.Idle, coordinator.stop(RuntimeStopReason.STOP))
+    }
+    @Test fun staleTokenStopCannotCancelOrSuppressReplacement() {
+        val coordinator = coordinator()
+        val first = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertEquals(RuntimeStartDecision.Idle, coordinator.stopIfCurrent(first.token, RuntimeStopReason.STOP))
+        val replacement = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertEquals(RuntimeStartDecision.Stale, coordinator.stopIfCurrent(first.token, RuntimeStopReason.REVOKE))
+        assertEquals(replacement.token, coordinator.currentToken())
+        assertTrue(replacement.guard.isAcquisitionCurrent())
+        assertEquals(RuntimeStartDecision.Idle, coordinator.stopIfCurrent(replacement.token, RuntimeStopReason.STOP))
+    }
+    @Test fun idleOnlyAdmissionDoesNotCancelCoalesceQueueOrReplaceExistingAttempt() {
+        val coordinator = coordinator()
+        val existing = coordinator.begin(RuntimeAuthorityTrigger.AUTOMATIC, true, true) as RuntimeStartDecision.RequestAuthority
+        var closed = 0
+        existing.guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, Closeable { closed++ })
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CLEANUP_UNPROVEN),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true))
+        assertEquals(existing.token, coordinator.currentToken())
+        assertTrue(existing.guard.isAcquisitionCurrent())
+        assertEquals(0, closed)
+        assertEquals(RuntimeStartDecision.Idle, coordinator.stop(RuntimeStopReason.STOP))
+        assertEquals(1, closed)
+        assertNull(coordinator.currentToken())
+        val admitted = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        assertEquals(existing.token.generation + 1, admitted.token.generation)
+    }
+
+    @Test fun idleOnlyAdmissionRefusesQuiescenceAndUnprovenCleanup() {
+        val coordinator = coordinator()
+        val lease = checkNotNull(coordinator.acquireMutationQuiescenceLease())
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CLEANUP_UNPROVEN),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true))
+        assertNull(coordinator.currentToken())
+        lease.close()
+        val admitted = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+        admitted.guard.own(RuntimeResourceKind.NATIVE_SESSION, Closeable { throw IOException("cleanup unproven") })
+        assertTrue(coordinator.stop(RuntimeStopReason.STOP) is RuntimeStartDecision.CleanupPending)
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CLEANUP_UNPROVEN),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true))
+        assertEquals(admitted.token, coordinator.currentToken())
+    }
+
+    @Test fun idleOnlyAdmissionSerializesConcurrentStartsAndPreservesConsentChecks() {
+        val coordinator = coordinator()
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CONSENT_REVOKED),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, false, true))
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CONSENT_REVOKED),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, false))
+        assertEquals(RuntimeStartDecision.Rejected(RuntimeStartFailure.CONSENT_REVOKED),
+            coordinator.beginIfIdle(RuntimeAuthorityTrigger.NETWORK_RETRY, true, true))
+        val gate = CountDownLatch(1)
+        val results = arrayOfNulls<RuntimeStartDecision>(2)
+        val workers = (0..1).map { index -> Thread {
+            check(gate.await(5, TimeUnit.SECONDS))
+            results[index] = coordinator.beginIfIdle(RuntimeAuthorityTrigger.MANUAL, true, true)
+        }.apply { isDaemon = true; start() } }
+        gate.countDown()
+        workers.forEach { it.join(5000); assertFalse(it.isAlive) }
+        assertEquals(1, results.count { it is RuntimeStartDecision.RequestAuthority })
+        assertEquals(1, results.count { it == RuntimeStartDecision.Rejected(RuntimeStartFailure.CLEANUP_UNPROVEN) })
+        assertEquals(RuntimeStartDecision.Idle, coordinator.stop(RuntimeStopReason.STOP))
+    }
+
     @Test fun quiescenceAdmissionDeadlineRejectsStaleOrUnboundedReplies() {
         assertTrue(RuntimeMutationQuiescenceWire.acceptsAdmissionDeadline(100, 101))
         assertTrue(RuntimeMutationQuiescenceWire.acceptsAdmissionDeadline(100, 2_100))
@@ -84,9 +238,26 @@ class RuntimeStartCoordinatorTest {
         assertEquals(1000L, (coordinator.failed(manual.token, RuntimeStartFailure.NETWORK_LOST) as RuntimeStartDecision.RequestAuthority).delayMillis)
     }
     @Test fun processInstallationCannotBeReplacedByAnotherEpoch() {
-        val installed = RuntimeStartCoordinator.installOnce("a".repeat(32))
-        assertSame(installed, RuntimeStartCoordinator.installOnce("a".repeat(32)))
-        assertThrows(IllegalStateException::class.java) { RuntimeStartCoordinator.installOnce("b".repeat(32)) }
+        val installed = RuntimeStartCoordinator.processOwner()
+        assertSame(installed, RuntimeStartCoordinator.processOwner())
+        assertSame(installed, RuntimeStartCoordinator.installOnce(installed.epoch))
+        val other = if (installed.epoch == "b".repeat(32)) "a".repeat(32) else "b".repeat(32)
+        assertThrows(IllegalStateException::class.java) { RuntimeStartCoordinator.installOnce(other) }
+    }
+
+    @Test fun sharedProcessAdmissionExcludesBothConsumerOrdersUntilActualCleanup() {
+        val legacy = RuntimeStartCoordinator.processOwner()
+        val production = RuntimeStartCoordinator.processOwner()
+        for ((first, second) in listOf(legacy to production, production to legacy)) {
+            val request = first.begin(RuntimeAuthorityTrigger.MANUAL, true, true) as RuntimeStartDecision.RequestAuthority
+            assertEquals(first.epoch, request.token.epoch)
+            assertEquals(RuntimeStartDecision.Coalesced(request.token), second.begin(RuntimeAuthorityTrigger.MANUAL, true, true))
+            var closed = 0
+            request.guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, Closeable { closed++ })
+            assertEquals(RuntimeStartDecision.Idle, first.stop(RuntimeStopReason.STOP))
+            assertEquals(1, closed)
+            assertNull(second.currentToken())
+        }
     }
 
     @Test fun automaticDuplicatesCoalesceAndManualSupersedesWithFreshGeneration() {
@@ -374,7 +545,7 @@ class RuntimeStartCoordinatorTest {
 
     private fun coordinator(): RuntimeStartCoordinator {
         var next = 1
-        return RuntimeStartCoordinator("1".repeat(32)) { (next++).toString(16).padStart(32, '0') }
+        return RuntimeStartCoordinator("1".repeat(32), retryRandom = { 0.5 }) { (next++).toString(16).padStart(32, '0') }
     }
     private fun verified(token: RuntimeStartToken, budget: Int = 2): RuntimeVerifiedAuthority {
         val capability = (token.generation * 2 + 10).toString(16).padStart(32, '0')

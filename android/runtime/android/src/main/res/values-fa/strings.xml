@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_notification_connecting">در حال اتصال…</string>
+    <string name="runtime_notification_connected">از طریق رلهٔ تأییدشدهٔ کُرد متصل است</string>
+    <string name="runtime_notification_stopping">در حال قطع اتصال…</string>
+    <string name="runtime_notification_blocked">اتصال مسدود است</string>
+    <string name="runtime_notification_channel">اتصال VPN</string>
+</resources>

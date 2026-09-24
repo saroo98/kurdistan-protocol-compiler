@@ -7,14 +7,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ServiceInfo
-import android.net.ConnectivityManager
-import android.net.Network
 import android.net.VpnService
 import android.os.Binder
 import android.os.Build
@@ -22,35 +18,122 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.os.UserManager
 import java.io.Closeable
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.CountDownLatch
+import java.nio.ByteBuffer
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import org.kurdistanvpn.core.model.PerAppSelectionMode
-import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSession
-import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
-import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeDiagnostics
-import org.kurdistanvpn.core.nativeapi.NativeResult
-import org.kurdistanvpn.core.nativejni.NativeBridge
+import org.kurdistanvpn.core.model.TunnelMode
+import org.kurdistanvpn.core.model.IpMode
+import org.kurdistanvpn.core.model.ResolverPolicy
+import org.kurdistanvpn.core.model.ProductFailureCode
+import org.kurdistanvpn.core.nativeapi.*
 import org.kurdistanvpn.runtime.api.*
+
+internal fun providerDeathFailureV1(failure: RuntimeStartFailure, inProgress: Boolean,
+    canRetry: Boolean): RuntimeStartFailure? {
+    val providerLoss = failure == RuntimeStartFailure.AUTHORITY_REJECTED ||
+        failure == RuntimeStartFailure.ENDPOINT_UNAVAILABLE
+    // Only consequences of the death fence wait for settlement. Independent
+    // terminal failures retain precedence through the existing coordinator.
+    if (providerLoss && inProgress) return null
+    return if (providerLoss && canRetry)
+        RuntimeStartFailure.AUTHORITY_PROVIDER_LOST else failure
+}
 
 /** One VPN-process coordinator, one TUN owner. A lifecycle Intent never conveys authority. */
 class KurdVpnService : VpnService() {
-    private val coordinator = RuntimeStartCoordinator.installOnce(PROCESS_EPOCH)
+    private val coordinator = RuntimeStartCoordinator.processOwner()
     private val executor = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(32),
         { task -> Thread(task, "kurd-vpn-tun").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val nativeCore by lazy { NativeBridge() }
     @Volatile private var attempt: Attempt? = null
     @Volatile private var destroyed = false
     @Volatile private var latestSnapshot = PublishedSnapshot()
-    private var queryRegistered = false
+    private val settingsContinuation = RuntimeSettingsContinuation(SystemClock::elapsedRealtime)
+    private var settingsExpiry: Runnable? = null // guarded by settingsContinuation
+    private val maintenance = RuntimeServiceMaintenance(this,
+        { attempt?.takeIf { current(it) && it.guard.isActive() }?.production },
+        { attempt == null }, { !destroyed })
+    private val controlProbe = RuntimeControlProbe { profileId ->
+        val owner = attempt
+        if (owner == null || !current(owner) || !owner.guard.isActive() ||
+            owner.production?.presentationEvidence()?.binding?.profileId != profileId.value) null
+        else owner.production?.selectedSessionProbe()
+    }
+    private val controlBinder by lazy {
+        RuntimeControlBinder(applicationInfo.uid, { controlSnapshot() }, proxyCredentials = {
+            val owner = attempt
+            if (owner != null && current(owner) && owner.guard.isActive()) owner.proxy?.credentials?.copyForReveal() else null
+        }, settingsTransition = ::settingsTransition, observerLost = {
+            controlProbe.cancel(null, it)
+            maintenance.cancel(null, it)
+            settingsContinuation.invalidate(it)
+            dispatch { if (attempt == null) finishService() }
+        }, probe = { id, profile, target, timeout, peer ->
+            val profileId = org.kurdistanvpn.core.model.CatalogId(profile)
+            val preferences = org.kurdistanvpn.core.model.ProbePreferences(org.kurdistanvpn.core.model.ProbeMethod.TCP_CONNECT,
+                signedTargetId = org.kurdistanvpn.core.model.CatalogId("probe-$target"), timeoutSeconds = timeout)
+            RuntimeProbeWire.encode(if (attempt == null) maintenance.run(id, profileId, peer) { parent ->
+                when (val request = selectedProbeRequestV1(preferences)) {
+                    is NativeProductResult.Failure -> request
+                    is NativeProductResult.Success -> parent.runProbe(request.value)
+                }
+            } else controlProbe.run(id, profileId, preferences, peer))
+        }, cancelProbe = { id, peer ->
+            val probeCancelled = controlProbe.cancel(id, peer)
+            maintenance.cancel(id, peer) || probeCancelled
+        }, update = { id, profile, output, peer ->
+            val result = maintenance.run(id, org.kurdistanvpn.core.model.CatalogId(profile), peer, ::materializeRuntimeUpdate)
+            val artifact = (result as? NativeProductResult.Success)?.value
+            try {
+                if (artifact != null) {
+                    RuntimeAuthorityPipeOwner.take(output, org.kurdistanvpn.core.nativejni.NativeBridge().durableFiles(),
+                        applicationInfo.uid.toLong(), 1, SystemClock.elapsedRealtime() + 5_000,
+                        { !destroyed && peer.isBinderAlive }).use { pipe ->
+                        var offset = 0
+                        while (offset < artifact.artifact.size) {
+                            val written = pipe.write(artifact.artifact, offset, artifact.artifact.size - offset)
+                            check(written > 0)
+                            offset += written
+                        }
+                    }
+                }
+                RuntimeUpdateWire.encode(result)
+            } finally { artifact?.close() }
+        }) { code ->
+            when (RuntimeAction.fromWire(code)) {
+                RuntimeAction.STOP -> {
+                    settingsContinuation.invalidate()
+                    mainHandler.post { requestStop(RuntimeStopReason.STOP, VpnRuntimeState.IDLE) }
+                    true
+                }
+                RuntimeAction.RECOVER_INTERNET -> {
+                    settingsContinuation.invalidate()
+                    mainHandler.post { requestStop(RuntimeStopReason.RECOVER_INTERNET, VpnRuntimeState.IDLE) }
+                    true
+                }
+                RuntimeAction.QUERY_STATUS -> true
+                RuntimeAction.RESTART_PROXY -> {
+                    val owner = attempt
+                    if (owner == null || !current(owner) || !owner.guard.isActive() ||
+                        owner.authority?.effectiveMode != TunnelMode.TUN_PLUS_PROXY) false
+                    else { dispatch { restartProxy(owner) }; true }
+                }
+                RuntimeAction.ROTATE_PROXY_CREDENTIALS -> {
+                    val owner = attempt
+                    if (owner == null || !current(owner) || !owner.guard.isActive() || owner.proxy == null) false
+                    else { owner.proxy?.credentials?.rotate(); true }
+                }
+                else -> false
+            }
+        }
+    }
     private data class HeldMutationQuiescence(val id: String, val lease: AutoCloseable,
         val death: IBinder.DeathRecipient)
     private val quiescenceMonitor = Any()
@@ -79,26 +162,18 @@ class KurdVpnService : VpnService() {
             }
         }
     }
-    private val statusQueryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != VpnRuntimeContract.ACTION_QUERY_STATUS) return
-            val query = try { intent.getStringExtra(VpnRuntimeContract.EXTRA_STATUS_QUERY) } catch (_: Throwable) { null }
-            if (query != null && RuntimeAuthorityLimits.validId(query)) publishTransient(safeSnapshot(), query)
-        }
-    }
-
-    private inner class Attempt(val token: RuntimeStartToken, val guard: RuntimeActivationGuard) {
+    private inner class Attempt(val admission: RuntimeStartDecision.RequestAuthority) {
+        val token = admission.token
+        val guard = admission.guard
         val cancelled = AtomicBoolean(false)
-        val network = UnderlyingNetworkAvailability<Network>()
-        var client: RuntimeAuthorityReissueClient? = null
-        var controller: NativeTunnelController? = null
-        var leases: RuntimeRevisionLeaseClient? = null
-        var config = VpnRuntimeConfig(VpnRoutingPolicy())
-        var authority: NativeLiveRuntimeSessionSnapshot? = null
-        var selectedNetwork: Network? = null
-        var lastStage: LiveTunnelStage? = null
-        var readyNotification: ActiveNotification? = null
-        var readyHealth: HealthMonitor? = null
+        val health = RuntimeSessionHealth()
+        var production: RuntimeProductionPlatformOwner? = null
+        var session: ProductionNativeSession? = null
+        var pump: TunPacketPump? = null
+        @Volatile var proxy: LocalProxySupervisor? = null
+        var authority: NativeOpeningSnapshot? = null
+        @Volatile var platformSettings: RuntimeCapturedPlatformSettingsV1? = null
+        @Volatile var appliedRevision: Long = 0
         val cleanupQueued = AtomicBoolean(false)
         var cleanupDeadline = 0L
     }
@@ -106,22 +181,18 @@ class KurdVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        val filter = IntentFilter(VpnRuntimeContract.ACTION_QUERY_STATUS)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(statusQueryReceiver, filter, RECEIVER_NOT_EXPORTED)
-        else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(statusQueryReceiver, filter)
-        }
-        queryRegistered = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val command = sanitizedCommand(intent)
+        if (command !is RuntimeServiceCommand.Rejected) settingsContinuation.invalidate()
         when (command) {
             is RuntimeServiceCommand.Rejected -> {
                 // An invalid start cannot tear down or replace a separately admitted session.
+                if (attempt?.let { !it.cancelled.get() && it.guard.isActive() } == true)
+                    return Service.START_STICKY
                 if (attempt == null) {
-                    try { promote(notification("Connection blocked: invalid start request")) }
+                    try { promote(notification(getString(R.string.runtime_notification_blocked))) }
                     finally {
                         publish(PublishedSnapshot(state = VpnRuntimeState.BLOCKED, failure = command.reason))
                         finishService()
@@ -129,16 +200,17 @@ class KurdVpnService : VpnService() {
                 }
             }
             RuntimeServiceCommand.Stop -> {
-                requestStop(RuntimeStopReason.STOP, VpnRuntimeState.IDLE)
-                try { promote(notification("Stopping Kurdistan VPN safely")) } catch (_: Throwable) {
-                    // Stop precedence is already published before fallible foreground work.
-                }
+                requestStop(RuntimeStopReason.STOP, VpnRuntimeState.IDLE, promoteStopNotification = true)
+            }
+            RuntimeServiceCommand.Recover -> {
+                requestStop(RuntimeStopReason.RECOVER_INTERNET, VpnRuntimeState.IDLE, promoteStopNotification = true)
             }
             is RuntimeServiceCommand.Manual, RuntimeServiceCommand.AutomaticTrigger -> {
                 if (attempt?.guard?.isActive() != true) {
-                    try { promote(notification("Connecting: verifying protected state")) }
-                    catch (_: Throwable) {
-                        requestStop(RuntimeStopReason.CANCEL, VpnRuntimeState.BLOCKED)
+                    try { promote(notification(getString(R.string.runtime_notification_connecting))) }
+                    catch (failure: Throwable) {
+                        requestStop(RuntimeStopReason.CANCEL, VpnRuntimeState.BLOCKED,
+                            finalFailure = runtimeStartFailure(this, failure))
                         return Service.START_NOT_STICKY
                     }
                 }
@@ -156,6 +228,9 @@ class KurdVpnService : VpnService() {
                         handle(coordinator.begin(trigger, isUnlocked(), isPrepared(),
                             (command as? RuntimeServiceCommand.Manual)?.requestId))
                     }
+                    // Recreate an interrupted started service with a null intent, never replay
+                    // manual authority. The automatic path reopens current protected bootstrap.
+                    return Service.START_STICKY
                 }
             }
         }
@@ -169,20 +244,31 @@ class KurdVpnService : VpnService() {
 
     override fun onDestroy() {
         destroyed = true
+        val standaloneMaintenance = maintenance.markCancelled()
+        settingsContinuation.invalidate()
+        synchronized(settingsContinuation) {
+            settingsExpiry?.let(mainHandler::removeCallbacks); settingsExpiry = null
+        }
+        controlBinder.close()
         releaseAllMutationQuiescences()
         attempt?.let { it.cancelled.set(true); it.guard.markCancellation() }
-        if (queryRegistered) {
-            queryRegistered = false
-            try { unregisterReceiver(statusQueryReceiver) } catch (_: Throwable) {
-                attempt?.guard?.own(RuntimeResourceKind.HEALTH_MONITOR, Closeable { error("QUERY_CLEANUP_UNPROVEN") })
-            }
+        dispatch {
+            // A query-only binding owns no session. Its destruction must not cancel
+            // another service's admitted owner in the shared VPN process.
+            attempt?.let { handle(coordinator.stopIfCurrent(it.token, RuntimeStopReason.CANCEL), VpnRuntimeState.IDLE) }
+            standaloneMaintenance?.stop(RuntimeStopReason.CANCEL)
         }
-        dispatch { handle(coordinator.stop(RuntimeStopReason.CANCEL), VpnRuntimeState.IDLE) }
         executor.shutdown()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? {
+        if (intent?.action == RuntimeControlBinder.ACTION_BIND) {
+            val expected = ComponentName(this, KurdVpnService::class.java)
+            return if (intent.component == expected && intent.data == null && intent.clipData == null &&
+                intent.selector == null && intent.categories.isNullOrEmpty() && intent.flags == 0 &&
+                intent.extras?.isEmpty != false) controlBinder else null
+        }
         if (intent?.action == RuntimeMutationQuiescenceWire.ACTION) {
             val expected = ComponentName(this, KurdVpnService::class.java)
             return if (intent.component == expected && intent.data == null && intent.clipData == null &&
@@ -256,10 +342,11 @@ class KurdVpnService : VpnService() {
         }
     } catch (_: Throwable) { RuntimeServiceCommand.Rejected("MALFORMED_START_PARCEL") }
 
-    private fun handle(decision: RuntimeStartDecision, finalState: VpnRuntimeState = VpnRuntimeState.FAILED) {
+    private fun handle(decision: RuntimeStartDecision, finalState: VpnRuntimeState = VpnRuntimeState.FAILED,
+        finalFailure: String? = null) {
         when (decision) {
             is RuntimeStartDecision.RequestAuthority -> {
-                val next = Attempt(decision.token, decision.guard)
+                val next = Attempt(decision)
                 attempt = next
                 publish(PublishedSnapshot(state = if (decision.delayMillis == 0L) VpnRuntimeState.CONNECTING else VpnRuntimeState.RECONNECTING,
                     requestId = next.token.requestId))
@@ -270,14 +357,16 @@ class KurdVpnService : VpnService() {
                         !mainHandler.postDelayed(retry, decision.delayMillis)) fail(next, RuntimeStartFailure.INTERNAL_FAILURE)
                 }
             }
-            is RuntimeStartDecision.Ready -> attempt?.takeIf { it.token == decision.token }?.let { beginNative(it, decision) }
-                ?: decision.authority.close()
+            is RuntimeStartDecision.Ready -> {
+                decision.authority.close()
+                attempt?.takeIf { it.token == decision.token }?.let { fail(it, RuntimeStartFailure.AUTHORITY_REJECTED) }
+            }
             is RuntimeStartDecision.Active, is RuntimeStartDecision.Coalesced, RuntimeStartDecision.Stale -> Unit
             is RuntimeStartDecision.CleanupPending -> {
                 publish(PublishedSnapshot(state = VpnRuntimeState.BLOCKED, failure = "CLEANUP_" + decision.state.name,
                     requestId = decision.token.requestId))
                 // No retry/replacement or success can cross incomplete cleanup.
-                if (decision.state == RuntimeCleanupState.CLEANUP_REQUIRED) scheduleCleanupDrain(decision.token, finalState)
+                if (decision.state == RuntimeCleanupState.CLEANUP_REQUIRED) scheduleCleanupDrain(decision.token, finalState, finalFailure)
             }
             is RuntimeStartDecision.Rejected -> {
                 attempt = null
@@ -286,13 +375,13 @@ class KurdVpnService : VpnService() {
             }
             RuntimeStartDecision.Idle -> {
                 attempt = null
-                publish(PublishedSnapshot(state = finalState))
+                publish(PublishedSnapshot(state = finalState, failure = finalFailure))
                 finishService()
             }
         }
     }
 
-    private fun scheduleCleanupDrain(token: RuntimeStartToken, finalState: VpnRuntimeState) {
+    private fun scheduleCleanupDrain(token: RuntimeStartToken, finalState: VpnRuntimeState, finalFailure: String?) {
         val value = attempt?.takeIf { it.token == token } ?: return
         val now = SystemClock.elapsedRealtime()
         if (value.cleanupDeadline == 0L) value.cleanupDeadline = now + 5_000
@@ -301,7 +390,7 @@ class KurdVpnService : VpnService() {
             value.cleanupQueued.set(false)
             dispatch {
                 if (coordinator.currentToken() == token)
-                    handle(coordinator.cleanupCompleted(token), finalState)
+                    handle(coordinator.cleanupCompleted(token), finalState, finalFailure)
             }
         }
         if (!mainHandler.postDelayed(drain, 25)) value.cleanupQueued.set(false)
@@ -309,257 +398,358 @@ class KurdVpnService : VpnService() {
 
     private fun acquireAuthority(value: Attempt) {
         if (!current(value) || !isUnlocked() || !isPrepared()) { fail(value, RuntimeStartFailure.CONSENT_REVOKED); return }
+        var acquisitionFailure = RuntimeStartFailure.AUTHORITY_REJECTED
         try {
-            val monitor = UnderlyingNetworkMonitor(getSystemService(ConnectivityManager::class.java)) { transition ->
-                value.network.update(transition.current, transition.current != null)
-                if (value.selectedNetwork != null && value.selectedNetwork != transition.current) {
-                    value.cancelled.set(true); value.guard.markCancellation()
-                    dispatch { fail(value, if (transition.current == null) RuntimeStartFailure.NETWORK_LOST else RuntimeStartFailure.NETWORK_CHANGED) }
+            val dependencies = (application as? RuntimeDependencyProvider)?.runtimeProcessGraph
+                ?: error("VPN_DEPENDENCIES_UNAVAILABLE")
+            val owner = dependencies.acquireAdmitted(this, value.admission,
+                onAdmitted = {
+                    value.production = it
+                    it.onProviderDeathSettled = { dispatch { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED) } }
+                }) { production ->
+                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "CAPTURE_VERIFIED", requestId = value.token.requestId))
+                value.platformSettings = production.capturedPlatformSettings()
+                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "SETTINGS_VERIFIED", requestId = value.token.requestId))
+                if (!checkNotNull(value.platformSettings).pausePolicy.permitsAutoConnect) {
+                    acquisitionFailure = RuntimeStartFailure.PAUSED
+                    error("PERSISTED_PAUSE")
                 }
-            }
-            check(value.guard.own(RuntimeResourceKind.SOCKET, Closeable {
-                monitor.close()
-                setUnderlyingNetworks(null)
-                ActiveVpnUnderlyingNetwork.publish(null)
-            }) != null)
-            check(value.guard.acquire { monitor.start() })
-            // Client owns partial pipes/binding before any authority acquisition.
-            val client = RuntimeAuthorityReissueClient(this,
-                ComponentName(this, "org.kurdistanvpn.app.RuntimeAuthorityReissueService"),
-                PROCESS_EPOCH, nativeCore.durableFiles(), value.guard) {
-                value.cancelled.set(true)
-                dispatch { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED) }
-            }
-            value.client = client
-            check(value.guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, client) != null)
-            check(client.bind { bound ->
-                if (!bound) { dispatch { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED) }; return@bind }
-                val now = SystemClock.elapsedRealtime()
-                val request = RuntimeReissueStart(PROCESS_EPOCH, value.token.requestId, value.token.generation,
-                    value.token.trigger, value.token.retryAttempt, now + RuntimeAuthorityLimits.MAX_LIFETIME_MILLIS)
-                if (!current(value) || !client.request(request) { result ->
-                    dispatch {
-                        when (result) {
-                            is RuntimeFrameVerification.Verified -> handle(coordinator.acceptAuthority(value.token, result.authority, SystemClock.elapsedRealtime()))
-                            is RuntimeFrameVerification.Rejected -> fail(value, RuntimeStartFailure.AUTHORITY_REJECTED)
+                check(production.admitProductRetryPolicy())
+                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "NATIVE_OPENING", requestId = value.token.requestId))
+                val opened = production.openProductionSession()
+                if (opened !is NativeProductResult.Success) {
+                    publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING,
+                        disposition = "NATIVE_OPEN_" + (opened as NativeProductResult.Failure).code.name,
+                        requestId = value.token.requestId))
+                    if (opened.code == ProductFailureCode.NETWORK_UNAVAILABLE) throw RuntimeProductionNetworkUnavailableV1()
+                    error("PRODUCTION_OPEN_REJECTED")
+                }
+                val session = opened.value
+                value.session = session
+                value.appliedRevision = production.capturedRevision()
+                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "SESSION_OPEN", requestId = value.token.requestId))
+                val buffer = ByteBuffer.allocateDirect(32768)
+                try {
+                    val deadline = SystemClock.elapsedRealtime() + 30_000
+                    while (value.authority == null) {
+                        check(current(value) && SystemClock.elapsedRealtime() < deadline)
+                        buffer.clear()
+                        when (val result = production.nextProductControl(buffer)) {
+                            is NativeProductResult.Failure -> {
+                                // An empty bounded native poll is not the overall startup deadline.
+                                if (result.code == ProductFailureCode.OPERATION_TIMED_OUT) continue
+                                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING,
+                                    disposition = "CONTROL_" + result.code.name, requestId = value.token.requestId))
+                                error("PRODUCTION_CONTROL_REJECTED")
+                            }
+                            is NativeProductResult.Success -> when (val event = result.value) {
+                                is NativeControlEvent.SocketProtectionRequired ->
+                                    check(session.confirmSocketProtection(event.token, true, null) is NativeProductResult.Success)
+                                is NativeControlEvent.RoutePlanReady -> value.authority = event.snapshot
+                                is NativeControlEvent.TransportConnecting, is NativeControlEvent.TransportReady -> Unit
+                                is NativeControlEvent.Failed -> {
+                                    publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING,
+                                        disposition = "NATIVE_" + event.code.name, requestId = value.token.requestId))
+                                    if (event.code == ProductFailureCode.NETWORK_UNAVAILABLE) throw RuntimeProductionNetworkUnavailableV1()
+                                    error("PRODUCTION_OPEN_TERMINATED")
+                                }
+                                else -> error("PRODUCTION_OPEN_TERMINATED")
+                            }
                         }
                     }
-                }) dispatch { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED) }
-            })
-        } catch (_: Throwable) { fail(value, RuntimeStartFailure.INTERNAL_FAILURE) }
-    }
-
-    /** Allocated and registered before native open; transfer is one-way into the TUN owner. */
-    private class NativeAcquisition : Closeable {
-        private var session: NativeLiveRuntimeSession? = null
-        private var terminal = false
-        private var clean = true
-        @Synchronized fun open(native: NativeBridge, bytes: ByteArray): NativeLiveRuntimeSession {
-            check(!terminal && session == null)
-            val result = try { native.openLiveRuntimeSession(bytes) } catch (error: Throwable) {
-                clean = false
-                throw error
-            }
-            check(result is NativeResult.Success)
-            session = result.value
-            return result.value
-        }
-        @Synchronized fun transfer(controller: NativeTunnelController): LiveTunnelStartResult {
-            check(!terminal)
-            val owned = checkNotNull(session)
-            session = null
-            // NativeTunnelController assumes ownership on entry, including rejected starts.
-            return controller.start(owned)
-        }
-        @Synchronized override fun close() {
-            if (!terminal) {
-                terminal = true
-                val owned = session
-                session = null
-                if (owned != null) {
-                    val stopped = try { owned.stop() is NativeResult.Success } catch (_: Throwable) { false }
-                    val closed = try { owned.close(); true } catch (_: Throwable) { false }
-                    clean = stopped && closed
+                } finally { for (i in 0 until buffer.capacity()) buffer.put(i, 0) }
+                publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "TRANSPORT_READY", requestId = value.token.requestId))
+                if (session.openingSnapshot.effectiveMode != TunnelMode.PROXY_ONLY) {
+                    value.pump = production.startProductPackets {
+                        value.cancelled.set(true); value.guard.markCancellation()
+                        dispatch { fail(value, RuntimeStartFailure.ENDPOINT_UNAVAILABLE) }
+                    }
+                }
+                if (session.openingSnapshot.effectiveMode != TunnelMode.TUN_ONLY) {
+                    publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "PROXY_BINDING", requestId = value.token.requestId))
+                    value.proxy = newProxy(value)
+                    // One stable ownership slot covers replacements without growing the guard.
+                    check(value.guard.own(RuntimeResourceKind.LOCAL_PROXY, Closeable { value.proxy?.close() }) != null)
                 }
             }
-            check(clean) { "NATIVE_CLEANUP_UNPROVEN" }
-        }
-    }
-
-    private fun beginNative(value: Attempt, ready: RuntimeStartDecision.Ready) {
-        value.leases = ready.leases
-        val nativeOwner = NativeAcquisition()
-        var failure = RuntimeStartFailure.INTERNAL_FAILURE
-        val acquired = value.guard.acquire { scope ->
-            check(scope.own(RuntimeResourceKind.NATIVE_SESSION, nativeOwner) != null)
-            val bytes = checkNotNull(ready.authority.takePayload())
-            val session = try { nativeOwner.open(nativeCore, bytes) } finally { bytes.fill(0); ready.authority.close() }
-            val snapshot = session.snapshot
-            value.authority = snapshot
-            check(scope.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, Closeable { wipe(snapshot) }) != null)
-            value.config = configFrom(snapshot)
-            val selected = value.network.awaitUsable(NETWORK_BIND_TIMEOUT_MILLIS)
-            if (selected == null) { failure = RuntimeStartFailure.NETWORK_UNAVAILABLE; error("NO_UNDERLYING_NETWORK") }
-            value.selectedNetwork = selected
-            check(current(value) && isPrepared() && isUnlocked())
+            publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING, disposition = "ACTIVATION_COMMIT", requestId = value.token.requestId))
+            check(current(value))
             val notification = ActiveNotification(value)
             val health = HealthMonitor(value)
-            val controller = NativeTunnelController(
-                protector = SocketProtector(::protect),
-                networkBinder = SocketNetworkBinder { descriptor ->
-                    val duplicate = ParcelFileDescriptor.fromFd(descriptor)
-                    try { selected.bindSocket(duplicate.fileDescriptor); true } finally { duplicate.close() }
-                },
-                tunEstablisher = TunEstablisher { configuration -> establishTun(configuration, selected) },
-                detachedCloser = DetachedFileDescriptorCloser { descriptor -> ParcelFileDescriptor.adoptFd(descriptor).close() },
-                onStage = { stage ->
-                    value.lastStage = stage
-                    if (stage != LiveTunnelStage.STOPPED) publish(PublishedSnapshot(state = VpnRuntimeState.CONNECTING,
-                        disposition = "LIVE_STAGE_" + stage.name, requestId = value.token.requestId, config = value.config))
-                },
-                preTunValidation = {
-                    ready.leases.beginFinalLease(SystemClock.elapsedRealtime()) &&
-                        leaseCheck(value, RuntimeAuthorityPurpose.PRE_TUN) && ready.leases.authorizeTun(checks(value))
-                },
-                prepareRequiredActivationResources = { it.notification(notification); it.healthMonitor(health) },
-                finalPublicationCheck = { leaseCheck(value, RuntimeAuthorityPurpose.PRE_ACTIVE) && current(value) },
-                activationOwner = value.guard,
-            )
-            value.controller = controller
-            check(scope.own(RuntimeResourceKind.TUN, Closeable {
-                check(controller.stopResult() == LiveTunnelCleanupState.CLEAN) { "TUN_CLEANUP_UNPROVEN" }
-            }) != null)
-            when (val result = nativeOwner.transfer(controller)) {
-                is LiveTunnelStartResult.Failure -> {
-                    failure = if (result.cleanup == LiveTunnelCleanupState.UNPROVEN) RuntimeStartFailure.CLEANUP_UNPROVEN else runtimeFailure(result.category)
-                    error("TUN_ACTIVATION_FAILED")
-                }
-                is LiveTunnelStartResult.Running -> Unit
+            val activated = owner.activateProduct(notification, health) { snapshot ->
+                check(current(value) && isPrepared() && isUnlocked())
+                notification.publish()
+                latestSnapshot = PublishedSnapshot(state = VpnRuntimeState.CONNECTING,
+                    authority = snapshot, requestId = value.token.requestId,
+                    startedAtElapsedRealtime = SystemClock.elapsedRealtime())
             }
-            value.readyNotification = notification
-            value.readyHealth = health
-        }
-        if (!acquired) { fail(value, failure); return }
-        // Required IPC acknowledgement is before publication and while both peers hold
-        // the same final revision lease. No fallible required work follows the barrier.
-        if (!awaitBoolean(value) { callback -> checkNotNull(value.client).prepareActivationCommit(callback) }) {
-            fail(value, RuntimeStartFailure.AUTHORITY_REJECTED); return
-        }
-        val published = value.guard.activate(ready.leases, { checks(value) },
-            checkNotNull(value.readyNotification), checkNotNull(value.readyHealth)) {
-            check(current(value) && value.controller?.isRunning() == true)
-            val snapshot = PublishedSnapshot(state = VpnRuntimeState.ACTIVE_KURD_LIVE,
-                config = value.config, authority = value.authority, requestId = value.token.requestId,
-                startedAtElapsedRealtime = SystemClock.elapsedRealtime())
-            checkNotNull(value.readyNotification).publish()
-            check(current(value) && isPrepared() && isUnlocked())
-            latestSnapshot = snapshot // No-throw local publication; reader also checks guard ACTIVE.
-        }
-        if (!published) { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED); return }
-        handle(coordinator.activationCompleted(value.token))
-        value.readyNotification?.publishOptionalActiveLabel()
-        try { publishTransient(safeSnapshot()) } catch (_: Throwable) { /* Optional status delivery cannot authorize ACTIVE. */ }
-        // Cleanup of the final lease is separate from the completed activation claim.
-        // Failure is a new terminal invalidation, never a retrospective success receipt.
-        if (value.client?.releaseActivationLease { released ->
-            if (!released) dispatch { fail(value, RuntimeStartFailure.AUTHORITY_REJECTED) }
-        } != true) fail(value, RuntimeStartFailure.AUTHORITY_REJECTED)
-    }
-
-    private fun leaseCheck(value: Attempt, purpose: RuntimeAuthorityPurpose): Boolean {
-        val client = value.client ?: return false
-        return awaitBoolean(value) { complete ->
-            client.checkLease(purpose) { result ->
-                val accepted = when (result) {
-                    is RuntimeFrameVerification.Verified -> if (current(value)) value.leases?.accept(result.authority, checks(value)) == true
-                        else { result.authority.close(); false }
-                    is RuntimeFrameVerification.Rejected -> false
-                }
-                complete(accepted)
+            handle(activated)
+            if (activated is RuntimeStartDecision.Active) {
+                acquisitionFailure = RuntimeStartFailure.PROXY_BIND_FAILED
+                check(value.guard.acquire { value.proxy?.start { current(value) && value.guard.isActive() } })
+                value.health.ready = true
+                publish(safeSnapshot().copy(state = value.health.state, failure = value.health.failure))
+                acquisitionFailure = RuntimeStartFailure.INTERNAL_FAILURE
+                notification.publishOptionalActiveLabel()
+                controlBinder.publish()
+            }
+        } catch (failure: Throwable) {
+            if (failure is RuntimeProductionNetworkOutcomeV1) { handle(failure.decision); return }
+            // Acquisition can retire its own coordinator entry before throwing. A stale
+            // token must not leave the last CONNECTING display behind, or stop a successor.
+            if (attempt === value && coordinator.currentToken() == null && !destroyed) {
+                val cleanup = value.guard.cleanupState()
+                val stopped = latestSnapshot.state == VpnRuntimeState.STOPPING
+                attempt = null
+                publish(PublishedSnapshot(
+                    state = if (stopped && cleanup == RuntimeCleanupState.CLEAN) VpnRuntimeState.IDLE else VpnRuntimeState.BLOCKED,
+                    disposition = latestSnapshot.disposition,
+                    failure = if (cleanup != RuntimeCleanupState.CLEAN) "CLEANUP_" + cleanup.name
+                        else if (stopped) null else acquisitionFailure.name))
+                if (cleanup == RuntimeCleanupState.CLEAN) finishService()
+            } else {
+                // The scoped acquisition may already have moved this token to STOPPING.
+                // Drain/publish that outcome instead of losing it through failed()'s stale guard.
+                val drained = coordinator.cleanupCompleted(value.token)
+                if (drained == RuntimeStartDecision.Stale) fail(value, acquisitionFailure) else handle(drained)
             }
         }
-    }
-    private fun awaitBoolean(value: Attempt, invoke: ((Boolean) -> Unit) -> Boolean): Boolean {
-        val latch = CountDownLatch(1)
-        val accepted = AtomicBoolean(false)
-        val finished = AtomicBoolean(false)
-        if (!invoke { result -> if (finished.compareAndSet(false, true)) { accepted.set(result); latch.countDown() } }) return false
-        val received = latch.await(2_000, TimeUnit.MILLISECONDS)
-        if (!received) { finished.set(true); value.cancelled.set(true); value.guard.markCancellation() }
-        return received && accepted.get() && current(value)
-    }
-    private fun checks(value: Attempt): RuntimeActivationChecks {
-        val lease = checkNotNull(value.leases)
-        return RuntimeActivationChecks(PROCESS_EPOCH, value.client?.observedProviderEpoch().orEmpty(),
-            coordinator.currentToken()?.generation ?: 0, lease.request.revision,
-            isUnlocked(), isPrepared(), !current(value), SystemClock.elapsedRealtime())
     }
 
     private inner class ActiveNotification(private val owner: Attempt) : RuntimeActivationResource() {
         private var prepared: Notification? = null
-        private var activeLabel: Notification? = null
         override fun acquire() {
             check(current(owner))
-            prepared = notification("Connecting: completing protected tunnel verification")
-            activeLabel = notification("Verified Kurd relay session active")
+            prepared = notification(getString(R.string.runtime_notification_connecting))
         }
         fun publish() { promote(checkNotNull(prepared)) }
         fun publishOptionalActiveLabel() {
             owner.guard.publishOptionalActiveStatus {
                 if (current(owner)) getSystemService(NotificationManager::class.java)
-                    ?.notify(NOTIFICATION_ID, checkNotNull(activeLabel))
+                    ?.notify(NOTIFICATION_ID, notification(getString(R.string.runtime_notification_connected),
+                        safeSnapshot().startedAtElapsedRealtime))
             }
         }
         override fun release() {
             prepared = null
-            activeLabel = null
-            if (attempt === owner) stopForeground(STOP_FOREGROUND_REMOVE)
+            // Foreground visibility ends only after the coordinator proves complete teardown.
         }
     }
     private inner class HealthMonitor(private val owner: Attempt) : RuntimeActivationResource() {
         private val stopped = AtomicBoolean(false)
-        private val queued = AtomicBoolean(false)
-        private val check = object : Runnable {
-            override fun run() {
-                if (stopped.get() || !current(owner)) return
-                if (queued.compareAndSet(false, true)) dispatch {
-                    try {
-                        if (current(owner)) {
-                            val error = owner.controller?.checkHealth()
-                            if (error != null) fail(owner, runtimeFailure(error))
-                            else if (owner.guard.isActive()) {
-                                val diagnostics = owner.controller?.diagnostics()
-                                if (diagnostics is NativeResult.Success) {
-                                    val current = safeSnapshot()
-                                    if (current.state == VpnRuntimeState.ACTIVE_KURD_LIVE)
-                                        publish(current.copy(diagnostics = diagnostics.value.toRuntimeDiagnostics()))
-                                }
-                            }
-                        }
-                    } finally { queued.set(false) }
-                }
-                if (!stopped.get() && current(owner) && !mainHandler.postDelayed(this, RUNTIME_HEALTH_INTERVAL_MILLIS)) {
-                    owner.cancelled.set(true); owner.guard.markCancellation()
-                    dispatch { fail(owner, RuntimeStartFailure.INTERNAL_FAILURE) }
+        private val rate = RuntimeTrafficRate()
+        private val networkMonitor = UnderlyingNetworkMonitor(getSystemService(android.net.ConnectivityManager::class.java)) { state ->
+            // Default VPN appearance is not physical loss. The socket owner observes actual loss.
+            if (state.handle != 0L && !state.vpn && state.permits(checkNotNull(owner.platformSettings).meteredPolicy)) {
+                dispatch {
+                    if (current(owner) && owner.guard.isActive() &&
+                        owner.production?.boundNetworkHandle()?.let { it != 0L && it != state.handle } == true)
+                        fail(owner, RuntimeStartFailure.NETWORK_CHANGED)
                 }
             }
         }
-        override fun acquire() {
-            check(current(owner) && mainHandler.postDelayed(check, RUNTIME_HEALTH_INTERVAL_MILLIS))
+        private val worker = Thread({
+            val buffer = ByteBuffer.allocateDirect(32768)
+            try {
+                while (!stopped.get() && current(owner)) {
+                    buffer.clear()
+                    when (val result = checkNotNull(owner.production).nextProductControl(buffer)) {
+                        is NativeProductResult.Failure -> {
+                            if (result.code == ProductFailureCode.OPERATION_TIMED_OUT) continue
+                            if (!stopped.get()) dispatch { fail(owner, RuntimeStartFailure.ENDPOINT_UNAVAILABLE) }
+                            return@Thread
+                        }
+                        is NativeProductResult.Success -> when (result.value) {
+                            is NativeControlEvent.MetricsUpdated -> Unit
+                            is NativeControlEvent.Degraded -> dispatch {
+                                if (current(owner)) {
+                                    owner.health.nativeDegraded = true
+                                    publish(safeSnapshot().copy(state = owner.health.state, failure = owner.health.failure))
+                                }
+                            }
+                            is NativeControlEvent.Revoked -> {
+                                dispatch { if (current(owner)) requestStop(RuntimeStopReason.REVOKE, VpnRuntimeState.REVOKED) }
+                                return@Thread
+                            }
+                            else -> {
+                                if (!stopped.get()) dispatch { fail(owner, RuntimeStartFailure.ENDPOINT_UNAVAILABLE) }
+                                return@Thread
+                            }
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+                if (!stopped.get()) dispatch { fail(owner, RuntimeStartFailure.AUTHORITY_REJECTED) }
+            } finally { for (i in 0 until buffer.capacity()) buffer.put(i, 0) }
+        }, "kurd-runtime-control")
+        private val sample = object : Runnable {
+            override fun run() {
+                if (stopped.get() || !current(owner)) return
+                owner.guard.publishOptionalActiveStatus {
+                    controlBinder.publish()
+                    val started = safeSnapshot().startedAtElapsedRealtime
+                    if (started > 0) coordinator.recordStableSession(owner.token, SystemClock.elapsedRealtime() - started)
+                    val counts = owner.pump?.snapshot()
+                    val speed = rate.sample(SystemClock.elapsedRealtime(), counts?.outboundBytes ?: 0, counts?.inboundBytes ?: 0)
+                    if (speed != null && owner.platformSettings?.showSpeed == true) {
+                        val text = getString(R.string.runtime_notification_speed, speed.first, speed.second)
+                        getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID,
+                            notification(text, safeSnapshot().startedAtElapsedRealtime))
+                    }
+                }
+                if (!mainHandler.postDelayed(this, RUNTIME_HEALTH_INTERVAL_MILLIS))
+                    dispatch { fail(owner, RuntimeStartFailure.INTERNAL_FAILURE) }
+            }
         }
-        override fun release() { stopped.set(true); mainHandler.removeCallbacks(check) }
+        override fun acquire() {
+            check(current(owner))
+            networkMonitor.start()
+            worker.start()
+            check(mainHandler.postDelayed(sample, RUNTIME_HEALTH_INTERVAL_MILLIS))
+            checkNotNull(startService(Intent(this@KurdVpnService, RuntimeRestartService::class.java)))
+        }
+        override fun release() {
+            stopped.set(true)
+            mainHandler.removeCallbacks(sample)
+            try { stopService(Intent(this@KurdVpnService, RuntimeRestartService::class.java)) } finally {
+                try { networkMonitor.close() } finally {
+                    val cancelled = owner.session?.cancel() is NativeProductResult.Success
+                    try { owner.proxy?.close() } finally {
+                        worker.join(5_000)
+                        check(!worker.isAlive && cancelled) { "CONTROL_WORKER_CLEANUP_UNPROVEN" }
+                    }
+                }
+            }
+        }
     }
 
-    private fun requestStop(reason: RuntimeStopReason, finalState: VpnRuntimeState) {
+    private fun newProxy(value: Attempt): LocalProxySupervisor {
+        val session = checkNotNull(value.session)
+        lateinit var proxy: LocalProxySupervisor
+        proxy = LocalProxySupervisor(checkNotNull(value.platformSettings).proxy,
+            checkNotNull(session.openingSnapshot.proxyLimits), session::openProxyStream) {
+            dispatch {
+                if (current(value) && value.proxy === proxy) {
+                    proxy.close(); value.proxy = null
+                    if (value.authority?.effectiveMode == TunnelMode.TUN_PLUS_PROXY && value.guard.isActive()) {
+                        value.health.proxyFailed = true
+                        publish(safeSnapshot().copy(state = value.health.state, failure = value.health.failure))
+                    }
+                    else fail(value, RuntimeStartFailure.INTERNAL_FAILURE)
+                }
+            }
+        }
+        return proxy
+    }
+
+    private fun restartProxy(value: Attempt) {
+        if (!current(value) || !value.guard.isActive()) return
+        check(value.guard.acquire {
+            value.proxy?.close(); value.proxy = null
+            if (current(value) && value.guard.isActive()) {
+                val replacement = newProxy(value)
+                value.proxy = replacement
+                try {
+                    replacement.start { current(value) && value.guard.isActive() }
+                    value.health.proxyFailed = false
+                    publish(safeSnapshot().copy(state = value.health.state, failure = value.health.failure))
+                } catch (_: Exception) {
+                    replacement.close(); value.proxy = null
+                    if (current(value) && value.guard.isActive()) {
+                        value.health.proxyFailed = true
+                        publish(safeSnapshot().copy(state = value.health.state, failure = value.health.failure))
+                    }
+                }
+            }
+        })
+    }
+
+    private fun settingsTransition(operation: Int, token: String?, observer: IBinder): String? {
+        if (destroyed) return null
+        return when (operation) {
+            RuntimeControlBinder.SETTINGS_PREPARE -> {
+                if (attempt?.guard?.isActive() != true) return null
+                val lease = settingsContinuation.prepare(observer) ?: return null
+                if (!mainHandler.post {
+                    synchronized(settingsContinuation) {
+                        if (settingsContinuation.matches(observer, lease)) {
+                            settingsExpiry?.let(mainHandler::removeCallbacks)
+                            val expiry = Runnable {
+                                // matches expires only the old lease, never invalidates a newer one.
+                                settingsContinuation.matches(observer, lease)
+                                dispatch { if (attempt == null) finishService() }
+                            }
+                            settingsExpiry = expiry
+                            if (!mainHandler.postDelayed(expiry, 120_000)) settingsContinuation.invalidate(observer)
+                            requestStop(RuntimeStopReason.STOP, VpnRuntimeState.IDLE, managedSettings = true)
+                        }
+                    }
+                }) { settingsContinuation.invalidate(observer); null } else lease
+            }
+            RuntimeControlBinder.SETTINGS_RESUME -> {
+                val lease = token ?: return null
+                if (attempt != null || safeSnapshot().state != VpnRuntimeState.IDLE) return null
+                val request = settingsContinuation.resume(observer, lease) ?: return null
+                if (!mainHandler.post {
+                    if (settingsContinuation.ownsRequest(observer, lease, request)) {
+                        try {
+                            promote(notification(getString(R.string.runtime_notification_connecting)))
+                            dispatch {
+                                if (settingsContinuation.ownsRequest(observer, lease, request))
+                                    handle(coordinator.begin(RuntimeAuthorityTrigger.MANUAL, isUnlocked(), isPrepared(), request))
+                            }
+                        } catch (failure: Exception) {
+                            settingsContinuation.invalidate(observer)
+                            requestStop(RuntimeStopReason.CANCEL, VpnRuntimeState.BLOCKED,
+                                finalFailure = runtimeStartFailure(this, failure))
+                        }
+                    }
+                }) null else request
+            }
+            RuntimeControlBinder.SETTINGS_STOP -> {
+                val lease = token ?: return null
+                if (!settingsContinuation.matches(observer, lease) ||
+                    (attempt != null && !settingsContinuation.ownsRequest(observer, lease, attempt?.token?.requestId))) return null
+                if (!mainHandler.post {
+                    if (settingsContinuation.matches(observer, lease) &&
+                        (attempt == null || settingsContinuation.ownsRequest(observer, lease, attempt?.token?.requestId)))
+                        requestStop(RuntimeStopReason.STOP, VpnRuntimeState.IDLE, managedSettings = true)
+                }) null else lease
+            }
+            RuntimeControlBinder.SETTINGS_FINISH -> {
+                if (token == null || !settingsContinuation.matches(observer, token)) null
+                else {
+                    settingsContinuation.invalidate(observer)
+                    dispatch { if (attempt == null) finishService() }
+                    token
+                }
+            }
+            else -> null
+        }
+    }
+
+    private fun requestStop(reason: RuntimeStopReason, finalState: VpnRuntimeState,
+        promoteStopNotification: Boolean = false, managedSettings: Boolean = false, finalFailure: String? = null) {
+        if (!managedSettings) settingsContinuation.invalidate()
+        maintenance.markCancelled()
         attempt?.let { it.cancelled.set(true); it.guard.markCancellation() }
         publish(PublishedSnapshot(state = VpnRuntimeState.STOPPING))
-        dispatch { handle(coordinator.stop(reason), finalState) }
+        if (promoteStopNotification) {
+            try { promote(notification(getString(R.string.runtime_notification_stopping))) } catch (_: Throwable) {
+                // Cancellation and STOPPING publication precede fallible foreground work.
+            }
+        }
+        // A retained quiescence binding can outlive stopSelf. Finish any promotion
+        // before dispatching cleanup so it cannot re-elevate the stopped service.
+        dispatch { handle(coordinator.stop(reason), finalState, finalFailure) }
     }
     private fun fail(value: Attempt, failure: RuntimeStartFailure) {
         if (coordinator.currentToken() != value.token) return
+        val outcome = providerDeathFailureV1(failure, value.production?.providerDeathInProgress() == true,
+            value.production?.providerDeathCanRetry() == true) ?: return
         value.cancelled.set(true)
         value.guard.markCancellation()
-        handle(coordinator.failed(value.token, failure))
+        handle(coordinator.failed(value.token, outcome))
     }
     private fun current(value: Attempt): Boolean = !destroyed && attempt === value && !value.cancelled.get() && coordinator.currentToken() == value.token
     private fun isUnlocked(): Boolean = getSystemService(UserManager::class.java)?.isUserUnlocked == true
@@ -572,15 +762,21 @@ class KurdVpnService : VpnService() {
     }
     private fun publish(snapshot: PublishedSnapshot) {
         synchronized(coordinator) { latestSnapshot = snapshot }
-        try { publishTransient(safeSnapshot()) } catch (_: Throwable) { /* Best-effort display only. */ }
+        try { controlBinder.publish() } catch (_: Throwable) { /* Best-effort display only. */ }
     }
     private fun promote(notification: Notification) {
         if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(NOTIFICATION_ID, notification)
     }
-    private fun finishService() {
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+    private fun finishService() = synchronized(settingsContinuation) {
+        stopService(Intent(this, RuntimeRestartService::class.java))
+        // A controlled reconnect retains the existing started/foreground lifetime.
+        // A notification alone cannot restart that lifetime after stopSelf().
+        if (!settingsContinuation.hasPending()) {
+            settingsExpiry?.let(mainHandler::removeCallbacks); settingsExpiry = null
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
     private fun dispatch(operation: () -> Unit) {
         try { executor.execute {
@@ -602,136 +798,62 @@ class KurdVpnService : VpnService() {
         }
     }
 
-    private fun publishTransient(
-        snapshot: PublishedSnapshot,
-        statusQueryId: String? = null,
-    ) {
-        sendBroadcast(
-            Intent(VpnRuntimeContract.ACTION_STATUS)
-                .setPackage(packageName)
-                .putExtra(VpnRuntimeContract.EXTRA_RUNTIME_REQUEST, snapshot.requestId)
-                .putExtra(VpnRuntimeContract.EXTRA_STATUS_QUERY, statusQueryId)
-                .putExtra(VpnRuntimeContract.EXTRA_STATE, snapshot.state.name)
-                .putExtra(VpnRuntimeContract.EXTRA_PACKETS, snapshot.packets)
-                .putExtra(VpnRuntimeContract.EXTRA_PACKETS_WRITTEN, snapshot.replies)
-                .putExtra(VpnRuntimeContract.EXTRA_ALWAYS_ON, isAlwaysOnCompat())
-                .putExtra(VpnRuntimeContract.EXTRA_LOCKDOWN, isLockdownCompat())
-                .putExtra(VpnRuntimeContract.EXTRA_FAILURE, snapshot.failure)
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_PACKET_DISPOSITION,
-                    snapshot.disposition,
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_PER_APP_MODE,
-                    snapshot.config.routingPolicy.perAppMode.name,
-                )
-                .putExtra(VpnRuntimeContract.EXTRA_STARTED_AT, snapshot.startedAtElapsedRealtime)
-                .putExtra(VpnRuntimeContract.EXTRA_DNS_MODE, snapshot.config.dnsMode.name)
-                .putExtra(VpnRuntimeContract.EXTRA_IP_MODE, snapshot.config.ipMode.name)
-                .putExtra(VpnRuntimeContract.EXTRA_MTU, snapshot.config.mtu)
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_PROFILE_GENERATION,
-                    snapshot.authority?.generation ?: 0,
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_PLAN_DIGEST,
-                    snapshot.authority?.planDigest?.toHex(),
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_PROFILE_FINGERPRINT,
-                    snapshot.authority?.profileFingerprint?.toHex(),
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_STRATEGY_FINGERPRINT,
-                    snapshot.authority?.strategyFingerprint?.toHex(),
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_RELAY_FINGERPRINT,
-                    snapshot.authority?.relayFingerprint?.toHex(),
-                )
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_MAX_RECONNECT_ATTEMPTS,
-                    snapshot.authority?.maxReconnectAttempts ?: 0,
-                )
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_READ, snapshot.diagnostics.tunPacketsRead)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_OUTBOUND, snapshot.diagnostics.outboundPacketsAccepted)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_WRITE, snapshot.diagnostics.carrierRecordsWritten)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_CARRIER_READ, snapshot.diagnostics.carrierRecordsRead)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_AUTHENTICATED, snapshot.diagnostics.authenticatedOperations)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_ACCEPTED, snapshot.diagnostics.innerPacketsAccepted)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_INNER_REJECTED, snapshot.diagnostics.innerPacketsRejected)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ATTEMPTS, snapshot.diagnostics.tunWriteAttempts)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURES, snapshot.diagnostics.tunWriteFailures)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_FAILURE_CODE, snapshot.diagnostics.tunWriteFailureCode)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_ERRNO, snapshot.diagnostics.tunWriteErrno)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_TUN_WRITTEN, snapshot.diagnostics.tunPacketsWritten)
-                .putExtra(VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTED, snapshot.diagnostics.rejectedTunPackets)
-                .putExtra(
-                    VpnRuntimeContract.EXTRA_DIAGNOSTIC_REJECTION_CODE,
-                    snapshot.diagnostics.rejectedTunPacketCode,
-                ),
-        )
-    }
-
-    private fun configFrom(snapshot: NativeLiveRuntimeSessionSnapshot): VpnRuntimeConfig {
-        val mode = when (snapshot.perAppMode) {
-            PerAppSelectionMode.ALL_APPS -> PerAppRoutingMode.ALL_APPS
-            PerAppSelectionMode.INCLUDE_ONLY -> PerAppRoutingMode.INCLUDE_ONLY
-            PerAppSelectionMode.EXCLUDE_SELECTED -> PerAppRoutingMode.EXCLUDE_SELECTED
+    private fun controlSnapshot(): VpnRuntimeSnapshot {
+        val snapshot = safeSnapshot()
+        val native = snapshot.authority
+        val counts = attempt?.takeIf { it.token.requestId == snapshot.requestId }?.pump?.snapshot()
+        val presentation = attempt?.takeIf { native != null && it.token.requestId == snapshot.requestId }?.let { owner ->
+            try {
+                owner.production?.presentationEvidence()?.let { evidence ->
+                    evidence.copy(proxySessionId = evidence.sessionId.takeIf {
+                        current(owner) && owner.guard.isActive() && owner.proxy?.isListening() == true
+                    })
+                }
+            } catch (_: Exception) { null }
         }
-        return VpnRuntimeConfig(
-            routingPolicy = VpnRoutingPolicy(mode, snapshot.packages.toSet()),
-            selectionMode = snapshot.selectionMode,
-            ipMode = snapshot.ipMode,
-            dnsMode = snapshot.dnsMode,
-            mtu = snapshot.mtu,
-            metered = snapshot.metered,
-        ).validatedForLiveTransport()
+        return VpnRuntimeSnapshot(
+            state = snapshot.state, packetsRead = counts?.outboundPackets ?: 0, packetsWritten = counts?.inboundPackets ?: 0,
+            bytesSent = counts?.outboundBytes ?: 0, bytesReceived = counts?.inboundBytes ?: 0,
+            alwaysOn = isAlwaysOnCompat(), lockdown = isLockdownCompat(), failure = snapshot.failure,
+            packetDisposition = snapshot.disposition,
+            perAppRoutingMode = when (native?.perAppMode) {
+                PerAppSelectionMode.INCLUDE_ONLY -> PerAppRoutingMode.INCLUDE_ONLY
+                PerAppSelectionMode.EXCLUDE_SELECTED -> PerAppRoutingMode.EXCLUDE_SELECTED
+                else -> PerAppRoutingMode.ALL_APPS
+            },
+            startedAtElapsedRealtime = snapshot.startedAtElapsedRealtime,
+            dnsMode = native?.effectiveDnsMode ?: ResolverPolicy.INTERNAL,
+            ipMode = native?.effectiveIp ?: IpMode.AUTO, mtu = native?.effectiveMtu ?: 1280,
+            profileGeneration = native?.profileGeneration ?: 0uL,
+            planDigest = native?.planDigest?.toHex(),
+            profileFingerprint = native?.profileFingerprint?.toHex(),
+            strategyFingerprint = native?.strategyFingerprint?.toHex(),
+            relayFingerprint = native?.relayFingerprint?.toHex(),
+            maxReconnectAttempts = native?.reconnectLimits?.effectiveAutomaticReconnectMax ?: 0,
+            runtimeRequestId = snapshot.requestId,
+            appliedRevision = if (native == null) 0 else attempt?.appliedRevision ?: 0,
+            routeCount = native?.routes?.size ?: 0,
+            perAppCount = native?.effectivePackageCount ?: 0,
+            lanBypass = false, // Current native admission rejects bypass rather than approximating it.
+            metering = when {
+                native == null -> VpnMeteringState.UNAVAILABLE
+                Build.VERSION.SDK_INT < 29 -> VpnMeteringState.OS_CONTROLLED
+                native.metered -> VpnMeteringState.METERED
+                else -> VpnMeteringState.UNMETERED
+            },
+            diagnostics = VpnRuntimeDiagnostics(tunPacketsRead = counts?.outboundPackets ?: 0,
+                outboundPacketsAccepted = counts?.outboundPackets ?: 0, tunPacketsWritten = counts?.inboundPackets ?: 0),
+            presentation = presentation,
+        ).validatedForDisplay()
     }
 
-    private fun establishTun(
-        configuration: LiveTunConfiguration,
-        underlyingNetwork: Network,
-    ): DetachableTun? {
-        val builder = Builder()
-            .setSession("Kurdistan VPN")
-            .setMtu(configuration.mtu)
-            .setBlocking(true)
-            .setUnderlyingNetworks(arrayOf(underlyingNetwork))
-        configuration.addresses.forEach { builder.addAddress(it.address, it.prefixLength) }
-        configuration.routes.forEach { builder.addRoute(it.address, it.prefixLength) }
-        configuration.dnsServers.forEach(builder::addDnsServer)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            builder.setMetered(configuration.metered)
-        }
-        applyPerAppPolicy(builder, configuration.routingPolicy)
-        // The wrapper exists before Builder.establish. A returned descriptor cannot be
-        // stranded by a later wrapper allocation or descriptor-validation exception.
-        return PlatformTunOwner(acquire = {
-            val descriptor = builder.establish()
-            descriptor
-        },
-            validate = { descriptor -> check(descriptor.fd >= 0) { "TUN_DESCRIPTOR_INVALID" } },
-            detach = ParcelFileDescriptor::detachFd).establish()
-    }
+    private fun isAlwaysOnCompat(): Boolean? =
+        if (Build.VERSION.SDK_INT >= 29) try { isAlwaysOn } catch (_: SecurityException) { null } else null
 
-    private fun applyPerAppPolicy(builder: Builder, policy: VpnRoutingPolicy) {
-        when (policy.perAppMode) {
-            PerAppRoutingMode.ALL_APPS -> Unit
-            PerAppRoutingMode.INCLUDE_ONLY ->
-                policy.packages.forEach(builder::addAllowedApplication)
-            PerAppRoutingMode.EXCLUDE_SELECTED ->
-                policy.packages.forEach(builder::addDisallowedApplication)
-        }
-    }
+    private fun isLockdownCompat(): Boolean? =
+        if (Build.VERSION.SDK_INT >= 29) try { isLockdownEnabled } catch (_: SecurityException) { null } else null
 
-    private fun isAlwaysOnCompat(): Boolean =
-        android.os.Build.VERSION.SDK_INT >= 29 && isAlwaysOn
-
-    private fun isLockdownCompat(): Boolean =
-        android.os.Build.VERSION.SDK_INT >= 29 && isLockdownEnabled
-
-    private fun notification(text: String): Notification {
+    private fun notification(text: String, startedAt: Long = 0): Notification {
         val launch = packageManager.getLaunchIntentForPackage(packageName)
         val pending = PendingIntent.getActivity(
             this,
@@ -745,6 +867,12 @@ class KurdVpnService : VpnService() {
             .setContentText(text)
             .setContentIntent(pending)
             .setOngoing(true)
+            .apply {
+                if (startedAt > 0) {
+                    setWhen(System.currentTimeMillis() - (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0))
+                    setUsesChronometer(true)
+                }
+            }
             .build()
     }
 
@@ -752,10 +880,10 @@ class KurdVpnService : VpnService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "VPN connection",
+                getString(R.string.runtime_notification_channel),
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
-                description = "Shows the active Kurdistan VPN runtime"
+                description = getString(R.string.runtime_notification_channel)
                 setShowBadge(false)
             },
         )
@@ -764,9 +892,7 @@ class KurdVpnService : VpnService() {
     companion object {
         private const val CHANNEL_ID = "kurdistan-vpn-runtime"
         private const val NOTIFICATION_ID = 1001
-        private const val NETWORK_BIND_TIMEOUT_MILLIS = 5_000L
         private const val RUNTIME_HEALTH_INTERVAL_MILLIS = 250L
-        private val PROCESS_EPOCH = UUID.randomUUID().toString().replace("-", "")
 
         fun start(context: Context, requestId: String) {
             require(RuntimeAuthorityLimits.validId(requestId))
@@ -781,56 +907,37 @@ class KurdVpnService : VpnService() {
                 .setAction(RuntimeServiceCommand.ACTION_STOP)
                 .putExtra(RuntimeServiceCommand.MARKER_KEY, RuntimeServiceCommand.MARKER_VERSION))
         }
-        private fun runtimeFailure(failure: LiveTunnelFailure): RuntimeStartFailure = when (failure) {
-            LiveTunnelFailure.NETWORK_LOST -> RuntimeStartFailure.NETWORK_LOST
-            LiveTunnelFailure.ENDPOINT_UNAVAILABLE -> RuntimeStartFailure.ENDPOINT_UNAVAILABLE
-            LiveTunnelFailure.TLS_REJECTED -> RuntimeStartFailure.TLS_REJECTED
-            LiveTunnelFailure.AUTHORITY_REJECTED, LiveTunnelFailure.KURD_AUTH_REJECTED -> RuntimeStartFailure.AUTHORITY_REJECTED
-            LiveTunnelFailure.CANCELLED -> RuntimeStartFailure.CANCELLED
-            LiveTunnelFailure.RECOVERY_REQUIRED -> RuntimeStartFailure.CLEANUP_UNPROVEN
-            LiveTunnelFailure.STATE_CORRUPT -> RuntimeStartFailure.STATE_CORRUPT
-            else -> RuntimeStartFailure.INTERNAL_FAILURE
-        }
-        private fun wipe(snapshot: NativeLiveRuntimeSessionSnapshot) {
-            snapshot.planDigest.fill(0); snapshot.profileFingerprint.fill(0)
-            snapshot.strategyFingerprint.fill(0); snapshot.relayFingerprint.fill(0)
-            snapshot.clientIpv4.fill(0); snapshot.clientIpv6.fill(0)
-            snapshot.dnsIpv4.fill(0); snapshot.dnsIpv6.fill(0)
-            snapshot.routes.forEach { it.address.fill(0) }
+        fun recoverInternet(context: Context) {
+            context.startService(Intent(context, KurdVpnService::class.java)
+                .setAction(RuntimeServiceCommand.ACTION_RECOVER)
+                .putExtra(RuntimeServiceCommand.MARKER_KEY, RuntimeServiceCommand.MARKER_VERSION))
         }
     }
     private data class PublishedSnapshot(
         val state: VpnRuntimeState = VpnRuntimeState.IDLE,
-        val packets: Long = 0,
-        val replies: Long = 0,
         val failure: String? = null,
         val disposition: String? = null,
-        val config: VpnRuntimeConfig = VpnRuntimeConfig(VpnRoutingPolicy()),
         val startedAtElapsedRealtime: Long = 0,
-        val authority: NativeLiveRuntimeSessionSnapshot? = null,
-        val diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
+        val authority: NativeOpeningSnapshot? = null,
         val requestId: String? = null,
     )
 
-    private fun NativeLiveRuntimeDiagnostics.toRuntimeDiagnostics() = VpnRuntimeDiagnostics(
-        tunPacketsRead = tunPacketsRead,
-        outboundPacketsAccepted = outboundPacketsAccepted,
-        carrierRecordsWritten = carrierRecordsWritten,
-        carrierRecordsRead = carrierRecordsRead,
-        authenticatedOperations = authenticatedOperations,
-        innerPacketsAccepted = innerPacketsAccepted,
-        innerPacketsRejected = innerPacketsRejected,
-        tunWriteAttempts = tunWriteAttempts,
-        tunWriteFailures = tunWriteFailures,
-        tunWriteFailureCode = tunWriteFailureCode,
-        tunWriteErrno = tunWriteErrno,
-        tunPacketsWritten = tunPacketsWritten,
-        rejectedTunPackets = rejectedTunPackets,
-        rejectedTunPacketCode = rejectedTunPacketCode,
-    )
 
 
     private fun ByteArray.toHex(): String = joinToString(separator = "") { value ->
         "%02x".format(value.toInt() and 0xff)
     }
+}
+
+/** Independent health on the existing attempt; proxy repair cannot certify native recovery. */
+internal class RuntimeSessionHealth {
+    var ready = false
+    var nativeDegraded = false
+    var proxyFailed = false
+    val state: VpnRuntimeState get() = when {
+        !ready -> VpnRuntimeState.CONNECTING
+        nativeDegraded || proxyFailed -> VpnRuntimeState.DEGRADED
+        else -> VpnRuntimeState.ACTIVE_KURD_LIVE
+    }
+    val failure: String? get() = if (proxyFailed) "PROXY_LISTENER_FAILED" else null
 }

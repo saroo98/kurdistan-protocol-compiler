@@ -7,6 +7,11 @@
 
     <application>
         <service
+            android:name=".RuntimeRestartService"
+            android:directBootAware="false"
+            android:exported="false"
+            android:process=":vpn" />
+        <service
             android:name=".KurdVpnService"
             android:directBootAware="false"
             android:exported="false"

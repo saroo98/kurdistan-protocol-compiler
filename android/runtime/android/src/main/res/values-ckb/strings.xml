@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_notification_connecting">پەیوەست دەبێت…</string>
+    <string name="runtime_notification_connected">لە ڕێگەی ڕێلەی پشتڕاستکراوی کوردەوە پەیوەستە</string>
+    <string name="runtime_notification_stopping">پەیوەندی دەپچڕێنرێت…</string>
+    <string name="runtime_notification_blocked">پەیوەندی ڕێگری لێکراوە</string>
+    <string name="runtime_notification_channel">پەیوەندی VPN</string>
+</resources>

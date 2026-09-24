@@ -3,15 +3,17 @@
 package org.kurdistanvpn.runtime.android
 
 import java.util.UUID
+import java.security.SecureRandom
 import org.kurdistanvpn.runtime.api.*
 
 data class RuntimeStartToken(val epoch: String, val requestId: String, val generation: Long,
     val trigger: RuntimeAuthorityTrigger, val retryAttempt: Int)
-enum class RuntimeStopReason(val priority: Int) { CANCEL(1), STOP(2), REVOKE(3) }
+enum class RuntimeStopReason(val priority: Int) { CANCEL(1), STOP(2), RECOVER_INTERNET(3), REVOKE(4) }
 enum class RuntimeStartFailure(val retryable: Boolean) {
     NETWORK_UNAVAILABLE(true), NETWORK_CHANGED(true), NETWORK_LOST(true), ENDPOINT_UNAVAILABLE(true),
     AUTHORITY_REJECTED(false), TLS_REJECTED(false), CONSENT_REVOKED(false), STATE_CORRUPT(false),
-    CANCELLED(false), CLEANUP_UNPROVEN(false), INTERNAL_FAILURE(false), RETRY_EXHAUSTED(false),
+    CANCELLED(false), CLEANUP_UNPROVEN(false), INTERNAL_FAILURE(false), RETRY_EXHAUSTED(false), PAUSED(false),
+    PROXY_BIND_FAILED(false), AUTHORITY_PROVIDER_LOST(true),
 }
 sealed interface RuntimeStartDecision {
     data class RequestAuthority(val token: RuntimeStartToken, val guard: RuntimeActivationGuard,
@@ -28,11 +30,13 @@ sealed interface RuntimeStartDecision {
 
 /** Public callers install one nonreplaceable VPN-process coordinator. The internal constructor
  * is the module's deterministic composition boundary, not an alternative app installation path. */
-class RuntimeStartCoordinator internal constructor(val epoch: String, private val requestIds: () -> String = { UUID.randomUUID().toString().replace("-", "") }) {
+class RuntimeStartCoordinator internal constructor(val epoch: String,
+    private val retryRandom: () -> Double = SecureRandom()::nextDouble,
+    private val requestIds: () -> String = { UUID.randomUUID().toString().replace("-", "") }) {
     private enum class Phase { AUTHORITY, ACQUIRING, ACTIVE, STOPPING }
     private data class Current(val token: RuntimeStartToken, val guard: RuntimeActivationGuard,
         var phase: Phase, var budget: Int?, val origin: RuntimeAuthorityTrigger,
-        var terminalFailure: RuntimeStartFailure? = null)
+        var terminalFailure: RuntimeStartFailure? = null, var stable: Boolean = false)
     private data class Next(val trigger: RuntimeAuthorityTrigger, val requestId: String?, val attempt: Int,
         val budget: Int?, val origin: RuntimeAuthorityTrigger, val delay: Long)
     private var generation = 0L
@@ -59,6 +63,20 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
                 if (mutationQuiescence === this) mutationQuiescence = null
             }
         }
+    }
+
+    /** Non-disruptive admission for a sole service owner. Validation and acquisition
+     * share the ordinary coordinator monitor; a refusal never mutates its queue. */
+    fun beginIfIdle(trigger: RuntimeAuthorityTrigger, unlocked: Boolean, vpnPrepared: Boolean,
+        manualRequestId: String? = null): RuntimeStartDecision = synchronized(this) {
+        if (!unlocked || !vpnPrepared || trigger == RuntimeAuthorityTrigger.NETWORK_RETRY ||
+            (manualRequestId != null && (trigger != RuntimeAuthorityTrigger.MANUAL || !RuntimeAuthorityLimits.validId(manualRequestId))))
+            return RuntimeStartDecision.Rejected(RuntimeStartFailure.CONSENT_REVOKED)
+        if (current != null || queued != null || mutationQuiescence != null)
+            return RuntimeStartDecision.Rejected(RuntimeStartFailure.CLEANUP_UNPROVEN)
+        if (trigger == RuntimeAuthorityTrigger.AUTOMATIC && suppressAutomatic)
+            return RuntimeStartDecision.Rejected(RuntimeStartFailure.CANCELLED)
+        start(Next(trigger, manualRequestId, 0, null, trigger, 0))
     }
 
     fun begin(trigger: RuntimeAuthorityTrigger, unlocked: Boolean, vpnPrepared: Boolean,
@@ -118,6 +136,17 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
         return failed(token, failure)
     }
 
+    /** Only the production platform owner calls this after native verification of its exact capture.
+     * Records scheduling limits; it neither grants native authority nor publishes ACTIVE. */
+    internal fun acceptProductionAuthority(token: RuntimeStartToken, effectiveRetryMaximum: Int): Boolean = synchronized(this) {
+        val value = current ?: return false
+        if (value.token != token || value.phase != Phase.AUTHORITY || !value.guard.isAcquisitionCurrent() ||
+            effectiveRetryMaximum !in 0..5 || (value.budget != null && effectiveRetryMaximum > value.budget!!)) return false
+        value.budget = effectiveRetryMaximum
+        value.phase = Phase.ACQUIRING
+        true
+    }
+
     fun activationCompleted(token: RuntimeStartToken): RuntimeStartDecision {
         synchronized(this) {
             val active = current ?: return RuntimeStartDecision.Stale
@@ -135,10 +164,14 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
             val value = current ?: return RuntimeStartDecision.Stale
             if (value.token != token || value.phase == Phase.STOPPING) return RuntimeStartDecision.Stale
             val budget = value.budget ?: 0
-            if (failure.retryable && token.retryAttempt < budget) {
-                val attempt = token.retryAttempt + 1
+            val used = if (value.stable) 0 else token.retryAttempt
+            if (failure.retryable && used < budget) {
+                val attempt = used + 1
+                val sample = retryRandom()
+                check(sample >= 0.0 && sample < 1.0)
+                val delay = ((1000L shl (attempt - 1)).toDouble() * (0.8 + 0.4 * sample)).toLong().coerceAtMost(30_000)
                 queued = Next(RuntimeAuthorityTrigger.NETWORK_RETRY, null, attempt, budget, value.origin,
-                    1000L shl (attempt - 1))
+                    delay)
                 value.terminalFailure = null
             } else {
                 queued = null
@@ -152,8 +185,22 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
         return retire(active)
     }
 
-    fun stop(reason: RuntimeStopReason): RuntimeStartDecision {
+    fun stop(reason: RuntimeStopReason): RuntimeStartDecision = stopOwned(null, reason)
+
+    internal fun recordStableSession(token: RuntimeStartToken, activeMillis: Long): Boolean = synchronized(this) {
+        val value = current ?: return false
+        if (value.token != token || value.phase != Phase.ACTIVE || !value.guard.isActive() || activeMillis < 60_000)
+            return false
+        value.stable = true
+        true
+    }
+
+    /** A retained service owner cannot cancel a later generation. */
+    fun stopIfCurrent(token: RuntimeStartToken, reason: RuntimeStopReason): RuntimeStartDecision = stopOwned(token, reason)
+
+    private fun stopOwned(token: RuntimeStartToken?, reason: RuntimeStopReason): RuntimeStartDecision {
         val active = synchronized(this) {
+            if (token != null && current?.token != token) return RuntimeStartDecision.Stale
             if (stopReason == null || reason.priority > stopReason!!.priority) stopReason = reason
             suppressAutomatic = true
             queued = null
@@ -161,6 +208,11 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
                 it.terminalFailure = null
                 it.phase = Phase.STOPPING
                 it.guard.markCancellation()
+                // Scoped production acquisition drains after its actual worker returns.
+                // Cancellation and this observation share the guard's monitor, preventing
+                // a new acquisition from starting between publication and deferral.
+                if (token != null && it.guard.acquisitionInFlight())
+                    return RuntimeStartDecision.CleanupPending(it.token, it.guard.cleanupState())
             }
         }
         return retire(active)
@@ -175,6 +227,11 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
         return retire(active)
     }
     @Synchronized fun currentToken(): RuntimeStartToken? = current?.token
+    internal fun ownsAdmission(admission: RuntimeStartDecision.RequestAuthority): Boolean = synchronized(this) {
+        val value = current
+        value != null && value.token == admission.token && value.guard === admission.guard &&
+            value.phase == Phase.AUTHORITY && value.guard.isAcquisitionCurrent()
+    }
 
     private fun retire(active: Current): RuntimeStartDecision {
         // STOPPING and cancellation are published together before cleanup. If publication
@@ -211,7 +268,9 @@ class RuntimeStartCoordinator internal constructor(val epoch: String, private va
     }
 
     companion object {
+        private val processEpoch = UUID.randomUUID().toString().replace("-", "")
         private var installed: RuntimeStartCoordinator? = null
+        fun processOwner(): RuntimeStartCoordinator = installOnce(processEpoch)
         @Synchronized fun installOnce(epoch: String): RuntimeStartCoordinator {
             val existing = installed
             if (existing != null) { check(existing.epoch == epoch) { "VPN process coordinator already installed" }; return existing }

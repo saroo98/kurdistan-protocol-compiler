@@ -11,6 +11,62 @@ import org.junit.Test
 import org.kurdistanvpn.runtime.api.*
 
 class RuntimeActivationGuardTest {
+    @Test fun productionCurrentnessCheckCannotPublishAfterItObservesCancellation() {
+        val guard = RuntimeActivationGuard()
+        guard.own(RuntimeResourceKind.NATIVE_SESSION, Closeable {})
+        guard.own(RuntimeResourceKind.TUN, Closeable {})
+        var publications = 0
+        assertFalse(guard.activateNativeOwned(true, PartialSetupResource(), PartialSetupResource(), {
+            guard.markCancellation(); true
+        }) { publications++ })
+        assertEquals(0, publications)
+    }
+    @Test fun productionPublicationRequiresOwnedNativeTunAndCurrentCapture() {
+        for (missing in listOf("native", "tun", "current", "none")) {
+            val guard = RuntimeActivationGuard()
+            if (missing != "native") guard.own(RuntimeResourceKind.NATIVE_SESSION, Closeable {})
+            if (missing != "tun") guard.own(RuntimeResourceKind.TUN, Closeable {})
+            var published = 0
+            val accepted = guard.activateNativeOwned(true, PartialSetupResource(), PartialSetupResource(),
+                { missing != "current" }) { published++ }
+            assertEquals(missing == "none", accepted)
+            assertEquals(if (accepted) 1 else 0, published)
+            assertEquals(accepted, guard.isActive())
+            assertEquals(RuntimeCleanupState.CLEAN, guard.cancel())
+        }
+    }
+
+    @Test fun productionPublicationCannotSurviveReentrantCancellation() {
+        val guard = RuntimeActivationGuard()
+        guard.own(RuntimeResourceKind.NATIVE_SESSION, Closeable {})
+        guard.own(RuntimeResourceKind.TUN, Closeable {})
+        assertFalse(guard.activateNativeOwned(true, PartialSetupResource(), PartialSetupResource(), { true }) {
+            guard.markCancellation()
+        })
+        assertFalse(guard.isActive())
+        assertEquals(RuntimeCleanupState.CLEAN, guard.cleanupState())
+    }
+    @Test fun acquisitionObservationStopsAtCancellationBeforeAnyCleanupAndNeverRevives() {
+        for (failure in listOf(false, true)) {
+            val guard = RuntimeActivationGuard()
+            var closes = 0
+            guard.own(RuntimeResourceKind.AUTHORITY_DESCRIPTOR, Closeable {
+                closes++
+                if (failure) throw IOException("retirement failed")
+            })
+            assertTrue(guard.isAcquisitionCurrent())
+            assertFalse(guard.isActive())
+            guard.markCancellation()
+            assertFalse(guard.isAcquisitionCurrent())
+            assertEquals(0, closes)
+            assertEquals(if (failure) RuntimeCleanupState.UNPROVEN else RuntimeCleanupState.CLEAN, guard.cancel())
+            assertFalse(guard.isAcquisitionCurrent())
+            guard.cancel()
+            assertFalse(guard.isAcquisitionCurrent())
+            assertEquals(1, closes)
+        }
+    }
+
     @Test fun optionalActiveNotificationCannotPublishBeforeCommitOrAfterCancellation() {
         val guard = RuntimeActivationGuard()
         var deliveries = 0

@@ -81,7 +81,7 @@ object RuntimeAuthorityFrameCodec {
                 body = ByteArray(length - TAG_BYTES)
                 ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN).apply {
                     put(byteArrayOf(75, 82, 65, 70)); put(2); put(0); putShort(HEADER_BYTES.toShort())
-                    putInt(length); putInt(ownedPayload.size); putRequest(request); put(ownedPayload)
+                    putInt(length); putInt(ownedPayload.size); RuntimeAuthorityRequestWire.write(this,request); put(ownedPayload)
                 }
                 tag = mac(key, body)
                 require(tag.size == TAG_BYTES)
@@ -118,7 +118,7 @@ object RuntimeAuthorityFrameCodec {
                     require(reader.short.toInt() == HEADER_BYTES && reader.int == ownedFrame.size)
                     val length = reader.int
                     require(length in 0..RuntimeAuthorityLimits.MAX_PAYLOAD_BYTES && encodedLength(length) == ownedFrame.size)
-                    val actual = reader.readRequest()
+                    val actual = RuntimeAuthorityRequestWire.read(reader)
                     if (actual != expected) return@consume RuntimeFrameVerification.Rejected(RuntimeFrameRejection.BINDING)
                     require(reader.remaining() == length)
                     require(if (actual.purpose == RuntimeAuthorityPurpose.FULL_AUTHORITY) length > 0 else length == 0)
@@ -141,29 +141,5 @@ object RuntimeAuthorityFrameCodec {
                 init(SecretKeySpec(key, "HmacSHA256")); update(domain); doFinal(body)
             }
         } finally { domain.fill(0) }
-    }
-    private fun ByteBuffer.putId(id: String) { repeat(16) { put(id.substring(it * 2, it * 2 + 2).toInt(16).toByte()) } }
-    private fun ByteBuffer.readId(): String = buildString(32) {
-        repeat(16) { val value = this@readId.get().toInt() and 255; append("0123456789abcdef"[value ushr 4]); append("0123456789abcdef"[value and 15]) }
-    }
-    private fun ByteBuffer.putRequest(r: RuntimeAuthorityRequest) {
-        putId(r.consumerEpoch); putId(r.providerEpoch); putId(r.requestId)
-        putLong(r.generation); put(r.purpose.wire.toByte()); put(r.trigger.wire.toByte())
-        putLong(r.revision); putLong(r.deadlineElapsedMillis); putId(r.capabilityChannelId); putId(r.frameChannelId)
-        putId(r.descriptor.id); putLong(r.descriptor.device); putLong(r.descriptor.inode); putLong(r.descriptor.ownerUid)
-        putLong(r.descriptor.mode); putLong(r.descriptor.length); put(r.descriptor.accessMode.toByte())
-        put(r.signedRetryBudget.toByte()); put(r.retryAttempt.toByte())
-    }
-    private fun ByteBuffer.readRequest(): RuntimeAuthorityRequest {
-        val consumerEpoch = readId(); val providerEpoch = readId(); val id = readId(); val generation = long
-        val purposeCode = get().toInt() and 255
-        val triggerCode = get().toInt() and 255
-        val purpose = RuntimeAuthorityPurpose.entries.single { it.wire == purposeCode }
-        val trigger = RuntimeAuthorityTrigger.entries.single { it.wire == triggerCode }
-        val revision = long; val deadline = long; val capabilityChannel = readId(); val frameChannel = readId()
-        val descriptor = RuntimeDescriptorBinding(readId(), long, long, long, long, long, get().toInt() and 255)
-        return RuntimeAuthorityRequest(consumerEpoch, providerEpoch, id, generation, purpose, trigger, revision, deadline,
-            capabilityChannel, frameChannel, descriptor,
-            get().toInt() and 255, get().toInt() and 255)
     }
 }
