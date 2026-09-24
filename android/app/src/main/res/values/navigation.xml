@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_welcome">Import a signed profile to prepare your VPN. Opening the app does not create keys or connect automatically.</string>
+    <string name="navigation_continue">Continue to Home</string>
+    <string name="navigation_history_full">Navigation history is full. Go back or select a main section to continue.</string>
+    <string name="navigation_recovery">Saved navigation could not be restored. Restart navigation without changing your app data.</string>
+    <string name="navigation_restart">Restart navigation</string>
+    <string name="navigation_stale">This item is no longer available. Go back or open its main section.</string>
+    <string name="navigation_planned">This screen is not available in the current version. No action has been performed.</string>
+    <string name="navigation_root">Open main section</string>
+    <string name="route_title_1">Welcome</string>
+    <string name="route_title_2">Import a profile</string>
+    <string name="route_title_3">Verify trust</string>
+    <string name="route_title_4">VPN permission</string>
+    <string name="route_title_5">Home</string>
+    <string name="route_title_6">Route details</string>
+    <string name="route_title_7">Profiles</string>
+    <string name="route_title_8">Operator and provider</string>
+    <string name="route_title_9">Profile details</string>
+    <string name="route_title_10">Strategies</string>
+    <string name="route_title_11">Probe history</string>
+    <string name="route_title_12">Settings</string>
+    <string name="route_title_13">Connection and permissions</string>
+    <string name="route_title_14">Trusted networks</string>
+    <string name="route_title_15">Per-app routing</string>
+    <string name="route_title_16">Excluded routes</string>
+    <string name="route_title_17">Tunnel and DNS</string>
+    <string name="route_title_18">Local proxy</string>
+    <string name="route_title_19">Updates and probes</string>
+    <string name="route_title_20">Appearance and accessibility</string>
+    <string name="route_title_21">Privacy and app lock</string>
+    <string name="route_title_22">Create backup</string>
+    <string name="route_title_23">Restore preview</string>
+    <string name="route_title_24">Transfer profile</string>
+    <string name="route_title_25">Privacy and recovery</string>
+    <string name="route_title_26">Reset selected data</string>
+    <string name="route_title_27">Diagnostics</string>
+    <string name="route_title_28">Export diagnostics</string>
+    <string name="route_title_29">Troubleshooting</string>
+    <string name="route_title_30">Notifications and performance</string>
+    <string name="route_title_31">Expert controls</string>
+    <string name="route_title_32">Automation</string>
+    <string name="route_title_33">About</string>
+    <string name="route_title_34">Legal</string>
+</resources>

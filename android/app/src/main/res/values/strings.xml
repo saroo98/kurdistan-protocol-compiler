@@ -15,4 +15,13 @@
     <string name="prepare_presentation_recovery">Review presentation recovery</string>
     <string name="confirm_presentation_recovery">Confirm presentation recovery</string>
     <string name="open_privacy_safe_diagnostics">Open privacy-safe diagnostics</string>
+    <string name="proxy_credentials_title">Local proxy credentials</string>
+    <string name="proxy_credentials_help">Only for this device and this VPN session. Authenticate to reveal username:password. Cleared after 60 seconds or when leaving the app. Public and hotspot access are unavailable.</string>
+    <string name="proxy_credentials_reveal">Authenticate and reveal</string>
+    <string name="proxy_credentials_copy">Authenticate and copy</string>
+    <string name="proxy_credentials_rotate">Authenticate and rotate credentials</string>
+    <string name="proxy_credentials_clear">Clear and close</string>
+    <string name="proxy_credentials_unavailable">Unavailable. Unlock using a supported device credential or strong biometric, and use an active session with local proxy enabled.</string>
+    <string name="settings_apply_failed_title">Settings were not applied</string>
+    <string name="settings_apply_failed_help">The change could not be completed. Check the connection status and current settings before trying again.</string>
 </resources>

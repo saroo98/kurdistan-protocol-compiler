@@ -3,6 +3,23 @@
 <!-- Copyright 2026 Saro -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- Prefer the production service for package-scoped system Always-on starts.
+             The explicit Task 7 fixture remains available to its own tests. -->
+        <service android:name="org.kurdistanvpn.runtime.android.KurdVpnService" android:exported="false">
+            <intent-filter android:priority="1">
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+        <service android:name=".InternalRuntimeObserverService" android:exported="false"
+            android:process=":runtime_observer_test" />
+        <activity android:name=".Task7InstalledConsentActivity" android:exported="false" />
+        <service android:name=".Task7InstalledDriverService" android:directBootAware="false"
+            android:exported="false" android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse" android:process=":vpn">
+            <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="internal verified adapter qualification" />
+        </service>
         <service
             android:name=".InternalVpnSocketProtectionService"
             android:exported="false"

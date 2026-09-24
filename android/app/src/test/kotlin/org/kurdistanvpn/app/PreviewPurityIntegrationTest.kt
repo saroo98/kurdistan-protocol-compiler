@@ -89,7 +89,7 @@ class PreviewPurityIntegrationTest {
 
     @Test fun invalidNativeHandleStillReleasesOnceAndNeverConfirms() {
         val fixture = PreviewOwnershipFixture()
-        fixture.resolveResult = NativeResult.Success(fixture.handle.copy(handle = 0))
+        fixture.resolveResult = NativeResult.Success(VerifiedPreviewHandle(0, fixture.handle.preview))
         assertEquals(OperationError.INTERNAL_FAILURE,
             (fixture.resolve() as NativePreviewRequestOutcome.Rejected).error)
         assertEquals(1, fixture.releases)
@@ -113,7 +113,7 @@ class PreviewPurityIntegrationTest {
         EncryptedDiagnosticEventStore(blobs).save(events)
         val before = blobs.snapshot()
         val writes = blobs.writes
-        val settings = Phase9Settings(
+        val settings = ProductSettings(
             connection = ConnectionPreferences(autoConnectOnLaunch = true),
             routing = RoutingPreferences(mode = PerAppSelectionMode.EXCLUDE_SELECTED, packages = setOf("org.legacy.package")),
             profiles = ProfilePreferences("missing", setOf("missing", "known")),
@@ -138,7 +138,7 @@ class PreviewPurityIntegrationTest {
         val routing = SecureRoutingPolicyStore.readOnly(blobs)
         val diagnostics = EncryptedDiagnosticEventStore.readOnly(blobs)
         assertEquals(0, blobs.reads)
-        val source = Phase9Settings(routing = RoutingPreferences(packages = setOf("org.legacy.app")))
+        val source = ProductSettings(routing = RoutingPreferences(packages = setOf("org.legacy.app")))
         val projected = ProtectedStatePreviewBackupPolicy.projectSettings(source, routing.loadPackages())
         assertTrue(projected.routing.packages.isEmpty())
         assertTrue(diagnostics.load().isEmpty())
