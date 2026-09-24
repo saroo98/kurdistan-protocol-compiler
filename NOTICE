@@ -9,4 +9,8 @@ Repository: https://github.com/saroo98/kurdistan-protocol-compiler
 Source code license: GNU Affero General Public License v3.0 or later.
 Documentation license: Creative Commons Attribution-ShareAlike 4.0 International.
 
+Bundled Android fonts are third-party assets, not relicensed by the source-code
+license above. Exact files, embedded credits and the basis for their inclusion
+are recorded in docs/third-party/android-fonts.md.
+
 Preserve this NOTICE file and copyright/license notices when using, modifying, or distributing this project.
