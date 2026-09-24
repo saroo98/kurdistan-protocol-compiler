@@ -5,11 +5,121 @@ package org.kurdistanvpn.core.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 object KurdistanIcons {
+    val Sun: ImageVector = ImageVector.Builder(
+        name = "Sun", defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 100f, viewportHeight = 100f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            // Twenty-one equal rays with the first pointing vertically upward.
+            repeat(21) { ray ->
+                val angle = ray * 2.0 * kotlin.math.PI / 21
+                val c = kotlin.math.cos(angle).toFloat()
+                val s = kotlin.math.sin(angle).toFloat()
+                moveTo(50f - 5f * c + 23f * s, 50f - 5f * s - 23f * c)
+                lineTo(50f + 47f * s, 50f - 47f * c)
+                lineTo(50f + 5f * c + 23f * s, 50f + 5f * s - 23f * c)
+                close()
+            }
+            moveTo(75f, 50f)
+            arcTo(25f, 25f, 0f, false, true, 50f, 75f)
+            arcTo(25f, 25f, 0f, false, true, 25f, 50f)
+            arcTo(25f, 25f, 0f, false, true, 50f, 25f)
+            arcTo(25f, 25f, 0f, false, true, 75f, 50f)
+            close()
+        }
+    }.build()
+
+    val Connection: ImageVector = outline("Connection") {
+        moveTo(12f, 3f); lineTo(21f, 7f); lineTo(21f, 12f)
+        curveTo(21f, 17f, 17f, 20f, 12f, 22f)
+        curveTo(7f, 20f, 3f, 17f, 3f, 12f)
+        lineTo(3f, 7f); close()
+    }
+    val Route: ImageVector = outline("Route") {
+        moveTo(5f, 3f); lineTo(5f, 17f); curveTo(5f, 20f, 9f, 20f, 9f, 17f)
+        lineTo(9f, 8f); curveTo(9f, 4f, 19f, 4f, 19f, 8f); lineTo(19f, 21f)
+        moveTo(16f, 18f); lineTo(19f, 21f); lineTo(22f, 18f)
+    }
+    val Refresh: ImageVector = outline("Refresh") {
+        moveTo(20f, 10f); curveTo(19f, 3f, 9f, 1f, 4f, 8f)
+        moveTo(20f, 4f); lineTo(20f, 10f); lineTo(14f, 10f)
+        moveTo(4f, 14f); curveTo(5f, 21f, 15f, 23f, 20f, 16f)
+        moveTo(4f, 20f); lineTo(4f, 14f); lineTo(10f, 14f)
+    }
+    val Lock: ImageVector = outline("Lock") {
+        moveTo(7f, 10f); lineTo(7f, 7f); curveTo(7f, 1f, 17f, 1f, 17f, 7f); lineTo(17f, 10f)
+        moveTo(4f, 10f); lineTo(20f, 10f); lineTo(20f, 21f); lineTo(4f, 21f); close()
+        moveTo(12f, 14f); lineTo(12f, 17f)
+    }
+    val Adjustments: ImageVector = outline("Adjustments") {
+        moveTo(4f, 3f); lineTo(4f, 7f); moveTo(4f, 11f); lineTo(4f, 21f)
+        moveTo(12f, 3f); lineTo(12f, 13f); moveTo(12f, 17f); lineTo(12f, 21f)
+        moveTo(20f, 3f); lineTo(20f, 7f); moveTo(20f, 11f); lineTo(20f, 21f)
+        moveTo(2f, 7f); lineTo(6f, 7f); lineTo(6f, 11f); lineTo(2f, 11f); close()
+        moveTo(10f, 13f); lineTo(14f, 13f); lineTo(14f, 17f); lineTo(10f, 17f); close()
+        moveTo(18f, 7f); lineTo(22f, 7f); lineTo(22f, 11f); lineTo(18f, 11f); close()
+    }
+
+    val Star: ImageVector = outline("Star") { starPath() }
+    val StarFilled: ImageVector = icon("StarFilled") { starPath() }
+
+    private fun androidx.compose.ui.graphics.vector.PathBuilder.starPath() {
+        moveTo(12f, 2.5f)
+        lineTo(15f, 8.6f)
+        lineTo(21.7f, 9.6f)
+        lineTo(16.9f, 14.3f)
+        lineTo(18f, 21f)
+        lineTo(12f, 17.8f)
+        lineTo(6f, 21f)
+        lineTo(7.1f, 14.3f)
+        lineTo(2.3f, 9.6f)
+        lineTo(9f, 8.6f)
+        close()
+    }
+
+    val Info: ImageVector = outline("Info") {
+        moveTo(12f, 3f)
+        curveTo(7f, 3f, 3f, 7f, 3f, 12f)
+        curveTo(3f, 17f, 7f, 21f, 12f, 21f)
+        curveTo(17f, 21f, 21f, 17f, 21f, 12f)
+        curveTo(21f, 7f, 17f, 3f, 12f, 3f)
+        close()
+        moveTo(12f, 11f)
+        lineTo(12f, 16f)
+        moveTo(12f, 7.5f)
+        lineTo(12f, 7.6f)
+    }
+
+    val Warning: ImageVector = outline("Warning") {
+        moveTo(12f, 3f)
+        lineTo(22f, 21f)
+        lineTo(2f, 21f)
+        close()
+        moveTo(12f, 9f)
+        lineTo(12f, 14f)
+        moveTo(12f, 17.5f)
+        lineTo(12f, 17.6f)
+    }
+
+    val ChevronForward: ImageVector = outline("ChevronForward", autoMirror = true) {
+        moveTo(9f, 5f)
+        lineTo(16f, 12f)
+        lineTo(9f, 19f)
+    }
+
+    val ChevronDown: ImageVector = outline("ChevronDown") {
+        moveTo(5f, 9f)
+        lineTo(12f, 16f)
+        lineTo(19f, 9f)
+    }
+
     val Home: ImageVector = icon("Home") {
         moveTo(3f, 10.8f)
         lineTo(12f, 3f)
@@ -114,6 +224,27 @@ object KurdistanIcons {
         lineTo(6.1f, 13.4f)
         close()
     }
+
+    private fun outline(
+        name: String,
+        autoMirror: Boolean = false,
+        draw: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
+    ): ImageVector = ImageVector.Builder(
+        name = name,
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+        autoMirror = autoMirror,
+    ).apply {
+        path(
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.8f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+            pathBuilder = draw,
+        )
+    }.build()
 
     private fun icon(
         name: String,

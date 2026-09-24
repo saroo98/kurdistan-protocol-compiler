@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="local_proxy_active">الوكيل المحلي نشط</string>
+    <string name="local_proxy_not_device_vpn">تستخدم هذا الاتصال التطبيقات المعدّة لاستخدام الوكيل المحلي فقط. لا تمر حركة بيانات الجهاز عبر النفق.</string>
     <string name="product_name">VPN كردستان</string><string name="foundation_label">أساس آمن للملفات</string><string name="runtime_unavailable">بيئة تشغيل VPN غير متاحة</string><string name="phase9_offline_notice">يتحقق هذا الإصدار من المرحلة 9 من الملفات ويحميها دون اتصال. لا يمكنه الاتصال أو توجيه حركة المرور.</string>
     <string name="application_state">حالة التطبيق: %1$s</string><string name="unknown">غير معروف</string><string name="import_rejected">رُفض الاستيراد: %1$s</string><string name="dismiss">إغلاق</string><string name="profiles">الملفات</string><string name="privacy_recovery">الخصوصية والاستعادة</string><string name="diagnostics_about">التشخيص وحول التطبيق</string><string name="kurd_profiles">ملفات كرد</string>
-    <plurals name="verified_profile_count"><item quantity="one">ملف واحد موثّق</item><item quantity="two">ملفان موثّقان</item><item quantity="few">%1$d ملفات موثّقة</item><item quantity="many">%1$d ملفًا موثّقًا</item><item quantity="other">%1$d ملف موثّق</item></plurals>
+    <plurals name="verified_profile_count"><item quantity="zero">لا توجد ملفات موثّقة</item><item quantity="one">ملف واحد موثّق</item><item quantity="two">ملفان موثّقان</item><item quantity="few">%1$d ملفات موثّقة</item><item quantity="many">%1$d ملفًا موثّقًا</item><item quantity="other">%1$d ملف موثّق</item></plurals>
     <string name="profile_generation">%1$s · الجيل %2$s</string><string name="import_profile_file">استيراد ملف</string><string name="import_clipboard">استيراد من الحافظة</string><string name="scan_offline_qr">مسح QR دون اتصال</string><string name="profile_link_label">رابط ملف kurd://</string><string name="preview_link">معاينة الرابط</string><string name="back">رجوع</string>
     <string name="verify_profile">التحقق من الملف</string><string name="artifact_class">الفئة: %1$s</string><string name="audience">الجمهور: %1$s</string><string name="generation">الجيل: %1$s</string><string name="fingerprint">البصمة: %1$s…</string><string name="encrypted_profile">ملف مشفّر</string><string name="signed_public_profile">ملف عام موقّع</string><string name="confirm_encrypted_storage">تأكيد التخزين المشفّر</string><string name="cancel">إلغاء</string>
     <string name="deployment_fingerprint">بصمة النشر: %1$s</string>
@@ -32,7 +34,7 @@
     <string name="favorites_all">All profiles</string>
     <string name="sort_value">Sort: %1$s</string>
     <string name="no_matching_profiles">No profiles match these filters.</string>
-    <string name="selected">Selected</string>
+    <string name="profile_selected">محدّد</string>
     <string name="use_profile">Use profile</string>
     <string name="favorite">Favorite</string>
     <string name="unfavorite">Remove favorite</string>
@@ -104,7 +106,7 @@
     <string name="auto_connect_launch">Auto-connect on app launch</string>
     <string name="auto_connect_launch_reason">Automatic startup is disabled until consent, verified-profile availability, and bounded lifecycle retries are exercised together by the device gate.</string>
     <string name="safe_reconnect">Safe reconnect</string>
-    <string name="safe_reconnect_reason">Network failures retry only within the signed profile limit. Every attempt reopens authority and creates a fresh protected Kurd session. Revocation and non-network failures stop without retry.</string>
+    <string name="safe_reconnect_reason">Connection interruptions can retry within the signed profile limit, including loss of the app process. Every attempt requires fresh authorization. Revocation or uncertain cleanup stops without retry.</string>
     <string name="auto_connect_boot">Auto-connect after device boot</string>
     <string name="auto_connect_boot_reason">Android background-start rules and system-managed always-on authority are not yet wired.</string>
     <string name="kill_switch">Kill switch</string>
@@ -134,15 +136,15 @@
     <string name="updates_probes">Updates and probes</string>
     <string name="automatic_signed_updates">Automatic signed profile updates</string>
     <string name="automatic_signed_updates_reason">No verified provider endpoint is present. Imported signed update bundles remain available through the profile import flow.</string>
-    <string name="health_probes">Health probes</string>
-    <string name="health_probes_explanation">Kurd session is the only executable probe in the current owned-loopback environment.</string>
-    <string name="probe_method_value">Method: %1$s</string>
-    <string name="network_probes_unavailable_reason">TCP, HTTP, and ICMP probes remain unavailable until their targets are authorized by an active signed session plan.</string>
-    <string name="run_kurd_loopback_probe">Run Kurd loopback probe</string>
-    <string name="probe_not_run">No probe run yet</string>
-    <string name="probe_running">Probe running</string>
-    <string name="probe_succeeded">Kurd session healthy · %1$d ms</string>
-    <string name="probe_failed">Probe failed safely · %1$s</string>
+    <string name="health_probes">اختبارات TCP الموقّعة</string>
+    <string name="health_probes_explanation">يقيس اتصال TCP موقّعًا واحدًا عبر مسار الاختبار المملوك.</string>
+    <string name="probe_method_value">الطريقة: اتصال TCP موقّع</string>
+    <string name="network_probes_unavailable_reason">يتطلب جلسة اختبار مملوكة متاحة وهدف TCP موقّعًا ومصرّحًا به.</string>
+    <string name="run_signed_tcp_probe">تشغيل اختبار TCP موقّع</string>
+    <string name="probe_not_run">لم يُجرَ اختبار بعد</string>
+    <string name="probe_running">الاختبار قيد التشغيل</string>
+    <string name="probe_succeeded">قياس الاختبار · %1$d مللي ثانية</string>
+    <string name="probe_failed">الاختبار غير متاح</string>
     <string name="runtime_resource_tuning">Runtime resource tuning</string>
     <string name="runtime_resource_tuning_reason">The current runtime does not consume user-defined connection or memory limits. Safe compiled limits remain enforced until an end-to-end execution path and measurements exist.</string>
     <string name="local_logs">Local logs</string>
@@ -180,7 +182,9 @@
     <string name="recovery_required">Recovery required</string>
     <string name="open_recovery_settings">Open recovery settings</string>
     <string name="recovery_storage_locked">Protected storage is locked. Unlock the device and reopen the app.</string>
-    <string name="recovery_migration_required">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="recovery_migration_required">Protected data needs a storage format upgrade. Open recovery settings to continue.</string>
+    <string name="core_incompatible">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="core_unavailable">The VPN core is unavailable. Reopen the app or install a compatible build. Do not reset your protected data.</string>
     <string name="recovery_key_invalidated">The Android Keystore key is invalidated. Ciphertext is preserved; restore an encrypted backup or explicitly reset local data.</string>
     <string name="recovery_storage_degraded">Protected local storage could not complete an operation. Connection remains blocked until recovery succeeds.</string>
     <string name="recovery_quarantined">A protected record failed integrity or recovery checks and is quarantined. It cannot be used for connection.</string>
@@ -216,4 +220,70 @@
     <string name="device_enrollment_delete_key">حذف مفتاح الجهاز غير المستخدم</string>
     <string name="keep_enrollment_key">الاحتفاظ بالمفتاح لتدوير الملف</string>
     <string name="create_device_enrollment_request">إنشاء طلب تسجيل الجهاز</string>
+    <string name="uiux_expanded">موسّع</string>
+    <string name="uiux_collapsed">مطوي</string>
+    <string name="uiux_selected_profile">الملف الشخصي المحدد</string>
+    <string name="uiux_change_profile">تغيير الملف الشخصي</string>
+    <string name="uiux_review_restriction">مراجعة القيد</string>
+    <string name="uiux_choose_profile">اختيار ملف شخصي آخر</string>
+    <string name="uiux_try_again">المحاولة مجددًا</string>
+    <string name="uiux_local_only_scope">بيئة تشغيل اختبار محلية فقط. المرحّل العام والخروج إلى الإنترنت غير مفعّلين.</string>
+
+    <string name="uiux_no_profiles">لا توجد ملفات تعريف بعد</string>
+    <string name="uiux_no_profiles_help">أضف ملف تعريف من مزوّدك للاتصال.</string>
+    <string name="uiux_clear_filters">مسح عوامل التصفية</string>
+    <string name="uiux_favorite_profile">إضافة %1$s إلى المفضلة</string>
+    <string name="uiux_unfavorite_profile">إزالة %1$s من المفضلة</string>
+    <string name="uiux_sort_profiles">ترتيب ملفات التعريف</string>
+    <string name="uiux_sort_name">الاسم</string>
+    <string name="uiux_sort_generation">الجيل</string>
+    <string name="uiux_sort_expiry">انتهاء الصلاحية</string>
+    <string name="uiux_profile_unavailable">ملف التعريف غير متاح. راجع تفاصيله.</string>
+    <string name="uiux_profile_expired">انتهت الصلاحية. أضف ملف تعريف سارياً من مزوّدك.</string>
+    <string name="uiux_select_confirmation_title">قطع الاتصال واختيار ملف التعريف هذا؟</string>
+    <string name="uiux_select_confirmation_body">سيتوقف اتصالك الحالي أو محاولة الاتصال. اختر %1$s، ثم اتصل مجدداً عندما تكون مستعداً.</string>
+    <string name="uiux_disconnect_select">قطع الاتصال والاختيار</string>
+    <string name="uiux_app_privacy">التطبيق والخصوصية</string>
+    <string name="uiux_support">الدعم</string>
+    <string name="uiux_advanced">متقدم</string>
+    <string name="uiux_clear_search">مسح البحث</string>
+    <string name="uiux_decrease">تقليل القيمة</string>
+    <string name="uiux_increase">زيادة القيمة</string>
+    <string name="uiux_backup_restore">النسخ الاحتياطي والاستعادة</string>
+    <string name="uiux_remove_reset">إزالة البيانات أو إعادة ضبطها</string>
+    <string name="uiux_privacy">الخصوصية</string>
+    <string name="uiux_theme_system">الإعداد الافتراضي للنظام</string>
+    <string name="uiux_theme_light">فاتح</string>
+    <string name="uiux_theme_dark">داكن</string>
+    <string name="uiux_filters">عوامل التصفية</string>
+    <string name="uiux_level">المستوى</string>
+    <string name="uiux_component">المكوّن</string>
+    <string name="uiux_filter_summary">%1$s · %2$s</string>
+    <string name="uiux_about">حول</string>
+    <string name="uiux_diagnostic_count">الأحداث المعروضة: %1$d. المطابقة: %2$d. المحفوظة: %3$d.</string>
+    <string name="uiux_event_metadata">%1$d · %2$s · %3$s</string>
+    <string name="uiux_diagnostic_export">تصدير بيانات التشخيص</string>
+    <string name="preview_detail_redacted">مخفي للخصوصية</string>
+    <string name="preview_deployment_local">نشر محلي</string>
+    <string name="foreground_auto_connect_help">محاولة واحدة عند فتح التطبيق باستخدام ملفك المحفوظ وإذن VPN السابق. لا يبدأ عند تشغيل الجهاز أو أثناء الإيقاف المؤقت.</string>
+    <string name="system_vpn_policy_help">يتحكم Android في VPN الدائم وحظر الاتصالات دون VPN. يمكنك إدارتهما من إعدادات VPN في النظام.</string>
+    <string name="open_system_vpn_settings">فتح إعدادات VPN في Android</string>
+    <string name="pause_15_minutes">إيقاف مؤقت لمدة ١٥ دقيقة</string>
+    <string name="pause_until_resumed">إيقاف مؤقت حتى الاستئناف</string>
+    <string name="resume_connections">السماح بالاتصالات مجددًا</string>
+    <string name="resume_connections_help">يلغي هذا الإيقاف المؤقت. اختر اتصال في الصفحة الرئيسية لبدء اتصال جديد.</string>
+    <string name="pause_system_restriction">الإيقاف المؤقت غير متاح عندما يدير Android الاتصال أو يتعذر قراءة سياسة VPN. تحقق من إعدادات VPN في Android.</string>
+    <string name="proxy_recovery_help">نفق VPN ما زال نشطًا، لكن الوكيل المحلي توقف. أعد تشغيل الوكيل أو اتصل مجددًا بدونه.</string>
+    <string name="proxy_restart">إعادة تشغيل الوكيل المحلي</string>
+    <string name="proxy_apply_tun_only">تطبيق وضع VPN فقط</string>
+    <string name="settings_draft_saving">جارٍ حفظ المسودة…</string>
+    <string name="settings_draft_saved">تم حفظ المسودة. لم تتغير الإعدادات المطبقة.</string>
+    <string name="settings_draft_failed">تعذر حفظ هذه المسودة أو تطبيقها. تجاهلها وأعد فتح الإعدادات الحالية.</string>
+    <string name="settings_draft_applying">جارٍ تطبيق الإعدادات…</string>
+    <string name="settings_draft_unapplied">لا تُطبق التغييرات إلا بعد التأكيد.</string>
+    <string name="profile_change_unconfirmed">تعذر تأكيد التغيير. أعد فتح الملف الشخصي للتحقق من حالته الحالية.</string>
+    <string name="privacy_authentication_title">تأكيد الإجراء المحمي</string>
+    <string name="privacy_authentication_help">تحقق من هويتك لمتابعة هذا الإجراء.</string>
+    <string name="protected_action_unconfirmed">تعذر تأكيد الإجراء. راجع الحالة الحالية قبل المحاولة مجددًا.</string>
+    <string name="encrypted_backup_saved">تم حفظ النسخة الاحتياطية المشفرة.</string>
 </resources>

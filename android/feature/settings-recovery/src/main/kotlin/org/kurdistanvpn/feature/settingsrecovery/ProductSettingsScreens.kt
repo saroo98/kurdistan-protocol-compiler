@@ -3,6 +3,7 @@
 
 package org.kurdistanvpn.feature.settingsrecovery
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,11 +16,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import org.kurdistanvpn.core.ui.KurdistanOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
@@ -37,14 +41,13 @@ import org.kurdistanvpn.core.model.ConnectionPreferences
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
 import org.kurdistanvpn.core.model.DiagnosticPreferences
 import org.kurdistanvpn.core.model.DiagnosticRetention
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.ExpertPreferences
 import org.kurdistanvpn.core.model.InstalledApplication
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.PerAppSelectionMode
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProbeDisplay
-import org.kurdistanvpn.core.model.ProbeMethod
 import org.kurdistanvpn.core.model.ProbeExecutionState
 import org.kurdistanvpn.core.model.ProbePreferences
 import org.kurdistanvpn.core.model.ProductCapabilities
@@ -53,11 +56,38 @@ import org.kurdistanvpn.core.model.SelectionMode
 import org.kurdistanvpn.core.model.SettingsValidationException
 import org.kurdistanvpn.core.model.TunnelPreferences
 import org.kurdistanvpn.core.model.UpdatePreferences
+import org.kurdistanvpn.core.ui.LocalEssentialBoundaryWidth
 import org.kurdistanvpn.core.ui.R as UiR
+
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import org.kurdistanvpn.core.ui.KurdistanIcons
+
+private data class SettingsCategory(
+    val title: String,
+    val summary: String,
+    val tag: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
 
 @Composable
 fun SettingsIndexScreen(
-    settings: Phase9Settings,
+    settings: ProductSettings,
     capabilities: ProductCapabilities,
     onConnection: () -> Unit,
     onTunnelDns: () -> Unit,
@@ -66,9 +96,14 @@ fun SettingsIndexScreen(
     onExpert: () -> Unit,
     onPrivacyRecovery: () -> Unit,
     onDiagnostics: () -> Unit,
+
     onBack: () -> Unit,
-) = ProductScreen(stringResource(UiR.string.settings), onBack) {
-    var query by remember { mutableStateOf("") }
+    showBack: Boolean = true,
+    onAppearance: () -> Unit = onPrivacyRecovery,
+    proxyCredentials: @Composable () -> Unit = {},
+) = ProductScreen(stringResource(UiR.string.settings), onBack, showBack) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var capabilitiesExpanded by rememberSaveable { mutableStateOf(false) }
     OutlinedTextField(
         value = query,
         onValueChange = { if (it.length <= 96) query = it },
@@ -76,79 +111,93 @@ fun SettingsIndexScreen(
         singleLine = true,
         modifier = Modifier.fillMaxWidth().testTag("settings_search"),
     )
-    val connectionTitle = stringResource(UiR.string.connection)
-    val connectionSummary = stringResource(UiR.string.connection_settings_summary)
-    val tunnelTitle = stringResource(UiR.string.tunnel_dns)
-    val tunnelSummary = stringResource(UiR.string.tunnel_dns_summary)
-    val routingTitle = stringResource(UiR.string.routing)
-    val routingSummary = stringResource(UiR.string.routing_summary)
-    val updateTitle = stringResource(UiR.string.profile_updates_probes)
-    val updateSummary = stringResource(UiR.string.profile_updates_probes_summary)
-    val privacyTitle = stringResource(UiR.string.privacy_accessibility_recovery)
-    val privacySummary = stringResource(UiR.string.privacy_accessibility_recovery_summary)
-    val diagnosticsTitle = stringResource(UiR.string.diagnostics_about)
-    val diagnosticsSummary = stringResource(UiR.string.diagnostics_about_summary)
-    val expertTitle = stringResource(UiR.string.expert_controls)
-    val expertSummary = stringResource(UiR.string.expert_controls_summary)
-    fun matches(title: String, summary: String): Boolean = query.isBlank() ||
-        title.contains(query, ignoreCase = true) || summary.contains(query, ignoreCase = true)
+    val groups = listOf(
+        stringResource(UiR.string.connection) to listOf(
+            SettingsCategory(stringResource(UiR.string.connection), stringResource(UiR.string.connection_settings_summary),
+                "settings_connection", KurdistanIcons.Connection, onConnection),
+            SettingsCategory(stringResource(UiR.string.routing), stringResource(UiR.string.routing_summary),
+                "settings_routing", KurdistanIcons.Route, onRouting),
+            SettingsCategory(stringResource(UiR.string.tunnel_dns), stringResource(UiR.string.tunnel_dns_summary),
+                "settings_tunnel", KurdistanIcons.Connection, onTunnelDns),
+            SettingsCategory(stringResource(UiR.string.profile_updates_probes), stringResource(UiR.string.profile_updates_probes_summary),
+                "settings_updates", KurdistanIcons.Refresh, onUpdatesProbes),
+        ),
+        stringResource(UiR.string.uiux_app_privacy) to listOf(
+            SettingsCategory(stringResource(UiR.string.appearance), stringResource(UiR.string.appearance),
+                "settings_appearance", KurdistanIcons.Adjustments, onAppearance),
+            SettingsCategory(stringResource(UiR.string.privacy_accessibility_recovery), stringResource(UiR.string.privacy_accessibility_recovery_summary),
+                "settings_privacy", KurdistanIcons.Lock, onPrivacyRecovery),
+        ),
+        stringResource(UiR.string.uiux_support) to listOf(
+            SettingsCategory(stringResource(UiR.string.diagnostics_about), stringResource(UiR.string.diagnostics_about_summary),
+                "settings_diagnostics", KurdistanIcons.Info, onDiagnostics),
+        ),
+        stringResource(UiR.string.uiux_advanced) to listOf(
+            SettingsCategory(stringResource(UiR.string.expert_controls), stringResource(UiR.string.expert_controls_summary),
+                "settings_expert", KurdistanIcons.Adjustments, onExpert),
+        ),
+    )
     var resultCount = 0
-    if (matches(connectionTitle, connectionSummary)) {
-        resultCount++
-        Section(connectionTitle, connectionSummary) {
-        FullButton(stringResource(UiR.string.open_connection_settings), onConnection, "settings_connection")
-    }
-    }
-    if (matches(tunnelTitle, tunnelSummary)) {
-        resultCount++
-        Section(tunnelTitle, tunnelSummary) {
-        Text(stringResource(UiR.string.tunnel_dns_value, settings.tunnel.ipMode.name, settings.tunnel.dnsMode.name, settings.tunnel.mtu))
-        FullButton(stringResource(UiR.string.open_tunnel_dns), onTunnelDns, "settings_tunnel")
-    }
-    }
-    if (matches(routingTitle, routingSummary)) {
-        resultCount++
-        Section(routingTitle, routingSummary) {
-        Text(stringResource(UiR.string.routing_value, settings.routing.mode.name, settings.routing.packages.size))
-        FullButton(stringResource(UiR.string.open_routing), onRouting, "settings_routing")
-    }
-    }
-    if (matches(updateTitle, updateSummary)) {
-        resultCount++
-        Section(updateTitle, updateSummary) {
-        Text(stringResource(UiR.string.update_probe_value, if (settings.updates.automatic) stringResource(UiR.string.enabled) else stringResource(UiR.string.manual), settings.probes.method.name))
-        FullButton(stringResource(UiR.string.open_updates_probes), onUpdatesProbes, "settings_updates")
-    }
-    }
-    if (matches(privacyTitle, privacySummary)) {
-        resultCount++
-        Section(privacyTitle, privacySummary) {
-        FullButton(stringResource(UiR.string.open_privacy_recovery), onPrivacyRecovery, "settings_privacy")
-    }
-    }
-    if (matches(diagnosticsTitle, diagnosticsSummary)) {
-        resultCount++
-        Section(diagnosticsTitle, diagnosticsSummary) {
-        FullButton(stringResource(UiR.string.open_diagnostics_about), onDiagnostics, "settings_diagnostics")
-    }
-    }
-    if (matches(expertTitle, expertSummary)) {
-        resultCount++
-        Section(expertTitle, expertSummary) {
-        FullButton(stringResource(UiR.string.open_expert_controls), onExpert, "settings_expert")
-    }
-    }
-    if (resultCount == 0) {
-        Card(modifier = Modifier.fillMaxWidth().testTag("settings_no_results")) {
-            Text(
-                stringResource(UiR.string.no_settings_match),
-                modifier = Modifier.padding(20.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    groups.forEach { (groupTitle, categories) ->
+        val matching = categories.filter { query.isBlank() || it.title.contains(query, true) || it.summary.contains(query, true) }
+        if (matching.isNotEmpty()) {
+            resultCount += matching.size
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(groupTitle, style = MaterialTheme.typography.titleLarge)
+                matching.forEachIndexed { i, category ->
+                    CategoryRow(category)
+                    if (i < matching.lastIndex) HorizontalDivider(
+                        Modifier.padding(start = 40.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
         }
     }
-    if (query.isBlank()) CapabilityCard(capabilities)
+    if (resultCount == 0) {
+        Text(stringResource(UiR.string.no_settings_match), modifier = Modifier.testTag("settings_no_results"))
+        TextButton(onClick = { query = "" }, modifier = Modifier.heightIn(min = 48.dp).testTag("settings_clear_search")) {
+            Text(stringResource(UiR.string.uiux_clear_search))
+        }
+    }
+    if (query.isBlank()) {
+        proxyCredentials()
+        val detailState = stringResource(if (capabilitiesExpanded) UiR.string.uiux_expanded else UiR.string.uiux_collapsed)
+        TextButton(onClick = { capabilitiesExpanded = !capabilitiesExpanded },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .semantics { stateDescription = detailState }.testTag("settings_capabilities")) {
+            Text(stringResource(UiR.string.capability_boundary), Modifier.weight(1f))
+            Icon(if (capabilitiesExpanded) KurdistanIcons.ChevronDown else KurdistanIcons.ChevronForward, null)
+        }
+        if (capabilitiesExpanded) CapabilityCard(capabilities)
+    }
 }
+
+@Composable
+private fun CategoryRow(category: SettingsCategory) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 72.dp)
+            .clickable(role = Role.Button, onClick = category.onClick)
+            .testTag(category.tag).padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(category.icon, null, Modifier.size(24.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(category.title, style = MaterialTheme.typography.titleMedium)
+            Text(category.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(KurdistanIcons.ChevronForward, null, Modifier.size(24.dp))
+    }
+}
+
+@Composable
+fun AppearanceSettingsScreen(applied: ProductSettings, editor: SettingsEditorState?,
+    onEdit: (ProductSettings) -> Unit, onApply: () -> Unit, onCancel: () -> Unit, onBack: () -> Unit) =
+    ProductScreen(stringResource(UiR.string.appearance), onBack) {
+        val requested = editor?.requested ?: applied
+        AppearanceControls(requested, { onEdit(requested.copy(theme = it)) },
+            { onEdit(requested.copy(highContrast = it)) }, { onEdit(requested.copy(reducedMotion = it)) })
+        DraftActions(requested != applied, onApply, onCancel, editor?.phase)
+    }
 
 @Composable
 fun ConnectionSettingsScreen(
@@ -156,31 +205,61 @@ fun ConnectionSettingsScreen(
     onChange: (ConnectionPreferences) -> Unit,
     onRecoverInternet: () -> Unit,
     onBack: () -> Unit,
+    paused: Boolean = false,
+    canPause: Boolean = false,
+    onPause: (Long?) -> Unit = {},
+    onSystemVpnSettings: () -> Unit = {},
+    draftValue: ConnectionPreferences? = null,
+    onEdit: ((ConnectionPreferences) -> Unit)? = null,
+    onCancelDraft: (() -> Unit)? = null,
+    editorPhase: SettingsEditorPhase? = null,
 ) {
-    var draft by remember(value) { mutableStateOf(value) }
+    var localDraft by remember(value) { mutableStateOf(value) }
+    val draft = draftValue ?: localDraft
+    fun edit(next: ConnectionPreferences) { if (onEdit != null) onEdit(next) else localDraft = next }
     ProductScreen(stringResource(UiR.string.connection), onBack) {
     Section(stringResource(UiR.string.selection_mode), stringResource(UiR.string.selection_mode_explanation)) {
         ChoiceRow(SelectionMode.entries.filter { it != SelectionMode.MANUAL_STRATEGY }, draft.selectionMode) {
-            draft = draft.copy(selectionMode = it)
+            edit(draft.copy(selectionMode = it))
         }
         Text(stringResource(UiR.string.manual_strategy_unavailable))
     }
-    UnavailableSetting(stringResource(UiR.string.auto_connect_launch), stringResource(UiR.string.auto_connect_launch_reason))
-    AvailableSetting(
+    ToggleRow(stringResource(UiR.string.auto_connect_launch), stringResource(UiR.string.foreground_auto_connect_help), draft.autoConnectOnLaunch) {
+        edit(draft.copy(autoConnectOnLaunch = it))
+    }
+    ToggleRow(
         stringResource(UiR.string.safe_reconnect),
         stringResource(UiR.string.safe_reconnect_reason),
-        "safe_reconnect_available",
-    )
-    UnavailableSetting(stringResource(UiR.string.auto_connect_boot), stringResource(UiR.string.auto_connect_boot_reason))
-    UnavailableSetting(stringResource(UiR.string.kill_switch), stringResource(UiR.string.kill_switch_reason))
+        draft.reconnectOnFailure,
+    ) { edit(draft.copy(reconnectOnFailure = it)) }
+    Text(stringResource(UiR.string.system_vpn_policy_help))
+    OutlinedButton(onClick = onSystemVpnSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        Text(stringResource(UiR.string.open_system_vpn_settings))
+    }
+    if (paused) {
+        OutlinedButton(onClick = { onPause(null) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("resume_connections")) {
+            Text(stringResource(UiR.string.resume_connections))
+        }
+        Text(stringResource(UiR.string.resume_connections_help))
+    } else {
+        OutlinedButton(onClick = { onPause(900000) }, enabled = canPause,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("pause_15_minutes")) {
+            Text(stringResource(UiR.string.pause_15_minutes))
+        }
+        OutlinedButton(onClick = { onPause(0) }, enabled = canPause, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+            Text(stringResource(UiR.string.pause_until_resumed))
+        }
+        if (!canPause) Text(stringResource(UiR.string.pause_system_restriction))
+    }
     UnavailableSetting(stringResource(UiR.string.allow_local_network), stringResource(UiR.string.allow_local_network_reason))
     UnavailableSetting(stringResource(UiR.string.trusted_network_auto_connect), stringResource(UiR.string.trusted_network_auto_connect_reason))
     DraftActions(
         changed = draft != value,
         onApply = { onChange(draft) },
-        onCancel = { draft = value },
+        onCancel = { if (onCancelDraft != null) onCancelDraft() else localDraft = value },
+        editorPhase = editorPhase,
     )
-    OutlinedButton(onClick = onRecoverInternet, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.outlinedButtonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), onClick = onRecoverInternet, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.small) {
         Text(stringResource(UiR.string.recover_internet_stop_vpn))
     }
 }
@@ -191,23 +270,29 @@ fun TunnelDnsSettingsScreen(
     value: TunnelPreferences,
     onChange: (TunnelPreferences) -> Unit,
     onBack: () -> Unit,
+    draftValue: TunnelPreferences? = null,
+    onEdit: ((TunnelPreferences) -> Unit)? = null,
+    onCancelDraft: (() -> Unit)? = null,
+    editorPhase: SettingsEditorPhase? = null,
 ) {
-    var draft by remember(value) { mutableStateOf(value) }
+    var localDraft by remember(value) { mutableStateOf(value) }
+    val draft = draftValue ?: localDraft
+    fun edit(next: TunnelPreferences) { if (onEdit != null) onEdit(next) else localDraft = next }
     var error by remember(value) { mutableStateOf<String?>(null) }
     ProductScreen(stringResource(UiR.string.tunnel_dns), onBack) {
     Section(stringResource(UiR.string.ip_family), stringResource(UiR.string.ip_family_explanation)) {
-        ChoiceRow(listOf(IpMode.AUTO, IpMode.IPV4_ONLY), draft.ipMode) { draft = draft.copy(ipMode = it) }
+        ChoiceRow(listOf(IpMode.AUTO, IpMode.IPV4_ONLY), draft.ipMode) { edit(draft.copy(ipMode = it)) }
         Text(stringResource(UiR.string.ipv6_unavailable_reason))
     }
     Section(stringResource(UiR.string.dns), stringResource(UiR.string.dns_explanation)) {
-        ChoiceRow(listOf(DnsMode.INTERNAL_TUN), draft.dnsMode) { draft = draft.copy(dnsMode = it, customDns = "") }
+        ChoiceRow(listOf(ResolverPolicy.INTERNAL), draft.dnsMode) { edit(draft.copy(dnsMode = it, customDns = "")) }
         Text(stringResource(UiR.string.external_dns_unavailable_reason))
     }
     Section(stringResource(UiR.string.mtu), stringResource(UiR.string.mtu_explanation)) {
-        NumericStepper(draft.mtu, 1280, 1500, 10) { draft = draft.copy(mtu = it) }
+        NumericStepper(draft.mtu, 1280, 1500, 10) { edit(draft.copy(mtu = it)) }
     }
     ToggleRow(stringResource(UiR.string.treat_vpn_metered), stringResource(UiR.string.treat_vpn_metered_explanation), draft.metered) {
-        draft = draft.copy(metered = it)
+        edit(draft.copy(metered = it))
     }
     UnavailableSetting(stringResource(UiR.string.speed_notification), stringResource(UiR.string.speed_notification_reason))
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -218,7 +303,8 @@ fun TunnelDnsSettingsScreen(
                 .onSuccess { valid -> error = null; onChange(valid) }
                 .onFailure { failure -> error = validationMessage(failure) }
         },
-        onCancel = { draft = value; error = null },
+        onCancel = { if (onCancelDraft != null) onCancelDraft() else localDraft = value; error = null },
+        editorPhase = editorPhase,
     )
 }
 }
@@ -229,15 +315,21 @@ fun RoutingSettingsScreen(
     applications: List<InstalledApplication>,
     onChange: (RoutingPreferences) -> Unit,
     onBack: () -> Unit,
+    draftValue: RoutingPreferences? = null,
+    onEdit: ((RoutingPreferences) -> Unit)? = null,
+    onCancelDraft: (() -> Unit)? = null,
+    editorPhase: SettingsEditorPhase? = null,
 ) {
-    var draft by remember(value) { mutableStateOf(value) }
+    var localDraft by remember(value) { mutableStateOf(value) }
+    val draft = draftValue ?: localDraft
+    fun edit(next: RoutingPreferences) { if (onEdit != null) onEdit(next) else localDraft = next }
     var error by remember(value) { mutableStateOf<String?>(null) }
     ProductScreen(stringResource(UiR.string.per_app_routing), onBack) {
     Text(stringResource(UiR.string.launchable_apps_only))
     ChoiceRow(PerAppSelectionMode.entries, draft.mode) { mode ->
-        draft = draft.copy(mode = mode, packages = if (mode == PerAppSelectionMode.ALL_APPS) emptySet() else draft.packages)
+        edit(draft.copy(mode = mode, packages = if (mode == PerAppSelectionMode.ALL_APPS) emptySet() else draft.packages))
     }
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     OutlinedTextField(
         value = search,
         onValueChange = { if (it.length <= 128) search = it },
@@ -255,7 +347,7 @@ fun RoutingSettingsScreen(
                 val packages = draft.packages.toMutableSet().apply {
                     if (enabled) add(app.packageName) else remove(app.packageName)
                 }
-                draft = draft.copy(packages = packages)
+                edit(draft.copy(packages = packages))
             }
         }
     }
@@ -268,7 +360,8 @@ fun RoutingSettingsScreen(
                 .onSuccess { valid -> error = null; onChange(valid) }
                 .onFailure { failure -> error = validationMessage(failure) }
         },
-        onCancel = { draft = value; error = null },
+        onCancel = { if (onCancelDraft != null) onCancelDraft() else localDraft = value; error = null },
+        editorPhase = editorPhase,
     )
 }
 }
@@ -288,15 +381,15 @@ fun UpdatesProbeSettingsScreen(
         stringResource(UiR.string.automatic_signed_updates_reason),
     )
     Section(stringResource(UiR.string.health_probes), stringResource(UiR.string.health_probes_explanation)) {
-        Text(stringResource(UiR.string.probe_method_value, ProbeMethod.KURD_SESSION.name))
+        Text(stringResource(UiR.string.probe_method_value))
         Text(stringResource(UiR.string.network_probes_unavailable_reason))
-        Button(onClick = onRunLocalProbe, modifier = Modifier.fillMaxWidth()) { Text(stringResource(UiR.string.run_kurd_loopback_probe)) }
+        Button(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.buttonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), onClick = onRunLocalProbe, modifier = Modifier.fillMaxWidth()) { Text(stringResource(UiR.string.run_signed_tcp_probe)) }
         Text(
             when (probeState) {
                 ProbeExecutionState.Idle -> stringResource(UiR.string.probe_not_run)
                 ProbeExecutionState.Running -> stringResource(UiR.string.probe_running)
                 is ProbeExecutionState.Succeeded -> stringResource(UiR.string.probe_succeeded, probeState.latencyMillis)
-                is ProbeExecutionState.Failed -> stringResource(UiR.string.probe_failed, probeState.category.name)
+                is ProbeExecutionState.Failed -> stringResource(UiR.string.probe_failed)
             },
         )
     }
@@ -329,40 +422,44 @@ fun ExpertSettingsScreen(
 }
 }
 
+
 @Composable
-private fun ProductScreen(
+internal fun ProductScreen(
     title: String,
     onBack: () -> Unit,
+    showBack: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().widthIn(max = 840.dp).verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val gutter = if (with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } < 600.dp) 16.dp else 24.dp
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()
+                .verticalScroll(rememberScrollState()).padding(horizontal = gutter, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(UiR.string.back))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (showBack) TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp).testTag("settings_back")) {
+                    Text(stringResource(UiR.string.back))
+                }
+                Text(title, style = MaterialTheme.typography.headlineMedium)
             }
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.weight(1f),
-            )
+            content()
         }
-        content()
     }
 }
 
 @Composable
 private fun Section(title: String, explanation: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(explanation, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(explanation, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             content()
         }
     }
@@ -370,64 +467,83 @@ private fun Section(title: String, explanation: String, content: @Composable () 
 
 @Composable
 private fun ToggleRow(title: String, explanation: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.weight(1f)) {
-            Text(title)
-            Text(explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange).padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(explanation, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
 @Composable
 private fun <T : Enum<T>> ChoiceRow(values: List<T>, selected: T, onSelect: (T) -> Unit) {
-    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
         values.forEach { value ->
-            FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(value.name) })
+            FilterChip(border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), selected = value == selected, onClick = { onSelect(value) },
+                modifier = Modifier.heightIn(min = 48.dp), label = { Text(value.name) })
         }
     }
 }
 
 @Composable
 private fun NumericStepper(value: Int, minimum: Int, maximum: Int, step: Int, onChange: (Int) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedButton(onClick = { onChange((value - step).coerceAtLeast(minimum)) }, enabled = value > minimum) { Text("−") }
+    val decrease = stringResource(UiR.string.uiux_decrease)
+    val increase = stringResource(UiR.string.uiux_increase)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.outlinedButtonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), onClick = { if (value > minimum) onChange((value - step).coerceAtLeast(minimum)) }, enabled = value > minimum,
+            modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = decrease }, shape = MaterialTheme.shapes.small) { Text("−") }
         Text(value.toString(), modifier = Modifier.padding(vertical = 12.dp))
-        OutlinedButton(onClick = { onChange((value + step).coerceAtMost(maximum)) }, enabled = value < maximum) { Text("+") }
+        OutlinedButton(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.outlinedButtonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), onClick = { if (value < maximum) onChange((value + step).coerceAtMost(maximum)) }, enabled = value < maximum,
+            modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = increase }, shape = MaterialTheme.shapes.small) { Text("+") }
     }
 }
 
 @Composable
-private fun FullButton(label: String, onClick: () -> Unit, tag: String) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag(tag)) { Text(label) }
-}
-
-@Composable
-private fun DraftActions(
-    changed: Boolean,
-    onApply: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(
-            onClick = onApply,
-            enabled = changed,
-            modifier = Modifier.weight(1f).testTag("settings_apply"),
-        ) { Text(stringResource(UiR.string.apply)) }
-        OutlinedButton(
-            onClick = onCancel,
-            enabled = changed,
-            modifier = Modifier.weight(1f).testTag("settings_cancel"),
-        ) { Text(stringResource(UiR.string.cancel_changes)) }
+private fun DraftActions(changed: Boolean, onApply: () -> Unit, onCancel: () -> Unit, editorPhase: SettingsEditorPhase? = null) {
+    val canApply = changed && (editorPhase == null || editorPhase == SettingsEditorPhase.SAVED)
+    val canCancel = changed || editorPhase == SettingsEditorPhase.FAILED || editorPhase == SettingsEditorPhase.SAVING
+    if (editorPhase != null) Text(stringResource(when (editorPhase) {
+        SettingsEditorPhase.SAVING, SettingsEditorPhase.LOADING -> UiR.string.settings_draft_saving
+        SettingsEditorPhase.SAVED -> UiR.string.settings_draft_saved
+        SettingsEditorPhase.FAILED -> UiR.string.settings_draft_failed
+        SettingsEditorPhase.APPLYING -> UiR.string.settings_draft_applying
+        else -> UiR.string.settings_draft_unapplied
+    }), modifier = Modifier.testTag("settings_draft_status"))
+    val largeText = LocalConfiguration.current.fontScale >= 1.5f
+    @Composable fun ApplyButton(modifier: Modifier) {
+        Button(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.buttonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), onClick = { if (canApply) onApply() }, enabled = canApply, shape = MaterialTheme.shapes.small,
+            modifier = modifier.heightIn(min = 56.dp).testTag("settings_apply")) { Text(stringResource(UiR.string.apply)) }
+    }
+    @Composable fun CancelButton(modifier: Modifier) {
+        OutlinedButton(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), colors = ButtonDefaults.outlinedButtonColors(disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant), border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), onClick = { if (canCancel) onCancel() }, enabled = canCancel, shape = MaterialTheme.shapes.small,
+            modifier = modifier.heightIn(min = 56.dp).testTag("settings_cancel")) { Text(stringResource(UiR.string.cancel_changes)) }
+    }
+    if (largeText) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ApplyButton(Modifier.fillMaxWidth())
+            CancelButton(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ApplyButton(Modifier.weight(1f))
+            CancelButton(Modifier.weight(1f))
+        }
     }
 }
 
 @Composable
 private fun UnavailableSetting(title: String, explanation: String) {
     Card(modifier = Modifier.fillMaxWidth().testTag("unavailable_${title.hashCode()}")) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(UiR.string.unavailable), color = MaterialTheme.colorScheme.error)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(UiR.string.unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(explanation, style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -436,8 +552,8 @@ private fun UnavailableSetting(title: String, explanation: String) {
 @Composable
 private fun AvailableSetting(title: String, explanation: String, tag: String) {
     Card(modifier = Modifier.fillMaxWidth().testTag(tag)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
             Text(stringResource(UiR.string.available), color = MaterialTheme.colorScheme.primary)
             Text(explanation, style = MaterialTheme.typography.bodySmall)
         }

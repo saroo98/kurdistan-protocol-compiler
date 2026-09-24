@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="local_proxy_active">پراکسی محلی فعال است</string>
+    <string name="local_proxy_not_device_vpn">فقط برنامه‌های تنظیم‌شده برای پراکسی محلی از این اتصال استفاده می‌کنند. ترافیک دستگاه از تونل عبور نمی‌کند.</string>
     <string name="product_name">وی‌پی‌ان کردستان</string><string name="foundation_label">پایهٔ امن نمایه‌ها</string><string name="runtime_unavailable">زمان‌اجرای VPN در دسترس نیست</string><string name="phase9_offline_notice">این ساخت مرحلهٔ ۹ نمایه‌ها را آفلاین راستی‌آزمایی و محافظت می‌کند. امکان اتصال یا مسیریابی ترافیک ندارد.</string>
     <string name="application_state">وضعیت برنامه: %1$s</string><string name="unknown">نامشخص</string><string name="import_rejected">ورود رد شد: %1$s</string><string name="dismiss">بستن</string><string name="profiles">نمایه‌ها</string><string name="privacy_recovery">حریم خصوصی و بازیابی</string><string name="diagnostics_about">عیب‌یابی و درباره</string><string name="kurd_profiles">نمایه‌های کرد</string>
     <plurals name="verified_profile_count"><item quantity="one">%1$d نمایهٔ تأییدشده</item><item quantity="other">%1$d نمایهٔ تأییدشده</item></plurals>
@@ -32,7 +34,7 @@
     <string name="favorites_all">All profiles</string>
     <string name="sort_value">Sort: %1$s</string>
     <string name="no_matching_profiles">No profiles match these filters.</string>
-    <string name="selected">Selected</string>
+    <string name="profile_selected">انتخاب‌شده</string>
     <string name="use_profile">Use profile</string>
     <string name="favorite">Favorite</string>
     <string name="unfavorite">Remove favorite</string>
@@ -104,7 +106,7 @@
     <string name="auto_connect_launch">Auto-connect on app launch</string>
     <string name="auto_connect_launch_reason">Automatic startup is disabled until consent, verified-profile availability, and bounded lifecycle retries are exercised together by the device gate.</string>
     <string name="safe_reconnect">Safe reconnect</string>
-    <string name="safe_reconnect_reason">Network failures retry only within the signed profile limit. Every attempt reopens authority and creates a fresh protected Kurd session. Revocation and non-network failures stop without retry.</string>
+    <string name="safe_reconnect_reason">Connection interruptions can retry within the signed profile limit, including loss of the app process. Every attempt requires fresh authorization. Revocation or uncertain cleanup stops without retry.</string>
     <string name="auto_connect_boot">Auto-connect after device boot</string>
     <string name="auto_connect_boot_reason">Android background-start rules and system-managed always-on authority are not yet wired.</string>
     <string name="kill_switch">Kill switch</string>
@@ -134,15 +136,15 @@
     <string name="updates_probes">Updates and probes</string>
     <string name="automatic_signed_updates">Automatic signed profile updates</string>
     <string name="automatic_signed_updates_reason">No verified provider endpoint is present. Imported signed update bundles remain available through the profile import flow.</string>
-    <string name="health_probes">Health probes</string>
-    <string name="health_probes_explanation">Kurd session is the only executable probe in the current owned-loopback environment.</string>
-    <string name="probe_method_value">Method: %1$s</string>
-    <string name="network_probes_unavailable_reason">TCP, HTTP, and ICMP probes remain unavailable until their targets are authorized by an active signed session plan.</string>
-    <string name="run_kurd_loopback_probe">Run Kurd loopback probe</string>
-    <string name="probe_not_run">No probe run yet</string>
-    <string name="probe_running">Probe running</string>
-    <string name="probe_succeeded">Kurd session healthy · %1$d ms</string>
-    <string name="probe_failed">Probe failed safely · %1$s</string>
+    <string name="health_probes">آزمون‌های TCP امضاشده</string>
+    <string name="health_probes_explanation">یک اتصال TCP امضاشده را در مسیر آزمون تحت مالکیت اندازه‌گیری می‌کند.</string>
+    <string name="probe_method_value">روش: اتصال TCP امضاشده</string>
+    <string name="network_probes_unavailable_reason">به نشست آزمون تحت مالکیت و هدف TCP امضاشده و مجاز نیاز دارد.</string>
+    <string name="run_signed_tcp_probe">اجرای آزمون TCP امضاشده</string>
+    <string name="probe_not_run">هنوز آزمونی اجرا نشده است</string>
+    <string name="probe_running">آزمون در حال اجراست</string>
+    <string name="probe_succeeded">اندازه‌گیری آزمون · %1$d میلی‌ثانیه</string>
+    <string name="probe_failed">آزمون در دسترس نیست</string>
     <string name="runtime_resource_tuning">Runtime resource tuning</string>
     <string name="runtime_resource_tuning_reason">The current runtime does not consume user-defined connection or memory limits. Safe compiled limits remain enforced until an end-to-end execution path and measurements exist.</string>
     <string name="local_logs">Local logs</string>
@@ -180,7 +182,9 @@
     <string name="recovery_required">Recovery required</string>
     <string name="open_recovery_settings">Open recovery settings</string>
     <string name="recovery_storage_locked">Protected storage is locked. Unlock the device and reopen the app.</string>
-    <string name="recovery_migration_required">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="recovery_migration_required">Protected data needs a storage format upgrade. Open recovery settings to continue.</string>
+    <string name="core_incompatible">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="core_unavailable">The VPN core is unavailable. Reopen the app or install a compatible build. Do not reset your protected data.</string>
     <string name="recovery_key_invalidated">The Android Keystore key is invalidated. Ciphertext is preserved; restore an encrypted backup or explicitly reset local data.</string>
     <string name="recovery_storage_degraded">Protected local storage could not complete an operation. Connection remains blocked until recovery succeeds.</string>
     <string name="recovery_quarantined">A protected record failed integrity or recovery checks and is quarantined. It cannot be used for connection.</string>
@@ -216,4 +220,70 @@
     <string name="device_enrollment_delete_key">حذف کلید بدون استفاده</string>
     <string name="keep_enrollment_key">نگه‌داشتن کلید برای چرخش نمایه</string>
     <string name="create_device_enrollment_request">ساخت درخواست ثبت دستگاه</string>
+    <string name="uiux_expanded">بازشده</string>
+    <string name="uiux_collapsed">بسته</string>
+    <string name="uiux_selected_profile">پروفایل انتخاب‌شده</string>
+    <string name="uiux_change_profile">تغییر پروفایل</string>
+    <string name="uiux_review_restriction">بررسی محدودیت</string>
+    <string name="uiux_choose_profile">انتخاب پروفایل دیگر</string>
+    <string name="uiux_try_again">تلاش دوباره</string>
+    <string name="uiux_local_only_scope">فقط محیط اجرای آزمایش محلی است. رله عمومی و خروجی اینترنت فعال نیستند.</string>
+
+    <string name="uiux_no_profiles">هنوز نمایه‌ای ندارید</string>
+    <string name="uiux_no_profiles_help">برای اتصال، نمایه‌ای از ارائه‌دهندهٔ خود اضافه کنید.</string>
+    <string name="uiux_clear_filters">پاک کردن فیلترها</string>
+    <string name="uiux_favorite_profile">افزودن %1$s به علاقه‌مندی‌ها</string>
+    <string name="uiux_unfavorite_profile">حذف %1$s از علاقه‌مندی‌ها</string>
+    <string name="uiux_sort_profiles">مرتب‌سازی نمایه‌ها</string>
+    <string name="uiux_sort_name">نام</string>
+    <string name="uiux_sort_generation">نسل</string>
+    <string name="uiux_sort_expiry">انقضا</string>
+    <string name="uiux_profile_unavailable">نمایه در دسترس نیست. جزئیات آن را بررسی کنید.</string>
+    <string name="uiux_profile_expired">منقضی شده است. نمایهٔ معتبری از ارائه‌دهندهٔ خود اضافه کنید.</string>
+    <string name="uiux_select_confirmation_title">اتصال قطع و این نمایه انتخاب شود؟</string>
+    <string name="uiux_select_confirmation_body">اتصال فعلی یا تلاش برای اتصال متوقف می‌شود. %1$s را انتخاب کنید و هر زمان آماده بودید دوباره متصل شوید.</string>
+    <string name="uiux_disconnect_select">قطع اتصال و انتخاب</string>
+    <string name="uiux_app_privacy">برنامه و حریم خصوصی</string>
+    <string name="uiux_support">پشتیبانی</string>
+    <string name="uiux_advanced">پیشرفته</string>
+    <string name="uiux_clear_search">پاک کردن جستجو</string>
+    <string name="uiux_decrease">کاهش مقدار</string>
+    <string name="uiux_increase">افزایش مقدار</string>
+    <string name="uiux_backup_restore">پشتیبان‌گیری و بازیابی</string>
+    <string name="uiux_remove_reset">حذف یا بازنشانی داده‌ها</string>
+    <string name="uiux_privacy">حریم خصوصی</string>
+    <string name="uiux_theme_system">پیش‌فرض سیستم</string>
+    <string name="uiux_theme_light">روشن</string>
+    <string name="uiux_theme_dark">تیره</string>
+    <string name="uiux_filters">فیلترها</string>
+    <string name="uiux_level">سطح</string>
+    <string name="uiux_component">بخش</string>
+    <string name="uiux_filter_summary">%1$s · %2$s</string>
+    <string name="uiux_about">درباره</string>
+    <string name="uiux_diagnostic_count">رویدادهای نمایش‌داده‌شده: %1$d. منطبق: %2$d. ذخیره‌شده: %3$d.</string>
+    <string name="uiux_event_metadata">%1$d · %2$s · %3$s</string>
+    <string name="uiux_diagnostic_export">خروجی عیب‌یابی</string>
+    <string name="preview_detail_redacted">پنهان برای حفظ حریم خصوصی</string>
+    <string name="preview_deployment_local">استقرار محلی</string>
+    <string name="foreground_auto_connect_help">هنگام باز کردن برنامه، یک بار با نمایهٔ ذخیره‌شده و مجوز قبلی VPN تلاش می‌کند. هنگام راه‌اندازی دستگاه یا توقف موقت شروع نمی‌شود.</string>
+    <string name="system_vpn_policy_help">Android اتصال همیشگی VPN و مسدود کردن اتصال بدون VPN را کنترل می‌کند. آن‌ها را در تنظیمات VPN سیستم مدیریت کنید.</string>
+    <string name="open_system_vpn_settings">باز کردن تنظیمات VPN اندروید</string>
+    <string name="pause_15_minutes">توقف موقت برای ۱۵ دقیقه</string>
+    <string name="pause_until_resumed">توقف موقت تا ادامه دادن</string>
+    <string name="resume_connections">اجازهٔ دوباره به اتصال‌ها</string>
+    <string name="resume_connections_help">این کار توقف موقت را لغو می‌کند. برای شروع اتصال جدید، در صفحهٔ اصلی اتصال را انتخاب کنید.</string>
+    <string name="pause_system_restriction">وقتی Android اتصال را مدیریت می‌کند یا سیاست VPN قابل خواندن نیست، توقف موقت در دسترس نیست. تنظیمات VPN اندروید را بررسی کنید.</string>
+    <string name="proxy_recovery_help">تونل VPN هنوز فعال است، اما پراکسی محلی متوقف شده است. پراکسی را دوباره راه‌اندازی کنید یا بدون آن دوباره وصل شوید.</string>
+    <string name="proxy_restart">راه‌اندازی دوبارهٔ پراکسی محلی</string>
+    <string name="proxy_apply_tun_only">اعمال حالت فقط VPN</string>
+    <string name="settings_draft_saving">در حال ذخیرهٔ پیش‌نویس…</string>
+    <string name="settings_draft_saved">پیش‌نویس ذخیره شد. تنظیمات اعمال‌شده تغییری نکرده‌اند.</string>
+    <string name="settings_draft_failed">ذخیره یا اعمال این پیش‌نویس ممکن نشد. آن را کنار بگذارید و تنظیمات فعلی را دوباره باز کنید.</string>
+    <string name="settings_draft_applying">در حال اعمال تنظیمات…</string>
+    <string name="settings_draft_unapplied">تغییرات فقط پس از تأیید اعمال می‌شوند.</string>
+    <string name="profile_change_unconfirmed">تأیید تغییر ممکن نشد. برای بررسی وضعیت فعلی، نمایه را دوباره باز کنید.</string>
+    <string name="privacy_authentication_title">تأیید اقدام محافظت‌شده</string>
+    <string name="privacy_authentication_help">برای ادامه این اقدام، هویت خود را تأیید کنید.</string>
+    <string name="protected_action_unconfirmed">اقدام تأیید نشد. پیش از تلاش دوباره، وضعیت فعلی را بررسی کنید.</string>
+    <string name="encrypted_backup_saved">نسخهٔ پشتیبان رمزگذاری‌شده ذخیره شد.</string>
 </resources>
