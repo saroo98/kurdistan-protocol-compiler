@@ -1555,9 +1555,9 @@
     "Rêzikên DNS aîdî girêdana piştrastkirî ne, ne vegerandineke derfetî ber bi çareserkerekî giştî ve."
   ],
   [
-    "The Phase 17 engineering package documents a Kurd TLS relay and TUN-scoped resolver policy.",
-    "پاکێجی ئەندازیاریی قۆناغی 17 ڕیلەیەکی Kurd TLS و سیاسەتی وەڵامدەرێکی سنووردار بە TUN تۆمار دەکات.",
-    "Pakêta endezyariyê ya Qonaxa 17 veguhêzerekî Kurd TLS û rêzikên çareserkerê di qada TUN de belge dike."
+    "The relay implementation documents a Kurd TLS connection and TUN-scoped resolver policy.",
+    "جێبەجێکردنی ڕیلە پەیوەندیی Kurd TLS و سیاسەتی چارەسەرکەری DNS لە سنووری TUN بەڵگەدار دەکات.",
+    "Pêkanîna relayê girêdana Kurd TLS û siyaseta çareserkera DNS di sînorê TUN de belge dike."
   ],
   [
     "The public production egress path and broad device validation are not established as released. This is not a blanket DNS-leak guarantee.",
@@ -1650,14 +1650,14 @@
     "Tenê bi kontrola herêmî ya kod û xebitandinê hatiye piştrastkirin. Mêvandarê paşê daxwazên webê distîne; ragirtina tomarên wî siyaseta birêveber dixwaze."
   ],
   [
-    "Wider platform and operational validation remains future work.",
-    "پشکنینی فراوانتری پلاتفۆرم و بەڕێوەبردن هێشتا کاری داهاتووە.",
-    "Kontrola platform û xebitandinê ya berfirehtir hîn karê pêşerojê ye."
+    "Platform and deployment support must be checked for the exact build.",
+    "پشتگیریی پلاتفۆرم و دامەزراندن دەبێت بۆ هەمان وەشانی دروستکراو بپشکنرێت.",
+    "Piştgiriya platformê û sazkirinê divê ji bo heman avakirina nermalavê were kontrolkirin."
   ],
   [
-    "A roadmap is not a claim that a feature protects users today.",
-    "نەخشەڕێگا بە مانای ئەوە نییە کە تایبەتمەندییەک ئێستا بەکارهێنەر دەپارێزێت.",
-    "Nexşeya rêyê nayê wê wateyê ku taybetmendiyek niha bikarhêneran diparêze."
+    "Source availability does not establish protection on every device or network.",
+    "بەردەستبوونی کۆدی سەرچاوە پاراستن لە هەموو ئامێر و تۆڕێک ناسەلمێنێت.",
+    "Berdestbûna kodê parastinê li ser her amûr û torê îspat nake."
   ],
   [
     "Release gates must bind source, artifacts, signatures and exact-build qualification before public download claims change.",
@@ -2325,9 +2325,9 @@
     "Belgeyên weşanê û rewşa projeyê — Kurdistan VPN"
   ],
   [
-    "Distinguish source milestones, engineering work and a verifiable public Kurdistan VPN release. No fabricated changelog or release artifact.",
-    "جیاوازیی نێوان قۆناغەکانی کۆد، کاری ئەندازیاری و بڵاوکراوەی گشتیی پشتڕاستکردنەوەپەسەندی Kurdistan VPN بزانە. هیچ گۆڕاننامە یان بەرهەمی بڵاوکراوەی لەخۆوەدروستکراو نییە.",
-    "Qonaxên kodê, karê endezyariyê û weşaneke giştî ya Kurdistan VPN ku dikare were piştrastkirin ji hev cuda bike. Tomara guhertinan an berhema weşanê ya çêkirî tune ye."
+    "Check public Kurdistan VPN releases, source revisions and artifact verification. No invented release or download is offered.",
+    "بڵاوکراوە گشتییەکانی Kurdistan VPN، وەشانەکانی کۆد و پشتڕاستکردنەوەی فایلەکان بپشکنە. هیچ بڵاوکراوە یان داگرتنێکی ساختە پێشکەش ناکرێت.",
+    "Weşanên giştî yên Kurdistan VPN, guhertoyên kodê û rastandina pelan kontrol bike. Tu weşan an daxistina çêkirî nayê pêşkêşkirin."
   ],
   [
     "SOURCE SNAPSHOT",
@@ -2395,9 +2395,9 @@
     "Endezyarî"
   ],
   [
-    "Phase 17 authenticated relay path described; external acceptance remains a gate.",
-    "ڕێڕەوی پشتڕاستکراوەی ڕیلەیی قۆناغی 17 باس کراوە؛ پەسەندکردنی دەرەکی هێشتا مەرجە.",
-    "Rêya veguhêzerê ya piştrastkirî ya Qonaxa 17 hatiye ravekirin; pejirandina derveyî hîn pêşmerc e."
+    "Authenticated relay implementation is available for controlled validation, not a qualified public service.",
+    "جێبەجێکردنی ڕیلەی پشتڕاستکراو بۆ تاقیکردنەوەی کۆنترۆڵکراو بەردەستە، نەک وەک خزمەتگوزارییەکی گشتیی پەسەندکراو.",
+    "Pêkanîna relayê ya rastandî ji bo ceribandina kontrolkirî berdest e, ne wek xizmeteke giştî ya pejirandî."
   ],
   [
     "Public release",
@@ -2420,9 +2420,9 @@
     "Commit:"
   ],
   [
-    ", dated 2026-09-03. That source date is not a release publication date.",
-    "، بە بەرواری 2026-09-03. ئەو بەروارەی کۆد بەرواری بڵاوکردنەوە نییە.",
-    ", bi dîroka 2026-09-03. Ew dîroka kodê ne dîroka weşana giştî ye."
+    ", dated 2026-09-24. That source date is not a release publication date.",
+    "، بە بەرواری 2026-09-24. ئەو بەروارەی کۆد بەرواری بڵاوکردنەوە نییە.",
+    ", bi dîroka 2026-09-24. Ew dîroka kodê ne dîroka weşana giştî ye."
   ],
   [
     "Inspect the exact source revision",
@@ -2905,9 +2905,9 @@
     "Pêrista rûpel û çavkaniyên weşandî bixwîne"
   ],
   [
-    "The complete editable source is supplied in the project handoff. Its publisher must make that corresponding source available before public deployment; it has not been pushed upstream by this work.",
-    "کۆدی تەواوی دەستکاری‌پەسەند لە ڕادەستکردنی پڕۆژەدا هەیە. بڵاوکەرەوەکەی دەبێت پێش بڵاوکردنەوەی گشتی کۆدی هاوتای بەردەست بکات؛ ئەم کارە کۆدی بۆ کۆگای سەرەکی نەناردووە.",
-    "Koda tevahî ya guhertinbar di radestkirina projeyê de heye. Weşanger divê berî weşandina giştî koda hevtayê berdest bike; ev kar kodê ber bi depoya sereke ve neşandiye."
+    "The website source and build tools are available in the public repository.",
+    "کۆدی سەرچاوەی ماڵپەڕ و ئامرازەکانی دروستکردن لە کۆگای گشتی بەردەستن.",
+    "Koda malperê û amûrên avakirinê di depoya giştî de berdest in."
   ],
   [
     "Use Preferences to change or reset the local appearance preference. Browser site-data controls also remove it. The website does not require registration, marketing consent or a tracking-cookie choice.",
@@ -2985,9 +2985,9 @@
     "Geroka xwedîtiyê dema tê çalakkirin piştgiriya bişkojên tîran, Home û End dike. Bê JavaScript her sînor wekî naveroka asayî ya rûpelê tê xwendin."
   ],
   [
-    "The included QA report records the actual local browser, responsive, keyboard, semantic, contrast and reduced-motion checks. Automated checks do not establish full WCAG conformance or replace assistive-technology testing.",
-    "ڕاپۆرتی QA ـی هاوپێچ پشکنینە ڕاستەقینە ناوخۆییەکانی وێبگەڕ، گونجاندن بە قەبارە، تەختەکلیل، واتاسازی، جیاوازیی ڕەنگ و کەمکردنەوەی جووڵە تۆمار دەکات. پشکنینی خۆکار پابەندیی تەواوی WCAG ناسەلمێنێت و جێگەی تاقیکردنەوەی تەکنەلۆژیای یارمەتیدەر ناگرێتەوە.",
-    "Rapora QA ya tevde kontrolên rastîn ên herêmî yên gerokê, bersivdarî, klavye, wate, kontrast û tevgera kêmtir tomar dike. Kontrolên bixweber lihevhatina tevahî ya WCAG îspat nakin û şûna ceribandina teknolojiyên alîkar nagirin."
+    "The public test suite checks browser behavior, responsive layout, keyboard controls, contrast and reduced motion. Automated checks do not establish full WCAG conformance or replace assistive-technology testing.",
+    "کۆمەڵە تاقیکردنەوە گشتییەکە ڕەفتاری وێبگەڕ، ڕێکخستنی گونجاو، کۆنترۆڵی تەختەکلیل، کۆنتراست و کەمکردنەوەی جووڵە دەپشکنێت. پشکنینی ئۆتۆماتیکی پابەندیی تەواو بە WCAG ناسەلمێنێت و جێی تاقیکردنەوەی تەکنەلۆژیای یارمەتیدەر ناگرێتەوە.",
+    "Koma testên giştî tevgera gerokê, cihbicihkirina bersivdar, kontrolên klavyeyê, kontrast û tevgera kêmkirî kontrol dike. Kontrolên otomatîk lihevhatina tevahî bi WCAG re îspat nakin û şûna testkirina teknolojiya alîkar nagirin."
   ],
   [
     "Remaining human verification",
@@ -3065,14 +3065,14 @@
     "Destûrnameya projeyê bixwîne"
   ],
   [
-    "Built from a reviewed source snapshot dated 2026-09-03, with evidence reviewed on 2026-09-15. The website has its own version, 2.0.1; this is not a VPN or APK release number.",
-    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-03 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-15. ماڵپەڕ وەشانی خۆی هەیە، 2.0.1؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
-    "Ji wêneya kodê ya kontrolkirî ya 2026-09-03 hatiye avakirin, bi kontrola belgeyan di 2026-09-15 de. Malper guhertoya xwe, 2.0.1, heye; ev ne hejmara weşana VPN an APK ye."
+    "Built from a reviewed source snapshot dated 2026-09-24, with evidence reviewed on 2026-09-15. The website has its own version, 2.0.1; this is not a VPN or APK release number.",
+    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-24 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-15. ماڵپەڕ وەشانی خۆی هەیە، 2.0.1؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
+    "Ji wêneya kodê ya kontrolkirî ya 2026-09-24 hatiye avakirin, bi kontrola belgeyan di 2026-09-15 de. Malper guhertoya xwe, 2.0.1, heye; ev ne hejmara weşana VPN an APK ye."
   ],
   [
-    "The complete source handoff contains the original supplied specifications, claim register, build tooling, tests and bounded QA report. No remote repository update or deployment is implied by this artifact.",
-    "ڕادەستکردنی تەواوی کۆد نووسراوە ڕەسەنە دابینکراوەکان، تۆماری بانگەشەکان، ئامرازەکانی دروستکردن، تاقیکردنەوە و ڕاپۆرتی سنوورداری QA لەخۆ دەگرێت. ئەم بەرهەمە نوێکردنەوەی کۆگای دوور یان بڵاوکردنەوە ناگەیەنێت.",
-    "Radestkirina tevahî ya kodê taybetnameyên eslî, tomara daxuyaniyan, amûrên avakirinê, ceribandin û rapora QA ya sînordar dihewîne. Ev berhem nayê wateya nûkirina depoya dûr an weşandina malperê."
+    "The public repository contains website source, build tools and tests. A website version is separate from an Android app release.",
+    "کۆگای گشتی کۆدی ماڵپەڕ، ئامرازەکانی دروستکردن و تاقیکردنەوەکان لەخۆ دەگرێت. وەشانی ماڵپەڕ لە بڵاوکردنەوەی ئەپی ئەندرۆید جیاوازە.",
+    "Depoya giştî koda malperê, amûrên avakirinê û testan dihewîne. Guhertoya malperê ji weşana sepana Androidê cuda ye."
   ],
   [
     "Project license",
@@ -3315,9 +3315,9 @@
     "Destûrname û çavkaniya çavkaniyan — malpera Kurdistan VPN"
   ],
   [
-    "Project license, original Kurdistan VPN mark, preserved design reference, website code and asset provenance.",
-    "مۆڵەتنامەی پڕۆژە، نیشانەی ڕەسەنی Kurdistan VPN، سەرچاوەی دیزاینی پارێزراو، کۆدی ماڵپەڕ و ڕەسەنایەتیی سامانەکان.",
-    "Destûrnameya projeyê, nîşana eslî ya Kurdistan VPN, referansa sêwiranê ya parastî, koda malperê û çavkaniya materyalan."
+    "Project license, Kurdistan VPN identity, website code and attribution for distributed assets.",
+    "مۆڵەتی پڕۆژە، ناسنامەی Kurdistan VPN، کۆدی ماڵپەڕ و ئاماژە بە سەرچاوەی فایلە بڵاوکراوەکان.",
+    "Lîsansa projeyê, nasnameya Kurdistan VPN, koda malperê û navkirina çavkaniyên pelên belavkirî."
   ],
   [
     "PROVENANCE",
@@ -3340,9 +3340,9 @@
     "bi çavkaniya wê re biparêze."
   ],
   [
-    "The source handoff includes the exact reference files, a content manifest and records of the source material used.",
-    "ڕادەستکردنی کۆد پەڕگە ڕەسەنەکان، بەڵگەنامەی ناوەڕۆک و تۆماری ئەو سەرچاوانە لەخۆ دەگرێت کە بەکار هاتوون.",
-    "Radestkirina kodê pelên eslî, manîfesta naverokê û tomarên çavkaniyên bikarhatî dihewîne."
+    "The public source includes license notices and attribution for distributed assets.",
+    "کۆدی گشتی ئاگادارکردنەوەکانی مۆڵەت و ئاماژە بە خاوەنی سەرچاوە بۆ فایلە بڵاوکراوەکان لەخۆ دەگرێت.",
+    "Koda giştî agahiyên lîsansê û navkirina xwediyên çavkaniyan ji bo pelên belavkirî dihewîne."
   ],
   [
     "Project and original mark",
@@ -3375,14 +3375,14 @@
     "Nîşana eslî lêkolîn bike"
   ],
   [
-    "The website source is supplied under AGPL-3.0-or-later. Preserve upstream notices when redistributing. The supplied app prototype is retained as a design reference, with an explicitly documented hosting adapter.",
-    "کۆدی ماڵپەڕ بە مۆڵەتی AGPL-3.0-or-later پێشکەش دەکرێت. لە دابەشکردنەوەدا ئاگادارکردنەوەکانی کۆگای سەرەکی بپارێزە. نموونەی ئەپی دابینکراو وەک سەرچاوەی دیزاین پارێزراوە، لەگەڵ گونجێنەری میوانداری کە بە ڕوونی بەڵگەنامەی بۆ نووسراوە.",
-    "Koda malperê di bin AGPL-3.0-or-later de tê dayîn. Dema belav dikî ragihandinên depoya sereke biparêze. Nimûneya sepanê wekî referansa sêwiranê hatiye parastin, bi adaptera mêvandariyê ya bi eşkereyî belgekirî."
+    "The website source is available under AGPL-3.0-or-later. Preserve license and attribution notices when redistributing. The interactive app is an isolated demonstration, not a VPN connection.",
+    "کۆدی ماڵپەڕ بە مۆڵەتی AGPL-3.0-or-later بەردەستە. لە کاتی دووبارە بڵاوکردنەوەدا ئاگادارکردنەوەکانی مۆڵەت و سەرچاوە بپارێزە. ئەپە کارلێکەکە نیشاندانێکی جیاکراوەیە، نەک پەیوەندیی VPN.",
+    "Koda malperê bi AGPL-3.0-or-later berdest e. Di belavkirina ji nû ve de agahiyên lîsansê û çavkaniyê biparêze. Sepana înteraktîf nimûneyeke veqetandî ye, ne girêdaneke VPN."
   ],
   [
-    "No font binaries are distributed. The live site uses system font stacks and local assets, not a remote font service. Browser-test tooling is separate from the deployed static output.",
-    "پەڕگەی فۆنت دابەش ناکرێت. ماڵپەڕ زنجیرەی فۆنتی سیستەم و سامانە ناوخۆییەکان بەکار دەهێنێت، نەک خزمەتگوزاریی دووری فۆنت. ئامرازەکانی تاقیکردنەوەی وێبگەڕ لە دەرچووی جێگیری بڵاوکراو جیاوازن.",
-    "Pelên fontê nayên belavkirin. Malper rêza fontên pergalê û çavkaniyên herêmî bi kar tîne, ne xizmeta fontê ya dûr. Amûrên ceribandina gerokê ji derketina sabît a weşandî cuda ne."
+    "The site serves bundled fonts and their notices locally, without a remote font service. Browser-test tools are separate from the deployed static files.",
+    "ماڵپەڕ فۆنتە هاوپێچەکان و ئاگادارکردنەوەکانیان بە ناوخۆیی پێشکەش دەکات، بەبێ خزمەتگوزاریی فۆنتی دوورەوە. ئامرازەکانی تاقیکردنەوەی وێبگەڕ لە فایلە جێگیرە بڵاوکراوەکان جیاوازن.",
+    "Malper fontên pêvekirî û agahiyên wan bi awayekî herêmî pêşkêş dike, bê xizmeta fontê ya dûr. Amûrên testkirina gerokê ji pelên statîk ên weşandî cuda ne."
   ],
   [
     "Kurdistan VPN documentation — profiles, operation and verification",
@@ -3955,9 +3955,9 @@
     "Pêşweşan e, ne xizmeta hilberînê ya bi yek tikê"
   ],
   [
-    "The Phase 17 package documents an authenticated Kurd TLS/TCP relay. It remains unsigned until its distribution gate and has not completed the external data-path acceptance campaign in the reviewed guide.",
-    "پاکێجی قۆناغی 17 ڕیلەیەکی پشتڕاستکراوەی Kurd TLS/TCP بەڵگەنامە دەکات. بە پێی ڕێبەری پێداچوونەوەکراو، تا مەرجی دابەشکردنەکەی بێ‌واژۆ دەمێنێتەوە و هێشتا پڕۆسەی پەسەندکردنی دەرەکیی ڕێڕەوی داتای تەواو نەکردووە.",
-    "Pakêta Qonaxa 17 veguhêzerekî piştrastkirî yê Kurd TLS/TCP belge dike. Li gorî rêbera kontrolkirî, heta dergeha belavkirinê bê îmze dimîne û hêj kampanyaya pejirandina derveyî ya rêya daneyan temam nekiriye."
+    "The source includes an authenticated Kurd TLS/TCP relay. Engineering packages are not signed production releases and do not establish public Internet-egress qualification.",
+    "کۆدی سەرچاوە ڕیلەیەکی پشتڕاستکراوی Kurd TLS/TCP لەخۆ دەگرێت. پاکێجە ئەندازیارییەکان بڵاوکراوەی بەرهەمی واژۆکراو نین و پەسەندکردنی دەرچوون بۆ ئینتەرنێتی گشتی ناسەلمێنن.",
+    "Di kodê de relayeke Kurd TLS/TCP ya rastandî heye. Pakêtên endezyariyê ne weşanên hilberê yên îmzekirî ne û pejirandina derketina înternetê ya giştî îspat nakin."
   ],
   [
     "You need:",
@@ -4565,9 +4565,9 @@
     "Mîhengên rastîn ên pergalê bi kar bîne da ku xebitandina di destê platformê de kontrol bikî. Malper an nimûneya gerokê nikare destûra VPN bide, girtina pergalê çalak bike an rûyeke xwemalî ya VPN ava bike."
   ],
   [
-    "The supplied prototype includes capability inspection pages for wider resolver modes, supplementary protocols and routing rules. Those pages preserve scope for future work; they are not a list of supported production features.",
-    "نموونەی دابینکراو پەڕەی پشکنینی تواناکان بۆ دۆخی فراوانتری وەڵامدەرەوەکان، پرۆتۆکۆلی زیادە و یاساکانی ڕێڕەو لەخۆ دەگرێت. ئەو پەڕانە سنووری کاری داهاتوو دەپارێزن؛ لیستی تایبەتمەندیی پشتگیریکراوی بەرهەمهێنان نین.",
-    "Nimûneya dayî rûpelên kontrola taybetmendiyan ji bo modên berfirehtir ên çareserkeran, protokolên zêde û rêzikên rêkirinê dihewîne. Ew rûpel qada karê pêşerojê diparêzin; ne lîsteya taybetmendiyên hilberînê yên piştgirîkirî ne."
+    "The app demonstration includes resolver modes, protocol choices and routing controls. A visible control is not evidence of supported production behavior; check the exact build and its documentation.",
+    "نیشاندانی ئەپ شێوازەکانی چارەسەرکەری DNS، هەڵبژاردەی پرۆتۆکۆل و کۆنترۆڵی ڕێڕەو لەخۆ دەگرێت. دیاربوونی کۆنترۆڵێک بەڵگەی پشتگیریی لە بەرهەمدا نییە؛ هەمان وەشانی دروستکراو و بەڵگەنامەکانی بپشکنە.",
+    "Nimûneya sepanê awayên çareserkerê DNS, vebijêrkên protokolê û kontrolên rêkirinê dihewîne. Kontroleke xuya delîla piştgiriya di hilberê de nîne; heman avakirin û belgeyên wê kontrol bike."
   ],
   [
     "My phone restarted",
@@ -5595,18 +5595,18 @@
     "Kurdistan VPN girêdana li telefona te li gorî profîla piştrastkirî birêve dibe. Nermalav e, ne rêvebirê amûrê ji dûr ve."
   ],
   [
-    "On 2026-09-16, the connected GitHub releases endpoint returned an empty array. A newer source branch is not automatically a new Android release.",
-    "لە 2026-09-16، خاڵی پەیوەستکراوی بڵاوکراوەکانی GitHub لیستێکی بەتاڵی گەڕاندەوە. لقێکی نوێتری کۆد بە خۆکارانە بڵاوکراوەی نوێی Android نییە.",
-    "Di 2026-09-16 de, xala girêdayî ya weşanên GitHub lîsteyeke vala vegerand. Şaxeke nûtir a kodê bixweber weşaneke nû ya Android nîne."
+    "On 2026-09-24, the connected GitHub releases endpoint returned an empty array. A newer source branch is not automatically a new Android release.",
+    "لە 2026-09-24، خاڵی پەیوەستکراوی بڵاوکراوەکانی GitHub لیستێکی بەتاڵی گەڕاندەوە. لقێکی نوێتری کۆد بە خۆکارانە بڵاوکراوەی نوێی Android نییە.",
+    "Di 2026-09-24 de, xala girêdayî ya weşanên GitHub lîsteyeke vala vegerand. Şaxeke nûtir a kodê bixweber weşaneke nû ya Android nîne."
   ],
   [
-    "Built from a reviewed source snapshot dated 2026-09-03, with evidence reviewed on 2026-09-16. The website has its own version, 2.0.1; this is not a VPN or APK release number.",
-    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-03 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-16. ماڵپەڕ وەشانی خۆی هەیە، 2.0.1؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
-    "Ji wêneya kodê ya kontrolkirî ya 2026-09-03 hatiye avakirin, bi kontrola belgeyan di 2026-09-16 de. Malper guhertoya xwe, 2.0.1, heye; ev ne hejmara weşana VPN an APK ye."
+    "Built from a reviewed source snapshot dated 2026-09-24, with evidence reviewed on 2026-09-24. The website has its own version, 2.0.1; this is not a VPN or APK release number.",
+    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-24 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-24. ماڵپەڕ وەشانی خۆی هەیە، 2.0.1؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
+    "Ji wêneya kodê ya kontrolkirî ya 2026-09-24 hatiye avakirin, bi kontrola belgeyan di 2026-09-24 de. Malper guhertoya xwe, 2.0.1, heye; ev ne hejmara weşana VPN an APK ye."
   ],
   [
-    "Built from a reviewed source snapshot dated 2026-09-03, with evidence reviewed on 2026-09-16. The website has its own version, 3.0.0; this is not a VPN or APK release number.",
-    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-03 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-16. ماڵپەڕ وەشانی خۆی هەیە، 3.0.0؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
-    "Ji wêneya kodê ya kontrolkirî ya 2026-09-03 hatiye avakirin, bi kontrola belgeyan di 2026-09-16 de. Malper guhertoya xwe, 3.0.0, heye; ev ne hejmara weşana VPN an APK ye."
+    "Built from a reviewed source snapshot dated 2026-09-24, with evidence reviewed on 2026-09-24. The website has its own version, 3.0.0; this is not a VPN or APK release number.",
+    "لە وێنەی کاتیی کۆدی پێداچوونەوەکراوی 2026-09-24 دروست کراوە، بە پێداچوونەوەی بەڵگە لە 2026-09-24. ماڵپەڕ وەشانی خۆی هەیە، 3.0.0؛ ئەمە ژمارەی بڵاوکراوەی VPN یان APK نییە.",
+    "Ji wêneya kodê ya kontrolkirî ya 2026-09-24 hatiye avakirin, bi kontrola belgeyan di 2026-09-24 de. Malper guhertoya xwe, 3.0.0, heye; ev ne hejmara weşana VPN an APK ye."
   ]
 ]

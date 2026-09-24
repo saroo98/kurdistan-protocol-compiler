@@ -1,6 +1,6 @@
 {
-  "reviewed": "2026-09-16",
-  "revision": "b86f475cfaa77ee2a2596ed2a29914f031bff506",
+  "reviewed": "2026-09-24",
+  "revision": "2e3877913bb52421409bedf37ee41183344a1eae",
   "scope": "Website evidence registry; not a newly discovered multi-protocol runtime registry. Owner reports do not substitute for qualification receipts.",
   "protocols": [
     {
@@ -18,8 +18,8 @@
       "accent": "sun",
       "descriptionKey": "kurdBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -37,8 +37,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -56,8 +56,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -75,8 +75,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -94,8 +94,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -113,8 +113,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -132,8 +132,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -151,8 +151,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -170,8 +170,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -189,8 +189,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -208,8 +208,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -227,8 +227,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -246,8 +246,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -265,8 +265,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -284,8 +284,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -303,8 +303,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -322,8 +322,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -341,8 +341,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -360,8 +360,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -379,8 +379,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -398,8 +398,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     },
     {
@@ -417,8 +417,8 @@
       "accent": "neutral",
       "descriptionKey": "otherBoundary",
       "evidence": [
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/README.md",
-        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/b86f475cfaa77ee2a2596ed2a29914f031bff506/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt#L577-L608"
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/README.md",
+        "https://github.com/saroo98/kurdistan-protocol-compiler/blob/2e3877913bb52421409bedf37ee41183344a1eae/android/app/src/main/kotlin/org/kurdistanvpn/app/MainActivity.kt"
       ]
     }
   ]
