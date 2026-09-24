@@ -477,12 +477,7 @@ class Phase9FoundationUiTest {
             .assertIsDisplayed()
             .performClick()
         compose.waitUntil(timeoutMillis = runtimeTimeout(20_000)) {
-            when (compose.activity.appStateSnapshotForTesting()) {
-                is AppState.ImportPreview,
-                is AppState.Importing,
-                -> false
-                else -> true
-            }
+            compose.activity.appStateSnapshotForTesting() is AppState.Ready
         }
         val ready = compose.activity.appStateSnapshotForTesting()
         assertTrue("signed profile confirmation must finalize, got $ready", ready is AppState.Ready)
