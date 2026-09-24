@@ -10,6 +10,54 @@ import (
 	"testing"
 )
 
+func TestProductionFlowTupleV1UsesValidatedOffsetAndKeepsLegacyShape(t *testing.T) {
+	src, dst := [4]byte{10, 89, 0, 2}, [4]byte{1, 1, 1, 1}
+	tcp := make([]byte, 20)
+	tcp[0], tcp[1], tcp[2], tcp[3], tcp[12] = 1, 2, 3, 4, 0x50
+	p := testIPv4PacketV1(src, dst, 6, tcp)
+	info, err := ValidateIPPacketV1(p, DirectionRelayV1, src, [16]byte{}, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, flow, err := productionFlowTupleV1(p, info, false)
+	if err != nil || !flow || k.sourcePort != 258 || k.destinationPort != 772 || k.family != 4 {
+		t.Fatal("tuple", err)
+	}
+	reverse, _, err := productionFlowTupleV1(p, info, true)
+	if err != nil || reverse.source != k.destination || reverse.destinationPort != k.sourcePort {
+		t.Fatal("reverse")
+	}
+	p[32] = 0x40
+	if _, _, err = productionFlowTupleV1(p, info, false); !errors.Is(err, ErrPacketInvalid) {
+		t.Fatal("short TCP header")
+	}
+	short := testIPv4PacketV1(src, dst, 6, []byte{1})
+	info, err = ValidateIPPacketV1(short, DirectionRelayV1, src, [16]byte{}, true, false)
+	if err != nil {
+		t.Fatal("legacy shape changed", err)
+	}
+	if _, _, err = productionFlowTupleV1(short, info, false); !errors.Is(err, ErrPacketInvalid) {
+		t.Fatal("production short TCP")
+	}
+	udp := []byte{0, 1, 0, 53, 0, 8, 0, 0}
+	s6 := [16]byte{0xfd, 0x42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	d6 := [16]byte{0x20, 1, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	ext := append([]byte{17, 0, 0, 0, 0, 0, 0, 0}, udp...)
+	p6 := testIPv6PacketV1(s6, d6, 60, ext)
+	i6, err := ValidateIPPacketV1(p6, DirectionRelayV1, [4]byte{}, s6, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, flow, err = productionFlowTupleV1(p6, i6, false)
+	if err != nil || !flow || k.family != 6 || k.sourcePort != 1 || k.destinationPort != 53 {
+		t.Fatal("single IPv6 extension walk", err)
+	}
+	p6[53] = 9
+	if _, _, err = productionFlowTupleV1(p6, i6, false); !errors.Is(err, ErrPacketInvalid) {
+		t.Fatal("UDP exact length")
+	}
+}
+
 func TestValidateIPPacketV1IPv4AndIPv6(t *testing.T) {
 	for _, test := range []struct {
 		name     string

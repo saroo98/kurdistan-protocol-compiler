@@ -26,11 +26,12 @@ var (
 )
 
 type IPPacketInfoV1 struct {
-	Version  uint8
-	Protocol uint8
-	Length   int
-	source   netip.Addr
-	dest     netip.Addr
+	Version         uint8
+	Protocol        uint8
+	Length          int
+	transportOffset int
+	source          netip.Addr
+	dest            netip.Addr
 }
 
 type relayTransportClassificationV1 struct {
@@ -204,7 +205,7 @@ func validateIPv4PacketV1(packet []byte, direction DirectionV1, assigned [4]byte
 	if destination != allowedDestination && blockedPacketAddressV1(destination) {
 		return IPPacketInfoV1{}, ErrPacketDestination
 	}
-	return IPPacketInfoV1{Version: 4, Protocol: protocol, Length: len(packet), source: source, dest: destination}, nil
+	return IPPacketInfoV1{Version: 4, Protocol: protocol, Length: len(packet), transportOffset: headerBytes, source: source, dest: destination}, nil
 }
 
 func validateIPv6PacketV1(packet []byte, direction DirectionV1, assigned [16]byte, allowedDestination netip.Addr) (IPPacketInfoV1, error) {
@@ -241,7 +242,51 @@ func validateIPv6PacketV1(packet []byte, direction DirectionV1, assigned [16]byt
 	if next != 6 && next != 17 && next != 58 {
 		return IPPacketInfoV1{}, ErrPacketProtocol
 	}
-	return IPPacketInfoV1{Version: 6, Protocol: next, Length: len(packet), source: source, dest: destination}, nil
+	return IPPacketInfoV1{Version: 6, Protocol: next, Length: len(packet), transportOffset: offset, source: source, dest: destination}, nil
+}
+
+// Called only with the successful existing IP walk's exact result. Additional
+// TCP/UDP shape checks are opt-in and do not change legacy packet admission.
+func productionFlowTupleV1(packet []byte, info IPPacketInfoV1, reverse bool) (productionFlowKeyV1, bool, error) {
+	if info.Length != len(packet) || info.transportOffset < 20 || info.transportOffset > len(packet) {
+		return productionFlowKeyV1{}, false, ErrPacketInvalid
+	}
+	if info.Protocol == 1 || info.Protocol == 58 {
+		return productionFlowKeyV1{}, false, nil
+	}
+	transport := packet[info.transportOffset:]
+	switch info.Protocol {
+	case 6:
+		if len(transport) < 20 {
+			return productionFlowKeyV1{}, false, ErrPacketInvalid
+		}
+		n := int(transport[12]>>4) * 4
+		if n < 20 || n > 60 || n > len(transport) {
+			return productionFlowKeyV1{}, false, ErrPacketInvalid
+		}
+	case 17:
+		if len(transport) < 8 || int(binary.BigEndian.Uint16(transport[4:6])) != len(transport) {
+			return productionFlowKeyV1{}, false, ErrPacketInvalid
+		}
+	default:
+		return productionFlowKeyV1{}, false, ErrPacketProtocol
+	}
+	k := productionFlowKeyV1{family: info.Version, protocol: info.Protocol, sourcePort: binary.BigEndian.Uint16(transport[:2]), destinationPort: binary.BigEndian.Uint16(transport[2:4])}
+	if info.Version == 4 && info.source.Is4() && info.dest.Is4() {
+		s, d := info.source.As4(), info.dest.As4()
+		copy(k.source[:4], s[:])
+		copy(k.destination[:4], d[:])
+	} else if info.Version == 6 && info.source.Is6() && info.dest.Is6() {
+		k.source = info.source.As16()
+		k.destination = info.dest.As16()
+	} else {
+		return productionFlowKeyV1{}, false, ErrPacketInvalid
+	}
+	if reverse {
+		k.source, k.destination = k.destination, k.source
+		k.sourcePort, k.destinationPort = k.destinationPort, k.sourcePort
+	}
+	return k, true, nil
 }
 
 func validateReturnIPPacketV1(packet []byte, assignedIPv4 [4]byte, assignedIPv6 [16]byte) (IPPacketInfoV1, error) {

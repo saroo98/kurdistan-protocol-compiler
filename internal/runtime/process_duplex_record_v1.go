@@ -56,6 +56,7 @@ type processDuplexStateV1 struct {
 	bound       bool
 	closed      bool
 	pending     *AuthenticatedInnerFrameV1
+	bounded     *duplexWorkspaceV3
 }
 
 type AuthenticatedInnerFrameV1 struct {
@@ -208,7 +209,7 @@ func (state *processDuplexStateV1) profileBindV1(exporter [32]byte) ([]byte, err
 	if !state.validLockedV1() || !state.client || state.bound || state.bindStarted || exporter == ([32]byte{}) {
 		return nil, state.failLockedV1(ErrSecureChannel)
 	}
-	body := make([]byte, 72)
+	body := state.controlBodyStorageV3(72)
 	copy(body[:8], processBindMagicV1[:])
 	copy(body[8:40], exporter[:])
 	copy(body[40:], state.digest[:])
@@ -263,7 +264,8 @@ func (state *processDuplexStateV1) acceptProfileBindV1(encoded []byte, exporter 
 		return nil, state.failLockedV1(err)
 	}
 	state.recvCount++
-	ready := append([]byte(nil), processReadyMagicV1[:]...)
+	ready := state.controlBodyStorageV3(len(processReadyMagicV1))
+	copy(ready, processReadyMagicV1[:])
 	defer clear(ready)
 	record, err := state.sealBodyLockedV1(wirev1.TypeEngineReady, 0, processControlSlotV1, ready)
 	if err != nil {
@@ -304,7 +306,8 @@ func (state *processDuplexStateV1) sealKeepaliveV1(seed int64) ([]byte, error) {
 	if !state.validLockedV1() || !state.bound {
 		return nil, state.failLockedV1(ErrSecureChannel)
 	}
-	body := encodeDuplexControlBodyV1(duplexKindKeepaliveV1, 0)
+	body := state.controlBodyStorageV3(duplexBodyHeaderV1)
+	writeDuplexControlBodyV3(body, duplexKindKeepaliveV1, 0)
 	defer clear(body)
 	record, err := state.sealBodyLockedV1(wirev1.TypeReliableData, uint32(processControlSlotV1), processControlSlotV1, body)
 	if err != nil {
@@ -319,7 +322,8 @@ func (state *processDuplexStateV1) sealCloseV1(code uint16) ([]byte, error) {
 	if !state.validLockedV1() || !state.bound || code != CloseCodeTerminalV1 {
 		return nil, state.failLockedV1(ErrSecureChannel)
 	}
-	body := encodeDuplexControlBodyV1(duplexKindCloseV1, code)
+	body := state.controlBodyStorageV3(duplexBodyHeaderV1)
+	writeDuplexControlBodyV3(body, duplexKindCloseV1, code)
 	defer clear(body)
 	record, err := state.sealBodyLockedV1(wirev1.TypeClose, 0, processControlSlotV1, body)
 	state.closeLockedV1()
@@ -489,6 +493,9 @@ func (state *processDuplexStateV1) sealBodyLockedV1(frameType uint8, outerStream
 	if state.sendCount >= state.maxMessages {
 		return nil, ErrSessionMessageLimit
 	}
+	if state.bounded != nil {
+		return state.sealBodyIntoV3Locked(frameType, outerStream, slot, body)
+	}
 	envelope, err := state.codec.SealApplicationV1(slot, body)
 	if err != nil {
 		return nil, err
@@ -510,6 +517,9 @@ func (state *processDuplexStateV1) sealBodyLockedV1(frameType uint8, outerStream
 func (state *processDuplexStateV1) authenticateBodyLockedV1(encoded []byte, frameType uint8, outerStream uint32, slot uint16) ([]byte, security.AuthenticatedReplayV1, uint64, error) {
 	if state.recvCount >= state.maxMessages {
 		return nil, security.AuthenticatedReplayV1{}, 0, ErrSessionMessageLimit
+	}
+	if state.bounded != nil {
+		return state.authenticateBodyIntoV3Locked(encoded, frameType, outerStream, slot)
 	}
 	direction := applicationDirectionRelayV1
 	if !state.client {
@@ -534,6 +544,9 @@ func (state *processDuplexStateV1) abortV1() {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	state.closeLockedV1()
+	if state.bounded != nil {
+		state.bounded.destroyV3()
+	}
 }
 
 func (state *processDuplexStateV1) validLockedV1() bool {
@@ -542,6 +555,9 @@ func (state *processDuplexStateV1) validLockedV1() bool {
 
 func (state *processDuplexStateV1) failLockedV1(err error) error {
 	state.closeLockedV1()
+	if state.bounded != nil && errors.Is(err, ServiceResourceLimitV1) {
+		return ServiceResourceLimitV1
+	}
 	return normalizeProcessRecordErrorV1(err)
 }
 
@@ -557,6 +573,9 @@ func (state *processDuplexStateV1) closeLockedV1() {
 	state.digest = [32]byte{}
 	state.program = liveprogram.ProgramV1{}
 	if state.pending != nil {
+		if state.bounded != nil {
+			_ = state.pending.replay.Discard()
+		}
 		state.pending.terminal = true
 		clear(state.pending.operation.Payload)
 		state.pending.operation = framing.Operation{}
