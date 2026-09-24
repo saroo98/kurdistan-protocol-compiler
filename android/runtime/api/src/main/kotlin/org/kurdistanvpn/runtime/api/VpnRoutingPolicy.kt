@@ -13,8 +13,9 @@ data class VpnRoutingPolicy(
     val perAppMode: PerAppRoutingMode = PerAppRoutingMode.ALL_APPS,
     val packages: Set<String> = emptySet(),
 ) {
-    fun validate(): VpnRoutingPolicy {
-        require(packages.size <= MAX_PACKAGES) { "too many per-app rules" }
+    fun validate(admittedMaximum: Int = MAX_PACKAGES): VpnRoutingPolicy {
+        require(admittedMaximum in 0..256) { "invalid per-app maximum" }
+        require(packages.size <= admittedMaximum) { "too many per-app rules" }
         require(packages.all(::isValidPackageName)) { "invalid package name" }
         when (perAppMode) {
             PerAppRoutingMode.ALL_APPS ->
@@ -28,6 +29,7 @@ data class VpnRoutingPolicy(
 
     private fun isValidPackageName(value: String): Boolean =
         value.length in 3..MAX_PACKAGE_NAME_LENGTH &&
+            value.all { it.code < 128 } &&
             value.split('.').size >= 2 &&
             value.split('.').all { segment ->
                 segment.isNotEmpty() &&

@@ -6,6 +6,10 @@ object RuntimeAuthorityLimits {
     const val MAX_PAYLOAD_BYTES = 1_500_000 + 1_200_000 + 512 + 128 + 32 * 1024
     const val MAX_FRAME_BYTES = MAX_PAYLOAD_BYTES + 512
     const val MAX_LIFETIME_MILLIS = 60_000L
+    // Non-renewable local publication budget, not a network timeout. Five seconds
+    // allows scheduling margin above measured 2.2-2.9s constrained-device validation.
+    // Fresh authority checks and the original request expiry still apply at every stage.
+    const val MAX_FINAL_LEASE_MILLIS = 5_000L
     const val MAX_RETRIES = 5
     fun validId(value: String): Boolean = value.length == 32 && value.all { it in '0'..'9' || it in 'a'..'f' } && value.any { it != '0' }
     fun validRevision(value: Long): Boolean = value > 0 && value and 1L == 0L

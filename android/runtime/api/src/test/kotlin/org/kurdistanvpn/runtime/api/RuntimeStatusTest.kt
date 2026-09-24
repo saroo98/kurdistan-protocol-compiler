@@ -7,7 +7,7 @@ import org.junit.Test
 
 class RuntimeStatusTest {
     private fun active() = VpnRuntimeSnapshot(state = VpnRuntimeState.ACTIVE_KURD_LIVE,
-        startedAtElapsedRealtime = 1, profileGeneration = 2, planDigest = "1".repeat(64),
+        startedAtElapsedRealtime = 1, profileGeneration = 2uL, planDigest = "1".repeat(64),
         profileFingerprint = "2".repeat(64), strategyFingerprint = "3".repeat(64),
         relayFingerprint = "4".repeat(64), runtimeRequestId = "5".repeat(32))
 
@@ -21,7 +21,7 @@ class RuntimeStatusTest {
     }
     @Test fun activeDisplayRequiresCurrentCompleteBoundedSessionMetadata() {
         assertEquals(active(), active().validatedForDisplay())
-        for (value in listOf(active().copy(profileGeneration = 0), active().copy(planDigest = null),
+        for (value in listOf(active().copy(profileGeneration = 0uL), active().copy(planDigest = null),
             active().copy(runtimeRequestId = "invalid"), active().copy(startedAtElapsedRealtime = 0),
             active().copy(maxReconnectAttempts = 6), active().copy(failure = "REVOKED"))) {
             assertEquals(VpnRuntimeState.BLOCKED, value.validatedForDisplay().state)

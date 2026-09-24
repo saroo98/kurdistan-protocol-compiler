@@ -5,7 +5,7 @@ package org.kurdistanvpn.runtime.api
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 
 object RuntimeStartWire {
     private const val POLICY_HEADER_BYTES = 26
@@ -47,17 +47,7 @@ object RuntimeStartWire {
             owned += activationRecord.copyOf()
             owned += recipientRequest.copyOf()
             owned += recipientPrivate.copyOf()
-            require(config.manualStrategyId.length <= 256 && config.customDns.length <= 45)
-            require(config.routingPolicy.packages.size <= VpnRoutingPolicy.MAX_PACKAGES)
-            val packages = linkedSetOf<String>()
-            val iterator = config.routingPolicy.packages.iterator()
-            while (iterator.hasNext()) {
-                require(packages.size < VpnRoutingPolicy.MAX_PACKAGES)
-                val item = iterator.next()
-                require(item.length in 1..VpnRoutingPolicy.MAX_PACKAGE_NAME_LENGTH && packages.add(item))
-            }
-            val captured = config.copy(routingPolicy = config.routingPolicy.copy(packages = packages))
-            policy = encodePolicy(captured.validatedForLiveTransport())
+            policy = encodeLegacyBootstrapPolicy(config)
             val size = LIVE_HEADER_BYTES.toLong() + policy.size + owned.sumOf { it.size.toLong() }
             require(policy.size <= 0xffff && size <= MAX_RUNTIME_OPEN_BYTES) { "RUNTIME_START_TOO_LARGE" }
             output = ByteArray(size.toInt())
@@ -83,6 +73,20 @@ object RuntimeStartWire {
         }
     }
 
+    fun encodeLegacyBootstrapPolicy(config: VpnRuntimeConfig): ByteArray {
+        require(config.manualStrategyId.length <= 256 && config.customDns.length <= 45)
+        require(config.routingPolicy.packages.size <= VpnRoutingPolicy.MAX_PACKAGES)
+        val packages = linkedSetOf<String>()
+        val iterator = config.routingPolicy.packages.iterator()
+        while (iterator.hasNext()) {
+            require(packages.size < VpnRoutingPolicy.MAX_PACKAGES)
+            val item = iterator.next()
+            require(item.length in 1..VpnRoutingPolicy.MAX_PACKAGE_NAME_LENGTH && packages.add(item))
+        }
+        val captured = config.copy(routingPolicy = config.routingPolicy.copy(packages = packages))
+        return encodePolicy(captured.validatedForLiveTransport())
+    }
+
     private fun encodePolicy(validated: VpnRuntimeConfig): ByteArray {
         val packages = mutableListOf<ByteArray>()
         var manual = ByteArray(0)
@@ -105,8 +109,8 @@ object RuntimeStartWire {
             output.put((validated.ipMode.ordinal + 1).toByte())
             output.put(
                 when (validated.dnsMode) {
-                    DnsMode.INTERNAL_TUN -> 1
-                    DnsMode.CUSTOM -> 2
+                    ResolverPolicy.INTERNAL -> 1
+                    ResolverPolicy.CUSTOM -> 2
                     else -> error("EXTERNAL_DNS_REQUIRES_RELAY_EGRESS")
                 }.toByte(),
             )
