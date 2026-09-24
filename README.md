@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <!-- Copyright 2026 Saro -->
 
-# Kurdistan Protocol Compiler
+# Kurdistan VPN
 
 [![Go](https://img.shields.io/badge/Go-1.26.6-00ADD8?logo=go)](go.mod)
 [![Android](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?logo=android)](android/)
@@ -11,8 +11,8 @@
 Kurdistan is a profile-driven, self-hosted relay transport system for
 censorship-resilient networking. The repository contains the Kurd protocol
 compiler, authenticated transport/runtime components, native profile tooling,
-self-hosted node administration, an Android VPN application, and an unusually
-strict audit and regression system.
+self-hosted node administration, an Android VPN application, and regression
+and security validation tools.
 
 The project is designed for independent deployments. Each operator controls
 their own VPS, authority keys, profiles, backups, and data. The architecture
@@ -27,7 +27,22 @@ cloud vendor.
 > a released production build. Source presence and local tests do not prove
 > censorship bypass, undetectability, anonymity, or production readiness.
 
-## Why Kurdistan is different
+Explore the [website and interactive app preview](https://saroo98.github.io/kurdistan-protocol-compiler/en/),
+read the [self-hosting guide](docs/self-hosting/QUICKSTART.md), or
+[build from source](#build-and-test).
+
+## App preview
+
+Home and Profiles, shown with synthetic demonstration data. These are interface
+previews, not screenshots of a released Android build. Displayed locations and
+latencies are examples, not an available server list or performance measurements.
+
+<p>
+  <img src="docs/assets/app-home-preview.png" alt="Home interface preview with profile details and a Connect button" width="256">
+  <img src="docs/assets/app-profiles-preview.png" alt="Profiles interface preview with grouped example profiles and latency indicators" width="256">
+</p>
+
+## The Kurd model
 
 Traditional transports usually ship one fixed protocol implementation.
 Kurdistan instead compiles bounded protocol behavior from a profile while
@@ -101,11 +116,18 @@ developers to implement.
 - real Go verification through a bounded native bridge;
 - profile import preview, explicit confirmation, duplicate handling, and
   recovery states;
-- bounded `VpnService` and TUN lifecycle implementation;
-- routing, DNS, diagnostics, privacy, backup, accessibility, localization, and
-  recovery foundations;
+- bounded `VpnService` and TUN lifecycle implementation, session ownership,
+  explicit cancellation, and fail-closed authority checks;
+- atomic settings drafts, encrypted stores, Room migrations, and resumable
+  protected-state operations;
+- owner-authorized profile updates, connectivity probes and maintenance;
+- encrypted backup/restore and redacted diagnostics with explicit user actions;
+- system settings guidance for always-on VPN, connection blocking, and optional
+  battery/background access; Android controls these policies;
+- routing, DNS, accessibility, localization, and recovery foundations;
 - English, Sorani Kurdish, Kurmanji, Persian, and Arabic resources, including
-  right-to-left validation.
+  right-to-left validation. Resource presence does not mean every interface has
+  completed human translation or accessibility review.
 
 ### Assurance
 
@@ -153,10 +175,29 @@ go run ./cmd/kdc generate --seed 12345 --out profile.json
 go run ./cmd/kdc validate --profile profile.json
 ```
 
-Generate a standalone Go implementation:
+Strict generation requires both the profile and an independently approved
+authorization catalog to already exist at absolute paths. A seed alone does
+not authorize generation. For PowerShell, provide the approved catalog path
+explicitly:
 
-```bash
-go run ./cmd/kgen -profile profile.json -out .generated/example
+```powershell
+if ([string]::IsNullOrWhiteSpace($env:KURDISTAN_AUTHORIZATION_CATALOG)) {
+    throw 'Set KURDISTAN_AUTHORIZATION_CATALOG to an existing approved catalog absolute path'
+}
+$profile = (Resolve-Path -LiteralPath './profile.json').Path
+$catalog = $env:KURDISTAN_AUTHORIZATION_CATALOG
+if (-not [IO.Path]::IsPathFullyQualified($catalog)) {
+    throw 'The approved catalog path must be absolute'
+}
+$catalog = (Resolve-Path -LiteralPath $catalog).Path
+go run ./cmd/kgen --profile $profile --authorization-catalog $catalog --out .generated/example
+if ($LASTEXITCODE -ne 0) { throw 'Strict generation failed' }
+```
+
+Synthetic developer validation is available without deployment material:
+
+```powershell
+go test ./cmd/kgen -run '^TestStrictGenerationPreservesForceWrite$' -count=1
 ```
 
 Run the audit suite:
@@ -231,9 +272,7 @@ testing. Release variants must not contain those fixtures.
 - Report security issues privately to the repository owner rather than opening
   a public issue containing exploit details or secrets.
 
-See [self-hosting security](docs/self-hosting/SECURITY.md),
-[project safety boundaries](docs/sb-evidence-ref-068), and
-[governance](docs/GZ-evidence-ref-001).
+See [self-hosting security](docs/self-hosting/SECURITY.md) and the [current project boundary](#current-boundary).
 
 ## Current boundary
 
