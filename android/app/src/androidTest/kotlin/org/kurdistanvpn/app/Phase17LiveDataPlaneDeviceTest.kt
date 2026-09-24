@@ -1049,6 +1049,7 @@ class Phase17LiveDataPlaneDeviceTest {
             service.metaData.getBoolean("android.net.VpnService.SUPPORTS_ALWAYS_ON", false),
         )
 
+        compose.continueFromWelcome(activity)
         compose.onNodeWithTag("connection_hero").assertIsDisplayed()
         val hasProfile = (activity.appStateSnapshotForTesting() as? org.kurdistanvpn.core.model.AppState.Ready)
             ?.profiles?.isNotEmpty() == true
