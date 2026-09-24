@@ -109,15 +109,19 @@ class ProductLocaleLifecycleDeviceTest {
                 val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
                 val frame = android.graphics.Rect().also(decor::getWindowVisibleDisplayFrame)
                 val origin = IntArray(2).also(decor::getLocationOnScreen)
+                val content = activity.findViewById<View>(android.R.id.content)
+                val contentOrigin = IntArray(2).also(content::getLocationOnScreen)
                 val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
                 val navigation = compose.onNodeWithTag("primary_navigation_bar").fetchSemanticsNode().boundsInRoot
                 // Compose idleness alone does not wait for the platform's pending IME
                 // and window-inset layout. Compare actual native and Compose viewports.
-                activity.hasWindowFocus() && decor.isInTouchMode && !decor.isLayoutRequested &&
+                // Older Android content excludes system bars; edge-to-edge content does not.
+                val visibleBottom = minOf(frame.bottom, contentOrigin[1] + content.height) - contentOrigin[1]
+                activity.hasWindowFocus() && decor.isInTouchMode && !decor.isLayoutRequested && !content.isLayoutRequested &&
                     !insets.isVisible(WindowInsets.Type.ime()) && insets.getInsets(WindowInsets.Type.ime()).bottom == 0 &&
-                    abs(root.height - decor.height) <= 1f &&
+                    abs(root.height - content.height) <= 1f &&
                     frame.bottom == origin[1] + decor.height - safe.bottom &&
-                    abs(navigation.bottom - (decor.height - safe.bottom)) <= 1f
+                    abs(navigation.bottom - visibleBottom) <= 1f
             }.getOrDefault(false)
         }
     }
