@@ -3,7 +3,7 @@
 
 package org.kurdistanvpn.runtime.api
 
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 
 import org.junit.Assert.assertEquals
@@ -12,6 +12,22 @@ import org.junit.Test
 import org.kurdistanvpn.core.model.SelectionMode
 
 class VpnRoutingPolicyTest {
+    @Test fun rejectsUnicodePackageLookalikesAtThePlatformBoundary() {
+        for (name in listOf("org.exämple.app", "org.example.١app", "org.example.аpp")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                VpnRoutingPolicy(PerAppRoutingMode.INCLUDE_ONLY, setOf(name)).validate()
+            }
+        }
+    }
+
+    @Test fun admittedPackageMaximumIsBoundedWithoutWideningLegacyDefaults() {
+        val policy = VpnRoutingPolicy(PerAppRoutingMode.INCLUDE_ONLY,
+            (1..256).map { "org.example.app$it" }.toSet())
+        assertEquals(256, policy.validate(256).packages.size)
+        assertThrows(IllegalArgumentException::class.java) { policy.validate(255) }
+        assertThrows(IllegalArgumentException::class.java) { policy.validate(257) }
+        assertThrows(IllegalArgumentException::class.java) { policy.validate() }
+    }
     @Test
     fun acceptsMutuallyExclusiveSupportedModes() {
         assertEquals(
@@ -51,7 +67,7 @@ class VpnRuntimeConfigTest {
         assertThrows(IllegalArgumentException::class.java) {
             VpnRuntimeConfig(
                 VpnRoutingPolicy(),
-                dnsMode = DnsMode.CLOUDFLARE,
+                dnsMode = ResolverPolicy.PRESET,
             ).validatedForLoopbackTransport()
         }
         assertThrows(IllegalArgumentException::class.java) {
@@ -115,7 +131,7 @@ class VpnRuntimeConfigTest {
         listOf("1.1.1.1", "2606:4700:4700::1111").forEach { address ->
             VpnRuntimeConfig(
                 routingPolicy = VpnRoutingPolicy(),
-                dnsMode = DnsMode.CUSTOM,
+                dnsMode = ResolverPolicy.CUSTOM,
                 customDns = address,
             ).validatedForLiveTransport()
         }
@@ -123,7 +139,7 @@ class VpnRuntimeConfigTest {
             assertThrows(IllegalArgumentException::class.java) {
                 VpnRuntimeConfig(
                     routingPolicy = VpnRoutingPolicy(),
-                    dnsMode = DnsMode.CUSTOM,
+                    dnsMode = ResolverPolicy.CUSTOM,
                     customDns = address,
                 ).validatedForLiveTransport()
             }

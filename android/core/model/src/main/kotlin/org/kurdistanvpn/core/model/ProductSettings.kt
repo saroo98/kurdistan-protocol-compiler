@@ -4,10 +4,17 @@
 package org.kurdistanvpn.core.model
 
 enum class SelectionMode { AUTOMATIC, KURD_ONLY, MANUAL_STRATEGY }
+enum class ManualSelectionAvailability { NOT_REQUESTED, UNAVAILABLE, SELECTED }
 
 enum class IpMode { AUTO, IPV4_ONLY, IPV6_ONLY, DUAL_STACK }
 
-enum class DnsMode { INTERNAL_TUN, CLOUDFLARE_GOOGLE, GOOGLE, CLOUDFLARE, QUAD9, CUSTOM }
+enum class ResolverPolicy { INTERNAL, PROFILE_DEFINED, PRESET, CUSTOM }
+
+/** Profile-derived request references are protected; a CatalogId is not a privacy classification. */
+data class SettingsIdentifiers(val manualStrategy: CatalogId? = null, val resolver: CatalogId? = null, val probeTarget: CatalogId? = null) {
+    override fun toString(): String = "SettingsIdentifiers(redacted)"
+    companion object { fun from(value: ProductSettings) = SettingsIdentifiers(value.connection.manualStrategyId, value.tunnel.resolverCatalogId, value.probes.signedTargetId) }
+}
 
 enum class ProbeMethod { KURD_SESSION, TCP_CONNECT, HTTP_HEAD, HTTP_GET, ICMP }
 
@@ -17,7 +24,12 @@ enum class DiagnosticLogLevel { NONE, ERROR, WARNING, INFO, DEBUG }
 
 enum class DiagnosticRetention { ONE_HOUR, SIX_HOURS, ONE_DAY, SEVEN_DAYS }
 
-enum class ResetScope { SETTINGS, PROFILES_PROVIDERS, ROUTING, DIAGNOSTICS, EVERYTHING, PENDING_CREDENTIALS }
+enum class ResetScope {
+    SETTINGS, PROFILES_AND_TRUST, ROUTING, DIAGNOSTICS, EVERYTHING, PENDING_CREDENTIALS, LOCAL_CREDENTIALS;
+    // The legacy reset adapter cannot clear all local credentials. Never widen pending-key reset.
+    val unavailableReason: OperationError? get() =
+        if (this == LOCAL_CREDENTIALS) OperationError.AUTHORITY_UNAVAILABLE else null
+}
 
 enum class PerAppSelectionMode { ALL_APPS, INCLUDE_ONLY, EXCLUDE_SELECTED }
 
@@ -48,39 +60,88 @@ private fun requireSetting(condition: Boolean, field: SettingsField, category: S
 data class ConnectionPreferences(
     val selectionMode: SelectionMode = SelectionMode.AUTOMATIC,
     val autoConnectOnLaunch: Boolean = false,
-    val autoConnectOnBoot: Boolean = false,
     val reconnectOnFailure: Boolean = false,
-    val killSwitchRequested: Boolean = false,
     val allowLan: Boolean = false,
     val connectOnlyOnUntrustedNetworks: Boolean = false,
-)
+    val manualStrategyId: CatalogId? = null,
+    val reconnectMaximum: Int = 3,
+) {
+    init {
+        require(reconnectMaximum in 1..10)
+        require(selectionMode == SelectionMode.MANUAL_STRATEGY || manualStrategyId == null)
+    }
+    val reconnectPolicy: ReconnectPreferences get() = ReconnectPreferences(reconnectOnFailure, reconnectMaximum)
+    // Legacy requested settings retained only the mode. A missing identity is never effective authority.
+    val manualSelectionAvailability: ManualSelectionAvailability get() = when {
+        selectionMode != SelectionMode.MANUAL_STRATEGY -> ManualSelectionAvailability.NOT_REQUESTED
+        manualStrategyId == null -> ManualSelectionAvailability.UNAVAILABLE
+        else -> ManualSelectionAvailability.SELECTED
+    }
+    fun effectiveStrategy(signed: Set<CatalogId>, native: Set<CatalogId>): StrategySelection = when (selectionMode) {
+        SelectionMode.AUTOMATIC -> StrategySelection.Automatic
+        SelectionMode.KURD_ONLY -> StrategySelection.KurdOnly
+        SelectionMode.MANUAL_STRATEGY -> StrategySelection.Manual(requireNotNull(manualStrategyId)).validatedAgainst(signed, native)
+    }
+}
 
 data class TunnelPreferences(
     val ipMode: IpMode = IpMode.AUTO,
-    val dnsMode: DnsMode = DnsMode.INTERNAL_TUN,
+    val dnsMode: ResolverPolicy = ResolverPolicy.INTERNAL,
     val customDns: String = "",
     val mtu: Int = 1500,
     val metered: Boolean = false,
     val showSpeedInNotification: Boolean = false,
+    val resolverCatalogId: CatalogId? = null,
+    val secondaryCustomDns: String = "",
 ) {
+    init {
+        requireSetting(mtu in 1280..1500, SettingsField.TUNNEL_MTU, "OUT_OF_RANGE")
+        requireSetting((dnsMode == ResolverPolicy.PRESET) == (resolverCatalogId != null), SettingsField.CUSTOM_DNS, "INVALID_CATALOG")
+        if (dnsMode == ResolverPolicy.CUSTOM) {
+            requireSetting(isValidIpLiteral(customDns), SettingsField.CUSTOM_DNS, "INVALID_IP_LITERAL")
+            requireSetting(secondaryCustomDns.isEmpty() || isValidIpLiteral(secondaryCustomDns), SettingsField.CUSTOM_DNS, "INVALID_IP_LITERAL")
+        } else {
+            requireSetting(customDns.isBlank() && secondaryCustomDns.isBlank(), SettingsField.CUSTOM_DNS, "UNEXPECTED_VALUE")
+        }
+    }
     fun validated(): TunnelPreferences {
         requireSetting(mtu in 1280..1500, SettingsField.TUNNEL_MTU, "OUT_OF_RANGE")
-        if (dnsMode == DnsMode.CUSTOM) {
+        if (dnsMode == ResolverPolicy.CUSTOM) {
             requireSetting(isValidIpLiteral(customDns), SettingsField.CUSTOM_DNS, "INVALID_IP_LITERAL")
+            requireSetting(secondaryCustomDns.isEmpty() || isValidIpLiteral(secondaryCustomDns), SettingsField.CUSTOM_DNS, "INVALID_IP_LITERAL")
         } else {
             requireSetting(customDns.isBlank(), SettingsField.CUSTOM_DNS, "UNEXPECTED_VALUE")
+            requireSetting(secondaryCustomDns.isBlank(), SettingsField.CUSTOM_DNS, "UNEXPECTED_VALUE")
         }
-        return copy(customDns = customDns.trim().let { if (it.isBlank()) it else canonicalizeIpLiteral(it)!! })
+        requireSetting((dnsMode == ResolverPolicy.PRESET) == (resolverCatalogId != null), SettingsField.CUSTOM_DNS, "INVALID_CATALOG")
+        return copy(
+            customDns = customDns.trim().let { if (it.isBlank()) it else canonicalizeIpLiteral(it)!! },
+            secondaryCustomDns = secondaryCustomDns.trim().let { if (it.isBlank()) it else canonicalizeIpLiteral(it)!! },
+        )
     }
+    override fun toString(): String = "TunnelPreferences(redacted)"
 }
 
-data class RoutingPreferences(
+class RoutingPreferences(
     val mode: PerAppSelectionMode = PerAppSelectionMode.ALL_APPS,
-    val packages: Set<String> = emptySet(),
-    val excludedCidrs: List<String> = SAFE_EXCLUDED_ROUTES,
+    packages: Set<String> = emptySet(),
+    excludedCidrs: List<String> = emptyList(),
 ) {
+    init {
+        requireSetting(packages.size <= 256, SettingsField.ROUTING_PACKAGES, "TOO_MANY")
+        requireSetting(packages.all(::isValidPackageName), SettingsField.ROUTING_PACKAGES, "INVALID_PACKAGE")
+        requireSetting(excludedCidrs.size <= 64, SettingsField.EXCLUDED_ROUTES, "TOO_MANY")
+        requireSetting(excludedCidrs.all { canonicalizeCidr(it) != null }, SettingsField.EXCLUDED_ROUTES, "INVALID_CIDR")
+    }
+    val packages: Set<String> = java.util.Collections.unmodifiableSet(packages.toSet())
+    val excludedCidrs: List<String> = java.util.Collections.unmodifiableList(excludedCidrs.toList())
+    fun copy(mode: PerAppSelectionMode = this.mode, packages: Set<String> = this.packages,
+        excludedCidrs: List<String> = this.excludedCidrs): RoutingPreferences = RoutingPreferences(mode, packages, excludedCidrs)
+    override fun equals(other: Any?): Boolean = other is RoutingPreferences && mode == other.mode && packages == other.packages && excludedCidrs == other.excludedCidrs
+    override fun hashCode(): Int = listOf(mode, packages, excludedCidrs).hashCode()
+    override fun toString(): String = "RoutingPreferences(redacted)"
     fun validatedMetadata(): RoutingPreferences {
-        requireSetting(packages.size <= 64, SettingsField.ROUTING_PACKAGES, "TOO_MANY")
+        requireSetting(packages.size <= 256, SettingsField.ROUTING_PACKAGES, "TOO_MANY")
         requireSetting(packages.all(::isValidPackageName), SettingsField.ROUTING_PACKAGES, "INVALID_PACKAGE")
         requireSetting(excludedCidrs.size <= 64, SettingsField.EXCLUDED_ROUTES, "TOO_MANY")
         val canonicalRoutes = excludedCidrs.map {
@@ -105,6 +166,12 @@ data class RoutingPreferences(
         }
         return normalized
     }
+    fun effective(nativeMaximum: Int, installedPackages: Set<String>, signedBypassable: Set<CanonicalRoute>): RoutingPreferences {
+        require(nativeMaximum >= 0 && installedPackages.size <= 65536)
+        require(packages.size <= minOf(256, nativeMaximum))
+        ExcludedRoutes(excludedCidrs.map(::CanonicalRoute)).validatedAgainst(signedBypassable)
+        return copy(packages = packages.intersect(installedPackages)).validated()
+    }
 }
 
 data class UpdatePreferences(
@@ -114,6 +181,7 @@ data class UpdatePreferences(
     val notifyOnChange: Boolean = true,
     val probeAfterUpdate: Boolean = false,
 ) {
+    init { requireSetting(intervalHours in 1..168, SettingsField.UPDATE_INTERVAL, "OUT_OF_RANGE") }
     fun validated(): UpdatePreferences {
         requireSetting(intervalHours in 1..168, SettingsField.UPDATE_INTERVAL, "OUT_OF_RANGE")
         return this
@@ -123,16 +191,21 @@ data class UpdatePreferences(
 data class ProbePreferences(
     val method: ProbeMethod = ProbeMethod.KURD_SESSION,
     val display: ProbeDisplay = ProbeDisplay.MILLISECONDS,
-    val testUrl: String = "",
+    val signedTargetId: CatalogId? = null,
     val timeoutSeconds: Int = 3,
 ) {
+    init { requireSetting(timeoutSeconds in 1..30, SettingsField.PROBE_TIMEOUT, "OUT_OF_RANGE") }
     fun validated(): ProbePreferences {
         requireSetting(timeoutSeconds in 1..30, SettingsField.PROBE_TIMEOUT, "OUT_OF_RANGE")
-        if (method == ProbeMethod.HTTP_GET || method == ProbeMethod.HTTP_HEAD) {
-            requireSetting(isValidHttpsProbeUrl(testUrl), SettingsField.PROBE_URL, "INVALID_HTTPS_URL")
-        }
-        return copy(testUrl = testUrl.trim())
+        return this
     }
+    fun validatedAgainst(signedTargets: Set<CatalogId>, signedMethods: Set<ProbeMethod>, nativeMethods: Set<ProbeMethod>): ProbePreferences {
+        validated()
+        require(signedTargets.size <= 256 && signedTargetId != null && signedTargetId in signedTargets)
+        require(method in signedMethods && method in nativeMethods)
+        return this
+    }
+    override fun toString(): String = "ProbePreferences(redacted)"
 }
 
 data class DiagnosticPreferences(
@@ -146,6 +219,12 @@ data class ExpertPreferences(
     val udpConnectionLimit: Int = 128,
     val memoryLimitMb: Int = 80,
 ) {
+    init {
+        requireSetting(idleTimeoutSeconds in 30..3600, SettingsField.IDLE_TIMEOUT, "OUT_OF_RANGE")
+        requireSetting(tcpConnectionLimit in 16..4096, SettingsField.TCP_LIMIT, "OUT_OF_RANGE")
+        requireSetting(udpConnectionLimit in 0..2048, SettingsField.UDP_LIMIT, "OUT_OF_RANGE")
+        requireSetting(memoryLimitMb == 0 || memoryLimitMb in 40..512, SettingsField.MEMORY_LIMIT, "OUT_OF_RANGE")
+    }
     fun validated(): ExpertPreferences {
         requireSetting(idleTimeoutSeconds in 30..3600, SettingsField.IDLE_TIMEOUT, "OUT_OF_RANGE")
         requireSetting(tcpConnectionLimit in 16..4096, SettingsField.TCP_LIMIT, "OUT_OF_RANGE")
@@ -155,10 +234,16 @@ data class ExpertPreferences(
     }
 }
 
-data class ProfilePreferences(
+class ProfilePreferences(
     val activeLocalRecordId: String? = null,
-    val favoriteLocalRecordIds: Set<String> = emptySet(),
+    favoriteLocalRecordIds: Set<String> = emptySet(),
 ) {
+    init { require(favoriteLocalRecordIds.size <= 1024) }
+    val favoriteLocalRecordIds: Set<String> = java.util.Collections.unmodifiableSet(favoriteLocalRecordIds.toSet())
+    fun copy(activeLocalRecordId: String? = this.activeLocalRecordId, favoriteLocalRecordIds: Set<String> = this.favoriteLocalRecordIds): ProfilePreferences = ProfilePreferences(activeLocalRecordId, favoriteLocalRecordIds)
+    override fun equals(other: Any?): Boolean = other is ProfilePreferences && activeLocalRecordId == other.activeLocalRecordId && favoriteLocalRecordIds == other.favoriteLocalRecordIds
+    override fun hashCode(): Int = listOf(activeLocalRecordId, favoriteLocalRecordIds).hashCode()
+    override fun toString(): String = "ProfilePreferences(redacted)"
     fun validated(): ProfilePreferences {
         val values = favoriteLocalRecordIds + listOfNotNull(activeLocalRecordId)
         requireSetting(values.size <= 1024, SettingsField.PROFILE_IDENTIFIERS, "TOO_MANY")
@@ -186,23 +271,6 @@ data class ProductCapabilities(
 )
 
 enum class ProjectionStatus { VERIFIED, UNAVAILABLE, REVOKED, EXPIRED, INCOMPATIBLE }
-
-data class OperatorClientProjection(
-    val providerAlias: String,
-    val publicationGeneration: ULong?,
-    val profileGeneration: ULong?,
-    val profileExpiryEpochSeconds: Long?,
-    val relayCompatibility: ProjectionStatus,
-    val rotationState: ProjectionStatus,
-    val updateCapability: ProjectionStatus,
-    val lastVerifiedUpdateCategory: String?,
-    val emergencyDenyState: ProjectionStatus,
-) {
-    init {
-        require(providerAlias.length in 1..96)
-        require(lastVerifiedUpdateCategory == null || lastVerifiedUpdateCategory.matches(Regex("[A-Z0-9_]{1,64}")))
-    }
-}
 
 data class InstalledApplication(
     val packageName: String,
@@ -234,8 +302,10 @@ data class DiagnosticEvent(
         require(coarseEpochMinutes >= 0)
         require(sessionAlias == null || sessionAlias.matches(Regex("[a-z0-9-]{1,32}")))
     }
+    override fun toString(): String = "DiagnosticEvent(redacted)"
 }
 
+/** Opt-in route suggestions only. Inclusion still requires signed bypass authority. */
 val SAFE_EXCLUDED_ROUTES: List<String> = listOf(
     "10.0.0.0/8",
     "100.64.0.0/10",
@@ -250,7 +320,7 @@ val SAFE_EXCLUDED_ROUTES: List<String> = listOf(
     "ff00::/8",
 )
 
-fun Phase9Settings.validated(): Phase9Settings = copy(
+fun ProductSettings.validated(): ProductSettings = copy(
     tunnel = tunnel.validated(),
     routing = routing.validated(),
     updates = updates.validated(),
@@ -269,7 +339,7 @@ private fun isValidPackageName(value: String): Boolean =
 
 private fun isValidIpLiteral(value: String): Boolean = canonicalizeIpLiteral(value) != null
 
-private fun canonicalizeIpLiteral(value: String): String? {
+internal fun canonicalizeIpLiteral(value: String): String? {
     val candidate = value.trim()
     if (candidate.isEmpty() || candidate.length > 45 || '%' in candidate || '[' in candidate || ']' in candidate) {
         return null
@@ -278,7 +348,7 @@ private fun canonicalizeIpLiteral(value: String): String? {
     return parseIpv6(candidate)?.let(::renderIpv6)
 }
 
-private fun canonicalizeCidr(value: String): String? {
+internal fun canonicalizeCidr(value: String): String? {
     val candidate = value.trim()
     val slash = candidate.indexOf('/')
     if (slash <= 0 || slash != candidate.lastIndexOf('/')) return null
@@ -313,7 +383,7 @@ private fun clearHostBits(bytes: ByteArray, prefix: Int) {
     }
 }
 
-private fun parseIpv4(value: String): ByteArray? {
+internal fun parseIpv4(value: String): ByteArray? {
     val parts = value.split('.')
     if (parts.size != 4) return null
     val result = ByteArray(4)
@@ -327,7 +397,7 @@ private fun parseIpv4(value: String): ByteArray? {
     return result
 }
 
-private fun parseIpv6(value: String): IntArray? {
+internal fun parseIpv6(value: String): IntArray? {
     if (value.isEmpty() || value.any { !(it.isDigit() || it.lowercaseChar() in 'a'..'f' || it == ':' || it == '.') }) {
         return null
     }
@@ -387,17 +457,4 @@ private fun renderIpv6(words: IntArray): String {
         index++
     }
     return output.ifEmpty { "::" }.toString()
-}
-
-private fun isValidHttpsProbeUrl(value: String): Boolean {
-    val candidate = value.trim()
-    if (candidate.length !in 9..2048 || !candidate.startsWith("https://")) return false
-    val authority = candidate.substringAfter("https://").substringBefore('/').substringBefore('?').substringBefore('#')
-    if (authority.isEmpty() || '@' in authority || authority.any { it.isWhitespace() }) return false
-    val host = authority.substringBeforeLast(':', authority)
-    if (host.isEmpty() || host.length > 253) return false
-    return host == "localhost" || isValidIpLiteral(host) || host.split('.').all { label ->
-        label.length in 1..63 && label.first().isLetterOrDigit() && label.last().isLetterOrDigit() &&
-            label.all { it.isLetterOrDigit() || it == '-' }
-    }
 }

@@ -4,12 +4,12 @@
 package org.kurdistanvpn.runtime.api
 
 import org.kurdistanvpn.core.model.RuntimeAvailability
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.SelectionMode
 
 data class UnavailableRuntime(
-    val reason: RuntimeAvailability = RuntimeAvailability.PHASE_9_NO_RUNTIME,
+    val reason: RuntimeAvailability = RuntimeAvailability.NOT_ADMITTED,
 )
 
 enum class VpnRuntimeState {
@@ -17,8 +17,6 @@ enum class VpnRuntimeState {
     PREPARING,
     AWAITING_VPN_CONSENT,
     CONNECTING,
-    ACTIVE_LOCAL_ONLY,
-    ACTIVE_KURD_LOOPBACK,
     ACTIVE_KURD_LIVE,
     DEGRADED,
     FALLING_BACK,
@@ -30,27 +28,71 @@ enum class VpnRuntimeState {
     FAILED,
 }
 
+enum class VpnMeteringState { UNAVAILABLE, OS_CONTROLLED, METERED, UNMETERED }
+
+/** Read-only local identities. This is neither an execution request nor native authority. */
+data class RuntimeProfilePresentation(val profileId: String, val profileGeneration: ULong,
+    val trustRevision: Long, val settingsRevision: Long) {
+    init {
+        org.kurdistanvpn.core.model.CatalogId(profileId)
+        require(profileGeneration > 0u && trustRevision > 0 && settingsRevision >= 0)
+    }
+    fun withPackageRevision(revision: Long) = RuntimePresentationBinding(profileId, profileGeneration,
+        trustRevision, settingsRevision, revision)
+    override fun toString() = "RuntimeProfilePresentation(redacted)"
+}
+
+data class RuntimePresentationBinding(val profileId: String, val profileGeneration: ULong,
+    val trustRevision: Long, val settingsRevision: Long, val packageRevision: Long) {
+    init {
+        org.kurdistanvpn.core.model.CatalogId(profileId)
+        require(profileGeneration > 0u && trustRevision >= 0 && settingsRevision >= 0 && packageRevision >= 0)
+    }
+    override fun toString() = "RuntimePresentationBinding(redacted)"
+}
+
+data class RuntimePresentationEvidence(val sessionId: String, val binding: RuntimePresentationBinding,
+    val nativeSessionId: String?, val tunSessionId: String?, val routeRevision: Long?, val dnsRevision: Long?,
+    val proxySessionId: String? = null) {
+    internal fun belongsTo(requestId: String?, generation: ULong): Boolean =
+        RuntimeAuthorityLimits.validId(sessionId) && sessionId == requestId && binding.profileGeneration == generation &&
+            (nativeSessionId == null || nativeSessionId == sessionId) &&
+            (tunSessionId == null || tunSessionId == sessionId) &&
+            (proxySessionId == null || proxySessionId == sessionId) &&
+            (routeRevision == null || routeRevision == binding.settingsRevision) &&
+            (dnsRevision == null || dnsRevision == binding.settingsRevision)
+    override fun toString() = "RuntimePresentationEvidence(redacted)"
+}
+
 data class VpnRuntimeSnapshot(
     val state: VpnRuntimeState = VpnRuntimeState.IDLE,
     val packetsRead: Long = 0,
     val packetsWritten: Long = 0,
-    val alwaysOn: Boolean = false,
-    val lockdown: Boolean = false,
+    val bytesSent: Long = 0,
+    val bytesReceived: Long = 0,
+    val alwaysOn: Boolean? = null,
+    val lockdown: Boolean? = null,
     val failure: String? = null,
     val packetDisposition: String? = null,
     val perAppRoutingMode: PerAppRoutingMode = PerAppRoutingMode.ALL_APPS,
     val startedAtElapsedRealtime: Long = 0,
-    val dnsMode: DnsMode = DnsMode.INTERNAL_TUN,
+    val dnsMode: ResolverPolicy = ResolverPolicy.INTERNAL,
     val ipMode: IpMode = IpMode.AUTO,
     val mtu: Int = 1500,
-    val profileGeneration: Long = 0,
+    val profileGeneration: ULong = 0uL,
     val planDigest: String? = null,
     val profileFingerprint: String? = null,
     val strategyFingerprint: String? = null,
     val relayFingerprint: String? = null,
     val maxReconnectAttempts: Int = 0,
     val runtimeRequestId: String? = null,
+    val appliedRevision: Long = 0,
+    val routeCount: Int = 0,
+    val perAppCount: Int = 0,
+    val lanBypass: Boolean = false,
+    val metering: VpnMeteringState = VpnMeteringState.UNAVAILABLE,
     val diagnostics: VpnRuntimeDiagnostics = VpnRuntimeDiagnostics(),
+    val presentation: RuntimePresentationEvidence? = null,
 )
 
 data class VpnRuntimeDiagnostics(
@@ -73,21 +115,27 @@ data class VpnRuntimeDiagnostics(
 /** Sanitizes display data only. No status message is an authority or traffic proof. */
 fun VpnRuntimeSnapshot.validatedForDisplay(): VpnRuntimeSnapshot {
     val digests = listOf(planDigest, profileFingerprint, strategyFingerprint, relayFingerprint)
-    val counters = listOf(packetsRead, packetsWritten, diagnostics.tunPacketsRead, diagnostics.outboundPacketsAccepted,
+    val fingerprints = listOfNotNull(profileFingerprint, strategyFingerprint, relayFingerprint)
+    val counters = listOf(packetsRead, packetsWritten, bytesSent, bytesReceived, diagnostics.tunPacketsRead, diagnostics.outboundPacketsAccepted,
         diagnostics.carrierRecordsWritten, diagnostics.carrierRecordsRead, diagnostics.authenticatedOperations,
         diagnostics.innerPacketsAccepted, diagnostics.innerPacketsRejected, diagnostics.tunWriteAttempts,
         diagnostics.tunWriteFailures, diagnostics.tunWriteFailureCode, diagnostics.tunWriteErrno,
         diagnostics.tunPacketsWritten, diagnostics.rejectedTunPackets, diagnostics.rejectedTunPacketCode)
     val wellFormed = counters.all { it >= 0 } && mtu in 1280..1500 && maxReconnectAttempts in 0..5 &&
-        profileGeneration >= 0 && startedAtElapsedRealtime >= 0 &&
+        (appliedRevision == 0L || RuntimeAuthorityLimits.validRevision(appliedRevision)) &&
+        routeCount in 0..256 && perAppCount in 0..256 &&
+        startedAtElapsedRealtime >= 0 &&
         (failure == null || failure.matches(Regex("[A-Z][A-Z0-9_]{0,63}"))) &&
         (packetDisposition == null || packetDisposition.matches(Regex("[A-Z][A-Z0-9_]{0,63}"))) &&
         (runtimeRequestId == null || RuntimeAuthorityLimits.validId(runtimeRequestId)) &&
-        digests.all { it == null || it.matches(Regex("[0-9a-f]{64}")) }
+        (planDigest == null || planDigest.matches(Regex("[0-9a-f]{64}"))) &&
+        fingerprints.all { it.matches(Regex("(?:[0-9a-f]{32}|[0-9a-f]{64})")) } &&
+        fingerprints.map(String::length).distinct().size <= 1
     val completeActive = state != VpnRuntimeState.ACTIVE_KURD_LIVE ||
-        (runtimeRequestId != null && startedAtElapsedRealtime > 0 && profileGeneration > 0 &&
+        (runtimeRequestId != null && startedAtElapsedRealtime > 0 && profileGeneration > 0uL &&
             digests.all { it != null } && failure == null)
-    return if (wellFormed && completeActive) this else VpnRuntimeSnapshot(state = VpnRuntimeState.BLOCKED,
+    val evidenceValid = presentation == null || presentation.belongsTo(runtimeRequestId, profileGeneration)
+    return if (wellFormed && completeActive && evidenceValid) this else VpnRuntimeSnapshot(state = VpnRuntimeState.BLOCKED,
         alwaysOn = alwaysOn, lockdown = lockdown, failure = "INVALID_RUNTIME_STATUS")
 }
 
@@ -96,7 +144,7 @@ data class VpnRuntimeConfig(
     val selectionMode: SelectionMode = SelectionMode.AUTOMATIC,
     val manualStrategyId: String = "",
     val ipMode: IpMode = IpMode.AUTO,
-    val dnsMode: DnsMode = DnsMode.INTERNAL_TUN,
+    val dnsMode: ResolverPolicy = ResolverPolicy.INTERNAL,
     val customDns: String = "",
     val mtu: Int = 1500,
     val metered: Boolean = false,
@@ -109,8 +157,8 @@ data class VpnRuntimeConfig(
             "INVALID_IP_MODE"
         }
         when (dnsMode) {
-            DnsMode.INTERNAL_TUN -> require(customDns.isBlank()) { "UNEXPECTED_CUSTOM_DNS" }
-            DnsMode.CUSTOM -> require(isNumericAddress(customDns)) { "INVALID_CUSTOM_DNS" }
+            ResolverPolicy.INTERNAL -> require(customDns.isBlank()) { "UNEXPECTED_CUSTOM_DNS" }
+            ResolverPolicy.CUSTOM -> require(isNumericAddress(customDns)) { "INVALID_CUSTOM_DNS" }
             else -> require(false) { "EXTERNAL_DNS_REQUIRES_PROFILE_AUTHORITY" }
         }
         require(!allowLan) { "LAN_POLICY_NOT_IMPLEMENTED" }
@@ -134,7 +182,7 @@ data class VpnRuntimeConfig(
         require(validated.ipMode != IpMode.IPV6_ONLY && validated.ipMode != IpMode.DUAL_STACK) {
             "IPV6_NOT_AVAILABLE"
         }
-        require(validated.dnsMode == DnsMode.INTERNAL_TUN && validated.customDns.isBlank()) {
+        require(validated.dnsMode == ResolverPolicy.INTERNAL && validated.customDns.isBlank()) {
             "EXTERNAL_DNS_REQUIRES_RELAY_EGRESS"
         }
         return validated

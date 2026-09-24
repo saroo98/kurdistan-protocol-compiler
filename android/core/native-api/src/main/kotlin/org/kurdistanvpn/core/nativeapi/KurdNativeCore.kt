@@ -5,7 +5,7 @@ package org.kurdistanvpn.core.nativeapi
 
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.RedactedProfilePreview
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.model.SelectionMode
@@ -25,10 +25,30 @@ data class NativeCompatibility(
     val maxConcurrentHandles: Int,
 )
 
-data class VerifiedPreviewHandle(
+/** Codec-only residue. Neither authority nor product/UI state; borrowed copies are wiped after use. */
+class NativePreviewFields(fields: List<ByteArray>) : AutoCloseable {
+    init { require(fields.size == 3 && fields.all { it.size <= 255 }) }
+    private val owned = fields.map { it.clone() }
+    private var closed = false
+    @Synchronized fun <T> withLegacyFields(block: (List<ByteArray>) -> T): T {
+        check(!closed)
+        val copies = owned.map { it.clone() }
+        return try { block(copies) } finally { copies.forEach { it.fill(0) } }
+    }
+    @Synchronized override fun close() { owned.forEach { it.fill(0) }; closed = true }
+    override fun toString(): String = "NativePreviewFields(redacted)"
+}
+
+class VerifiedPreviewHandle(
     val handle: Long,
     val preview: RedactedProfilePreview,
-)
+    private val legacyFields: NativePreviewFields? = null,
+) : AutoCloseable {
+    fun <T> withLegacyPreviewFields(block: (List<ByteArray>) -> T): T =
+        legacyFields?.withLegacyFields(block) ?: block(List(3) { byteArrayOf() })
+    override fun close() { legacyFields?.close() }
+    override fun toString(): String = "VerifiedPreviewHandle(redacted)"
+}
 
 data class DiagnosticPreviewHandle(
     val handle: Long,
@@ -50,7 +70,7 @@ data class NativeRuntimeSessionSnapshot(
     val perAppMode: PerAppSelectionMode,
     val packages: List<String>,
     val ipMode: IpMode,
-    val dnsMode: DnsMode,
+    val dnsMode: ResolverPolicy,
     val mtu: Int,
     val metered: Boolean,
     val loopbackOnly: Boolean,
@@ -85,7 +105,7 @@ data class NativeLiveRuntimeSessionSnapshot(
     val perAppMode: PerAppSelectionMode,
     val packages: List<String>,
     val ipMode: IpMode,
-    val dnsMode: DnsMode,
+    val dnsMode: ResolverPolicy,
     val mtu: Int,
     val metered: Boolean,
     val clientIpv4: ByteArray,
@@ -137,7 +157,6 @@ interface NativeLiveRuntimeSession : AutoCloseable {
 
 interface NativeRuntimeSession : AutoCloseable {
     val snapshot: NativeRuntimeSessionSnapshot
-    fun roundTrip(payload: ByteArray): NativeResult<ByteArray>
     fun cancel(): NativeResult<Unit>
 }
 
@@ -198,7 +217,6 @@ interface KurdNativeCore {
     fun createBackup(payload: ByteArray, passphrase: ByteArray): NativeResult<ByteArray>
     fun openBackup(backup: ByteArray, passphrase: ByteArray): NativeResult<BackupPreviewHandle>
     fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray>
-    fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray>
     fun openRuntimeSession(request: ByteArray): NativeResult<NativeRuntimeSession>
     fun openLiveRuntimeSession(request: ByteArray): NativeResult<NativeLiveRuntimeSession>
     fun releaseDiagnostic(preview: DiagnosticPreviewHandle): NativeResult<Unit>
