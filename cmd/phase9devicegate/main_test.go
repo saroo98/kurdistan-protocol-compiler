@@ -2346,6 +2346,8 @@ func TestDiagnosticCommandFixtureProcess(t *testing.T) {
 		fmt.Fprintln(os.Stdout, "Status: error")
 		fmt.Fprintln(os.Stderr, "credential=synthetic-secret")
 		os.Exit(7)
+	case "disconnected":
+		os.Exit(255)
 	case "wait":
 		interrupt := make(chan os.Signal, 1)
 		signal.Notify(interrupt, os.Interrupt)
@@ -2871,6 +2873,63 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 		t.Run(name, func(t *testing.T) {
 			if err := validateNativeFilesystemInstrumentationArgs(mutated, targetPackage, testPackage); err == nil {
 				t.Fatalf("invalid instrumentation arguments accepted: %q", mutated)
+			}
+		})
+	}
+}
+
+func TestNativeFilesystemPreparationRetriesOnlyOneEmptyChmodDisconnect(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	disconnected := exec.Command(executable, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "disconnected").Run()
+	var exit *exec.ExitError
+	if !errors.As(disconnected, &exit) || exit.ExitCode() != 255 {
+		t.Fatal("missing real exit-255 fixture", disconnected)
+	}
+	for _, scenario := range []string{"recovers", "repeated-disconnect", "mkdir", "diagnostic-output", "other-error", "cancelled"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			client := newADBClient("fixture-adb", "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+			operation := "chmod"
+			if scenario == "mkdir" {
+				operation = "mkdir"
+			}
+			var failedArgs []string
+			attempts := 0
+			client.transport.run = func(_ context.Context, _ string, args []string, stdout, _ io.Writer, _ time.Duration) error {
+				if args[len(args)-1] == "pwd" {
+					_, _ = io.WriteString(stdout, "/data/user/0/org.example.app\n")
+					return nil
+				}
+				if args[3] != operation || (failedArgs != nil && !reflect.DeepEqual(args, failedArgs)) {
+					return nil
+				}
+				failedArgs = append([]string(nil), args...)
+				attempts++
+				if attempts > 1 && scenario == "recovers" {
+					return nil
+				}
+				if scenario == "diagnostic-output" {
+					_, _ = io.WriteString(stdout, "permission denied\n")
+				}
+				if scenario == "other-error" {
+					return errors.New("command unavailable")
+				}
+				if scenario == "cancelled" {
+					cancel()
+				}
+				return disconnected
+			}
+			_, got := prepareNativeFilesystemInstrumentation(ctx, client, "org.example.app", "org.example.test", "org.example.test/androidx.test.runner.AndroidJUnitRunner")
+			wantAttempts := 1
+			if scenario == "recovers" || scenario == "repeated-disconnect" {
+				wantAttempts = 2
+			}
+			if attempts != wantAttempts || (got == nil) != (scenario == "recovers") {
+				t.Fatalf("attempts=%d want=%d err=%v", attempts, wantAttempts, got)
 			}
 		})
 	}
