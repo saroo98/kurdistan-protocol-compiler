@@ -4,14 +4,30 @@ import org.gradle.api.tasks.Exec
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 val releaseVersionName: String by rootProject.extra
 val releaseVersionCode: Int by rootProject.extra
 
+// Authenticated legacy device fixtures may access only the matching protected-state compile JAR.
+val protectedStateFixtureProject = project(":data:protected-state")
+val appFixtureTasks = tasks
+protectedStateFixtureProject.afterEvaluate {
+    appFixtureTasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
+        if (name == "compileInternalAndroidTestKotlin") {
+            val protectedStateCompileJar = protectedStateFixtureProject.tasks
+                .named("bundleLibCompileToJarInternal")
+            dependsOn(protectedStateCompileJar)
+            friendPaths.from(protectedStateCompileJar.map { it.outputs.files })
+        }
+    }
+}
+
 android {
     namespace = "org.kurdistanvpn.app"
     testBuildType = "internal"
+    sourceSets.getByName("androidTest").assets.srcDir(project(":data:metadata").file("schemas"))
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     ndkVersion = "28.2.13676358"
@@ -55,6 +71,12 @@ android {
                 rootProject.file("config/proguard/phase9-rules.pro"),
             )
         }
+        create("benchmark") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
 
     buildFeatures {
@@ -84,7 +106,7 @@ val internalAppApk = layout.buildDirectory.file("outputs/apk/internal/app-intern
 val internalTestApk = layout.buildDirectory.file(
     "outputs/apk/androidTest/internal/app-internal-androidTest.apk",
 )
-val phase17ExpectedTests = rootProject.file("config/phase17-required-device-tests.txt")
+val currentExpectedTests = rootProject.file("config/phase18-current-device-tests.txt")
 val deviceArtifactMetadata = rootProject.layout.buildDirectory.file("ci/device-artifacts.json")
 
 tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
@@ -93,7 +115,7 @@ tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
     dependsOn("assembleInternal", "assembleInternalAndroidTest")
     inputs.file(internalAppApk)
     inputs.file(internalTestApk)
-    inputs.file(phase17ExpectedTests)
+    inputs.file(currentExpectedTests)
     outputs.file(deviceArtifactMetadata)
     workingDir(repositoryDirectory)
     commandLine(
@@ -111,7 +133,7 @@ tasks.register<Exec>("writeCiDeviceArtifactMetadata") {
         "-artifact",
         "instrumentation-apk=${internalTestApk.get().asFile.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
         "-artifact",
-        "expected-tests=${phase17ExpectedTests.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
+        "expected-tests=${currentExpectedTests.relativeTo(repositoryDirectory).invariantSeparatorsPath}",
     )
 }
 
@@ -197,13 +219,16 @@ dependencies {
     implementation(project(":data:secure"))
     implementation(project(":data:settings"))
     implementation(project(":data:protected-state"))
+    implementation(project(":data:node"))
     implementation(project(":platform:import"))
+    implementation(project(":platform:system"))
     implementation(project(":runtime:api"))
     implementation(project(":runtime:android"))
     implementation(project(":feature:home"))
     implementation(project(":feature:profiles"))
     implementation(project(":feature:settings-recovery"))
     implementation(project(":feature:diagnostics-about"))
+    implementation(project(":feature:onboarding"))
     "internalImplementation"(project(":test:fixtures"))
 
     implementation(libs.androidx.core.ktx)
@@ -216,8 +241,13 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.kotlinx.serialization.core)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.window)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment)
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -226,6 +256,7 @@ dependencies {
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.window.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
