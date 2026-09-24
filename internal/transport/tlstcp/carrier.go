@@ -31,6 +31,7 @@ type Conn struct {
 	planDigest [32]byte
 	binding    [32]byte
 	maxFrame   uint32
+	selected   *RecordStreamV3
 	stateMu    sync.RWMutex
 	readMu     sync.Mutex
 	writeMu    sync.Mutex
@@ -96,26 +97,41 @@ func (conn *Conn) CarrierBinding() ([32]byte, error) {
 	return conn.binding, nil
 }
 
-func (conn *Conn) Send(ctx context.Context, frame wirev1.Frame) error {
-	if conn == nil || ctx == nil || frame.PlanDigest != conn.planDigest {
+// ValidatePlanDigestV1 compares retained TLS-exporter context without exposing
+// it or granting profile authority. It changes no framed/record-stream state.
+func (conn *Conn) ValidatePlanDigestV1(expected [32]byte) error {
+	if conn == nil {
 		return ErrCarrier
 	}
 	conn.stateMu.RLock()
-	secured := conn.conn
-	conn.stateMu.RUnlock()
-	if secured == nil {
+	defer conn.stateMu.RUnlock()
+	if conn.conn == nil || expected == ([32]byte{}) || conn.planDigest != expected {
+		return ErrCarrier
+	}
+	return nil
+}
+
+func (conn *Conn) Send(ctx context.Context, frame wirev1.Frame) error {
+	if conn == nil || ctx == nil || frame.PlanDigest != conn.planDigest {
 		return ErrCarrier
 	}
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		return ErrCarrier
 	}
+	conn.writeMu.Lock()
+	defer conn.writeMu.Unlock()
+	conn.stateMu.RLock()
+	secured := conn.conn
+	framed := secured != nil && conn.selected == nil
+	conn.stateMu.RUnlock()
+	if !framed {
+		return ErrCarrier
+	}
 	encoded, err := wirev1.Encode(frame)
 	if err != nil || len(encoded) > int(conn.maxFrame) {
 		return ErrCarrier
 	}
-	conn.writeMu.Lock()
-	defer conn.writeMu.Unlock()
 	if err := secured.SetWriteDeadline(deadline); err != nil {
 		return ErrCarrier
 	}
@@ -135,18 +151,19 @@ func (conn *Conn) Receive(ctx context.Context) (wirev1.Frame, error) {
 	if conn == nil || ctx == nil {
 		return wirev1.Frame{}, ErrCarrier
 	}
-	conn.stateMu.RLock()
-	secured := conn.conn
-	conn.stateMu.RUnlock()
-	if secured == nil {
-		return wirev1.Frame{}, ErrCarrier
-	}
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		return wirev1.Frame{}, ErrCarrier
 	}
 	conn.readMu.Lock()
 	defer conn.readMu.Unlock()
+	conn.stateMu.RLock()
+	secured := conn.conn
+	framed := secured != nil && conn.selected == nil
+	conn.stateMu.RUnlock()
+	if !framed {
+		return wirev1.Frame{}, ErrCarrier
+	}
 	if err := secured.SetReadDeadline(deadline); err != nil {
 		return wirev1.Frame{}, ErrCarrier
 	}
@@ -184,6 +201,7 @@ func (conn *Conn) Close() error {
 		return nil
 	}
 	conn.conn = nil
+	conn.selected = nil
 	clear(conn.binding[:])
 	conn.stateMu.Unlock()
 	_ = secured.SetDeadline(time.Now())

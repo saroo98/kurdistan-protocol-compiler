@@ -56,6 +56,40 @@ func planDigest() [32]byte {
 	return value
 }
 
+func TestValidatePlanDigestV1ReadOnlyAdmission(t *testing.T) {
+	cc, sc := testConfigs(t)
+	c, s, ce, se := pair(t, cc, sc)
+	if ce != nil || se != nil {
+		t.Fatal(ce, se)
+	}
+	t.Cleanup(func() { c.Close(); s.Close() })
+	if e := c.ValidatePlanDigestV1(planDigest()); e != nil {
+		t.Fatal(e)
+	}
+	before, e := c.CarrierBinding()
+	if e != nil {
+		t.Fatal(e)
+	}
+	wrong := planDigest()
+	wrong[0] ^= 1
+	for _, digest := range [][32]byte{wrong, {}} {
+		if e = c.ValidatePlanDigestV1(digest); !errors.Is(e, ErrCarrier) {
+			t.Fatal("mismatched digest", e)
+		}
+	}
+	after, e := c.CarrierBinding()
+	if e != nil || after != before {
+		t.Fatal("read-only validation mutated carrier", e)
+	}
+	if e = (*Conn)(nil).ValidatePlanDigestV1(planDigest()); !errors.Is(e, ErrCarrier) {
+		t.Fatal("nil", e)
+	}
+	c.Close()
+	if e = c.ValidatePlanDigestV1(planDigest()); !errors.Is(e, ErrCarrier) {
+		t.Fatal("closed", e)
+	}
+}
+
 func pair(t *testing.T, clientConfig, serverConfig *tls.Config) (*Conn, *Conn, error, error) {
 	t.Helper()
 	clientRaw, serverRaw := net.Pipe()
