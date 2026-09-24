@@ -450,7 +450,7 @@ internal object Phase17FieldHarness {
         }
         check(!candidate.runtimeRequestId.isNullOrBlank()) { "FIELD_RECONNECT_REQUEST_MISSING" }
         check(candidate.startedAtElapsedRealtime > 0) { "FIELD_RECONNECT_START_TIME_MISSING" }
-        check(candidate.profileGeneration > 0 && !candidate.planDigest.isNullOrBlank()) {
+        check(candidate.profileGeneration > 0uL && !candidate.planDigest.isNullOrBlank()) {
             "FIELD_RECONNECT_AUTHORITY_EVIDENCE_MISSING"
         }
         check(candidate.maxReconnectAttempts in 1..5) { "FIELD_RECONNECT_POLICY_REJECTED" }
@@ -552,7 +552,7 @@ internal object Phase17FieldHarness {
         return true
     }
 
-    private suspend fun exportRecipient(root: Phase9CompositionRoot, fieldRoot: File) {
+    private suspend fun exportRecipient(root: ProductCompositionRoot, fieldRoot: File) {
         assertTrue("protected state initialization failed", root.initializeProtectedStateForExplicitUserAction())
         assertTrue("protected state reset failed", root.resetProtectedStateConfirmed() is ProtectedStateApplicationFacade.CommandResult.Committed)
         check(root.protectedStateFacade() == null) { "RESET_RECREATED_STATE" }
@@ -583,7 +583,7 @@ internal object Phase17FieldHarness {
         }
     }
 
-    private suspend fun importProfile(root: Phase9CompositionRoot, fieldRoot: File) {
+    private suspend fun importProfile(root: ProductCompositionRoot, fieldRoot: File) {
         val profileFile = File(fieldRoot, SEALED_PROFILE)
         require(profileFile.isFile && profileFile.length() in 1..MAX_PROFILE_BYTES.toLong()) {
             "SEALED_PROFILE_UNAVAILABLE"
@@ -624,7 +624,7 @@ internal object Phase17FieldHarness {
 
     private suspend fun connect(
         application: KurdistanApplication,
-        root: Phase9CompositionRoot,
+        root: ProductCompositionRoot,
         fieldRoot: File,
         shouldVerifyDataPlane: Boolean,
         dnsFamily: Int? = null,
@@ -676,7 +676,7 @@ internal object Phase17FieldHarness {
                 "LIVE_CONNECT_FAILED:${snapshot.failure ?: snapshot.state.name}:" +
                     (snapshot.packetDisposition ?: "NONE")
             }
-            check(snapshot.profileGeneration > 0 && !snapshot.planDigest.isNullOrBlank()) {
+            check(snapshot.profileGeneration > 0uL && !snapshot.planDigest.isNullOrBlank()) {
                 "LIVE_SESSION_EVIDENCE_MISSING"
             }
             check(snapshot.maxReconnectAttempts in 1..5) {

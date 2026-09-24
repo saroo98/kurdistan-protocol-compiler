@@ -211,7 +211,12 @@ class Phase17ProtectedStateIntegrityDeviceTest {
             val flagsMethod = ProtectedStateApplicationFacade.Companion::class.java
                 .getDeclaredMethod("credentialParentOpenFlags").apply { isAccessible = true }
             val flags = flagsMethod.invoke(ProtectedStateApplicationFacade.Companion) as Int
-            val linuxODirectory = 0x00010000
+            // Independent NDK ABI oracle, not the production flag-family mapping.
+            val linuxODirectory = when (Os.uname().machine) {
+                "aarch64" -> 0x00004000
+                "x86_64" -> 0x00010000
+                else -> error("TEST_DIRECTORY_ABI_NOT_ADMITTED")
+            }
             val linuxOCloexec = 0x00080000
             assertEquals(linuxOCloexec, flags and linuxOCloexec)
             assertEquals(linuxODirectory, flags and linuxODirectory)

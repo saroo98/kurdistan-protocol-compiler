@@ -10,6 +10,8 @@ import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.Locales
 import androidx.compose.ui.test.WindowSize
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.accessibility.disableAccessibilityChecks
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -36,8 +38,8 @@ import org.kurdistanvpn.core.model.DiagnosticComponent
 import org.kurdistanvpn.core.model.DiagnosticEvent
 import org.kurdistanvpn.core.model.DiagnosticLogLevel
 import org.kurdistanvpn.core.model.DiagnosticWorkflowState
-import org.kurdistanvpn.core.model.OperatorClientProjection
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.DeploymentProjection
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProductCapabilities
 import org.kurdistanvpn.core.model.ProductCapability
 import org.kurdistanvpn.core.model.ProjectionStatus
@@ -49,6 +51,56 @@ import org.kurdistanvpn.feature.settingsrecovery.ConnectionSettingsScreen
 import org.kurdistanvpn.feature.settingsrecovery.SettingsIndexScreen
 
 class Phase13ProductSurfaceDeviceTest {
+    @Test fun proxyRecoveryOffersOnlyTheTwoScopedActionsForProxyFailure() {
+        val failure = mutableStateOf<String?>("PROXY_LISTENER_FAILED")
+        var restarted = 0
+        var tunOnly = 0
+        compose.setContent {
+            ProxyRecoveryActions(failure.value, { restarted++ }, { tunOnly++ })
+        }
+        compose.onNodeWithTag("proxy_restart").performClick()
+        compose.onNodeWithTag("proxy_apply_tun_only").performClick()
+        compose.runOnIdle {
+            assertEquals(1, restarted); assertEquals(1, tunOnly)
+            failure.value = "AUTHORITY_REJECTED"
+        }
+        compose.onNodeWithTag("proxy_restart").assertDoesNotExist()
+        compose.onNodeWithTag("proxy_apply_tun_only").assertDoesNotExist()
+    }
+    @Test fun systemOwnedOrUnknownActiveVpnDoesNotOfferAnAppDisconnect() {
+        var opened = 0
+        var stopped = 0
+        val policy = mutableStateOf<Boolean?>(null)
+        compose.setContent {
+            org.kurdistanvpn.feature.home.HomeScreen(org.kurdistanvpn.core.model.AppState.NoProfiles,
+                vpnRuntime = org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot(
+                    org.kurdistanvpn.runtime.api.VpnRuntimeState.DEGRADED, alwaysOn = policy.value, lockdown = false),
+                onStartVpn = {}, onStopVpn = { stopped++ }, onOpenProfiles = {}, onOpenSettings = {},
+                onOpenDiagnostics = {}, onClearError = {}, onSystemVpnSettings = { opened++ })
+        }
+        compose.onNodeWithTag("home_system_vpn").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, opened); assertEquals(0, stopped); policy.value = true }
+        compose.onNodeWithTag("home_system_vpn").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(2, opened); assertEquals(0, stopped); policy.value = false }
+        compose.onNodeWithTag("home_disconnect").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, stopped) }
+    }
+    @Test fun pauseControlsRequireKnownSystemPermissionAndResumeIsExplicit() {
+        val allowed = mutableStateOf(false)
+        val paused = mutableStateOf(false)
+        var requested: Long? = -1L
+        compose.setContent {
+            ConnectionSettingsScreen(ConnectionPreferences(), {}, {}, {},
+                paused = paused.value, canPause = allowed.value,
+                onPause = { requested = it; paused.value = it != null }, onSystemVpnSettings = {})
+        }
+        compose.onNodeWithTag("pause_15_minutes").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { allowed.value = true }
+        compose.onNodeWithTag("pause_15_minutes").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(900000L, requested) }
+        compose.onNodeWithTag("resume_connections").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(null, requested) }
+    }
     @get:Rule
     val compose = createComposeRule()
 
@@ -60,7 +112,7 @@ class Phase13ProductSurfaceDeviceTest {
         val invoked = linkedSetOf<String>()
         compose.setContent {
             SettingsIndexScreen(
-                settings = Phase9Settings(),
+                settings = ProductSettings(),
                 capabilities = unavailableCapabilities(),
                 onConnection = { invoked += "connection" },
                 onTunnelDns = { invoked += "tunnel" },
@@ -74,16 +126,10 @@ class Phase13ProductSurfaceDeviceTest {
         }
 
         listOf(
-            UiR.string.open_connection_settings,
-            UiR.string.open_tunnel_dns,
-            UiR.string.open_routing,
-            UiR.string.open_updates_probes,
-            UiR.string.open_privacy_recovery,
-            UiR.string.open_diagnostics_about,
-            UiR.string.open_expert_controls,
-            UiR.string.back,
-        ).forEach { resource ->
-            compose.onNodeWithText(context.getString(resource)).performScrollTo().performClick()
+            "settings_connection", "settings_tunnel", "settings_routing", "settings_updates",
+            "settings_privacy", "settings_diagnostics", "settings_expert", "settings_back",
+        ).forEach { tag ->
+            compose.onNodeWithTag(tag).performScrollTo().performClick()
         }
         compose.runOnIdle {
             assertEquals(
@@ -121,9 +167,13 @@ class Phase13ProductSurfaceDeviceTest {
 
         compose.onNodeWithText(SelectionMode.KURD_ONLY.name).performClick()
         compose.runOnIdle { assertEquals(SelectionMode.AUTOMATIC, current.value.selectionMode) }
-        compose.onNodeWithTag("safe_reconnect_available").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(context.getString(UiR.string.safe_reconnect)).performScrollTo().performClick()
+        compose.runOnIdle { assertFalse(current.value.reconnectOnFailure) }
         compose.onNodeWithText(context.getString(UiR.string.apply)).performScrollTo().performClick()
-        compose.runOnIdle { assertEquals(SelectionMode.KURD_ONLY, current.value.selectionMode) }
+        compose.runOnIdle {
+            assertEquals(SelectionMode.KURD_ONLY, current.value.selectionMode)
+            assertEquals(true, current.value.reconnectOnFailure)
+        }
         compose.onNodeWithText(context.getString(UiR.string.recover_internet_stop_vpn))
             .performScrollTo().performClick()
         compose.runOnIdle { assertFalse(!recovered) }
@@ -150,9 +200,15 @@ class Phase13ProductSurfaceDeviceTest {
             )
         }
 
-        compose.onNodeWithText(DiagnosticLogLevel.ERROR.name).performScrollTo().performClick()
-        compose.onNodeWithText("2 · ERROR · STORAGE · STORAGE_FAILURE").assertIsDisplayed()
-        compose.onNodeWithText("1 · WARNING · RUNTIME · RUNTIME_STOPPED").assertDoesNotExist()
+        compose.onNodeWithTag("diagnostic_filters").performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostic_level_ERROR").performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostic_filter_apply").performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostic_event_2").assertIsDisplayed()
+            .assertTextContains("2 · ERROR · STORAGE")
+            .assertTextContains("STORAGE_FAILURE")
+        compose.onNodeWithTag("diagnostic_event_1").assertDoesNotExist()
+        compose.onNodeWithText("WARNING", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("RUNTIME_STOPPED", substring = true).assertDoesNotExist()
         compose.onNodeWithText(context.getString(UiR.string.clear_local_diagnostic_events))
             .performScrollTo().performClick()
         compose.runOnIdle { assertFalse(!cleared) }
@@ -162,15 +218,13 @@ class Phase13ProductSurfaceDeviceTest {
     fun operatorProjectionIsReadOnlyAndUnavailableEvidenceIsTruthful() {
         compose.setContent {
             OperatorProviderScreen(
-                projection = OperatorClientProjection(
-                    providerAlias = "No verified provider",
+                projection = DeploymentProjection(
+                    alias = org.kurdistanvpn.core.model.SafeAlias("No verified provider"),
                     publicationGeneration = null,
                     profileGeneration = null,
                     profileExpiryEpochSeconds = null,
                     relayCompatibility = ProjectionStatus.UNAVAILABLE,
                     rotationState = ProjectionStatus.UNAVAILABLE,
-                    updateCapability = ProjectionStatus.UNAVAILABLE,
-                    lastVerifiedUpdateCategory = null,
                     emergencyDenyState = ProjectionStatus.UNAVAILABLE,
                 ),
                 onBack = {},
@@ -230,7 +284,7 @@ class Phase13ProductSurfaceDeviceTest {
                 settingsIndex()
             }
         }
-        compose.onNodeWithText(context.getString(UiR.string.open_connection_settings))
+        compose.onNodeWithText(context.getString(UiR.string.connection_settings_summary))
             .assertDoesNotExist()
         compose.onNodeWithTag("settings_connection").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("settings_expert").performScrollTo().assertIsDisplayed()
@@ -247,7 +301,7 @@ class Phase13ProductSurfaceDeviceTest {
                 settingsIndex()
             }
         }
-        compose.onNodeWithText(context.getString(UiR.string.open_connection_settings))
+        compose.onNodeWithText(context.getString(UiR.string.connection_settings_summary))
             .assertDoesNotExist()
         compose.onNodeWithTag("settings_connection").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("settings_expert").performScrollTo().assertIsDisplayed()
@@ -256,7 +310,7 @@ class Phase13ProductSurfaceDeviceTest {
     @androidx.compose.runtime.Composable
     private fun settingsIndex() {
         SettingsIndexScreen(
-            settings = Phase9Settings(),
+            settings = ProductSettings(),
             capabilities = unavailableCapabilities(),
             onConnection = {},
             onTunnelDns = {},
