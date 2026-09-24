@@ -10,7 +10,9 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.test) apply false
     alias(libs.plugins.compose.compiler) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.cyclonedx)
 }
@@ -27,7 +29,7 @@ if (localCorrection.get()) {
     check(gradle.startParameter.isWriteDependencyLocks == lockWrite) { "Explicit confined lock-write mode required" }
     if (lockWrite) {
         check(gradle.startParameter.taskNames == listOf(":resolveLocalCorrectionLocks")) { "Unapproved lock-write task" }
-        val permitted = setOf(":app", ":core:native-api", ":data:protected-state")
+        val permitted = setOf(":app", ":core:native-api", ":core:native-jni", ":data:protected-state")
         val known = mutableSetOf<String>()
         // Existing lock identities are inputs, not writable output targets.
         allprojects.forEach { candidate ->
@@ -91,7 +93,7 @@ if (localCorrection.get()) {
         }
         tasks.register("resolveLocalCorrectionLocks") {
             group = "verification"
-            description = "Offline identity-preserving lock generation for the three explicitly approved modules only."
+            description = "Offline identity-preserving lock generation for the four explicitly approved modules only."
             dependsOn(lockTasks)
         }
     }
@@ -100,14 +102,20 @@ if (localCorrection.get()) {
         ":core:native-jni:buildDebugX8664GoBridge",
         ":core:native-jni:buildInternalArm64v8aGoBridge",
         ":core:native-jni:buildInternalX8664GoBridge",
+        ":core:native-jni:buildReleaseArm64v8aGoBridge",
     )
     val prohibited = Regex("(?i)(assemble|bundle(?!Lib(Compile|Runtime)To(Jar|Dir))|install|uninstall|connected|devicegate|phase17gate|campaign|stress|soak|publish|upload|deploy|sign.*(apk|bundle|release)|^package(Internal|Debug|Release)$)")
     val confinedRoot = rootDir.parentFile.canonicalFile.toPath()
-    val applicationClassJars = setOf(":app:bundleInternalClassesToCompileJar", ":app:bundleInternalClassesToRuntimeJar")
+    val applicationClassJars = setOf(
+        ":app:bundleBenchmarkClassesToCompileJar",
+        ":app:bundleInternalClassesToCompileJar",
+        ":app:bundleInternalClassesToRuntimeJar",
+    )
     val lintPreparationProjects = setOf(":app", ":core:model", ":core:ui", ":domain", ":core:native-api", ":core:native-jni",
-        ":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":platform:import",
+        ":data:metadata", ":data:secure", ":data:settings", ":data:protected-state", ":data:node",
+        ":platform:import", ":platform:system",
         ":runtime:api", ":runtime:android", ":feature:home", ":feature:profiles",
-        ":feature:settings-recovery", ":feature:diagnostics-about", ":test:fixtures")
+        ":feature:settings-recovery", ":feature:diagnostics-about", ":feature:onboarding", ":test:fixtures")
     fun isConfinedLintPreparation(task: Task): Boolean {
         // Audited AGP 9.2.1 task: local optional lint.jar copy only, not remote publication.
         if (task.name != "prepareLintJarForPublish" || task.project.path !in lintPreparationProjects ||
@@ -116,7 +124,7 @@ if (localCorrection.get()) {
         return output.name == "lint.jar" && output.toPath().startsWith(task.project.layout.buildDirectory.get().asFile.canonicalFile.toPath())
     }
     fun isConfinedLocalLintAar(task: Task): Boolean {
-        val variant = Regex("^bundle(Debug|Internal)LocalLintAar$").matchEntire(task.name)?.groupValues?.get(1)?.lowercase()
+        val variant = Regex("^bundle(Debug|Internal|Release)LocalLintAar$").matchEntire(task.name)?.groupValues?.get(1)?.lowercase()
             ?: return false
         if (task.project.path !in lintPreparationProjects ||
             task !is com.android.build.gradle.tasks.BundleAar) return false
@@ -319,6 +327,10 @@ val verifyPhase17Artifacts = tasks.register<Exec>("verifyPhase17Artifacts") {
         "android/app/build/outputs/apk/internal/app-internal.apk",
         "-manifest",
         "android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
+        "-aapt2",
+        androidSdkDirectory.resolve(
+            "build-tools/36.0.0/${if (System.getProperty("os.name").startsWith("Windows")) "aapt2.exe" else "aapt2"}",
+        ).absolutePath,
     )
 }
 
@@ -410,22 +422,62 @@ val phase14Gate = tasks.register("phase14Gate") {
     )
 }
 
+val currentHostTestTasks = listOf(
+    ":app:testInternalUnitTest",
+    ":core:model:testDebugUnitTest",
+    ":core:native-api:testDebugUnitTest",
+    ":core:native-jni:testDebugUnitTest",
+    ":core:ui:testDebugUnitTest",
+    ":data:metadata:testDebugUnitTest",
+    ":data:protected-state:testDebugUnitTest",
+    ":data:secure:testDebugUnitTest",
+    ":data:settings:testDebugUnitTest",
+    ":domain:testDebugUnitTest",
+    ":feature:diagnostics-about:testDebugUnitTest",
+    ":feature:onboarding:testDebugUnitTest",
+    ":feature:profiles:testDebugUnitTest",
+    ":feature:settings-recovery:testDebugUnitTest",
+    ":platform:import:testDebugUnitTest",
+    ":runtime:android:testDebugUnitTest",
+    ":runtime:api:testDebugUnitTest",
+)
+
+val currentHostTestRoots = subprojects.associate { it.path to it.file("src/test") }
+val verifyCurrentHostTestCoverage = tasks.register("verifyCurrentHostTestCoverage") {
+    group = "verification"
+    description = "Checks that every current test-bearing Android module has its host test task."
+    // Capture plain task inputs, not the Gradle script instance, for cache reuse.
+    val testRoots = currentHostTestRoots
+    val testTasks = currentHostTestTasks
+    inputs.files(testRoots.values)
+    doLast {
+        val actual = testRoots.filterValues { root ->
+            root.isDirectory && root.walkTopDown().any {
+                it.isFile && (it.extension == "kt" || it.extension == "java")
+            }
+        }.keys
+        check(testTasks.distinct().size == testTasks.size) {
+            "Duplicate current host test task"
+        }
+        val selected = testTasks.map { it.substringBeforeLast(':') }.toSet()
+        check(actual == selected) { "Current host test modules differ: actual=$actual selected=$selected" }
+        testTasks.forEach { path ->
+            val expected = if (path.substringBeforeLast(':') == ":app")
+                "testInternalUnitTest" else "testDebugUnitTest"
+            check(path.substringAfterLast(':') == expected) { "Unexpected host test variant: $path" }
+        }
+    }
+}
+
 val phase17Gate = tasks.register("phase17Gate") {
     group = "verification"
-    description = "Runs the cache-independent current Phase 17 live data-plane Android verification bar."
+    description = "Verifies current Android source with retained Phase 17 compatibility prerequisites."
+    dependsOn(currentHostTestTasks, verifyCurrentHostTestCoverage)
     dependsOn(
         ":app:assembleRelease",
         ":app:assembleInternal",
         ":app:lintRelease",
-        ":app:testInternalUnitTest",
         ":app:compileInternalAndroidTestKotlin",
-        ":core:model:testDebugUnitTest",
-        ":runtime:api:testDebugUnitTest",
-        ":runtime:android:testDebugUnitTest",
-        ":data:metadata:testDebugUnitTest",
-        ":data:secure:testDebugUnitTest",
-        ":data:settings:testDebugUnitTest",
-        ":platform:import:testDebugUnitTest",
         "cyclonedxBom",
         verifyPhase13Artifacts,
         verifyPhase14Artifacts,
@@ -582,7 +634,7 @@ tasks.register<Exec>("phase14DeviceGate") {
 
 tasks.register<Exec>("phase17DeviceGate") {
     group = "verification"
-    description = "Runs the exact current Phase 17 device inventory on a connected API 26, 34, or 36 device."
+    description = "Runs the exact current Android device inventory with retained Phase 17 compatibility on API 26, 34, or 36."
     dependsOn(":app:assembleInternal", ":app:assembleInternalAndroidTest")
     workingDir(rootProject.projectDir.parentFile)
     commandLine(
@@ -602,7 +654,7 @@ tasks.register<Exec>("phase17DeviceGate") {
         "-conflicting-app-package",
         "org.kurdistanvpn.app.debug",
         "-expected-tests",
-        "android/config/phase17-required-device-tests.txt",
+        "android/config/phase18-current-device-tests.txt",
         "-minimum-tests",
         "1",
     )
@@ -617,13 +669,13 @@ val ciReleaseMetadata = tasks.register<Exec>("ciReleaseMetadata") {
 
 tasks.register("ciPrHostGate") {
     group = "verification"
-    description = "Runs the current Phase 17 host proof and centralized metadata check for pull requests."
+    description = "Checks current Android source, retained Phase 17 compatibility, and metadata for pull requests."
     dependsOn(phase17Gate, ciReleaseMetadata)
 }
 
 tasks.register("ciAssuranceHostGate") {
     group = "verification"
-    description = "Runs the current Phase 17 host proof and centralized metadata check for assurance."
+    description = "Checks current Android source, retained Phase 17 compatibility, and metadata for assurance."
     dependsOn(phase17Gate, ciReleaseMetadata)
 }
 
