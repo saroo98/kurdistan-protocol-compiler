@@ -193,9 +193,10 @@ private fun CategoryRow(category: SettingsCategory) {
 fun AppearanceSettingsScreen(applied: ProductSettings, editor: SettingsEditorState?,
     onEdit: (ProductSettings) -> Unit, onApply: () -> Unit, onCancel: () -> Unit, onBack: () -> Unit) =
     ProductScreen(stringResource(UiR.string.appearance), onBack) {
-        val requested = editor?.requested ?: applied
+        val requested = editor?.requested ?: editor?.applied?.settings ?: applied
         AppearanceControls(requested, { onEdit(requested.copy(theme = it)) },
-            { onEdit(requested.copy(highContrast = it)) }, { onEdit(requested.copy(reducedMotion = it)) })
+            { onEdit(requested.copy(highContrast = it)) }, { onEdit(requested.copy(reducedMotion = it)) },
+            enabled = (editor?.draft != null && editor.requested != null) || editor?.phase == SettingsEditorPhase.APPLIED)
         DraftActions(requested != applied, onApply, onCancel, editor?.phase)
     }
 

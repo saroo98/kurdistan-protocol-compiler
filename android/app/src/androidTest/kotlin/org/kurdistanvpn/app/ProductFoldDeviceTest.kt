@@ -28,8 +28,15 @@ class ProductFoldDeviceTest {
         assertTrue("Requires a wide owned emulator window", compose.activity.resources.configuration.screenWidthDp >= 840)
         compose.onNodeWithTag("primary_settings").performClick()
         compose.onNodeWithTag("settings_appearance").performScrollTo().performClick()
+        compose.waitUntil(10_000) { owner.state.value.phase == SettingsEditorPhase.EDITING }
         compose.onNodeWithContentDescription(app.getString(org.kurdistanvpn.core.ui.R.string.high_contrast)).performClick()
-        compose.waitUntil(10_000) { owner.state.value.phase == SettingsEditorPhase.SAVED }
+        try {
+            compose.waitUntil(10_000) { owner.state.value.phase in setOf(SettingsEditorPhase.SAVED, SettingsEditorPhase.FAILED) }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("Draft phase=${owner.state.value.phase}; failure=${owner.state.value.failure}; " +
+                "hasDraft=${owner.state.value.draft != null}; requestedChange=${owner.state.value.requested != owner.state.value.applied?.settings}", timeout)
+        }
+        assertEquals("Draft failure: ${owner.state.value.failure}", SettingsEditorPhase.SAVED, owner.state.value.phase)
         val draft = owner.state.value.draft?.id
         try {
             listOf(FoldingFeature.Orientation.VERTICAL, FoldingFeature.Orientation.HORIZONTAL).forEach { orientation ->

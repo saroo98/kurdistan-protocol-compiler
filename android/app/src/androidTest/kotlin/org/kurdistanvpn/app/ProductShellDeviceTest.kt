@@ -89,6 +89,7 @@ class ProductShellDeviceTest {
         compose.onNodeWithTag("settings_appearance").performScrollTo().performClick()
         val editor = androidx.lifecycle.ViewModelProvider(compose.activity)[org.kurdistanvpn.feature.settingsrecovery.SettingsViewModel::class.java]
         try {
+            compose.waitUntil(10_000) { editor.state.value.phase == org.kurdistanvpn.feature.settingsrecovery.SettingsEditorPhase.EDITING }
             compose.onNodeWithContentDescription(app.getString(org.kurdistanvpn.core.ui.R.string.high_contrast)).performClick()
             val saveStarted = android.os.SystemClock.elapsedRealtime()
             try {

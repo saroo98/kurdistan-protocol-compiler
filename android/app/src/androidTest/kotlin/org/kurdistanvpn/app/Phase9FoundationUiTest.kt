@@ -22,6 +22,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -208,6 +209,9 @@ class Phase9FoundationUiTest {
             .performClick()
 
         val highContrast = activity.getString(UiR.string.high_contrast)
+        compose.waitUntil(timeoutMillis = runtimeTimeout(10_000)) {
+            runCatching { compose.onNodeWithContentDescription(highContrast).assertIsEnabled(); true }.getOrDefault(false)
+        }
         compose.onNodeWithContentDescription(highContrast)
             .performScrollTo()
             .assertIsOff()
