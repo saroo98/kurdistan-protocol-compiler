@@ -912,6 +912,7 @@ func nativeFilesystemInstrumentationPlan(ownerPackage, testPackage, dataDir, inv
 func nativeFilesystemPreparationArgs(plan nativeFilesystemInvocationPlan) [][]string {
 	prefix := strings.TrimPrefix(plan.Root, plan.DataDir+"/")
 	commands := [][]string{
+		{"shell", "run-as", plan.OwnerPackage, "mkdir", "-p", "cache"},
 		{"shell", "run-as", plan.OwnerPackage, "mkdir", prefix},
 		{"shell", "run-as", plan.OwnerPackage, "chmod", "700", prefix},
 	}

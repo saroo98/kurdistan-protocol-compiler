@@ -2828,6 +2828,7 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 		t.Fatalf("filesystem child roots changed: %q", plan.Children)
 	}
 	wantPreparation := [][]string{
+		{"shell", "run-as", targetPackage, "mkdir", "-p", "cache"},
 		{"shell", "run-as", targetPackage, "mkdir", "cache/phase17-disposable-" + invocation},
 		{"shell", "run-as", targetPackage, "chmod", "700", "cache/phase17-disposable-" + invocation},
 	}
