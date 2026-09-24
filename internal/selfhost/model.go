@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"kurdistan/internal/product/profile"
+	"kurdistan/internal/product/runtimepolicy"
 )
 
 const (
@@ -84,6 +85,8 @@ type CreateProfileOptions struct {
 	LiveProgram           []byte
 	RegistryDir           string
 	ConfirmRecipientReuse string
+	// Services is explicit signed authority; nil retains legacy V2 issuance.
+	Services *runtimepolicy.ServicesV1
 }
 
 type RotateProfileOptions struct {
@@ -95,6 +98,10 @@ type RotateProfileOptions struct {
 	LiveProgram             []byte
 	RegistryDir             string
 	ConfirmRecipientReuse   string
+	// Nil preserves existing signed services; nonnil explicitly replaces them.
+	Services *runtimepolicy.ServicesV1
+	// ClearServices explicitly removes services and cannot accompany Services.
+	ClearServices bool
 }
 
 type RevokeProfileOptions struct {

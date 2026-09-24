@@ -198,7 +198,8 @@ func ConfirmRecovery(dataDir, recoveryPath string, passphrase []byte, now time.T
 
 func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile, error) {
 	now := options.Now.UTC()
-	if !validName(options.Name) || now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity {
+	if !validName(options.Name) || now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity ||
+		options.Services != nil && len(options.RecipientRequest) == 0 {
 		return IssuedProfile{}, ErrInvalidInput
 	}
 	var recipientRequest enrollment.PublicRequestV1
@@ -241,7 +242,10 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 				return err
 			}
 			ownerReservation = &reservation
-			issued, record, err = issueLiveProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, options.LiveProgram, now, recipientRequest, 1, &reservation)
+			issued, record, err = issueLiveProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, options.LiveProgram, options.Services, 0, now, recipientRequest, 1, &reservation)
+			if err != nil {
+				return err
+			}
 		} else {
 			issued, record, err = issueProfile(state, master, options.Name, profileID, "", "initial", options.ValidFor, now)
 		}
@@ -263,7 +267,8 @@ func CreateProfile(dataDir string, options CreateProfileOptions) (IssuedProfile,
 func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile, error) {
 	now := options.Now.UTC()
 	if !validID(options.ProfileID) || options.RecoveryPath == "" || !validPassphrase(options.RecoveryPassphrase) ||
-		now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity {
+		now.IsZero() || options.ValidFor < time.Hour || options.ValidFor > maxProfileValidity ||
+		options.ClearServices && options.Services != nil {
 		return IssuedProfile{}, ErrInvalidInput
 	}
 	var recipientRequest enrollment.PublicRequestV1
@@ -292,6 +297,13 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 			return err
 		}
 		previous := state.Profiles[index]
+		if previous.Mode != profileModeLive && len(options.RecipientRequest) == 0 && options.Services != nil {
+			return ErrInvalidInput
+		}
+		services, generation, err := replacementRuntimeIntent(previous, options.Services, options.ClearServices)
+		if err != nil {
+			return err
+		}
 		state.Assignments = quarantineProfileAssignments(state.Assignments, previous.ProfileID, now.Unix())
 		if err := updateRevocations(state, rootPrivate, now, append(state.Revocations.RevokedContentIDs, previous.ContentID), state.Revocations.EmergencyDenied); err != nil {
 			return err
@@ -325,14 +337,17 @@ func RotateProfile(dataDir string, options RotateProfileOptions) (IssuedProfile,
 				return err
 			}
 			ownerReservation = &reservation
-			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, now, recipientRequest, epoch, &reservation)
+			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, services, generation, now, recipientRequest, epoch, &reservation)
+			if err != nil {
+				return err
+			}
 		} else if previous.Mode == profileModeLive {
 			reused := enrollment.PublicRequestV1{
 				RequestID: previous.Recipient.Hint, RecipientKeyID: previous.Recipient.KeyID,
 				RecipientPublic: bytes.Clone(previous.RecipientPublic), ClientAuthKeyID: previous.ClientAuthKeyID,
 				ClientAuthPublic: bytes.Clone(previous.ClientAuthPublic),
 			}
-			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, now, reused, previous.Recipient.Epoch, nil)
+			issued, record, err = issueLiveProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, options.LiveProgram, services, generation, now, reused, previous.Recipient.Epoch, nil)
 		} else {
 			issued, record, err = issueProfile(state, master, previous.Name, previous.ProfileID, previous.ContentID, "replacement", options.ValidFor, now)
 		}

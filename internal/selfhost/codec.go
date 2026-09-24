@@ -19,12 +19,23 @@ func encodeCanonical(value any) ([]byte, error) {
 }
 
 func decodeCanonical(encoded []byte, destination any, maxBytes int) error {
+	if err := decodeCanonicalFields(encoded, destination, maxBytes, maxStateArrayElements); err != nil {
+		return err
+	}
+	canonical, err := encodeCanonical(destination)
+	if err != nil || !bytes.Equal(canonical, encoded) {
+		return errors.Join(ErrInvalidInput, errors.New("non-canonical encoding"))
+	}
+	return nil
+}
+
+func decodeCanonicalFields(encoded []byte, destination any, maxBytes, maxArray int) error {
 	if len(encoded) == 0 || len(encoded) > maxBytes {
 		return ErrInvalidInput
 	}
 	options := cbor.DecOptions{
 		DupMapKey:         cbor.DupMapKeyEnforcedAPF,
-		MaxArrayElements:  maxStateArrayElements,
+		MaxArrayElements:  maxArray,
 		MaxMapPairs:       256,
 		MaxNestedLevels:   16,
 		IndefLength:       cbor.IndefLengthForbidden,
@@ -35,10 +46,6 @@ func decodeCanonical(encoded []byte, destination any, maxBytes int) error {
 	mode, err := options.DecMode()
 	if err != nil || mode.Unmarshal(encoded, destination) != nil {
 		return ErrInvalidInput
-	}
-	canonical, err := encodeCanonical(destination)
-	if err != nil || !bytes.Equal(canonical, encoded) {
-		return errors.Join(ErrInvalidInput, errors.New("non-canonical encoding"))
 	}
 	return nil
 }

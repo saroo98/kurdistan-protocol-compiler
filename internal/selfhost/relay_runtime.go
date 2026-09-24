@@ -26,16 +26,19 @@ type RelayRuntimeStatusV1 struct {
 // RelayAdmissionV1 is the exact current relay-side authority for one client
 // identity. It intentionally contains no profile artifact or recipient key.
 type RelayAdmissionV1 struct {
-	ProfileID, ContentID  string
-	Generation            uint64
-	ValidFrom, ValidUntil int64
-	ClientAuthKeyID       string
-	ClientAuthPublic      [32]byte
-	AssignedIPv4          []byte
-	AssignedIPv6          []byte
-	RuntimePolicy         runtimepolicy.PolicyV2
-	StrategyIDs           []string
-	RelayIDs              []string
+	ProviderID, LineageID      string
+	ServiceAuthorityDeadlineV3 time.Time
+	RevocationSubjectV3        RelayRevocationSubjectV3
+	ProfileID, ContentID       string
+	Generation                 uint64
+	ValidFrom, ValidUntil      int64
+	ClientAuthKeyID            string
+	ClientAuthPublic           [32]byte
+	AssignedIPv4               []byte
+	AssignedIPv6               []byte
+	RuntimePolicy              runtimepolicy.PolicyV2
+	StrategyIDs                []string
+	RelayIDs                   []string
 }
 
 func (a RelayAdmissionV1) clone() RelayAdmissionV1 {
@@ -65,11 +68,12 @@ type RelayRuntimeSnapshotV1 struct {
 	admissions     map[string]RelayAdmissionV1
 	profiles       map[relayProfileKeyV1]string
 	closed         bool
+	revocationsV3  *RelayRevocationViewV3
 }
 
 // OpenRelayRuntimeSnapshotV1 opens a validated state-v2 relay view at the
 // caller's trusted time. It never returns raw persisted state or sealed data.
-func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSnapshotV1, error) {
+func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (snapshot *RelayRuntimeSnapshotV1, returnErr error) {
 	now = now.UTC()
 	if dataDir == "" || now.IsZero() {
 		return nil, ErrInvalidInput
@@ -79,6 +83,12 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		return nil, err
 	}
 	defer zero(master)
+	view := verifiedRelayRevocationsV3(state, now)
+	defer func() {
+		if returnErr != nil && view != nil {
+			returnErr = &relayRuntimeLoadErrorV3{cause: returnErr, view: view}
+		}
+	}()
 	if state.Revocations.EmergencyDenied {
 		return nil, ErrRelayRuntimeUnavailable
 	}
@@ -120,7 +130,8 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		return nil, ErrStateCorrupt
 	}
 
-	snapshot := &RelayRuntimeSnapshotV1{
+	snapshot = &RelayRuntimeSnapshotV1{
+		revocationsV3: view,
 		status: RelayRuntimeStatusV1{
 			Revision: state.Revision, Generation: state.Generation, RelayEpoch: state.RelayEpoch, TLSEpoch: state.TLS.Epoch,
 			RelayKeyID: state.RelayKeyID, TLSKeyID: state.TLS.KeyID, AdmissionCount: 0, Drained: state.Drained,
@@ -139,7 +150,7 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		if record.Mode != profileModeLive || record.Revoked || now.Unix() < record.CreatedAt || now.Unix() >= record.ValidUntil {
 			continue
 		}
-		policy, decodeErr := runtimepolicy.DecodeV2At(record.RuntimePolicy, now)
+		policy, decodeErr := runtimepolicy.DecodeRuntimeAt(record.RuntimePolicy, now)
 		if decodeErr != nil || policy.RelayAuthKeyID != state.RelayKeyID ||
 			!bytes.Equal(policy.RelayAuthPublic[:], state.RelayPublic) || policy.ClientAuthKeyID != record.ClientAuthKeyID ||
 			!bytes.Equal(policy.ClientAuthPublic[:], record.ClientAuthPublic) || !bytes.Equal(policy.ClientIPv4, record.AssignedIPv4) ||
@@ -158,13 +169,17 @@ func OpenRelayRuntimeSnapshotV1(dataDir string, now time.Time) (*RelayRuntimeSna
 		}
 		var clientPublic [32]byte
 		copy(clientPublic[:], record.ClientAuthPublic)
-		snapshot.admissions[record.ClientAuthKeyID] = RelayAdmissionV1{
+		admission := RelayAdmissionV1{
 			ProfileID: record.ProfileID, ContentID: record.ContentID, Generation: record.Generation,
 			ValidFrom: record.CreatedAt, ValidUntil: record.ValidUntil,
 			ClientAuthKeyID: record.ClientAuthKeyID, ClientAuthPublic: clientPublic,
 			AssignedIPv4: bytes.Clone(record.AssignedIPv4), AssignedIPv6: bytes.Clone(record.AssignedIPv6), RuntimePolicy: policy.Clone(),
 			StrategyIDs: []string{"strategy.kurd-tls13-tcp"}, RelayIDs: []string{state.RelayKeyID},
 		}
+		if policy.SchemaVersion == runtimepolicy.SchemaVersionV3 {
+			admission.ProviderID, admission.LineageID, admission.ServiceAuthorityDeadlineV3, admission.RevocationSubjectV3 = projectRelayServicesV3(state, record, view, now)
+		}
+		snapshot.admissions[record.ClientAuthKeyID] = admission
 		snapshot.profiles[profileKey] = record.ClientAuthKeyID
 	}
 	snapshot.status.AdmissionCount = len(snapshot.admissions)
@@ -301,6 +316,7 @@ func (snapshot *RelayRuntimeSnapshotV1) Close() {
 	snapshot.tlsPrivate = nil
 	snapshot.tlsCertificate = nil
 	snapshot.profiles = nil
+	snapshot.revocationsV3 = nil
 	snapshot.status = RelayRuntimeStatusV1{}
 	snapshot.closed = true
 }

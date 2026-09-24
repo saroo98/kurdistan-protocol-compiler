@@ -44,6 +44,10 @@ func validateLiveProgramBytesV1(encoded []byte) ([]byte, [32]byte, error) {
 }
 
 func buildRuntimePolicyV2(state *persistedState, request enrollment.PublicRequestV1, ipv4, ipv6, program []byte, programDigest [32]byte, now time.Time) (runtimepolicy.PolicyV2, []byte, error) {
+	return buildRuntimePolicyAt(state, request, ipv4, ipv6, program, programDigest, nil, now)
+}
+
+func buildRuntimePolicyAt(state *persistedState, request enrollment.PublicRequestV1, ipv4, ipv6, program []byte, programDigest [32]byte, services *runtimepolicy.ServicesV1, now time.Time) (runtimepolicy.PolicyV2, []byte, error) {
 	host, portText, err := net.SplitHostPort(state.Endpoint)
 	if err != nil {
 		return runtimepolicy.PolicyV2{}, nil, ErrInvalidInput
@@ -112,24 +116,57 @@ func buildRuntimePolicyV2(state *persistedState, request enrollment.PublicReques
 	}
 	policy.Limits.MaxPackets, policy.Limits.MaxFrames, policy.Limits.MaxMessages = maxMessages, maxMessages, maxMessages
 	policy.Limits.MaxQueuedPackets, policy.Limits.MaxIdleSeconds = maxQueued, maxIdle
-	digest, err := runtimepolicy.RelayAdmissionDigestV2At(policy, now)
+	if services != nil {
+		policy.SchemaVersion = runtimepolicy.SchemaVersionV3
+		policy.Services = services
+		policy = policy.Clone()
+	}
+	digest, err := runtimepolicy.RelayAdmissionDigestRuntimeAt(policy, now)
 	if err != nil {
 		return runtimepolicy.PolicyV2{}, nil, ErrInvalidInput
 	}
 	policy.RelayAdmissionDigest = digest
-	encoded, err := runtimepolicy.EncodeV2At(policy, now)
+	encoded, err := runtimepolicy.EncodeRuntimeAt(policy, now)
 	if err != nil {
 		return runtimepolicy.PolicyV2{}, nil, ErrInvalidInput
 	}
-	decoded, err := runtimepolicy.DecodeV2At(encoded, now)
+	decoded, err := runtimepolicy.DecodeRuntimeAt(encoded, now)
 	if err != nil {
 		return runtimepolicy.PolicyV2{}, nil, ErrInvalidInput
 	}
-	reencoded, err := runtimepolicy.EncodeV2At(decoded, now)
+	reencoded, err := runtimepolicy.EncodeRuntimeAt(decoded, now)
 	if err != nil || !bytes.Equal(encoded, reencoded) || decoded.RelayAdmissionDigest != digest {
 		return runtimepolicy.PolicyV2{}, nil, ErrInvalidInput
 	}
 	return decoded, encoded, nil
+}
+
+// replacementRuntimeIntent carries only retained signed authority unless the
+// owner explicitly replaces or clears it. Zero generation keeps V2 legacy
+// issuance; a V3-aware replacement uses the exact profile-local successor.
+func replacementRuntimeIntent(previous profileRecord, services *runtimepolicy.ServicesV1, clearServices bool) (*runtimepolicy.ServicesV1, uint64, error) {
+	if clearServices && services != nil {
+		return nil, 0, ErrInvalidInput
+	}
+	var prior runtimepolicy.PolicyV2
+	if previous.Mode == profileModeLive {
+		var err error
+		prior, err = runtimepolicy.DecodeRuntimeAt(previous.RuntimePolicy, time.Unix(previous.CreatedAt, 0).UTC())
+		if err != nil {
+			return nil, 0, ErrStateCorrupt
+		}
+	}
+	if services == nil && !clearServices {
+		services = prior.Services
+	}
+	var generation uint64
+	if prior.SchemaVersion == runtimepolicy.SchemaVersionV3 || services != nil {
+		if previous.Generation == ^uint64(0) {
+			return nil, 0, ErrInvalidInput
+		}
+		generation = previous.Generation + 1
+	}
+	return (runtimepolicy.PolicyV2{Services: services}).Clone().Services, generation, nil
 }
 
 func issueLiveProfile(
@@ -138,6 +175,8 @@ func issueLiveProfile(
 	name, profileID, previousContentID, updateKind string,
 	validFor time.Duration,
 	liveProgramBytes []byte,
+	services *runtimepolicy.ServicesV1,
+	generation uint64,
 	now time.Time,
 	request enrollment.PublicRequestV1,
 	recipientEpoch uint64,
@@ -177,7 +216,14 @@ func issueLiveProfile(
 	if err != nil {
 		return IssuedProfile{}, profileRecord{}, err
 	}
-	policyValue, policyBytes, err := buildRuntimePolicyV2(state, request, ipv4, ipv6, program, programDigest, now)
+	services = (runtimepolicy.PolicyV2{Services: services}).Clone().Services
+	if services != nil && services.Update != nil {
+		if services.Update.ProfileID != "" && services.Update.ProfileID != profileID {
+			return IssuedProfile{}, profileRecord{}, ErrInvalidInput
+		}
+		services.Update.ProfileID = profileID
+	}
+	policyValue, policyBytes, err := buildRuntimePolicyAt(state, request, ipv4, ipv6, program, programDigest, services, now)
 	if err != nil {
 		return IssuedProfile{}, profileRecord{}, err
 	}
@@ -185,7 +231,9 @@ func issueLiveProfile(
 	if err != nil || state.Generation == ^uint64(0) {
 		return IssuedProfile{}, profileRecord{}, ErrInvalidInput
 	}
-	generation := state.Generation + 1
+	if generation == 0 {
+		generation = state.Generation + 1
+	}
 	validUntil := now.Add(validFor).Unix()
 	profileValue := envelope.CanonicalProfileV1{
 		ContentID: contentID, ProfileID: profileID,
@@ -196,6 +244,9 @@ func issueLiveProfile(
 		RootEpoch: state.Root.Epoch, RevocationEpoch: state.Revocations.Epoch,
 		PreviousContentID: previousContentID,
 		RelayIDs:          []string{state.RelayKeyID}, StrategyIDs: []string{"strategy.kurd-tls13-tcp"}, Policy: policyBytes,
+	}
+	if runtimepolicy.ValidateRuntimeAgainstEnvelopeAt(policyValue, profileValue, now) != nil {
+		return IssuedProfile{}, profileRecord{}, ErrInvalidInput
 	}
 	binding := bindingRecord.binding()
 	spec := profile.OfflineIssuanceSpec{
@@ -285,7 +336,8 @@ func issueLiveProfile(
 			return IssuedProfile{}, profileRecord{}, err
 		}
 	}
-	state.Generation = generation
+	// This is the deployment issuance counter, not the profile generation.
+	state.Generation++
 	state.Assignments = assignments
 	state.RecipientUses = ledger
 	return IssuedProfile{
@@ -412,15 +464,18 @@ func validateLiveProfileRecord(state persistedState, record profileRecord) error
 		return ErrStateCorrupt
 	}
 	now := time.Unix(record.CreatedAt, 0).UTC()
-	policy, err := runtimepolicy.DecodeV2At(record.RuntimePolicy, now)
+	policy, err := runtimepolicy.DecodeRuntimeAt(record.RuntimePolicy, now)
 	if err != nil {
 		return ErrStateCorrupt
 	}
-	canonical, err := runtimepolicy.EncodeV2At(policy, now)
+	canonical, err := runtimepolicy.EncodeRuntimeAt(policy, now)
 	if err != nil || !bytes.Equal(canonical, record.RuntimePolicy) {
 		return ErrStateCorrupt
 	}
-	digest, err := runtimepolicy.RelayAdmissionDigestV2At(policy, now)
+	if policy.Services != nil && policy.Services.Update != nil && policy.Services.Update.ProfileID != record.ProfileID {
+		return ErrStateCorrupt
+	}
+	digest, err := runtimepolicy.RelayAdmissionDigestRuntimeAt(policy, now)
 	if err != nil || digest != policy.RelayAdmissionDigest || !bytes.Equal(digest[:], record.RelayAdmissionDigest) ||
 		policy.ClientAuthKeyID != record.ClientAuthKeyID || !bytes.Equal(policy.ClientAuthPublic[:], record.ClientAuthPublic) ||
 		!bytes.Equal(policy.ClientIPv4, record.AssignedIPv4) || !bytes.Equal(policy.ClientIPv6, record.AssignedIPv6) ||

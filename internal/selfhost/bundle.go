@@ -68,56 +68,117 @@ func encodeLiveBundle(value liveProfileBundleV2) ([]byte, error) {
 }
 
 func decodeLiveBundle(encoded []byte) (liveProfileBundleV2, error) {
-	var value liveProfileBundleV2
-	if decodeCanonical(encoded, &value, envelope.MaxTotalInputBytes) != nil || value.Version != liveBundleVersion {
-		return liveProfileBundleV2{}, ErrInvalidInput
-	}
-	return value, nil
+	return decodeLiveBundleWithResourceMode(encoded, liveResourceLegacy)
 }
 
 // verifyLiveBundleAuthority validates the clear owner authority chain and the
 // strict metadata of the sealed native artifact. It deliberately does not
 // claim recipient decryptability or inspect protected profile policy.
 func verifyLiveBundleAuthority(encoded []byte, now time.Time, minimumGeneration uint64) (liveProfileBundleV2, envelope.ArtifactMetadata, error) {
+	return verifyLiveBundleAuthorityWithResourceMode(encoded, now, minimumGeneration, liveResourceLegacy)
+}
+
+func verifyLiveBundleAuthorityWithResourceMode(encoded []byte, now time.Time, minimumGeneration uint64, mode liveResourceMode) (liveProfileBundleV2, envelope.ArtifactMetadata, error) {
+	return verifyLiveBundleAuthorityCore(encoded, now, minimumGeneration, mode, nil)
+}
+
+func verifyLiveBundleAuthorityCore(encoded []byte, now time.Time, minimumGeneration uint64, mode liveResourceMode, diagnostic *liveMaintenanceDiagnostic) (liveProfileBundleV2, envelope.ArtifactMetadata, error) {
+	if !mode.valid() {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, ErrInvalidInput
+	}
 	if now.IsZero() || minimumGeneration == 0 {
+		if now.IsZero() {
+			diagnostic.fail(LiveMaintenanceExpired)
+		} else {
+			diagnostic.fail(LiveMaintenanceInvalidRequest)
+		}
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("time or minimum generation")
 	}
-	bundle, err := decodeLiveBundle(encoded)
+	bundle, err := decodeLiveBundleWithResourceMode(encoded, mode)
+	keepBundle := false
+	if diagnostic != nil {
+		defer func() {
+			if !keepBundle {
+				destroyMaintenanceBundle(&bundle)
+			}
+		}()
+	}
+	if err != nil && mode == liveResourceTypedFirstV1 {
+		diagnostic.resource(err)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, err
+	}
 	if err != nil || !validID(bundle.DeploymentID) || bundle.RootFingerprint != fingerprint(bundle.RootPublicDER) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live bundle framing")
 	}
 	rootPublic, err := parseP256Public(bundle.RootPublicDER)
 	if err != nil || len(bundle.Root.Keys) != 1 || bundle.Root.Keys[0].KeyID != keyID("root", bundle.RootPublicDER) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live root")
 	}
 	issuerPublic, err := parseP256Public(bundle.IssuerPublicDER)
 	if err != nil || bundle.IssuerKey.KeyID != keyID("issuer", bundle.IssuerPublicDER) || bundle.IssuerKey.KeyID == bundle.Root.Keys[0].KeyID {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live issuer")
 	}
 	verifier := p256Verifier{keys: map[string]*ecdsa.PublicKey{bundle.Root.Keys[0].KeyID: rootPublic, bundle.IssuerKey.KeyID: issuerPublic}}
 	delegationPayload, err := profile.EncodeIssuerDelegationV1(bundle.Delegation)
-	if err != nil || !bytes.Equal(delegationPayload, bundle.DelegationPayload) || verifier.Verify(bundle.Root.Keys[0], bundle.DelegationPayload, bundle.DelegationSignature) != nil {
+	if diagnostic != nil {
+		defer clear(delegationPayload)
+	}
+	if err != nil || !bytes.Equal(delegationPayload, bundle.DelegationPayload) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live delegation")
+	}
+	if verifier.Verify(bundle.Root.Keys[0], bundle.DelegationPayload, bundle.DelegationSignature) != nil {
+		if sink := diagnostic.sink(nil); sink != nil {
+			sink(profile.VerificationRejection{Stage: profile.VerificationStageDelegation, Reason: profile.VerificationReasonSignatureInvalid})
+		}
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live delegation")
 	}
 	revocationPayload, err := profile.EncodeRevocationSetV1(bundle.Revocations)
-	if err != nil || !bytes.Equal(revocationPayload, bundle.RevocationPayload) || verifier.Verify(bundle.Root.Keys[0], bundle.RevocationPayload, bundle.RevocationSignature) != nil {
+	if diagnostic != nil {
+		defer clear(revocationPayload)
+	}
+	if err != nil || !bytes.Equal(revocationPayload, bundle.RevocationPayload) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live revocations")
+	}
+	if verifier.Verify(bundle.Root.Keys[0], bundle.RevocationPayload, bundle.RevocationSignature) != nil {
+		if sink := diagnostic.sink(nil); sink != nil {
+			sink(profile.VerificationRejection{Stage: profile.VerificationStageRevocations, Reason: profile.VerificationReasonSignatureInvalid})
+		}
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live revocations")
 	}
 	nowUnix := now.UTC().Unix()
-	if profile.ValidateIssuerDelegation(bundle.Root, bundle.Delegation, nowUnix, bundle.Delegation.Scope.ProviderID, bundle.Delegation.Scope.LineageID, bundle.Delegation.Scope.ProfileNamespace+"candidate") != nil ||
-		bundle.Delegation.IssuerKey != bundle.IssuerKey || bundle.Revocations.RootEpoch != bundle.Root.Epoch || nowUnix < bundle.Revocations.IssuedAt || nowUnix >= bundle.Revocations.ExpiresAt ||
-		bundle.Revocations.EmergencyDenied || contains(bundle.Revocations.RevokedIssuerKeyIDs, bundle.IssuerKey.KeyID) {
+	if profile.ValidateIssuerDelegationWithRejection(bundle.Root, bundle.Delegation, nowUnix, bundle.Delegation.Scope.ProviderID, bundle.Delegation.Scope.LineageID, bundle.Delegation.Scope.ProfileNamespace+"candidate", diagnostic.sink(nil)) != nil {
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live authority")
+	}
+	if bundle.Delegation.IssuerKey != bundle.IssuerKey || bundle.Revocations.RootEpoch != bundle.Root.Epoch {
+		diagnostic.fail(LiveMaintenanceProfileMismatch)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live authority")
+	}
+	if nowUnix < bundle.Revocations.IssuedAt || nowUnix >= bundle.Revocations.ExpiresAt {
+		diagnostic.fail(LiveMaintenanceExpired)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live authority")
+	}
+	if bundle.Revocations.EmergencyDenied || contains(bundle.Revocations.RevokedIssuerKeyIDs, bundle.IssuerKey.KeyID) {
+		diagnostic.fail(LiveMaintenanceRevoked)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live authority")
 	}
 	sealed, err := envelope.ParseSealedProfileOpaque(bundle.SealedProfile)
 	if err != nil {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live sealed frame")
 	}
 	context, err := envelope.DecodeSealProtectedContextV1(sealed.Protected)
 	if err != nil || context.SuiteID != envelope.SuiteClassicalV1 || context.ContentType != envelope.SignedObjectContentType ||
 		context.Metadata.Class != envelope.ArtifactDeviceRecipient || context.Metadata.AudienceClass != envelope.AudienceProvisionedDevice {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, bundleError("live sealed metadata")
 	}
+	keepBundle = true
 	return bundle, context.Metadata, nil
 }
 
@@ -209,7 +270,29 @@ func VerifyAndroidArtifact(encoded []byte, now time.Time, minimumGeneration uint
 // opens and verifies the exact recipient-sealed native profile with the
 // device-owned capability. ExactArtifact remains the complete owner bundle.
 func VerifyLiveAndroidArtifact(encoded []byte, now time.Time, minimumGeneration uint64, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener) (profile.OfflineVerifiedArtifact, error) {
-	bundle, metadata, err := verifyLiveBundleAuthority(encoded, now, minimumGeneration)
+	return verifyLiveAndroidArtifactWithResourceMode(encoded, now, minimumGeneration, resolver, opener, liveResourceLegacy)
+}
+
+func verifyLiveAndroidArtifactWithResourceMode(encoded []byte, now time.Time, minimumGeneration uint64, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener, mode liveResourceMode) (profile.OfflineVerifiedArtifact, error) {
+	return verifyLiveAndroidArtifactCore(encoded, now, minimumGeneration, resolver, opener, mode, nil)
+}
+
+func verifyLiveAndroidArtifactCore(encoded []byte, now time.Time, minimumGeneration uint64, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener, mode liveResourceMode, diagnostic *liveMaintenanceDiagnostic) (profile.OfflineVerifiedArtifact, error) {
+	diagnostic.reset()
+	if !validLiveResourceProviders(mode, resolver, opener) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return profile.OfflineVerifiedArtifact{}, ErrInvalidInput
+	}
+	if mode == liveResourceTypedFirstV1 {
+		opener.(*liveResourceRecipientOpener).failure = liveResourceFailureNone
+	}
+	bundle, metadata, err := verifyLiveBundleAuthorityCore(encoded, now, minimumGeneration, mode, diagnostic)
+	if diagnostic != nil {
+		defer destroyMaintenanceBundle(&bundle)
+	}
+	if mode == liveResourceTypedFirstV1 && (err == ErrInvalidInput || err == errLiveResourceSize) {
+		return profile.OfflineVerifiedArtifact{}, err
+	}
 	if err != nil || resolver == nil || opener == nil {
 		return profile.OfflineVerifiedArtifact{}, bundleError("live recipient verification")
 	}
@@ -225,19 +308,58 @@ func VerifyLiveAndroidArtifact(encoded []byte, now time.Time, minimumGeneration 
 		bundle.Root.Keys[0].KeyID: rootPublic,
 		bundle.IssuerKey.KeyID:    issuerPublic,
 	}}
-	verified, err := profile.VerifyOffline(profile.OfflineVerifyRequest{
+	verified, err := profile.VerifyOfflineWithRejection(profile.OfflineVerifyRequest{
 		Artifact: bundle.SealedProfile, Class: metadata.Class, Audience: metadata.AudienceClass,
 		Suite: envelope.SuiteClassicalV1, IssuerRole: profile.RoleIssuer, IssuerScope: bundle.Delegation.Scope,
 		IssuerKey: bundle.IssuerKey, Now: now.UTC().Unix(), MinimumGeneration: minimumGeneration,
 		MinimumSafetyFloor: 1, MinimumRootEpoch: bundle.Root.Epoch, MinimumRevocationEpoch: bundle.Revocations.Epoch,
-	}, verifier, resolver, opener)
-	if err != nil || contains(bundle.Revocations.RevokedContentIDs, verified.Profile.ContentID) ||
-		verified.Profile.RootEpoch != bundle.Root.Epoch || verified.Profile.RevocationEpoch != bundle.Revocations.Epoch {
+	}, verifier, resolver, opener, diagnostic.sink(opener))
+	if err != nil && mode == liveResourceTypedFirstV1 {
+		if resourceErr := opener.(*liveResourceRecipientOpener).resourceError(); resourceErr != nil {
+			return profile.OfflineVerifiedArtifact{}, resourceErr
+		}
+	}
+	if err != nil {
 		return profile.OfflineVerifiedArtifact{}, bundleError("live signed profile verification")
 	}
-	policy, err := runtimepolicy.DecodeV2At(verified.Profile.Policy, now)
-	if err != nil || policy.RelayAuthKeyID == "" || !contains(verified.Profile.RelayIDs, policy.RelayAuthKeyID) || policy.ValidateAgainstEnvelopeAt(verified.Profile, now) != nil {
+	if contains(bundle.Revocations.RevokedContentIDs, verified.Profile.ContentID) {
+		diagnostic.fail(LiveMaintenanceRevoked)
+		if diagnostic != nil {
+			destroyLiveMaintenanceOffline(&verified)
+		}
+		return profile.OfflineVerifiedArtifact{}, bundleError("live signed profile verification")
+	}
+	if verified.Profile.RootEpoch != bundle.Root.Epoch || verified.Profile.RevocationEpoch != bundle.Revocations.Epoch {
+		diagnostic.fail(LiveMaintenanceProfileMismatch)
+		if diagnostic != nil {
+			destroyLiveMaintenanceOffline(&verified)
+		}
+		return profile.OfflineVerifiedArtifact{}, bundleError("live signed profile verification")
+	}
+	if diagnostic != nil && diagnostic.expectedProfile != nil {
+		p, current := verified.Profile, diagnostic.expectedProfile
+		if p.ProfileID != current.ProfileID || p.ProviderID != current.ProviderID || p.LineageID != current.LineageID || p.ContractVersion != current.ContractVersion || p.RevocationScope != current.RevocationScope {
+			diagnostic.fail(LiveMaintenanceProfileMismatch)
+			destroyLiveMaintenanceOffline(&verified)
+			return profile.OfflineVerifiedArtifact{}, bundleError("live runtime policy")
+		}
+	}
+	policy, runtimeDiagnostic, err := runtimepolicy.DecodeRuntimeAtWithDiagnostic(verified.Profile.Policy, now)
+	if diagnostic != nil {
+		defer destroyMaintenancePolicy(&policy)
+	}
+	if err != nil || policy.RelayAuthKeyID == "" || !contains(verified.Profile.RelayIDs, policy.RelayAuthKeyID) || runtimepolicy.ValidateRuntimeAgainstEnvelopeAt(policy, verified.Profile, now) != nil {
+		if runtimeDiagnostic == runtimepolicy.RuntimeDiagnosticTLSValidityTime {
+			diagnostic.fail(LiveMaintenanceExpired)
+		}
+		diagnostic.fail(LiveMaintenanceIncompatible)
+		if diagnostic != nil {
+			destroyLiveMaintenanceOffline(&verified)
+		}
 		return profile.OfflineVerifiedArtifact{}, bundleError("live runtime policy")
+	}
+	if diagnostic != nil {
+		clear(verified.ExactArtifact)
 	}
 	verified.ExactArtifact = bytes.Clone(encoded)
 	return verified, nil
@@ -257,7 +379,7 @@ func VerifyLiveBundleForRecipient(encoded []byte, now time.Time, minimumGenerati
 	if err != nil {
 		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, err
 	}
-	policy, err := runtimepolicy.DecodeV2At(verified.Profile.Policy, now)
+	policy, err := runtimepolicy.DecodeRuntimeAt(verified.Profile.Policy, now)
 	if err != nil || len(policy.Endpoints) == 0 {
 		return VerifiedBundle{}, profile.OfflineVerifiedArtifact{}, bundleError("live runtime endpoint")
 	}
@@ -292,19 +414,45 @@ func NewAndroidLiveActivationSessionForRecipient(encoded []byte, now time.Time, 
 }
 
 func liveRecipientProviders(encoded []byte, now time.Time, minimumGeneration uint64, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1) (liveProfileBundleV2, envelope.ArtifactMetadata, profile.RecipientResolver, *profilehpke.Opener, error) {
-	bundle, metadata, err := verifyLiveBundleAuthority(encoded, now, minimumGeneration)
+	return liveRecipientProvidersCore(encoded, now, minimumGeneration, request, private, liveResourceLegacy)
+}
+
+func liveRecipientProvidersCore(encoded []byte, now time.Time, minimumGeneration uint64, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1, mode liveResourceMode) (liveProfileBundleV2, envelope.ArtifactMetadata, profile.RecipientResolver, *profilehpke.Opener, error) {
+	return liveRecipientProvidersDiagnosticCore(encoded, now, minimumGeneration, request, private, mode, nil)
+}
+
+func liveRecipientProvidersDiagnosticCore(encoded []byte, now time.Time, minimumGeneration uint64, request enrollment.PublicRequestV1, private enrollment.PrivateBundleV1, mode liveResourceMode, diagnostic *liveMaintenanceDiagnostic) (liveProfileBundleV2, envelope.ArtifactMetadata, profile.RecipientResolver, *profilehpke.Opener, error) {
+	bundle, metadata, err := verifyLiveBundleAuthorityCore(encoded, now, minimumGeneration, mode, diagnostic)
+	keepBundle := false
+	if diagnostic != nil {
+		defer func() {
+			if !keepBundle {
+				destroyMaintenanceBundle(&bundle)
+			}
+		}()
+	}
 	if err != nil {
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, err
 	}
+	if mode == liveResourceTypedFirstV1 && !liveResourceRequestShape(request) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, ErrInvalidInput
+	}
 	requestBytes, err := enrollment.EncodeRequestV1(request)
 	if err != nil || metadata.RecipientHint != request.RequestID || metadata.RecipientEpoch == 0 {
+		diagnostic.fail(LiveMaintenanceWrongRecipient)
 		clear(requestBytes)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient request")
 	}
 	clear(requestBytes)
+	if mode == liveResourceTypedFirstV1 && !liveResourcePrivateShape(private) {
+		diagnostic.fail(LiveMaintenanceInvalidRequest)
+		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, ErrInvalidInput
+	}
 	privateBytes, err := enrollment.EncodePrivateBundleV1(private)
 	clear(privateBytes)
 	if err != nil {
+		diagnostic.fail(LiveMaintenanceWrongRecipient)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient private capability")
 	}
 	binding := profile.RecipientBinding{
@@ -313,12 +461,15 @@ func liveRecipientProviders(encoded []byte, now time.Time, minimumGeneration uin
 		Hint: request.RequestID, KeyID: request.RecipientKeyID, Epoch: metadata.RecipientEpoch,
 	}
 	if _, err := profile.ResolveRecipientBinding([]profile.RecipientBinding{binding}, binding.Class, binding.Hint); err != nil {
+		diagnostic.fail(LiveMaintenanceWrongRecipient)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient binding")
 	}
 	opener, err := profilehpke.NewOpener(binding, private.RecipientPrivate)
 	if err != nil {
+		diagnostic.fail(LiveMaintenanceWrongRecipient)
 		return liveProfileBundleV2{}, envelope.ArtifactMetadata{}, nil, nil, bundleError("live recipient opener")
 	}
+	keepBundle = true
 	return bundle, metadata, liveRecipientResolver{binding: binding}, opener, nil
 }
 
@@ -326,21 +477,44 @@ func liveRecipientProviders(encoded []byte, now time.Time, minimumGeneration uin
 // for a device-bound live profile. The outer owner authority is revalidated on
 // every exact-byte reopen before the native sealed artifact is returned.
 func NewAndroidLiveActivationSession(encoded []byte, now time.Time, current lifecycle.VerifiedState, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener) (*profile.ActivationSession, error) {
-	verified, err := VerifyLiveAndroidArtifact(encoded, now, 1, resolver, opener)
+	request, err := liveActivationRequestWithResourceMode(encoded, now, current, resolver, opener, liveResourceLegacy)
 	if err != nil {
 		return nil, err
 	}
-	bundle, metadata, err := verifyLiveBundleAuthority(encoded, now, 1)
+	return profile.NewActivationSession(request), nil
+}
+
+func liveActivationRequestWithResourceMode(encoded []byte, now time.Time, current lifecycle.VerifiedState, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener, mode liveResourceMode) (profile.ActivationRequest, error) {
+	return liveActivationRequestCore(encoded, now, current, resolver, opener, mode, nil)
+}
+
+func liveActivationRequestCore(encoded []byte, now time.Time, current lifecycle.VerifiedState, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener, mode liveResourceMode, diagnostic *liveMaintenanceDiagnostic) (profile.ActivationRequest, error) {
+	verified, err := verifyLiveAndroidArtifactCore(encoded, now, 1, resolver, opener, mode, diagnostic)
 	if err != nil {
-		return nil, err
+		return profile.ActivationRequest{}, err
+	}
+	if diagnostic != nil {
+		defer destroyLiveMaintenanceOffline(&verified)
+	}
+	return liveActivationRequestFromVerified(encoded, now, current, resolver, opener, mode, diagnostic, verified)
+}
+
+func liveActivationRequestFromVerified(encoded []byte, now time.Time, current lifecycle.VerifiedState, resolver profile.RecipientResolver, opener profile.OfflineRecipientOpener, mode liveResourceMode, diagnostic *liveMaintenanceDiagnostic, verified profile.OfflineVerifiedArtifact) (profile.ActivationRequest, error) {
+	bundle, metadata, err := verifyLiveBundleAuthorityCore(encoded, now, 1, mode, diagnostic)
+	if diagnostic != nil {
+		diagnostic.destroyRequest()
+		diagnostic.requestBundle = &bundle
+	}
+	if err != nil {
+		return profile.ActivationRequest{}, err
 	}
 	rootPublic, err := parseP256Public(bundle.RootPublicDER)
 	if err != nil {
-		return nil, err
+		return profile.ActivationRequest{}, err
 	}
 	issuerPublic, err := parseP256Public(bundle.IssuerPublicDER)
 	if err != nil {
-		return nil, err
+		return profile.ActivationRequest{}, err
 	}
 	verifier := p256Verifier{keys: map[string]*ecdsa.PublicKey{bundle.Root.Keys[0].KeyID: rootPublic, bundle.IssuerKey.KeyID: issuerPublic}}
 	request := profile.ActivationRequest{
@@ -351,15 +525,24 @@ func NewAndroidLiveActivationSession(encoded []byte, now time.Time, current life
 		Verifier:    verifier, Resolver: resolver, OfflineOpener: opener,
 		ContractVersion: verified.Profile.ContractVersion, MinSafetyFloor: verified.Profile.RequiredSafetyFloor,
 		MinRootEpoch: verified.Profile.RootEpoch, MinRevocationEpoch: verified.Profile.RevocationEpoch,
+		Rejected: diagnostic.sink(opener),
 	}
 	request.UnwrapArtifact = func(candidate []byte) ([]byte, error) {
-		candidateBundle, candidateMetadata, err := verifyLiveBundleAuthority(candidate, now, 1)
+		if diagnostic != nil && !bytes.Equal(candidate, encoded) {
+			diagnostic.fail(LiveMaintenanceInvalidRequest)
+			return nil, bundleError("live activation outer authority")
+		}
+		candidateBundle, candidateMetadata, err := verifyLiveBundleAuthorityCore(candidate, now, 1, mode, diagnostic)
+		if diagnostic != nil {
+			defer destroyMaintenanceBundle(&candidateBundle)
+		}
 		if err != nil || candidateBundle.DeploymentID != bundle.DeploymentID || candidateBundle.RootFingerprint != bundle.RootFingerprint || candidateMetadata != metadata {
+			diagnostic.fail(LiveMaintenanceProfileMismatch)
 			return nil, bundleError("live activation outer authority")
 		}
 		return bytes.Clone(candidateBundle.SealedProfile), nil
 	}
-	return profile.NewActivationSession(request), nil
+	return request, nil
 }
 
 // NewAndroidActivationSession creates the authoritative activation state
