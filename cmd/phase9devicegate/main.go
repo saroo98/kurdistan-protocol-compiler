@@ -982,7 +982,14 @@ func prepareNativeFilesystemInstrumentation(ctx context.Context, client adbClien
 	}
 	for index, args := range nativeFilesystemPreparationArgs(plan) {
 		name := fmt.Sprintf("12b-native-root-%02d.txt", index+1)
-		if _, err := client.capture(ctx, name, args...); err != nil {
+		output, err := client.capture(ctx, name, args...)
+		var exit *exec.ExitError
+		if args[3] == "chmod" && output == "" && errors.As(err, &exit) && exit.ExitCode() == 255 && ctx.Err() == nil {
+			// ADB may disconnect before returning the shell result. Only this
+			// idempotent permission assignment is safe to repeat, once; mkdir is not.
+			_, err = client.capture(ctx, strings.TrimSuffix(name, ".txt")+"-retry.txt", args...)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("prepare invocation-owned native-filesystem root step %d: %w", index+1, err)
 		}
 	}
