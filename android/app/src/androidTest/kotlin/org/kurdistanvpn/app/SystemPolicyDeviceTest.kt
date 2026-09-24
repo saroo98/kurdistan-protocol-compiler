@@ -44,10 +44,27 @@ class SystemPolicyDeviceTest {
         val repository = (context.applicationContext as KurdistanApplication).compositionRoot.systemPolicy
         ActivityScenario.launch(MainActivity::class.java).use {
             val result = async { repository.requestPermission(ProductPermission.CAMERA) }
+            val permissionPackages = setOf("com.android.permissioncontroller", "com.google.android.permissioncontroller",
+                "com.android.packageinstaller", "com.google.android.packageinstaller")
             withTimeout(10_000) {
-                while (instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString()?.contains("permissioncontroller") != true) delay(50)
+                while (instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() !in permissionPackages) delay(50)
             }
-            assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            if (android.os.Build.VERSION.SDK_INT < 30) {
+                // Older permission dialogs deliberately ignore Back; decline through the real button.
+                val automation = instrumentation.uiAutomation
+                automation.serviceInfo = automation.serviceInfo.apply {
+                    flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+                }
+                val window = checkNotNull(automation.rootInActiveWindow)
+                // The Google package can retain the AOSP resource namespace.
+                val deny = permissionPackages.flatMap {
+                    window.findAccessibilityNodeInfosByViewId("$it:id/permission_deny_button")
+                }
+                    .first { it.isEnabled && it.isClickable }
+                assertTrue(deny.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+            } else {
+                assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            }
             val completed = withTimeout(10_000) { result.await() }
             assertTrue(completed is DomainResult.Success && completed.value == PermissionStatus.NOT_GRANTED)
             assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(Manifest.permission.CAMERA))
