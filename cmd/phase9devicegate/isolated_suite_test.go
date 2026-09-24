@@ -58,6 +58,17 @@ func TestOwnedEmulatorMustMatchBeforeAnyDestructiveSetup(t *testing.T) {
 	}
 }
 
+func TestNetworkLeasePlanSeparatesIncompatibleFixturesAndKeepsDnsHistory(t *testing.T) {
+	const p = "org.kurdistanvpn.app.Task7VpnNetworkLeaseDeviceTest#"
+	basic := []string{p + "associatedMaintenanceLeaseUsesOwnedTunAndRetiresWithOwner", p + "disconnectedMaintenanceAcquiresAndClosesWithoutNetworkIO"}
+	dns := []string{p + "signedUpdateTruncatedDnsReachesTcpSynThenCancels", p + "signedUpdateTunLossInvalidatesLeaseAndCannotPublish", p + "signedUpdateUdpDnsReachesOwnedTunThenHttpsSynCancels"}
+	batches, err := planIsolatedDeviceBatches(append(append([]string{}, basic...), dns...))
+	want := []deviceBatch{{tests: basic, clearData: true}, {tests: dns, clearData: true}}
+	if err != nil || !reflect.DeepEqual(batches, want) {
+		t.Fatalf("network fixture groups = %+v, %v", batches, err)
+	}
+}
+
 func TestFoldBatchRequiresWideWindowWithoutDroppingTheMethod(t *testing.T) {
 	name := "org.kurdistanvpn.app.ProductFoldDeviceTest#postureChangesKeepOneDraftOwnerAndAvoidThePhysicalHinge"
 	batches, err := planIsolatedDeviceBatches([]string{name})

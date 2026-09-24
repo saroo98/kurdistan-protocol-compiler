@@ -59,6 +59,15 @@ func planIsolatedDeviceBatches(tests []string) ([]deviceBatch, error) {
 			batches = append(batches,
 				deviceBatch{tests: []string{group[1]}, clearData: true, extras: []string{"-e", "draftPhase", "stage"}},
 				deviceBatch{tests: []string{group[0]}, extras: []string{"-e", "draftPhase", "resume"}})
+		} else if class == prefix+"Task7VpnNetworkLeaseDeviceTest" {
+			// Basic leases and signed updates require different protected-state fixtures.
+			// Keep the DNS cases in one process so their native rate history is still checked.
+			split := sort.SearchStrings(group, class+"#signedUpdate")
+			for _, fixture := range [][]string{group[:split], group[split:]} {
+				if len(fixture) > 0 {
+					batches = append(batches, deviceBatch{tests: fixture, clearData: true})
+				}
+			}
 		} else {
 			batches = append(batches, deviceBatch{tests: group, clearData: true,
 				wide: class == prefix+"ProductFoldDeviceTest", credential: class == prefix+"SensitiveActionDeviceTest"})
