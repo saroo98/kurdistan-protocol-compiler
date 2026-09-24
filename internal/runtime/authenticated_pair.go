@@ -9,6 +9,7 @@ import (
 
 	"kurdistan/internal/crypto/auth"
 	"kurdistan/internal/crypto/security"
+	"kurdistan/internal/protocol/ir"
 )
 
 var (
@@ -726,7 +727,10 @@ func strictConfigFromContextV1(context auth.AuthenticatedContextSnapshotV1, clie
 		source = context.ClientConfigSourceBlock
 		limits = context.ClientLimitBlock
 	}
-	policy := context.EffectivePolicy
+	return strictConfigFromSourcesV1(context.EffectivePolicy, source, limits)
+}
+
+func strictConfigFromSourcesV1(policy ir.EffectiveSecurityPolicy, source security.ConfigSourceBlockV1, limits security.LimitBlockV1) (StrictSessionConfigV1, error) {
 	if policy.ReplayWindowSize <= 0 || policy.MaxSessionMessages <= 0 || policy.MaxKeyLifetimeMessages <= 0 {
 		return StrictSessionConfigV1{}, ErrProfileIncompatible
 	}

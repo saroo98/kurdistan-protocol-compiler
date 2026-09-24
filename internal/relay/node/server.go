@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"kurdistan/internal/crypto/auth"
+	"kurdistan/internal/net/boundeddns"
+	"kurdistan/internal/product/runtimepolicy"
 	"kurdistan/internal/product/sessionplan"
 	"kurdistan/internal/protocol/liveprogram"
 	"kurdistan/internal/protocol/wirev1"
@@ -98,15 +100,24 @@ type RelaySnapshotV1 interface {
 }
 
 type ServerV1 struct {
-	config           Config
-	health           *HealthMachine
-	registry         *SessionRegistry
-	listener         net.Listener
-	control          net.Listener
-	authorizeControl func(net.Conn) error
-	limiter          *SourceLimiterV1
-	replay           *auth.HandshakeReplayCache
-	workers          chan struct{}
+	config                  Config
+	health                  *HealthMachine
+	registry                *SessionRegistry
+	listener                net.Listener
+	control                 net.Listener
+	authorizeControl        func(net.Conn) error
+	limiter                 *SourceLimiterV1
+	replay                  *auth.HandshakeReplayCache
+	workers                 chan struct{}
+	socketsV3               relaySocketOwnerV3
+	resolverV3              *boundeddns.Resolver
+	probeRatesV3            *kruntime.ProbeRateRegistryV1
+	reloadMu                sync.Mutex
+	reloadInProgressV3      bool
+	transitionV3, stoppedV3 bool // stateMu; distinct from transaction ownership.
+	revocationsV3           *selfhost.RelayRevocationViewV3
+	authorityGenerationV3   uint64 // Saturates; exhausted V3 admission stays closed.
+	stopActionsV3           []serviceStopActionV3
 
 	stateMu       sync.RWMutex
 	snapshot      RelaySnapshotV1
@@ -159,13 +170,28 @@ func NewServerV1(config Config, listener net.Listener, tunnel io.ReadWriteCloser
 		_ = registry.Close()
 		return nil, ErrServerConfig
 	}
-	return &ServerV1{
+	server := &ServerV1{
 		config: config, health: NewHealthMachine(), registry: registry,
 		listener: listener, control: control, authorizeControl: authorizeControl,
 		limiter: limiter, replay: replay, workers: make(chan struct{}, config.MaxHandshakeWorkers),
 		listenerReady: true, tunnelReady: true, transients: make(map[string]transientSessionV1),
-		connections: make(map[uint64]net.Conn),
-	}, nil
+		connections:   make(map[uint64]net.Conn),
+		stopActionsV3: make([]serviceStopActionV3, config.MaxSessions),
+	}
+	server.resolverV3, err = boundeddns.NewResolver(ownedDNSEndpointsV3[:], &server.socketsV3, 16)
+	if err == nil {
+		server.probeRatesV3, err = kruntime.NewProbeRateRegistryV1(4096)
+	}
+	if err != nil {
+		if server.resolverV3 != nil {
+			server.resolverV3.Close()
+			<-server.resolverV3.Done()
+		}
+		limiter.Close()
+		_ = registry.Close()
+		return nil, ErrServerConfig
+	}
+	return server, nil
 }
 
 func (server *ServerV1) Run(ctx context.Context) error {
@@ -195,7 +221,7 @@ func (server *ServerV1) Run(ctx context.Context) error {
 	}
 
 	runContext, cancel := context.WithCancel(ctx)
-	errorsOut := make(chan error, 4)
+	errorsOut := make(chan error, 5)
 	var wait sync.WaitGroup
 	start := func(run func(context.Context) error) {
 		wait.Add(1)
@@ -235,6 +261,9 @@ func (server *ServerV1) Run(ctx context.Context) error {
 		}
 		return nil
 	})
+	if signal := server.writeFailureSignalV3(); signal != nil {
+		start(func(runContext context.Context) error { return server.watchWriteHealthV3(runContext, signal) })
+	}
 
 	var runErr error
 	select {
@@ -260,59 +289,7 @@ func (server *ServerV1) Reload() error {
 	if server == nil || server.health == nil || server.registry == nil || server.config.LoadSnapshot == nil || server.config.Now == nil {
 		return ErrServerConfig
 	}
-	server.stateMu.Lock()
-	defer server.stateMu.Unlock()
-
-	now := server.config.Now().UTC()
-	candidate, err := server.config.LoadSnapshot(server.config.DataDir, now)
-	if err != nil || candidate == nil {
-		state := HealthDegraded
-		switch {
-		case errors.Is(err, selfhost.ErrDrained):
-			state = HealthDraining
-		case errors.Is(err, selfhost.ErrRelayRuntimeUnavailable):
-			state = HealthDisabled
-		}
-		server.failClosedStateV1(state)
-		if state == HealthDraining || state == HealthDisabled {
-			return nil
-		}
-		return errors.Join(ErrServerState, err)
-	}
-	status, ok := candidate.StatusV1()
-	tlsConfig, tlsErr := candidate.ServerTLSConfigV1()
-	tlsValid := validRelayTLSConfigV1(tlsConfig)
-	destroyTLSConfigV1(tlsConfig)
-	dnsContext, cancel := context.WithTimeout(context.Background(), server.config.HandshakeTimeout)
-	dnsReady := server.config.DNSReady != nil && server.config.DNSReady(dnsContext)
-	cancel()
-	if !ok || !validRelayRuntimeStatusV1(status) || !tlsValid || tlsErr != nil || !dnsReady {
-		candidate.Close()
-		state := HealthDegraded
-		if status.Drained {
-			state = HealthDraining
-		}
-		server.failClosedStateV1(state)
-		return ErrServerState
-	}
-	if server.snapshot != nil {
-		current, currentOK := server.snapshot.StatusV1()
-		if currentOK && current == status {
-			candidate.Close()
-			server.health.SetDrain(false)
-			server.health.SetDisabled(false)
-			server.health.Update(server.readyRequirementsV1())
-			return nil
-		}
-		server.stopAllTransientsV1()
-		server.registry.StopAll()
-		server.snapshot.Close()
-	}
-	server.snapshot = candidate
-	server.health.SetDrain(false)
-	server.health.SetDisabled(false)
-	server.health.Update(server.readyRequirementsV1())
-	return nil
+	return server.reloadServicesV3()
 }
 
 func (server *ServerV1) acceptLoopV1(ctx context.Context) error {
@@ -395,16 +372,17 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	}
 
 	server.stateMu.RLock()
-	if server.snapshot == nil || !server.health.Snapshot().AcceptingSessions {
+	if server.snapshot == nil || server.transitionV3 || server.stoppedV3 || !server.health.Snapshot().AcceptingSessions {
 		server.stateMu.RUnlock()
 		return server.rejectSessionV1(SessionRejectStateV1)
 	}
 	snapshot := server.snapshot
 	admission, ok := snapshot.AdmissionByProfileV1(preface.ProfileContentID, preface.ProfileGeneration)
-	if !ok {
+	if !ok || admission.RuntimePolicy.SchemaVersion == runtimepolicy.SchemaVersionV3 && !server.admissionCurrentLockedV3(admission, server.authorityGenerationV3) {
 		server.stateMu.RUnlock()
 		return server.rejectSessionV1(SessionRejectAdmissionV1)
 	}
+	authorityGeneration := server.authorityGenerationV3
 	plan, err := sessionplan.BuildRelayV2At(sessionplan.RelayAuthorityV2{
 		ProfileContentID: admission.ContentID, ProfileGeneration: admission.Generation,
 		ValidFrom: admission.ValidFrom, ValidUntil: admission.ValidUntil, RuntimePolicy: admission.RuntimePolicy,
@@ -467,6 +445,9 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 		_ = carrier.Close()
 		return ErrServerSession
 	}
+	if admission.RuntimePolicy.SchemaVersion == runtimepolicy.SchemaVersionV3 {
+		return server.handleServicesV3(sessionContext, handshakeContext, carrier, handshake, plan, admission, status, authorityGeneration, sessionID, transientToken, cancelSession, cancelHandshake)
+	}
 	endpoint, err := acceptRelayDuplexEndpointV1(handshakeContext, carrier, handshake, plan.Digest, program)
 	cancelHandshake()
 	if err != nil {
@@ -480,7 +461,7 @@ func (server *ServerV1) handleSessionV1(runContext context.Context, raw net.Conn
 	if server.snapshot != nil {
 		currentStatus, currentOK = server.snapshot.StatusV1()
 	}
-	if sessionContext.Err() != nil || !currentOK || currentStatus != status || !server.health.Snapshot().AcceptingSessions {
+	if sessionContext.Err() != nil || !currentOK || currentStatus != status || server.transitionV3 || server.stoppedV3 || !server.health.Snapshot().AcceptingSessions {
 		server.stateMu.RUnlock()
 		endpoint.Abort()
 		_ = carrier.Close()
@@ -646,6 +627,14 @@ func (server *ServerV1) observeSessionPacketPumpSnapshotV1(snapshot kruntime.Pac
 }
 
 func acceptRelayDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, handshake *kruntime.ProcessWireRelayHandshakeV1, digest [32]byte, program liveprogram.ProgramV1) (*kruntime.ProcessRelayDuplexEndpointV1, error) {
+	result, err := acceptRelayHandshakeResultV3(ctx, carrier, handshake)
+	if err != nil {
+		return nil, err
+	}
+	return bindRelayDuplexEndpointV1(ctx, carrier, result, digest, program)
+}
+
+func acceptRelayHandshakeResultV3(ctx context.Context, carrier *tlstcp.Conn, handshake *kruntime.ProcessWireRelayHandshakeV1) (*auth.ProcessHandshakeResultV1, error) {
 	clientHello, err := receiveProcessFrameV1(ctx, carrier)
 	if err != nil {
 		return nil, ErrServerSession
@@ -671,6 +660,10 @@ func acceptRelayDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, hand
 		return nil, ErrServerSession
 	}
 	clear(serverFinish)
+	return result, nil
+}
+
+func bindRelayDuplexEndpointV1(ctx context.Context, carrier *tlstcp.Conn, result *auth.ProcessHandshakeResultV1, digest [32]byte, program liveprogram.ProgramV1) (*kruntime.ProcessRelayDuplexEndpointV1, error) {
 	endpoint, err := kruntime.NewProcessRelayDuplexEndpointV1(result, digest, program)
 	if err != nil {
 		result.Close()
@@ -751,25 +744,27 @@ func (server *ServerV1) nextSessionIDV1() (string, error) {
 }
 
 func (server *ServerV1) shutdownV1() {
-	server.stopAllTransientsV1()
 	server.stateMu.Lock()
-	if server.snapshot != nil {
-		server.snapshot.Close()
-		server.snapshot = nil
-	}
+	server.stoppedV3 = true
+	server.transitionV3 = true
+	old := server.snapshot
+	server.snapshot = nil
 	server.stateMu.Unlock()
+	server.stopAllTransientsV1()
+	if server.resolverV3 != nil {
+		server.resolverV3.Close()
+		<-server.resolverV3.Done()
+	}
+	if old != nil {
+		old.Close()
+	}
 	if server.limiter != nil {
 		server.limiter.Close()
 	}
 }
 
 func (server *ServerV1) failClosedStateV1(state HealthState) {
-	server.stopAllTransientsV1()
-	server.registry.StopAll()
-	if server.snapshot != nil {
-		server.snapshot.Close()
-		server.snapshot = nil
-	}
+	// State-only helper: callers perform owned callbacks/Close outside locks.
 	server.health.SetDrain(false)
 	server.health.SetDisabled(false)
 	server.health.Update(HealthRequirements{Listener: server.listenerReady, Tunnel: server.tunnelReady})
@@ -783,7 +778,7 @@ func (server *ServerV1) failClosedStateV1(state HealthState) {
 
 func (server *ServerV1) readyRequirementsV1() HealthRequirements {
 	return HealthRequirements{
-		Listener: server.listenerReady, Tunnel: server.tunnelReady, VerifiedState: true,
+		Listener: server.listenerReady, Tunnel: server.tunnelReady && !server.writeFailedV3(), VerifiedState: true,
 		TLSIdentity: true, RelayIdentity: true, DNS: true,
 	}
 }
@@ -917,7 +912,34 @@ func (server *ServerV1) stopProfileV1(profileID string) int {
 		return 0
 	}
 	server.stateMu.Lock()
-	defer server.stateMu.Unlock()
+	var actions *SessionDeviceV3
+	if server.registry != nil {
+		r := server.registry
+		r.mu.Lock()
+		for _, record := range r.sessions {
+			if record.spec.ProfileID == profileID && record.v3 != nil {
+				d := record.v3
+				if d.reason == nil {
+					now := time.Now()
+					if server.config.Now != nil {
+						now = server.config.Now()
+					}
+					d.reason = classifyServiceStopV3(d.subjectV3, server.revocationsV3, now, d.authorityDeadline)
+				}
+				if action := r.stopLocked(record, SessionStopProfileV1); action != nil {
+					action.stopNext = actions
+					actions = action
+				}
+			}
+		}
+		r.mu.Unlock()
+	}
+	server.stateMu.Unlock()
+	countV3 := 0
+	for d := actions; d != nil; d = d.stopNext {
+		countV3++
+	}
+	runDeviceStopsV3(actions)
 	server.transientMu.Lock()
 	transients := make([]context.CancelFunc, 0)
 	for sessionID, transient := range server.transients {
@@ -930,7 +952,7 @@ func (server *ServerV1) stopProfileV1(profileID string) int {
 	for _, cancel := range transients {
 		cancel()
 	}
-	stopped := len(transients)
+	stopped := len(transients) + countV3
 	if server.registry != nil {
 		stopped += server.registry.StopProfile(profileID)
 	}

@@ -6,20 +6,30 @@
 package tun
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
 type linuxDevice struct {
-	file      *os.File
-	name      string
-	closeOnce sync.Once
-	closeErr  error
+	file             *os.File
+	name             string
+	closeOnce        sync.Once
+	closeErr         error
+	writeInit        sync.Once
+	writeGate        chan struct{}
+	writeStateMu     sync.Mutex
+	closed           chan struct{}
+	writeFailure     chan struct{}
+	writeFailed      bool
+	setWriteDeadline func(time.Time) error
+	writePacket      func(int, []byte) (int, error)
 }
 
 // OpenExisting attaches to the persistent owner-created TUN named kurd0.
@@ -57,7 +67,9 @@ func OpenExisting(name string) (Device, error) {
 		_ = unix.Close(fd)
 		return nil, ErrOpen
 	}
-	return &linuxDevice{file: file, name: name}, nil
+	device := &linuxDevice{file: file, name: name}
+	device.initWriteV3()
+	return device, nil
 }
 
 func openExistingFlags() uint16 {
@@ -99,6 +111,10 @@ func (device *linuxDevice) Write(packet []byte) (int, error) {
 	if device == nil || device.file == nil {
 		return 0, ErrOpen
 	}
+	if err := device.acquireWriteV3(context.Background()); err != nil {
+		return 0, err
+	}
+	defer device.releaseWriteV3()
 	return device.file.Write(packet)
 }
 
@@ -107,6 +123,10 @@ func (device *linuxDevice) Close() error {
 		return nil
 	}
 	device.closeOnce.Do(func() {
+		device.initWriteV3()
+		device.writeStateMu.Lock()
+		close(device.closed)
+		device.writeStateMu.Unlock()
 		device.closeErr = device.file.Close()
 	})
 	return device.closeErr

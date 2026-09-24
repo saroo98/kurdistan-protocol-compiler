@@ -6,15 +6,18 @@
 package tun
 
 import (
+	"context"
 	"errors"
 	"io"
 )
 
 var (
-	ErrUnavailable = errors.New("relay tun: unavailable on this platform")
-	ErrInvalidName = errors.New("relay tun: invalid owned interface name")
-	ErrOpen        = errors.New("relay tun: existing interface unavailable")
-	ErrPrivileged  = errors.New("relay tun: privileged process rejected")
+	ErrUnavailable   = errors.New("relay tun: unavailable on this platform")
+	ErrInvalidName   = errors.New("relay tun: invalid owned interface name")
+	ErrOpen          = errors.New("relay tun: existing interface unavailable")
+	ErrPrivileged    = errors.New("relay tun: privileged process rejected")
+	ErrPacketWriteV3 = errors.New("relay tun: packet write failed")
+	ErrWriteHealthV3 = errors.New("relay tun: write health failed")
 )
 
 const OwnedName = "kurd0"
@@ -49,4 +52,14 @@ func validateExistingOwnedInterface(name, actualName string, lookupErr, tunMarke
 type Device interface {
 	io.ReadWriteCloser
 	Name() string
+}
+
+// Optional capabilities. A session cancels its own write, never the shared TUN.
+type ContextPacketWriterV3 interface {
+	WritePacketContextV3(context.Context, []byte) (int, error)
+}
+
+type PacketWriteControlV3 interface {
+	PreparePacketWriteV3(context.Context) error
+	WriteFailureV3() <-chan struct{}
 }

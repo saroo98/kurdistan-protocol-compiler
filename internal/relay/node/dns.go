@@ -6,12 +6,14 @@ package node
 import (
 	"context"
 	"net"
+	"net/netip"
 )
 
-var ownedDNSAddressesV1 = [...]string{
-	"10.77.0.1:53",
-	"[fd4b:7572:6400::1]:53",
+var ownedDNSEndpointsV3 = [...]netip.AddrPort{
+	netip.MustParseAddrPort("10.77.0.1:53"),
+	netip.MustParseAddrPort("[fd4b:7572:6400::1]:53"),
 }
+var ownedDNSAddressesV1 = [...]string{ownedDNSEndpointsV3[0].String(), ownedDNSEndpointsV3[1].String()}
 
 type dnsDialV1 func(context.Context, string, string) (net.Conn, error)
 

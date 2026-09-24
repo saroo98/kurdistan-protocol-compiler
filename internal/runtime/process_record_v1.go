@@ -425,27 +425,53 @@ func newProcessRecordCodecV1(result *auth.ProcessHandshakeResultV1, planDigest [
 	if !ok {
 		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, ErrProfileIncompatible
 	}
-	clientConfig, err := strictConfigFromContextV1(contextSnapshot, true)
+	envelopeContext, config, err := prepareProcessRecordContextV1(contextSnapshot, client)
 	if err != nil {
 		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+	}
+	codec, err := deriveProcessRecordCodecV1(result, contextSnapshot, envelopeContext, client, false)
+	if err != nil {
+		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+	}
+	return envelopeContext, codec, config, err
+}
+
+func prepareProcessRecordContextV1(contextSnapshot auth.AuthenticatedContextSnapshotV1, client bool) (security.EnvelopeContextV1, StrictSessionConfigV1, error) {
+	clientConfig, err := strictConfigFromContextV1(contextSnapshot, true)
+	if err != nil {
+		return security.EnvelopeContextV1{}, StrictSessionConfigV1{}, err
 	}
 	relayConfig, err := strictConfigFromContextV1(contextSnapshot, false)
 	if err != nil || clientConfig.MaxEnvelopeBytes != relayConfig.MaxEnvelopeBytes ||
 		clientConfig.MaxFrameBytes != relayConfig.MaxFrameBytes ||
 		clientConfig.MaxSessionMessages != relayConfig.MaxSessionMessages {
-		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, ErrProfileIncompatible
+		return security.EnvelopeContextV1{}, StrictSessionConfigV1{}, ErrProfileIncompatible
 	}
 	config := relayConfig
 	if client {
 		config = clientConfig
 	}
+	_, err = strictTrafficSuiteV1(contextSnapshot.SelectedSuite)
+	if err != nil {
+		return security.EnvelopeContextV1{}, StrictSessionConfigV1{}, err
+	}
+	envelopeContext := security.EnvelopeContextV1{
+		EffectivePolicy: contextSnapshot.EffectivePolicy, MaxEnvelopeBytes: config.MaxEnvelopeBytes,
+		EffectivePolicyHash: contextSnapshot.EffectivePolicyHash, TranscriptHash: contextSnapshot.TranscriptHash,
+		CapabilityHash: contextSnapshot.SelectedCapabilityHash, ProfileHash: contextSnapshot.ClientProfileHash,
+		FramingHash: contextSnapshot.ClientModeBinding.FramingPolicyHash, CarrierContextHash: contextSnapshot.ClientModeBinding.CarrierContextHash,
+	}
+	return envelopeContext, config, nil
+}
+
+func deriveProcessRecordCodecV1(result *auth.ProcessHandshakeResultV1, contextSnapshot auth.AuthenticatedContextSnapshotV1, envelopeContext security.EnvelopeContextV1, client, bounded bool) (*security.EnvelopeCodecV1, error) {
 	suite, err := strictTrafficSuiteV1(contextSnapshot.SelectedSuite)
 	if err != nil {
-		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+		return nil, err
 	}
 	secret, err := result.TakeChannelSecretV1()
 	if err != nil {
-		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+		return nil, err
 	}
 	schedule, err := security.DeriveKeyScheduleV1(security.KeyScheduleInput{
 		ApplicationSecret: secret,
@@ -453,25 +479,23 @@ func newProcessRecordCodecV1(result *auth.ProcessHandshakeResultV1, planDigest [
 		Suite:             suite,
 	})
 	if err != nil {
-		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+		return nil, err
 	}
 	defer schedule.Destroy()
-	envelopeContext := security.EnvelopeContextV1{
-		EffectivePolicy: contextSnapshot.EffectivePolicy, MaxEnvelopeBytes: config.MaxEnvelopeBytes,
-		EffectivePolicyHash: contextSnapshot.EffectivePolicyHash, TranscriptHash: contextSnapshot.TranscriptHash,
-		CapabilityHash: contextSnapshot.SelectedCapabilityHash, ProfileHash: contextSnapshot.ClientProfileHash,
-		FramingHash: contextSnapshot.ClientModeBinding.FramingPolicyHash, CarrierContextHash: contextSnapshot.ClientModeBinding.CarrierContextHash,
-	}
 	var codec *security.EnvelopeCodecV1
-	if client {
+	if bounded && client {
+		codec, err = security.NewClientEnvelopeBoundedV3(schedule, envelopeContext)
+	} else if bounded {
+		codec, err = security.NewRelayEnvelopeBoundedV3(schedule, envelopeContext)
+	} else if client {
 		codec, err = security.NewClientEnvelopeV1(schedule, envelopeContext)
 	} else {
 		codec, err = security.NewRelayEnvelopeV1(schedule, envelopeContext)
 	}
 	if err != nil {
-		return security.EnvelopeContextV1{}, nil, StrictSessionConfigV1{}, err
+		return nil, err
 	}
-	return envelopeContext, codec, config, nil
+	return codec, nil
 }
 
 func (client *ProcessClientRecordEndpointV1) sealLockedV1(frameType uint8, outerStream uint32, innerSlot uint16, body []byte) ([]byte, error) {
@@ -589,20 +613,12 @@ func encodeProcessEnvelopeV1(record security.EnvelopeRecordV1) ([]byte, error) {
 }
 
 func decodeProcessEnvelopeV1(encoded []byte, direction uint16, maxEnvelope uint32) (security.EnvelopeRecordV1, error) {
-	if len(encoded) < processEnvelopeHeaderBytes+processAEADOverheadV1 {
-		return security.EnvelopeRecordV1{}, ErrRecordInvalid
+	record, err := decodeProcessEnvelopeViewV3(encoded, direction, maxEnvelope)
+	if err != nil {
+		return security.EnvelopeRecordV1{}, err
 	}
-	header, err := parseApplicationHeaderV1(encoded[:processEnvelopeHeaderBytes])
-	if err != nil || header.Version != ApplicationRecordVersionV1 || header.Type != RecordTypeApplicationFragmentV1 ||
-		header.Direction != direction || header.StreamSlot == 0 || header.SealedLength < processAEADOverheadV1 ||
-		header.SealedLength > maxEnvelope || uint64(processEnvelopeHeaderBytes)+uint64(header.SealedLength) != uint64(len(encoded)) {
-		return security.EnvelopeRecordV1{}, ErrRecordInvalid
-	}
-	return security.EnvelopeRecordV1{
-		RecordType: header.Type, Epoch: header.Epoch, Direction: header.Direction,
-		Slot: header.StreamSlot, Sequence: header.Sequence, SealedLength: header.SealedLength,
-		Ciphertext: append([]byte(nil), encoded[processEnvelopeHeaderBytes:]...),
-	}, nil
+	record.Ciphertext = append([]byte(nil), record.Ciphertext...)
+	return record, nil
 }
 
 func parseProcessDataV1(body []byte) ([32]byte, []byte, error) {
