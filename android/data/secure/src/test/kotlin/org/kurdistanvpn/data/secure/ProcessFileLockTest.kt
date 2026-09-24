@@ -343,7 +343,8 @@ class ProcessFileLockTest {
     }
 
     private fun fixture(block: (File) -> Unit) {
-        val root = Files.createTempDirectory("legacy-lock-").toFile()
+        // Production canonicalizes its owner path, including Windows short-name TEMP roots.
+        val root = Files.createTempDirectory("legacy-lock-").toFile().canonicalFile
         try { block(root) } finally { check(root.deleteRecursively()) }
     }
 
@@ -363,6 +364,7 @@ class ProcessFileLockTest {
             .joinToString(File.pathSeparator)
         val executable = if (System.getProperty("os.name").orEmpty().startsWith("Windows")) "java.exe" else "java"
         return ProcessBuilder(File(System.getProperty("java.home"), "bin/$executable").absolutePath,
+            "-Xms16m", "-Xmx64m", "-XX:ActiveProcessorCount=2",
             "-cp", classpath, ProcessFileLockTest::class.java.name, root.absolutePath, mode)
             .redirectErrorStream(true).start()
     }
