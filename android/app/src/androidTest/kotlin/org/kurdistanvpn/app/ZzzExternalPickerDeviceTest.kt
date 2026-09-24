@@ -26,6 +26,7 @@ class ZzzExternalPickerDeviceTest {
 
     @Test
     fun profileFileImportLaunchesTheSystemDocumentPickerWithoutCrashing() {
+        compose.continueFromWelcome(compose.activity)
         compose.waitUntil(10_000) {
             compose.activity.lifecycle.currentState == androidx.lifecycle.Lifecycle.State.RESUMED &&
                 compose.activity.hasWindowFocus()
