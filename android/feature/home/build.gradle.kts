@@ -19,4 +19,8 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
     implementation(project(":runtime:api"))
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.junit4)
+    constraints { implementation(libs.androidx.core.ktx) }
 }

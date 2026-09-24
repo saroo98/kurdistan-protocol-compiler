@@ -19,12 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.kurdistanvpn.core.model.OperatorClientProjection
+import org.kurdistanvpn.core.model.DeploymentProjection
 import org.kurdistanvpn.core.ui.R as UiR
 
 @Composable
 fun OperatorProviderScreen(
-    projection: OperatorClientProjection,
+    projection: DeploymentProjection,
     onBack: () -> Unit,
 ) {
     Column(
@@ -34,7 +34,7 @@ fun OperatorProviderScreen(
     ) {
         Text(stringResource(UiR.string.provider_operator_status), style = MaterialTheme.typography.headlineMedium)
         Text(stringResource(UiR.string.operator_authority_boundary))
-        StatusCard(stringResource(UiR.string.provider_projection), projection.providerAlias)
+        StatusCard(stringResource(UiR.string.provider_projection), projection.alias.value)
         StatusCard(
             stringResource(UiR.string.signed_publication),
             projection.publicationGeneration?.let { stringResource(UiR.string.verified_publication_generation, it) }
@@ -58,8 +58,8 @@ fun OperatorProviderScreen(
             stringResource(UiR.string.signed_updates),
             stringResource(
                 UiR.string.signed_update_status,
-                projection.updateCapability.name,
-                projection.lastVerifiedUpdateCategory ?: stringResource(UiR.string.unavailable),
+                projection.update.status.name,
+                stringResource(UiR.string.unavailable),
             ),
         )
         StatusCard(

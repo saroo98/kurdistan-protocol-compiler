@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="local_proxy_active">Proxy ya herêmî çalak e</string>
+    <string name="local_proxy_not_device_vpn">Tenê sepanên ji bo proxy ya herêmî hatine mîhengkirin vê girêdanê bi kar tînin. Trafîka amûrê di tunelê re derbas nabe.</string>
     <string name="product_name">VPNa Kurdistanê</string><string name="foundation_label">Bingeha profîlên ewle</string><string name="runtime_unavailable">Runtime-a VPN ne amade ye</string><string name="phase9_offline_notice">Ev avakirina Qonaxa 9 profîlan derveyî torê piştrast dike û diparêze. Nikare girêbide an trafîkê rêve bibe.</string>
     <string name="application_state">Rewşa sepanê: %1$s</string><string name="unknown">Nenas</string><string name="import_rejected">Îtxal hat redkirin: %1$s</string><string name="dismiss">Bigire</string><string name="profiles">Profîl</string><string name="privacy_recovery">Taybetmendî û vegerandin</string><string name="diagnostics_about">Teşxîs û derbarê</string><string name="kurd_profiles">Profîlên Kurd</string>
     <plurals name="verified_profile_count"><item quantity="one">%1$d profîla piştrastkirî</item><item quantity="other">%1$d profîlên piştrastkirî</item></plurals>
@@ -32,7 +34,7 @@
     <string name="favorites_all">All profiles</string>
     <string name="sort_value">Sort: %1$s</string>
     <string name="no_matching_profiles">No profiles match these filters.</string>
-    <string name="selected">Selected</string>
+    <string name="profile_selected">Hilbijartî</string>
     <string name="use_profile">Use profile</string>
     <string name="favorite">Favorite</string>
     <string name="unfavorite">Remove favorite</string>
@@ -104,7 +106,7 @@
     <string name="auto_connect_launch">Auto-connect on app launch</string>
     <string name="auto_connect_launch_reason">Automatic startup is disabled until consent, verified-profile availability, and bounded lifecycle retries are exercised together by the device gate.</string>
     <string name="safe_reconnect">Safe reconnect</string>
-    <string name="safe_reconnect_reason">Network failures retry only within the signed profile limit. Every attempt reopens authority and creates a fresh protected Kurd session. Revocation and non-network failures stop without retry.</string>
+    <string name="safe_reconnect_reason">Connection interruptions can retry within the signed profile limit, including loss of the app process. Every attempt requires fresh authorization. Revocation or uncertain cleanup stops without retry.</string>
     <string name="auto_connect_boot">Auto-connect after device boot</string>
     <string name="auto_connect_boot_reason">Android background-start rules and system-managed always-on authority are not yet wired.</string>
     <string name="kill_switch">Kill switch</string>
@@ -134,15 +136,15 @@
     <string name="updates_probes">Updates and probes</string>
     <string name="automatic_signed_updates">Automatic signed profile updates</string>
     <string name="automatic_signed_updates_reason">No verified provider endpoint is present. Imported signed update bundles remain available through the profile import flow.</string>
-    <string name="health_probes">Health probes</string>
-    <string name="health_probes_explanation">Kurd session is the only executable probe in the current owned-loopback environment.</string>
-    <string name="probe_method_value">Method: %1$s</string>
-    <string name="network_probes_unavailable_reason">TCP, HTTP, and ICMP probes remain unavailable until their targets are authorized by an active signed session plan.</string>
-    <string name="run_kurd_loopback_probe">Run Kurd loopback probe</string>
-    <string name="probe_not_run">No probe run yet</string>
-    <string name="probe_running">Probe running</string>
-    <string name="probe_succeeded">Kurd session healthy · %1$d ms</string>
-    <string name="probe_failed">Probe failed safely · %1$s</string>
+    <string name="health_probes">Ceribandinên TCP yên îmzekirî</string>
+    <string name="health_probes_explanation">Girêdaneke TCP ya îmzekirî li ser riya ceribandinê ya xwedîkirî dipîve.</string>
+    <string name="probe_method_value">Rêbaz: girêdana TCP ya îmzekirî</string>
+    <string name="network_probes_unavailable_reason">Danîşîna ceribandinê ya xwedîkirî û hedefa TCP ya îmzekirî û destûrdayî pêwîst in.</string>
+    <string name="run_signed_tcp_probe">Ceribandina TCP ya îmzekirî bimeşîne</string>
+    <string name="probe_not_run">Hêj ceribandin nehatiye meşandin</string>
+    <string name="probe_running">Ceribandin dimeşe</string>
+    <string name="probe_succeeded">Ceribandina pîvandî · %1$d ms</string>
+    <string name="probe_failed">Ceribandin ne berdest e</string>
     <string name="runtime_resource_tuning">Runtime resource tuning</string>
     <string name="runtime_resource_tuning_reason">The current runtime does not consume user-defined connection or memory limits. Safe compiled limits remain enforced until an end-to-end execution path and measurements exist.</string>
     <string name="local_logs">Local logs</string>
@@ -180,7 +182,9 @@
     <string name="recovery_required">Recovery required</string>
     <string name="open_recovery_settings">Open recovery settings</string>
     <string name="recovery_storage_locked">Protected storage is locked. Unlock the device and reopen the app.</string>
-    <string name="recovery_migration_required">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="recovery_migration_required">Protected data needs a storage format upgrade. Open recovery settings to continue.</string>
+    <string name="core_incompatible">The installed Android app and Kurd core are incompatible. Connection remains blocked until a compatible build is installed.</string>
+    <string name="core_unavailable">The VPN core is unavailable. Reopen the app or install a compatible build. Do not reset your protected data.</string>
     <string name="recovery_key_invalidated">The Android Keystore key is invalidated. Ciphertext is preserved; restore an encrypted backup or explicitly reset local data.</string>
     <string name="recovery_storage_degraded">Protected local storage could not complete an operation. Connection remains blocked until recovery succeeds.</string>
     <string name="recovery_quarantined">A protected record failed integrity or recovery checks and is quarantined. It cannot be used for connection.</string>
@@ -216,4 +220,70 @@
     <string name="device_enrollment_delete_key">Mifteya amûra nehatî bikaranîn jê bibe</string>
     <string name="keep_enrollment_key">Mifteyê ji bo zivirandina profîlê biparêze</string>
     <string name="create_device_enrollment_request">Daxwaza tomarkirina amûrê çêke</string>
+    <string name="uiux_expanded">Vekirî</string>
+    <string name="uiux_collapsed">Girtî</string>
+    <string name="uiux_selected_profile">Profîla hilbijartî</string>
+    <string name="uiux_change_profile">Profîlê biguherîne</string>
+    <string name="uiux_review_restriction">Sînordariyê binirxîne</string>
+    <string name="uiux_choose_profile">Profîleke din hilbijêre</string>
+    <string name="uiux_try_again">Dîsa biceribîne</string>
+    <string name="uiux_local_only_scope">Tenê runtime-a ceribandina herêmî ye. Relay-a giştî û derketina Înternetê neçalak in.</string>
+
+    <string name="uiux_no_profiles">Hêj profîl tune ye</string>
+    <string name="uiux_no_profiles_help">Ji bo girêdanê, profîlekê ji dabînkerê xwe zêde bike.</string>
+    <string name="uiux_clear_filters">Parzûnan paqij bike</string>
+    <string name="uiux_favorite_profile">%1$s li bijarteyan zêde bike</string>
+    <string name="uiux_unfavorite_profile">%1$s ji bijarteyan rake</string>
+    <string name="uiux_sort_profiles">Rêzkirina profîlan</string>
+    <string name="uiux_sort_name">Nav</string>
+    <string name="uiux_sort_generation">Nifş</string>
+    <string name="uiux_sort_expiry">Dawiya demê</string>
+    <string name="uiux_profile_unavailable">Profîl ne berdest e. Hûrguliyên wê binêre.</string>
+    <string name="uiux_profile_expired">Dema wê qediya. Profîleke nû ji dabînkerê xwe zêde bike.</string>
+    <string name="uiux_select_confirmation_title">Girêdanê qut bike û vê profîlê hilbijêre?</string>
+    <string name="uiux_select_confirmation_body">Girêdana heyî an hewldana girêdanê dê raweste. %1$s hilbijêre, paşê dema amade bî dîsa girêbide.</string>
+    <string name="uiux_disconnect_select">Qut bike û hilbijêre</string>
+    <string name="uiux_app_privacy">Sepan û nepenî</string>
+    <string name="uiux_support">Piştgirî</string>
+    <string name="uiux_advanced">Pêşketî</string>
+    <string name="uiux_clear_search">Lêgerînê paqij bike</string>
+    <string name="uiux_decrease">Nirxê kêm bike</string>
+    <string name="uiux_increase">Nirxê zêde bike</string>
+    <string name="uiux_backup_restore">Paşvekişandin û vegerandin</string>
+    <string name="uiux_remove_reset">Rakirin an vegerandina daneyan</string>
+    <string name="uiux_privacy">Nepenî</string>
+    <string name="uiux_theme_system">Bingehîn a pergalê</string>
+    <string name="uiux_theme_light">Ronahî</string>
+    <string name="uiux_theme_dark">Tarî</string>
+    <string name="uiux_filters">Parzûn</string>
+    <string name="uiux_level">Ast</string>
+    <string name="uiux_component">Pêkhate</string>
+    <string name="uiux_filter_summary">%1$s · %2$s</string>
+    <string name="uiux_about">Derbarê</string>
+    <string name="uiux_diagnostic_count">Bûyerên nîşandaye: %1$d. Lihevhatî: %2$d. Tomarkirî: %3$d.</string>
+    <string name="uiux_event_metadata">%1$d · %2$s · %3$s</string>
+    <string name="uiux_diagnostic_export">Derxistina teşxîsê</string>
+    <string name="preview_detail_redacted">Ji bo taybetiyê veşartî</string>
+    <string name="preview_deployment_local">Sazkirina herêmî</string>
+    <string name="foreground_auto_connect_help">Dema ku sepanê vedikî, bi profîla tomarkirî û destûra berê ya VPN carekê biceribîne. Di destpêkirina amûrê an dema rawestandinê de dest pê nake.</string>
+    <string name="system_vpn_policy_help">Android VPN ya her dem çalak û astengkirina girêdanên bê VPN kontrol dike. Wan di mîhengên VPN yên pergalê de birêve bibe.</string>
+    <string name="open_system_vpn_settings">Mîhengên VPN yên Android vekin</string>
+    <string name="pause_15_minutes">Ji bo 15 deqîqeyan rawestîne</string>
+    <string name="pause_until_resumed">Heta berdewamkirinê rawestîne</string>
+    <string name="resume_connections">Dîsa destûrê bide girêdanan</string>
+    <string name="resume_connections_help">Ev rawestandinê radike. Ji bo girêdaneke nû, li rûpela sereke Girêde hilbijêre.</string>
+    <string name="pause_system_restriction">Dema ku Android girêdanê birêve dibe an siyaseta VPN nayê xwendin, rawestandin ne berdest e. Mîhengên VPN yên Android kontrol bike.</string>
+    <string name="proxy_recovery_help">Tunela VPN hîn çalak e, lê proxy ya herêmî rawestiyaye. Proxy ji nû ve bide destpêkirin an bê wê dîsa girêde.</string>
+    <string name="proxy_restart">Proxy ya herêmî ji nû ve bide destpêkirin</string>
+    <string name="proxy_apply_tun_only">Moda tenê VPN bicîh bîne</string>
+    <string name="settings_draft_saving">Reşnivîs tê tomarkirin…</string>
+    <string name="settings_draft_saved">Reşnivîs hat tomarkirin. Mîhengên sepandî nehatine guhertin.</string>
+    <string name="settings_draft_failed">Ev reşnivîs nehat tomarkirin an sepandin. Jê vaz bike û mîhengên heyî dîsa veke.</string>
+    <string name="settings_draft_applying">Mîheng tên sepandin…</string>
+    <string name="settings_draft_unapplied">Guhertin tenê piştî pejirandinê tên sepandin.</string>
+    <string name="profile_change_unconfirmed">Guherîn nehat piştrastkirin. Profîlê dîsa veke da ku rewşa wê ya niha kontrol bikî.</string>
+    <string name="privacy_authentication_title">Çalakiya parastî piştrast bike</string>
+    <string name="privacy_authentication_help">Ji bo domandina vê çalakiyê nasnameya xwe piştrast bike.</string>
+    <string name="protected_action_unconfirmed">Çalakî nehat piştrastkirin. Berî ku dîsa biceribînî rewşa niha kontrol bike.</string>
+    <string name="encrypted_backup_saved">Paşveka şîfrekirî hat tomarkirin.</string>
 </resources>
