@@ -75,7 +75,7 @@ class RuntimeControlDeviceTest {
             assertEquals(2, connections.size); assertEquals(1, unbindings)
             connections[0].onServiceConnected(name, peers[0])
             connections[0].onBindingDied(name)
-            connections[0].onNullBinding(name)
+            if (android.os.Build.VERSION.SDK_INT >= 28) connections[0].onNullBinding(name)
             checkNotNull(deaths[0]).binderDied()
             checkNotNull(lease()).close()
             assertEquals("Retired callbacks cannot replace or poison the current peer", 2, connections.size)
@@ -91,14 +91,16 @@ class RuntimeControlDeviceTest {
     }
 
     @Test fun servicePromotionFailureRetainsItsCategoryAfterCleanup() {
-        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 31)
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         assertNull(android.net.VpnService.prepare(base))
-        for ((failure, expected) in listOf(
-            android.app.ForegroundServiceStartNotAllowedException("fixture") to "FOREGROUND_START_BLOCKED",
+        val failures = mutableListOf(
             SecurityException("fixture") to "RUNTIME_PERMISSION_DENIED",
             IllegalStateException("fixture") to "RUNTIME_START_FAILED",
-        )) {
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            failures.add(android.app.ForegroundServiceStartNotAllowedException("fixture") to "FOREGROUND_START_BLOCKED")
+        }
+        for ((failure, expected) in failures) {
             // Exercise the real Service callback, replacing only its remote framework boundary.
             val service = KurdVpnService()
             android.content.ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
@@ -131,14 +133,16 @@ class RuntimeControlDeviceTest {
         }
     }
     @Test fun automaticStartReportsPlatformDenialWithoutMisclassifyingInternalFailure() = kotlinx.coroutines.runBlocking {
-        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 31)
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         assertNull("Owned emulator must have fixture VPN consent", android.net.VpnService.prepare(base))
-        for ((failure, expected) in listOf(
-            android.app.ForegroundServiceStartNotAllowedException("fixture") to "FOREGROUND_START_BLOCKED",
+        val failures = mutableListOf(
             SecurityException("fixture") to "RUNTIME_PERMISSION_DENIED",
             IllegalStateException("fixture") to "RUNTIME_START_FAILED",
-        )) {
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            failures.add(android.app.ForegroundServiceStartNotAllowedException("fixture") to "FOREGROUND_START_BLOCKED")
+        }
+        for ((failure, expected) in failures) {
             lateinit var connection: ServiceConnection
             var launches = 0
             val context = object : android.content.ContextWrapper(base) {
