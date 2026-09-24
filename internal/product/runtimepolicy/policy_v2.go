@@ -100,7 +100,8 @@ type FallbackV2 struct {
 }
 
 // PolicyV2 is the deterministic inner policy carried as CanonicalProfileV1.Policy.
-// The admission digest binds precisely labels 1 through 24.
+// Its historical name is shared by V2 and V3. Strict V2 functions still admit
+// only schema 2, whose admission digest binds precisely labels 1 through 24.
 type PolicyV2 struct {
 	SchemaVersion        uint64
 	WireProtocol         string
@@ -127,6 +128,7 @@ type PolicyV2 struct {
 	Limits               LimitsV2
 	Fallback             FallbackV2
 	RelayAdmissionDigest [32]byte
+	Services             *ServicesV1
 }
 
 func (p PolicyV2) Clone() PolicyV2 {
@@ -148,11 +150,67 @@ func (p PolicyV2) Clone() PolicyV2 {
 	p.AllowedIPModes = append([]IPModeV2(nil), p.AllowedIPModes...)
 	p.AllowedProtocols = append([]PayloadProtocolV2(nil), p.AllowedProtocols...)
 	p.Fallback.EndpointIndexes = append([]uint8(nil), p.Fallback.EndpointIndexes...)
+	p.Services = p.Services.clone()
 	return p
 }
 
 func EncodeV2(policy PolicyV2) ([]byte, error) {
 	return EncodeV2At(policy, time.Now())
+}
+
+// Destroy retires an exclusively owned policy graph, such as Clone's result.
+// Never call it on a borrowed verified policy. Immutable string backing and
+// library-private codec/crypto storage are not claimed deterministically erased.
+func (policy *PolicyV2) Destroy() {
+	if policy == nil {
+		return
+	}
+	clear(policy.LiveProgram)
+	clear(policy.TLSLeafDER)
+	clear(policy.ClientIPv4)
+	clear(policy.DNSIPv4)
+	clear(policy.ClientIPv6)
+	clear(policy.DNSIPv6)
+	for _, endpoint := range policy.Endpoints {
+		clear(endpoint.Address)
+	}
+	for _, route := range policy.Routes {
+		clear(route.Address)
+	}
+	for _, dns := range policy.DNSServers {
+		clear(dns)
+	}
+	clear(policy.Endpoints)
+	clear(policy.Routes)
+	clear(policy.DNSServers)
+	clear(policy.AllowedIPModes)
+	clear(policy.AllowedProtocols)
+	clear(policy.Fallback.EndpointIndexes)
+	if services := policy.Services; services != nil {
+		if proxy := services.Proxy; proxy != nil {
+			clear(proxy.AddressKinds)
+			for _, cidr := range proxy.DestinationCIDRs {
+				clear(cidr.Address)
+			}
+			clear(proxy.DestinationCIDRs)
+			clear(proxy.DestinationPorts)
+			*proxy = ProxyV1{}
+		}
+		if probes := services.Probes; probes != nil {
+			for _, target := range probes.Targets {
+				clear(target.Address)
+				clear(target.Methods)
+				clear(target.Modes)
+			}
+			clear(probes.Targets)
+			*probes = ProbesV1{}
+		}
+		if services.Update != nil {
+			*services.Update = UpdateV1{}
+		}
+		*services = ServicesV1{}
+	}
+	*policy = PolicyV2{}
 }
 
 // EncodeV2At validates policy time bounds against the caller's trusted time.
@@ -174,6 +232,10 @@ func DecodeV2(encoded []byte) (PolicyV2, error) {
 // DecodeV2At decodes policy bytes using the caller's trusted time for TLS
 // validity checks. Restore and migration callers must supply their own clock.
 func DecodeV2At(encoded []byte, now time.Time) (PolicyV2, error) {
+	return decodeV2AtDiagnostic(encoded, now, nil)
+}
+
+func decodeV2AtDiagnostic(encoded []byte, now time.Time, diagnostic *RuntimeDiagnostic) (PolicyV2, error) {
 	if len(encoded) == 0 || len(encoded) > MaxEncodedBytes {
 		return PolicyV2{}, fail(ErrorSize)
 	}
@@ -188,7 +250,7 @@ func DecodeV2At(encoded []byte, now time.Time) (PolicyV2, error) {
 	if err := decodePolicy(fields, &policy); err != nil {
 		return PolicyV2{}, err
 	}
-	if err := validatePolicyAt(policy, true, now); err != nil {
+	if err := validatePolicyAtDiagnostic(policy, true, now, diagnostic); err != nil {
 		return PolicyV2{}, err
 	}
 	reencoded, err := EncodeV2At(policy, now)
@@ -246,10 +308,36 @@ func ValidateV2At(policy PolicyV2, now time.Time) error {
 }
 
 func validatePolicyAt(p PolicyV2, requireDigest bool, now time.Time) error {
+	return validatePolicyAtDiagnostic(p, requireDigest, now, nil)
+}
+
+func validatePolicyAtDiagnostic(p PolicyV2, requireDigest bool, now time.Time, diagnostic *RuntimeDiagnostic) error {
+	if p.SchemaVersion != SchemaVersionV2 || p.Services != nil {
+		return fail(ErrorInvalid)
+	}
+	if err := validateCommonPolicyAtDiagnostic(p, now, diagnostic); err != nil {
+		return err
+	}
+	if requireDigest {
+		digest, err := RelayAdmissionDigestV2At(p, now)
+		if err != nil || digest != p.RelayAdmissionDigest {
+			return fail(ErrorBinding)
+		}
+	}
+	return nil
+}
+
+// validateCommonPolicyAt checks transport authority, never version or digest.
+// Neither a temporary V2 policy nor a V2 digest is used as V3 authority.
+func validateCommonPolicyAt(p PolicyV2, now time.Time) error {
+	return validateCommonPolicyAtDiagnostic(p, now, nil)
+}
+
+func validateCommonPolicyAtDiagnostic(p PolicyV2, now time.Time, diagnostic *RuntimeDiagnostic) error {
 	if now.IsZero() {
 		return fail(ErrorInvalid)
 	}
-	if p.SchemaVersion != SchemaVersionV2 || p.WireProtocol != WireProtocolV1 || p.CarrierFamily != CarrierFamilyTLS13TCP {
+	if p.WireProtocol != WireProtocolV1 || p.CarrierFamily != CarrierFamilyTLS13TCP {
 		return fail(ErrorInvalid)
 	}
 	program, err := validateLiveProgram(p.LiveProgram, p.LiveProgramSHA256)
@@ -260,7 +348,7 @@ func validatePolicyAt(p PolicyV2, requireDigest bool, now time.Time) error {
 		!keyIDMatches(p.ClientAuthKeyID, p.ClientAuthPublic) || !relayKeyIDMatches(p.RelayAuthKeyID, p.RelayAuthPublic) {
 		return fail(ErrorBinding)
 	}
-	if err := validateTLSAt(p.TLSServerName, p.TLSLeafDER, p.TLSLeafSHA256, now); err != nil {
+	if err := validateTLSAtDiagnostic(p.TLSServerName, p.TLSLeafDER, p.TLSLeafSHA256, now, diagnostic); err != nil {
 		return err
 	}
 	if err := validateAddresses(p); err != nil {
@@ -277,12 +365,6 @@ func validatePolicyAt(p PolicyV2, requireDigest bool, now time.Time) error {
 	}
 	if err := validateFallback(p.Fallback, len(p.Endpoints), p.Limits.MaxReconnectAttempts); err != nil {
 		return err
-	}
-	if requireDigest {
-		digest, err := RelayAdmissionDigestV2At(p, now)
-		if err != nil || digest != p.RelayAdmissionDigest {
-			return fail(ErrorBinding)
-		}
 	}
 	return nil
 }
@@ -334,11 +416,24 @@ func validateTLS(serverName string, der []byte, expected [32]byte) error {
 }
 
 func validateTLSAt(serverName string, der []byte, expected [32]byte, now time.Time) error {
+	return validateTLSAtDiagnostic(serverName, der, expected, now, nil)
+}
+
+func validateTLSAtDiagnostic(serverName string, der []byte, expected [32]byte, now time.Time, diagnostic *RuntimeDiagnostic) error {
 	if !validServerName(serverName) || len(der) == 0 || len(der) > 4096 || sha256.Sum256(der) != expected {
 		return fail(ErrorInvalid)
 	}
 	leaf, err := x509.ParseCertificate(der)
-	if err != nil || now.IsZero() || now.Before(leaf.NotBefore) || now.After(leaf.NotAfter) || !bytes.Equal(leaf.RawIssuer, leaf.RawSubject) || leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) != nil || leaf.VerifyHostname(serverName) != nil {
+	if err != nil || now.IsZero() {
+		return fail(ErrorBinding)
+	}
+	if now.Before(leaf.NotBefore) || now.After(leaf.NotAfter) {
+		if diagnostic != nil && *diagnostic == RuntimeDiagnosticNone {
+			*diagnostic = RuntimeDiagnosticTLSValidityTime
+		}
+		return fail(ErrorBinding)
+	}
+	if !bytes.Equal(leaf.RawIssuer, leaf.RawSubject) || leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) != nil || leaf.VerifyHostname(serverName) != nil {
 		return fail(ErrorBinding)
 	}
 	if ip := net.ParseIP(serverName); ip != nil {
@@ -599,6 +694,10 @@ func protocolValues(values []PayloadProtocolV2) []string {
 }
 
 func decodePolicy(fields map[uint64]cbor.RawMessage, p *PolicyV2) error {
+	return decodePolicyFields(fields, p, decode)
+}
+
+func decodePolicyFields(fields map[uint64]cbor.RawMessage, p *PolicyV2, decode func([]byte, any) error) error {
 	values := []any{&p.SchemaVersion, &p.WireProtocol, &p.CarrierFamily, &p.LiveProgram, nil, &p.ClientAuthKeyID, nil, &p.RelayAuthKeyID, nil, &p.TLSServerName, &p.TLSLeafDER, nil, nil, &p.ClientIPv4, &p.DNSIPv4, &p.ClientIPv6, &p.DNSIPv6, nil, &p.DNSServers, &p.MTU, nil, nil, nil, nil}
 	for i, destination := range values {
 		label := uint64(i + 1)
@@ -606,30 +705,30 @@ func decodePolicy(fields map[uint64]cbor.RawMessage, p *PolicyV2) error {
 			return fail(ErrorSchema)
 		}
 	}
-	if fixedBytes(fields[5], p.LiveProgramSHA256[:]) != nil || fixedBytes(fields[7], p.ClientAuthPublic[:]) != nil || fixedBytes(fields[9], p.RelayAuthPublic[:]) != nil || fixedBytes(fields[12], p.TLSLeafSHA256[:]) != nil || fixedBytes(fields[25], p.RelayAdmissionDigest[:]) != nil {
+	if fixedBytes(fields[5], p.LiveProgramSHA256[:], decode) != nil || fixedBytes(fields[7], p.ClientAuthPublic[:], decode) != nil || fixedBytes(fields[9], p.RelayAuthPublic[:], decode) != nil || fixedBytes(fields[12], p.TLSLeafSHA256[:], decode) != nil || fixedBytes(fields[25], p.RelayAdmissionDigest[:], decode) != nil {
 		return fail(ErrorSchema)
 	}
 	var err error
-	if p.Endpoints, err = decodeEndpoints(fields[13]); err != nil {
+	if p.Endpoints, err = decodeEndpoints(fields[13], decode); err != nil {
 		return err
 	}
-	if p.Routes, err = decodePrefixes(fields[18]); err != nil {
+	if p.Routes, err = decodePrefixes(fields[18], decode); err != nil {
 		return err
 	}
-	if p.AllowedIPModes, err = decodeModes(fields[21]); err != nil {
+	if p.AllowedIPModes, err = decodeModes(fields[21], decode); err != nil {
 		return err
 	}
-	if p.AllowedProtocols, err = decodeProtocols(fields[22]); err != nil {
+	if p.AllowedProtocols, err = decodeProtocols(fields[22], decode); err != nil {
 		return err
 	}
-	if p.Limits, err = decodeLimits(fields[23]); err != nil {
+	if p.Limits, err = decodeLimits(fields[23], decode); err != nil {
 		return err
 	}
-	p.Fallback, err = decodeFallback(fields[24])
+	p.Fallback, err = decodeFallback(fields[24], decode)
 	return err
 }
 
-func decodeEndpoints(raw []byte) ([]EndpointV2, error) {
+func decodeEndpoints(raw []byte, decode func([]byte, any) error) ([]EndpointV2, error) {
 	var values []cbor.RawMessage
 	if decode(raw, &values) != nil || len(values) == 0 || len(values) > 4 {
 		return nil, fail(ErrorSchema)
@@ -647,7 +746,7 @@ func decodeEndpoints(raw []byte) ([]EndpointV2, error) {
 	return result, nil
 }
 
-func decodePrefixes(raw []byte) ([]PrefixV2, error) {
+func decodePrefixes(raw []byte, decode func([]byte, any) error) ([]PrefixV2, error) {
 	var values []cbor.RawMessage
 	if decode(raw, &values) != nil || len(values) == 0 || len(values) > 2 {
 		return nil, fail(ErrorSchema)
@@ -665,7 +764,7 @@ func decodePrefixes(raw []byte) ([]PrefixV2, error) {
 	return result, nil
 }
 
-func decodeModes(raw []byte) ([]IPModeV2, error) {
+func decodeModes(raw []byte, decode func([]byte, any) error) ([]IPModeV2, error) {
 	var values []string
 	if decode(raw, &values) != nil {
 		return nil, fail(ErrorSchema)
@@ -677,7 +776,7 @@ func decodeModes(raw []byte) ([]IPModeV2, error) {
 	return result, nil
 }
 
-func decodeProtocols(raw []byte) ([]PayloadProtocolV2, error) {
+func decodeProtocols(raw []byte, decode func([]byte, any) error) ([]PayloadProtocolV2, error) {
 	var values []string
 	if decode(raw, &values) != nil {
 		return nil, fail(ErrorSchema)
@@ -689,7 +788,7 @@ func decodeProtocols(raw []byte) ([]PayloadProtocolV2, error) {
 	return result, nil
 }
 
-func decodeLimits(raw []byte) (LimitsV2, error) {
+func decodeLimits(raw []byte, decode func([]byte, any) error) (LimitsV2, error) {
 	fields, err := rawMap(raw, 6)
 	if err != nil {
 		return LimitsV2{}, err
@@ -704,7 +803,7 @@ func decodeLimits(raw []byte) (LimitsV2, error) {
 	return result, nil
 }
 
-func decodeFallback(raw []byte) (FallbackV2, error) {
+func decodeFallback(raw []byte, decode func([]byte, any) error) (FallbackV2, error) {
 	fields, err := rawMap(raw, 4)
 	if err != nil {
 		return FallbackV2{}, err
@@ -737,7 +836,7 @@ func decode(raw []byte, destination any) error {
 	return mode.Unmarshal(raw, destination)
 }
 
-func fixedBytes(raw []byte, destination []byte) error {
+func fixedBytes(raw []byte, destination []byte, decode func([]byte, any) error) error {
 	var value []byte
 	if decode(raw, &value) != nil || len(value) != len(destination) {
 		return errors.New("fixed")

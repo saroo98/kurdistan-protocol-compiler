@@ -29,8 +29,23 @@ func ResolveV2(policy runtimepolicy.PolicyV2) (LiveAuthorityV2, error) {
 // ResolveV2At lets callers bind carrier authorization to the same trusted-time
 // decision used for profile and policy validation.
 func ResolveV2At(policy runtimepolicy.PolicyV2, now time.Time) (LiveAuthorityV2, error) {
-	if err := runtimepolicy.ValidateV2At(policy, now); err != nil ||
-		policy.WireProtocol != runtimepolicy.WireProtocolV1 ||
+	if err := runtimepolicy.ValidateV2At(policy, now); err != nil {
+		return LiveAuthorityV2{}, ErrNotAuthorized
+	}
+	return resolveValidatedRuntime(policy)
+}
+
+// ResolveRuntimeAt admits supported signed policy versions at trusted time.
+// It does not make service authority available from a carrier label alone.
+func ResolveRuntimeAt(policy runtimepolicy.PolicyV2, now time.Time) (LiveAuthorityV2, error) {
+	if err := runtimepolicy.ValidateRuntimeAt(policy, now); err != nil {
+		return LiveAuthorityV2{}, ErrNotAuthorized
+	}
+	return resolveValidatedRuntime(policy)
+}
+
+func resolveValidatedRuntime(policy runtimepolicy.PolicyV2) (LiveAuthorityV2, error) {
+	if policy.WireProtocol != runtimepolicy.WireProtocolV1 ||
 		policy.CarrierFamily != runtimepolicy.CarrierFamilyTLS13TCP {
 		return LiveAuthorityV2{}, ErrNotAuthorized
 	}

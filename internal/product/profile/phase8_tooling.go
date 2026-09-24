@@ -127,60 +127,126 @@ func signOffline(spec OfflineIssuanceSpec, signer Signer) ([]byte, envelope.Arti
 }
 
 func VerifyOffline(request OfflineVerifyRequest, verifier Verifier, resolver RecipientResolver, opener OfflineRecipientOpener) (OfflineVerifiedArtifact, error) {
+	return VerifyOfflineWithRejection(request, verifier, resolver, opener, nil)
+}
+
+func VerifyOfflineWithRejection(request OfflineVerifyRequest, verifier Verifier, resolver RecipientResolver, opener OfflineRecipientOpener, rejected VerificationRejectionSink) (OfflineVerifiedArtifact, error) {
+	rejected = firstVerificationRejectionSink(rejected)
 	metadata := envelope.ArtifactMetadata{Class: request.Class, AudienceClass: request.Audience}
 	if request.Class != envelope.ArtifactSignedPublic {
 		sealed, err := envelope.ParseSealedProfileOpaque(request.Artifact)
 		if err != nil {
+			rejectVerification(rejected, VerificationStageOuter, VerificationReasonMalformed)
 			return OfflineVerifiedArtifact{}, ErrOfflineVerify
 		}
 		outer, err := envelope.DecodeSealProtectedContextV1(sealed.Protected)
-		if err != nil || outer.SuiteID != request.Suite || outer.ContentType != envelope.SignedObjectContentType {
+		if err != nil {
+			rejectVerification(rejected, VerificationStageOuter, VerificationReasonMalformed)
+			return OfflineVerifiedArtifact{}, ErrOfflineVerify
+		}
+		if outer.SuiteID != request.Suite || outer.ContentType != envelope.SignedObjectContentType {
+			rejectVerification(rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 			return OfflineVerifiedArtifact{}, ErrOfflineVerify
 		}
 		metadata = outer.Metadata
-		if metadata.Class != request.Class || metadata.AudienceClass != request.Audience || resolver == nil || opener == nil {
+		if metadata.Class != request.Class || metadata.AudienceClass != request.Audience {
+			rejectVerification(rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
+			return OfflineVerifiedArtifact{}, ErrOfflineVerify
+		}
+		if resolver == nil || opener == nil {
+			rejectVerification(rejected, VerificationStageRecipient, VerificationReasonRecipientRejected)
 			return OfflineVerifiedArtifact{}, ErrOfflineVerify
 		}
 		binding, err := ResolveRecipientForMetadata(resolver, metadata)
 		if err != nil {
+			rejectVerification(rejected, VerificationStageRecipient, VerificationReasonRecipientRejected)
 			return OfflineVerifiedArtifact{}, ErrOfflineVerify
 		}
 		opened, err := opener.OpenOffline(binding, sealed.Protected, sealed.Encapsulation, sealed.Ciphertext)
 		if err != nil {
+			rejectVerification(rejected, VerificationStageRecipient, VerificationReasonRecipientRejected)
 			return OfflineVerifiedArtifact{}, ErrOfflineVerify
 		}
-		return verifyOfflineSigned(request, metadata, opened, verifier, &binding)
+		return verifyOfflineSignedWithRejection(request, metadata, opened, verifier, &binding, rejected)
 	}
 	if err := envelope.ValidateArtifactMetadata(metadata); err != nil {
+		rejectVerification(rejected, VerificationStageOuter, VerificationReasonMalformed)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
-	return verifyOfflineSigned(request, metadata, request.Artifact, verifier, nil)
+	return verifyOfflineSignedWithRejection(request, metadata, request.Artifact, verifier, nil, rejected)
 }
 
 func verifyOfflineSigned(request OfflineVerifyRequest, metadata envelope.ArtifactMetadata, signed []byte, verifier Verifier, recipient *RecipientBinding) (OfflineVerifiedArtifact, error) {
-	if verifier == nil || request.Suite != envelope.SuiteClassicalV1 || request.IssuerKey.validate() != nil {
+	return verifyOfflineSignedWithRejection(request, metadata, signed, verifier, recipient, nil)
+}
+
+func verifyOfflineSignedWithRejection(request OfflineVerifyRequest, metadata envelope.ArtifactMetadata, signed []byte, verifier Verifier, recipient *RecipientBinding, rejected VerificationRejectionSink) (OfflineVerifiedArtifact, error) {
+	if verifier == nil {
+		rejectVerification(rejected, VerificationStageProfileSignature, VerificationReasonIncompatible)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.Suite != envelope.SuiteClassicalV1 {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonIncompatible)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.IssuerKey.validate() != nil {
+		rejectVerification(rejected, VerificationStageProfileSignature, VerificationReasonMalformed)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	parsed, err := envelope.ParseSignedProfileOpaque(signed)
 	if err != nil {
+		rejectVerification(rejected, VerificationStageOuter, VerificationReasonMalformed)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	context, err := envelope.DecodeSignedProtectedContextV1(parsed.Protected)
-	if err != nil || context.SuiteID != request.Suite || context.Metadata != metadata || string(context.KeyID) != request.IssuerKey.KeyID {
+	if err != nil {
+		rejectVerification(rejected, VerificationStageOuter, VerificationReasonMalformed)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if context.SuiteID != request.Suite || context.Metadata != metadata || string(context.KeyID) != request.IssuerKey.KeyID {
+		rejectVerification(rejected, VerificationStageOuter, VerificationReasonBindingMismatch)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	sigStructure, err := envelope.BuildCOSESigStructure(parsed.Protected, parsed.Payload)
-	if err != nil || verifier.Verify(request.IssuerKey, sigStructure, parsed.Signature) != nil {
+	if err != nil {
+		rejectVerification(rejected, VerificationStageProfileSignature, VerificationReasonMalformed)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if verifier.Verify(request.IssuerKey, sigStructure, parsed.Signature) != nil {
+		rejectVerification(rejected, VerificationStageProfileSignature, VerificationReasonSignatureInvalid)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	profileValue, err := envelope.DecodeCanonicalProfileV1(parsed.Payload)
 	if err != nil {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonMalformed)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	if recipient != nil && !RecipientBindingContainsProfile(*recipient, profileValue) {
+		rejectVerification(rejected, VerificationStageRecipient, VerificationReasonScopeMismatch)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
-	if AuthorizeRoleOperation(request.IssuerRole, OperationAuthenticateProfile) != nil || request.IssuerKey.SuiteID != uint16(request.Suite) || request.IssuerScope.validate() != nil || !request.IssuerScope.contains(profileValue.ProviderID, profileValue.LineageID, profileValue.ProfileID) || request.Now < profileValue.ValidFrom || request.Now >= profileValue.ValidUntil || request.MinimumGeneration == 0 || profileValue.Generation < request.MinimumGeneration || request.MinimumSafetyFloor == 0 || profileValue.RequiredSafetyFloor < request.MinimumSafetyFloor || request.MinimumRootEpoch == 0 || profileValue.RootEpoch < request.MinimumRootEpoch || request.MinimumRevocationEpoch == 0 || profileValue.RevocationEpoch < request.MinimumRevocationEpoch {
+	if AuthorizeRoleOperation(request.IssuerRole, OperationAuthenticateProfile) != nil {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonScopeMismatch)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.IssuerKey.SuiteID != uint16(request.Suite) {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonBindingMismatch)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.IssuerScope.validate() != nil {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonMalformed)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if !request.IssuerScope.contains(profileValue.ProviderID, profileValue.LineageID, profileValue.ProfileID) {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonScopeMismatch)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.Now < profileValue.ValidFrom || request.Now >= profileValue.ValidUntil {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonTimeInvalid)
+		return OfflineVerifiedArtifact{}, ErrOfflineVerify
+	}
+	if request.MinimumGeneration == 0 || profileValue.Generation < request.MinimumGeneration || request.MinimumSafetyFloor == 0 || profileValue.RequiredSafetyFloor < request.MinimumSafetyFloor || request.MinimumRootEpoch == 0 || profileValue.RootEpoch < request.MinimumRootEpoch || request.MinimumRevocationEpoch == 0 || profileValue.RevocationEpoch < request.MinimumRevocationEpoch {
+		rejectVerification(rejected, VerificationStageProfilePolicy, VerificationReasonFloorRejected)
 		return OfflineVerifiedArtifact{}, ErrOfflineVerify
 	}
 	return OfflineVerifiedArtifact{ExactArtifact: bytes.Clone(request.Artifact), ExactSignedObject: bytes.Clone(parsed.ExactObject), Profile: cloneCanonicalProfile(profileValue), Metadata: metadata, Suite: request.Suite}, nil

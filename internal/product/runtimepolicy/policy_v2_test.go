@@ -364,6 +364,30 @@ func fixturePolicyV2(t testing.TB) PolicyV2 {
 	return policy
 }
 
+func TestPolicyV2DestroyOwnedV2V3LeavesAndCloneSource(t *testing.T) {
+	source := fixturePolicyV2(t)
+	source.Services = &ServicesV1{Version: 1, Proxy: &ProxyV1{AddressKinds: []uint8{1}, DestinationCIDRs: []PrefixV2{{Address: []byte{8, 8, 8, 8}}}, DestinationPorts: []PortRangeV1{{First: 443, Last: 443}}}, Probes: &ProbesV1{Targets: []ProbeTargetV1{{Address: []byte{1, 1, 1, 1}, Methods: []uint8{1}, Modes: []uint8{1, 2}}}}, Update: &UpdateV1{URL: "https://updates.example/profile"}}
+	owned := source.Clone()
+	program := owned.LiveProgram
+	dns := owned.DNSServers[0]
+	probe := owned.Services.Probes.Targets[0].Address
+	proxy := owned.Services.Proxy.DestinationCIDRs[0].Address
+	owned.Destroy()
+	owned.Destroy()
+	var nilPolicy *PolicyV2
+	nilPolicy.Destroy()
+	for _, bytes := range [][]byte{program, dns, probe, proxy} {
+		for _, b := range bytes {
+			if b != 0 {
+				t.Fatal("owned leaf retained")
+			}
+		}
+	}
+	if source.LiveProgram[0] == 0 || source.Services.Probes.Targets[0].Address[0] != 1 || owned.Services != nil {
+		t.Fatal("clone source changed or owner retained")
+	}
+}
+
 func keyID(public ed25519.PublicKey) string {
 	digest := sha256.Sum256(public)
 	return hex.EncodeToString(digest[:16])

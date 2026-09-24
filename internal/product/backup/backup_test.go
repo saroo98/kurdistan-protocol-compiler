@@ -15,6 +15,50 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+type boundRecipientVerifier struct {
+	request, private []byte
+	reject           bool
+}
+
+func (*boundRecipientVerifier) VerifyBackupRecord(record Record) error {
+	if record.Kind == RecordLocalAlias {
+		return nil
+	}
+	return ErrRestoreRejected
+}
+
+func (v *boundRecipientVerifier) VerifyBackupRecordWithRecipient(record Record, key RecipientKeyRecord) error {
+	if v.reject || record.LocalID != "a" || key.SourceVersion != 2 || !bytes.Equal(key.PublicRequest, []byte{1}) || !bytes.Equal(key.PrivateBundle, []byte{2}) {
+		return ErrRestoreRejected
+	}
+	v.request, v.private = key.PublicRequest, key.PrivateBundle
+	return nil
+}
+
+func TestRestoreSuppliesOnlyBoundRecipientAndWipesMaterial(t *testing.T) {
+	payload := keyPayloadFixture(t)
+	preview := Preview{Version: Version, RecordCount: 2, KindCounts: map[RecordKind]int{RecordNativeProfile: 1, RecordLocalAlias: 1}}
+	opened := Opened{preview: preview, payload: payload}
+	defer opened.Destroy()
+	verifier := &boundRecipientVerifier{}
+	restored, err := Restore(opened, preview, verifier)
+	if err != nil {
+		t.Fatalf("bound recipient restore rejected: %v", err)
+	}
+	defer destroyPayload(&restored)
+	if !bytes.Equal(verifier.request, []byte{0}) || !bytes.Equal(verifier.private, []byte{0}) {
+		t.Fatal("recipient material retained")
+	}
+	if _, err := Restore(opened, preview, &boundRecipientVerifier{reject: true}); err == nil {
+		t.Fatal("failed recipient validation accepted")
+	}
+	withoutKey := Opened{preview: Preview{Version: Version, RecordCount: 1, KindCounts: map[RecordKind]int{RecordNativeProfile: 1}},
+		payload: Payload{Version: 2, Records: payload.Records[:1]}}
+	if _, err := Restore(withoutKey, withoutKey.preview, &boundRecipientVerifier{}); err == nil {
+		t.Fatal("unbound profile accepted")
+	}
+}
+
 func TestBackupV2AuthenticatedPayloadCannotClaimLegacyHeader(t *testing.T) {
 	plaintext, err := encodePayload(keyPayloadFixture(t))
 	if err != nil {

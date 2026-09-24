@@ -440,15 +440,28 @@ func unmarshalStrict(data []byte, destination any) error {
 }
 
 func signedMetadataBytes(protected []byte) ([]byte, error) {
+	return signedMetadataBytesWithResources(protected, false)
+}
+
+func signedMetadataBytesWithResources(protected []byte, resources bool) ([]byte, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
 	if err := validateInputSize("signed protected headers", len(protected), MaxSignedProtectedBytes); err != nil {
 		return nil, err
 	}
-	if err := ValidateCoreDeterministicCBOR(protected); err != nil {
-		return nil, err
+	if !resources {
+		if err := ValidateCoreDeterministicCBOR(protected); err != nil {
+			return nil, err
+		}
 	}
 	var headers map[int64]cbor.RawMessage
-	if err := unmarshalStrict(protected, &headers); err != nil || len(headers) != 7 {
+	if err := decode(protected, &headers); err != nil || len(headers) != 7 {
 		return nil, errors.New("envelope: signed protected header schema is invalid")
+	}
+	if resources {
+		defer clearResourceMapV1(headers)
 	}
 	var algorithm int64
 	var critical []int64
@@ -456,83 +469,117 @@ func signedMetadataBytes(protected []byte) ([]byte, error) {
 	var keyID []byte
 	var formatVersion, suiteID uint64
 	var metadata []byte
-	if err := unmarshalStrict(headers[COSEHeaderAlgorithm], &algorithm); err != nil || algorithm != COSEAlgorithmES256 {
+	complete := false
+	defer func() {
+		if resources {
+			clear(keyID)
+			if !complete {
+				clear(metadata)
+			}
+		}
+	}()
+	if err := decode(headers[COSEHeaderAlgorithm], &algorithm); err != nil || algorithm != COSEAlgorithmES256 {
 		return nil, errors.New("envelope: signed algorithm is invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderCritical], &critical); err != nil || len(critical) != 3 || critical[0] != COSEHeaderProfileFormatVersion || critical[1] != COSEHeaderProfileSuiteID || critical[2] != COSEHeaderArtifactMetadata {
+	if err := decode(headers[COSEHeaderCritical], &critical); err != nil || len(critical) != 3 || critical[0] != COSEHeaderProfileFormatVersion || critical[1] != COSEHeaderProfileSuiteID || critical[2] != COSEHeaderArtifactMetadata {
 		return nil, errors.New("envelope: signed critical headers are invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderContent], &contentType); err != nil || contentType != SignedPayloadContentType {
+	if err := decode(headers[COSEHeaderContent], &contentType); err != nil || contentType != SignedPayloadContentType {
 		return nil, errors.New("envelope: signed content type is invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderKeyID], &keyID); err != nil || len(keyID) < MinKeyIDBytes || len(keyID) > MaxKeyIDBytes {
+	if err := decode(headers[COSEHeaderKeyID], &keyID); err != nil || len(keyID) < MinKeyIDBytes || len(keyID) > MaxKeyIDBytes {
 		return nil, errors.New("envelope: signed key ID is invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderProfileFormatVersion], &formatVersion); err != nil || formatVersion != ProfileFormatVersion {
+	if err := decode(headers[COSEHeaderProfileFormatVersion], &formatVersion); err != nil || formatVersion != ProfileFormatVersion {
 		return nil, errors.New("envelope: signed profile format is invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderProfileSuiteID], &suiteID); err != nil || suiteID != uint64(SuiteClassicalV1) {
+	if err := decode(headers[COSEHeaderProfileSuiteID], &suiteID); err != nil || suiteID != uint64(SuiteClassicalV1) {
 		return nil, errors.New("envelope: signed suite is invalid")
 	}
-	if err := unmarshalStrict(headers[COSEHeaderArtifactMetadata], &metadata); err != nil || len(metadata) == 0 || len(metadata) > MaxArtifactMetadataBytes {
+	if err := decode(headers[COSEHeaderArtifactMetadata], &metadata); err != nil || len(metadata) == 0 || len(metadata) > MaxArtifactMetadataBytes {
 		return nil, errors.New("envelope: signed artifact metadata is invalid")
 	}
-	if _, err := decodeArtifactMetadataSchema(metadata); err != nil {
+	if _, err := decodeArtifactMetadataSchemaWithResources(metadata, resources); err != nil {
 		return nil, errors.New("envelope: signed artifact metadata is invalid")
 	}
-	canonical, err := marshalDeterministicBounded(map[int64]any{
-		COSEHeaderAlgorithm:            algorithm,
-		COSEHeaderCritical:             critical,
-		COSEHeaderContent:              contentType,
-		COSEHeaderKeyID:                keyID,
-		COSEHeaderProfileFormatVersion: formatVersion,
-		COSEHeaderProfileSuiteID:       suiteID,
-		COSEHeaderArtifactMetadata:     metadata,
-	}, MaxSignedProtectedBytes, "signed protected headers")
-	if err != nil || !bytes.Equal(protected, canonical) {
-		return nil, errors.New("envelope: signed protected headers must use exact direct schema types")
+	if !resources {
+		canonical, err := marshalDeterministicBounded(map[int64]any{
+			COSEHeaderAlgorithm:            algorithm,
+			COSEHeaderCritical:             critical,
+			COSEHeaderContent:              contentType,
+			COSEHeaderKeyID:                keyID,
+			COSEHeaderProfileFormatVersion: formatVersion,
+			COSEHeaderProfileSuiteID:       suiteID,
+			COSEHeaderArtifactMetadata:     metadata,
+		}, MaxSignedProtectedBytes, "signed protected headers")
+		if err != nil || !bytes.Equal(protected, canonical) {
+			return nil, errors.New("envelope: signed protected headers must use exact direct schema types")
+		}
 	}
+	complete = true
 	return metadata, nil
 }
 
 func outerMetadataBytes(protected []byte) ([]byte, error) {
+	return outerMetadataBytesWithResources(protected, false)
+}
+
+func outerMetadataBytesWithResources(protected []byte, resources bool) ([]byte, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
 	if err := validateInputSize("outer protected metadata", len(protected), MaxOuterProtectedBytes); err != nil {
 		return nil, err
 	}
-	if err := ValidateCoreDeterministicCBOR(protected); err != nil {
-		return nil, err
+	if !resources {
+		if err := ValidateCoreDeterministicCBOR(protected); err != nil {
+			return nil, err
+		}
 	}
 	var headers map[uint64]cbor.RawMessage
-	if err := unmarshalStrict(protected, &headers); err != nil || len(headers) != 4 {
+	if err := decode(protected, &headers); err != nil || len(headers) != 4 {
 		return nil, errors.New("envelope: outer protected schema is invalid")
+	}
+	if resources {
+		defer clearResourceMapV1(headers)
 	}
 	var formatVersion, suiteID uint64
 	var contentType string
 	var metadata []byte
-	if err := unmarshalStrict(headers[1], &formatVersion); err != nil || formatVersion != SealFormatVersion {
+	complete := false
+	defer func() {
+		if resources && !complete {
+			clear(metadata)
+		}
+	}()
+	if err := decode(headers[1], &formatVersion); err != nil || formatVersion != SealFormatVersion {
 		return nil, errors.New("envelope: outer seal format is invalid")
 	}
-	if err := unmarshalStrict(headers[2], &suiteID); err != nil || suiteID != uint64(SuiteClassicalV1) {
+	if err := decode(headers[2], &suiteID); err != nil || suiteID != uint64(SuiteClassicalV1) {
 		return nil, errors.New("envelope: outer suite is invalid")
 	}
-	if err := unmarshalStrict(headers[3], &contentType); err != nil || contentType != SignedObjectContentType {
+	if err := decode(headers[3], &contentType); err != nil || contentType != SignedObjectContentType {
 		return nil, errors.New("envelope: outer content type is invalid")
 	}
-	if err := unmarshalStrict(headers[4], &metadata); err != nil || len(metadata) == 0 || len(metadata) > MaxArtifactMetadataBytes {
+	if err := decode(headers[4], &metadata); err != nil || len(metadata) == 0 || len(metadata) > MaxArtifactMetadataBytes {
 		return nil, errors.New("envelope: outer artifact metadata is invalid")
 	}
-	if _, err := decodeArtifactMetadataSchema(metadata); err != nil {
+	if _, err := decodeArtifactMetadataSchemaWithResources(metadata, resources); err != nil {
 		return nil, errors.New("envelope: outer artifact metadata is invalid")
 	}
-	canonical, err := marshalDeterministicBounded(map[uint64]any{
-		1: formatVersion,
-		2: suiteID,
-		3: contentType,
-		4: metadata,
-	}, MaxOuterProtectedBytes, "outer protected metadata")
-	if err != nil || !bytes.Equal(protected, canonical) {
-		return nil, errors.New("envelope: outer protected metadata must use exact direct schema types")
+	if !resources {
+		canonical, err := marshalDeterministicBounded(map[uint64]any{
+			1: formatVersion,
+			2: suiteID,
+			3: contentType,
+			4: metadata,
+		}, MaxOuterProtectedBytes, "outer protected metadata")
+		if err != nil || !bytes.Equal(protected, canonical) {
+			return nil, errors.New("envelope: outer protected metadata must use exact direct schema types")
+		}
 	}
+	complete = true
 	return metadata, nil
 }
 
@@ -548,40 +595,58 @@ func decodeArtifactMetadata(encoded []byte) (ArtifactMetadata, error) {
 }
 
 func decodeArtifactMetadataSchema(encoded []byte) (ArtifactMetadata, error) {
+	return decodeArtifactMetadataSchemaWithResources(encoded, false)
+}
+
+func decodeArtifactMetadataSchemaWithResources(encoded []byte, resources bool) (ArtifactMetadata, error) {
+	decode := unmarshalStrict
+	if resources {
+		decode = unmarshalResourceV1
+	}
 	if err := validateInputSize("artifact metadata", len(encoded), MaxArtifactMetadataBytes); err != nil {
 		return ArtifactMetadata{}, err
 	}
-	if err := ValidateCoreDeterministicCBOR(encoded); err != nil {
-		return ArtifactMetadata{}, err
+	if !resources {
+		if err := ValidateCoreDeterministicCBOR(encoded); err != nil {
+			return ArtifactMetadata{}, err
+		}
 	}
 	var fields map[uint64]cbor.RawMessage
-	if err := unmarshalStrict(encoded, &fields); err != nil || len(fields) != 4 {
+	if err := decode(encoded, &fields); err != nil || len(fields) != 4 {
 		return ArtifactMetadata{}, errors.New("envelope: artifact metadata schema is invalid")
+	}
+	if resources {
+		defer clearResourceMapV1(fields)
 	}
 	var class, audience string
 	var hint []byte
+	if resources {
+		defer func() { clear(hint) }()
+	}
 	var epoch uint64
-	if err := unmarshalStrict(fields[1], &class); err != nil {
+	if err := decode(fields[1], &class); err != nil {
 		return ArtifactMetadata{}, errors.New("envelope: artifact class is invalid")
 	}
-	if err := unmarshalStrict(fields[2], &audience); err != nil {
+	if err := decode(fields[2], &audience); err != nil {
 		return ArtifactMetadata{}, errors.New("envelope: artifact audience is invalid")
 	}
-	if err := unmarshalStrict(fields[3], &hint); err != nil {
+	if err := decode(fields[3], &hint); err != nil {
 		return ArtifactMetadata{}, errors.New("envelope: artifact recipient hint is invalid")
 	}
-	if err := unmarshalStrict(fields[4], &epoch); err != nil {
+	if err := decode(fields[4], &epoch); err != nil {
 		return ArtifactMetadata{}, errors.New("envelope: artifact recipient epoch is invalid")
 	}
 	metadata := ArtifactMetadata{Class: ArtifactClass(class), AudienceClass: audience, RecipientHint: string(hint), RecipientEpoch: epoch}
-	canonical, err := marshalDeterministicBounded(map[uint64]any{
-		1: class,
-		2: audience,
-		3: hint,
-		4: epoch,
-	}, MaxArtifactMetadataBytes, "artifact metadata")
-	if err != nil || !bytes.Equal(encoded, canonical) {
-		return ArtifactMetadata{}, errors.New("envelope: artifact metadata must use exact direct schema types")
+	if !resources {
+		canonical, err := marshalDeterministicBounded(map[uint64]any{
+			1: class,
+			2: audience,
+			3: hint,
+			4: epoch,
+		}, MaxArtifactMetadataBytes, "artifact metadata")
+		if err != nil || !bytes.Equal(encoded, canonical) {
+			return ArtifactMetadata{}, errors.New("envelope: artifact metadata must use exact direct schema types")
+		}
 	}
 	return metadata, nil
 }
