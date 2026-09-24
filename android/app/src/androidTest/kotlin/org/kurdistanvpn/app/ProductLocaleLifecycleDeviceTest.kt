@@ -30,6 +30,8 @@ class ProductLocaleLifecycleDeviceTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test
     fun applicationLocaleRecreationKeepsRealActivityAndFilterModalInTheSameLanguage() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

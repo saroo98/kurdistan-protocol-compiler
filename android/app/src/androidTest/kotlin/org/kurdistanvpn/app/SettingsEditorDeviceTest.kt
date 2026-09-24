@@ -13,6 +13,8 @@ import org.kurdistanvpn.core.ui.R as UiR
 class SettingsEditorDeviceTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test fun savedEditSurvivesActivityRecreationAndCancelLeavesAppliedSettingsUntouched() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as KurdistanApplication
         runBlocking { Task7InstalledFixturePreparation.prepareProxyOrVerify(app) }

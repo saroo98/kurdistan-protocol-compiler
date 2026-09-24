@@ -19,6 +19,8 @@ class ProductFoldDeviceTest {
     @get:Rule(order = 0) val windows = WindowLayoutInfoPublisherRule()
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before fun prepareImportedProfile() = compose.prepareImportedProduct(compose.activity)
+
     @Test fun postureChangesKeepOneDraftOwnerAndAvoidThePhysicalHinge() {
         val app = compose.activity.application as KurdistanApplication
         val original = checkNotNull(app.compositionRoot.protectedStateFacade()).readProjection()

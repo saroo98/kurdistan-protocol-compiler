@@ -91,7 +91,7 @@ class Phase11ControlSurfaceDeviceTest {
                         runtimeRequestId = "1".repeat(32), startedAtElapsedRealtime = 1,
                         profileGeneration = 7uL, planDigest = "2".repeat(64),
                         profileFingerprint = "3".repeat(64), strategyFingerprint = "4".repeat(64),
-                        relayFingerprint = "5".repeat(64))
+                        relayFingerprint = "5".repeat(64), alwaysOn = false, lockdown = false)
                 },
                 onStopVpn = {
                     record("stop")
