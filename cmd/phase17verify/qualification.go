@@ -90,6 +90,7 @@ var qualificationFiles = []string{
 	"cmd/phase17verify/artifact_test.go",
 	"cmd/phase17verify/constants.go",
 	"cmd/phase17verify/constants_test.go",
+	"cmd/phase17verify/current_artifact.go",
 	"cmd/phase17verify/inventory.go",
 	"cmd/phase17verify/inventory_test.go",
 	"cmd/phase17verify/main.go",

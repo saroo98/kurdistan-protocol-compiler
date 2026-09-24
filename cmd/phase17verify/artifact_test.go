@@ -239,16 +239,104 @@ func TestPhase17NativeJNIExportPolicyRejectsMissingExtraAndVisibleInternalHelper
 	}
 }
 
+func TestCurrentAPKAcceptsTrustFailureStatusAndRejectsInternalControls(t *testing.T) {
+	markers := []string{"KurdVpnService", "nativeRuntimeSocketPrepare", "nativeRuntimeSocketCommitProtected", "nativeRuntimeTunAttach", "ENDPOINT_UNAVAILABLE", "DNS_UNAVAILABLE", "nativeProdOpenV1", "nativeMaintenanceOpenV1", "TRUST_UNAVAILABLE"}
+	if err := verifyPhase17APKMarkers(phase17APKFixture(t, markers)); err != nil {
+		t.Fatalf("current fail-closed trust status rejected: %v", err)
+	}
+	for _, denied := range []string{"TunPacketLoop", "com/google/firebase/analytics", "InternalConformanceBridge", "Task7InstalledFixtureNative", "Task7MaintenanceFixtureNative", "AndroidPlatformConformanceV1"} {
+		t.Run(denied, func(t *testing.T) {
+			if err := verifyPhase17APKMarkers(phase17APKFixture(t, append(append([]string(nil), markers...), denied))); err == nil {
+				t.Fatalf("internal or predecessor implementation accepted: %s", denied)
+			}
+		})
+	}
+	for _, missing := range []string{"nativeProdOpenV1", "nativeMaintenanceOpenV1", "nativeRuntimeSocketCommitProtected"} {
+		if err := verifyPhase17APKMarkers(phase17APKFixture(t, removeString(markers, missing))); err == nil {
+			t.Fatalf("missing current implementation accepted: %s", missing)
+		}
+	}
+}
+
+func TestCurrentNativeExportsRequireExactCallableDefinitions(t *testing.T) {
+	expected := []string{"kvpn_prod_open_v1", "Java_example_Bridge_open"}
+	valid := []elf.Symbol{
+		{Name: expected[0], Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)},
+		{Name: expected[1], Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)},
+	}
+	if err := verifyCurrentNativeExports(valid, expected); err != nil {
+		t.Fatal(err)
+	}
+	globalVersion := append([]elf.Symbol(nil), valid...)
+	globalVersion[0].HasVersion = true
+	globalVersion[0].VersionIndex = 1 // ELF VER_NDX_GLOBAL, not a named symbol version.
+	if err := verifyCurrentNativeExports(globalVersion, expected); err != nil {
+		t.Fatalf("ordinary global version-table entry rejected: %v", err)
+	}
+	for name, mutate := range map[string]func([]elf.Symbol) []elf.Symbol{
+		"missing":   func(s []elf.Symbol) []elf.Symbol { return s[:1] },
+		"duplicate": func(s []elf.Symbol) []elf.Symbol { return append(s, s[0]) },
+		"internal helper": func(s []elf.Symbol) []elf.Symbol {
+			return append(s, elf.Symbol{Name: "kvpn_go_unexpected_v1", Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)})
+		},
+		"foreign JNI": func(s []elf.Symbol) []elf.Symbol {
+			return append(s, elf.Symbol{Name: "Java_other_Bridge_open", Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)})
+		},
+		"undefined": func(s []elf.Symbol) []elf.Symbol { s[0].Section = elf.SHN_UNDEF; return s },
+		"object": func(s []elf.Symbol) []elf.Symbol {
+			s[0].Info = byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_OBJECT)
+			return s
+		},
+		"weak":           func(s []elf.Symbol) []elf.Symbol { s[0].Info = byte(elf.STB_WEAK)<<4 | byte(elf.STT_FUNC); return s },
+		"hidden":         func(s []elf.Symbol) []elf.Symbol { s[0].Other = byte(elf.STV_HIDDEN); return s },
+		"versioned":      func(s []elf.Symbol) []elf.Symbol { s[0].HasVersion = true; s[0].VersionIndex = 2; return s },
+		"local version":  func(s []elf.Symbol) []elf.Symbol { s[0].HasVersion = true; return s },
+		"hidden version": func(s []elf.Symbol) []elf.Symbol { s[0].HasVersion = true; s[0].VersionIndex = 0x8001; return s },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := verifyCurrentNativeExports(mutate(append([]elf.Symbol(nil), valid...)), expected); err == nil {
+				t.Fatal("unsafe native export set accepted")
+			}
+		})
+	}
+}
+
+func TestCurrentNativeVariantRejectsConformanceInRelease(t *testing.T) {
+	for _, internal := range []bool{false, true} {
+		bridge, jni := currentNativeSymbols(internal)
+		for _, pair := range []struct {
+			names   []string
+			control string
+		}{
+			{bridge, "kvpn_runtime_session_roundtrip"},
+			{jni, "Java_org_kurdistanvpn_core_nativejni_InternalConformanceBridge_nativeRuntimeSessionRoundTrip"},
+		} {
+			var symbols []elf.Symbol
+			for _, name := range pair.names {
+				if name != pair.control {
+					symbols = append(symbols, elf.Symbol{Name: name, Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)})
+				}
+			}
+			if !internal {
+				symbols = append(symbols, elf.Symbol{Name: pair.control, Section: 1, Info: byte(elf.STB_GLOBAL)<<4 | byte(elf.STT_FUNC)})
+			}
+			if err := verifyCurrentNativeExports(symbols, pair.names); err == nil {
+				t.Fatalf("variant mismatch accepted, internal=%t", internal)
+			}
+		}
+	}
+}
+
 func TestPhase17APKRequiresProtectedLivePathAndRejectsPredecessorMarkers(t *testing.T) {
 	valid := phase17APKFixture(t, phase17RequiredAPKMarkers)
-	if err := verifyPhase17APKMarkers(valid); err != nil {
+	if err := verifyAPKMarkers(valid, phase17RequiredAPKMarkers, phase17ForbiddenAPKMarkers); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, forbidden := range phase17ForbiddenAPKMarkers {
 		t.Run("reject_"+strings.NewReplacer("/", "_", ".", "_").Replace(forbidden), func(t *testing.T) {
 			artifact := phase17APKFixture(t, append(append([]string(nil), phase17RequiredAPKMarkers...), forbidden))
-			if err := verifyPhase17APKMarkers(artifact); err == nil {
+			if err := verifyAPKMarkers(artifact, phase17RequiredAPKMarkers, phase17ForbiddenAPKMarkers); err == nil {
 				t.Fatalf("forbidden APK marker %q was accepted", forbidden)
 			}
 		})
@@ -257,7 +345,7 @@ func TestPhase17APKRequiresProtectedLivePathAndRejectsPredecessorMarkers(t *test
 	for _, missing := range phase17RequiredAPKMarkers {
 		t.Run("missing_"+missing, func(t *testing.T) {
 			artifact := phase17APKFixture(t, removeString(phase17RequiredAPKMarkers, missing))
-			if err := verifyPhase17APKMarkers(artifact); err == nil {
+			if err := verifyAPKMarkers(artifact, phase17RequiredAPKMarkers, phase17ForbiddenAPKMarkers); err == nil {
 				t.Fatalf("APK without %q was accepted", missing)
 			}
 		})
