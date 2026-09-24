@@ -345,7 +345,7 @@ private fun RecoveryTextButton(
 
 @Composable
 internal fun AppearanceControls(settings: ProductSettings, onTheme: (ThemePreference) -> Unit,
-    onHighContrast: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit) {
+    onHighContrast: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, enabled: Boolean = true) {
     val highContrastLabel = stringResource(UiR.string.high_contrast)
     val reducedMotionLabel = stringResource(UiR.string.reduced_motion)
 
@@ -356,7 +356,7 @@ internal fun AppearanceControls(settings: ProductSettings, onTheme: (ThemePrefer
                         ThemePreference.LIGHT -> UiR.string.uiux_theme_light
                         ThemePreference.DARK -> UiR.string.uiux_theme_dark
                     })
-                    FilterChip(border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), selected = settings.theme == theme, onClick = { onTheme(theme) },
+                    FilterChip(enabled = enabled, border = BorderStroke(LocalEssentialBoundaryWidth.current, MaterialTheme.colorScheme.outline), selected = settings.theme == theme, onClick = { onTheme(theme) },
                         label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp).testTag("theme_${theme.name}"))
                 }
             }
@@ -365,6 +365,7 @@ internal fun AppearanceControls(settings: ProductSettings, onTheme: (ThemePrefer
                 .fillMaxWidth().heightIn(min = 56.dp)
                 .semantics { contentDescription = highContrastLabel }
                 .toggleable(
+                    enabled = enabled,
                     value = settings.highContrast,
                     role = Role.Switch,
                     onValueChange = onHighContrast,
@@ -387,6 +388,7 @@ internal fun AppearanceControls(settings: ProductSettings, onTheme: (ThemePrefer
                 .fillMaxWidth().heightIn(min = 56.dp)
                 .semantics { contentDescription = reducedMotionLabel }
                 .toggleable(
+                    enabled = enabled,
                     value = settings.reducedMotion,
                     role = Role.Switch,
                     onValueChange = onReducedMotion,

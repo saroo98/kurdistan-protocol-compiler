@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,6 +42,9 @@ import org.kurdistanvpn.feature.home.HomeScreen
 import org.kurdistanvpn.feature.profiles.ProfilesScreen
 import org.kurdistanvpn.feature.profiles.ImportPreviewScreen
 import org.kurdistanvpn.feature.settingsrecovery.SettingsRecoveryScreen
+import org.kurdistanvpn.feature.settingsrecovery.AppearanceSettingsScreen
+import org.kurdistanvpn.feature.settingsrecovery.SettingsEditorState
+import org.kurdistanvpn.feature.settingsrecovery.SettingsEditorPhase
 import org.kurdistanvpn.runtime.api.VpnRuntimeSnapshot
 import org.kurdistanvpn.runtime.api.VpnRuntimeState
 
@@ -55,6 +59,32 @@ class Phase11ControlSurfaceDeviceTest {
     fun configureHostedEmulatorIdlingBudget() {
         IdlingPolicies.setMasterPolicyTimeout(2, TimeUnit.MINUTES)
         IdlingPolicies.setIdlingResourceTimeout(2, TimeUnit.MINUTES)
+    }
+
+    @Test
+    fun appearanceWaitsForItsDraftBeforeAcceptingEdits() {
+        val loaded = ProductSettings(profiles = ProfilePreferences(activeLocalRecordId = "selected-profile"))
+        val revision = org.kurdistanvpn.domain.SettingsRevision(1, loaded)
+        val draft = org.kurdistanvpn.domain.SettingsDraft(org.kurdistanvpn.core.model.CatalogId("appearance-draft"), revision)
+        var editor by mutableStateOf(SettingsEditorState(phase = SettingsEditorPhase.LOADING))
+        var edited: ProductSettings? = null
+        compose.setContent {
+            AppearanceSettingsScreen(ProductSettings(), editor, { edited = it }, {}, {}, {})
+        }
+        val contrast = compose.onNodeWithContentDescription(context.getString(UiR.string.high_contrast))
+        compose.onNodeWithTag("theme_DARK").assertIsNotEnabled()
+        contrast.assertIsNotEnabled()
+        compose.onNodeWithContentDescription(context.getString(UiR.string.reduced_motion)).assertIsNotEnabled()
+        compose.runOnIdle { editor = SettingsEditorState(SettingsEditorPhase.EDITING, draft, loaded, revision) }
+        contrast.performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(loaded.copy(highContrast = true), edited) }
+        compose.runOnIdle {
+            editor = SettingsEditorState(phase = SettingsEditorPhase.APPLIED,
+                applied = revision.copy(revision = 2, settings = loaded.copy(highContrast = true)))
+            edited = null
+        }
+        contrast.performClick()
+        compose.runOnIdle { assertEquals(loaded, edited) }
     }
 
     @Test
