@@ -121,6 +121,7 @@ type nonceDirectionStateV1 struct {
 	mu        sync.Mutex
 	config    nonceDirectionConfigV1
 	sequences map[uint16]nonceSequenceStateV1
+	fixed     []nonceSequenceStateV1
 }
 
 // ClientNonceOwnerV1 fixes client outbound to c2s and expected inbound to s2c.
@@ -136,11 +137,15 @@ type RelayNonceOwnerV1 struct {
 }
 
 func NewClientNonceOwnerV1(schedule KeySchedule, mode string) (*ClientNonceOwnerV1, error) {
+	return newClientNonceOwnerV1(schedule, mode, false)
+}
+
+func newClientNonceOwnerV1(schedule KeySchedule, mode string, bounded bool) (*ClientNonceOwnerV1, error) {
 	material, err := nonceOwnerMaterialFromScheduleV1(schedule, mode)
 	if err != nil {
 		return nil, err
 	}
-	outbound, err := newNonceDirectionStateV1(material.epoch, DirectionClientToRelayV1, material.clientToRelay[:], mode)
+	outbound, err := newNonceDirectionBackendV1(material.epoch, DirectionClientToRelayV1, material.clientToRelay[:], mode, bounded)
 	if err != nil {
 		return nil, ErrNonceMismatch
 	}
@@ -152,11 +157,15 @@ func NewClientNonceOwnerV1(schedule KeySchedule, mode string) (*ClientNonceOwner
 }
 
 func NewRelayNonceOwnerV1(schedule KeySchedule, mode string) (*RelayNonceOwnerV1, error) {
+	return newRelayNonceOwnerV1(schedule, mode, false)
+}
+
+func newRelayNonceOwnerV1(schedule KeySchedule, mode string, bounded bool) (*RelayNonceOwnerV1, error) {
 	material, err := nonceOwnerMaterialFromScheduleV1(schedule, mode)
 	if err != nil {
 		return nil, err
 	}
-	outbound, err := newNonceDirectionStateV1(material.epoch, DirectionRelayToClientV1, material.relayToClient[:], mode)
+	outbound, err := newNonceDirectionBackendV1(material.epoch, DirectionRelayToClientV1, material.relayToClient[:], mode, bounded)
 	if err != nil {
 		return nil, ErrNonceMismatch
 	}
@@ -274,11 +283,21 @@ func (o *RelayNonceOwnerV1) ExpectedInboundApplicationV1(slot uint16, sequence u
 }
 
 func newNonceDirectionStateV1(epoch uint64, direction uint16, base []byte, mode string) (*nonceDirectionStateV1, error) {
+	return newNonceDirectionBackendV1(epoch, direction, base, mode, false)
+}
+
+func newNonceDirectionBackendV1(epoch uint64, direction uint16, base []byte, mode string, bounded bool) (*nonceDirectionStateV1, error) {
 	config, err := newNonceDirectionConfigV1(epoch, direction, base, mode)
 	if err != nil {
 		return nil, err
 	}
-	return &nonceDirectionStateV1{config: config, sequences: make(map[uint16]nonceSequenceStateV1)}, nil
+	state := &nonceDirectionStateV1{config: config}
+	if bounded {
+		state.fixed = make([]nonceSequenceStateV1, nonceDomainsV3(mode))
+	} else {
+		state.sequences = make(map[uint16]nonceSequenceStateV1)
+	}
+	return state, nil
 }
 
 func newNonceDirectionConfigV1(epoch uint64, direction uint16, base []byte, mode string) (nonceDirectionConfigV1, error) {
@@ -347,6 +366,9 @@ func (s *nonceDirectionStateV1) allocateV1(class nonceRecordClassV1, slot uint16
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.sequences[stateSlot]
+	if s.fixed != nil {
+		state = s.fixed[stateSlot]
+	}
 	if state.exhausted {
 		return NonceAllocationV1{}, ErrNonceExhausted
 	}
@@ -356,7 +378,11 @@ func (s *nonceDirectionStateV1) allocateV1(class nonceRecordClassV1, slot uint16
 	} else {
 		state.next++
 	}
-	s.sequences[stateSlot] = state
+	if s.fixed != nil {
+		s.fixed[stateSlot] = state
+	} else {
+		s.sequences[stateSlot] = state
+	}
 
 	nonce, err := deriveNonceV1(s.config, slot, sequence)
 	if err != nil {
