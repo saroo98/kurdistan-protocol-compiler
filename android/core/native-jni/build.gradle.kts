@@ -29,6 +29,7 @@ android {
             externalNativeBuild.cmake {
                 abiFilters += setOf("arm64-v8a", "x86_64")
                 arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("debug")}"
+                arguments += "-DKVPN_ANDROID_PLATFORM_INTERNAL_V1=OFF"
             }
         }
         create("internal") {
@@ -41,6 +42,7 @@ android {
             externalNativeBuild.cmake {
                 abiFilters += setOf("arm64-v8a", "x86_64")
                 arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("internal")}"
+                arguments += "-DKVPN_ANDROID_PLATFORM_INTERNAL_V1=ON"
             }
         }
         release {
@@ -50,6 +52,7 @@ android {
             externalNativeBuild.cmake {
                 abiFilters += "arm64-v8a"
                 arguments += "-DKVPN_GO_BRIDGE_ROOT=${generatedGoRoot.get().asFile.resolve("release")}"
+                arguments += "-DKVPN_ANDROID_PLATFORM_INTERNAL_V1=OFF"
             }
         }
     }
@@ -67,6 +70,7 @@ android {
 
 dependencies {
     implementation(project(":core:native-api"))
+    testImplementation(libs.junit4)
 }
 
 fun ndkHostTag(): String =
@@ -119,7 +123,7 @@ fun registerGoBridge(buildType: String, internalTrust: Boolean, abi: AndroidGoAb
         val output = outputDirectory.resolve("libkurdistan_bridge.so")
         val header = outputDirectory.resolve("libkurdistan_bridge.h")
         inputs.files(
-            fileTree(repositoryRoot.resolve("cmd/kandroidbridge")) { include("**/*.go") },
+            fileTree(repositoryRoot.resolve("cmd/kandroidbridge")) { include("**/*.go", "**/*.c", "**/*.h") },
             fileTree(repositoryRoot.resolve("internal")) { include("**/*.go") },
             repositoryRoot.resolve("go.mod"),
             repositoryRoot.resolve("go.sum"),

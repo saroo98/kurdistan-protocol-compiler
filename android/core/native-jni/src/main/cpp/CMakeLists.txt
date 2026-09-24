@@ -19,7 +19,30 @@ set_target_properties(
     IMPORTED_SONAME "libkurdistan_bridge.so"
 )
 
-add_library(kurdistan_jni SHARED kvpn_jni.c kvpn_durable_fs.c kvpn_durable_fs_jni.c)
+add_library(kurdistan_jni SHARED kvpn_jni.c kvpn_durable_fs.c kvpn_durable_fs_jni.c kvpn_output_gate_v1.c kvpn_bootstrap_binding_jni.c kvpn_android_callbacks.c kvpn_tun_proof.c kvpn_production_facade_v1.c kvpn_production_jni_v1.c kvpn_production_spans_v1.c)
+target_sources(kurdistan_jni PRIVATE kvpn_stream_facade_v1.c kvpn_stream_jni_v1.c kvpn_platform_finalize_v1.c)
+target_sources(kurdistan_jni PRIVATE kvpn_maintenance_facade_v1.c kvpn_maintenance_jni_v1.c)
+
+if(KVPN_ANDROID_PLATFORM_INTERNAL_V1)
+    configure_file(../../internal/cpp/kvpn_task7_maintenance_fixture_jni.c
+        "${CMAKE_CURRENT_BINARY_DIR}/task7_maintenance_fixture.c" COPYONLY)
+    target_sources(kurdistan_jni PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/task7_maintenance_fixture.c")
+    configure_file(../../internal/cpp/kvpn_task7_installed_fixture_jni.c
+        "${CMAKE_CURRENT_BINARY_DIR}/task7_installed_fixture.c" COPYONLY)
+    target_sources(kurdistan_jni PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/task7_installed_fixture.c")
+    # A build-owned copy avoids Ninja encoding this outside-source-tree file's
+    # absolute Windows path into its object path. CMake tracks the original input.
+    configure_file(../../internal/cpp/kvpn_android_platform_conformance.c
+        "${CMAKE_CURRENT_BINARY_DIR}/platform_vm.c" COPYONLY)
+    target_sources(kurdistan_jni PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/platform_vm.c")
+    configure_file(../../internal/cpp/kvpn_conformance_internal_jni.c
+        "${CMAKE_CURRENT_BINARY_DIR}/conformance_internal.c" COPYONLY)
+    target_sources(kurdistan_jni PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/conformance_internal.c")
+    target_compile_definitions(kurdistan_jni PRIVATE KVPN_ANDROID_PLATFORM_INTERNAL_V1=1)
+endif()
+target_include_directories(kurdistan_jni PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+target_include_directories(kurdistan_jni PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../cmd/kandroidbridge")
 
 target_compile_features(kurdistan_jni PRIVATE c_std_17)
 target_compile_options(

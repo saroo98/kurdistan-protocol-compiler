@@ -3,6 +3,9 @@
 
 package org.kurdistanvpn.core.nativejni
 
+import org.kurdistanvpn.core.nativeapi.NativeOpeningSnapshot
+import org.kurdistanvpn.core.nativeapi.NativeProductResult
+
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.kurdistanvpn.core.model.OperationError
@@ -20,12 +23,14 @@ import org.kurdistanvpn.core.nativeapi.NativeLiveRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.NativePayloadProtocol
 import org.kurdistanvpn.core.nativeapi.NativeRecipient
 import org.kurdistanvpn.core.nativeapi.NativeResult
+import org.kurdistanvpn.core.nativeapi.NativeBootstrapValidator
+import org.kurdistanvpn.core.nativeapi.NativeBootstrapMaterialV1
 import org.kurdistanvpn.core.nativeapi.NativeRoute
 import org.kurdistanvpn.core.nativeapi.NativeRuntimeSession
 import org.kurdistanvpn.core.nativeapi.NativeRuntimeSessionSnapshot
 import org.kurdistanvpn.core.nativeapi.NativeRuntimeState
 import org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
 import org.kurdistanvpn.core.model.PerAppSelectionMode
 import org.kurdistanvpn.core.model.SelectionMode
@@ -122,7 +127,117 @@ private fun NativeLiveRuntimeSessionSnapshot.copyOwnedSnapshot() = copy(
     payloadProtocols = payloadProtocols.toSet(),
 )
 
-class NativeBridge : KurdNativeCore {
+class NativeBridge : KurdNativeCore, NativeBootstrapValidator {
+    private val productionStreamCallsV1 = object : ProductionNativeStreamCallsV1 {
+        override fun send(parent: Long, child: Long, input: ByteBuffer, position: Int, limit: Int) = nativeStreamSendV1(parent,child,input,position,limit)
+        override fun receive(parent: Long, child: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray) = nativeStreamReceiveV1(parent,child,output,position,limit,metadata)
+        override fun confirm(parent: Long, child: Long, token: Long, length: Long) = nativeStreamConfirmV1(parent,child,token,length)
+        override fun reject(parent: Long, child: Long, token: Long) = nativeStreamRejectV1(parent,child,token)
+        override fun halfClose(parent: Long, child: Long) = nativeStreamHalfCloseV1(parent,child)
+        override fun cancel(parent: Long, child: Long) = nativeStreamCancelV1(parent,child)
+        override fun close(parent: Long, child: Long) = nativeStreamCloseV1(parent,child)
+    }
+    private val productionCallsV1 = object : ProductionNativeCallsV1 {
+        override fun runProbe(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray) =
+            nativeProdRunProbeV1(parent,request,position,limit,output,outputPosition,outputLimit,metadata)
+        override fun openStream(parent: Long, request: ByteBuffer, position: Int, limit: Int, metadata: LongArray) =
+            nativeProdOpenStreamV1(parent,request,position,limit,metadata)
+        override fun receivePacket(parent: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray) =
+            nativeProdReceivePacketV1(parent, output, position, limit, metadata)
+        override fun nextControl(parent: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray) =
+            nativeProdNextControlV1(parent, output, position, limit, metadata)
+        override fun submitPacket(parent: Long, input: ByteBuffer, position: Int, limit: Int) =
+            nativeProdSubmitPacketV1(parent, input, position, limit)
+        override fun confirmSocket(parent: Long, token: Long, protected: Int, hasNetwork: Int, network: Long) =
+            nativeProdConfirmSocketV1(parent, token, protected, hasNetwork, network)
+        override fun confirmPacket(parent: Long, token: Long, length: Long) = nativeProdConfirmPacketV1(parent, token, length)
+        override fun rejectPacket(parent: Long, token: Long) = nativeProdRejectPacketV1(parent, token)
+        override fun reconnect(parent: Long, reason: Int) = nativeProdReconnectV1(parent, reason)
+        override fun handover(parent: Long, hasNetwork: Int, network: Long) = nativeProdHandoverV1(parent, hasNetwork, network)
+    }
+
+    private val maintenanceCallsV1 = object : ProductionNativeMaintenanceCallsV1 {
+        override fun runProbe(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray) =
+            nativeMaintenanceRunProbeV1(parent,request,position,limit,output,outputPosition,outputLimit,metadata)
+        override fun checkUpdate(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray) =
+            nativeMaintenanceCheckUpdateV1(parent,request,position,limit,output,outputPosition,outputLimit,metadata)
+        override fun materialize(parent: Long, candidate: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray) =
+            nativeMaintenanceMaterializeV1(parent,candidate,output,position,limit,metadata)
+        override fun release(parent: Long, candidate: Long) = nativeMaintenanceReleaseUpdateV1(parent,candidate)
+    }
+
+    internal fun openMaintenanceOwnerV1(delegate: AndroidProductionPlatformDelegateV1,
+        owner: Long, lease: Long, adopt: (java.io.Closeable) -> Unit, failedOpening: () -> Unit): NativeProductResult<ProductionNativeMaintenanceV1> =
+        openMaintenanceCapturedV1(delegate, owner,
+            nativeOpen = { request, metadata -> nativeMaintenanceOpenV1(request,request.position(),request.limit(),lease,metadata) },
+            cancel = ::nativeMaintenanceCancelV1, close = ::nativeMaintenanceCloseV1,
+            adopt = adopt, failedOpening = failedOpening) { parent, generation ->
+                ProductionNativeMaintenanceV1(parent,generation,maintenanceCallsV1,delegate.bindDisconnectedSelectors(owner))
+            }
+
+    internal fun openProductionOwnerV1(delegate: AndroidProductionPlatformDelegateV1,
+        owner: Long, lease: Long, adopt: (java.io.Closeable) -> Unit, failedOpening: () -> Unit): NativeProductResult<ProductionNativeSessionV1> =
+        openCapturedProductionV1(delegate, owner, lease, adopt, failedOpening) { snapshot, parent ->
+            val digest=snapshot.planDigest
+            val binding=try { delegate.bindActiveSelectors(owner,snapshot.profileGeneration.toLong(),digest) }
+                finally {digest.fill(0)}
+            ProductionNativeSessionV1(snapshot, parent, productionCallsV1,binding) { ProductionNativeStreamV1(it,productionStreamCallsV1) }
+        }
+
+    internal fun <T> openCapturedProductionV1(delegate: AndroidProductionPlatformDelegateV1,
+        owner: Long, lease: Long, adopt: (java.io.Closeable) -> Unit, failedOpening: () -> Unit,
+        construct: (NativeOpeningSnapshot, ProductionNativeParentV1) -> T): NativeProductResult<T> =
+        openProductionCapturedV1(delegate, owner,
+            nativeOpen = { request, output, metadata ->
+                nativeProdOpenV1(request, request.position(), request.limit(), lease,
+                    output, output.position(), output.limit(), metadata)
+            }, cancel = ::nativeProdCancelV1, close = ::nativeProdCloseV1,
+            adopt = adopt, failedOpening = failedOpening, construct = construct)
+
+    private external fun nativeProdOpenV1(request: ByteBuffer, position: Int, limit: Int, privatePlatformLease: Long, snapshot: ByteBuffer, snapshotPosition: Int, snapshotLimit: Int, metadata: LongArray): Int
+    private external fun nativeProdNextControlV1(parent: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray): Int
+    private external fun nativeProdConfirmSocketV1(parent: Long, token: Long, protected: Int, hasNetwork: Int, network: Long): Int
+    private external fun nativeProdSubmitPacketV1(parent: Long, packet: ByteBuffer, position: Int, limit: Int): Int
+    private external fun nativeProdReceivePacketV1(parent: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray): Int
+    private external fun nativeProdConfirmPacketV1(parent: Long, token: Long, deliveredLength: Long): Int
+    private external fun nativeProdRejectPacketV1(parent: Long, token: Long): Int
+    private external fun nativeProdOpenStreamV1(parent: Long, request: ByteBuffer, position: Int, limit: Int, metadata: LongArray): Int
+    private external fun nativeProdRunProbeV1(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray): Int
+    private external fun nativeProdReconnectV1(parent: Long, reason: Int): Int
+    private external fun nativeProdHandoverV1(parent: Long, hasNetwork: Int, network: Long): Int
+    private external fun nativeProdCancelV1(parent: Long): Int
+    private external fun nativeProdCloseV1(parent: Long): Int
+    private external fun nativeStreamSendV1(parent: Long, child: Long, input: ByteBuffer, position: Int, limit: Int): Int
+    private external fun nativeStreamReceiveV1(parent: Long, child: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray): Int
+    private external fun nativeStreamConfirmV1(parent: Long, child: Long, token: Long, deliveredLength: Long): Int
+    private external fun nativeStreamRejectV1(parent: Long, child: Long, token: Long): Int
+    private external fun nativeStreamHalfCloseV1(parent: Long, child: Long): Int
+    private external fun nativeStreamCancelV1(parent: Long, child: Long): Int
+    private external fun nativeStreamCloseV1(parent: Long, child: Long): Int
+    private external fun nativeMaintenanceOpenV1(request: ByteBuffer, position: Int, limit: Int, privatePlatformLease: Long, metadata: LongArray): Int
+    private external fun nativeMaintenanceCheckUpdateV1(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray): Int
+    private external fun nativeMaintenanceMaterializeV1(parent: Long, candidate: Long, output: ByteBuffer, position: Int, limit: Int, metadata: LongArray): Int
+    private external fun nativeMaintenanceReleaseUpdateV1(parent: Long, candidate: Long): Int
+    private external fun nativeMaintenanceRunProbeV1(parent: Long, request: ByteBuffer, position: Int, limit: Int, output: ByteBuffer, outputPosition: Int, outputLimit: Int, metadata: LongArray): Int
+    private external fun nativeMaintenanceCancelV1(parent: Long): Int
+    private external fun nativeMaintenanceCloseV1(parent: Long): Int
+    override fun readLegacyBinding(material: NativeBootstrapMaterialV1, legacyPolicy: ByteBuffer) =
+        BootstrapBindingCallsV1.legacy(material, legacyPolicy, ::mapError) { input, facts, _, _, _ ->
+            nativeBootstrapLegacyBindingV1(input[0], input[1], input[2], input[3], input[4], facts)
+        }
+
+    override fun readProductionBinding(material: NativeBootstrapMaterialV1, settings: ByteBuffer) =
+        BootstrapBindingCallsV1.production(material, settings) { input, facts, active, disconnected, metadata ->
+            nativeBootstrapProductionBindingV1(input[0], input[1], input[2], input[3], input[4], facts,
+                checkNotNull(active), checkNotNull(disconnected), checkNotNull(metadata))
+        }
+
+    private external fun nativeBootstrapLegacyBindingV1(verify: ByteBuffer, activation: ByteBuffer,
+        recipient: ByteBuffer, privateKey: ByteBuffer, policy: ByteBuffer, facts: ByteBuffer): Int
+    private external fun nativeBootstrapProductionBindingV1(verify: ByteBuffer, activation: ByteBuffer,
+        recipient: ByteBuffer, privateKey: ByteBuffer, settings: ByteBuffer, facts: ByteBuffer,
+        active: ByteBuffer, disconnected: ByteBuffer, metadata: ByteBuffer): Int
+
     override fun compatibility(): NativeResult<NativeCompatibility> {
         val output = ByteBuffer.allocateDirect(MAX_ABI_BYTES)
         val length = IntArray(1)
@@ -163,14 +278,13 @@ class NativeBridge : KurdNativeCore {
         }
         val output = ByteBuffer.allocateDirect(MAX_PREVIEW_BYTES)
         val metadata = LongArray(2)
+        try {
         val code = nativeVerifyPreview(request, output, metadata)
         if (code != CODE_OK) return NativeResult.Failure(mapError(code))
-        val preview = decodePreview(readBytes(output, metadata[1].toInt()))
-        return when (preview) {
-            is NativeResult.Failure -> preview
-            is NativeResult.Success ->
-                NativeResult.Success(VerifiedPreviewHandle(metadata[0], preview.value))
+        return decodePreview(readBytes(output, metadata[1].toInt()), metadata[0]).also {
+            if (it is NativeResult.Failure) nativeFree(metadata[0])
         }
+        } finally { for (index in 0 until output.capacity()) output.put(index, 0) }
     }
 
     override fun verifyPreviewWithRecipient(
@@ -186,6 +300,7 @@ class NativeBridge : KurdNativeCore {
         }
         val output = ByteBuffer.allocateDirect(MAX_PREVIEW_BYTES)
         val metadata = LongArray(2)
+        try {
         val code = nativeVerifyPreviewWithRecipient(
             request,
             recipientRequest,
@@ -194,15 +309,14 @@ class NativeBridge : KurdNativeCore {
             metadata,
         )
         if (code != CODE_OK) return NativeResult.Failure(mapError(code))
-        return when (val preview = decodePreview(readBytes(output, metadata[1].toInt()))) {
+        return when (val preview = decodePreview(readBytes(output, metadata[1].toInt()), metadata[0])) {
             is NativeResult.Failure -> {
                 nativeFree(metadata[0])
                 preview
             }
-            is NativeResult.Success -> NativeResult.Success(
-                VerifiedPreviewHandle(metadata[0], preview.value),
-            )
+            is NativeResult.Success -> preview
         }
+        } finally { for (index in 0 until output.capacity()) output.put(index, 0) }
     }
 
     override fun openActivation(verified: VerifiedPreviewHandle): NativeResult<NativeActivationSession> {
@@ -216,7 +330,7 @@ class NativeBridge : KurdNativeCore {
     }
 
     override fun releaseVerified(verified: VerifiedPreviewHandle): NativeResult<Unit> =
-        unitResult(nativeFree(verified.handle))
+        try { unitResult(nativeFree(verified.handle)) } finally { verified.close() }
 
     override fun prepareDiagnostic(request: ByteArray): NativeResult<DiagnosticPreviewHandle> {
         val handle = LongArray(1)
@@ -293,19 +407,6 @@ class NativeBridge : KurdNativeCore {
         }
     }
 
-    override fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray> {
-        if (payload.isEmpty() || payload.size > MAX_PHASE11_PAYLOAD_BYTES) {
-            return NativeResult.Failure(OperationError.SIZE_LIMIT)
-        }
-        val output = ByteBuffer.allocateDirect(MAX_PHASE11_PAYLOAD_BYTES)
-        val length = IntArray(1)
-        val code = nativePhase11RoundTrip(payload, output, length)
-        return if (code == CODE_OK) {
-            NativeResult.Success(readBytes(output, length[0]))
-        } else {
-            NativeResult.Failure(mapError(code))
-        }
-    }
 
     override fun openRuntimeSession(request: ByteArray): NativeResult<NativeRuntimeSession> {
         if (request.isEmpty() || request.size > MAX_RUNTIME_OPEN_BYTES) {
@@ -455,20 +556,6 @@ class NativeBridge : KurdNativeCore {
     ) : NativeRuntimeSession {
         private var closed = false
 
-        override fun roundTrip(payload: ByteArray): NativeResult<ByteArray> {
-            if (closed) return NativeResult.Failure(OperationError.CANCELLED)
-            if (payload.isEmpty() || payload.size > MAX_PHASE11_PAYLOAD_BYTES) {
-                return NativeResult.Failure(OperationError.SIZE_LIMIT)
-            }
-            val output = ByteBuffer.allocateDirect(MAX_PHASE11_PAYLOAD_BYTES)
-            val length = IntArray(1)
-            val code = nativeRuntimeSessionRoundTrip(handle, payload, output, length)
-            return if (code == CODE_OK) {
-                NativeResult.Success(readBytes(output, length[0]))
-            } else {
-                NativeResult.Failure(mapError(code))
-            }
-        }
 
         override fun cancel(): NativeResult<Unit> {
             if (closed) return NativeResult.Failure(OperationError.CANCELLED)
@@ -684,21 +771,10 @@ class NativeBridge : KurdNativeCore {
         output: ByteBuffer,
         outputLength: IntArray,
     ): Int
-    private external fun nativePhase11RoundTrip(
-        input: ByteArray,
-        output: ByteBuffer,
-        outputLength: IntArray,
-    ): Int
     private external fun nativeRuntimeSessionOpen(
         input: ByteArray,
         output: ByteBuffer,
         metadata: LongArray,
-    ): Int
-    private external fun nativeRuntimeSessionRoundTrip(
-        handle: Long,
-        input: ByteArray,
-        output: ByteBuffer,
-        outputLength: IntArray,
     ): Int
     private external fun nativeRuntimeSessionOpenV2(
         input: ByteArray,
@@ -727,7 +803,6 @@ class NativeBridge : KurdNativeCore {
         private const val MAX_RUNTIME_OPEN_V2_BYTES =
             1_500_000 + 1_200_000 + MAX_RECIPIENT_REQUEST_BYTES + MAX_RECIPIENT_PRIVATE_BYTES + 32 * 1024
         private const val MAX_RUNTIME_SNAPSHOT_BYTES = 32 * 1024
-        private const val MAX_PHASE11_PAYLOAD_BYTES = 32 * 1024
 
         init {
             System.loadLibrary("kurdistan_bridge")
@@ -775,8 +850,10 @@ class NativeBridge : KurdNativeCore {
                 onFailure = { NativeResult.Failure(OperationError.INCOMPATIBLE_NATIVE_CORE) },
             )
 
-        private fun decodePreview(encoded: ByteArray): NativeResult<RedactedProfilePreview> =
+        private fun decodePreview(encoded: ByteArray, handle: Long): NativeResult<VerifiedPreviewHandle> =
             runCatching {
+                val fields = mutableListOf<ByteArray>()
+                try {
                 val reader = BinaryReader(encoded)
                 require(reader.ascii(4) == "KVP2")
                 val artifactClass = reader.boundedString()
@@ -784,12 +861,12 @@ class NativeBridge : KurdNativeCore {
                 val contentFingerprint = reader.boundedString()
                 val lineageFingerprint = reader.boundedString()
                 val deploymentFingerprint = reader.boundedString()
-                val relayEndpointSummary = reader.boundedString()
-                val authorityScope = reader.boundedString()
-                val updateLocation = reader.boundedString()
+                val relayEndpointSummary = reader.fixedBytes(reader.u8()).also(fields::add)
+                val authorityScope = reader.fixedBytes(reader.u8()).also(fields::add)
+                val updateLocation = reader.fixedBytes(reader.u8()).also(fields::add)
                 val flags = reader.u8()
                 require(flags and 0xf8 == 0)
-                RedactedProfilePreview(
+                val preview = RedactedProfilePreview(
                     artifactClass = artifactClass,
                     audienceClass = audienceClass,
                     contentFingerprint = contentFingerprint,
@@ -798,16 +875,18 @@ class NativeBridge : KurdNativeCore {
                     generation = reader.u64().toULong(),
                     validUntilEpochSeconds = reader.i64(),
                     deploymentFingerprint = deploymentFingerprint,
-                    relayEndpointSummary = relayEndpointSummary,
-                    authorityScope = authorityScope,
-                    updateLocation = updateLocation,
+                    relayEndpoint = if (relayEndpointSummary.isEmpty()) org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED else org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
+                    authorityScope = if (authorityScope.contentEquals("deployment-local".encodeToByteArray())) org.kurdistanvpn.core.model.PreviewAuthorityScope.DEPLOYMENT_LOCAL else org.kurdistanvpn.core.model.PreviewAuthorityScope.UNAVAILABLE,
+                    updateSource = if (updateLocation.isEmpty()) org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED else org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
                     ownerControlled = flags and 2 != 0,
                     updatesEnabled = flags and 4 != 0,
                 ).also { require(reader.exhausted()) }
+                VerifiedPreviewHandle(handle, preview, org.kurdistanvpn.core.nativeapi.NativePreviewFields(fields))
+                } finally { fields.forEach { it.fill(0) } }
             }.fold(
                 onSuccess = { NativeResult.Success(it) },
                 onFailure = { NativeResult.Failure(OperationError.INTERNAL_FAILURE) },
-            )
+            ).also { encoded.fill(0) }
 
         private fun decodeRuntimeSnapshot(
             encoded: ByteArray,
@@ -824,8 +903,8 @@ class NativeBridge : KurdNativeCore {
             val ipMode = IpMode.entries.getOrNull(reader.u8() - 1)
                 ?: error("invalid IP mode")
             val dnsMode = when (reader.u8()) {
-                1 -> DnsMode.INTERNAL_TUN
-                2 -> DnsMode.CUSTOM
+                1 -> ResolverPolicy.INTERNAL
+                2 -> ResolverPolicy.CUSTOM
                 else -> error("invalid DNS mode")
             }
             val mtu = reader.u16()
@@ -875,8 +954,8 @@ class NativeBridge : KurdNativeCore {
             val ipMode = IpMode.entries.getOrNull(reader.u8() - 1)
                 ?: error("invalid IP mode")
             val dnsMode = when (reader.u8()) {
-                1 -> DnsMode.INTERNAL_TUN
-                2 -> DnsMode.CUSTOM
+                1 -> ResolverPolicy.INTERNAL
+                2 -> ResolverPolicy.CUSTOM
                 else -> error("invalid DNS mode")
             }
             val mtu = reader.u16()
