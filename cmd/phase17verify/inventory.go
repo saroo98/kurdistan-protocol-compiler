@@ -153,6 +153,9 @@ func validateCurrentDeviceManifest(raw, frozen []byte) (map[string]int, error) {
 		if name == locale {
 			want = 34
 		}
+		if name == "org.kurdistanvpn.app.ProductionProxyServiceDeviceTest#systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled" {
+			want = 36
+		}
 		if lane != want {
 			return nil, fmt.Errorf("current inventory minimum lane changed for %s", name)
 		}

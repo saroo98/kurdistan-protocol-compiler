@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -684,7 +685,14 @@ func TestAndroidDeviceStepsBindTheCurrentRosterForEveryLane(t *testing.T) {
 	for _, api := range []int{26, 34, 36} {
 		step := androidDeviceStep(api)
 		count := 0
+		owned := 0
 		for i, arg := range step.args {
+			if arg == "-owned-emulator-name" {
+				owned++
+				if i+1 >= len(step.args) || step.args[i+1] != fmt.Sprintf("kurdistan_phase17_api%d", api) {
+					t.Fatalf("API %d does not bind its owned emulator: %v", api, step.args)
+				}
+			}
 			if arg == "-expected-tests" {
 				count++
 				if i+1 >= len(step.args) || step.args[i+1] != "android/config/phase18-current-device-tests.txt" {
@@ -694,6 +702,9 @@ func TestAndroidDeviceStepsBindTheCurrentRosterForEveryLane(t *testing.T) {
 		}
 		if count != 1 {
 			t.Fatalf("API %d expected-tests count=%d", api, count)
+		}
+		if owned != 1 {
+			t.Fatalf("API %d owned-emulator count=%d", api, owned)
 		}
 	}
 }
