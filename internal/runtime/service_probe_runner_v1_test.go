@@ -374,6 +374,39 @@ func TestServiceProbeRunnerV1Fix1RelayWorkerCapacityRepliesResource(t *testing.T
 	}
 }
 
+func TestServiceProbeRunnerV1CompletedResultDoesNotSendStaleReset(t *testing.T) {
+	for _, resultSeen := range []bool{false, true} {
+		t.Run(map[bool]string{false: "request-still-in-flight", true: "remote-result-received"}[resultSeen], func(t *testing.T) {
+			c, _, _, _ := pumpPairFixtureV1(t, nil, false)
+			admission, err := c.admitProbeV1(ProbeRequestV1{7, 1, 1000, 2000, 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.probes[0] = serviceProbeSlotV1{handle: 1, id: 1, state: 1, admission: admission, sentAt: serviceTestNowV1, resultSeen: resultSeen}
+			if err = c.finishProbeV1(0, 1, ServiceResourceLimitV1); err != nil {
+				t.Fatal(err)
+			}
+			g := c.probes[0]
+			if g.state != 3 || g.failure != ServiceResourceLimitV1 || g.aggregate.Attempted != 0 {
+				t.Fatal("categorical failure or zero-attempt result lost", g.state, g.failure, g.aggregate)
+			}
+			resets := 0
+			for _, q := range c.queue {
+				if q.state == 2 && q.opcode == ServiceResetV1 && q.id == 1 {
+					resets++
+				}
+			}
+			want := 1
+			if resultSeen {
+				want = 0
+			}
+			if resets != want {
+				t.Fatalf("reset count=%d, want=%d after resultSeen=%v", resets, want, resultSeen)
+			}
+		})
+	}
+}
+
 type pumpGatedDialV1 struct {
 	*pumpLocalNetworkV1
 	entered, release chan struct{}
