@@ -11,7 +11,432 @@ import org.kurdistanvpn.data.settings.SettingsProjectionCodec
 
 internal fun syntheticObjectBinding() = org.kurdistanvpn.data.secure.SecureOperationBinding(ByteArray(32) { 2 }, 2)
 
+/** Independent physical Preferences protobuf, including a wrong-type display Boolean. */
+internal fun legacyWrongTypeDisplayStoredFixture(): ByteArray = listOf("theme" to "INVALID", "high_contrast" to "wrong-type")
+    .fold(byteArrayOf()) { bytes, (key, text) ->
+        val value = byteArrayOf(0x2a, text.length.toByte()) + text.toByteArray(Charsets.US_ASCII)
+        val entry = byteArrayOf(0x0a, key.length.toByte()) + key.toByteArray(Charsets.US_ASCII) + byteArrayOf(0x12, value.size.toByte()) + value
+        bytes + byteArrayOf(0x0a, entry.size.toByte()) + entry
+    }
+
+internal fun invalidLegacyAuthorityFields(): List<Map<String, Any>> = listOf(
+    mapOf("dns_mode" to "CUSTOM"),
+    mapOf("dns_mode" to "CUSTOM", "custom_dns" to ""),
+    mapOf("dns_mode" to "INTERNAL_TUN", "custom_dns" to "1.1.1.1"),
+    mapOf("custom_dns" to "1.1.1.1"),
+    mapOf("dns_mode" to "GOOGLE", "custom_dns" to "1.1.1.1"),
+    mapOf("ip_mode" to "INVALID"), mapOf("ip_mode" to true), mapOf("metered" to "true"),
+    mapOf("dns_mode" to "CUSTOM", "ip_mode" to "IPV6_ONLY", "metered" to true),
+    mapOf("routing_mode" to "INCLUDE_ONLY", "routing_packages" to setOf("bad")),
+    mapOf("routing_mode" to "EXCLUDE_SELECTED", "routing_packages" to setOf("bad")),
+    mapOf("routing_mode" to "INVALID"), mapOf("routing_mode" to true),
+    mapOf("routing_packages" to "private.package"),
+    mapOf("routing_mode" to "ALL_APPS", "routing_packages" to setOf("private.package")),
+    mapOf("routing_packages" to setOf("private.package")),
+    mapOf("routing_mode" to "INCLUDE_ONLY", "routing_packages" to setOf("private.package"), "excluded_cidrs" to setOf("invalid")),
+).map { it + ("active_profile" to "p") }
+
+/** Independent legacy KSP1/Preferences encodings allow malformed pre-existing source fixtures. */
+internal fun legacyAuthorityFixture(fields: Map<String, Any>, physical: Boolean): ByteArray {
+    fun frame(tag: Int, bytes: ByteArray): ByteArray {
+        require(bytes.size < 128)
+        return byteArrayOf(tag.toByte(), bytes.size.toByte()) + bytes
+    }
+    if (physical) return fields.entries.fold(byteArrayOf()) { result, (name, value) ->
+        val encoded = when (value) {
+            is String -> frame(0x2a, value.toByteArray(Charsets.US_ASCII))
+            is Boolean -> byteArrayOf(0x08, if (value) 1 else 0)
+            is Set<*> -> frame(0x32, value.fold(byteArrayOf()) { bytes, member -> bytes + frame(0x0a, (member as String).toByteArray(Charsets.US_ASCII)) })
+            else -> error("Unsupported fixture")
+        }
+        result + frame(0x0a, frame(0x0a, name.toByteArray(Charsets.US_ASCII)) + frame(0x12, encoded))
+    }
+    return java.io.ByteArrayOutputStream().also { output -> java.io.DataOutputStream(output).use { writer ->
+        writer.writeInt(0x4b535031); writer.writeByte(1); writer.writeShort(fields.size)
+        for ((name, value) in fields.toSortedMap()) {
+            writer.writeByte(name.length); writer.writeBytes(name)
+            when (value) {
+                is String -> { writer.writeByte(3); writer.writeUTF(value) }
+                is Boolean -> { writer.writeByte(1); writer.writeBoolean(value) }
+                is Set<*> -> { writer.writeByte(4); writer.writeShort(value.size); value.map { it as String }.sorted().forEach { writer.writeUTF(it) } }
+                else -> error("Unsupported fixture")
+            }
+        }
+    } }.toByteArray()
+}
+
 class ProtectedStateMutationBrokerTest {
+    @Test fun pauseTimerAndSuppressionCommitTogetherAndResumeRemovesBoth() {
+        val state = BrokerFixture()
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductionSettings(2, 0, ProductSettings()).status)
+        val timer = StoredPauseState(100_000, 10_000, 3, 60_000)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyPause(4, 1, timer).status)
+        val paused = state.snapshot()
+        fun read(snapshot: ProtectedStateSnapshot) = ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)
+        assertArrayEquals(timer.encode(), checkNotNull(PauseStateStore.readOnly(read(paused)).load()).encode())
+        assertEquals(PausePolicy.UNTIL_RESUMED, readProductSettings(paused, read(paused)).pausePolicy)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyPause(6, 2, null).status)
+        val resumed = state.snapshot()
+        assertNull(PauseStateStore.readOnly(read(resumed)).load())
+        assertEquals(PausePolicy.NOT_PAUSED, readProductSettings(resumed, read(resumed)).pausePolicy)
+    }
+    @Test fun settingsDraftPreservesTheAuthenticatedProductionBootstrap() = kotlinx.coroutines.runBlocking {
+        val state = BrokerFixture()
+        val requested = ProductSettings(tunnelMode = TunnelMode.TUN_PLUS_PROXY)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductionSettings(2, 0, requested).status)
+        val port = state.broker().settingsPort()
+        val changed = requested.copy(tunnel = requested.tunnel.copy(mtu = 1280))
+        assertTrue(port.validate(4, 1, changed) is org.kurdistanvpn.data.settings.SettingsPortResult.Success)
+        assertTrue(port.apply(4, 1, changed) is org.kurdistanvpn.data.settings.SettingsPortResult.Success)
+        val restored = port.rollback(6)
+        assertTrue(restored is org.kurdistanvpn.data.settings.SettingsPortResult.Success)
+        assertEquals(requested, (restored as org.kurdistanvpn.data.settings.SettingsPortResult.Success).value.requested)
+    }
+    @Test fun productionWriterStageAndJournalFailuresNeverPublishMixedState() {
+        for(stage in 0..3) {
+            val state=BrokerFixture();val original=state.snapshot().settingsBytes()
+            state.beforeObjectWrite={if(state.objectWrites==stage)error("SYNTHETIC_PRODUCTION_STAGE")}
+            assertEquals(ProtectedMutationStatus.DIRTY,state.broker().applyProductionSettings(2,0,ProductSettings(highContrast=true)).status)
+            assertEquals(0,state.projections.publications)
+            state.beforeObjectWrite=null
+            val recovered=state.broker().recoverProductSettingsConfirmed(true)
+            if(stage==0)assertNotEquals(ProtectedMutationStatus.COMMITTED,recovered.status)
+            else {assertEquals(ProtectedMutationStatus.COMMITTED,recovered.status);assertArrayEquals(original,state.snapshot().settingsBytes())}
+        }
+        for(leaf in listOf("journal-control","journal-intent-0000000000000002")) {
+            val state=BrokerFixture()
+            state.storage.beforeReplace={name,_,_->if(name==leaf)error("SYNTHETIC_PRODUCTION_JOURNAL")}
+            assertNotEquals(ProtectedMutationStatus.COMMITTED,state.broker().applyProductionSettings(2,0,ProductSettings()).status)
+            assertEquals(0,state.objectWrites);assertEquals(0,state.projections.publications)
+        }
+    }
+    @Test fun productionWriterInterruptedPublicationRecoversExactVersionedCandidateOrPrior() {
+        for(rollback in listOf(false,true)) for(after in listOf(false,true)) {
+            val state=BrokerFixture()
+            assertEquals(ProtectedMutationStatus.COMMITTED,state.broker().applyProductionSettings(2,0,ProductSettings()).status)
+            val requested=ProductSettings(highContrast=true,updates=UpdatePreferences(intervalHours=12))
+            if(after)state.projections.afterPublish={error("SYNTHETIC_PRODUCTION_PUBLISH")}
+            else state.projections.beforePublish={error("SYNTHETIC_PRODUCTION_PROJECTION")}
+            assertEquals(ProtectedMutationStatus.DIRTY,state.broker().applyProductionSettings(4,1,requested).status)
+            state.projections.beforePublish=null;state.projections.afterPublish=null
+            assertEquals(ProtectedMutationStatus.COMMITTED,state.broker().recoverProductSettingsConfirmed(rollback).status)
+            val snapshot=state.snapshot()
+            val blobs=ReadOnlyProtectedBlobView(snapshot.objects(),{state.objects[it]?.clone()},state.codec,state.key)
+            assertEquals(if(rollback)ProductSettings() else requested,readProductSettings(snapshot,blobs))
+            val raw=blobs.reopen(RuntimeBootstrapRecord.RECORD_ID,SecureDataClass.RUNTIME_BOOTSTRAP)
+            try {val record=RuntimeProductionBootstrapRecord.decode(raw);assertFalse(record.connectable);assertEquals(if(rollback)1L else 2L,record.settingsRevision)}
+            finally{raw.fill(0)}
+        }
+    }
+    @Test fun independentValidAuthorityFixtureOpensDraftWithAndWithoutSelectedOwner() = kotlinx.coroutines.runBlocking {
+        for (active in listOf(false, true)) {
+            val fields: Map<String, Any> = mapOf("dns_mode" to "CUSTOM", "custom_dns" to "1.1.1.1",
+                "ip_mode" to "IPV6_ONLY", "metered" to true, "routing_mode" to "INCLUDE_ONLY", "routing_packages" to setOf("org.synthetic.allowed")) +
+                if (active) mapOf("active_profile" to "profile-kept") else emptyMap()
+            val state = BrokerFixture(pendingReset = active, initialSettings = legacyAuthorityFixture(fields, false))
+            val broker = state.broker()
+            val coordinator = org.kurdistanvpn.data.settings.SettingsApplyCoordinator(broker.settingsPort(), broker.inactiveRuntimePort(), ProtectedUiDraftStore(state.storage))
+            val draft = (coordinator.openDraft() as org.kurdistanvpn.domain.DomainResult.Success).value
+            assertEquals(IpMode.IPV6_ONLY, draft.basedOn.settings.tunnel.ipMode)
+            assertTrue(draft.basedOn.settings.tunnel.metered)
+            assertEquals(if (active) ResolverPolicy.CUSTOM else ResolverPolicy.INTERNAL, draft.basedOn.settings.tunnel.dnsMode)
+            assertEquals(PerAppSelectionMode.INCLUDE_ONLY, draft.basedOn.settings.routing.mode)
+            assertEquals(setOf("org.synthetic.allowed"), draft.basedOn.settings.routing.packages)
+            assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+        }
+    }
+    @Test fun malformedCommittedAuthorityCannotOpenDraftOrWriteNormalizedReplacement() = kotlinx.coroutines.runBlocking {
+        for (active in listOf(false, true)) for ((index, fields) in invalidLegacyAuthorityFields().withIndex()) {
+            val source = if (active) fields + ("active_profile" to "profile-kept") else fields - "active_profile"
+            val state = BrokerFixture(pendingReset = active, initialSettings = legacyAuthorityFixture(source, false))
+            val before = state.journal.readCheckpoint(); val control = state.journal.readControl().encode()
+            val broker = state.broker()
+            val coordinator = org.kurdistanvpn.data.settings.SettingsApplyCoordinator(broker.settingsPort(), broker.inactiveRuntimePort(), ProtectedUiDraftStore(state.storage))
+            val result = coordinator.openDraft()
+            assertTrue("draft/$index", result is org.kurdistanvpn.domain.DomainResult.Rejected)
+            assertEquals(ProductFailureCode.INVALID_INPUT, (result as org.kurdistanvpn.domain.DomainResult.Rejected).failure.code)
+            assertNotEquals("apply/$index", ProtectedMutationStatus.COMMITTED, broker.applyProductSettings(2, 0, ProductSettings()).status)
+            assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+            assertArrayEquals(before, state.journal.readCheckpoint()); assertArrayEquals(control, state.journal.readControl().encode())
+        }
+    }
+    @Test fun actualLegacyPhysicalImageReachesCoordinatorAndCompensationPreservesOriginalDisplayBytes() = kotlinx.coroutines.runBlocking {
+        val source = legacyWrongTypeDisplayStoredFixture()
+        val file = java.io.File(java.nio.file.Files.createTempDirectory("raw-settings-broker").toFile().canonicalFile, "test.preferences_pb")
+        file.writeBytes(source)
+        val captured = SettingsProjectionCodec.captureLegacyStoredBytes(file.readBytes()).image()
+        val state = BrokerFixture(initialSettings = captured)
+        val broker = state.broker()
+        val coordinator = org.kurdistanvpn.data.settings.SettingsApplyCoordinator(broker.settingsPort(), broker.inactiveRuntimePort(), ProtectedUiDraftStore(state.storage))
+        val draft = (coordinator.openDraft() as org.kurdistanvpn.domain.DomainResult.Success).value
+        assertEquals(ThemePreference.SYSTEM, draft.basedOn.settings.theme)
+        assertFalse(draft.basedOn.settings.highContrast)
+        assertArrayEquals(source, file.readBytes()); assertEquals(0, state.objectWrites)
+        assertTrue(coordinator.apply(draft.id, 0, draft.basedOn.settings.copy(highContrast = true)) is org.kurdistanvpn.domain.DomainResult.Success)
+        assertEquals(ProtectedMutationStatus.COMMITTED, broker.rollbackLastProductSettings(4).status)
+        assertArrayEquals(captured, state.snapshot().settingsBytes())
+    }
+    @Test fun noProfileCoordinatorRejectsUnsupportedRuntimeRequestsWithoutWritingAnyField() = kotlinx.coroutines.runBlocking {
+        val unsupported = listOf(
+            ProductSettings(tunnelMode = TunnelMode.TUN_PLUS_PROXY),
+            ProductSettings(tunnel = TunnelPreferences(dnsMode = ResolverPolicy.CUSTOM, customDns = "9.9.9.9", secondaryCustomDns = "1.1.1.1")),
+            ProductSettings(connection = ConnectionPreferences(connectOnlyOnUntrustedNetworks = true)),
+            ProductSettings(connection = ConnectionPreferences(selectionMode = SelectionMode.MANUAL_STRATEGY, manualStrategyId = CatalogId("private-strategy"))),
+            ProductSettings(probes = ProbePreferences(signedTargetId = CatalogId("private-probe")))
+        )
+        for (requested in unsupported) {
+            val state = BrokerFixture(); val broker = state.broker()
+            val coordinator = org.kurdistanvpn.data.settings.SettingsApplyCoordinator(broker.settingsPort(), broker.inactiveRuntimePort(), ProtectedUiDraftStore(state.storage))
+            val draft = (coordinator.openDraft() as org.kurdistanvpn.domain.DomainResult.Success).value
+            val before = state.journal.readCheckpoint()
+            assertTrue(coordinator.apply(draft.id, 0, requested.copy(highContrast = true)) is org.kurdistanvpn.domain.DomainResult.Rejected)
+            assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+            assertArrayEquals(before, state.journal.readCheckpoint())
+        }
+        val state = BrokerFixture()
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings(highContrast = true)).status)
+    }
+    @Test fun eachInterruptedSecureStageRetainsPriorAndCanExplicitlyRestoreWhenOperationRecordExists() {
+        for (stage in 0..3) {
+            val state = BrokerFixture()
+            val original = state.snapshot().settingsBytes()
+            state.beforeObjectWrite = { if (state.objectWrites == stage) error("SYNTHETIC_STAGE_INTERRUPTION") }
+            assertEquals(ProtectedMutationStatus.DIRTY, state.broker().applyProductSettings(2, 0, ProductSettings(highContrast = true)).status)
+            assertEquals(0, state.projections.publications)
+            state.beforeObjectWrite = null
+            val recovered = state.broker().recoverProductSettingsConfirmed(true)
+            if (stage == 0) assertNotEquals(ProtectedMutationStatus.COMMITTED, recovered.status)
+            else {
+                assertEquals(ProtectedMutationStatus.COMMITTED, recovered.status)
+                assertEquals(0L, recovered.value?.settingsRevision)
+                assertArrayEquals(original, state.snapshot().settingsBytes())
+            }
+        }
+    }
+    @Test fun compensationRejectsInterveningWriterAndMissingOrTamperedAuthenticatedPredecessor() {
+        for (fault in listOf("writer", "missing", "tampered")) {
+            val state = BrokerFixture()
+            assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+            assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(4, 1, ProductSettings(highContrast = true)).status)
+            if (fault == "writer") assertEquals(ProtectedMutationStatus.COMMITTED,
+                state.broker().applyProductSettings(6, 2, ProductSettings(reducedMotion = true)).status)
+            else {
+                val name = "journal-checkpoint-0000000000000004"
+                val prior = state.storage.read(name, JournalLimits.CHECKPOINT_BYTES)!!
+                if (fault == "missing") state.storage.delete(name, prior)
+                else state.storage.compareAndReplace(name, prior, prior.clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() })
+            }
+            val control = state.journal.readControl().encode()
+            val publications = state.projections.publications
+            assertNotEquals(ProtectedMutationStatus.COMMITTED, state.broker().rollbackLastProductSettings(6).status)
+            assertArrayEquals(control, state.journal.readControl().encode())
+            assertEquals(publications, state.projections.publications)
+        }
+    }
+
+    @Test fun interruptedCompensationResumesExactPriorSemanticStateAndRetainsDirtyEvidence() {
+        val state = BrokerFixture()
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(4, 1, ProductSettings(highContrast = true)).status)
+        state.projections.afterPublish = { error("SYNTHETIC_INTERRUPTION") }
+        assertEquals(ProtectedMutationStatus.DIRTY, state.broker().rollbackLastProductSettings(6).status)
+        val objectNames = state.objects.keys.toSet()
+        assertNotEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(6, 2, ProductSettings()).status)
+        assertEquals(objectNames, state.objects.keys)
+        state.projections.afterPublish = null
+        val result = state.broker().recoverProductSettingsConfirmed(false)
+        assertEquals(ProtectedMutationStatus.COMMITTED, result.status); assertEquals(1L, result.value?.settingsRevision)
+        assertEquals(8L, state.snapshot().revision)
+    }
+
+    @Test fun productDirtyAndIntentFailuresHaveNoProductPublicationOrOwnerCleanup() {
+        for (leaf in listOf("journal-control", "journal-intent-0000000000000002")) {
+            val state = BrokerFixture()
+            var closes = 0
+            state.sessions.register("dc".repeat(16), 1, 2, AutoCloseable { closes++ })
+            state.storage.beforeReplace = { name, _, _ -> if (name == leaf) error("SYNTHETIC_INTERRUPTION") }
+            assertNotEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+            assertEquals(0, closes); assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+        }
+    }
+
+    @Test fun productOwnerCleanupRefusalLeavesDirtyWithoutAnyStagedObjectPublication() {
+        val state = BrokerFixture()
+        state.sessions.register("ce".repeat(16), 1, 2, AutoCloseable { error("SYNTHETIC_CLEANUP_REFUSAL") })
+        assertEquals(ProtectedMutationStatus.DIRTY, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        assertTrue(state.journal.readControl().dirty)
+        assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+    }
+    @Test fun applicationFacadeExposesTypedSettingsRepositoryNotStorageAdapter() {
+        val method = ProtectedStateApplicationFacade::class.java.getMethod("settingsRepository")
+        assertEquals(org.kurdistanvpn.domain.SettingsRepository::class.java, method.returnType)
+    }
+    @Test fun coordinatorUsesRealBrokerPortAndInactiveApplyHasOneCompletePublication() = kotlinx.coroutines.runBlocking {
+        val state = BrokerFixture()
+        val broker = state.broker()
+        val coordinator = org.kurdistanvpn.data.settings.SettingsApplyCoordinator(broker.settingsPort(), broker.inactiveRuntimePort(), ProtectedUiDraftStore(state.storage))
+        val draft = (coordinator.openDraft() as org.kurdistanvpn.domain.DomainResult.Success).value
+        assertEquals(0L, draft.basedOn.revision)
+        assertTrue(coordinator.validate(draft.id, ProductSettings(highContrast = true)) is org.kurdistanvpn.domain.DomainResult.Success)
+        assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+        val result = coordinator.apply(draft.id, 0, ProductSettings(highContrast = true)) as org.kurdistanvpn.domain.DomainResult.Success
+        assertEquals(1L, result.value.revision); assertTrue(result.value.settings.highContrast)
+        assertEquals(1, state.projections.publications)
+        assertEquals(4L, state.snapshot().revision)
+    }
+    @Test fun inactiveProductApplyRefusesRegisteredRuntimeWithoutRetiringOrWriting() {
+        val state = BrokerFixture()
+        var closed = 0
+        val owner = state.sessions.register("ab".repeat(16), 1, 2, AutoCloseable { closed++ })!!
+        val before = state.journal.readCheckpoint()
+        assertNotEquals(ProtectedMutationStatus.COMMITTED,
+            state.broker().applyProductSettings(2, 0, ProductSettings(), requireInactive = true).status)
+        assertEquals(0, closed); assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+        assertArrayEquals(before, state.journal.readCheckpoint())
+        owner.close()
+        assertEquals(ProtectedMutationStatus.COMMITTED,
+            state.broker().applyProductSettings(2, 0, ProductSettings(), requireInactive = true).status)
+    }
+    @Test fun runtimeApplyFailureRollbackUsesNewJournalRevisionButRestoresExactPriorSemanticSettings() {
+        val state = BrokerFixture()
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(4, 1,
+            ProductSettings(highContrast = true)).status)
+        val result = state.broker().rollbackLastProductSettings(6)
+        assertEquals(ProtectedMutationStatus.COMMITTED, result.status)
+        assertEquals(1L, result.value!!.settingsRevision)
+        val snapshot = state.snapshot()
+        assertEquals(8L, snapshot.revision)
+        assertFalse(readProductSettings(snapshot, ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)).highContrast)
+        assertEquals(ProtectedMutationStatus.NO_MUTATION, state.broker().rollbackLastProductSettings(6).status)
+    }
+    @Test fun completeProductImageSupersedesStaleAppearanceOverlayAndOldCompareAndMutateUsesJournalRevision() {
+        val state = BrokerFixture()
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceSettings(2, ProductSettings(highContrast = true)).status)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        var snapshot = state.snapshot()
+        val blobs = ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)
+        assertFalse(readPresentedProductSettings(snapshot, blobs, state.storage::read).highContrast)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceSettings(4,
+            ProductSettings(highContrast = true, connection = ConnectionPreferences(reconnectOnFailure = true))).status)
+        snapshot = state.snapshot()
+        assertEquals(6L, snapshot.revision)
+        val actual = readProductSettings(snapshot, ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key))
+        assertTrue(actual.highContrast); assertTrue(actual.connection.reconnectOnFailure)
+        assertEquals(ProtectedMutationStatus.NO_MUTATION, state.broker().replaceSettings(4, ProductSettings()).status)
+    }
+    @Test fun interruptedCompleteDraftCanResumeExactCandidateOrRestorePriorSemanticRevision() {
+        for (rollback in listOf(false, true)) {
+            val state = BrokerFixture()
+            assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+            val requested = ProductSettings(highContrast = true, updates = UpdatePreferences(intervalHours = 12))
+            state.projections.afterPublish = { error("SYNTHETIC_INTERRUPTION") }
+            assertEquals(ProtectedMutationStatus.DIRTY, state.broker().applyProductSettings(4, 1, requested).status)
+            state.projections.afterPublish = null
+            val result = state.broker().recoverProductSettingsConfirmed(rollback)
+            assertEquals(ProtectedMutationStatus.COMMITTED, result.status)
+            val snapshot = state.snapshot()
+            assertEquals(6L, snapshot.revision)
+            assertEquals(if (rollback) 1L else 2L, result.value!!.settingsRevision)
+            assertEquals(if (rollback) ProductSettings() else requested, readProductSettings(snapshot,
+                ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)))
+        }
+    }
+
+    @Test fun missingOrTamperedRollbackRecordCannotAuthorizeRecoveryOrEraseDirtyState() {
+        for (missing in listOf(false, true)) {
+            val state = BrokerFixture()
+            state.projections.beforePublish = { error("SYNTHETIC_INTERRUPTION") }
+            assertEquals(ProtectedMutationStatus.DIRTY, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+            state.projections.beforePublish = null
+            val name = operationObjectLeaf(state.journal.readControl().operationId(), 1)
+            if (missing) state.objects.remove(name) else state.objects[name]!![10] = 99
+            val before = state.journal.readControl().encode()
+            assertNotEquals(ProtectedMutationStatus.COMMITTED, state.broker().recoverProductSettingsConfirmed(true).status)
+            assertArrayEquals(before, state.journal.readControl().encode())
+        }
+    }
+
+    @Test fun completeDraftPersistsExactOperationBoundRollbackBeforeAnyProductObjectOrProjection() {
+        val state = BrokerFixture()
+        val prior = state.journal.readCheckpoint()
+        var verified = false
+        state.beforeObjectWrite = { name ->
+            val control = state.journal.readControl()
+            if (state.objectWrites == 0) assertEquals(operationObjectLeaf(control.operationId(), 1), name)
+            else assertNotNull(state.objects[operationObjectLeaf(control.operationId(), 1)])
+        }
+        state.projections.beforePublish = {
+            val control = state.journal.readControl()
+            val encrypted = requireNotNull(state.objects[operationObjectLeaf(control.operationId(), 1)])
+            val opened = state.codec.openForOperation(encrypted, SettingsOperationState.RECORD_ID,
+                SecureDataClass.OPERATION_STATE, state.key, SecureOperationBinding(control.operationId(), 4))
+            try { SettingsOperationState.decode(opened.plaintext).use { record ->
+                assertArrayEquals(prior, record.priorSnapshot())
+                assertEquals(0L, record.settingsBefore); assertEquals(1L, record.settingsAfter)
+                val candidate = ProtectedStateSnapshot.decode(record.candidateSnapshot())
+                assertEquals(4L, candidate.revision)
+                assertFalse(candidate.objects().any { it.dataClass == 27 })
+                verified = true
+            } } finally { opened.plaintext.fill(0) }
+        }
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        assertTrue(verified)
+    }
+
+    @Test fun interruptedRollbackObjectDurabilityLeavesDirtyWithoutProductPublication() {
+        val state = BrokerFixture()
+        state.beforeObjectWrite = { error("SYNTHETIC_DURABILITY_FAILURE") }
+        assertEquals(ProtectedMutationStatus.DIRTY,
+            state.broker().applyProductSettings(2, 0, ProductSettings()).status)
+        assertTrue(state.journal.readControl().dirty)
+        assertEquals(0, state.objectWrites); assertEquals(0, state.projections.publications)
+    }
+
+    @Test fun completeProductSettingsMigrationCommitsMixedValuesOnceWithNonconnectableBootstrap() {
+        val state = BrokerFixture()
+        val requested = ProductSettings(highContrast = true, updates = UpdatePreferences(intervalHours = 12))
+        val result = state.broker().applyProductSettings(2, 0, requested)
+        assertEquals(ProtectedMutationStatus.COMMITTED, result.status)
+        assertEquals(1L, result.value!!.settingsRevision)
+        assertEquals(1, state.projections.publications)
+        assertEquals(4L, state.snapshot().revision)
+        val snapshot = state.snapshot()
+        val blobs = ReadOnlyProtectedBlobView(snapshot.objects(), { state.objects[it]?.clone() }, state.codec, state.key)
+        assertEquals(requested, readProductSettings(snapshot, blobs))
+        val bootstrap = blobs.reopen(RuntimeBootstrapRecord.RECORD_ID, SecureDataClass.RUNTIME_BOOTSTRAP)
+        try { assertFalse(RuntimeBootstrapRecord.decode(bootstrap).connectable) } finally { bootstrap.fill(0) }
+        assertNull(state.storage.read(ProtectedPresentationOverlay.NAME, JournalLimits.RECORD_BYTES))
+        assertTrue(snapshot.objects().any { it.dataClass == 20 })
+        assertTrue(snapshot.objects().any { it.dataClass == 26 })
+        assertFalse(snapshot.objects().any { it.dataClass == 27 })
+    }
+
+    @Test fun invalidCompleteProductDraftWritesNeitherSettingsNorProtectedObjects() {
+        val state = BrokerFixture()
+        val before = state.journal.readCheckpoint()
+        val invalid = ProductSettings(highContrast = true, routing = RoutingPreferences(PerAppSelectionMode.INCLUDE_ONLY))
+        val result = state.broker().applyProductSettings(2, 0, invalid)
+        assertEquals(ProtectedMutationStatus.NO_MUTATION, result.status)
+        assertArrayEquals(before, state.journal.readCheckpoint())
+        assertEquals(0, state.projections.publications); assertEquals(0, state.objectWrites)
+    }
+    @Test fun modelEditsPreserveInactiveLegacyProbeButExplicitSettingsResetDiscardsIt() {
+        for (presentationOnly in listOf(true, false)) {
+            val state = BrokerFixture(legacyProbe = true)
+            val current = SettingsProjectionCodec.toModel(state.snapshot().settingsBytes())
+            val updated = if (presentationOnly) current.copy(highContrast = true)
+                else current.copy(updates = current.updates.copy(intervalHours = 4))
+            assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceSettings(2, updated).status)
+            assertTrue(String(state.snapshot().settingsBytes(), Charsets.UTF_8).contains("https://example.invalid/legacy"))
+            assertEquals(if (presentationOnly) 2L else 4L, state.snapshot().revision)
+        }
+        val state = BrokerFixture(legacyProbe = true)
+        assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceSettings(2, ProductSettings(),
+            org.kurdistanvpn.data.settings.LegacySettingsResiduePolicy.DISCARD).status)
+        assertFalse(String(state.snapshot().settingsBytes(), Charsets.UTF_8).contains("https://example.invalid/legacy"))
+        assertEquals(4L, state.snapshot().revision)
+    }
     @Test fun presentationSettingsDoNotRetireActiveOrChangeAuthorityCheckpointAndProjection() {
         val state = BrokerFixture()
         var closes = 0
@@ -76,7 +501,7 @@ class ProtectedStateMutationBrokerTest {
         var closes = 0
         state.sessions.register("0a".repeat(16), 1, 2, AutoCloseable { closes++ })
         val settings = SettingsProjectionCodec.toModel(state.snapshot().settingsBytes())
-        val result = state.broker().replaceSettings(2, settings.copy(connection = settings.connection.copy(autoConnectOnBoot = true)))
+        val result = state.broker().replaceSettings(2, settings.copy(connection = settings.connection.copy(reconnectOnFailure = true)))
         assertEquals(ProtectedMutationStatus.COMMITTED, result.status)
         assertEquals(1, closes)
         assertEquals(4L, state.journal.readControl().revision)
@@ -209,7 +634,7 @@ class ProtectedStateMutationBrokerTest {
         assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceDiagnostics(events).status)
         assertEquals(ProtectedMutationStatus.COMMITTED,
             state.broker().replaceSettings(2, settings.copy(highContrast = true)).status)
-        val mixed = settings.copy(connection = settings.connection.copy(autoConnectOnBoot = true))
+        val mixed = settings.copy(connection = settings.connection.copy(reconnectOnFailure = true))
         assertEquals(ProtectedMutationStatus.COMMITTED, state.broker().replaceSettings(2, mixed).status)
         assertEquals(4L, state.journal.readControl().revision)
         ProtectedPresentationOverlay.read(state.storage::read, ByteArray(16) { 1 })!!.use {
@@ -601,6 +1026,30 @@ class ProtectedStateMutationBrokerTest {
         assertEquals(0, closes)
     }
 
+    @Test fun staleProfileDeletionConfirmationDoesNotRetireSessionsOrPublish() {
+        val state = BrokerFixture()
+        var closes = 0
+        state.sessions.register("0a".repeat(16), 1, 2, AutoCloseable { closes++ })
+        val outcome = state.broker().deleteProfile("missing-profile", expectedRevision = 0)
+        assertNotEquals(ProtectedMutationStatus.COMMITTED, outcome.status)
+        assertEquals(2L, state.journal.readControl().revision)
+        assertEquals(0, state.objectWrites)
+        assertEquals(0, closes)
+    }
+
+    @Test fun staleScopedResetDoesNotRetireSessionsOrPublish() {
+        val state = BrokerFixture()
+        var closes = 0
+        state.sessions.register("0a".repeat(16), 1, 2, AutoCloseable { closes++ })
+        assertNotEquals(ProtectedMutationStatus.COMMITTED,
+            state.broker().resetProfiles(setOf("missing-profile"), expectedRevision = 0).status)
+        assertNotEquals(ProtectedMutationStatus.COMMITTED,
+            state.broker().resetPendingCredentials(expectedRevision = 0).status)
+        assertEquals(2L, state.journal.readControl().revision)
+        assertEquals(0, state.objectWrites)
+        assertEquals(0, closes)
+    }
+
     @Test fun enrollmentIndexAndMaterialAreOneCommittedOperationAndFailureCannotLeakPreparedState() {
         val state = BrokerFixture()
         val first = state.broker().createEnrollment(600, 1_800_000_000)
@@ -697,7 +1146,9 @@ class ProtectedStateMutationBrokerTest {
     }
 }
 
-private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = null, restoreNative: Boolean = false) {
+internal class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = null, restoreNative: Boolean = false, legacyProbe: Boolean = false,
+    initialSettings: ByteArray? = null, productProjectionNative: Boolean = false, selectSeedProfile: Boolean = true,
+    initialProjection: ((ProtectedStateSnapshot) -> ProjectionImages)? = null) {
     val sessions = ActiveSessionMutationPolicy { 100 }
     val storage = MemoryJournalStorage()
     val journal = ProtectedStateOperationJournal(storage)
@@ -719,6 +1170,9 @@ private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = 
     }
     val projections: MemoryProjectionAccess
     var objectWrites = 0
+    var beforeObjectWrite: ((String) -> Unit)? = null
+    var afterObjectWrite: ((String) -> Unit)? = null
+    var afterObjectRead: ((String, ByteArray?) -> Unit)? = null
     var rejectRecipient = false
     var rejectRestoreSecond = false
     var recipientCreations = 0
@@ -731,6 +1185,7 @@ private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = 
         org.kurdistanvpn.core.nativeapi.KurdNativeCore::class.java.classLoader,
         arrayOf(org.kurdistanvpn.core.nativeapi.KurdNativeCore::class.java),
     ) { _, method, args -> when (method.name) {
+        "compatibility" -> NativeResult.Success(NativeCompatibility("bridge-v1", "core-v1", "profile-v1", "strategy-v1", "relay-v1", "diagnostic-v1", 1, 100, 4, 100, 100, 10))
         "validateRecipient" -> {
             nativeSecrets += args!![0] as ByteArray; nativeSecrets += args[1] as ByteArray
             if (rejectRecipient) NativeResult.Failure(OperationError.KEY_INVALIDATED) else NativeResult.Success(Unit)
@@ -741,7 +1196,13 @@ private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = 
             override fun cancel() = org.kurdistanvpn.core.nativeapi.NativeResult.Success(Unit)
             override fun close() = Unit
         }) }
-        "verifyPreview" -> { check(restoreNative); NativeResult.Failure(OperationError.TRUST_REJECTED) }
+        "verifyPreview" -> { check(restoreNative || productProjectionNative); if (productProjectionNative) {
+            nativeSecrets += args!![0] as ByteArray
+            verificationHandles++
+            val newer = (args[0] as ByteArray).contentEquals(byteArrayOf(65))
+            NativeResult.Success(VerifiedPreviewHandle(verificationHandles.toLong(), RedactedProfilePreview("synthetic", "synthetic",
+                if (newer) "new-public-summary" else "public-summary", "lineage-summary", if (newer) 2uL else 1uL, 1_900_000_000, false)))
+        } else NativeResult.Failure(OperationError.TRUST_REJECTED) }
         "verifyPreviewWithRecipient" -> {
             check(restoreNative)
             val input = args!![0] as ByteArray
@@ -758,9 +1219,9 @@ private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = 
                         "new-synthetic-lineage", 1uL, 1_900_000_000, true)))
             }
         }
-        "releaseVerified" -> { check(restoreNative); verificationReleases++; NativeResult.Success(Unit) }
+        "releaseVerified" -> { check(restoreNative || productProjectionNative); verificationReleases++; NativeResult.Success(Unit) }
         "openActivation" -> {
-            check(restoreNative); activationOpens++
+            check(restoreNative || productProjectionNative); activationOpens++
             NativeResult.Success(ScriptedRestoreActivation { activationCloses++ })
         }
         else -> error("Unexpected native operation: ${method.name}")
@@ -778,34 +1239,47 @@ private class BrokerFixture(pendingReset: Boolean = false, seedFault: String? = 
         }.orEmpty()
         if (seedFault == "tampered-object") objects.values.first().let { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
         journal.initialize(ByteArray(16) { 1 })
-        val settings = if (seed == null) Phase9Settings() else Phase9Settings(profiles =
-            ProfilePreferences("profile-kept", setOf("profile-kept", "profile-other")))
+        val settings = if (seed == null) ProductSettings() else ProductSettings(profiles =
+            ProfilePreferences(if (selectSeedProfile) "profile-kept" else null, setOf("profile-kept", "profile-other")))
+        val legacyImage = java.io.ByteArrayOutputStream().also { output ->
+            java.io.DataOutputStream(output).use { writer ->
+                writer.writeInt(0x4b535031); writer.writeByte(1); writer.writeShort(1)
+                writer.writeByte(8); writer.writeBytes("test_url"); writer.writeByte(3)
+                writer.writeUTF("https://example.invalid/legacy")
+            }
+        }.toByteArray()
+        val settingsImage = initialSettings?.clone() ?: SettingsProjectionCodec.fromModel(settings,
+            if (legacyProbe) SettingsProjectionCodec.legacyResidue(legacyImage) else null)
         val initial = ProtectedStateSnapshot.create(ByteArray(16) { 1 }, 2, settings.profiles.activeLocalRecordId, references,
-            SettingsProjectionCodec.fromModel(settings),
+            settingsImage,
             ProfileCatalogProjectionCodec.encode(seed?.second.orEmpty()), ByteArray(JournalLimits.OPERATION_BYTES) { 2 })
         val raw = initial.encode()
-        check(journal.mutate(MutationKind.MIGRATION, ByteArray(JournalLimits.OPERATION_BYTES) { 2 }, raw, {}, {
-            bindSyntheticProjection(journal, raw); raw.clone()
-        }) == ProtectedMutationStatus.COMMITTED)
-        projections = MemoryProjectionAccess(ProjectionImages(initial.catalogBytes(), initial.settingsBytes(),
+        val initialImages = initialProjection?.invoke(initial) ?: ProjectionImages(initial.catalogBytes(), initial.settingsBytes(),
             ProjectionImageWitness.reconstruct(initial.storeId(), initial.operationId(), 2, initial.catalogBytes(), initial.settingsBytes()),
-            syntheticProjectionObservations(initial)))
+            syntheticProjectionObservations(initial))
+        check(journal.mutate(MutationKind.MIGRATION, ByteArray(JournalLimits.OPERATION_BYTES) { 2 }, raw, {}, {
+            journal.bindProjection(initial, PhysicalProjectionWitness.capture(initial, initialImages.physical())); raw.clone()
+        }) == ProtectedMutationStatus.COMMITTED)
+        projections = MemoryProjectionAccess(initialImages)
     }
     fun snapshot(): ProtectedStateSnapshot = ProtectedStateSnapshot.decode(journal.readCheckpoint())
     fun readKeys(snapshot: ProtectedStateSnapshot): ClientKeyBundleStore = ClientKeyBundleStore.readOnly(
         ReadOnlyProtectedBlobView(snapshot.objects(), { objects[it]?.clone() }, codec, key), KurdRecipientKeyNative(native))
-    fun broker(journalStorage: JournalStorage = storage): ProtectedStateMutationBroker = ProtectedStateMutationBroker.compose(journalStorage,
+    fun broker(journalStorage: JournalStorage = storage, policy: ActiveSessionMutationPolicy = sessions,
+        projectionAccess: ProtectedProjectionAccess = projections): ProtectedStateMutationBroker = ProtectedStateMutationBroker.compose(journalStorage,
         { name -> objects[name]?.clone() }, { operation -> object : ImmutableProtectedObjectWriter {
             override fun requireDirtyOperation(operation: ByteArray) {
                 val control = journal.readControl()
                 check(control.dirty && control.operationId().contentEquals(operation))
             }
-            override fun read(name: String) = objects[name]?.clone()
+            override fun read(name: String) = objects[name]?.clone().also { afterObjectRead?.invoke(name, it) }
             override fun create(name: String, bytes: ByteArray) {
                 requireDirtyOperation(operation)
+                beforeObjectWrite?.invoke(name)
                 check(!objects.containsKey(name)); objectWrites++; objects[name] = bytes.clone()
+                afterObjectWrite?.invoke(name)
             }
-        } }, codec, key, projections, native, sessions, object : JournalObjectAccess {
+        } }, codec, key, projectionAccess, native, policy, object : JournalObjectAccess {
             override fun inventory() = objects.map { JournalStoredEntry(it.key, it.value.size.toLong()) }
             override fun read(name: String) = objects[name]?.clone()
             override fun delete(name: String, expected: ByteArray) {
@@ -912,11 +1386,42 @@ private class ScriptedRestoreActivation(private val onClose: () -> Unit) : Nativ
     override fun close() { check(!closed); closed = true; onClose() }
 }
 
-private class MemoryProjectionAccess(var current: ProjectionImages) : ProtectedProjectionAccess {
+internal class MemoryProjectionAccess(var current: ProjectionImages) : ProtectedProjectionAccess {
+    var schemaFailure: RuntimeException? = null
+    var inspectSchema: (() -> Unit)? = null
+    override fun migrateSchema(prior: ProtectedStateSnapshot, candidate: ProtectedStateSnapshot,
+        replacement: ProtectedStateSnapshot, verifyEvidence: () -> Unit) {
+        schemaFailure?.let { throw it }
+        inspectSchema?.invoke()
+        verifyEvidence()
+        check(schemaVersion == 2 || schemaVersion == 3)
+        check(runCatching { current.requireMatches(prior) }.isSuccess || runCatching { current.requireMatches(candidate) }.isSuccess ||
+            runCatching { current.requireMatches(replacement) }.isSuccess)
+        schemaVersion = 3
+        publish(current, replacement)
+    }
+    var schemaVersion = 3
+    var beforeSchemaCheck: (() -> Unit)? = null
+    override fun requireClosedSchema(expected: ProtectedStateSnapshot, version: Int) {
+        beforeSchemaCheck?.invoke()
+        current.requireMatches(expected)
+        check(schemaVersion == version)
+        val physical = current.physical()
+        val synthetic = syntheticProjectionObservations(expected)
+        check(physical.size == synthetic.size && physical.zip(synthetic).all { (a, b) -> a.bytes().contentEquals(b.bytes()) })
+    }
     var publications = 0; var reads = 0; var failPublication = false
     var beforePublish: (() -> Unit)? = null
     var afterPublish: (() -> Unit)? = null
-    override fun read(): ProjectionImages { reads++; return current.copyOwned() }
+    var afterRead: (() -> Unit)? = null
+    override fun read(): ProjectionImages { reads++; return current.copyOwned().also { afterRead?.invoke() } }
+    override fun recover(prior: ProtectedStateSnapshot, candidate: ProtectedStateSnapshot, replacement: ProtectedStateSnapshot) {
+        val actual = current.settings()
+        val a = prior.settingsBytes(); val b = candidate.settingsBytes()
+        try { check(actual.contentEquals(a) || actual.contentEquals(b)) }
+        finally { actual.fill(0); a.fill(0); b.fill(0) }
+        publish(current, replacement)
+    }
     override fun publish(expected: ProjectionImages, replacement: ProtectedStateSnapshot) {
         publications++
         beforePublish?.invoke()
@@ -950,12 +1455,29 @@ internal fun bindSyntheticProjection(journal: ProtectedStateOperationJournal, ra
     journal.bindProjection(snapshot, PhysicalProjectionWitness.capture(snapshot, syntheticProjectionObservations(snapshot)))
 }
 
+internal val syntheticProductCanaries = listOf("PrivateAliasCanary732", "org.synthetic.canary732", "FakeWifiCanary732",
+    "EndpointCanary732", "CredentialCanary732", "PayloadCanary732")
+
+/** Scans controlled host bytes only, not real SQLite, Android DataStore, or device logs. */
+internal fun assertSyntheticCanariesAbsent(state: BrokerFixture, extra: List<ByteArray> = emptyList()) {
+    val leaves = state.storage.inventory(JournalLimits.OBJECTS).map { it.name }
+    val owned = leaves.map { checkNotNull(state.storage.read(it, JournalLimits.CHECKPOINT_BYTES)) } +
+        (leaves + state.objects.keys).map { it.toByteArray() } +
+        listOf(state.projections.current.catalog(), state.projections.current.settings()) +
+        state.projections.current.physical().map { it.bytes() }
+    try {
+        for (canary in syntheticProductCanaries) assertEquals(canary, 0,
+            (owned + state.objects.values + extra).count { String(it, Charsets.ISO_8859_1).contains(canary) })
+    } finally { owned.forEach { it.fill(0) } }
+}
+
 internal class MemoryJournalStorage : JournalStorage {
     private val lock = Any()
     private val values = linkedMapOf<String, ByteArray>()
     var corruptNextWrite = false
     val events = mutableListOf<String>()
     var beforeReplace: ((String, ByteArray?, ByteArray) -> Unit)? = null
+    var afterReplace: ((String, ByteArray) -> Unit)? = null
     override fun <T> exclusive(block: () -> T): T = synchronized(lock) { block() }
     override fun read(name: String, maximum: Int): ByteArray? {
         events += "read:$name"
@@ -969,6 +1491,7 @@ internal class MemoryJournalStorage : JournalStorage {
         values[name] = replacement.clone().also {
             if (corruptNextWrite) { it[0] = (it[0].toInt() xor 1).toByte(); corruptNextWrite = false }
         }
+        afterReplace?.invoke(name, replacement)
     }
     override fun delete(name: String, expected: ByteArray) {
         check(values[name]?.contentEquals(expected) == true)

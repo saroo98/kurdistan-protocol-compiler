@@ -13,20 +13,21 @@ private const val PREVIEW_MAGIC_V1 = 0x4B505231
 private const val PREVIEW_MAGIC_V2 = 0x4B505232
 
 internal object ProfilePreviewCodec {
-    fun encode(preview: RedactedProfilePreview, alias: String): ByteArray {
+    fun encode(verified: org.kurdistanvpn.core.nativeapi.VerifiedPreviewHandle, alias: String): ByteArray =
+        verified.withLegacyPreviewFields { encode(verified.preview, alias, it) }
+
+    fun encode(preview: RedactedProfilePreview, alias: String): ByteArray = encode(preview, alias, List(3) { byteArrayOf() })
+
+    private fun encode(preview: RedactedProfilePreview, alias: String, legacyFields: List<ByteArray>): ByteArray {
         val fields = listOf(
             preview.artifactClass,
             preview.audienceClass,
             preview.contentFingerprint,
             preview.lineageFingerprint,
             preview.deploymentFingerprint,
-            preview.relayEndpointSummary,
-            preview.authorityScope,
-            preview.updateLocation,
-            alias,
-        ).map {
-            it.encodeToByteArray().also { bytes -> require(bytes.size <= 255) }
-        }
+        ).map { it.encodeToByteArray() } + legacyFields.map { it.clone() } + listOf(alias.encodeToByteArray())
+        try {
+        require(fields.all { it.size <= 255 })
         require(fields.take(4).all { it.isNotEmpty() } && fields.last().isNotEmpty())
         val size = 4 + fields.sumOf { 1 + it.size } + 1 + 8 + 8
         return ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN).apply {
@@ -42,7 +43,11 @@ internal object ProfilePreviewCodec {
             put(flags.toByte())
             putLong(preview.generation.toLong())
             putLong(preview.validUntilEpochSeconds)
-        }.array()
+        }.array().also { encoded ->
+            try { require(decode(encoded).first == preview) }
+            catch (failure: Throwable) { encoded.fill(0); throw failure }
+        }
+        } finally { fields.forEach { it.fill(0) } }
     }
 
     fun decode(encoded: ByteArray): Pair<RedactedProfilePreview, String> {
@@ -51,31 +56,36 @@ internal object ProfilePreviewCodec {
         require(reader.remaining() >= 4)
         val magic = reader.int
         require(magic == PREVIEW_MAGIC_V1 || magic == PREVIEW_MAGIC_V2)
-        fun field(): String {
+        fun fieldBytes(): ByteArray {
             require(reader.hasRemaining())
             val length = reader.get().toInt() and 0xff
             require(length <= reader.remaining())
-            return ByteArray(length).also(reader::get).toString(Charsets.UTF_8)
+            return ByteArray(length).also(reader::get)
+        }
+        fun field(): String = fieldBytes().let { bytes ->
+            try { bytes.toString(Charsets.UTF_8) } finally { bytes.fill(0) }
         }
         val artifactClass = field()
         val audienceClass = field()
         val fingerprint = field()
         val lineageFingerprint = field()
         require(artifactClass.isNotEmpty() && audienceClass.isNotEmpty() && fingerprint.isNotEmpty() && lineageFingerprint.isNotEmpty())
+        val rawFields = mutableListOf<ByteArray>()
+        try {
         val deploymentFingerprint: String
-        val relayEndpointSummary: String
-        val authorityScope: String
-        val updateLocation: String
+        val relayEndpointSummary: ByteArray
+        val authorityScope: ByteArray
+        val updateLocation: ByteArray
         if (magic == PREVIEW_MAGIC_V2) {
             deploymentFingerprint = field()
-            relayEndpointSummary = field()
-            authorityScope = field()
-            updateLocation = field()
+            relayEndpointSummary = fieldBytes().also(rawFields::add)
+            authorityScope = fieldBytes().also(rawFields::add)
+            updateLocation = fieldBytes().also(rawFields::add)
         } else {
             deploymentFingerprint = ""
-            relayEndpointSummary = ""
-            authorityScope = ""
-            updateLocation = ""
+            relayEndpointSummary = byteArrayOf()
+            authorityScope = byteArrayOf()
+            updateLocation = byteArrayOf()
         }
         val alias = field()
         require(alias.isNotEmpty())
@@ -95,14 +105,15 @@ internal object ProfilePreviewCodec {
             generation = generation,
             validUntilEpochSeconds = validUntil,
             deploymentFingerprint = deploymentFingerprint,
-            relayEndpointSummary = relayEndpointSummary,
-            authorityScope = authorityScope,
-            updateLocation = updateLocation,
+                    relayEndpoint = if (relayEndpointSummary.isEmpty()) org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED else org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
+                    authorityScope = if (authorityScope.contentEquals("deployment-local".encodeToByteArray())) org.kurdistanvpn.core.model.PreviewAuthorityScope.DEPLOYMENT_LOCAL else org.kurdistanvpn.core.model.PreviewAuthorityScope.UNAVAILABLE,
+                    updateSource = if (updateLocation.isEmpty()) org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED else org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
             ownerControlled = flags and 2 != 0,
             updatesEnabled = flags and 4 != 0,
         )
         require(!reader.hasRemaining())
         return preview to alias
+        } finally { rawFields.forEach { it.fill(0) } }
     }
 
     fun summary(

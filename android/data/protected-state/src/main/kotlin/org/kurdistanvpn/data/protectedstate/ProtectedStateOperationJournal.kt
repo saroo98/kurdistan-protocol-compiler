@@ -262,6 +262,70 @@ internal class ProtectedStateOperationJournal(private val storage: JournalStorag
         } catch (failure: Throwable) { recorded.fill(0); throw failure }
     }
 
+    /** Prove a typed rollback record names the original intent, even when resolving to prior state. */
+    fun requireSettingsRecoveryCandidate(operation: ByteArray, candidate: ByteArray) {
+        val control = readControl()
+        check(control.dirty && control.kind in setOf(MutationKind.SETTINGS, MutationKind.PROFILE_DELETE, MutationKind.SCOPED_RESET) &&
+            control.operationId().contentEquals(operation))
+        val expected = encodeIntent(control, candidate)
+        val actual = checkNotNull(storage.read(intentName(control.reservedSequence), JournalLimits.RECORD_BYTES))
+        try {
+            check(java.security.MessageDigest.isEqual(expected, actual))
+            check(control.encode().contentEquals(readControl().encode()))
+        } finally { expected.fill(0); actual.fill(0) }
+    }
+
+    fun requireProductRecoveryCandidate(operation: ByteArray, candidate: ByteArray, schema: Boolean = false) {
+        val control = readControl()
+        check(control.dirty && control.kind == (if (schema) MutationKind.PROJECTION_SCHEMA else MutationKind.PRODUCT_STATE) && control.operationId().contentEquals(operation))
+        val expected = encodeIntent(control, candidate)
+        val actual = checkNotNull(storage.read(intentName(control.reservedSequence), JournalLimits.RECORD_BYTES))
+        try {
+            check(java.security.MessageDigest.isEqual(expected, actual))
+            check(control.encode().contentEquals(readControl().encode()))
+        } finally { expected.fill(0); actual.fill(0) }
+    }
+
+    /** No temporary record or unrelated CLEAN state can stand in for retained final evidence. */
+    fun requireLatestCompletedProduct(operation: ByteArray, rollback: Boolean, schema: Boolean = false) {
+        val control = readControl()
+        check(!control.dirty && control.sequence >= 2)
+        readCheckpoint().fill(0)
+        val intent = checkNotNull(storage.read(intentName(control.sequence), JournalLimits.RECORD_BYTES))
+        val resolution = storage.read(resolutionName(control.sequence), JournalLimits.RECORD_BYTES)
+        try {
+            check(intent.size == 141 && intent.copyOfRange(20, 52).contentEquals(operation) &&
+                intent[76].toInt() == (if (schema) MutationKind.PROJECTION_SCHEMA else MutationKind.PRODUCT_STATE).wire && ByteBuffer.wrap(intent, 60, 8).long == control.revision)
+            if (rollback) {
+                check(resolution != null && resolution[4].toInt() == RecoveryResolution.ROLLBACK.wire)
+                check(resolutionCheckpoint(resolution, intent).contentEquals(control.checkpointDigest()))
+            } else check(resolution == null)
+            check(control.encode().contentEquals(readControl().encode()))
+        } finally { intent.fill(0); resolution?.fill(0) }
+    }
+
+    /** Prior authority for rollback of the latest completed settings command, not a GC retention hint. */
+    fun readPriorCheckpointForCompletedSettingsRollback(operation: ByteArray): ByteArray {
+        val control = readControl()
+        check(!control.dirty && control.revision >= 4 && control.sequence >= 2)
+        readCheckpoint().fill(0) // Authenticates the full retained journal chain and current intent.
+        val intent = checkNotNull(storage.read(intentName(control.sequence), JournalLimits.RECORD_BYTES))
+        val terminal = checkNotNull(storage.read(recordName(control.sequence - 1), JournalLimits.RECORD_BYTES))
+        try {
+            check(intent.size == 141 && intent.copyOfRange(20, 52).contentEquals(operation) &&
+                intent[76].toInt() == MutationKind.SETTINGS.wire)
+            check(ByteBuffer.wrap(intent, 60, 8).long == control.revision)
+            check(JournalDigest.record(terminal).matches(intent.copyOfRange(77, 109)))
+            check(terminal.size >= 132 && ByteBuffer.wrap(terminal).int in setOf(0x4b4a5433, 0x4b4a5434, 0x4b4a5832))
+            val prior = checkNotNull(storage.read(checkpointName(control.revision - 2), JournalLimits.CHECKPOINT_BYTES))
+            try {
+                check(JournalDigest.checkpoint(prior).matches(terminal.copyOfRange(terminal.size - 64, terminal.size - 32)))
+                check(control.encode().contentEquals(readControl().encode()))
+                return prior
+            } catch (failure: Throwable) { prior.fill(0); throw failure }
+        } finally { intent.fill(0); terminal.fill(0) }
+    }
+
     /** Retention only: these bytes never authorize restoration or repair. */
     fun retainedSnapshotsForGarbageCollection(): List<ProtectedStateSnapshot> {
         val control = readControl()
@@ -292,6 +356,8 @@ internal class ProtectedStateOperationJournal(private val storage: JournalStorag
         check(entries.size <= JournalLimits.OBJECTS && entries.map { it.name }.toSet().size == entries.size)
         var journalBytes = 0L
         var totalBytes = 0L
+        var draftCount = 0
+        var draftBytes = 0L
         for (entry in entries) {
             check(entry.length in 0..JournalLimits.OBJECT_BYTES.toLong())
             totalBytes = Math.addExact(totalBytes, entry.length)
@@ -299,6 +365,18 @@ internal class ProtectedStateOperationJournal(private val storage: JournalStorag
             if (!entry.name.startsWith("journal-")) continue
             journalBytes = Math.addExact(journalBytes, entry.length)
             check(journalBytes <= JournalLimits.CONTROL_BYTES)
+            if (ProtectedProbeHistoryStore.isName(entry.name) || ProtectedProbeHistoryStore.isUpdateName(entry.name)) {
+                check(entry.length <= ProtectedProbeHistoryStore.MAX_BYTES + 2048)
+                continue
+            }
+            if (ProtectedUiDraftStore.isName(entry.name)) {
+                draftCount++
+                draftBytes = Math.addExact(draftBytes, entry.length)
+                check(draftCount <= ProtectedUiDraftStore.MAX_RECORDS &&
+                    entry.length <= ProtectedUiDraftStore.MAX_BYTES + ProtectedUiDraftStore.ENVELOPE_ALLOWANCE &&
+                    draftBytes <= ProtectedUiDraftStore.MAX_TOTAL_BYTES)
+                continue
+            }
             val prefixes = listOf("journal-record-", "journal-intent-", "journal-resolution-", "journal-checkpoint-", "journal-projection-")
             val prefix = prefixes.firstOrNull(entry.name::startsWith)
             if (prefix == null) {
@@ -455,6 +533,7 @@ internal class ProtectedStateOperationJournal(private val storage: JournalStorag
         reconstruct: () -> ByteArray,
         expectedOldControl: ByteArray? = null,
         prepareReset: (() -> Unit)? = null,
+        beforeReservation: ((JournalControl) -> Unit)? = null,
     ): ProtectedMutationStatus {
         val expected = expectedNormalized.clone()
         val operation = operationId.clone()
@@ -477,6 +556,8 @@ internal class ProtectedStateOperationJournal(private val storage: JournalStorag
                     ProtectedStateGarbageCollector.requireNoPendingMutation(storage)
                     if (before.revision > 0) readCheckpointInternal(kind == MutationKind.COMPLETE_RESET).fill(0) else validateInventory(before)
                 } catch (_: Exception) { beforeBytes.fill(0); return@exclusive ProtectedMutationStatus.MUTATION_UNPROVEN }
+                try { beforeReservation?.invoke(before) }
+                catch (_: Exception) { beforeBytes.fill(0); return@exclusive ProtectedMutationStatus.NO_MUTATION }
                 val dirty = try { before.reserve(operation, kind) } catch (_: IllegalArgumentException) {
                     beforeBytes.fill(0)
                     return@exclusive ProtectedMutationStatus.CAPACITY_EXHAUSTED

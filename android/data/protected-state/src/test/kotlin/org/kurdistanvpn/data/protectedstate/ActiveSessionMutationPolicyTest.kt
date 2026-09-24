@@ -5,6 +5,165 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ActiveSessionMutationPolicyTest {
+    @Test fun registeredCurrentUsesExactEntryAndRejectsWriterBeforeRetirement() {
+        val policy = ActiveSessionMutationPolicy { 100L }
+        val session = checkNotNull(policy.register("1".repeat(32), 1, 2, AutoCloseable {}))
+        val other = ActiveSessionMutationPolicy { 100L }
+        assertTrue(policy.isRegisteredCurrent(session, 2))
+        assertFalse(policy.isRegisteredCurrent(session, 4))
+        assertFalse(other.isRegisteredCurrent(session, 2))
+        val lease = checkNotNull(policy.acquireFinalLease(session, 2, 200))
+        lease.close()
+        assertFalse(lease.validate(2))
+        assertTrue(policy.isRegisteredCurrent(session, 2))
+        val writer = checkNotNull(policy.reserveMutation())
+        assertFalse(policy.isRegisteredCurrent(session, 2))
+        writer.retirePriorOwners()
+        assertFalse(policy.isRegisteredCurrent(session, 2))
+        writer.close()
+        assertFalse(policy.isRegisteredCurrent(session, 2))
+    }
+
+    @Test fun registeredCurrentBracketsFreshObservationAndRequiresInstalledCallback() {
+        val process = ProtectedStateProcessOwner { 100L }
+        val registration = checkNotNull(process.registerRuntimeRevision("2".repeat(32), 1, 2))
+        var reads = 0
+        assertFalse(registration.isRegisteredCurrent { reads++; true })
+        assertEquals(0, reads)
+        val lease = checkNotNull(registration.acquireFinalLease(200))
+        val active = lease.registerActive({})
+        lease.close()
+        assertTrue(registration.isRegisteredCurrent { reads++; true })
+        assertEquals(1, reads)
+        assertFalse(registration.isRegisteredCurrent { active.close(); true })
+        assertFalse(registration.isRegisteredCurrent { error("must not read retired owner") })
+        process.close()
+    }
+
+    @Test fun writerWaitsForCallbackAndPrivateFinalizationBeforeCleanupIsProven() {
+        val process = ProtectedStateProcessOwner { 100L }
+        val registration = checkNotNull(process.registerRuntimeRevision("32".repeat(16), 1, 2))
+        val lease = checkNotNull(registration.acquireFinalLease(200))
+        val owner = field(registration, "invalidation") as ProtectedStateProcessOwner.RuntimeRegistrationOwner
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        var callbacks = 0; var acknowledgements = 0
+        val active = lease.registerActive({
+            callbacks++; entered.countDown(); check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        }, { clean -> check(clean); acknowledgements++ })
+        lease.close()
+        val policy = process.mutationPolicy()
+        val writer = checkNotNull(policy.reserveMutation())
+        val failure = java.util.concurrent.atomic.AtomicReference<Throwable>()
+        val worker = Thread {
+            try { writer.retirePriorOwners() } catch (caught: Throwable) { failure.set(caught) }
+        }.apply { isDaemon = true }
+        // Hold only the process metadata-release monitor to gate the real finalizer, not
+        // a fabricated cleanup callback. Policy admission and owner state remain callable.
+        synchronized(field(process, "monitor")) {
+            worker.start()
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertFalse(owner.cleanupProven())
+            assertThrows(IllegalStateException::class.java) { writer.requireCurrent() }
+            release.countDown()
+            awaitState { owner.callbackProven() }
+            assertFalse(owner.cleanupProven())
+            assertEquals(0, acknowledgements)
+            assertEquals(1, (field(policy, "owners") as Map<*, *>).size)
+            assertEquals(1, (field(process, "registrations") as Set<*>).size)
+            assertThrows(IllegalStateException::class.java) { writer.requireCurrent() }
+            assertNull(policy.reserveMutation())
+        }
+        worker.join(5000); assertFalse(worker.isAlive); assertNull(failure.get())
+        writer.requireCurrent(); writer.close()
+        assertTrue(owner.cleanupProven())
+        assertEquals(0, (field(policy, "owners") as Map<*, *>).size)
+        assertEquals(0, (field(process, "registrations") as Set<*>).size)
+        active.close(); registration.close(); process.close()
+        assertEquals(1, callbacks); assertEquals(1, acknowledgements)
+    }
+
+    @Test fun overlappingExplicitCloseCannotHealFailedPrivateFinalization() {
+        for (closeFirst in listOf(false, true)) {
+            val process = ProtectedStateProcessOwner { 100L }
+            val registration = checkNotNull(process.registerRuntimeRevision("33".repeat(16), 1, 2))
+            val lease = checkNotNull(registration.acquireFinalLease(200))
+            val entered = java.util.concurrent.CountDownLatch(1)
+            val release = java.util.concurrent.CountDownLatch(1)
+            var callbacks = 0; var retired: Boolean? = null
+            lease.registerActive({
+                callbacks++; entered.countDown(); check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            }, { retired = it })
+            lease.close()
+            val policy = process.mutationPolicy()
+            val writer = checkNotNull(policy.reserveMutation())
+            val failure = java.util.concurrent.atomic.AtomicReference<Throwable>()
+            val worker = Thread {
+                try { if (closeFirst) registration.close() else writer.retirePriorOwners() }
+                catch (caught: Throwable) { failure.set(caught) }
+            }.apply { isDaemon = true; start() }
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            try {
+                assertThrows(IllegalStateException::class.java) { registration.close() }
+                assertThrows(IllegalStateException::class.java) { writer.requireCurrent() }
+            } finally { release.countDown(); worker.join(5000) }
+            assertFalse(worker.isAlive); assertEquals(1, callbacks)
+            if (closeFirst) {
+                assertNull(failure.get()); assertEquals(true, retired)
+                writer.retirePriorOwners(); writer.requireCurrent()
+                registration.close(); registration.close()
+            } else {
+                assertNotNull(failure.get()); assertEquals(false, retired)
+                assertThrows(IllegalStateException::class.java) { registration.close() }
+                assertThrows(IllegalStateException::class.java) { writer.retirePriorOwners() }
+                assertThrows(IllegalStateException::class.java) { writer.requireCurrent() }
+                assertEquals(1, (field(policy, "owners") as Map<*, *>).size)
+                // Explicit failure releases the process reference, never the policy barrier.
+                assertEquals(0, (field(process, "registrations") as Set<*>).size)
+            }
+            writer.close(); process.close()
+        }
+    }
+
+    @Test fun failedCallbackNeverAcknowledgesRetirementOrAdmitsAWriter() {
+        val process = ProtectedStateProcessOwner { 100L }
+        val registration = checkNotNull(process.registerRuntimeRevision("34".repeat(16), 1, 2))
+        val lease = checkNotNull(registration.acquireFinalLease(200))
+        var retired: Boolean? = null; var callbacks = 0
+        lease.registerActive({ callbacks++; error("synthetic failed cleanup") }, { retired = it })
+        lease.close()
+        assertNull(process.mutationPolicy().beginMutation())
+        assertEquals(false, retired)
+        assertNull(process.mutationPolicy().beginMutation())
+        assertEquals(1, callbacks)
+        assertThrows(IllegalStateException::class.java) { registration.close() }
+        process.close()
+    }
+
+    private fun field(value: Any, name: String): Any = checkNotNull(value.javaClass.getDeclaredField(name)
+        .apply { isAccessible = true }.get(value))
+
+    private fun awaitState(predicate: () -> Boolean) {
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+        while (!predicate() && System.nanoTime() < deadline) Thread.yield()
+        assertTrue("lifetime phase did not arrive", predicate())
+    }
+
+    @Test fun successfulPolicyInvalidationAutomaticallyRetiresTheContainingRegistration() {
+        val process = ProtectedStateProcessOwner { 100L }
+        val registration = checkNotNull(process.registerRuntimeRevision("31".repeat(16), 1, 2))
+        val lease = checkNotNull(registration.acquireFinalLease(200))
+        var callbacks = 0
+        val active = lease.registerActive { callbacks++ }
+        lease.close()
+        process.mutationPolicy().beginMutation()!!.use {
+            assertTrue(registration.isClosed())
+            assertEquals(1, callbacks)
+        }
+        active.close(); registration.close(); process.close()
+        assertEquals(1, callbacks)
+    }
+
     @Test fun quiescenceCleanupUncertaintyPermanentlyRejectsFurtherMutationAdmission() {
         var acquires = 0
         val owner = ProtectedStateProcessOwner({
@@ -83,6 +242,40 @@ class ActiveSessionMutationPolicyTest {
         assertThrows(IllegalStateException::class.java) { owner.close() }
         assertEquals(1, goodInvalidations)
         assertThrows(IllegalStateException::class.java) { owner.close() }
+    }
+
+    @Test fun fiveSecondFinalLeaseExcludesConflictingWritesButCannotExtendOrOutliveItsDeadline() {
+        var now = 100L
+        val policy = ActiveSessionMutationPolicy { now }
+        val session = policy.register("28".repeat(16), 1, 2, AutoCloseable {})!!
+        assertNull(policy.acquireFinalLease(session, 2, 5101))
+        val lease = checkNotNull(policy.acquireFinalLease(session, 2, 5100))
+
+        now = 3000
+        assertTrue(lease.validate(2))
+        assertNull(policy.reserveMutation())
+        assertNull(policy.acquireFinalLease(session, 2, 8000))
+        now = 5099
+        assertTrue(lease.validate(2))
+        now = 5100
+        assertFalse(lease.validate(2))
+        assertNull(policy.acquireFinalLease(session, 2, 10100))
+        policy.beginMutation()!!.close()
+    }
+
+    @Test fun cancellationRetiresFiveSecondLeaseImmediatelyWithoutWaitingForExpiry() {
+        var now = 100L
+        val policy = ActiveSessionMutationPolicy { now }
+        var closes = 0
+        val session = policy.register("29".repeat(16), 1, 2, AutoCloseable { closes++ })!!
+        val lease = checkNotNull(policy.acquireFinalLease(session, 2, 5100))
+        now = 3000
+        assertTrue(lease.validate(2))
+        session.close()
+        assertEquals(1, closes)
+        assertFalse(lease.validate(2))
+        policy.beginMutation()!!.close()
+        assertEquals(1, closes)
     }
 
     @Test fun liveFinalLeaseExcludesMutationUntilReleaseOrExpiry() {

@@ -178,7 +178,7 @@ class ProfileAdmissionJournal private constructor(
             }
             result
         } finally {
-            nativeCore.releaseVerified(verified)
+            try { nativeCore.releaseVerified(verified) } finally { verified.close() }
         }
     }
 
@@ -419,7 +419,7 @@ class ProfileAdmissionJournal private constructor(
                 try {
                     activate(recordId, verified, recipientKeyLocalId = resolved.recipientKeyLocalId)
                 } finally {
-                    nativeCore.releaseVerified(verified)
+                    try { nativeCore.releaseVerified(verified) } finally { verified.close() }
                 }
             } finally {
                 request.fill(0)
@@ -481,7 +481,7 @@ class ProfileAdmissionJournal private constructor(
                         active.fill(0)
                     }
                     val alias = "Kurd profile ${verified.preview.contentFingerprint.take(8)}"
-                    val encodedPreview = ProfilePreviewCodec.encode(verified.preview, alias)
+                    val encodedPreview = ProfilePreviewCodec.encode(verified, alias)
                     try {
                         writeBlobs().stage(
                             recordId,
@@ -672,7 +672,7 @@ class ProfileAdmissionJournal private constructor(
                 }
                 val verified = resolved.verified
                 val preview = verified.preview
-                nativeCore.releaseVerified(verified)
+                try { nativeCore.releaseVerified(verified) } finally { verified.close() }
                 when (
                     val result = admitInternal(
                         verifyRequest = record.verifyRequest,

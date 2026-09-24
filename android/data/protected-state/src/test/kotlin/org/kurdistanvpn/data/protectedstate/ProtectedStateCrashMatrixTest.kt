@@ -13,6 +13,165 @@ import javax.crypto.spec.SecretKeySpec
 import org.kurdistanvpn.core.nativeapi.*
 
 class ProtectedStateCrashMatrixTest {
+    @Test fun captureReuseRejectsChangedMissingWrongRoleAndGenerationAndFreshKeyFailure() {
+        val raw = MemoryDurablePrimitives()
+        val codec = SecureEnvelopeCodec()
+        val delegate = JournalTestKey()
+        var generation = 1
+        var unavailable = false
+        val key = object : KeyEncryptionKey by delegate {
+            override val generation get() = generation
+            override fun unwrap(recordId: String, dataClass: SecureDataClass, wrapped: WrappedKey): ByteArray {
+                check(!unavailable) { "SYNTHETIC_KEY_UNAVAILABLE" }
+                return delegate.unwrap(recordId, dataClass, wrapped)
+            }
+        }
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, codec, key, raw.lock)
+        storage.provisionStoreIdentity(ByteArray(16) { 1 })
+        val name = "journal-checkpoint-0000000000000002"
+        storage.exclusive { storage.compareAndReplace(name, null, byteArrayOf(4, 5)) }
+        val leaf = "$name.blob"
+        val original = checkNotNull(raw.files[leaf])
+        storage.captureReadScope().use { reader ->
+            assertArrayEquals(byteArrayOf(4, 5), reader.read(name, 2))
+            val corrupt = original.bytes.also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            raw.files[leaf] = DurableSnapshot(original.identity, corrupt)
+            assertThrows(Exception::class.java) { reader.read(name, 2) }
+            raw.files.remove(leaf)
+            assertNull(reader.read(name, 2))
+            raw.files[leaf] = DurableSnapshot(original.identity,
+                codec.seal(name, SecureDataClass.LOCAL_ALIAS, byteArrayOf(8, 9), key))
+            assertThrows(IllegalArgumentException::class.java) { reader.read(name, 2) }
+            raw.files[leaf] = original
+            generation = 2
+            assertThrows(IllegalArgumentException::class.java) { reader.read(name, 2) }
+            generation = 1
+            unavailable = true
+            assertThrows(IllegalStateException::class.java) { reader.read("journal-store", 65) }
+            unavailable = false
+            storage.exclusive { storage.compareAndReplace(name, byteArrayOf(4, 5), byteArrayOf(8, 9)) }
+            assertArrayEquals(byteArrayOf(8, 9), reader.read(name, 2))
+            assertThrows(IllegalStateException::class.java) { reader.exclusive { } }
+            assertThrows(IllegalStateException::class.java) { reader.delete(name, byteArrayOf(8, 9)) }
+        }
+    }
+
+    @Test fun captureScopeCapacityFallsBackAndEveryExitWipesOwnedBuffers() {
+        val raw = MemoryDurablePrimitives()
+        var unwraps = 0
+        val delegate = JournalTestKey()
+        val key = object : KeyEncryptionKey by delegate {
+            override fun unwrap(recordId: String, dataClass: SecureDataClass, wrapped: WrappedKey): ByteArray {
+                unwraps++; return delegate.unwrap(recordId, dataClass, wrapped)
+            }
+        }
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, SecureEnvelopeCodec(), key, raw.lock)
+        val names = (1..17).map { "journal-record-" + it.toString(16).padStart(16, '0') }
+        storage.exclusive { names.forEach { storage.compareAndReplace(it, null, byteArrayOf(7)) } }
+        unwraps = 0
+        var retained: List<ByteArray> = emptyList()
+        val scope = storage.captureReadScope()
+        assertThrows(IllegalStateException::class.java) {
+            scope.use { reader ->
+                names.forEach { assertArrayEquals(byteArrayOf(7), reader.read(it, 1)) }
+                assertArrayEquals(byteArrayOf(7), reader.read(names.first(), 1))
+                assertArrayEquals(byteArrayOf(7), reader.read(names.last(), 1))
+                assertEquals(18, unwraps)
+                val entries = reader.javaClass.getDeclaredField("entries").apply { isAccessible = true }.get(reader) as Map<*, *>
+                retained = entries.values.flatMap { value -> listOf("encoded", "plaintext").map { field ->
+                    checkNotNull(value).javaClass.getDeclaredField(field).apply { isAccessible = true }.get(value) as ByteArray
+                } }
+                check(retained.isNotEmpty() && retained.any { bytes -> bytes.any { it != 0.toByte() } })
+                error("SYNTHETIC_CAPTURE_FAILURE")
+            }
+        }
+        assertTrue(retained.all { bytes -> bytes.all { it == 0.toByte() } })
+        assertThrows(IllegalStateException::class.java) { scope.read(names.first(), 1) }
+        val large = "journal-checkpoint-0000000000000002"
+        storage.exclusive { storage.compareAndReplace(large, null, ByteArray(140_000) { 6 }) }
+        unwraps = 0
+        storage.captureReadScope().use { reader -> repeat(2) {
+            val bytes = checkNotNull(reader.read(large, 140_000)); assertEquals(140_000, bytes.size); bytes.fill(0)
+        } }
+        assertEquals(2, unwraps)
+    }
+
+    @Test fun oneCaptureReusesAuthenticationButStillReadsEveryCiphertextAndKeepsStoreChecksFresh() {
+        val raw = MemoryDurablePrimitives()
+        var unwraps = 0
+        val delegate = JournalTestKey()
+        val key = object : KeyEncryptionKey by delegate {
+            override fun unwrap(recordId: String, dataClass: SecureDataClass, wrapped: WrappedKey): ByteArray {
+                unwraps++
+                return delegate.unwrap(recordId, dataClass, wrapped)
+            }
+        }
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, SecureEnvelopeCodec(), key, raw.lock)
+        storage.provisionStoreIdentity(ByteArray(16) { 1 })
+        val name = "journal-checkpoint-0000000000000002"
+        storage.exclusive { storage.compareAndReplace(name, null, byteArrayOf(4, 5)) }
+        unwraps = 0
+        val before = raw.reads
+        val scope = storage.captureReadScope()
+        scope.use { reader ->
+            val first = checkNotNull(reader.read(name, 2)); first.fill(0)
+            assertArrayEquals(byteArrayOf(4, 5), reader.read(name, 2))
+            assertEquals(2, raw.reads - before)
+            assertEquals("identical freshly reread ciphertext needs one unwrap per capture", 1, unwraps)
+            repeat(2) { assertEquals(65, checkNotNull(reader.read("journal-store", 65)).size) }
+            assertEquals(3, unwraps)
+            assertThrows(IllegalArgumentException::class.java) { reader.read(name, 1) }
+        }
+        assertThrows(IllegalStateException::class.java) { scope.read(name, 2) }
+        storage.captureReadScope().use { assertArrayEquals(byteArrayOf(4, 5), it.read(name, 2)) }
+        assertEquals(4, unwraps)
+    }
+
+    @Test fun selectedAuthorityReadsUseCommittedCiphertextLengthAndStillRejectInvalidObjects() {
+        val raw = MemoryDurablePrimitives()
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, SecureEnvelopeCodec(), JournalTestKey(), raw.lock)
+        storage.provisionStoreIdentity(ByteArray(16) { 1 })
+        val journal = ProtectedStateOperationJournal(storage)
+        journal.initialize(ByteArray(16) { 1 })
+        val operation = ByteArray(JournalLimits.OPERATION_BYTES) { 2 }
+        assertEquals(ProtectedMutationStatus.COMMITTED, journal.mutate(MutationKind.PROFILE_IMPORT, operation,
+            byteArrayOf(9), { storage.objectWriter(operation).create("object-test", byteArrayOf(1, 2, 3)) }, { byteArrayOf(9) }))
+        raw.maximumReadBudget = 3
+        fun reader(expected: ByteArray, physical: String = "object-test") = SelectedAuthorityObjectReader(
+            listOf(ProtectedObjectReference.fromEncryptedObject(1, "profile-one", physical, 1, expected,
+                syntheticObjectBinding())), storage::readObject, {})
+        assertArrayEquals(byteArrayOf(1, 2, 3), reader(byteArrayOf(1, 2, 3)).read("object-test"))
+        assertThrows(IllegalStateException::class.java) { reader(byteArrayOf(1, 2)).read("object-test") }
+        assertThrows(IllegalStateException::class.java) { reader(byteArrayOf(3, 2, 1)).read("object-test") }
+        assertThrows(IllegalStateException::class.java) { reader(byteArrayOf(1), "object-missing").read("object-missing") }
+    }
+
+    @Test fun smallGarbageDeletionUsesTheAuthenticatedRecordSizeRatherThanTheObjectCeiling() {
+        val raw = MemoryDurablePrimitives()
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, SecureEnvelopeCodec(), JournalTestKey(), raw.lock)
+        storage.provisionStoreIdentity(ByteArray(16) { 1 })
+        val journal = ProtectedStateOperationJournal(storage)
+        journal.initialize(ByteArray(16) { 1 })
+        val operation = ByteArray(JournalLimits.OPERATION_BYTES) { 2 }
+        assertEquals(ProtectedMutationStatus.COMMITTED, journal.mutate(MutationKind.PROFILE_IMPORT, operation,
+            byteArrayOf(9), { storage.objectWriter(operation).create("object-test", byteArrayOf(7)) }, { byteArrayOf(9) }))
+        raw.maximumReadBudget = 4096
+        assertArrayEquals(byteArrayOf(7), storage.garbageObjects().read("object-test", 1))
+        storage.exclusive {
+            assertThrows(IllegalStateException::class.java) { storage.garbageObjects().delete("object-test", byteArrayOf(8)) }
+        }
+        storage.exclusive { storage.garbageObjects().delete("object-test", byteArrayOf(7)) }
+        storage.exclusive { storage.delete("journal-checkpoint-0000000000000002", byteArrayOf(9)) }
+    }
+
+    @Test fun smallEncryptedJournalReadFitsBoundedNativeMemoryAndStillRejectsOversizedPlaintext() {
+        val raw = MemoryDurablePrimitives()
+        val storage = EncryptedJournalStorage.writer(raw.directory, raw, SecureEnvelopeCodec(), JournalTestKey(), raw.lock)
+        storage.provisionStoreIdentity(ByteArray(16) { 1 })
+        raw.maximumReadBudget = 4096
+        assertEquals(65, checkNotNull(storage.read("journal-store", 65)).size)
+        assertThrows(IllegalArgumentException::class.java) { storage.read("journal-store", 64) }
+    }
     @Test fun encryptedProductionAdapterPersistsAndReopensCompensationResolution() {
         val raw = MemoryDurablePrimitives()
         val codec = SecureEnvelopeCodec()
@@ -147,13 +306,19 @@ internal class JournalTestKey : KeyEncryptionKey {
 private class MemoryDurablePrimitives : DurableFilePrimitives {
     val directory = DurableDirectory(90, 1000, DurableFileIdentity(1, 2))
     val lock = DurableFileIdentity(1, 3)
-    private val files = linkedMapOf<String, DurableSnapshot>(EncryptedJournalStorage.LOCK to DurableSnapshot(lock, byteArrayOf()))
+    val files = linkedMapOf<String, DurableSnapshot>(EncryptedJournalStorage.LOCK to DurableSnapshot(lock, byteArrayOf()))
     private var inode = 4L
     var closes = 0
     var closeFailure = false
-    override fun read(directory: DurableDirectory, leaf: String, maxBytes: Int): DurableReadResult = files[leaf]?.let {
-        check(it.size <= maxBytes); DurableReadResult(DurableCode.OK, DurableSnapshot(it.identity, it.bytes))
-    } ?: DurableReadResult(DurableCode.ABSENT)
+    var maximumReadBudget = Int.MAX_VALUE
+    var reads = 0
+    override fun read(directory: DurableDirectory, leaf: String, maxBytes: Int): DurableReadResult {
+        reads++
+        check(maxBytes <= maximumReadBudget) { "NATIVE_READ_ALLOCATION_BUDGET" }
+        return files[leaf]?.let {
+            check(it.size <= maxBytes); DurableReadResult(DurableCode.OK, DurableSnapshot(it.identity, it.bytes))
+        } ?: DurableReadResult(DurableCode.ABSENT)
+    }
     override fun list(directory: DurableDirectory, maxEntries: Int): DurableListResult =
         DurableListResult(DurableCode.OK, files.map { (name, value) -> DurableDirectoryEntry(name, value.identity, value.size.toLong()) })
     override fun bootstrapLock(directory: DurableDirectory, lockLeaf: String) = DurableIdentityResult(DurableCode.OK, lock)
@@ -170,6 +335,7 @@ private class MemoryDurablePrimitives : DurableFilePrimitives {
                 return DurableMutationResult(DurableCode.OK)
             }
             override fun delete(leaf: String, expectedOld: DurableSnapshot, maxBytes: Int): DurableMutationResult {
+                check(maxBytes <= maximumReadBudget) { "NATIVE_DELETE_ALLOCATION_BUDGET" }
                 check(!closed && files[leaf]?.identity == expectedOld.identity)
                 files.remove(leaf)
                 return DurableMutationResult(DurableCode.OK)

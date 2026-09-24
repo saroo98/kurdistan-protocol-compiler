@@ -45,6 +45,9 @@ internal object ProtectedStateJournalLifecycle {
 internal interface JournalObjectAccess {
     fun inventory(): List<JournalStoredEntry>
     fun read(name: String): ByteArray?
+    fun read(name: String, maximum: Int): ByteArray? = read(name)?.also {
+        if (it.size > maximum) { it.fill(0); error("OBJECT_SIZE_UNPROVEN") }
+    }
     fun delete(name: String, expected: ByteArray)
 }
 
@@ -77,7 +80,7 @@ internal class ProtectedStateGarbageCollector(
                     val candidates = (ProtectedStateJournalLifecycle.garbageCandidates(objects.inventory(), retained, emptySet(), emptySet()) +
                         journalCandidates()).sortedBy { it.name }.take(MAX_ENTRIES)
                     val entries = candidates.map { entry ->
-                        val bytes = checkNotNull(readCandidate(entry.name))
+                        val bytes = checkNotNull(readCandidate(entry.name, entry.length.toInt()))
                         try {
                             if (entry.name.startsWith("object-")) check(bytes.size.toLong() == entry.length)
                             // Journal inventory measures ciphertext; the adapter returns authenticated plaintext.
@@ -121,7 +124,7 @@ internal class ProtectedStateGarbageCollector(
         val start = System.nanoTime()
         for (entry in plan.entries) {
             check(System.nanoTime() - start <= JournalLimits.SCAN_NANOS) { "BOUNDED_GC_PAUSED" }
-            val bytes = readCandidate(entry.name) ?: continue // A prior deletion is already independently observable.
+            val bytes = readCandidate(entry.name, entry.length.toInt()) ?: continue // A prior deletion is already independently observable.
             try {
                 check(!plan.complete && bytes.size.toLong() == entry.length && contentDigest(entry.name, bytes).matches(entry.digest))
                 if (entry.name.startsWith("object-")) objects.delete(entry.name, bytes)
@@ -129,7 +132,7 @@ internal class ProtectedStateGarbageCollector(
                     check(entry.name in eligibleJournal) { "JOURNAL_RECORD_STILL_REQUIRED" }
                     storage.delete(entry.name, bytes)
                 }
-                val surviving = readCandidate(entry.name)
+                val surviving = readCandidate(entry.name, entry.length.toInt())
                 try { check(surviving == null) } finally { surviving?.fill(0) }
             } finally { bytes.fill(0) }
         }
@@ -159,11 +162,11 @@ internal class ProtectedStateGarbageCollector(
         } }
     }
 
-    private fun readCandidate(name: String): ByteArray? = when {
-        name.startsWith("object-") -> objects.read(name)
-        name.startsWith("journal-checkpoint-") -> storage.read(name, JournalLimits.CHECKPOINT_BYTES)
-        name.startsWith("journal-projection-") -> storage.read(name, PhysicalProjectionWitness.MAXIMUM)
-        name.startsWith("journal-record-") || name.startsWith("journal-intent-") || name.startsWith("journal-resolution-") -> storage.read(name, JournalLimits.RECORD_BYTES)
+    private fun readCandidate(name: String, maximum: Int): ByteArray? = when {
+        name.startsWith("object-") -> objects.read(name, maximum)
+        name.startsWith("journal-checkpoint-") -> storage.read(name, minOf(maximum, JournalLimits.CHECKPOINT_BYTES))
+        name.startsWith("journal-projection-") -> storage.read(name, minOf(maximum, PhysicalProjectionWitness.MAXIMUM))
+        name.startsWith("journal-record-") || name.startsWith("journal-intent-") || name.startsWith("journal-resolution-") -> storage.read(name, minOf(maximum, JournalLimits.RECORD_BYTES))
         else -> error("INVALID_GARBAGE_CLASS")
     }
 

@@ -279,6 +279,40 @@ class ProtectedStateBoundaryTest {
         assertFails { ProfilePreviewCodec.decode(invalidSealed) }
     }
 
+    @Test fun previewAdapterPreservesPrivateV2FieldsWithoutExposingThemToProductState() {
+        val fields = listOf("private-endpoint:443", "deployment-local", "private-update-location").map { it.encodeToByteArray() }
+        val safe = preview().copy(
+            relayEndpoint = org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
+            authorityScope = org.kurdistanvpn.core.model.PreviewAuthorityScope.DEPLOYMENT_LOCAL,
+            updateSource = org.kurdistanvpn.core.model.RedactedFieldPresence.PROVIDED_REDACTED,
+        )
+        val handle = VerifiedPreviewHandle(1, safe, org.kurdistanvpn.core.nativeapi.NativePreviewFields(fields))
+        val encoded = ProfilePreviewCodec.encode(handle, "Local profile")
+        val inputSnapshot = encoded.clone()
+        val decoded = ProfilePreviewCodec.decode(encoded).first
+        assertEquals(safe, decoded)
+        assertFalse(decoded.toString().contains("private"))
+        assertArrayEquals(inputSnapshot, encoded)
+        val reader = java.nio.ByteBuffer.wrap(encoded)
+        reader.int
+        repeat(5) { val count = reader.get().toInt() and 255; reader.position(reader.position() + count) }
+        fields.forEach { expected ->
+            val count = reader.get().toInt() and 255
+            assertArrayEquals(expected, ByteArray(count).also { reader.get(it) })
+        }
+        assertArrayEquals(encoded, ProfilePreviewCodec.encode(handle, "Local profile"))
+        // Every partial raw-field and trailing-metadata read must fail without modifying persisted input.
+        for (length in 0 until encoded.size) {
+            val partial = encoded.copyOf(length)
+            val unchanged = partial.clone()
+            assertFails { ProfilePreviewCodec.decode(partial) }
+            assertArrayEquals(unchanged, partial)
+        }
+        assertFails { ProfilePreviewCodec.encode(safe, "Local profile") }
+        handle.close()
+        assertFails { ProfilePreviewCodec.encode(handle, "Local profile") }
+    }
+
     @Test
     fun previewCodecMigratesLegacyKpr1WithoutInventingDeploymentTrust() {
         val legacy = legacyPreviewEncoding(preview(), "Legacy Kurd profile")
@@ -286,9 +320,9 @@ class ProtectedStateBoundaryTest {
         assertEquals("Legacy Kurd profile", alias)
         assertEquals(preview(), decoded)
         assertEquals("", decoded.deploymentFingerprint)
-        assertEquals("", decoded.relayEndpointSummary)
-        assertEquals("", decoded.authorityScope)
-        assertEquals("", decoded.updateLocation)
+        assertEquals(org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED, decoded.relayEndpoint)
+        assertEquals(org.kurdistanvpn.core.model.PreviewAuthorityScope.UNAVAILABLE, decoded.authorityScope)
+        assertEquals(org.kurdistanvpn.core.model.RedactedFieldPresence.NOT_PROVIDED, decoded.updateSource)
         assertFalse(decoded.ownerControlled)
         assertFalse(decoded.updatesEnabled)
     }
@@ -709,9 +743,6 @@ private class FakeNativeCore(
     ): NativeResult<BackupPreviewHandle> = NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun restoreBackup(preview: BackupPreviewHandle): NativeResult<ByteArray> =
-        NativeResult.Failure(OperationError.INTERNAL_FAILURE)
-
-    override fun phase11RoundTrip(payload: ByteArray): NativeResult<ByteArray> =
         NativeResult.Failure(OperationError.INTERNAL_FAILURE)
 
     override fun openRuntimeSession(

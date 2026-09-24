@@ -25,8 +25,7 @@ class SecureRoutingPolicyStore private constructor(
     private fun writes(): SecureBlobAccess = checkNotNull(writer) { "READ_ONLY_ROUTING_VIEW" }
 
     fun loadPackages(): Set<String> {
-        if (!blobs.exists(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)) return emptySet()
-        val encoded = blobs.reopen(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY)
+        val encoded = blobs.reopenIfPresent(ROUTING_RECORD_ID, SecureDataClass.ROUTING_POLICY) ?: return emptySet()
         return try {
             decode(encoded)
         } finally {

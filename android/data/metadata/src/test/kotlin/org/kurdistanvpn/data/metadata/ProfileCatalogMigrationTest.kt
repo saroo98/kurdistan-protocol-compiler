@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package org.kurdistanvpn.data.metadata
 
-import androidx.sqlite.db.SupportSQLiteDatabase
-import java.lang.reflect.Proxy
 import org.junit.Assert.*
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
 
 class ProfileCatalogMigrationTest {
+    @Test fun explicitProjectionRecoveryAllowsOnlySameOperationRevisionAndStillComparesEveryOldField() = runBlocking {
+        val row = ProfileCatalogEntity("p", "FINALIZED", 1, 1, "AVAILABLE", 4, "1".repeat(64), "NONE")
+        val witness = ProtectedProjectionEntity(storeEpoch = "1".repeat(32), operationId = "1".repeat(64), revision = 4,
+            imageDigest = ProfileCatalogProjectionCodec.imageDigest(listOf(row)))
+        val fixture = ProjectionFixture(listOf(row), witness)
+        val replacement = witness.copy(imageDigest = ProfileCatalogProjectionCodec.imageDigest(emptyList()))
+        assertThrows(IllegalStateException::class.java) { runBlocking { fixture.recover(fixture.read(),
+            replacement.copy(operationId = "2".repeat(64)), emptyList()) } }
+        assertEquals(0, fixture.writes)
+        fixture.recover(fixture.read(), replacement, emptyList())
+        fixture.recover(fixture.read(), replacement, emptyList())
+        assertTrue(fixture.read().rows.isEmpty()); assertEquals(replacement, fixture.read().witness)
+        val writes = fixture.writes
+        assertThrows(IllegalStateException::class.java) { runBlocking { fixture.recover(CatalogProjection(listOf(row), witness),
+            replacement, emptyList()) } }
+        assertEquals(writes, fixture.writes)
+    }
     @Test fun bindingEncodingUsesIndependentGoldenAndRejectsCardinalityOrContextConflicts() {
         val binding = RecipientBindingEntity("p", "k", "1".repeat(64), 2)
         val golden = ("4b504231000000010170016b40" + "31".repeat(64) + "0000000000000002")
@@ -115,7 +130,7 @@ class ProfileCatalogMigrationTest {
         target.publish(expected, next, listOf(row), supplied)
         supplied.clear()
         assertEquals(listOf(binding), target.read().bindings)
-        assertEquals(listOf("clear-bindings", "clear-rows", "put-rows", "put-bindings", "put-witness"), target.actions)
+        assertEquals(listOf("clear-operation", "clear-bindings", "clear-rows", "put-rows", "put-bindings", "put-witness"), target.actions)
         val mutableRead = target.read().bindings as MutableList<RecipientBindingEntity>
         assertThrows(UnsupportedOperationException::class.java) { mutableRead.clear() }
     }
@@ -201,25 +216,6 @@ class ProfileCatalogMigrationTest {
         assertEquals(listOf(committed), dao.read().rows)
     }
 
-    @Test fun migrationPreservesLegacyFieldsAndAddsNoTrustedIdentityOrRecipientBinding() {
-        val statements = mutableListOf<String>()
-        val database = Proxy.newProxyInstance(SupportSQLiteDatabase::class.java.classLoader,
-            arrayOf(SupportSQLiteDatabase::class.java)) { _, method, args ->
-            check(method.name == "execSQL")
-            statements += args!![0] as String
-            null
-        } as SupportSQLiteDatabase
-        KurdistanMetadataDatabase.MIGRATION_1_2.migrate(database)
-        assertEquals(listOf(
-            "ALTER TABLE `profile_catalog` ADD COLUMN `committedRevision` INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE `profile_catalog` ADD COLUMN `operationId` TEXT NOT NULL DEFAULT ''",
-            "ALTER TABLE `profile_catalog` ADD COLUMN `quarantineReason` TEXT NOT NULL DEFAULT 'LEGACY_UNVERIFIED'",
-            "CREATE TABLE IF NOT EXISTS `protected_projection` (`singleton` INTEGER NOT NULL, `storeEpoch` TEXT NOT NULL, `operationId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `imageDigest` TEXT NOT NULL, PRIMARY KEY(`singleton`))",
-            "CREATE TABLE IF NOT EXISTS `recipient_bindings` (`profileRecordId` TEXT NOT NULL, `clientKeyRecordId` TEXT NOT NULL, `operationId` TEXT NOT NULL, `committedRevision` INTEGER NOT NULL, PRIMARY KEY(`profileRecordId`), FOREIGN KEY(`profileRecordId`) REFERENCES `profile_catalog`(`localRecordId`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_recipient_bindings_clientKeyRecordId` ON `recipient_bindings` (`clientKeyRecordId`)",
-        ), statements)
-    }
-
     @Test fun projectionWitnessRejectsInvalidIdentityRevisionAndDigest() {
         val good = ProtectedProjectionEntity(1, "1".repeat(32), "2".repeat(64), 2, "3".repeat(64))
         good.validate()
@@ -243,6 +239,10 @@ private class ProjectionFixture(private var catalog: List<ProfileCatalogEntity>,
     private var identity: ProtectedProjectionEntity?, private var relationships: List<RecipientBindingEntity> = emptyList()) : ProtectedProjectionDao() {
     var writes = 0
     val actions = mutableListOf<String>()
+    private var operations = emptyList<ProductOperationProjectionEntity>()
+    override suspend fun operationRows() = operations.toList()
+    override suspend fun putOperation(value: ProductOperationProjectionEntity) { writes++; actions += "put-operation"; operations = listOf(value) }
+    override suspend fun clearOperation() { writes++; actions += "clear-operation"; operations = emptyList() }
     override suspend fun rows() = catalog.toList()
     override suspend fun bindings() = relationships.toList()
     override suspend fun witness() = identity

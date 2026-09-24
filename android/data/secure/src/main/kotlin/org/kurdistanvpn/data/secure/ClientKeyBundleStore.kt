@@ -590,8 +590,7 @@ class ClientKeyBundleStore private constructor(
     }
 
     private fun readIndexLocked(): List<ClientKeyIndexEntry> {
-        if (!blobs.exists(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX)) return emptyList()
-        val encoded = blobs.reopen(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX)
+        val encoded = blobs.reopenIfPresent(CLIENT_KEY_INDEX_ID, SecureDataClass.RECIPIENT_KEY_INDEX) ?: return emptyList()
         return try {
             decodeIndex(encoded)
         } finally {

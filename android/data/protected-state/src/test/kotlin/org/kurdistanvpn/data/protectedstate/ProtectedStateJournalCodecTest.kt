@@ -5,6 +5,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProtectedStateJournalCodecTest {
+    @Test fun authenticatedProductCatalogRejectsDescriptorFromAnotherOperation() {
+        val fixture = BrokerFixture()
+        val before = fixture.snapshot()
+        val descriptor = org.kurdistanvpn.data.metadata.ProductOperationProjectionEntity("5".repeat(64), "UPDATE", null,
+            "APPLIED", 0, 0, 0, 1, false)
+        val catalog = org.kurdistanvpn.data.metadata.ProductCatalogProjectionCodec.encode(emptyList(), descriptor)
+        assertThrows(IllegalArgumentException::class.java) {
+            ProtectedStateSnapshot.create(before.storeId(), before.revision, null, emptyList(), before.settingsBytes(), catalog, before.operationId())
+        }
+    }
+    @Test fun dirtyControlAcceptsOnlySeventeenAssignedMutationKinds() {
+        val encoded = JournalControl.initial(ByteArray(16) { 1 }).reserve(ByteArray(32) { 2 }, MutationKind.PRODUCT_STATE).encode()
+        for (wire in 0..255) {
+            val input = encoded.clone().also { it[98] = wire.toByte() }
+            if (wire in 1..17) assertEquals(wire, JournalControl.decode(input).kind!!.wire)
+            else assertThrows(IllegalArgumentException::class.java) { JournalControl.decode(input) }
+        }
+    }
     @Test fun everyJournalDigestDomainMatchesIndependentFixedSha256Vectors() {
         // Independently calculated using .NET SHA256 over fixed ASCII labels, u32be(3), 01 02 03.
         val expected = listOf(

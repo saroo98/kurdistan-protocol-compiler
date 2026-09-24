@@ -2,9 +2,9 @@
 // Copyright 2026 Saro
 package org.kurdistanvpn.data.protectedstate
 
-import org.kurdistanvpn.core.model.DnsMode
+import org.kurdistanvpn.core.model.ResolverPolicy
 import org.kurdistanvpn.core.model.IpMode
-import org.kurdistanvpn.core.model.Phase9Settings
+import org.kurdistanvpn.core.model.ProductSettings
 import org.kurdistanvpn.core.model.ProbeMethod
 import org.kurdistanvpn.core.model.ProbePreferences
 import org.kurdistanvpn.core.model.ProfilePreferences
@@ -38,7 +38,7 @@ import java.util.concurrent.CancellationException
  * Backup eligibility and current trust remain with their validating readers.
  */
 object ProtectedStatePreviewBackupPolicy {
-    fun projectSettings(persisted: Phase9Settings, securePackages: Set<String>): Phase9Settings {
+    fun projectSettings(persisted: ProductSettings, securePackages: Set<String>): ProductSettings {
         require(securePackages.size <= 64)
         val routing = persisted.routing.copy(packages = securePackages.toSet()).validatedMetadata()
         return persisted.copy(
@@ -47,10 +47,8 @@ object ProtectedStatePreviewBackupPolicy {
                     SelectionMode.AUTOMATIC, SelectionMode.KURD_ONLY -> persisted.connection.selectionMode
                     SelectionMode.MANUAL_STRATEGY -> SelectionMode.AUTOMATIC
                 },
-                autoConnectOnBoot = false,
                 autoConnectOnLaunch = false,
                 reconnectOnFailure = false,
-                killSwitchRequested = false,
                 allowLan = false,
                 connectOnlyOnUntrustedNetworks = false,
             ),
@@ -59,14 +57,14 @@ object ProtectedStatePreviewBackupPolicy {
                     IpMode.AUTO, IpMode.IPV4_ONLY -> persisted.tunnel.ipMode
                     IpMode.IPV6_ONLY, IpMode.DUAL_STACK -> IpMode.AUTO
                 },
-                dnsMode = DnsMode.INTERNAL_TUN,
+                dnsMode = ResolverPolicy.INTERNAL,
                 customDns = "",
                 showSpeedInNotification = false,
             ),
             // Never promote a legacy plaintext package list into protected routing.
             routing = routing,
             updates = UpdatePreferences(),
-            probes = persisted.probes.copy(method = ProbeMethod.KURD_SESSION, testUrl = ProbePreferences().testUrl),
+            probes = persisted.probes.copy(method = ProbeMethod.KURD_SESSION, signedTargetId = null),
         )
     }
 
@@ -151,8 +149,10 @@ private fun <T> releaseOwnedNativePreview(
     check(handle.handle > 0) { "NATIVE_PREVIEW_HANDLE_INVALID" }
     block(handle.preview)
 } finally {
-    val released = try { release(handle) } catch (_: Throwable) { throw NativePreviewCleanupUnproven() }
-    if (released !is NativeResult.Success) throw NativePreviewCleanupUnproven()
+    try {
+        val released = try { release(handle) } catch (_: Throwable) { throw NativePreviewCleanupUnproven() }
+        if (released !is NativeResult.Success) throw NativePreviewCleanupUnproven()
+    } finally { handle.close() }
 }
 
 enum class ProtectedReadFailure { CANCELLED, EXPIRED, REJECTED, STATE_UNPROVEN, CLEANUP_UNPROVEN }

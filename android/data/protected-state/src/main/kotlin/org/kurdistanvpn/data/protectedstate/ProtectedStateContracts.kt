@@ -9,6 +9,7 @@ internal enum class MutationKind(val wire: Int) {
     ENROLLMENT_CREATE(5), ENROLLMENT_EXPORT(6), CREDENTIAL_DELETE(7),
     RESTORE(8), SCOPED_RESET(9), COMPLETE_RESET(10), RECOVERY(11),
     MIGRATION(12), REVOCATION(13), SETTINGS(14), DIAGNOSTIC_RECORD(15),
+    PRODUCT_STATE(16), PROJECTION_SCHEMA(17),
 }
 
 internal object JournalLimits {
@@ -16,7 +17,9 @@ internal object JournalLimits {
     const val RECORD_BYTES = 64 * 1024
     const val RECORDS = 256
     const val EPOCH_BYTES = 8L * 1024 * 1024
-    const val COMPACT_RECORDS = 128
+    // Fresh runtime publication repeatedly verifies this chain within its finite lease.
+    // Compact during explicit mutations, never during read-only restoration.
+    const val COMPACT_RECORDS = 16
     const val COMPACT_BYTES = 4L * 1024 * 1024
     const val RESERVED_RECORDS = 32
     const val RESERVED_BYTES = 1024L * 1024
