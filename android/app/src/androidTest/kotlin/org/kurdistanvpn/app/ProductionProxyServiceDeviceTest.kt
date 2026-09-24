@@ -522,7 +522,16 @@ class ProductionProxyServiceDeviceTest {
                 }
                 if (pauseActive) runBlocking {
                     val repository = (context.applicationContext as KurdistanApplication).compositionRoot.connectionRepository
-                    assertTrue(repository.pause(900000) is org.kurdistanvpn.domain.DomainResult.Success)
+                    val paused = repository.pause(900000)
+                    if (Build.VERSION.SDK_INT < 29) {
+                        // Without authoritative system-policy visibility, Pause must fail closed.
+                        assertEquals(org.kurdistanvpn.domain.DomainResult.Rejected(org.kurdistanvpn.core.model.ProductFailure(
+                            org.kurdistanvpn.core.model.ProductFailureCode.ROUTE_POLICY_REJECTED)), paused)
+                        assertEquals(VpnRuntimeState.ACTIVE_KURD_LIVE, RuntimeStatusWire.decode(control.queryStatus(version)).state)
+                        assertNull(facade.readProductStorage()?.pause)
+                        return@runBlocking
+                    }
+                    assertTrue(paused is org.kurdistanvpn.domain.DomainResult.Success)
                     assertEquals(VpnRuntimeState.IDLE, RuntimeStatusWire.decode(control.queryStatus(version)).state)
                     assertEquals(900000L, facade.readProductStorage()?.pause?.durationMillis)
                     assertTrue(repository.resume() is org.kurdistanvpn.domain.DomainResult.Success)
