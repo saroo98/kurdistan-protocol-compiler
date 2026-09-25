@@ -16,6 +16,7 @@ const steps=[
  ['reproducibility',['scripts/reproducibility.mjs']],
  ['artifacts',['--test',...artifacts]],
  ['browser',['tests/refinement.browser.mjs']],
+ ['approved-demo',['tests/approved-demo.browser.mjs']],
  ['performance',['scripts/python.mjs','tests/performance.py']],
  ['criteria',['scripts/requirements.mjs']],
  ['report',['scripts/report.mjs']],
