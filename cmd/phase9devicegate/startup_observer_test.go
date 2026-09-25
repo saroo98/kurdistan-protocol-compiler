@@ -85,6 +85,29 @@ func TestCompositeStartupObserverAllowsHostLaunchToClearForceStoppedPackageState
 	}
 }
 
+func TestStartupMarkersAcceptADBLineEndingsWithoutChangingIdentity(t *testing.T) {
+	invocation := strings.Repeat("a", 32)
+	start, err := newLaunchMarkerIdentity("START", invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	end, err := newLaunchMarkerIdentity("END", invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, newline := range []string{"\n", "\r\n"} {
+		raw := "100.000001 1 1 I KurdistanLaunchProbe: " + start.String() + newline +
+			"101.000001 1 1 I KurdistanLaunchProbe: " + end.String() + newline
+		if _, _, ok := launchMarkerWindow(raw, raw, invocation, 99_000_000_000, 102_000_000_000); !ok {
+			t.Fatalf("ADB line ending %q changed marker identity", newline)
+		}
+		malformed := strings.ReplaceAll(raw, start.String(), start.String()+" ")
+		if _, _, ok := launchMarkerWindow(malformed, malformed, invocation, 99_000_000_000, 102_000_000_000); ok {
+			t.Fatal("marker trailing content was accepted")
+		}
+	}
+}
+
 func TestCompositeStartupObserverRetainsExactEventsPreflightDenial(t *testing.T) {
 	for _, scenario := range []string{"ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-crash-probe-denied"} {
 		t.Run(scenario, func(t *testing.T) {
