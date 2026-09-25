@@ -2993,6 +2993,7 @@ type diagnosticStreamLifecycle struct {
 	StderrBytes                int64
 	StderrSHA256               string
 	StderrExcerpt              []string
+	ExactPermissionDenial      bool
 	LastParsedRecord           diagnosticLaunchStreamRecord
 	StartCapturedBeforeStop    bool
 	EndCapturedBeforeStop      bool
@@ -3202,8 +3203,17 @@ func sanitizeLaunchStreamStderr(input string) []string {
 	return result
 }
 
+func exactLogcatPermissionDenial(stderr string) bool {
+	// Classification must precede redaction, which intentionally loses words.
+	switch strings.TrimSuffix(strings.ReplaceAll(stderr, "\r\n", "\n"), "\n") {
+	case "Permission denied", "logcat: Permission denied", "logcat: permission denied", "dmesg: klogctl: Permission denied":
+		return true
+	default:
+		return false
+	}
+}
+
 func knownNonPrivilegedSystemEventDenial(lifecycle diagnosticStreamLifecycle) bool {
-	stderrExcerpt := strings.Join(lifecycle.StderrExcerpt, " ")
 	if lifecycle.Buffer != "events" || lifecycle.ExecutionBoundary != "ADB_SHELL" ||
 		lifecycle.CommandIdentityStatus != "CAPTURED" || lifecycle.CommandUID != 2000 || lifecycle.CommandGID != 2000 ||
 		lifecycle.CommandSELinuxContext != "u:r:shell:s0" || lifecycle.StartStatus != "STARTED" ||
@@ -3216,7 +3226,7 @@ func knownNonPrivilegedSystemEventDenial(lifecycle diagnosticStreamLifecycle) bo
 		lifecycle.FirstStderrSequence >= lifecycle.CancellationSequence || lifecycle.CancellationRequestedUTC.IsZero() ||
 		lifecycle.FirstStderrUTC.IsZero() || !lifecycle.FirstStderrUTC.Before(lifecycle.CancellationRequestedUTC) ||
 		lifecycle.CommandExitedUTC.Before(lifecycle.CancellationRequestedUTC) ||
-		(stderrExcerpt != "permission denied" && stderrExcerpt != "logcat permission denied") {
+		!lifecycle.ExactPermissionDenial {
 		return false
 	}
 	return (lifecycle.CommandStatus == "CANCELLED" && lifecycle.ExitCode == -1) ||
@@ -3317,6 +3327,7 @@ func diagnoseLaunchStreamLifecycle(stream *launchLogStream, stdout, stderr launc
 		CommandExitSequence: stream.terminalSequence, OutputTruncated: stdout.truncated, StderrTruncated: stderr.truncated,
 		StderrObserved: stderr.bytes != 0, StdoutBytes: stdout.bytes, StderrBytes: stderr.bytes,
 		StderrExcerpt: sanitizeLaunchStreamStderr(stderr.text), LastParsedRecord: lastLaunchStreamRecord(stdout.text),
+		ExactPermissionDenial:   exactLogcatPermissionDenial(stderr.text),
 		StartCapturedBeforeStop: startCaptured, EndCapturedBeforeStop: endCaptured,
 		IntentionallyStopped: stream.intentionallyStopped, ParserComplete: parserComplete,
 	}
@@ -3606,14 +3617,12 @@ func (observation *launchObservation) captureCollectorCapability(parent context.
 		}
 		_, stderr, command, err := observation.collectorCommand(parent, "collector-"+buffer+"-probe", args...)
 		probe := collectorProbeFromCommand(buffer, command)
-		excerpt := strings.Join(probe.StderrExcerpt, " ")
 		switch {
 		case command.Truncated:
 			probe.Rejection = "OUTPUT_TRUNCATED"
 		case err != nil:
 			probe.Rejection = "COMMAND_FAILED"
-		case buffer == "events" && identity.Status == "CAPTURED" &&
-			(excerpt == "permission denied" || excerpt == "logcat permission denied"):
+		case buffer == "events" && identity.Status == "CAPTURED" && exactLogcatPermissionDenial(stderr):
 			// Unavailable final events still require the exact denied stream lifecycle
 			// and a complete independent process/activity/crash replacement.
 			probe.Status = "OPTIONAL_SOURCE_UNAVAILABLE"
