@@ -2481,11 +2481,33 @@ func TestProductionCommandTransportCancelsAnActuallyStartedStream(t *testing.T) 
 		if !errors.Is(ctx.Err(), context.Canceled) || !errors.As(err, &exit) || exit.Success() || stderr.Len() != 0 {
 			t.Fatalf("real child cancellation lost: context=%v wait=%v stderr_bytes=%d", ctx.Err(), err, stderr.Len())
 		}
+		if !launchStreamCancellationDriven(err, ctx) {
+			t.Fatal("owned child termination was not retained as cancellation evidence")
+		}
 		if stdout.String() != "child ready\n" {
 			t.Fatalf("real subprocess output-copy lost readiness bytes: length=%d", len(stdout.String()))
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("cancelled real child did not complete its wait")
+	}
+}
+
+func TestProductionCommandTransportDoesNotRelabelAnEarlierFailure(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wait, err := startRealCommand(ctx, executable, []string{"-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "nonzero"}, io.Discard, io.Discard, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wait()
+	cancel()
+	status, code := diagnosticCommandStatus(err)
+	if launchStreamCancellationDriven(err, ctx) || status != "ERROR" || code != 7 {
+		t.Fatalf("original child failure changed: %s/%d %v", status, code, err)
 	}
 }
 
