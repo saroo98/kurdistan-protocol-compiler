@@ -23,6 +23,45 @@ import org.kurdistanvpn.runtime.android.*
 
 /** Host execution covers the real provider state machine, not Android Binder or pipe syscalls. */
 class RuntimeAuthorityReissueServiceTest {
+    @Test fun completedResponseAdmitsOneSuccessorWhileWorkerReturnsAndDrainsItOnShutdown() {
+        listOf(false, true).forEach { detached ->
+            val f = Fixture()
+            assertTrue(f.bind()); assertNotNull(f.offer())
+            val worker = newAuthorityResponseWorker()
+            val ready = CountDownLatch(1)
+            val returning = CountDownLatch(1)
+            val first = java.util.concurrent.FutureTask {
+                val response = f.respond(RuntimeAuthorityPurpose.FULL_AUTHORITY, 30)
+                ready.countDown()
+                check(returning.await(5, TimeUnit.SECONDS))
+                response
+            }
+            val successor = java.util.concurrent.FutureTask { f.respond(RuntimeAuthorityPurpose.PRE_TUN, 40) }
+            try {
+                worker.execute(first)
+                assertTrue(ready.await(5, TimeUnit.SECONDS))
+                assertEquals(1, f.adapter.responseStatus("2".repeat(32), RuntimeAuthorityPurpose.FULL_AUTHORITY, 1000, 20, f.peer))
+                worker.execute(successor)
+                assertThrows(java.util.concurrent.RejectedExecutionException::class.java) { worker.execute { error("excess response") } }
+                if (detached) f.adapter.connectionClosed(f.peer)
+                worker.shutdown()
+                assertThrows(java.util.concurrent.RejectedExecutionException::class.java) { worker.execute { error("shutdown response") } }
+                returning.countDown()
+                val initial = first.get(5, TimeUnit.SECONDS)
+                val next = successor.get(5, TimeUnit.SECONDS)
+                assertTrue(initial.accepted); assertEquals(!detached, next.accepted)
+                for (response in listOf(initial, next)) {
+                    assertEquals(1, response.input.closes); assertEquals(1, response.output.closes)
+                }
+                assertTrue(worker.awaitTermination(5, TimeUnit.SECONDS))
+                assertEquals(if (detached) 0 else 1, f.backend.leaseAcquisitions)
+            } finally {
+                returning.countDown(); worker.shutdown()
+                assertTrue(worker.awaitTermination(5, TimeUnit.SECONDS))
+                f.adapter.cancel("2".repeat(32), 1000, 20, f.peer)
+            }
+        }
+    }
     @Test fun publicationExpiryPendingCleanupKeepsRegistrationUntilActualRetirement() {
         for (completed in listOf(false, true)) ProductionRegistrationFixture().use { p ->
             assertTrue(p.f.respond(RuntimeAuthorityPurpose.PRE_ACTIVE, 50).accepted)
