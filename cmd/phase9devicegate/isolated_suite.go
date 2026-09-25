@@ -21,6 +21,7 @@ type deviceBatch struct {
 	clearData        bool
 	extras           []string
 	wide, credential bool
+	wifiOnly         bool
 }
 
 func verifyOwnedEmulator(selected, actual, hardware, app string) error {
@@ -79,9 +80,9 @@ func planIsolatedDeviceBatches(tests []string) ([]deviceBatch, error) {
 			// Basic leases and signed updates require different protected-state fixtures.
 			// Keep the DNS cases in one process so their native rate history is still checked.
 			split := sort.SearchStrings(group, class+"#signedUpdate")
-			for _, fixture := range [][]string{group[:split], group[split:]} {
+			for index, fixture := range [][]string{group[:split], group[split:]} {
 				if len(fixture) > 0 {
-					batches = append(batches, deviceBatch{tests: fixture, clearData: true})
+					batches = append(batches, deviceBatch{tests: fixture, clearData: true, wifiOnly: index == 0})
 				}
 			}
 		} else {
@@ -132,6 +133,39 @@ func runIsolatedDeviceSuite(ctx context.Context, client adbClient, value options
 }
 
 func runIsolatedDeviceBatch(ctx context.Context, client adbClient, value options, batch deviceBatch) (_ string, resultErr error) {
+	if batch.wifiOnly {
+		// This fixture requires a stable underlay while it retires and replaces its TUN.
+		// A real default-network handover must remain terminal in the application.
+		name, nameErr := client.captureOutput(ctx, "emu", "avd", "name")
+		hardware, hardwareErr := client.captureOutput(ctx, "shell", "getprop", "ro.hardware")
+		fields := strings.Fields(name)
+		if nameErr != nil || hardwareErr != nil || len(fields) != 2 || fields[1] != "OK" {
+			return "", errors.New("maintenance underlay requires verified owned emulator identity")
+		}
+		if err := verifyOwnedEmulator(value.ownedEmulatorName, fields[0], hardware, value.appPackage); err != nil {
+			return "", err
+		}
+		wifi, wifiErr := client.captureOutput(ctx, "shell", "settings", "get", "global", "wifi_on")
+		data, dataErr := client.captureOutput(ctx, "shell", "settings", "get", "global", "mobile_data")
+		data = strings.TrimSpace(data)
+		if wifiErr != nil || dataErr != nil || strings.TrimSpace(wifi) != "1" || (data != "0" && data != "1") {
+			return "", errors.New("maintenance underlay requires enabled emulator Wi-Fi and known mobile-data state")
+		}
+		if data == "1" {
+			defer func() {
+				cleanup, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err := client.capture(cleanup, "91-restore-mobile-data.txt", "shell", "svc", "data", "enable")
+				restored, readErr := client.captureOutput(cleanup, "shell", "settings", "get", "global", "mobile_data")
+				if err != nil || readErr != nil || strings.TrimSpace(restored) != "1" {
+					resultErr = errors.Join(resultErr, errors.New("emulator mobile-data restoration failed"))
+				}
+			}()
+			if _, err := client.capture(ctx, "00-isolate-maintenance-underlay.txt", "shell", "svc", "data", "disable"); err != nil {
+				return "", err
+			}
+		}
+	}
 	if _, err := client.capture(ctx, "00-force-stop.txt", "shell", "am", "force-stop", value.appPackage); err != nil {
 		return "", err
 	}
