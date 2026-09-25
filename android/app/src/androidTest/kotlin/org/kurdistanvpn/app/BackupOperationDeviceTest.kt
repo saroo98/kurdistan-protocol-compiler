@@ -76,13 +76,29 @@ class BackupOperationDeviceTest {
             try {
                 try {
                     if (root.protectedStateFacade() != null) {
+                        val resetStarted = android.os.SystemClock.elapsedRealtime()
                         var reset = root.resetProtectedStateConfirmed()
+                        val firstReset = reset.javaClass.simpleName.uppercase(java.util.Locale.ROOT)
+                        val firstMillis = android.os.SystemClock.elapsedRealtime() - resetStarted
                         // Bounded reset may pause with its authenticated manifest intact. Resume
                         // that operation once; never start a replacement or accept partial cleanup.
                         if (reset is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Unproven)
                             reset = root.resetProtectedStateConfirmed(recoverPending = true)
-                        assertTrue("KURDISTAN_TEST_SETUP expected=COMMITTED actual=${reset.javaClass.simpleName.uppercase(java.util.Locale.ROOT)} setup=BACKUP_RESET", reset is
-                            org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed)
+                        if (reset !is org.kurdistanvpn.data.protectedstate.ProtectedStateApplicationFacade.CommandResult.Committed) {
+                            val totalMillis = android.os.SystemClock.elapsedRealtime() - resetStarted
+                            // Failure evidence only. Do not read key material, dump paths or
+                            // treat absence as proof that authenticated cleanup completed.
+                            val keyPresent = runCatching {
+                                java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                                    .containsAlias("kurdistan-phase9-availability-kek-v1")
+                            }.fold({ if (it) "1" else "0" }, { "UNKNOWN" })
+                            val state = java.io.File(parent, "no_backup/protected-state-v1")
+                            val manifest = if (java.io.File(state, "journal-reset.blob").isFile) 1 else 0
+                            val ready = if (java.io.File(state, "journal-reset-ready.blob").isFile) 1 else 0
+                            fail("KURDISTAN_TEST_SETUP expected=COMMITTED actual=${reset.javaClass.simpleName.uppercase(java.util.Locale.ROOT)} " +
+                                "setup=BACKUP_RESET,FIRST_$firstReset,FIRST_MS_$firstMillis,TOTAL_MS_$totalMillis," +
+                                "KEY_PRESENT_$keyPresent,MANIFEST_$manifest,READY_$ready")
+                        }
                     }
                 } finally { root.close() }
             } catch (cleanup: Throwable) {
