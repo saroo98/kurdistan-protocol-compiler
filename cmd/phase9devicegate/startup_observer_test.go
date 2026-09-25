@@ -109,10 +109,10 @@ func TestStartupMarkersAcceptADBLineEndingsWithoutChangingIdentity(t *testing.T)
 }
 
 func TestCompositeStartupObserverRetainsExactEventsPreflightDenial(t *testing.T) {
-	for _, scenario := range []string{"ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-crash-probe-denied"} {
+	for _, scenario := range []string{"ci-api36-events-probe-denied", "ci-api36-events-probe-dmesg", "ci-api36-events-probe-ambiguous", "ci-api36-events-probe-negated", "ci-api36-events-probe-mixed", "ci-api36-crash-probe-denied"} {
 		t.Run(scenario, func(t *testing.T) {
 			err, observation := runLaunchScenario(t, scenario, 36)
-			if scenario != "ci-api36-events-probe-denied" {
+			if scenario != "ci-api36-events-probe-denied" && scenario != "ci-api36-events-probe-dmesg" {
 				if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" {
 					t.Fatalf("unproven collector accepted: err=%v gate=%s", err, observation.GateResult)
 				}
@@ -128,6 +128,17 @@ func TestCompositeStartupObserverRetainsExactEventsPreflightDenial(t *testing.T)
 				t.Fatalf("denial evidence lost: probe=%+v events=%+v", probe, observation.SystemEvents)
 			}
 			assertVersionedCompositeBinding(t, observation)
+		})
+	}
+}
+
+func TestCompositeStartupObserverRejectsAmbiguousFinalEventsDenial(t *testing.T) {
+	for _, scenario := range []string{"ci-api36-events-stream-negated", "ci-api36-events-stream-mixed"} {
+		t.Run(scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, scenario, 36)
+			if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" || observation.SystemEvents.Status == "OPTIONAL_SOURCE_UNAVAILABLE" {
+				t.Fatalf("ambiguous final diagnostic accepted: err=%v gate=%s events=%s", err, observation.GateResult, observation.SystemEvents.Status)
+			}
 		})
 	}
 }
@@ -188,6 +199,7 @@ func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycl
 		CancellationSequence: 2, FirstStderrSequence: 1, LastStderrSequence: 1, CommandExitSequence: 3,
 		ExitRelativeToCancellation: "AFTER_OWNED_CANCELLATION", StderrObserved: true, StderrBytes: 27,
 		StderrSHA256: strings.Repeat("a", 64), StderrExcerpt: []string{"permission denied"},
+		ExactPermissionDenial:   true,
 		StartCapturedBeforeStop: true, EndCapturedBeforeStop: true, IntentionallyStopped: true,
 	}
 	if !knownNonPrivilegedSystemEventDenial(valid) {
@@ -220,7 +232,7 @@ func TestKnownNonPrivilegedSystemEventDenialRequiresTheExactBoundedShellLifecycl
 		{"not-intentional", func(value *diagnosticStreamLifecycle) { value.IntentionallyStopped = false }},
 		{"missing-marker", func(value *diagnosticStreamLifecycle) { value.EndCapturedBeforeStop = false }},
 		{"wrong-reason", func(value *diagnosticStreamLifecycle) { value.TerminalReason = "PARSER_INCOMPLETE" }},
-		{"ambiguous-diagnostic", func(value *diagnosticStreamLifecycle) { value.StderrExcerpt = []string{"error permission denied"} }},
+		{"unclassified-raw-diagnostic", func(value *diagnosticStreamLifecycle) { value.ExactPermissionDenial = false }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			candidate := valid

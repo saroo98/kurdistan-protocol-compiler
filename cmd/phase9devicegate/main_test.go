@@ -474,7 +474,13 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	case strings.HasPrefix(command, "logcat -b ") && strings.Contains(command, " -d -t 1 "):
 		if (strings.HasPrefix(scenario, "ci-api36-events-probe-") && args[2] == "events") ||
 			(scenario == "ci-api36-crash-probe-denied" && args[2] == "crash") {
-			if strings.HasSuffix(scenario, "ambiguous") {
+			if strings.HasSuffix(scenario, "negated") {
+				fmt.Fprintln(stderr, "Permission was not denied")
+			} else if strings.HasSuffix(scenario, "mixed") {
+				fmt.Fprintln(stderr, "logcat: Permission denied: socket authentication rejected")
+			} else if strings.HasSuffix(scenario, "dmesg") {
+				fmt.Fprint(stderr, "dmesg: klogctl: Permission denied\r\n")
+			} else if strings.HasSuffix(scenario, "ambiguous") {
 				fmt.Fprintln(stderr, "error permission denied")
 			} else {
 				fmt.Fprintln(stderr, "Permission denied")
@@ -926,10 +932,22 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	stderrMode, stderrBefore := "", ""
 	if buffer == "main" || buffer == "system" || (buffer == "events" && strings.HasPrefix(fixture.scenario, "ci-api")) {
 		switch fixture.scenario {
-		case "ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-crash-probe-denied":
+		case "ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-events-probe-negated", "ci-api36-events-probe-mixed", "ci-api36-crash-probe-denied":
 			if buffer == "events" {
 				stderrMode = "before-owned-cancellation"
 				stderrBefore = "Permission denied\n"
+			}
+		case "ci-api36-events-probe-dmesg", "ci-api36-events-stream-negated", "ci-api36-events-stream-mixed":
+			if buffer == "events" {
+				stderrMode = "before-owned-cancellation"
+				switch fixture.scenario {
+				case "ci-api36-events-probe-dmesg":
+					stderrBefore = "dmesg: klogctl: Permission denied\r\n"
+				case "ci-api36-events-stream-negated":
+					stderrBefore = "Permission was not denied\n"
+				case "ci-api36-events-stream-mixed":
+					stderrBefore = "logcat: Permission denied: socket authentication rejected\n"
+				}
 			}
 		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-proc-status":
 			stderrMode = "before-owned-cancellation"
