@@ -920,7 +920,7 @@ func nativeFilesystemPreparationArgs(plan nativeFilesystemInvocationPlan) [][]st
 	for _, child := range plan.Children {
 		path := prefix + "/" + child
 		commands = append(commands,
-			[]string{"shell", "run-as", plan.OwnerPackage, "mkdir", path},
+			[]string{"shell", "run-as", plan.OwnerPackage, "mkdir", "-p", path},
 			[]string{"shell", "run-as", plan.OwnerPackage, "chmod", "700", path},
 		)
 	}
@@ -985,9 +985,11 @@ func prepareNativeFilesystemInstrumentation(ctx context.Context, client adbClien
 		name := fmt.Sprintf("12b-native-root-%02d.txt", index+1)
 		output, err := client.capture(ctx, name, args...)
 		var exit *exec.ExitError
-		if args[3] == "chmod" && output == "" && errors.As(err, &exit) && exit.ExitCode() == 255 && ctx.Err() == nil {
+		idempotent := args[3] == "chmod" || (index >= 3 && args[3] == "mkdir" && args[4] == "-p")
+		if idempotent && output == "" && errors.As(err, &exit) && exit.ExitCode() == 255 && ctx.Err() == nil {
 			// ADB may disconnect before returning the shell result. Only this
-			// idempotent permission assignment is safe to repeat, once; mkdir is not.
+			// permission assignment or child setup in the already exclusively
+			// created invocation root may repeat once. Root creation never does.
 			_, err = client.capture(ctx, strings.TrimSuffix(name, ".txt")+"-retry.txt", args...)
 		}
 		if err != nil {

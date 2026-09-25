@@ -2893,7 +2893,7 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 	}
 	for _, child := range wantChildren {
 		wantPreparation = append(wantPreparation,
-			[]string{"shell", "run-as", targetPackage, "mkdir", "cache/phase17-disposable-" + invocation + "/" + child},
+			[]string{"shell", "run-as", targetPackage, "mkdir", "-p", "cache/phase17-disposable-" + invocation + "/" + child},
 			[]string{"shell", "run-as", targetPackage, "chmod", "700", "cache/phase17-disposable-" + invocation + "/" + child},
 		)
 	}
@@ -2935,7 +2935,7 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 	}
 }
 
-func TestNativeFilesystemPreparationRetriesOnlyOneEmptyChmodDisconnect(t *testing.T) {
+func TestNativeFilesystemPreparationRetriesOnlyOneEmptyIdempotentDisconnect(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -2945,13 +2945,13 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyChmodDisconnect(t *testin
 	if !errors.As(disconnected, &exit) || exit.ExitCode() != 255 {
 		t.Fatal("missing real exit-255 fixture", disconnected)
 	}
-	for _, scenario := range []string{"recovers", "repeated-disconnect", "mkdir", "diagnostic-output", "other-error", "cancelled"} {
+	for _, scenario := range []string{"recovers", "child-recovers", "child-repeated-disconnect", "repeated-disconnect", "mkdir", "diagnostic-output", "other-error", "cancelled"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			client := newADBClient("fixture-adb", "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
 			operation := "chmod"
-			if scenario == "mkdir" {
+			if scenario == "mkdir" || strings.HasPrefix(scenario, "child-") {
 				operation = "mkdir"
 			}
 			var failedArgs []string
@@ -2964,9 +2964,15 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyChmodDisconnect(t *testin
 				if args[3] != operation || (failedArgs != nil && !reflect.DeepEqual(args, failedArgs)) {
 					return nil
 				}
+				if operation == "mkdir" {
+					path := args[len(args)-1]
+					if path == "cache" || (strings.HasPrefix(scenario, "child-") != strings.HasSuffix(path, "/existing-directory")) {
+						return nil
+					}
+				}
 				failedArgs = append([]string(nil), args...)
 				attempts++
-				if attempts > 1 && scenario == "recovers" {
+				if attempts > 1 && (scenario == "recovers" || scenario == "child-recovers") {
 					return nil
 				}
 				if scenario == "diagnostic-output" {
@@ -2982,10 +2988,10 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyChmodDisconnect(t *testin
 			}
 			_, got := prepareNativeFilesystemInstrumentation(ctx, client, "org.example.app", "org.example.test", "org.example.test/androidx.test.runner.AndroidJUnitRunner")
 			wantAttempts := 1
-			if scenario == "recovers" || scenario == "repeated-disconnect" {
+			if scenario == "recovers" || scenario == "repeated-disconnect" || strings.HasPrefix(scenario, "child-") {
 				wantAttempts = 2
 			}
-			if attempts != wantAttempts || (got == nil) != (scenario == "recovers") {
+			if attempts != wantAttempts || (got == nil) != (scenario == "recovers" || scenario == "child-recovers") {
 				t.Fatalf("attempts=%d want=%d err=%v", attempts, wantAttempts, got)
 			}
 		})
