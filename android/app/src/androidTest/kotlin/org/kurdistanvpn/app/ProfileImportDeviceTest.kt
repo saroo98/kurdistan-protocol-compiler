@@ -84,6 +84,7 @@ class ProfileImportDeviceTest {
                 flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             }
             compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
+            val initialIme = automation.windows.any { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
             assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
             // Back dismisses the IME asynchronously. Do not send the picker Back to the closing IME.
             compose.waitUntil(5_000) {
@@ -91,10 +92,23 @@ class ProfileImportDeviceTest {
             }
             automation.waitForIdle(100, 2_000)
             // Accessibility can still report the old picker after our window regains focus.
-            if (!compose.activity.hasWindowFocus() &&
-                automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
+            val secondBack = !compose.activity.hasWindowFocus() &&
+                automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true
+            if (secondBack)
                 assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-            compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
+            try {
+                compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
+            } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+                val foreground = when (automation.rootInActiveWindow?.packageName?.toString()) {
+                    "com.android.documentsui", "com.google.android.documentsui" -> "PICKER"
+                    compose.activity.packageName -> "APPLICATION"
+                    null -> "UNAVAILABLE"
+                    else -> "OTHER"
+                }
+                val ime = automation.windows.any { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+                val setup = "EXPORT_CANCEL,INITIAL_IME_${if (initialIme) 1 else 0},SECOND_BACK_${if (secondBack) 1 else 0},FINAL_IME_${if (ime) 1 else 0}"
+                throw AssertionError("KURDISTAN_TEST_SETUP expected=APPLICATION_FOCUS actual=$foreground setup=$setup", failure)
+            }
         } finally {
             automation.serviceInfo = automation.serviceInfo.apply { flags = previousFlags }
         }
