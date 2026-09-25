@@ -2383,6 +2383,20 @@ func TestDiagnosticCommandFixtureProcess(t *testing.T) {
 		os.Exit(7)
 	case "disconnected":
 		os.Exit(255)
+	case "stdin-held":
+		read := make(chan error, 1)
+		go func() {
+			var input [1]byte
+			_, err := os.Stdin.Read(input[:])
+			read <- err
+		}()
+		select {
+		case <-read:
+			os.Exit(11)
+		case <-time.After(200 * time.Millisecond):
+			fmt.Fprintln(os.Stdout, "stdin remains open")
+			os.Exit(0)
+		}
 	case "wait":
 		interrupt := make(chan os.Signal, 1)
 		signal.Notify(interrupt, os.Interrupt)
@@ -2406,6 +2420,34 @@ func TestProductionCommandTransportInvokesRealChildAndKeepsExitState(t *testing.
 	childPID, parseErr := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(stdout, "child pid=")))
 	if err != nil || record.Status != "CAPTURED" || record.ExitCode != 0 || parseErr != nil || childPID <= 0 || childPID == os.Getpid() || stderr != "child stderr\n" {
 		t.Fatalf("real child contract failed: err=%v status=%s exit=%d distinct_child=%t stderr_bytes=%d", err, record.Status, record.ExitCode, parseErr == nil && childPID > 0 && childPID != os.Getpid(), len(stderr))
+	}
+}
+
+func TestProductionCommandTransportDoesNotSendPrematureStdinEOF(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stream := range []bool{false, true} {
+		t.Run(strconv.FormatBool(stream), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var output bytes.Buffer
+			args := []string{"-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "stdin-held"}
+			var err error
+			if stream {
+				var wait func() error
+				wait, err = startRealCommand(ctx, executable, args, &output, io.Discard, time.Second)
+				if err == nil {
+					err = wait()
+				}
+			} else {
+				err = runRealCommand(ctx, executable, args, &output, io.Discard, time.Second)
+			}
+			if err != nil || output.String() != "stdin remains open\n" {
+				t.Fatalf("command received premature stdin EOF: err=%v output=%q", err, output.String())
+			}
+		})
 	}
 }
 
