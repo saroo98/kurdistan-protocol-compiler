@@ -259,6 +259,19 @@ internal fun runProductionPublicationCallV1(lease: RuntimeProductionInitialLease
     }
 }
 
+/** Pending cleanup consumes the existing call deadline, not an unrelated poll quota. */
+internal fun awaitProductionResponseReadyV1(isLive: () -> Boolean, readStatus: () -> Int,
+    waitPending: () -> Unit = { java.util.concurrent.locks.LockSupport.parkNanos(1_000_000) }) {
+    while (true) {
+        check(isLive())
+        when (readStatus()) {
+            1 -> { check(isLive()); return }
+            2 -> waitPending()
+            else -> error("AUTHORITY_RESPONSE_REJECTED")
+        }
+    }
+}
+
 internal class RuntimeProductionClientCaptureV1(val offer: RuntimeProductionAuthorityOfferV1,
     val capture: RuntimeCaptureSnapshotV1) : Closeable {
     override fun close() = capture.close()
@@ -605,19 +618,11 @@ internal class RuntimeProductionAuthorityClientV1(private val context: Context,
             }) { it.readInt() == 1 })
             cap.first.close(); output.second.close(); key.fill(0)
             frame = RuntimeReissuePipeIo.readExact(output.first, length) { live(call, deadline) }
-            var ready = false
-            repeat(100) {
-                if (!ready) {
-                    check(live(call, deadline))
-                    val status = rpc(RuntimeProductionReissueWireV1.RESPONSE_READY, {
-                        it.writeString(offer.offer.start.requestId); it.writeInt(purpose.wire)
-                    }) { it.readInt() }
-                    require(status == 1 || status == 2)
-                    ready = status == 1
-                    if (!ready) java.util.concurrent.locks.LockSupport.parkNanos(1_000_000)
-                }
-            }
-            check(ready)
+            awaitProductionResponseReadyV1({ live(call, deadline) }, {
+                rpc(RuntimeProductionReissueWireV1.RESPONSE_READY, {
+                    it.writeString(offer.offer.start.requestId); it.writeInt(purpose.wire)
+                }) { it.readInt() }
+            })
             val result = verifier.verifyAndConsume(checkNotNull(frame), descriptor, SystemClock.elapsedRealtime())
             check(result is RuntimeProductionFrameVerificationV1.Verified)
             verified = result.authority
