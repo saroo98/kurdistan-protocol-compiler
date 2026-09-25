@@ -77,6 +77,24 @@ func TestFoldBatchRequiresWideWindowWithoutDroppingTheMethod(t *testing.T) {
 	}
 }
 
+func TestAlwaysOnPlatformControlIsIsolatedFromOrdinaryAppChecks(t *testing.T) {
+	const prefix = "org.kurdistanvpn.app.ProductionProxyServiceDeviceTest#"
+	ordinary := []string{prefix + "authenticatedLoopbackProxyTransfersThroughNativeAndStopsWithSession", prefix + "survivingControllerRestoresKilledProcessAndProxyTraffic"}
+	alwaysOn := prefix + "systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled"
+	batches, err := planIsolatedDeviceBatches(append(append([]string{}, ordinary...), alwaysOn))
+	want := []deviceBatch{
+		{tests: ordinary, clearData: true},
+		{tests: []string{alwaysOn}, clearData: true, extras: []string{"--no-hidden-api-checks"}},
+	}
+	if err != nil || !reflect.DeepEqual(batches, want) {
+		t.Fatalf("platform control batches = %+v, %v", batches, err)
+	}
+	batches, err = planIsolatedDeviceBatches(ordinary)
+	if err != nil || !reflect.DeepEqual(batches, want[:1]) {
+		t.Fatalf("ordinary checks changed: %+v, %v", batches, err)
+	}
+}
+
 func TestTemporaryCredentialIsClearedWhenLaterSetupFails(t *testing.T) {
 	client := newADBClient("fixture-adb", "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
 	var installed, cleared string
