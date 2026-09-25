@@ -107,9 +107,11 @@ class ProductionProxyServiceDeviceTest {
         fun category(value: String?): String = value?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
         fun publicationDiagnostic(): Pair<String, String> {
             val adapter = (context.applicationContext as KurdistanApplication).runtimeAuthorityReissue
-            val values = adapter.javaClass.declaredMethods.single {
+            val snapshot = adapter.javaClass.declaredMethods.single {
                 it.name.startsWith("responseDiagnosticSnapshot") && it.parameterCount == 1
-            }.apply { isAccessible = true }.invoke(adapter, 1) as LongArray
+            }.apply { isAccessible = true }
+            val values = snapshot.invoke(adapter, 1) as LongArray
+            val response = snapshot.invoke(adapter, 0) as LongArray
             val facade = (context.applicationContext as KurdistanApplication).compositionRoot.protectedStateFacade()
             val read = facade?.reconstructProductionCapture(object : org.kurdistanvpn.data.protectedstate.ProtectedAuthorityEnvironment {
                 override fun isUserUnlocked() = context.getSystemService(UserManager::class.java).isUserUnlocked
@@ -129,7 +131,7 @@ class ProductionProxyServiceDeviceTest {
                 it.localRecordId == projection.settings.profiles.activeLocalRecordId
             }
             val expired = selected?.let { it.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000 }
-            val setup = "PUB_${values.drop(12).take(3).joinToString("_")},CAPTURE_${category(captureCategory.replace('/', '_'))},EXPIRED_${expired?.toString()?.uppercase(java.util.Locale.ROOT) ?: "UNKNOWN"}"
+            val setup = "RESP_${response.take(4).joinToString("_")},ACQ_${values.drop(4).take(3).joinToString("_")},PUB_${values.drop(12).take(3).joinToString("_")},CAPTURE_${category(captureCategory.replace('/', '_'))},EXPIRED_${expired?.toString()?.uppercase(java.util.Locale.ROOT) ?: "UNKNOWN"}"
             return "${values.joinToString()}; fresh-capture=$captureCategory; selected-expired=$expired" to setup
         }
         if (automatic) {
@@ -235,7 +237,7 @@ class ProductionProxyServiceDeviceTest {
                 val capabilities = connectivity.allNetworks.take(64).mapNotNull(connectivity::getNetworkCapabilities)
                 val physical = capabilities.filter { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN) }
                 val networkState = "PHYSICAL_${physical.size}_INTERNET_${physical.count { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) }}_CAPTIVE_${physical.count { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) }}"
-                val setup = (listOf(publication.second) + stages).fold("PROXY_ACTIVATION,${category(state.failure)},${category(state.packetDisposition)},$networkState") { value, stage ->
+                val setup = (publication.second.split(',') + stages).fold("PROXY_ACTIVATION,${category(state.failure)},${category(state.packetDisposition)},$networkState") { value, stage ->
                     if (value.length + stage.length + 1 <= 256) "$value,$stage" else value
                 }
                 throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${state.state.name} setup=$setup",
