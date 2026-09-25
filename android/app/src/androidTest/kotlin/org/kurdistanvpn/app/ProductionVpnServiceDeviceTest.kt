@@ -84,7 +84,13 @@ class ProductionVpnServiceDeviceTest {
                 val requestBytes = byteArrayOf(75, 55, 84, 49, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
                 socket.send(DatagramPacket(requestBytes, 16, destination, 28472))
                 val response = DatagramPacket(ByteArray(17), 17)
-                socket.receive(response)
+                try {
+                    socket.receive(response)
+                } catch (failure: java.io.IOException) {
+                    val current = RuntimeStatusWire.decode(control.queryStatus(version))
+                    val reason = current.failure?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
+                    throw AssertionError("KURDISTAN_TEST_SETUP expected=UDP_REPLY actual=${current.state.name} setup=$reason,READ_${current.packetsRead},WRITTEN_${current.packetsWritten}", failure)
+                }
                 assertEquals(16, response.length)
                 assertEquals(destination, response.address)
                 assertEquals(28472, response.port)
