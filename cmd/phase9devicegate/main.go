@@ -3581,8 +3581,17 @@ func (observation *launchObservation) captureCollectorCapability(parent context.
 	case !idOK:
 		identity.Rejection = "IDENTITY_NOT_SHELL"
 	}
-	rawContext, contextStderr, contextCommand, contextErr := observation.collectorCommand(parent, "collector-shell-selinux", "shell", "cat", "/proc/self/attr/current")
+	contextBudget, cancelContext := context.WithTimeout(parent, 2*time.Second)
+	rawContext, contextStderr, contextCommand, contextErr := observation.collectorCommand(contextBudget, "collector-shell-selinux", "shell", "cat", "/proc/self/attr/current")
 	identity.Commands = append(identity.Commands, contextCommand)
+	// A lost read-only shell response may be queried once more without extending
+	// its budget. Keep both receipts; only the fresh parsed context can qualify.
+	if contextBudget.Err() == nil && contextErr != nil && contextCommand.CommandStatus == "ERROR" &&
+		contextCommand.ExitCode == 255 && !contextCommand.Truncated && rawContext == "" && contextStderr == "" {
+		rawContext, contextStderr, contextCommand, contextErr = observation.collectorCommand(contextBudget, "collector-shell-selinux-retry", "shell", "cat", "/proc/self/attr/current")
+		identity.Commands = append(identity.Commands, contextCommand)
+	}
+	cancelContext()
 	contextValue, contextParsed := parseDiagnosticSELinuxContext(rawContext)
 	identity.SELinuxContext = contextValue
 	contextOK := contextErr == nil && !contextCommand.Truncated && contextStderr == "" && contextParsed
