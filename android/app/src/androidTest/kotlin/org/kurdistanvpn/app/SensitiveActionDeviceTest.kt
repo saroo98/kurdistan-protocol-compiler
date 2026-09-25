@@ -67,8 +67,21 @@ class SensitiveActionDeviceTest {
                 assertFalse(authorizer.isDeviceCredentialPending)
                 authorizer.authorize(SensitiveAction.REVEAL, "Credential verification", "Cancel this request", onResult = results::add)
             }
-            awaitCondition("Second credential screen did not open") { systemPromptVisible() }
-            shell("input keyevent 4")
+            awaitCondition("Second credential screen did not become ready") {
+                val root = instrumentation.uiAutomation.rootInActiveWindow
+                systemPromptVisible() && root?.findAccessibilityNodeInfosByText("Cancel this request")?.isNotEmpty() == true &&
+                    root.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                        ?.let { it.isEditable && it.isEnabled } == true
+            }
+            // The previous prompt can remain visible while the new one is opening.
+            instrumentation.uiAutomation.waitForIdle(500, 3_000)
+            assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            instrumentation.uiAutomation.waitForIdle(100, 2_000)
+            // Back may first dismiss the credential keyboard. Never send another
+            // action after the result or outside the real system prompt.
+            if (results.size == 1 && systemPromptVisible()) {
+                assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            }
             awaitCondition("Cancellation was not delivered") { results.size == 2 }
             assertEquals(listOf(true, false), results.toList())
             scenario.onActivity { assertFalse(authorizer.isDeviceCredentialPending) }
