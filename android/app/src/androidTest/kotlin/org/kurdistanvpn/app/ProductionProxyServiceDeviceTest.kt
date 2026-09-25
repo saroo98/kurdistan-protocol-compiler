@@ -198,15 +198,13 @@ class ProductionProxyServiceDeviceTest {
             } else if (activityStart) {
                 val target = checkNotNull(facade.readProjection()?.runtimeProfile)
                 activity = androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java)
-                if (manualAction) {
-                    val readyBy = SystemClock.elapsedRealtime() + 30_000
-                    var appReady = false
-                    do {
-                        activity.onActivity { appReady = it.appStateSnapshotForTesting() is org.kurdistanvpn.core.model.AppState.Ready }
-                        if (!appReady) SystemClock.sleep(25)
-                    } while (!appReady && SystemClock.elapsedRealtime() < readyBy)
-                    assertTrue("Manual Connect requires the real ready screen", appReady)
-                }
+                val readyBy = SystemClock.elapsedRealtime() + 30_000
+                var appReady = false
+                do {
+                    activity.onActivity { appReady = it.appStateSnapshotForTesting() is org.kurdistanvpn.core.model.AppState.Ready }
+                    if (!appReady) SystemClock.sleep(25)
+                } while (!appReady && SystemClock.elapsedRealtime() < readyBy)
+                assertTrue("Manual Connect requires the real ready screen", appReady)
                 activity.onActivity {
                     if (manualAction) manualStartedAt = SystemClock.elapsedRealtime()
                     if (manualAction) MainActivity::class.java.getDeclaredMethod("requestManualConnection")
