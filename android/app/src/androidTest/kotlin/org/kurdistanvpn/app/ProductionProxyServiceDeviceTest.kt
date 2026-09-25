@@ -229,7 +229,16 @@ class ProductionProxyServiceDeviceTest {
             if (state.state != VpnRuntimeState.ACTIVE_KURD_LIVE) {
                 // Existing bounded scalar observations only; no authority or exception text.
                 fun category(value: String?): String = value?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
-                throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${state.state.name} setup=PROXY_ACTIVATION,${category(state.failure)},${category(state.packetDisposition)}",
+                val stages = openingStates.map { category(it.substringAfterLast('/')) }.distinct().takeLast(8)
+                val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+                @Suppress("DEPRECATION")
+                val capabilities = connectivity.allNetworks.take(64).mapNotNull(connectivity::getNetworkCapabilities)
+                val physical = capabilities.filter { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN) }
+                val networkState = "PHYSICAL_${physical.size}_INTERNET_${physical.count { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) }}_CAPTIVE_${physical.count { it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) }}"
+                val setup = stages.fold("PROXY_ACTIVATION,${category(state.failure)},${category(state.packetDisposition)},$networkState") { value, stage ->
+                    if (value.length + stage.length + 1 <= 256) "$value,$stage" else value
+                }
+                throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${state.state.name} setup=$setup",
                     AssertionError("Proxy activation: ${state.state}/${state.failure}/${state.packetDisposition}; opening=$openingStates; publication=${publicationDiagnostic()}"))
             }
             val presentation = checkNotNull(state.presentation) { "Production presentation evidence missing" }
