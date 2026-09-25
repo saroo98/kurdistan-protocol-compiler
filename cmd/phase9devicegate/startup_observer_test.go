@@ -6,7 +6,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -23,10 +22,11 @@ func TestCompositeStartupObserverAllowsOptionalMainSystemDenialOnlyWithCompleteR
 		scenario string
 	}{
 		{26, "ci-api26-permission-denied"},
+		{26, "ci-api26-dev-kmsg-denied"},
 		{34, "ci-api34-permission-denied"},
 		{36, "ci-api36-permission-denied"},
 	} {
-		t.Run(fmt.Sprintf("api%d", test.api), func(t *testing.T) {
+		t.Run(test.scenario, func(t *testing.T) {
 			err, observation := runLaunchScenario(t, test.scenario, test.api)
 			if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
 				t.Fatalf("complete composite with optional main/system denial rejected: err=%v gate=%s status=%s issues=%q streams=%+v events=%+v", err, observation.GateResult, observation.Status, observation.Issues, observation.StreamLifecycle, observation.SystemEvents)

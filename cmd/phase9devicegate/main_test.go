@@ -932,6 +932,9 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	stderrMode, stderrBefore := "", ""
 	if buffer == "main" || buffer == "system" || (buffer == "events" && strings.HasPrefix(fixture.scenario, "ci-api")) {
 		switch fixture.scenario {
+		case "ci-api26-dev-kmsg-denied":
+			stderrMode = "before-owned-cancellation"
+			stderrBefore = "dmesg: /dev/kmsg: Permission denied\n"
 		case "ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-events-probe-negated", "ci-api36-events-probe-mixed", "ci-api36-crash-probe-denied":
 			if buffer == "events" {
 				stderrMode = "before-owned-cancellation"
