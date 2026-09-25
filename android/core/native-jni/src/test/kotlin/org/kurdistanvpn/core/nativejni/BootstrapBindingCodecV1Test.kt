@@ -13,8 +13,68 @@ import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.ProductFailureCode
 
 class BootstrapBindingCodecV1Test {
+    @Test fun admissionTimeoutDoesNotEnterNativeAndReleasesItsSlot() {
+        val admission=BootstrapBindingAdmissionV1(25)
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        val first=Thread {admission.call({false}) {entered.countDown();release.await(5,TimeUnit.SECONDS)}}
+        first.start()
+        try {
+            assertTrue(entered.await(5,TimeUnit.SECONDS))
+            assertFalse(admission.call({false}) {fail("Timed-out caller entered native");true})
+            assertFalse(admission.call({false}) {fail("Owner still active");true})
+        } finally {release.countDown();first.join(5000)}
+        assertFalse(first.isAlive)
+        // Both permits must have been returned, not just enough for one later call.
+        assertTrue(admission.call({false}) {admission.call({false}) {true}})
+    }
+
+    @Test fun admissionBoundsWaitersAndInterruptsWithoutNativeEntry() {
+        val admission=BootstrapBindingAdmissionV1()
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        var interrupted=false;var secondResult=true
+        val first=Thread {admission.call({false}) {entered.countDown();release.await(5,TimeUnit.SECONDS)}}
+        val second=Thread {
+            secondResult=admission.call({false}) {fail("Interrupted waiter entered native");true}
+            interrupted=Thread.currentThread().isInterrupted
+        }
+        first.start()
+        try {
+            assertTrue(entered.await(5,TimeUnit.SECONDS));second.start()
+            val until=System.nanoTime()+TimeUnit.SECONDS.toNanos(2)
+            while(second.isAlive && second.state!=Thread.State.TIMED_WAITING && System.nanoTime()<until)Thread.yield()
+            assertEquals(Thread.State.TIMED_WAITING,second.state)
+            assertFalse(admission.call({false}) {fail("Third caller exceeded admission capacity");true})
+            second.interrupt();second.join(2000)
+            assertFalse(second.isAlive);assertFalse(secondResult);assertTrue(interrupted)
+        } finally {release.countDown();second.interrupt();first.join(5000);if(second.isAlive)second.join(5000)}
+        assertTrue(admission.call({false}) {true})
+    }
+
+    @Test fun normalBindingCallWaitsForConcurrentReadToFinishInsteadOfRejectingAuthority() {
+        val entered=CountDownLatch(1);val release=CountDownLatch(1)
+        val secondStarted=CountDownLatch(1);val secondFinished=CountDownLatch(1)
+        var second:NativeProductResult<NativeProductionBootstrapReadV1>?=null
+        val first=Thread {
+            BootstrapBindingCallsV1.production(material(),ByteBuffer.wrap(byteArrayOf(1))) { _,_,_,_,_->
+                entered.countDown();check(release.await(5,TimeUnit.SECONDS));2
+            }
+        }
+        val competing=Thread {
+            secondStarted.countDown()
+            second=BootstrapBindingCallsV1.production(material(),ByteBuffer.wrap(byteArrayOf(1))) { _,_,_,_,_->2 }
+            secondFinished.countDown()
+        }
+        first.start()
+        try {
+            assertTrue(entered.await(5,TimeUnit.SECONDS));competing.start()
+            assertTrue(secondStarted.await(5,TimeUnit.SECONDS))
+            assertFalse("A competing read must wait, not become an authority rejection",secondFinished.await(100,TimeUnit.MILLISECONDS))
+        } finally {release.countDown();first.join(5000);if(competing.isAlive)competing.join(5000)}
+        assertFalse(first.isAlive);assertFalse(competing.isAlive)
+        assertEquals(ProductFailureCode.INVALID_INPUT,(second as NativeProductResult.Failure).code)
+    }
     @Test fun capacityInvariantSignalIsCanonicalInternalAndPermanentlyRefusesBothRoles() {
-        val calls=BootstrapBindingCallOwnerV1(BootstrapBindingGuardV1())
+        val calls=BootstrapBindingCallOwnerV1(BootstrapBindingGuardV1(),BootstrapBindingAdmissionV1())
         val first=calls.legacy(material(),ByteBuffer.wrap(byteArrayOf(1)),{
             assertEquals(14,it);OperationError.INTERNAL_FAILURE
         }){_,_,_,_,_->-6401}
@@ -108,11 +168,13 @@ class BootstrapBindingCodecV1Test {
         return NativeBootstrapMaterialV1(span(),span(),span(),span())
     }
     @Test fun actualStagingRejectsContentionAndWipesExceptionBeforeReadmission() {
+        // Exercise the immediate guard below the normal caller-admission boundary.
+        val calls=BootstrapBindingCallOwnerV1(BootstrapBindingGuardV1())
         val input=material();val entered=CountDownLatch(1);val release=CountDownLatch(1)
         var held:Array<ByteBuffer>?=null;var output:ByteBuffer?=null
         var result:NativeResult<NativeLegacyBootstrapFactsV1>?=null
         val worker=Thread {
-            result=BootstrapBindingCallsV1.legacy(input,ByteBuffer.wrap(byteArrayOf(1)),{OperationError.INTERNAL_FAILURE}) { spans,facts,_,_,_ ->
+            result=calls.legacy(input,ByteBuffer.wrap(byteArrayOf(1)),{OperationError.INTERNAL_FAILURE}) { spans,facts,_,_,_ ->
                 held=spans;output=facts
                 assertEquals(1,input.verifyRequest.position())
                 assertEquals(1,spans[0].remaining())
@@ -122,13 +184,13 @@ class BootstrapBindingCodecV1Test {
             }
         }
         worker.start();assertTrue(entered.await(5,TimeUnit.SECONDS))
-        val competing=BootstrapBindingCallsV1.production(input,ByteBuffer.wrap(byteArrayOf(1))) { _,_,_,_,_ -> fail("competing call staged");0 }
+        val competing=calls.production(input,ByteBuffer.wrap(byteArrayOf(1))) { _,_,_,_,_ -> fail("competing call staged");0 }
         assertEquals(ProductFailureCode.RESOURCE_LIMIT,(competing as NativeProductResult.Failure).code)
         release.countDown();worker.join(5000);assertFalse(worker.isAlive)
         assertTrue(result is NativeResult.Failure)
         checkNotNull(held).forEach{buffer->repeat(buffer.capacity()){assertEquals(0,buffer.get(it).toInt())}}
         repeat(checkNotNull(output).capacity()){assertEquals(0,checkNotNull(output).get(it).toInt())}
-        val next=BootstrapBindingCallsV1.legacy(input,ByteBuffer.wrap(byteArrayOf(1)),{OperationError.INTERNAL_FAILURE}) { _,facts,_,_,_ ->
+        val next=calls.legacy(input,ByteBuffer.wrap(byteArrayOf(1)),{OperationError.INTERNAL_FAILURE}) { _,facts,_,_,_ ->
             facts.put(wire().copyOfRange(0,40)+byteArrayOf(5));facts.position(0);0
         }
         assertTrue(next is NativeResult.Success)
