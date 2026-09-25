@@ -81,7 +81,10 @@ class ProfileImportDeviceTest {
         compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
         assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
         automation.waitForIdle(100, 2_000)
-        if (automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
+        // Accessibility can still report the old picker after our window regains focus.
+        // A second Back is only for a picker that still owns focus (for example after IME dismissal).
+        if (!compose.activity.hasWindowFocus() &&
+            automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
             assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
         compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
         assertEquals(before.revision, facade.readProjection()?.revision)
