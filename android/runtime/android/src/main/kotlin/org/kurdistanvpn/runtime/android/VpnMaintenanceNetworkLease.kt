@@ -239,7 +239,11 @@ private class AndroidMaintenanceNetworkPlatformV1(service: VpnService, private v
             }
             notify?.invoke()
         }
-        override fun onAvailable(network: Network) = event(network) { default && it.handle != network.networkHandle }
+        override fun onAvailable(network: Network) = event(network) {
+            // Before API28 this callback tracks the system default, not the app's VPN.
+            // The visible observer and every fresh snapshot still validate the selected VPN.
+            default && (!it.vpn || apiLevel >= 28) && it.handle != network.networkHandle
+        }
         override fun onLost(network: Network) = event(network) { it.handle == network.networkHandle }
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) = event(network) {
             val vpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
