@@ -15,7 +15,7 @@ import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.os.SystemClock
 import android.os.UserManager
-import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -28,12 +28,15 @@ interface RuntimeAuthorityReissueOwner {
     val runtimeAuthorityPipePrimitives: DurableFilePrimitives
 }
 
+// One sequential successor may arrive after RESPONSE_READY but before its worker returns.
+internal fun newAuthorityResponseWorker() = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(1),
+    { job -> Thread(job, "authority-reissue").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
+
 /** Manifest must be explicit, unexported, default-process and non-Direct-Boot. Bound only. */
 class RuntimeAuthorityReissueService : Service() {
     @Volatile private var owner: RuntimeAuthorityReissueOwner? = null
     private val peers = mutableMapOf<IBinder, IBinder.DeathRecipient>()
-    private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, SynchronousQueue(),
-        { job -> Thread(job, "authority-reissue").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
+    private val worker = newAuthorityResponseWorker()
     private val clock = Executors.newSingleThreadScheduledExecutor { job -> Thread(job, "authority-expiry").apply { isDaemon = true } }
     private val binder = object : Binder() {
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
@@ -191,7 +194,8 @@ class RuntimeAuthorityReissueService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { stopSelf(startId); return START_NOT_STICKY }
     override fun onUnbind(intent: Intent?): Boolean { detachPeers(); return false }
     override fun onDestroy() {
-        detachPeers(); worker.shutdownNow(); clock.shutdownNow(); owner = null
+        // Detached authority rejects queued work; let it run to close its adopted pipes.
+        detachPeers(); worker.shutdown(); clock.shutdownNow(); owner = null
         super.onDestroy()
     }
     private fun detachPeers() {
