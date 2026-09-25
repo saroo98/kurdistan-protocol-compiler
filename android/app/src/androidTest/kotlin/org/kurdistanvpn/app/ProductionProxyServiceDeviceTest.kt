@@ -501,7 +501,14 @@ class ProductionProxyServiceDeviceTest {
                     SystemClock.sleep(25)
                 }
                 android.util.Log.i("RecoveryObservation", "end newPid=$everNewPid socks=$everSocksResponse state=${restored?.state}")
-                assertEquals("Process restart: ${restored?.state}/${restored?.failure}; newPid=$everNewPid, socks=$everSocksResponse, disconnected=${disconnected.get()}, bindingDied=${bindingDied.get()}; controller=${survivingController?.snapshot?.value?.state}/${survivingController?.snapshot?.value?.failure}/${survivingController?.isClosed}; publication=${publicationDiagnostic()}; relay=${relay.snapshot().joinToString()}", VpnRuntimeState.ACTIVE_KURD_LIVE, restored?.state)
+                if (restored?.state != VpnRuntimeState.ACTIVE_KURD_LIVE) {
+                    val controller = survivingController?.snapshot?.value
+                    val setup = publicationDiagnostic().second.split(',').fold(
+                        "RECOVERY,NEW_PID_${if (everNewPid) 1 else 0},SOCKS_${if (everSocksResponse) 1 else 0},CONTROLLER_${controller?.state?.name ?: "NONE"},${category(controller?.failure)}") { value, token ->
+                        if (value.length + token.length + 1 <= 256) "$value,$token" else value
+                    }
+                    throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${restored?.state?.name ?: "NO_STATUS"} setup=$setup")
+                }
                 // No death recipient remains after unbinding; probe the old remote object.
                 assertFalse(retiredBinder.pingBinder())
                 if (systemAlwaysOn) { assertEquals(true, restored?.alwaysOn); assertEquals(true, restored?.lockdown) }
