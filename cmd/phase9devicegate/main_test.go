@@ -3012,13 +3012,13 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyIdempotentDisconnect(t *t
 	if !errors.As(disconnected, &exit) || exit.ExitCode() != 255 {
 		t.Fatal("missing real exit-255 fixture", disconnected)
 	}
-	for _, scenario := range []string{"recovers", "child-recovers", "child-repeated-disconnect", "repeated-disconnect", "mkdir", "diagnostic-output", "other-error", "cancelled"} {
+	for _, scenario := range []string{"recovers", "parent-recovers", "parent-repeated-disconnect", "child-recovers", "child-repeated-disconnect", "repeated-disconnect", "mkdir", "diagnostic-output", "other-error", "cancelled"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			client := newADBClient("fixture-adb", "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
 			operation := "chmod"
-			if scenario == "mkdir" || strings.HasPrefix(scenario, "child-") {
+			if scenario == "mkdir" || strings.HasPrefix(scenario, "child-") || strings.HasPrefix(scenario, "parent-") {
 				operation = "mkdir"
 			}
 			var failedArgs []string
@@ -3033,13 +3033,14 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyIdempotentDisconnect(t *t
 				}
 				if operation == "mkdir" {
 					path := args[len(args)-1]
-					if path == "cache" || (strings.HasPrefix(scenario, "child-") != strings.HasSuffix(path, "/existing-directory")) {
+					if strings.HasPrefix(scenario, "parent-") != (path == "cache") ||
+						(strings.HasPrefix(scenario, "child-") != strings.HasSuffix(path, "/existing-directory")) {
 						return nil
 					}
 				}
 				failedArgs = append([]string(nil), args...)
 				attempts++
-				if attempts > 1 && (scenario == "recovers" || scenario == "child-recovers") {
+				if attempts > 1 && (scenario == "recovers" || scenario == "child-recovers" || scenario == "parent-recovers") {
 					return nil
 				}
 				if scenario == "diagnostic-output" {
@@ -3055,10 +3056,10 @@ func TestNativeFilesystemPreparationRetriesOnlyOneEmptyIdempotentDisconnect(t *t
 			}
 			_, got := prepareNativeFilesystemInstrumentation(ctx, client, "org.example.app", "org.example.test", "org.example.test/androidx.test.runner.AndroidJUnitRunner")
 			wantAttempts := 1
-			if scenario == "recovers" || scenario == "repeated-disconnect" || strings.HasPrefix(scenario, "child-") {
+			if scenario == "recovers" || scenario == "repeated-disconnect" || strings.HasPrefix(scenario, "child-") || strings.HasPrefix(scenario, "parent-") {
 				wantAttempts = 2
 			}
-			if attempts != wantAttempts || (got == nil) != (scenario == "recovers" || scenario == "child-recovers") {
+			if attempts != wantAttempts || (got == nil) != (scenario == "recovers" || scenario == "child-recovers" || scenario == "parent-recovers") {
 				t.Fatalf("attempts=%d want=%d err=%v", attempts, wantAttempts, got)
 			}
 		})
