@@ -3206,7 +3206,8 @@ func sanitizeLaunchStreamStderr(input string) []string {
 func exactLogcatPermissionDenial(stderr string) bool {
 	// Classification must precede redaction, which intentionally loses words.
 	switch strings.TrimSuffix(strings.ReplaceAll(stderr, "\r\n", "\n"), "\n") {
-	case "Permission denied", "logcat: Permission denied", "logcat: permission denied", "dmesg: klogctl: Permission denied":
+	case "Permission denied", "logcat: Permission denied", "logcat: permission denied",
+		"dmesg: klogctl: Permission denied", "dmesg: /dev/kmsg: Permission denied":
 		return true
 	default:
 		return false
