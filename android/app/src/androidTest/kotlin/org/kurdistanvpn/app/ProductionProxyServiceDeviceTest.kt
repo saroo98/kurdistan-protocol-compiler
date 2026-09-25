@@ -111,7 +111,7 @@ class ProductionProxyServiceDeviceTest {
                 it.name.startsWith("responseDiagnosticSnapshot") && it.parameterCount == 1
             }.apply { isAccessible = true }
             val values = snapshot.invoke(adapter, 1) as LongArray
-            val response = snapshot.invoke(adapter, 0) as LongArray
+            val response = snapshot.invoke(adapter, 2) as LongArray
             val facade = (context.applicationContext as KurdistanApplication).compositionRoot.protectedStateFacade()
             val read = facade?.reconstructProductionCapture(object : org.kurdistanvpn.data.protectedstate.ProtectedAuthorityEnvironment {
                 override fun isUserUnlocked() = context.getSystemService(UserManager::class.java).isUserUnlocked
@@ -131,7 +131,7 @@ class ProductionProxyServiceDeviceTest {
                 it.localRecordId == projection.settings.profiles.activeLocalRecordId
             }
             val expired = selected?.let { it.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000 }
-            val setup = "RESP_${response.take(4).joinToString("_")},ACQ_${values.drop(4).take(3).joinToString("_")},PUB_${values.drop(12).take(3).joinToString("_")},CAPTURE_${category(captureCategory.replace('/', '_'))},EXPIRED_${expired?.toString()?.uppercase(java.util.Locale.ROOT) ?: "UNKNOWN"}"
+            val setup = "RESP_${response.take(4).joinToString("_")},OBS_${response.drop(7).joinToString("_")},ACQ_${values.drop(4).take(3).joinToString("_")},PUB_${values.drop(12).take(3).joinToString("_")},CAPTURE_${category(captureCategory.replace('/', '_'))},EXPIRED_${expired?.toString()?.uppercase(java.util.Locale.ROOT) ?: "UNKNOWN"}"
             return "${values.joinToString()}; fresh-capture=$captureCategory; selected-expired=$expired" to setup
         }
         if (automatic) {
