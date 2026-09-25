@@ -119,7 +119,10 @@ class ProductionVpnServiceDeviceTest {
                 assertTrue("Only one runtime notification may be visible", matching.size <= 1)
                 notification = matching.singleOrNull()?.notification
                 if (notification?.extras?.getBoolean(android.app.Notification.EXTRA_SHOW_CHRONOMETER) == true) break
-                assertEquals(VpnRuntimeState.ACTIVE_KURD_LIVE, RuntimeStatusWire.decode(control.queryStatus(version)).state)
+                val active = RuntimeStatusWire.decode(control.queryStatus(version))
+                val reason = active.failure?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
+                assertEquals("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${active.state.name} setup=NOTIFICATION_WAIT,$reason,READ_${active.packetsRead},WRITTEN_${active.packetsWritten}",
+                    VpnRuntimeState.ACTIVE_KURD_LIVE, active.state)
                 SystemClock.sleep(25)
             } while (SystemClock.elapsedRealtime() < notificationDeadline)
             assertNotNull("The runtime notification must become visible", notification)
