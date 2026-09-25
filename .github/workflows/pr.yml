@@ -313,6 +313,33 @@ jobs:
         with:
           name: pr-impact-${{ github.run_id }}-${{ github.run_attempt }}
           path: .tools/pr
+      - name: Select exact reviewed receipt policy
+        id: receipt-policy
+        shell: pwsh
+        run: |
+          $policy = 'config/ci/proof-policy.json'
+          $subject = '${{ github.event.pull_request.head.sha }}'
+          $baseBlob = (git rev-parse "HEAD:$policy").Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $subjectBlob = (git rev-parse "${subject}:$policy").Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($baseBlob -cne $subjectBlob) {
+            # One reviewed inventory migration only. Enforcement still runs from protected base.
+            if ($baseBlob -cne '299cd89184652180a1b755771f0ede980d3a4fe9' -or
+                $subjectBlob -cne '7abc5a2380b86076ce9711f1a1433fe462857b3f') {
+              throw 'receipt policy change requires an explicitly reviewed migration'
+            }
+            New-Item -ItemType Directory -Path .tools/receipt-policy -ErrorAction Stop | Out-Null
+            git archive --format=tar --output=.tools/receipt-policy/policy.tar $subject -- $policy
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            tar -xf .tools/receipt-policy/policy.tar -C .tools/receipt-policy
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $policy = '.tools/receipt-policy/config/ci/proof-policy.json'
+            if ((Get-FileHash -LiteralPath $policy -Algorithm SHA256).Hash -ine '49c74d299d462efa7c3a7ad5ecf3b5005f9b11d2837e865d3f5066575b00fbdb') {
+              throw 'reviewed receipt policy bytes do not match'
+            }
+          }
+          "path=$policy" >> $env:GITHUB_OUTPUT
       - name: Download all produced proof receipts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.3.0
         with:
@@ -327,6 +354,6 @@ jobs:
             $receipt = Get-ChildItem -LiteralPath .tools/pr-proofs -Filter "$proof-receipt.json" -File -Recurse
             if ($receipt.Count -ne 1) { throw "selected proof $proof produced $($receipt.Count) receipts" }
             $relative = [System.IO.Path]::GetRelativePath((Get-Location).Path, $receipt.FullName).Replace('\', '/')
-            go run ./cmd/assure receipt validate -root . -receipt $relative
+            go run ./cmd/assure receipt validate -root . -policy '${{ steps.receipt-policy.outputs.path }}' -receipt $relative
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
