@@ -78,15 +78,26 @@ class ProfileImportDeviceTest {
         compose.onNodeWithText(compose.activity.getString(UiR.string.device_enrollment_export_file)).performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(UiR.string.confirm)).performScrollTo().performClick()
         val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
-        compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
-        assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-        automation.waitForIdle(100, 2_000)
-        // Accessibility can still report the old picker after our window regains focus.
-        // A second Back is only for a picker that still owns focus (for example after IME dismissal).
-        if (!compose.activity.hasWindowFocus() &&
-            automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
+        val previousFlags = automation.serviceInfo.flags
+        try {
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            }
+            compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
             assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-        compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
+            // Back dismisses the IME asynchronously. Do not send the picker Back to the closing IME.
+            compose.waitUntil(5_000) {
+                automation.windows.none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            }
+            automation.waitForIdle(100, 2_000)
+            // Accessibility can still report the old picker after our window regains focus.
+            if (!compose.activity.hasWindowFocus() &&
+                automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
+                assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = previousFlags }
+        }
         assertEquals(before.revision, facade.readProjection()?.revision)
         assertEquals(keys, facade.enrollmentSummaries())
     }
