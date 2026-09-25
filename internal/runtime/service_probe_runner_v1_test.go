@@ -23,10 +23,13 @@ type productionProbeWaitGateV1 struct {
 	context.Context
 	entered, release chan struct{}
 	once             sync.Once
+	ready            func() bool
 }
 
 func (g *productionProbeWaitGateV1) Done() <-chan struct{} {
-	g.once.Do(func() { close(g.entered); <-g.release })
+	if g.ready() {
+		g.once.Do(func() { close(g.entered); <-g.release })
+	}
 	return g.Context.Done()
 }
 
@@ -38,6 +41,11 @@ func TestServiceProbeRunnerV1NextSampleRechecksRetiredGroupBeforeID(t *testing.T
 	}
 	leaf, cancel := context.WithCancel(context.Background())
 	wait := &productionProbeWaitGateV1{Context: leaf, entered: make(chan struct{}), release: make(chan struct{})}
+	wait.ready = func() bool {
+		p.cfg.ProbeRates.mu.Lock()
+		defer p.cfg.ProbeRates.mu.Unlock()
+		return p.cfg.ProbeRates.states[0].state.count == 1
+	}
 	finishEntered, workerRetired, leafRelease := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
 	var releaseWait, releaseLeaf, notifyRetired sync.Once
@@ -68,16 +76,17 @@ func TestServiceProbeRunnerV1NextSampleRechecksRetiredGroupBeforeID(t *testing.T
 	p.nextID = 1
 	p.probes[0] = serviceProbeSlotV1{handle: 1, id: 1, state: 1, admission: a, deadline: p.lastNow.Add(4 * time.Second), worker: true, cancel: blockedCancel, hasResult: true, result: ServiceSuccessV1, sampleCount: 1}
 	p.probes[0].samples[0] = ProbeSampleV1{Attempted: true, Success: true, DurationMicros: 100, AttemptTimeoutMillis: 1000}
-	if e = p.reserveUsesLockedV1(2); e != nil {
+	if e = p.reserveUsesLockedV1(3); e != nil {
 		p.mu.Unlock()
 		t.Fatal(e)
 	}
 	p.mu.Unlock()
 	go func() { p.workerV1(func() error { return p.probeGroupV1(0, 1, wait) }); close(workerDone) }()
 	go p.workerV1(p.txV1)
+	go p.workerV1(p.superviseV1)
 	select {
 	case <-wait.entered:
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("next-sample did not reach queue wait")
 	}
 	go func() { finished <- p.finishProbeV1(0, 1, ServiceCancelledV1) }()
@@ -493,6 +502,45 @@ func TestServiceProbeRunnerV1ActualDialAndSharedRate(t *testing.T) {
 		t.Fatal("fresh handle bypassed shared rate", e)
 	}
 }
+func TestServiceProbeRunnerV1SerialSamplesRespectRelayRateAfterDelayedRequest(t *testing.T) {
+	l, n := pumpLocalListenerV1(t)
+	c, r, _, _ := pumpPairFixtureV1(t, n, false)
+	gate := &serviceFINWriteGateV1{ReadWriteCloser: c.cfg.Carrier, entered: make(chan struct{}), release: make(chan struct{})}
+	c.cfg.Carrier = gate
+	var release sync.Once
+	defer release.Do(func() { close(gate.release) })
+	pumpStartPairV1(t, c, r)
+	gate.armed.Store(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	h, e := c.StartProbe(ctx, ProbeRequestV1{7, 1, 1000, 4000, 3})
+	if e != nil {
+		t.Fatal(e)
+	}
+	select {
+	case <-gate.entered:
+	case <-ctx.Done():
+		t.Fatal("first probe did not enter the carrier")
+	}
+	// The relay spends its own rate token only after this delayed request arrives.
+	time.Sleep(200 * time.Millisecond)
+	release.Do(func() { close(gate.release) })
+	a, e := c.AwaitProbe(ctx, h)
+	if e != nil || a.Attempted != 3 || a.LossPermille != 0 {
+		r.cfg.ProbeRates.mu.Lock()
+		starts := r.cfg.ProbeRates.states[0].state.count
+		r.cfg.ProbeRates.mu.Unlock()
+		t.Fatal("serial request violated relay spacing", a, e, "relay starts", starts)
+	}
+	for range 3 {
+		conn, e := l.AcceptTCP()
+		if e != nil {
+			t.Fatal(e)
+		}
+		conn.Close()
+	}
+}
+
 func TestServiceProbeRunnerV1SerialSamplesReuseCompletedRelayCapacity(t *testing.T) {
 	l, n := pumpLocalListenerV1(t)
 	c, r, _, _ := pumpPairFixtureV1(t, n, false)
@@ -514,6 +562,27 @@ func TestServiceProbeRunnerV1SerialSamplesReuseCompletedRelayCapacity(t *testing
 		}
 		conn.Close()
 	}
+}
+
+func TestServiceProbeRunnerV1SerialSpacingDoesNotExtendTotalBudget(t *testing.T) {
+	l, n := pumpLocalListenerV1(t)
+	c, r, _, _ := pumpPairFixtureV1(t, n, false)
+	pumpStartPairV1(t, c, r)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	h, e := c.StartProbe(ctx, ProbeRequestV1{7, 1, 1000, 1000, 2})
+	if e != nil {
+		t.Fatal(e)
+	}
+	a, e := c.AwaitProbe(ctx, h)
+	if e != ErrProbeRateLimitedV1 || a.Attempted != 1 || a.LossPermille != 0 {
+		t.Fatal("serial spacing changed the total budget", a, e)
+	}
+	conn, e := l.AcceptTCP()
+	if e != nil {
+		t.Fatal(e)
+	}
+	conn.Close()
 }
 
 type pumpDeadlineNetworkV1 struct{ pumpNoNetworkV1 }
