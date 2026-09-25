@@ -39,6 +39,26 @@ class TunPacketDeviceTest {
             worker.start()
             assertTrue(waiting.await(2, TimeUnit.SECONDS))
             assertFalse(finished.await(100, TimeUnit.MILLISECONDS))
+            val written = CountDownLatch(1)
+            var writeFailure: Throwable? = null
+            val writer = Thread {
+                try {
+                    val outbound = ByteBuffer.allocateDirect(packet.size).apply { put(packet); flip() }
+                    assertEquals(packet.size, endpoint.write(outbound))
+                } catch (failure: Throwable) { writeFailure = failure }
+                finally { written.countDown() }
+            }
+            writer.start()
+            try {
+                assertTrue("An idle read must not starve the reply writer", written.await(2, TimeUnit.SECONDS))
+                writeFailure?.let { throw AssertionError("Concurrent packet write failed", it) }
+                assertEquals(40, Os.read(pair[1].fileDescriptor, returned, 0, returned.size))
+                assertArrayEquals(packet, returned)
+            } finally {
+                endpoint.close()
+                writer.join(2000)
+                worker.join(2000)
+            }
             endpoint.close()
             assertTrue(finished.await(2, TimeUnit.SECONDS))
             worker.join(2000)

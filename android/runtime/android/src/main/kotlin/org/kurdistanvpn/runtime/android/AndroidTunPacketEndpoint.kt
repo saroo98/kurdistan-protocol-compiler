@@ -10,10 +10,13 @@ import android.system.OsConstants
 import android.system.StructPollfd
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /** Owns only a service-provided TUN descriptor, never a native upstream socket. */
 class AndroidTunPacketEndpoint : TunPacketEndpoint {
-    private val monitor = Any()
+    // An idle poll must yield to a queued reply writer before polling again.
+    private val monitor = ReentrantLock(true)
     private val closing = AtomicBoolean()
     private var descriptor: ParcelFileDescriptor? = null
     private var acquired = false
@@ -22,7 +25,7 @@ class AndroidTunPacketEndpoint : TunPacketEndpoint {
     private val polls = arrayOf(poll)
 
     /** Allocate this owner before acquiring the descriptor so partial setup remains owned. */
-    fun acquire(source: () -> ParcelFileDescriptor) = synchronized(monitor) {
+    fun acquire(source: () -> ParcelFileDescriptor) = monitor.withLock {
         check(!acquired && !closing.get())
         acquired = true
         try {
@@ -50,7 +53,7 @@ class AndroidTunPacketEndpoint : TunPacketEndpoint {
         var interrupted = 0
         while (!closing.get()) {
             check(SystemClock.elapsedRealtime() < deadline) { "TUN_WRITE_TIMEOUT" }
-            val count = synchronized(monitor) {
+            val count = monitor.withLock {
                 if (closing.get()) return -1
                 val fd = checkNotNull(descriptor).fileDescriptor
                 try {
@@ -79,7 +82,7 @@ class AndroidTunPacketEndpoint : TunPacketEndpoint {
 
     override fun close() {
         closing.set(true)
-        synchronized(monitor) {
+        monitor.withLock {
             val owned = descriptor
             descriptor = null // Never retry an uncertain descriptor close.
             try { owned?.close() } catch (failure: Throwable) { closeFailed = true; throw failure }
