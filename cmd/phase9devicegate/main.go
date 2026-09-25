@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -1442,10 +1443,27 @@ func runRealCommand(ctx context.Context, path string, args []string, stdout, std
 
 func startRealCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
 	command := realCommand(ctx, path, args, stdout, stderr, waitDelay)
+	var killed atomic.Bool
+	stop := command.Cancel
+	command.Cancel = func() error {
+		err := stop()
+		if err == nil {
+			killed.Store(true)
+		}
+		return err
+	}
 	if err := command.Start(); err != nil {
 		return nil, err
 	}
-	return command.Wait, nil
+	return func() error {
+		err := command.Wait()
+		// Windows reports an owned process kill as exit 1, without a signal.
+		// Retain cancellation only when this command's own Kill succeeded.
+		if err != nil && killed.Load() {
+			return errors.Join(err, ctx.Err())
+		}
+		return err
+	}, nil
 }
 
 func (client adbClient) runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, waitDelay time.Duration) error {
