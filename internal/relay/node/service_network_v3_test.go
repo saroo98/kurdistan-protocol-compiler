@@ -128,7 +128,8 @@ func TestServiceNetworkV3OwnedDNSFamiliesAndEffectiveAnswerMask(t *testing.T) {
 			}
 			defer listener.Close()
 			tcpNetwork := []string{"tcp4", "tcp6"}[family]
-			tcp, err := net.Listen(tcpNetwork, listener.LocalAddr().String())
+			// UDP allocation does not establish TCP availability for the same port.
+			tcp, err := net.Listen(tcpNetwork, local)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -207,7 +208,11 @@ func TestServiceNetworkV3OwnedDNSFamiliesAndEffectiveAnswerMask(t *testing.T) {
 				if source.String() != want.String() {
 					t.Error("DNS source is not relay owned")
 				}
-				return new(net.Dialer).DialContext(ctx, gotNetwork, listener.LocalAddr().String())
+				target := listener.LocalAddr().String()
+				if gotNetwork == tcpNetwork {
+					target = tcp.Addr().String()
+				}
+				return new(net.Dialer).DialContext(ctx, gotNetwork, target)
 			}}
 			resolver, err := boundeddns.NewResolver(ownedDNSEndpointsV3[family:family+1], owner, 1)
 			if err != nil {
