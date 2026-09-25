@@ -2324,7 +2324,7 @@ func monotonicClockDiagnostic(raw, marker string, command diagnosticCommand) dia
 }
 
 func parseEpochLog(line string) (launchLogEvent, bool) {
-	match := epochLogPattern.FindStringSubmatch(line)
+	match := epochLogPattern.FindStringSubmatch(strings.TrimSuffix(line, "\r"))
 	if match == nil {
 		return launchLogEvent{}, false
 	}
