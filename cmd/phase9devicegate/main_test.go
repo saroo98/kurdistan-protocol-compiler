@@ -2935,6 +2935,73 @@ func TestNativeFilesystemInstrumentationPlanIsInvocationBoundAndFailClosed(t *te
 	}
 }
 
+func TestCollectorContextRecoversOnlyOneEmptyDisconnectWithinOriginalBudget(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	disconnected := exec.Command(executable, "-test.run=^TestDiagnosticCommandFixtureProcess$", "--", "disconnected").Run()
+	var exit *exec.ExitError
+	if !errors.As(disconnected, &exit) || exit.ExitCode() != 255 {
+		t.Fatal("missing real exit-255 fixture", disconnected)
+	}
+	for _, scenario := range []string{"recovers", "repeated", "stdout", "stderr", "other-error", "cancelled", "unknown-context"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			fixture := newLaunchFixtureTransport("healthy")
+			client := newADBClient("fixture-adb", "emulator-5554", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+			attempts := 0
+			var firstDeadline time.Time
+			client.transport = &commandTransport{start: fixture.start, run: func(commandCtx context.Context, path string, args []string, stdout, stderr io.Writer, delay time.Duration) error {
+				if strings.Join(args, " ") != "-s emulator-5554 shell cat /proc/self/attr/current" {
+					return fixture.run(commandCtx, path, args, stdout, stderr, delay)
+				}
+				attempts++
+				deadline, ok := commandCtx.Deadline()
+				if !ok {
+					t.Fatal("context query lacks deadline")
+				}
+				if attempts == 1 {
+					firstDeadline = deadline
+				} else if !deadline.Equal(firstDeadline) {
+					t.Fatal("retry extended query budget")
+				}
+				if attempts > 1 && scenario == "recovers" {
+					return fixture.run(commandCtx, path, args, stdout, stderr, delay)
+				}
+				if attempts > 1 && scenario == "unknown-context" {
+					_, _ = io.WriteString(stdout, "unconfined\n")
+					return nil
+				}
+				switch scenario {
+				case "stdout":
+					_, _ = io.WriteString(stdout, "u:r:shell:s0\n")
+				case "stderr":
+					_, _ = io.WriteString(stderr, "Permission denied\n")
+				case "other-error":
+					return errors.New("unavailable")
+				case "cancelled":
+					cancel()
+				}
+				return disconnected
+			}}
+			observation := &launchObservation{client: client, app: defaultAppPackage, Status: "CAPTURED"}
+			got := observation.captureCollectorCapability(ctx)
+			wantAttempts := 1
+			if scenario == "recovers" || scenario == "repeated" || scenario == "unknown-context" {
+				wantAttempts = 2
+			}
+			if got != (scenario == "recovers") || attempts != wantAttempts {
+				t.Fatalf("captured=%v attempts=%d want=%d identity=%+v", got, attempts, wantAttempts, observation.CollectorIdentity)
+			}
+			if len(observation.CollectorIdentity.Commands) != 2+wantAttempts || observation.CollectorIdentity.Commands[1].ExitCode != 255 && scenario != "other-error" && scenario != "cancelled" {
+				t.Fatal("original context evidence lost")
+			}
+		})
+	}
+}
+
 func TestNativeFilesystemPreparationRetriesOnlyOneEmptyIdempotentDisconnect(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {
