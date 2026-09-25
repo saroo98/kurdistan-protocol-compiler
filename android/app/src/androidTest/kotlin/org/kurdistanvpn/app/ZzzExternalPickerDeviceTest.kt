@@ -45,8 +45,21 @@ class ZzzExternalPickerDeviceTest {
             !compose.activity.hasWindowFocus()
         }
         val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
-        compose.waitUntil(10_000) {
-            automation.rootInActiveWindow?.packageName?.toString()?.endsWith("documentsui") == true
+        try {
+            compose.waitUntil(10_000) {
+                automation.rootInActiveWindow?.packageName?.toString()?.endsWith("documentsui") == true
+            }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            val foreground = when (automation.rootInActiveWindow?.packageName?.toString()) {
+                "com.android.documentsui", "com.google.android.documentsui" -> "PICKER"
+                compose.activity.packageName -> "APPLICATION"
+                "com.android.systemui", "com.android.settings" -> "SYSTEM"
+                null -> "UNAVAILABLE"
+                else -> "OTHER"
+            }
+            val focused = if (compose.activity.hasWindowFocus()) 1 else 0
+            val state = compose.activity.lifecycle.currentState.name
+            throw AssertionError("KURDISTAN_TEST_SETUP expected=DOCUMENT_PICKER actual=$foreground setup=IMPORT_PICKER,APP_FOCUS_$focused,LIFECYCLE_$state", failure)
         }
         org.junit.Assert.assertTrue(automation.performGlobalAction(
             android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
