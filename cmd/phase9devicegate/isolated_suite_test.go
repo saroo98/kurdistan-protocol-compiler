@@ -63,7 +63,7 @@ func TestNetworkLeasePlanSeparatesIncompatibleFixturesAndKeepsDnsHistory(t *test
 	basic := []string{p + "associatedMaintenanceLeaseUsesOwnedTunAndRetiresWithOwner", p + "disconnectedMaintenanceAcquiresAndClosesWithoutNetworkIO"}
 	dns := []string{p + "signedUpdateTruncatedDnsReachesTcpSynThenCancels", p + "signedUpdateTunLossInvalidatesLeaseAndCannotPublish", p + "signedUpdateUdpDnsReachesOwnedTunThenHttpsSynCancels"}
 	batches, err := planIsolatedDeviceBatches(append(append([]string{}, basic...), dns...))
-	want := []deviceBatch{{tests: basic, clearData: true}, {tests: dns, clearData: true}}
+	want := []deviceBatch{{tests: basic, clearData: true, wifiOnly: true}, {tests: dns, clearData: true}}
 	if err != nil || !reflect.DeepEqual(batches, want) {
 		t.Fatalf("network fixture groups = %+v, %v", batches, err)
 	}
@@ -119,5 +119,50 @@ func TestTemporaryCredentialIsClearedWhenLaterSetupFails(t *testing.T) {
 		deviceBatch{tests: []string{"org.kurdistanvpn.app.SensitiveActionDeviceTest#realCredentialPromptPreservesPendingActionAndDeliversOnce"}, credential: true})
 	if err == nil || len(installed) != 6 || installed != cleared {
 		t.Fatalf("credential cleanup missing: failed=%t installed=%t cleared=%t", err != nil, installed != "", cleared != "")
+	}
+}
+
+func TestMaintenanceUnderlayRestoresOwnedEmulatorDataAfterSetupFailure(t *testing.T) {
+	for _, initial := range []string{"1", "0", "unknown"} {
+		t.Run(initial, func(t *testing.T) {
+			client := newADBClient("fixture-adb", "", t.TempDir(), &diagnosticTimeline{Started: time.Now()})
+			state, disabled, restored := initial, 0, 0
+			client.transport = &commandTransport{run: func(_ context.Context, _ string, args []string, stdout, _ io.Writer, _ time.Duration) error {
+				switch strings.Join(args, " ") {
+				case "shell am force-stop org.kurdistanvpn.app.internal":
+				case "emu avd name":
+					_, _ = io.WriteString(stdout, "owned-fixture\nOK\n")
+				case "shell getprop ro.hardware":
+					_, _ = io.WriteString(stdout, "ranchu\n")
+				case "shell settings get global wifi_on":
+					_, _ = io.WriteString(stdout, "1\n")
+				case "shell settings get global mobile_data":
+					_, _ = io.WriteString(stdout, state+"\n")
+				case "shell svc data disable":
+					disabled++
+					state = "0"
+				case "shell svc data enable":
+					restored++
+					state = "1"
+				default:
+					return errors.New("injected later setup failure")
+				}
+				return nil
+			}}
+			batches, err := planIsolatedDeviceBatches([]string{"org.kurdistanvpn.app.Task7VpnNetworkLeaseDeviceTest#associatedMaintenanceLeaseUsesOwnedTunAndRetiresWithOwner"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			batch := batches[0]
+			batch.clearData = false
+			_, err = runIsolatedDeviceBatch(context.Background(), client, options{appPackage: "org.kurdistanvpn.app.internal", ownedEmulatorName: "owned-fixture"}, batch)
+			want := 0
+			if initial == "1" {
+				want = 1
+			}
+			if err == nil || disabled != want || restored != want || state != initial {
+				t.Fatalf("failed=%t disabled=%d restored=%d state=%q", err != nil, disabled, restored, state)
+			}
+		})
 	}
 }
