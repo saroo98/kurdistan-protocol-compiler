@@ -153,6 +153,23 @@ func (p *ServicePumpV1) probeGroupV1(i int, handle uint64, ctx context.Context) 
 		}
 		a := g.admission
 		deadline := g.deadline
+		// A locally spaced send can reach the relay too early after variable
+		// carrier delay. Space serial samples from the confirmed response instead.
+		nextSample := p.lastNow.Add(a.interval)
+		if !nextSample.Before(deadline) {
+			p.mu.Unlock()
+			return p.finishProbeV1(i, handle, ErrProbeRateLimitedV1)
+		}
+		for g.state == 1 && p.lastNow.Before(nextSample) {
+			if e := p.waitLockedV1(ctx, deadline); e != nil {
+				p.mu.Unlock()
+				return p.finishProbeV1(i, handle, e)
+			}
+		}
+		if g.handle != handle || g.state != 1 || p.terminal {
+			p.mu.Unlock()
+			return nil
+		}
 		g.id = 0
 		g.sentAt = time.Time{}
 		g.sentMono = time.Time{}
