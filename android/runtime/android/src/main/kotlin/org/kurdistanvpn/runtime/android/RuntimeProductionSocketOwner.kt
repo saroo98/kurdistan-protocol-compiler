@@ -151,6 +151,8 @@ private class AndroidSocketPlatformV1(private val service: VpnService,
         private fun event(network: Network, invalid: Boolean) {
             val notify = synchronized(monitor) {
                 if (closed) return
+                // Once selected, a different network cannot invalidate this socket.
+                if (selected != null && selected != network) return
                 if (!revision.observe(invalid)) lost else if (selected == network && invalid) lost else null
             }
             notify?.invoke()
@@ -174,25 +176,35 @@ private class AndroidSocketPlatformV1(private val service: VpnService,
     override fun select(explicit: Int, has: Int, handle: Long): Long {
         check(explicit in 0..1 && has in 0..1 && (has != 0 || handle == 0L))
         if (explicit == 1) check(has == 1 && handle != 0L)
-        val before = synchronized(monitor) { check(observed && !closed); revision.snapshot() }
-        val networks = connectivity.allNetworks
-        check(networks.size <= 64)
+        var candidate: Network? = null
+        var candidateName: String? = null
         fun usable(network: Network): Boolean {
             val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
             return capabilities.runtimeState(network.networkHandle).permits(policy) &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         }
-        val currentDefault = connectivity.activeNetwork
-        val chosen = if (has == 1) networks.firstOrNull { it.networkHandle == handle && usable(it) }
-            else currentDefault?.takeIf(::usable) ?: networks.firstOrNull(::usable)
-        if (chosen == null) return 0
-        val name = connectivity.getLinkProperties(chosen)?.interfaceName
-        if (name.isNullOrEmpty()) return 0
-        synchronized(monitor) {
-            if (closed || !revision.unchanged(before)) return 0
-            selected = chosen; interfaceName = name
+        // Initial callbacks may overlap a read. Re-read boundedly, never accept
+        // unstable facts or switch candidates during the same acquisition.
+        repeat(3) {
+            val before = synchronized(monitor) { check(observed); if (closed) return 0; revision.snapshot() }
+            val networks = connectivity.allNetworks
+            check(networks.size <= 64)
+            val currentDefault = connectivity.activeNetwork
+            val chosen = if (has == 1) networks.firstOrNull { it.networkHandle == handle && usable(it) }
+                else currentDefault?.takeIf(::usable) ?: networks.firstOrNull(::usable)
+            if (chosen == null) return 0
+            val name = connectivity.getLinkProperties(chosen)?.interfaceName
+            if (name.isNullOrEmpty() || (candidate != null && (candidate != chosen || candidateName != name))) return 0
+            candidate = chosen; candidateName = name
+            synchronized(monitor) {
+                if (closed) return 0
+                if (revision.unchanged(before)) {
+                    selected = chosen; interfaceName = name
+                    return chosen.networkHandle
+                }
+            }
         }
-        return chosen.networkHandle
+        return 0
     }
     override fun current(): Boolean {
         val before: Long; val network: Network; val name: String?
