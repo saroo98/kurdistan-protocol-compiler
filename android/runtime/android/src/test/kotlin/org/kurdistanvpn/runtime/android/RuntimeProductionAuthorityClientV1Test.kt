@@ -12,6 +12,44 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RuntimeProductionAuthorityClientV1Test {
+    @Test fun pendingResponseCompletesWithinItsDeadlineWithoutAPollQuota() {
+        var elapsed = 0
+        var polls = 0
+        awaitProductionResponseReadyV1({ elapsed < 1000 }, {
+            polls++
+            if (elapsed >= 150) 1 else 2
+        }, { elapsed++ })
+        assertEquals(151, polls)
+        assertEquals(150, elapsed)
+    }
+
+    @Test fun pendingResponseStopsAtTheOriginalDeadline() {
+        var elapsed = 0
+        var polls = 0
+        assertThrows(IllegalStateException::class.java) {
+            awaitProductionResponseReadyV1({ elapsed < 3 }, { polls++; 2 }, { elapsed++ })
+        }
+        assertEquals(3, polls)
+        assertEquals(3, elapsed)
+    }
+
+    @Test fun readyResponseCannotOutliveCancellation() {
+        var live = true
+        assertThrows(IllegalStateException::class.java) {
+            awaitProductionResponseReadyV1({ live }, { live = false; 1 }, { throw AssertionError("must not wait") })
+        }
+    }
+
+    @Test fun rejectedOrUnknownResponseNeverWaitsOrRetries() {
+        for (status in listOf(0, -1, 3)) {
+            var polls = 0
+            assertThrows(IllegalStateException::class.java) {
+                awaitProductionResponseReadyV1({ true }, { polls++; status }, { throw AssertionError("must not wait") })
+            }
+            assertEquals(1, polls)
+        }
+    }
+
     @Test fun aDeadPublishedProviderDoesNotRequireAnImpossibleRemoteAcknowledgement() {
         assertTrue(retireProductionProviderV1(true, true) { error("dead provider cannot acknowledge") })
         assertFalse(retireProductionProviderV1(false, true) { false })
