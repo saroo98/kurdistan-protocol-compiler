@@ -652,11 +652,15 @@ func (n *productionAttemptTransportV1) AttachInstalledV1(ctx context.Context) in
 		if s != 0 {
 			return n.leaveV1(0, s)
 		}
+		// The installed TLS stream retains this context after attachment. Keep
+		// authority expiry and cancellation, not the completed startup deadline.
+		// The stage timer and the surrounding revalidations still bound startup.
+		lifetime := productionStageContextV1{leaf: n.leaf, deadline: n.authorityDeadline}
 		switch schema {
 		case runtimepolicy.SchemaVersionV2:
-			n.packet, err = n.borrow.AttachRawV2(stage, n.result, n.carrier)
+			n.packet, err = n.borrow.AttachRawV2(lifetime, n.result, n.carrier)
 		case runtimepolicy.SchemaVersionV3:
-			n.service, err = n.borrow.AttachServiceV1(stage, n.result, n.carrier)
+			n.service, err = n.borrow.AttachServiceV1(lifetime, n.result, n.carrier)
 		default:
 			err = kruntime.ServiceNotAdmittedV1
 		}

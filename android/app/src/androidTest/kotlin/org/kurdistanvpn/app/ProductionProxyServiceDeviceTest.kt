@@ -37,7 +37,7 @@ class ProductionProxyServiceDeviceTest {
             app.compositionRoot.validateProductionManualStart(org.kurdistanvpn.core.model.CatalogId("missing-profile"), target.settingsRevision))
         assertEquals(projection, app.compositionRoot.protectedStateFacade()?.readProjection())
     }
-    @Test fun authenticatedLoopbackProxyTransfersThroughNativeAndStopsWithSession() = exercise(false)
+    @Test fun authenticatedLoopbackProxyTransfersThroughNativeAndStopsWithSession() = exercise(false, beyondStartupDeadline = true)
     @Test fun signedProbeUsesTheActiveServiceWithoutReplacingTheTunnel() = exercise(false, activeProbe = true)
     @Test fun maintenanceRepositoryPersistsActualProbeWithoutReplacingTheTunnel() = exercise(false, repositoryProbe = true)
     @Test fun unsupportedUpdateRetiresMaintenanceAndCanBeCheckedAgainWithoutReplacingTheTunnel() =
@@ -101,7 +101,7 @@ class ProductionProxyServiceDeviceTest {
         rejectWhileActive: Boolean = false, releaseObservation: Boolean = false, rejectClient: Boolean = false,
         draftStaging: Boolean = false, activityStart: Boolean = false, proxyOnly: Boolean = false,
         activeProbe: Boolean = false, activeUpdate: Boolean = false, repositoryProbe: Boolean = false,
-        manualAction: Boolean = false) {
+        manualAction: Boolean = false, beyondStartupDeadline: Boolean = false) {
         check(Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk")) { "EMULATOR_ONLY" }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         fun category(value: String?): String = value?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
@@ -242,6 +242,13 @@ class ProductionProxyServiceDeviceTest {
                 }
                 throw AssertionError("KURDISTAN_TEST_SETUP expected=ACTIVE_KURD_LIVE actual=${state.state.name} setup=$setup",
                     AssertionError("Proxy activation: ${state.state}/${state.failure}/${state.packetDisposition}; opening=$openingStates; publication=${publication.first}"))
+            }
+            if (beyondStartupDeadline) {
+                // The signed fixture's startup attempt is 10 seconds, not the active session lifetime.
+                SystemClock.sleep(11_000)
+                val continued = RuntimeStatusWire.decode(control.queryStatus(version))
+                assertEquals("Active session must outlive its completed startup deadline", VpnRuntimeState.ACTIVE_KURD_LIVE, continued.state)
+                assertEquals(state.runtimeRequestId, continued.runtimeRequestId)
             }
             val presentation = checkNotNull(state.presentation) { "Production presentation evidence missing" }
             if (manualAction) {
