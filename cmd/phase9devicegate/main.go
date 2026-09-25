@@ -1432,19 +1432,30 @@ func newADBClient(path, serial, evidenceDir string, timeline *diagnosticTimeline
 	}
 }
 
-func realCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) *exec.Cmd {
+func realCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (*exec.Cmd, error) {
 	command := exec.CommandContext(ctx, path, args...)
 	command.Stdout, command.Stderr = stdout, stderr
 	command.WaitDelay = waitDelay
-	return command
+	// No command reads input. Keep stdin open until Wait so adb does not send
+	// CloseStdin while an older daemon is delivering a short command's exit packet.
+	// Cmd owns both pipe ends and closes them after Wait or a failed Start.
+	_, err := command.StdinPipe()
+	return command, err
 }
 
 func runRealCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) error {
-	return realCommand(ctx, path, args, stdout, stderr, waitDelay).Run()
+	command, err := realCommand(ctx, path, args, stdout, stderr, waitDelay)
+	if err != nil {
+		return err
+	}
+	return command.Run()
 }
 
 func startRealCommand(ctx context.Context, path string, args []string, stdout, stderr io.Writer, waitDelay time.Duration) (func() error, error) {
-	command := realCommand(ctx, path, args, stdout, stderr, waitDelay)
+	command, err := realCommand(ctx, path, args, stdout, stderr, waitDelay)
+	if err != nil {
+		return nil, err
+	}
 	var killed atomic.Bool
 	stop := command.Cancel
 	command.Cancel = func() error {
