@@ -402,6 +402,7 @@ func TestRepositoryAssurancePolicyDefinesExactCertificateLanes(t *testing.T) {
 				"-expected-tests", "android/config/phase18-current-device-tests.txt",
 				"-expected-api", api,
 				"-expected-abi", "x86_64",
+				"-owned-emulator-name", "kurdistan_phase17_api" + api,
 			}
 			if !reflect.DeepEqual(proof.Commands, [][]string{wantCommand}) {
 				t.Fatalf("%s commands = %v, want exact Phase 17 device command %v", proof.ID, proof.Commands, wantCommand)
