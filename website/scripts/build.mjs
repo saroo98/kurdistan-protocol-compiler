@@ -58,7 +58,7 @@ await emit('offline.html',document(all.find(p=>p.slug==='offline'),makeContext('
 const original=await readFile(path.join(root,'src/prototype/app.html'),'utf8');
 if(/ORS-\d|OBLIGATIONS|SCOPE_GROUPS|SCOPE_ROUTES|Phase 2\.7|phase18\//i.test(original))throw Error('Private content in public demo source');
 let prototype=original.replace(/<title>[\s\S]*?<\/title>/,'<title>Kurdistan VPN · supplied design prototype · simulated</title>');
-const protoCss=[...original.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n')+'\n'+await readFile(path.join(root,'src/styles/prototype-host.css'),'utf8');
+const protoCss=[...original.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n')+'\n'+await readFile(path.join(root,'src/styles/app-design.css'),'utf8')+'\n'+await readFile(path.join(root,'src/styles/prototype-host.css'),'utf8');
 prototype=prototype.replace(/<style[^>]*>[\s\S]*?<\/style>/g,'');
 await mkdir(path.join(dist,'prototype'),{recursive:true});await writeFile(path.join(dist,'prototype/reference.css'),protoCss);
 prototype=prototype.replace('</head>','<link rel="stylesheet" href="reference.css"><meta name="robots" content="noindex,nofollow"></head>');
@@ -70,12 +70,12 @@ await cp(path.join(root,'src/client/prototype-history.js'),path.join(dist,'proto
 prototype=prototype.replace('</head>','<script src="history.js"></script></head>');
 await cp(path.join(root,'src/client/prototype-adapter.js'),path.join(dist,'prototype/adapter.js'));
 prototype=prototype.replace('</body>','<script src="adapter.js"></script></body>');
-await cp(path.join(root,'src/client/prototype-refinement.js'),path.join(dist,'prototype/refinement.js'));
+await cp(path.join(root,'src/client/app-design.js'),path.join(dist,'prototype/app-design.js'));
 const protocolLogos=JSON.parse(await readFile(path.join(root,'src/refinement/protocol-logos.json'),'utf8'));
 await cp(path.join(root,'src/refinement/protocol-logos'),path.join(dist,'prototype/protocol-logos'),{recursive:true});
 await cp(path.join(root,'public/assets/kurdistan-mark.svg'),path.join(dist,'prototype/protocol-logos/kurd.svg'));
 await writeFile(path.join(dist,'prototype/copy.js'),'window.DemoCopy='+JSON.stringify(refinementCopy)+';window.DemoMethods='+JSON.stringify(methods.map(p=>({...p,logo:protocolLogos[p.id]?.file||null})))+';');
-prototype=prototype.replace('<script src="adapter.js">','<script src="copy.js"></script><script src="refinement.js"></script><script src="adapter.js">');
+prototype=prototype.replace('<script src="adapter.js">','<script src="copy.js"></script><script src="app-design.js"></script><script src="adapter.js">');
 await writeFile(path.join(dist,'prototype/index.html'),prototype);
 headers[base+'prototype/index.html']={'Content-Security-Policy':policy(prototype,true),'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':permission,'X-Frame-Options':'SAMEORIGIN','X-Robots-Tag':'noindex, nofollow'};
 await cp(path.join(root,'src/content/protocols.json'),path.join(dist,'prototype/protocols.json'));

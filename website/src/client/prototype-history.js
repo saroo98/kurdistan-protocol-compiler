@@ -2,6 +2,7 @@
    same-origin privileges merely to satisfy that expectation. Keep its fragment
    navigation in memory instead. This adapter changes no VPN/profile decisions. */
 (function(){
+ window.kurdSetMarkup=(target,html)=>{target.innerHTML=html};
  if(window.parent===window)return;
  const entries=[{state:null,fragment:''}];let index=0;
  function check(url){if(url!==undefined&&url!==null&&!/^#[a-z0-9-]{0,120}$/.test(String(url)))throw new TypeError('The embedded prototype permits local screen fragments only.');return String(url||'');}

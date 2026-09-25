@@ -27,3 +27,8 @@ Public implementation entry points are `scripts/build.mjs`, `src/content/`,
 `src/i18n/`, `src/client/` and `tests/`. Product operation and security guidance
 are in [`../docs/self-hosting/`](../docs/self-hosting/). Local QA does not establish
 production VPN availability, native-language approval or field performance.
+
+The interactive demo uses `src/prototype/app.html` for its synthetic state and
+routes, with the app presentation in `src/client/app-design.js` and
+`src/styles/app-design.css`. Host adapters provide only viewport fitting,
+isolated history and website preference/state messaging.

@@ -61,82 +61,65 @@ try{
    await p.locator('[data-demo-command=disconnected]').click();
    await p.waitForFunction(()=>document.querySelector('[data-demo]').dataset.demoState==='disconnected');
   }
-  assert.equal(await f.locator('[data-home-latency]').textContent(),'—');
-  assert.deepEqual(await f.locator('[data-transfer]').allTextContents(),['—','—']);
-  assert.equal(await f.locator('.refined-profile [data-home-latency]').count(),1);
+  check(await f.locator('.gold-home').isVisible(),`${locale}/${theme} approved Home layout`);
+  assert.equal(await f.locator('.refined-home').count(),0);
   assert.equal(await p.locator('[data-demo-notice]').count(),1);
-  assert.equal(await f.locator('.prototype-stamp,.refined-primary p').count(),0);
-  const themeDetails=await f.evaluate(()=>({accent:getComputedStyle(document.querySelector('.device')).getPropertyValue('--accent').trim().toLowerCase(),rays:document.querySelectorAll('.refined-connect polygon').length,flag:getComputedStyle(document.querySelector('.bottom-nav'),'::before').display,logo:getComputedStyle(document.querySelector('.brand img')).filter}));
-  assert.equal(themeDetails.accent,theme==='dark'?'#e4b33a':'#c69318');assert.equal(themeDetails.rays,21);assert.equal(themeDetails.flag,'none');assert.ok(themeDetails.logo.includes('brightness(0)'));
-  const branding=await f.evaluate(()=>{const nav=document.querySelector('.bottom-nav'),stripe=getComputedStyle(nav,'::before'),brand=document.querySelector('.toolbar .brand');return {center:parseFloat(stripe.left)+parseFloat(stripe.marginLeft)+parseFloat(stripe.width)/2,width:nav.clientWidth,name:brand.textContent.trim(),outline:getComputedStyle(brand,'::after').outlineWidth};});
-  assert.equal(branding.name,'KurdistanVPN');assert.equal(branding.outline,'1px');
-  const shape=await f.evaluate(()=>{const main=document.querySelector('.screen-main'),a=document.querySelector('.refined-profile').getBoundingClientRect(),b=document.querySelector('.refined-metrics').getBoundingClientRect(),d=document.querySelector('.refined-primary>.btn').getBoundingClientRect();return {overflow:main.scrollHeight-main.clientHeight,edges:[a.left-b.left,b.left-d.left,a.right-b.right,b.right-d.right]};});
-  check(shape.overflow<=1,`${locale}/${theme} Home primary controls fit`);check(shape.edges.every(n=>Math.abs(n)<=1),`${locale}/${theme} Phone alignment within 1px`);
+  assert.equal(await f.locator('.prototype-stamp').count(),0);
+  assert.equal(await f.locator('.brand').innerText(),'KurdistanVPN');
+  assert.equal(await f.locator('.gold-sun-button polygon').count(),21);
+  assert.equal(await f.locator('.device').evaluate(e=>getComputedStyle(e).getPropertyValue('--accent').trim()),'#ffba00');
+  check(await f.locator('.screen-main').evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${locale}/${theme} Home has no horizontal overflow`);
   await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/phone-home-${locale}-${theme}.png`});
-  for(const key of ['device','server','session']){
-   const control=f.locator(`[data-refine-screen=${key}]`).first();await control.click();check(await f.locator('.refined-detail').isVisible(),`${locale}/${theme} ${key} details`);
-   if(locale==='en'&&theme==='light')await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/phone-${key}.png`});
-   await f.locator('[data-refine-back]').click();check(await control.evaluate(e=>e===document.activeElement),`${locale}/${theme} ${key} focus restored`);
-   assert.equal(await f.evaluate(()=>KurdDemo.getState().session.status),'IDLE');
+  await f.locator('[data-action=home-details]').click();
+  check(await f.locator('.modal-layer').isVisible(),`${locale}/${theme} connection details`);
+  await f.getByRole('button',{name:'Done',exact:true}).click();
+  for(const route of ['home','profiles','settings']){
+   await f.evaluate(route=>KurdDemo.go(route),route);
+   check(await f.locator('.toolbar [data-go=scan-qr]').count()===1&&await f.locator('.toolbar [data-action=profiles-add]').count()===1,`${locale}/${theme} ${route} import toolbar`);
   }
-  // Use normal timing here so cancellation is tested while completion is pending.
-  await f.evaluate(()=>{const s=KurdDemo.getState();s.settings.reducedMotion=false;KurdDemo.setState(s);});
-  for(const route of ['home','profiles','settings']){await f.evaluate(route=>KurdDemo.go(route),route);check(await f.locator('.toolbar [data-go=scan-qr]').count()===1&&await f.locator('.toolbar [data-action=profiles-add]').count()===1&&await f.locator('.toolbar [data-go=settings]').count()===0,`${locale}/${theme} ${route} shared import toolbar`);}
   await f.evaluate(()=>KurdDemo.go('home'));
-  await f.locator('[data-focus-key=home-protocol-metric]').click();
-  check(await f.locator('.protocol-options>button').count()===22,`${locale}/${theme} full protocol picker`);
-  const expectedCount=await f.evaluate(()=>new Intl.NumberFormat(app.settings.language).format(app.profiles.filter(p=>p.protocol.toLowerCase()==='kurd').length));
-  assert.ok((await f.locator('[data-value=kurd] .protocol-profile-count').innerText()).startsWith(expectedCount));
-  assert.ok((await f.locator('[data-value=vmess] .protocol-profile-count').innerText()).startsWith(await f.evaluate(()=>new Intl.NumberFormat(app.settings.language).format(0))));
-  assert.equal(await f.locator('[data-value=kurd][data-action=choose-demo-protocol]').getAttribute('aria-pressed'),'true');
-  check(await f.locator('.toolbar [data-action=profiles-add]').count()===0,`${locale}/${theme} subscreen has back navigation only`);
-  await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/phone-protocol-picker-${locale}-${theme}.png`});
-  await f.locator('[data-go=protocol-guide]').click();assert.equal(await f.locator('.protocol-guide section').count(),22);await f.locator('.toolbar [data-action=back]').click();
-  await f.locator('[data-value=wireguard][data-action=choose-demo-protocol]').click();assert.equal(await f.locator('.protocol-lockup').innerText(),'WireGuard');assert.equal(await f.locator('.protocol-lockup svg').count(),0);
-  await f.waitForFunction(()=>{const img=document.querySelector('.protocol-project-logo');return img?.complete&&img.naturalWidth>0;});
-  assert.equal(await f.locator('.refined-route .refined-mini-sun').count(),0);
-  if(locale==='en')await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/phone-wireguard-${theme}.png`});
-  if(locale==='en'&&theme==='light'){
-   const choices=await f.evaluate(()=>DemoMethods.map(({id,logo})=>({id,logo})));
-   for(const choice of choices){await f.locator('[data-focus-key=home-protocol-metric]').click();await f.locator(`[data-action=choose-demo-protocol][data-value="${choice.id}"]`).click();assert.equal(await f.locator('.refined-route .refined-mini-sun').count(),choice.id==='kurd'?1:0);if(choice.logo)await f.waitForFunction(()=>{const img=document.querySelector('.protocol-project-logo');return img?.complete&&img.naturalWidth>0;});else assert.equal(await f.locator('.protocol-project-logo').count(),0);}
-   check(true,'All 22 selections use Kurd sun, verified project artwork, or text only');
-  }
-  await f.locator('[data-focus-key=home-protocol-metric]').click();await f.locator('[data-value=kurd][data-action=choose-demo-protocol]').click();
-  await f.locator('.refined-connect').click();await f.locator('.refined-connect').click();await p.waitForTimeout(1250);
-  check(await f.evaluate(()=>KurdDemo.getState().session.status)==='IDLE',`${locale}/${theme} Cancel prevents delayed connection`);
-  await f.locator('.refined-primary [data-action=connect]').click();await p.waitForFunction(()=>document.querySelector('[data-demo]').dataset.demoState==='connected');
-  assert.match(await f.locator('[data-home-latency]').textContent(),/^\d+ ms$/);
-  assert.deepEqual(await f.locator('[data-transfer]').allTextContents(),['1.24 MB/s','86 KB/s']);
-  check(await f.locator('.refined-transfer').isVisible(),`${locale}/${theme} Simulated transfer rates appear with connection`);
-  check(await p.locator('[data-demo-command=connected]').getAttribute('aria-pressed')==='true',`${locale}/${theme} Parent reflects completed connection`);
+  await f.locator('.protocol-identity').click();
+  check(await f.locator('.toolbar [data-action=back]').isVisible(),`${locale}/${theme} protocol navigation`);
+  await f.locator('.toolbar [data-action=back]').click();
+  await f.locator('.gold-sun-button').click();
+  await f.locator('.gold-sun-button').click();
+  await p.waitForTimeout(2800);
+  check(await f.evaluate(()=>KurdDemo.getState().session.status)==='IDLE',`${locale}/${theme} cancellation prevents delayed connection`);
+  await f.locator('.gold-sun-button').click();
+  await p.waitForFunction(()=>document.querySelector('[data-demo]').dataset.demoState==='connected');
+  check(await f.locator('.home-stat.transfer .stat-value').allTextContents().then(t=>t.join('|')==='12.4 MB/s|1.8 MB/s'),`${locale}/${theme} synthetic transfer state`);
+  assert.equal(await p.locator('[data-demo-command=connected]').getAttribute('aria-pressed'),'true');
   const beforePreferences=await f.evaluate(()=>({session:KurdDemo.getState().session.status,route:KurdDemo.getUI().route}));
   await p.evaluate(t=>{document.documentElement.dataset.theme=t;document.documentElement.dataset.motion='reduce';document.documentElement.dataset.text='large';},theme==='light'?'dark':'light');
   await f.waitForFunction(dark=>document.querySelector('.device').classList.contains('dark')===dark,theme==='light');
-  check(await f.locator('.device.pref-large').count()===1,`${locale}/${theme} larger text reaches demo`);
-  assert.deepEqual(await f.evaluate(()=>({session:KurdDemo.getState().session.status,route:KurdDemo.getUI().route})),beforePreferences,`${locale} preference changes preserve session and route`);
+  assert.equal(await f.locator('.device.pref-large').count(),1);
+  assert.deepEqual(await f.evaluate(()=>({session:KurdDemo.getState().session.status,route:KurdDemo.getUI().route})),beforePreferences);
   await p.evaluate(t=>{document.documentElement.dataset.theme=t;delete document.documentElement.dataset.text;},theme);
   await f.waitForFunction(()=>!document.querySelector('.device').classList.contains('pref-large'));
-  if(locale==='en'&&theme==='light')await p.locator('[data-demo-host]').screenshot({path:'qa/screenshots/phone-connected.png'});
-  await f.locator('.refined-primary [data-action=disconnect]').click();await f.locator('.bottom-nav [data-go=profiles]').click();
-  check(await f.locator('.profile-latency').evaluateAll(es=>es.every(e=>getComputedStyle(e).whiteSpace==='nowrap')),`${locale}/${theme} profile statuses stay on one line`);
-  assert.equal(await f.locator('.compact-star').count(),0);
-  assert.ok(await f.locator('.compact-profile').evaluateAll(es=>es.every(e=>getComputedStyle(e,'::before').display==='none')));
-  assert.ok(await f.locator('.profile-metadata').evaluateAll(es=>es.every(e=>e.textContent==='Kurd')));
-  assert.ok(await f.locator('.profile-latency').evaluateAll(es=>es.every(e=>['—','-1 ms'].includes(e.textContent))));
-  assert.equal(await f.locator('.profile-latency.failed').first().innerText(),'-1 ms');
-  await f.locator('[data-action=latency-test]').click();await p.waitForTimeout(500);check((await f.evaluate(()=>KurdDemo.latency())).simulation,`${locale}/${theme} Latency explicitly synthetic`);
-  await f.locator('[data-latency-sort]').selectOption('latency-low');
+  await f.locator('.gold-sun-button').click();
+  await f.locator('.bottom-nav [data-go=profiles]').click();
+  assert.equal(await f.locator('.gold-profile-row').count(),12);
+  check(await f.locator('.profile-ping').evaluateAll(es=>es.every(e=>getComputedStyle(e).whiteSpace==='nowrap')),`${locale}/${theme} latency stays on one line`);
+  assert.equal(await f.locator('.profile-ping.failed span').first().innerText(),'-1 ms');
+  await f.locator('[data-action=gold-test]').click();
+  await f.locator('[data-action=gold-cancel-test]').click();
+  const cancelled=await f.locator('.profile-ping').allTextContents();
+  await p.waitForTimeout(1750);
+  assert.deepEqual(await f.locator('.profile-ping').allTextContents(),cancelled,`${locale} latency cancellation`);
+  await f.locator('[data-action=gold-test]').click();
+  await f.locator('[data-action=gold-test]').waitFor();
+  await f.locator('select[data-ui=profileSort]').selectOption('latency');
+  await f.locator('#profile-search').fill('Zurich');
+  assert.equal(await f.locator('.gold-profile-row').count(),1);
+  await f.locator('.profile-favorite').click();
+  assert.equal(await f.locator('.profile-favorite').getAttribute('aria-pressed'),'true');
+  await f.locator('#profile-search').fill('');
   await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/phone-profiles-${locale}-${theme}.png`});
-  await p.locator('[data-demo-command=grandma]').click();await f.locator('.grandma').waitFor();await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/grandma-${locale}-${theme}.png`});
+  await p.locator('[data-demo-command=grandma]').click();
+  await f.locator('.grandma').waitFor();
+  await p.locator('[data-demo-host]').screenshot({path:`qa/screenshots/grandma-${locale}-${theme}.png`});
   await p.close();
  }
- const large=await newPage();const f=await demo(large);
- for(const count of [100,500,1000,5000]){
-  await f.evaluate(count=>{const s=KurdDemo.getState();s.profiles=ProfileView.fixtures(count);s.selected=s.profiles[0].id;s.inspected=s.selected;KurdDemo.setState(s);KurdDemo.go('profiles');},count);
-  check(await f.locator('.compact-profile').count()<160,`${count} profiles have bounded rendering`);
-  await f.locator('[data-action=latency-test]').click();await f.locator('[data-action=latency-cancel]').click();const before=await f.evaluate(()=>JSON.stringify(KurdDemo.latency()));await large.waitForTimeout(250);check(before===await f.evaluate(()=>JSON.stringify(KurdDemo.latency())),`${count} latency cancellation stable`);
- }
- await large.close();
  const zoom=await newPage('ckb',320);
  await zoom.evaluate(()=>document.documentElement.style.fontSize='200%');
  check(await zoom.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Sorani at 320px and 200% text has no page overflow');

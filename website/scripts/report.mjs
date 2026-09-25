@@ -17,7 +17,7 @@ Website version: ${i.websiteVersion}. Build manifest SHA-256: ${r.manifestSha256
 - CSS: ${p.cssGzipBytes} gzip bytes. Enhancement JavaScript: ${p.javascriptGzipBytes} gzip bytes.
 - All Node unit/artifact checks and source syntax lint ran in this verification. Exact commands/results are in the receipt and evidence logs.
 
-The browser tests cover hero selection, localized method search, phone alignment, detail navigation and focus, connection cancellation, parent synchronization, simulated latency cancellation and bounded rendering with up to 5,000 profiles. Screenshots are current captures, not historical input evidence.
+The browser tests cover hero selection, localized method search, the approved app layout, detail navigation, connection cancellation, parent synchronization, simulated latency cancellation, profile search and favorites. Screenshots are current captures, not historical input evidence.
 
 The demo and production output contain no private obligation/scope register. Original uploads and historical private material are outside the distributable project. The previous React website is not part of this build.
 

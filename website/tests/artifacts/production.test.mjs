@@ -72,7 +72,7 @@ test('manifest binds actual build bytes and locally provided assets',async()=>{
  assert.ok(entries.length>70);
  for(const x of entries){const b=await readFile(path.join(dist,x.path||x.file));assert.equal(hash(b),x.sha256,x.path||x.file);assert.equal(b.length,x.bytes,x.path||x.file);}
  const fonts=publicFiles.filter(f=>/\.(woff2?|ttf|otf|eot)$/i.test(f));
- assert.equal(fonts.length,8);
+ assert.equal(fonts.length,9);
  for(const f of fonts)assert.ok(f.startsWith('assets/fonts/')&&f.endsWith('.woff2'));
  const svg=await readFile(path.join(dist,'assets/kurdistan-mark.svg'));
  assert.equal(createHash('sha1').update(`blob ${svg.length}\0`).update(svg).digest('hex'),'52043eb1df2d0bf511dded884a89f4f88b92dca0');
