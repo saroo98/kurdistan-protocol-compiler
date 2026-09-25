@@ -85,13 +85,15 @@ class ExportDestinationDeviceTest {
             automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true
         }
         instrumentation.runOnMainSync { old.recreate() }
-        compose.waitUntil(10_000) { password.all { it == 0.toByte() } }
+        // API26 may defer recreation while DocumentsUI keeps this activity stopped.
+        // Return from the picker before requiring destruction and secret erasure.
         assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
         automation.waitForIdle(100, 2_000)
         if (automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true) {
             assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
         }
-        compose.waitUntil(10_000) { compose.activity !== old &&
+        compose.waitUntil(10_000) { compose.activity !== old && password.all { it == 0.toByte() } }
+        compose.waitUntil(10_000) {
             compose.activity.backupStateSnapshotForTesting() ==
                 org.kurdistanvpn.core.model.BackupWorkflowState.Failed(org.kurdistanvpn.core.model.OperationError.CANCELLED) }
     }
