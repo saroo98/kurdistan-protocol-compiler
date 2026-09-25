@@ -16,6 +16,8 @@ interface RuntimeAuthorityReissueBackend {
     /** Must perform read-only checks, including fresh external expiry/revocation/key/consent checks.
      * Locked state must be determined before any credential-protected lookup. */
     fun observe(start: RuntimeReissueStart): RuntimeAuthorityProviderState?
+    /** Call-local fixed rejection scalars, never authorization or payload. */
+    fun observe(start: RuntimeReissueStart, rejection: LongArray): RuntimeAuthorityProviderState? = observe(start)
     /** Internally owns and wipes every partial acquisition if this method throws. */
     fun prepare(start: RuntimeReissueStart): RuntimeReissueMaterial?
     /** Acquisition and active registration are serialized by the broker's revision owner. */
@@ -101,6 +103,7 @@ class RuntimeAuthorityReissueIpcAdapter internal constructor(private val uid: Lo
     private var unproven = false
     private var completedFullAuthorities = 0
     private var responseDiagnostic = LongArray(7) { -1 }
+    private var observationDiagnostic = LongArray(3) { -1 }
     private var registeredDiagnostic = LongArray(3)
     private var publicationDiagnostic: LongArray? = null
     init { require(uid in 0..0xffff_fffeL && RuntimeAuthorityLimits.validId(providerEpoch)) }
@@ -179,7 +182,8 @@ class RuntimeAuthorityReissueIpcAdapter internal constructor(private val uid: Lo
         var key: ByteArray? = null; var payload: ByteArray? = null; var frame: ByteArray? = null
         var success = false
         val diagnostic = LongArray(7) { -1 }.apply { this[4] = 0 }
-        synchronized(monitor) { responseDiagnostic = diagnostic }
+        val observation = LongArray(3) { -1 }
+        synchronized(monitor) { responseDiagnostic = diagnostic; observationDiagnostic = observation }
         var diagnosticStage = 1L
         try {
             active = synchronized(monitor) {
@@ -200,7 +204,7 @@ class RuntimeAuthorityReissueIpcAdapter internal constructor(private val uid: Lo
             val request = offer.request(purpose, outputIdentity.descriptor(descriptorId, size))
             val selectedBackend = backend(active)
             diagnosticStage = 3
-            val state = selectedBackend.observe(active.start) ?: error("state unavailable")
+            val state = selectedBackend.observe(active.start, observation) ?: error("state unavailable")
             diagnosticStage = 4
             require(valid(state, active.start) && state.revision == offer.revision && state.signedRetryBudget == offer.signedRetryBudget)
             val environment = RuntimeAdmissionEnvironment(uid, state.unlocked, state.vpnPrepared, state.automaticEnabled,
@@ -568,8 +572,9 @@ class RuntimeAuthorityReissueIpcAdapter internal constructor(private val uid: Lo
     fun completedFullAuthorityCount(): Int = synchronized(monitor) { completedFullAuthorities }
     /** Fixed process-local observations only; never authority, payload or exception text. */
     internal fun responseDiagnosticSnapshot(page: Int = 0): LongArray = synchronized(monitor) {
-        require(page in 0..1)
+        require(page in 0..2)
         if (page == 0) (responseDiagnostic + registeredDiagnostic).also { it[5] = if (unproven) 1 else 0 }
+        else if (page == 2) responseDiagnostic + synchronized(observationDiagnostic) { observationDiagnostic.copyOf() }
         else LongArray(24) { -1 }.also { result ->
             result[0] = 1; result[1] = 1; result[2] = 0
             publicationDiagnostic?.let { values ->

@@ -23,6 +23,42 @@ import org.kurdistanvpn.runtime.android.*
 
 /** Host execution covers the real provider state machine, not Android Binder or pipe syscalls. */
 class RuntimeAuthorityReissueServiceTest {
+    @Test fun originalReadRejectionIsCallScopedAndDoesNotReplaceCleanupFailure() {
+        var rejected = true
+        var cleanupFails = false
+        var closes = 0
+        val backend = DefaultProcessAuthorityBackend({ true }, { true }, { 100L }, { _, receipt ->
+            object : ExistingRestorationReadOwner {
+                override fun prepare(): RuntimeReissueMaterial? {
+                    if (rejected) {
+                        recordAuthorityReadRejection(receipt, 4, 5, 2)
+                        return null
+                    }
+                    return object : RuntimeReissueMaterial {
+                        override val revision = 2L
+                        override val signedRetryBudget = 2
+                        override val payloadLength = 1
+                        override fun writeTo(output: OutputStream) = output.write(7)
+                        override fun close() { }
+                    }
+                }
+                override fun close() { closes++; if (cleanupFails) throw IOException("synthetic") }
+            }
+        }, { _, _ -> null })
+        val first = LongArray(3) { -1 }
+        assertNull(backend.observe(Fixture().start(), first))
+        assertArrayEquals(longArrayOf(4, 5, 2), first)
+        rejected = false
+        val second = LongArray(3) { -1 }
+        assertEquals(2L, backend.observe(Fixture().start(), second)?.revision)
+        assertArrayEquals(longArrayOf(-1, -1, -1), second)
+        assertArrayEquals(longArrayOf(4, 5, 2), first)
+        rejected = true; cleanupFails = true
+        assertThrows(RuntimeAuthorityCleanupUnprovenException::class.java) {
+            backend.observe(Fixture().start(), LongArray(3) { -1 })
+        }
+        assertEquals(3, closes)
+    }
     @Test fun completedResponseAdmitsOneSuccessorWhileWorkerReturnsAndDrainsItOnShutdown() {
         listOf(false, true).forEach { detached ->
             val f = Fixture()
@@ -817,7 +853,7 @@ class RuntimeAuthorityReissueServiceTest {
     @Test fun defaultBackendChecksUnlockBeforeOpeningAndNeverCachesRuntimeAuthority() {
         var unlocked = false
         var opens = 0; var preparations = 0; var materialCloses = 0; var readerCloses = 0
-        val backend = DefaultProcessAuthorityBackend({ unlocked }, { true }, { 100L }, {
+        val backend = DefaultProcessAuthorityBackend({ unlocked }, { true }, { 100L }, { _, _ ->
             opens++
             object : ExistingRestorationReadOwner {
                 override fun prepare(): RuntimeReissueMaterial {
@@ -846,7 +882,7 @@ class RuntimeAuthorityReissueServiceTest {
 
     @Test fun defaultBackendRetainsCleanupFailureAndStillClosesEveryOwnedReader() {
         var materialCloses = 0; var readerCloses = 0
-        val backend = DefaultProcessAuthorityBackend({ true }, { true }, { 100L }, {
+        val backend = DefaultProcessAuthorityBackend({ true }, { true }, { 100L }, { _, _ ->
             object : ExistingRestorationReadOwner {
                 override fun prepare(): RuntimeReissueMaterial = object : RuntimeReissueMaterial {
                     override val revision = 2L; override val signedRetryBudget = 1; override val payloadLength = 1
@@ -868,7 +904,7 @@ class RuntimeAuthorityReissueServiceTest {
 
     @Test fun defaultBackendClosesPartialReadAndChecksAdmissionAgainBeforeTransfer() {
         var prepared = true; var readerCloses = 0; var materialCloses = 0
-        val backend = DefaultProcessAuthorityBackend({ true }, { prepared }, { 100L }, {
+        val backend = DefaultProcessAuthorityBackend({ true }, { prepared }, { 100L }, { _, _ ->
             object : ExistingRestorationReadOwner {
                 override fun prepare(): RuntimeReissueMaterial {
                     prepared = false

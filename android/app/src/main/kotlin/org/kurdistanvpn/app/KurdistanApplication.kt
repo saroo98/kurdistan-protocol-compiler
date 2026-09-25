@@ -136,20 +136,31 @@ class KurdistanApplication : Application(), RuntimeAuthorityReissueOwner,
         return processRole(packageName, currentName)
     }
 
-    private fun existingFacade(): ProtectedStateApplicationFacade? {
-        if (!isUnlocked() || !isPrepared()) return null
+    private fun existingFacade(rejection: LongArray? = null): ProtectedStateApplicationFacade? {
+        if (!isUnlocked() || !isPrepared()) { recordAuthorityReadRejection(rejection, 2); return null }
         return when (val opened = ProtectedStateApplicationFacade.openExistingReadOnly(this,
             runtimeAuthorityPipePrimitives, nativeCore, protectedStateProcessOwner)) {
             is ProtectedStateApplicationFacade.OpenResult.Ready -> opened.facade
-            else -> null
+            else -> {
+                val category = when (opened) {
+                    ProtectedStateApplicationFacade.OpenResult.Locked -> 1L
+                    ProtectedStateApplicationFacade.OpenResult.Missing -> 2L
+                    ProtectedStateApplicationFacade.OpenResult.MigrationRequired -> 3L
+                    ProtectedStateApplicationFacade.OpenResult.KeyInvalidated -> 4L
+                    else -> 5L
+                }
+                recordAuthorityReadRejection(rejection, 3, category)
+                null
+            }
         }
     }
 
-    private fun openAuthorityReadOwner(environment: ProtectedAuthorityEnvironment): ExistingRestorationReadOwner? {
-        val facade = existingFacade() ?: return null
+    private fun openAuthorityReadOwner(environment: ProtectedAuthorityEnvironment, rejection: LongArray?): ExistingRestorationReadOwner? {
+        val facade = existingFacade(rejection) ?: return null
         return object : ExistingRestorationReadOwner {
             override fun prepare(): RuntimeReissueMaterial? = when (val result = facade.reconstructAuthority(environment)) {
                 is AuthorityReadResult.Rejected -> {
+                    recordAuthorityReadRejection(rejection, 4, result.category.ordinal.toLong(), result.error?.ordinal?.toLong() ?: -1)
                     if (result.category == AuthorityReadFailure.CLEANUP_UNPROVEN) throw RuntimeAuthorityCleanupUnprovenException()
                     null
                 }
@@ -166,11 +177,12 @@ class KurdistanApplication : Application(), RuntimeAuthorityReissueOwner,
         }
     }
 
-    private fun openProductionReadOwner(environment: ProtectedAuthorityEnvironment): ExistingRestorationReadOwner? {
-        val facade = existingFacade() ?: return null
+    private fun openProductionReadOwner(environment: ProtectedAuthorityEnvironment, rejection: LongArray?): ExistingRestorationReadOwner? {
+        val facade = existingFacade(rejection) ?: return null
         return object : ExistingRestorationReadOwner {
             override fun prepare(): RuntimeReissueMaterial? = when (val result = facade.reconstructProductionCapture(environment)) {
                 is ProductionCaptureReadResult.Rejected -> {
+                    recordAuthorityReadRejection(rejection, 4, result.category.ordinal.toLong(), result.error?.ordinal?.toLong() ?: -1)
                     if (result.category == AuthorityReadFailure.CLEANUP_UNPROVEN) throw RuntimeAuthorityCleanupUnprovenException()
                     null
                 }
@@ -393,6 +405,16 @@ internal interface ExistingRestorationReadOwner : Closeable {
     fun prepare(): RuntimeReissueMaterial?
 }
 
+// First original rejection wins. No additional admission/storage reads or exception text.
+internal fun recordAuthorityReadRejection(receipt: LongArray?, boundary: Long, category: Long = -1, error: Long = -1) {
+    if (receipt == null) return
+    synchronized(receipt) {
+        if (receipt.size == 3 && receipt[0] == -1L) {
+            receipt[0] = boundary; receipt[1] = category; receipt[2] = error
+        }
+    }
+}
+
 /** Shared manual/system provider path. It cannot initialize storage, normalize preferences,
  * manufacture authority, or retain a wire between requests. Android binding supplies only
  * lifecycle metadata; all material is reconstructed through the committed read facade. */
@@ -400,7 +422,7 @@ internal class DefaultProcessAuthorityBackend(
     private val unlocked: () -> Boolean,
     private val prepared: () -> Boolean,
     private val now: () -> Long,
-    private val openExisting: (ProtectedAuthorityEnvironment) -> ExistingRestorationReadOwner?,
+    private val openExisting: (ProtectedAuthorityEnvironment, LongArray?) -> ExistingRestorationReadOwner?,
     private val lease: (RuntimeAuthorityRequest, ProtectedAuthorityEnvironment) -> RuntimeProviderRevisionLease?,
 ) : RuntimeAuthorityReissueBackend {
     private fun admitted(start: RuntimeReissueStart): Boolean =
@@ -413,29 +435,38 @@ internal class DefaultProcessAuthorityBackend(
         override fun elapsedRealtimeMillis() = now()
     }
 
-    override fun observe(start: RuntimeReissueStart): RuntimeAuthorityProviderState? {
-        val current = prepare(start) ?: return null
+    override fun observe(start: RuntimeReissueStart): RuntimeAuthorityProviderState? = observeOriginal(start, null)
+    override fun observe(start: RuntimeReissueStart, rejection: LongArray): RuntimeAuthorityProviderState? = observeOriginal(start, rejection)
+    private fun observeOriginal(start: RuntimeReissueStart, rejection: LongArray?): RuntimeAuthorityProviderState? {
+        val current = prepareOriginal(start, rejection) ?: return null
         return current.use {
-            if (!admitted(start)) null else RuntimeAuthorityProviderState(true, true, true, it.revision, it.signedRetryBudget)
+            if (!admitted(start)) { recordAuthorityReadRejection(rejection, 7); null } else RuntimeAuthorityProviderState(true, true, true, it.revision, it.signedRetryBudget)
         }
     }
 
-    override fun prepare(start: RuntimeReissueStart): RuntimeReissueMaterial? {
-        if (!admitted(start)) return null // before even opening credential-protected state
+    override fun prepare(start: RuntimeReissueStart): RuntimeReissueMaterial? = prepareOriginal(start, null)
+    private fun prepareOriginal(start: RuntimeReissueStart, rejection: LongArray?): RuntimeReissueMaterial? {
+        if (!admitted(start)) { recordAuthorityReadRejection(rejection, 1); return null } // before even opening credential-protected state
         var reader: ExistingRestorationReadOwner? = null
         var material: RuntimeReissueMaterial? = null
         var transferred = false
         try {
-            reader = openExisting(environment(start)) ?: return null
-            material = reader.prepare() ?: return null
+            reader = openExisting(environment(start), rejection)
+            if (reader == null) { recordAuthorityReadRejection(rejection, 3); return null }
+            material = reader.prepare()
+            if (material == null) { recordAuthorityReadRejection(rejection, 4); return null }
             require(RuntimeAuthorityLimits.validRevision(material.revision) &&
                 material.signedRetryBudget in 0..RuntimeAuthorityLimits.MAX_RETRIES &&
                 start.retryAttempt <= material.signedRetryBudget &&
                 material.payloadLength in 1..RuntimeAuthorityLimits.MAX_PAYLOAD_BYTES)
-            if (!admitted(start)) return null
+            if (!admitted(start)) { recordAuthorityReadRejection(rejection, 6); return null }
             return OwnedMaterial(reader, material) { admitted(start) }.also { transferred = true }
         } catch (failure: RuntimeAuthorityCleanupUnprovenException) { throw failure }
-        catch (_: Exception) { return null }
+        catch (failure: Exception) {
+            val category = when (failure) { is IllegalArgumentException -> 1L; is IllegalStateException -> 2L; is SecurityException -> 3L; else -> 4L }
+            recordAuthorityReadRejection(rejection, 5, category)
+            return null
+        }
         finally {
             if (!transferred) {
                 var clean = true
