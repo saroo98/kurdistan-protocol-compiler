@@ -499,10 +499,18 @@ internal class Task7InstalledTunCase(
     private fun write(s:Step,count:Int):Int=io(s,true,count)
     private fun exchangeStart(s:Step,short:Boolean):NativePacketDelivery{
         stage(6);witness(s);val socket=checkNotNull(s.generator)
-        val request=payload(false,1);socket.send(DatagramPacket(request,request.size,checkNotNull(s.dns),28472))
+        val request=payload(false,1);val packet=DatagramPacket(request,request.size,checkNotNull(s.dns),28472)
         val until=minOf(deadline,SystemClock.elapsedRealtime()+4096);var found=false;var dropped=0
+        var nextSend=0L
         for(observed in 0 until 64){
-            val n=io(s,false,inBytes.size,until);task7TunRequireV1(n>0,5)
+            // UDP delivery is not guaranteed. Generate within the existing capture
+            // budget, then submit exactly one observed packet to the native owner.
+            val n=task7TunPollIoV1(checkNotNull(s.descriptor),inBytes,inBytes.size,false,until){
+                witness(s)
+                val now=SystemClock.elapsedRealtime()
+                if(now>=nextSend && now<until){socket.send(packet);nextSend=now+100}
+            }
+            task7TunRequireV1(n>0,5)
             if(packetMatches(s,inBytes,n,false,1)){put(19,n.toLong());found=true;break}
             dropped++;put(51,dropped.toLong())
         }
