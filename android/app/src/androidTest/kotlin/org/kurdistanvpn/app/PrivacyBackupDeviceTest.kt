@@ -55,7 +55,7 @@ class PrivacyBackupDeviceTest {
                 assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
             try {
                 compose.waitUntil(10_000) { compose.activity !== old && compose.activity.backupStateSnapshotForTesting() == BackupWorkflowState.Idle }
-            } catch (error: AssertionError) {
+            } catch (error: androidx.compose.ui.test.ComposeTimeoutException) {
                 val current = compose.activity
                 val actual = current.backupStateSnapshotForTesting().javaClass.simpleName.uppercase(java.util.Locale.ROOT)
                 val recreated = if (current !== old) "RECREATED" else "ORIGINAL_ACTIVITY"
