@@ -49,12 +49,29 @@ class PrivacyBackupDeviceTest {
             assertTrue(checkNotNull(button).performAction(AccessibilityNodeInfo.ACTION_CLICK))
             compose.waitUntil(10_000) { compose.activity !== old && compose.activity.backupStateSnapshotForTesting() == BackupWorkflowState.Exported }
         } else {
-            assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-            automation.waitForIdle(100, 2_000)
-            if (automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true)
-                assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            val previousFlags = automation.serviceInfo.flags
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            }
+            var nextBackAt = 0L
             try {
-                compose.waitUntil(10_000) { compose.activity !== old && compose.activity.backupStateSnapshotForTesting() == BackupWorkflowState.Idle }
+                compose.waitUntil(10_000) {
+                    val current = compose.activity
+                    if (current !== old && current.backupStateSnapshotForTesting() == BackupWorkflowState.Idle) true else {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        val foreground = automation.rootInActiveWindow
+                        // Back may hide the keyboard or move up a directory before cancelling.
+                        // Act only on the focused picker and let each asynchronous action settle.
+                        if (now >= nextBackAt && foreground != null && !current.hasWindowFocus() &&
+                            foreground.packageName?.toString() in setOf("com.android.documentsui", "com.google.android.documentsui") &&
+                            automation.windows.any { it.id == foreground.windowId && it.isFocused } &&
+                            !compose.activity.hasWindowFocus()) {
+                            assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+                            nextBackAt = android.os.SystemClock.elapsedRealtime() + 1_000
+                        }
+                        false
+                    }
+                }
             } catch (error: androidx.compose.ui.test.ComposeTimeoutException) {
                 val current = compose.activity
                 val actual = current.backupStateSnapshotForTesting().javaClass.simpleName.uppercase(java.util.Locale.ROOT)
@@ -65,6 +82,8 @@ class PrivacyBackupDeviceTest {
                     else -> "OTHER_WINDOW"
                 }
                 throw AssertionError("KURDISTAN_TEST_SETUP expected=IDLE actual=$actual setup=EXPORT_CANCEL,$recreated,$foreground", error)
+            } finally {
+                automation.serviceInfo = automation.serviceInfo.apply { flags = previousFlags }
             }
         }
         val after = checkNotNull(root.protectedStateFacade()?.readProjection())
