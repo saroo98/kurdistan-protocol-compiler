@@ -38,7 +38,7 @@ previews, not screenshots of a released Android build. Displayed locations and
 latencies are examples, not an available server list or performance measurements.
 
 <p>
-  <img src="docs/assets/app-home-preview.png" alt="Home interface preview with profile details and a Connect button" width="256">
+  <img src="docs/assets/app-home-preview.png" alt="Home interface preview with profile details and the sun connection control" width="256">
   <img src="docs/assets/app-profiles-preview.png" alt="Profiles interface preview with grouped example profiles and latency indicators" width="256">
 </p>
 
