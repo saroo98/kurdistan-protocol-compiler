@@ -5,6 +5,9 @@ package org.kurdistanvpn.core.nativejni
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 import org.kurdistanvpn.core.nativeapi.*
 import org.kurdistanvpn.core.model.OperationError
 import org.kurdistanvpn.core.model.ProductFailureCode
@@ -55,11 +58,31 @@ internal fun completeBootstrapSelectorPairV1(facts:NativeProductionBootstrapFact
 }
 
 /** Actual wrapper staging, also exercised without loading a native library. */
-internal object BootstrapBindingCallsV1 : BootstrapBindingCallOwnerV1(processBootstrapBindingGuardV1)
+internal object BootstrapBindingCallsV1 : BootstrapBindingCallOwnerV1(processBootstrapBindingGuardV1, BootstrapBindingAdmissionV1())
+
+/** One active call and one waiter, before direct-buffer staging. This availability
+ * wait never renews a caller's authority deadline; callers still validate fresh state.
+ * Five seconds matches the maximum publication-lease interval, not a network timeout. */
+internal class BootstrapBindingAdmissionV1(private val waitMillis:Long=5_000) {
+    private val slots=Semaphore(2)
+    private val lock=ReentrantLock(true)
+    init { require(waitMillis in 1..5_000) }
+
+    fun <T> call(refused:()->T, action:()->T):T {
+        if(Thread.currentThread().isInterrupted || !slots.tryAcquire())return refused()
+        try {
+            val acquired=try {lock.tryLock(waitMillis,TimeUnit.MILLISECONDS)}
+            catch(_:InterruptedException) {Thread.currentThread().interrupt();return refused()}
+            if(!acquired)return refused()
+            try {return action()} finally {lock.unlock()}
+        } finally {slots.release()}
+    }
+}
 
 /** The actual call owner takes its guard explicitly; production has one instance,
  * while tests can isolate terminal anomalies without a reset hook. */
-internal open class BootstrapBindingCallOwnerV1(private val guard:BootstrapBindingGuardV1) {
+internal open class BootstrapBindingCallOwnerV1(private val guard:BootstrapBindingGuardV1,
+    private val admission:BootstrapBindingAdmissionV1?=null) {
     fun legacy(material:NativeBootstrapMaterialV1,policy:ByteBuffer,mapError:(Int)->OperationError,
         invoke:BootstrapNativeCallV1):NativeResult<NativeLegacyBootstrapFactsV1> =
         execute(material,policy,false,{NativeResult.Failure(mapError(it))},invoke) { facts,_,_,_ ->
@@ -77,6 +100,14 @@ internal open class BootstrapBindingCallOwnerV1(private val guard:BootstrapBindi
         }
 
     private fun <T> execute(material:NativeBootstrapMaterialV1,fifth:ByteBuffer,production:Boolean,
+        failure:(Int)->T,invoke:BootstrapNativeCallV1,
+        decode:(ByteBuffer,ByteBuffer?,ByteBuffer?,ByteBuffer?)->T):T =
+        if(admission==null)executeOwned(material,fifth,production,failure,invoke,decode)
+        else admission.call({failure(if(production)5 else 24)}) {
+            executeOwned(material,fifth,production,failure,invoke,decode)
+        }
+
+    private fun <T> executeOwned(material:NativeBootstrapMaterialV1,fifth:ByteBuffer,production:Boolean,
         failure:(Int)->T,invoke:BootstrapNativeCallV1,
         decode:(ByteBuffer,ByteBuffer?,ByteBuffer?,ByteBuffer?)->T):T {
         val invalid=if(production)2 else 1
