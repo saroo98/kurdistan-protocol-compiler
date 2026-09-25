@@ -203,12 +203,19 @@ func TestServiceStreamV1NativeFenceRejectsMisuse(t *testing.T) {
 type serviceFINWriteGateV1 struct {
 	io.ReadWriteCloser
 	armed            atomic.Bool
+	afterRecord      bool
 	entered, release chan struct{}
 	once             sync.Once
 }
 
 func (g *serviceFINWriteGateV1) Write(b []byte) (int, error) {
-	if g.armed.Load() {
+	// Hold the record body, not its four-byte length, after actual peer delivery.
+	if g.armed.Load() && g.afterRecord && len(b) > 4 {
+		n, err := g.ReadWriteCloser.Write(b)
+		g.once.Do(func() { close(g.entered); <-g.release })
+		return n, err
+	}
+	if g.armed.Load() && !g.afterRecord {
 		g.once.Do(func() { close(g.entered); <-g.release })
 	}
 	return g.ReadWriteCloser.Write(b)
@@ -284,6 +291,77 @@ func TestServiceStreamV1NativeFencedConfirmationAndActualRetirement(t *testing.T
 		return retired
 	})
 }
+func TestServiceStreamV1CloseAfterEOFKeepsPendingFINAndParentAlive(t *testing.T) {
+	l, network := pumpLocalListenerV1(t)
+	c, r, _, _ := pumpPairNarrowV1(t, network, false, sessionplan.NarrowingRequestV2{MaxQueuePackets: 4})
+	gate := &serviceFINWriteGateV1{ReadWriteCloser: c.cfg.Carrier, afterRecord: true, entered: make(chan struct{}), release: make(chan struct{})}
+	c.cfg.Carrier = gate
+	var release sync.Once
+	releaseFIN := func() { release.Do(func() { close(gate.release) }) }
+	defer releaseFIN()
+	pumpStartPairV1(t, c, r)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	id, err := c.OpenStream(ctx, ProxyRequestV1{1, []byte{1, 1, 1, 1}, 443})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := l.AcceptTCP()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	gate.armed.Store(true)
+	if err = c.CloseWrite(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-gate.entered:
+	case <-ctx.Done():
+		t.Fatal("FIN did not enter carrier")
+	}
+	if err = conn.CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = c.ReceiveStream(ctx, id, make([]byte, 1)); err != io.EOF {
+		t.Fatal("remote EOF", err)
+	}
+	pumpWaitUntilV1(t, func() bool { return r.BoundsV1().ActiveStreams == 0 })
+	if err = c.CancelStream(id); err != nil {
+		t.Fatal("close after EOF", err)
+	}
+	if retired, err := c.StreamRetiredV1(id); retired || err != nil {
+		t.Fatal("retired before FIN completion", retired, err)
+	}
+	releaseFIN()
+	next, err := c.OpenStream(ctx, ProxyRequestV1{1, []byte{1, 1, 1, 1}, 443})
+	if err != nil {
+		t.Fatal("completed stream closed its parent", err)
+	}
+	peer, err := l.AcceptTCP()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+	if err = peer.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := c.WriteStream(ctx, next, []byte{42}); n != 1 || err != nil {
+		t.Fatal("second stream write", n, err)
+	}
+	var received [1]byte
+	if _, err = io.ReadFull(peer, received[:]); err != nil || received[0] != 42 {
+		t.Fatal("second stream delivery", received, err)
+	}
+	pumpWaitUntilV1(t, func() bool {
+		retired, err := c.StreamRetiredV1(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return retired
+	})
+}
+
 func TestServiceStreamV1Fix1CloseReservationExcludesOtherCloserAndWriter(t *testing.T) {
 	for _, writer := range []bool{false, true} {
 		t.Run(fmt.Sprint(writer), func(t *testing.T) {
