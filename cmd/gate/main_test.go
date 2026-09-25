@@ -682,8 +682,31 @@ func TestAndroidPRStepUsesCacheEnabledFeedbackTask(t *testing.T) {
 }
 
 func TestAndroidDeviceStepsBindTheCurrentRosterForEveryLane(t *testing.T) {
+	data, err := os.ReadFile("../../config/ci/proof-policy.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy struct {
+		Proofs []struct {
+			ID       string     `json:"id"`
+			Commands [][]string `json:"commands"`
+		} `json:"proofs"`
+	}
+	if err := json.Unmarshal(data, &policy); err != nil {
+		t.Fatal(err)
+	}
 	for _, api := range []int{26, 34, 36} {
 		step := androidDeviceStep(api)
+		matched := false
+		for _, proof := range policy.Proofs {
+			if proof.ID != step.name {
+				continue
+			}
+			matched = len(proof.Commands) == 1 && equalStrings(proof.Commands[0], append([]string{step.program}, step.args...))
+		}
+		if !matched {
+			t.Fatalf("API %d generated device command differs from receipt policy", api)
+		}
 		count := 0
 		owned := 0
 		for i, arg := range step.args {
