@@ -85,19 +85,26 @@ class ProfileImportDeviceTest {
             }
             compose.waitUntil(15_000) { automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true }
             val initialIme = automation.windows.any { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-            assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
-            // Back dismisses the IME asynchronously. Do not send the picker Back to the closing IME.
-            compose.waitUntil(5_000) {
-                automation.windows.none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-            }
-            automation.waitForIdle(100, 2_000)
-            // Accessibility can still report the old picker after our window regains focus.
-            val secondBack = !compose.activity.hasWindowFocus() &&
-                automation.rootInActiveWindow?.packageName?.toString()?.contains("documentsui") == true
-            if (secondBack)
-                assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+            var backCount = 0
+            var nextBackAt = 0L
             try {
-                compose.waitUntil(15_000) { compose.activity.hasWindowFocus() }
+                compose.waitUntil(15_000) {
+                    if (compose.activity.hasWindowFocus()) true else {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        val foreground = automation.rootInActiveWindow
+                        // Back can dismiss the IME or move up a directory without cancelling.
+                        // Give each asynchronous action time to settle; stop once app focus is observed.
+                        if (now >= nextBackAt && foreground != null &&
+                            automation.windows.any { it.id == foreground.windowId && it.isFocused } &&
+                            foreground.packageName?.toString() in setOf("com.android.documentsui", "com.google.android.documentsui") &&
+                            !compose.activity.hasWindowFocus()) {
+                            assertTrue(automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+                            backCount++
+                            nextBackAt = android.os.SystemClock.elapsedRealtime() + 1_000
+                        }
+                        false
+                    }
+                }
             } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
                 val foreground = when (automation.rootInActiveWindow?.packageName?.toString()) {
                     "com.android.documentsui", "com.google.android.documentsui" -> "PICKER"
@@ -106,7 +113,7 @@ class ProfileImportDeviceTest {
                     else -> "OTHER"
                 }
                 val ime = automation.windows.any { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-                val setup = "EXPORT_CANCEL,INITIAL_IME_${if (initialIme) 1 else 0},SECOND_BACK_${if (secondBack) 1 else 0},FINAL_IME_${if (ime) 1 else 0}"
+                val setup = "EXPORT_CANCEL,INITIAL_IME_${if (initialIme) 1 else 0},BACK_COUNT_$backCount,FINAL_IME_${if (ime) 1 else 0}"
                 throw AssertionError("KURDISTAN_TEST_SETUP expected=APPLICATION_FOCUS actual=$foreground setup=$setup", failure)
             }
         } finally {
