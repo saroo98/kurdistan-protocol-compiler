@@ -51,9 +51,20 @@ class SensitiveActionDeviceTest {
                 ?.toString() in setOf("com.android.systemui", "com.android.settings")
             awaitCondition("System credential screen did not open") { systemPromptVisible() }
             awaitCondition("System credential input did not become ready") {
-                instrumentation.uiAutomation.rootInActiveWindow
-                    ?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
-                    ?.let { it.isEditable && it.isEnabled } == true
+                val root = instrumentation.uiAutomation.rootInActiveWindow
+                val focused = root?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                if (focused?.let { it.isEditable && it.isEnabled } == true) {
+                    true
+                } else {
+                    // Older Settings can initially focus Cancel instead of the PIN field.
+                    // Focus the real credential input before sending any test-only digits.
+                    if (Build.VERSION.SDK_INT < 30 && systemPromptVisible()) {
+                        root?.findAccessibilityNodeInfosByViewId("com.android.settings:id/password_entry")
+                            ?.singleOrNull()?.takeIf { it.isEditable && it.isEnabled && it.isVisibleToUser }
+                            ?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS)
+                    }
+                    false
+                }
             }
             // SystemUI exposes the input before its opening transition has finished.
             // Wait for the system accessibility stream, not just the app's Compose clock.
@@ -69,9 +80,13 @@ class SensitiveActionDeviceTest {
             }
             awaitCondition("Second credential screen did not become ready") {
                 val root = instrumentation.uiAutomation.rootInActiveWindow
-                systemPromptVisible() && root?.findAccessibilityNodeInfosByText("Cancel this request")?.isNotEmpty() == true &&
-                    root.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
-                        ?.let { it.isEditable && it.isEnabled } == true
+                systemPromptVisible() && root?.findAccessibilityNodeInfosByText("Cancel this request")
+                    ?.any { it.isVisibleToUser } == true
+            }
+            // Cancellation needs the new system prompt, not keyboard input focus.
+            assertEquals(listOf(true), results.toList())
+            if (Build.VERSION.SDK_INT < 30) {
+                scenario.onActivity { assertTrue(authorizer.isDeviceCredentialPending) }
             }
             // The previous prompt can remain visible while the new one is opening.
             instrumentation.uiAutomation.waitForIdle(500, 3_000)
