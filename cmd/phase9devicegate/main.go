@@ -3588,18 +3588,25 @@ func (observation *launchObservation) captureCollectorCapability(parent context.
 		}
 		_, stderr, command, err := observation.collectorCommand(parent, "collector-"+buffer+"-probe", args...)
 		probe := collectorProbeFromCommand(buffer, command)
+		excerpt := strings.Join(probe.StderrExcerpt, " ")
 		switch {
 		case command.Truncated:
 			probe.Rejection = "OUTPUT_TRUNCATED"
 		case err != nil:
 			probe.Rejection = "COMMAND_FAILED"
+		case buffer == "events" && identity.Status == "CAPTURED" &&
+			(excerpt == "permission denied" || excerpt == "logcat permission denied"):
+			// Unavailable final events still require the exact denied stream lifecycle
+			// and a complete independent process/activity/crash replacement.
+			probe.Status = "OPTIONAL_SOURCE_UNAVAILABLE"
+			probe.Rejection = "NONPRIVILEGED_EVENT_BUFFER_PERMISSION_DENIED"
 		case stderr != "":
 			probe.Rejection = "STDERR_OBSERVED"
 		default:
 			probe.Status = "CAPTURED"
 			probe.Rejection = ""
 		}
-		if (buffer == "crash" || buffer == "events") && probe.Status != "CAPTURED" {
+		if (buffer == "crash" || buffer == "events") && probe.Status != "CAPTURED" && probe.Status != "OPTIONAL_SOURCE_UNAVAILABLE" {
 			requiredProbesOK = false
 		}
 		observation.CollectorProbes = append(observation.CollectorProbes, probe)

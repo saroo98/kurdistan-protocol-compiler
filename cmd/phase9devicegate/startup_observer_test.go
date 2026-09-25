@@ -85,6 +85,30 @@ func TestCompositeStartupObserverAllowsHostLaunchToClearForceStoppedPackageState
 	}
 }
 
+func TestCompositeStartupObserverRetainsExactEventsPreflightDenial(t *testing.T) {
+	for _, scenario := range []string{"ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-crash-probe-denied"} {
+		t.Run(scenario, func(t *testing.T) {
+			err, observation := runLaunchScenario(t, scenario, 36)
+			if scenario != "ci-api36-events-probe-denied" {
+				if !errors.Is(err, errLaunchIncomplete) || observation.GateResult != "BLOCKED" {
+					t.Fatalf("unproven collector accepted: err=%v gate=%s", err, observation.GateResult)
+				}
+				return
+			}
+			if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {
+				t.Fatalf("complete replacement evidence rejected: err=%v issues=%q", err, observation.Issues)
+			}
+			probe := observation.CollectorProbes[1]
+			if probe.Buffer != "events" || probe.ExitCode != 0 || probe.Status != "OPTIONAL_SOURCE_UNAVAILABLE" ||
+				probe.Rejection != "NONPRIVILEGED_EVENT_BUFFER_PERMISSION_DENIED" || probe.StderrBytes == 0 ||
+				observation.SystemEvents.Status != "OPTIONAL_SOURCE_UNAVAILABLE" {
+				t.Fatalf("denial evidence lost: probe=%+v events=%+v", probe, observation.SystemEvents)
+			}
+			assertVersionedCompositeBinding(t, observation)
+		})
+	}
+}
+
 func TestStartupBootAndBuildIdentityUseOneBoundedADBObservation(t *testing.T) {
 	err, observation, fixture := runLaunchFixture(t, "ci-api26-inter-command-drop", 26)
 	if err != nil || observation.Status != "CAPTURED" || observation.GateResult != "LAUNCH_OBSERVED_NOT_QUALIFIED" {

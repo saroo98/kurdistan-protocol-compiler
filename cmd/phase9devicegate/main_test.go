@@ -472,6 +472,15 @@ func (fixture *launchFixtureTransport) run(ctx context.Context, path string, arg
 	case command == "logcat --help":
 		fmt.Fprintln(stdout, "Usage: logcat [options] [filterspecs]\n  -b <buffer>  load an alternate log buffer")
 	case strings.HasPrefix(command, "logcat -b ") && strings.Contains(command, " -d -t 1 "):
+		if (strings.HasPrefix(scenario, "ci-api36-events-probe-") && args[2] == "events") ||
+			(scenario == "ci-api36-crash-probe-denied" && args[2] == "crash") {
+			if strings.HasSuffix(scenario, "ambiguous") {
+				fmt.Fprintln(stderr, "error permission denied")
+			} else {
+				fmt.Fprintln(stderr, "Permission denied")
+			}
+			return nil
+		}
 		if (scenario == "permission-denied-preflight" && (args[2] == "main" || args[2] == "system")) ||
 			(scenario == "ci-api36-permission-denied" && args[2] == "system") ||
 			(strings.HasSuffix(scenario, "missing-events") && args[2] == "events") ||
@@ -917,6 +926,11 @@ func (fixture *launchFixtureTransport) start(ctx context.Context, path string, a
 	stderrMode, stderrBefore := "", ""
 	if buffer == "main" || buffer == "system" || (buffer == "events" && strings.HasPrefix(fixture.scenario, "ci-api")) {
 		switch fixture.scenario {
+		case "ci-api36-events-probe-denied", "ci-api36-events-probe-ambiguous", "ci-api36-crash-probe-denied":
+			if buffer == "events" {
+				stderrMode = "before-owned-cancellation"
+				stderrBefore = "Permission denied\n"
+			}
 		case "ci-api26-permission-denied", "ci-api34-permission-denied", "ci-api36-permission-denied", "ci-api34-permission-denied-missing-events", "ci-api34-permission-denied-missing-proc-status":
 			stderrMode = "before-owned-cancellation"
 			stderrBefore = "Permission denied\n"
