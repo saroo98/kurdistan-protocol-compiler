@@ -59,6 +59,22 @@ func planIsolatedDeviceBatches(tests []string) ([]deviceBatch, error) {
 			batches = append(batches,
 				deviceBatch{tests: []string{group[1]}, clearData: true, extras: []string{"-e", "draftPhase", "stage"}},
 				deviceBatch{tests: []string{group[0]}, extras: []string{"-e", "draftPhase", "resume"}})
+		} else if class == prefix+"ProductionProxyServiceDeviceTest" {
+			platformControl := class + "#systemAlwaysOnRestartsTheKilledProcessWithLockdownStillEnabled"
+			ordinary := make([]string, 0, len(group))
+			for _, name := range group {
+				if name != platformControl {
+					ordinary = append(ordinary, name)
+				}
+			}
+			if len(ordinary) > 0 {
+				batches = append(batches, deviceBatch{tests: ordinary, clearData: true})
+			}
+			if len(ordinary) != len(group) {
+				// Only this owned-emulator platform-control test needs non-SDK access.
+				batches = append(batches, deviceBatch{tests: []string{platformControl}, clearData: true,
+					extras: []string{"--no-hidden-api-checks"}})
+			}
 		} else if class == prefix+"Task7VpnNetworkLeaseDeviceTest" {
 			// Basic leases and signed updates require different protected-state fixtures.
 			// Keep the DNS cases in one process so their native rate history is still checked.
