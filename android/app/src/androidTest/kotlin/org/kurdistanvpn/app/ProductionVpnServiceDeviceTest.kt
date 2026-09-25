@@ -104,9 +104,20 @@ class ProductionVpnServiceDeviceTest {
             }
             snapshot = RuntimeStatusWire.decode(control.queryStatus(version))
             assertTrue(snapshot.packetsRead > 0 && snapshot.packetsWritten > 0)
-            val notification = context.getSystemService(android.app.NotificationManager::class.java)
-                .activeNotifications.single { it.id == 1001 }.notification
-            assertTrue(notification.extras.getBoolean(android.app.Notification.EXTRA_SHOW_CHRONOMETER))
+            val notifications = context.getSystemService(android.app.NotificationManager::class.java)
+            val notificationDeadline = SystemClock.elapsedRealtime() + 15_000
+            var notification: android.app.Notification? = null
+            // Android can defer foreground notification visibility after service admission.
+            do {
+                val matching = notifications.activeNotifications.filter { it.id == 1001 }
+                assertTrue("Only one runtime notification may be visible", matching.size <= 1)
+                notification = matching.singleOrNull()?.notification
+                if (notification?.extras?.getBoolean(android.app.Notification.EXTRA_SHOW_CHRONOMETER) == true) break
+                assertEquals(VpnRuntimeState.ACTIVE_KURD_LIVE, RuntimeStatusWire.decode(control.queryStatus(version)).state)
+                SystemClock.sleep(25)
+            } while (SystemClock.elapsedRealtime() < notificationDeadline)
+            assertNotNull("The runtime notification must become visible", notification)
+            assertTrue(checkNotNull(notification).extras.getBoolean(android.app.Notification.EXTRA_SHOW_CHRONOMETER))
             val recoveryObserver = object : IRuntimeObserver.Stub() {
                 override fun onStatus(bytes: ByteArray?) = Unit
             }
