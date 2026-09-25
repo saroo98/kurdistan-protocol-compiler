@@ -262,6 +262,14 @@ func (p *ServicePumpV1) cancelStreamV1(id uint32, reason error) error {
 		p.CancelWithReason(ErrAuthenticatedFrameState)
 		return ErrAuthenticatedFrameState
 	}
+	// The peer may already have retired both FINs while our final carrier
+	// write is returning. Do not follow that graceful close with RESET.
+	// Retain the row until the actual queued write and readers retire it.
+	if p.client && s.state == 2 && s.localFIN && s.remoteFIN && s.readEOF {
+		p.retireClientStreamLockedV1(i)
+		p.mu.Unlock()
+		return nil
+	}
 	sent := s.sent || !p.client
 	s.state = 3
 	s.result = reason
