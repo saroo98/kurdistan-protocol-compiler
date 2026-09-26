@@ -14,6 +14,34 @@ import org.kurdistanvpn.core.model.LocalProxyPreferences
 import org.kurdistanvpn.core.nativeapi.*
 
 class LocalProxySupervisorTest {
+    @Test fun nativeRejectionRetainsOnlyTheFirstSafeCauseAndStillClosesTheClient() {
+        val socks = port(); var http = port(); while (http == socks) http = port()
+        val observations = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val supervisor = LocalProxySupervisor(LocalProxyPreferences(socks, http), limits(),
+            { NativeProductResult.Failure(org.kurdistanvpn.core.model.ProductFailureCode.RESOURCE_LIMIT) },
+            { fail("Unexpected listener failure") }, diagnostic = {
+                observations.add(it)
+                throw IllegalStateException("The observer must not interfere with cleanup")
+            })
+        try {
+            supervisor.start { true }
+            val credentials = supervisor.credentials.copyForReveal()
+            try {
+                Socket(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), socks).use { socket ->
+                    socket.soTimeout = 3000
+                    socket.getOutputStream().write(byteArrayOf(5, 1, 2, 1, 16) + credentials.copyOfRange(0, 16) +
+                        byteArrayOf(43) + credentials.copyOfRange(17, 60) + byteArrayOf(5, 1, 0, 3, 11) +
+                        "example.com".toByteArray() + byteArrayOf(1, -69))
+                    val response = ByteArray(4)
+                    java.io.DataInputStream(socket.getInputStream()).readFully(response)
+                    assertArrayEquals(byteArrayOf(5, 2, 1, 0), response)
+                    assertEquals(-1, socket.getInputStream().read())
+                }
+            } finally { credentials.fill(0) }
+        } finally { supervisor.close() }
+        assertEquals(listOf("SOCKS_OPEN_RESOURCE_LIMIT"), observations.toList())
+    }
+
     @Test fun failedAuthenticationFloodCannotOpenNativeStreamsOrRetainCapacity() {
         val socks = port(); var http = port(); while (http == socks) http = port()
         val opens = java.util.concurrent.atomic.AtomicInteger()

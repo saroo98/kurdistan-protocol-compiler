@@ -37,18 +37,24 @@ class SensitiveActionDeviceTest {
                 })
                 authorizer.authorize(SensitiveAction.REVEAL, "Credential verification", "Owned emulator test", onResult = results::add)
             }
-            fun shell(command: String) {
+            fun shell(command: String): String =
                 ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use {
-                    it.readBytes()
+                    it.readBytes().toString(Charsets.UTF_8)
                 }
-            }
-            fun awaitCondition(message: String, condition: () -> Boolean) {
+            fun awaitCondition(message: String, diagnostic: (() -> String)? = null, condition: () -> Boolean) {
                 val deadline = SystemClock.elapsedRealtime() + 15_000
                 while (!condition() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(100)
+                if (!condition() && diagnostic != null) {
+                    throw AssertionError("KURDISTAN_TEST_SETUP expected=CREDENTIAL_RESULT actual=TIMEOUT setup=${diagnostic()}")
+                }
                 assertTrue(message, condition())
             }
             fun systemPromptVisible(): Boolean = instrumentation.uiAutomation.rootInActiveWindow?.packageName
                 ?.toString() in setOf("com.android.systemui", "com.android.settings")
+            fun promptState(): String =
+                Regex("(?m)^\\s*containerState=([0-5])\\s*$").find(
+                    shell("dumpsys activity service com.android.systemui/.SystemUIService AuthController"))
+                    ?.groupValues?.get(1) ?: "NONE"
             awaitCondition("System credential screen did not open") { systemPromptVisible() }
             awaitCondition("System credential input did not become ready") {
                 val root = instrumentation.uiAutomation.rootInActiveWindow
@@ -66,9 +72,10 @@ class SensitiveActionDeviceTest {
                     false
                 }
             }
-            // SystemUI exposes the input before its opening transition has finished.
-            // Wait for the system accessibility stream, not just the app's Compose clock.
-            instrumentation.uiAutomation.waitForIdle(500, 3_000)
+            // Accessibility exposes the input during ANIMATING_IN. On these owned
+            // emulator images, state 3 (SHOWING) proves the transition has completed.
+            if (Build.VERSION.SDK_INT < 30) instrumentation.uiAutomation.waitForIdle(500, 3_000)
+            else awaitCondition("System credential prompt did not finish opening") { promptState() == "3" }
             shell("input text $pin")
             shell("input keyevent 66")
             awaitCondition("Successful credential result was not delivered") { results.isNotEmpty() }
@@ -90,14 +97,27 @@ class SensitiveActionDeviceTest {
             }
             // The previous prompt can remain visible while the new one is opening.
             instrumentation.uiAutomation.waitForIdle(500, 3_000)
+            var backActions = 1
             assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
             instrumentation.uiAutomation.waitForIdle(100, 2_000)
             // Back may first dismiss the credential keyboard. Never send another
             // action after the result or outside the real system prompt.
             if (results.size == 1 && systemPromptVisible()) {
+                backActions++
                 assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
             }
-            awaitCondition("Cancellation was not delivered") { results.size == 2 }
+            awaitCondition("Cancellation was not delivered", diagnostic = {
+                val root = when (instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString()) {
+                    "com.android.systemui" -> "SYSTEMUI"
+                    "com.android.settings" -> "SETTINGS"
+                    instrumentation.targetContext.packageName -> "APP"
+                    null -> "NONE"
+                    else -> "OTHER"
+                }
+                val ime = Regex("mInputShown=(true|false)").find(shell("dumpsys input_method"))
+                    ?.groupValues?.get(1)?.uppercase(java.util.Locale.ROOT) ?: "UNKNOWN"
+                "AUTH_${promptState()},IME_$ime,ROOT_$root,BACK_$backActions,LIFECYCLE_${scenario.state.name},RESULTS_${results.size}"
+            }) { results.size == 2 }
             assertEquals(listOf(true, false), results.toList())
             scenario.onActivity { assertFalse(authorizer.isDeviceCredentialPending) }
         }

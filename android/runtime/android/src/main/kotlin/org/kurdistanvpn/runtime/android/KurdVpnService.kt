@@ -627,7 +627,7 @@ class KurdVpnService : VpnService() {
         val session = checkNotNull(value.session)
         lateinit var proxy: LocalProxySupervisor
         proxy = LocalProxySupervisor(checkNotNull(value.platformSettings).proxy,
-            checkNotNull(session.openingSnapshot.proxyLimits), session::openProxyStream) {
+            checkNotNull(session.openingSnapshot.proxyLimits), session::openProxyStream, listenerFailed = {
             dispatch {
                 if (current(value) && value.proxy === proxy) {
                     proxy.close(); value.proxy = null
@@ -638,7 +638,10 @@ class KurdVpnService : VpnService() {
                     else fail(value, RuntimeStartFailure.INTERNAL_FAILURE)
                 }
             }
-        }
+        }, diagnostic = if (packageName == "org.kurdistanvpn.app.internal" &&
+            applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            { token -> android.util.Log.w("KurdProxy", "${android.os.SystemClock.elapsedRealtime()},$token"); Unit }
+        } else null)
         return proxy
     }
 
