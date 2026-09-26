@@ -104,6 +104,7 @@ class ProductionProxyServiceDeviceTest {
         manualAction: Boolean = false, beyondStartupDeadline: Boolean = false) {
         check(Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk")) { "EMULATOR_ONLY" }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val diagnosticStart = SystemClock.elapsedRealtime()
         fun category(value: String?): String = value?.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNAVAILABLE"
         fun publicationDiagnostic(): Pair<String, String> {
             val adapter = (context.applicationContext as KurdistanApplication).runtimeAuthorityReissue
@@ -712,7 +713,16 @@ class ProductionProxyServiceDeviceTest {
                 } catch (failure: java.io.IOException) {
                     val observed = RuntimeStatusWire.decode(control.queryStatus(version))
                     val counts = relay.snapshot().sliceArray(listOf(9, 10, 13, 14, 15))
-                    val setup = "PROXY_TRAFFIC,${category(observed.failure)},${category(observed.packetDisposition)},RELAY_${counts.joinToString("_")}"
+                    val base = "PROXY_TRAFFIC,${category(observed.failure)},${category(observed.packetDisposition)},RELAY_${counts.joinToString("_")}"
+                    // The internal build emits only fixed categories. Never retain raw log text.
+                    val raw = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                            "logcat -d -t 2000 -v raw KurdProxy:W *:S")).use { it.readBytes().toString(Charsets.UTF_8) }
+                    val events = Regex("(?m)^([0-9]{1,14}),((?:SOCKS|HTTP)_[A-Z_]{1,80})$").findAll(raw)
+                        .filter { it.groupValues[1].toLong() >= diagnosticStart }.map { it.groupValues[2] }.toList()
+                    val setup = events.takeLast(4).asReversed().fold(base) { value, token ->
+                        if (value.length + token.length + 1 <= 256) "$value,$token" else value
+                    }
                     throw AssertionError("KURDISTAN_TEST_SETUP expected=PROXY_TRAFFIC actual=${observed.state.name} setup=$setup", failure)
                 } finally { credentials.fill(0) }
                 val retained = survivingController
